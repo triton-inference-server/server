@@ -62,13 +62,13 @@ set(
  ../examples/shm_utils.h
 )
 
-add_executable(perf_client_v2
+add_executable(perf_client
   ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
 target_include_directories(
-  perf_client_v2
+  perf_client
   PRIVATE ${RapidJSON_INCLUDE_DIRS})
 target_link_libraries(
-  perf_client_v2
+  perf_client
   PRIVATE TRTIS::grpcclient_static
   PRIVATE TRTIS::httpclient_static
   PRIVATE -lb64
@@ -76,13 +76,13 @@ target_link_libraries(
 
 # If gpu is enabled then compile with CUDA dependencies
 if(${TRTIS_ENABLE_GPU})
-  target_include_directories(perf_client_v2 PRIVATE ${CUDA_INCLUDE_DIRS})
-  target_link_libraries(perf_client_v2 PRIVATE ${CUDA_LIBRARIES})
+  target_include_directories(perf_client PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(perf_client PRIVATE ${CUDA_LIBRARIES})
 endif()
 
 
 install(
-  TARGETS perf_client_v2
+  TARGETS perf_client
   RUNTIME DESTINATION bin
 )
 

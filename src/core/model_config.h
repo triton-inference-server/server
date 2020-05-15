@@ -31,10 +31,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-/// The type for the correlation ID in an inference request. This must
-/// match the protobuf type used in InferRequestHeader.correlation_id.
-using CorrelationID = uint64_t;
-
 /// The type for a repeated dims field (used for shape).
 using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 

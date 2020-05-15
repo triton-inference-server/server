@@ -25,8 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-SIMPLE_HTTP_CLIENT=../clients/simple_http_v2_infer_client
-SIMPLE_GRPC_CLIENT=../clients/simple_grpc_v2_infer_client
+SIMPLE_HTTP_CLIENT=../clients/simple_http_infer_client
+SIMPLE_GRPC_CLIENT=../clients/simple_grpc_infer_client
 TRACE_SUMMARY=../common/trace_summary.py
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}

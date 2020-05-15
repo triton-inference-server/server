@@ -37,7 +37,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-CLIENT=../clients/v2_image_client
+CLIENT=../clients/image_client
 CLIENT_LOG="./client.log"
 
 IMAGE="../images/vulture.jpeg"

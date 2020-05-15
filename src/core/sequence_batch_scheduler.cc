@@ -332,7 +332,7 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   // A request must have a correlation ID to be processed correctly by
   // this scheduler. A value of 0 (zero) indicates that the request
   // doesn't have a correlation ID.
-  const CorrelationID correlation_id = irequest->CorrelationId();
+  const uint64_t correlation_id = irequest->CorrelationId();
   if (correlation_id == 0) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -343,9 +343,9 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   BatcherSequenceSlot* target = nullptr;
 
   const bool seq_start =
-      ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
+      ((irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START) != 0);
   const bool seq_end =
-      ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
+      ((irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END) != 0);
 
   std::unique_lock<std::mutex> lock(mu_);
 
@@ -464,7 +464,7 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   return Status::Success;
 }
 
-CorrelationID
+uint64_t
 SequenceBatchScheduler::ReleaseSequenceSlot(
     const BatcherSequenceSlot& batcher_seq_slot,
     std::deque<std::unique_ptr<InferenceRequest>>* requests)
@@ -479,7 +479,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
     backlog_queues_.pop_front();
     if (!requests->empty()) {  // should never be empty...
       const auto& irequest = requests->back();
-      const CorrelationID correlation_id = irequest->CorrelationId();
+      const uint64_t correlation_id = irequest->CorrelationId();
 
       // If the last queue entry is not an END request then the entire
       // sequence is not contained in the backlog. In that case must
@@ -487,7 +487,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
       // requests get directed to the batcher sequence-slot instead of
       // the backlog.
       const bool seq_end =
-          ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
+          ((irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END) != 0);
       if (!seq_end) {
         // Since the correlation ID is being actively collected in the
         // backlog, there should not be any in-flight sequences with
@@ -586,7 +586,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
           continue;
         }
 
-        const CorrelationID idle_correlation_id = cid_itr->first;
+        const uint64_t idle_correlation_id = cid_itr->first;
         LOG_VERBOSE(1) << "Reaper: CORRID " << idle_correlation_id
                        << ": max sequence idle exceeded";
 
@@ -624,7 +624,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
 
     // Enqueue force-ends outside of the lock.
     for (const auto& pr : force_end_sequences) {
-      const CorrelationID idle_correlation_id = pr.first;
+      const uint64_t idle_correlation_id = pr.first;
       const size_t batcher_idx = pr.second.batcher_idx_;
       const uint32_t seq_slot = pr.second.seq_slot_;
 
@@ -750,7 +750,7 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
 void
 SequenceBatch::SetControlTensors(
     std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
-    const CorrelationID corrid, const bool not_ready)
+    const uint64_t corrid, const bool not_ready)
 {
   const SequenceBatchScheduler::ControlInputs* controls;
 
@@ -758,15 +758,16 @@ SequenceBatch::SetControlTensors(
   if (not_ready) {
     controls = notready_input_overrides_.get();
   } else if (
-      (irequest->Flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
-                            InferRequestHeader::FLAG_SEQUENCE_END)) ==
-      (InferRequestHeader::FLAG_SEQUENCE_START |
-       InferRequestHeader::FLAG_SEQUENCE_END)) {
+      (irequest->Flags() & (TRITONSERVER_REQUEST_FLAG_SEQUENCE_START |
+                            TRITONSERVER_REQUEST_FLAG_SEQUENCE_END)) ==
+      (TRITONSERVER_REQUEST_FLAG_SEQUENCE_START |
+       TRITONSERVER_REQUEST_FLAG_SEQUENCE_END)) {
     controls = startend_input_overrides_.get();
   } else if (
-      (irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
+      (irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START) != 0) {
     controls = start_input_overrides_.get();
-  } else if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+  } else if (
+      (irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END) != 0) {
     controls = end_input_overrides_.get();
   } else {
     controls = continue_input_overrides_.get();
@@ -859,7 +860,7 @@ DirectSequenceBatch::~DirectSequenceBatch()
 
 void
 DirectSequenceBatch::Enqueue(
-    const uint32_t seq_slot, const CorrelationID correlation_id,
+    const uint32_t seq_slot, const uint64_t correlation_id,
     std::unique_ptr<InferenceRequest>& request)
 {
   bool wake_runner = false;
@@ -1076,7 +1077,7 @@ DirectSequenceBatch::SchedulerThread(
             SetControlTensors(
                 irequest, seq_slot, seq_slot_correlation_ids_[seq_slot]);
 
-            if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
+            if ((irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END) !=
                 0) {
               end_of_sequence = true;
             }
@@ -1258,12 +1259,12 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
                        << ", slot " << seq_slot;
         release_seq_slot = true;
       } else {
-        const CorrelationID correlation_id = irequest->CorrelationId();
+        const uint64_t correlation_id = irequest->CorrelationId();
 
         // After handling the last inference in a sequence we must
         // release the sequence slot to make it available to another
         // sequence.
-        if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+        if ((irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END) != 0) {
           LOG_VERBOSE(1) << "end sequence CORRID " << correlation_id
                          << " in batcher " << batcher_idx_ << ", slot "
                          << seq_slot;
@@ -1301,7 +1302,7 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
 
       SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
           batcher_idx_, seq_slot);
-      const CorrelationID released_cid =
+      const uint64_t released_cid =
           base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
       if (released_cid != 0) {
         LOG_VERBOSE(1) << "Enqueued new sequence containing " << queue.size()
@@ -1322,7 +1323,7 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
 
 void
 OldestSequenceBatch::Enqueue(
-    const uint32_t seq_slot, const CorrelationID correlation_id,
+    const uint32_t seq_slot, const uint64_t correlation_id,
     std::unique_ptr<InferenceRequest>& request)
 {
   // Queue the new request... if there isn't already a request in

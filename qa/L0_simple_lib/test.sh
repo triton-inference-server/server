@@ -48,7 +48,7 @@ rm -f *.log
 
 RET=0
 
-for SIMPLE_CLIENT in simple simplev2 ; do
+for SIMPLE_CLIENT in simple ; do
     CLIENT_LOG=$SIMPLE_CLIENT
     SIMPLE_CLIENT=./$SIMPLE_CLIENT
 

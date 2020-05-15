@@ -37,7 +37,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-CLIENT=../clients/perf_client_v2
+CLIENT=../clients/perf_client
 BACKENDS=${BACKENDS:="graphdef savedmodel"}
 TENSOR_SIZE=16384
 

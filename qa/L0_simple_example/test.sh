@@ -27,8 +27,8 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
-SIMPLE_CLIENT=../clients/simple_http_v2_infer_client
-SIMPLE_CLIENT_PY=../clients/simple_http_v2_infer_client.py
+SIMPLE_CLIENT=../clients/simple_http_infer_client
+SIMPLE_CLIENT_PY=../clients/simple_http_infer_client.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"

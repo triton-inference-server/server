@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/api.pb.h"
 #include "src/core/backend_context.h"
 #include "src/core/infer_stats.h"
 #include "src/core/label_provider.h"

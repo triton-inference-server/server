@@ -29,8 +29,8 @@ import argparse
 import numpy as np
 
 import grpc
-from tritongrpcclient import grpc_service_v2_pb2
-from tritongrpcclient import grpc_service_v2_pb2_grpc
+from tritongrpcclient import grpc_service_pb2
+from tritongrpcclient import grpc_service_pb2_grpc
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -53,16 +53,16 @@ if __name__ == '__main__':
     # each and returns 2 output tensors of 16 integers each. One
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
-    model_name = "simple"
+    model_name = "graphdef_int8_int32_int32"
     model_version = ""
     batch_size = 1
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     # Generate the request
-    request = grpc_service_v2_pb2.ModelInferRequest()
+    request = grpc_service_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
 
@@ -71,24 +71,24 @@ if __name__ == '__main__':
     input1_data = [1 for i in range(16)]
 
     # Populate the inputs in inference request
-    input0 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+    input0 = grpc_service_pb2.ModelInferRequest().InferInputTensor()
     input0.name = "INPUT0"
-    input0.datatype = "INT32"
+    input0.datatype = "INT8"
     input0.shape.extend([1, 16])
     input0.contents.int_contents[:] = input0_data
 
-    input1 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+    input1 = grpc_service_pb2.ModelInferRequest().InferInputTensor()
     input1.name = "INPUT1"
-    input1.datatype = "INT32"
+    input1.datatype = "INT8"
     input1.shape.extend([1, 16])
     input1.contents.int_contents[:] = input1_data
     request.inputs.extend([input0, input1])
 
     # Populate the outputs in the inference request
-    output0 = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output0 = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output0.name = "OUTPUT0"
 
-    output1 = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output1 = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output1.name = "OUTPUT1"
     request.outputs.extend([output0, output1])
 
@@ -119,14 +119,10 @@ if __name__ == '__main__':
             print("sync infer error: incorrect difference")
             sys.exit(1)
 
-    # Populating additional content field should generate an error
-    request.inputs[0].contents.raw_contents = np.array(
-        input0_data[0:8]).tobytes()
-    request.inputs[0].contents.int_contents[:] = input0_data[8:]
-
+    # Server should catch wrong model version specification
+    request.model_version = "wrong_specification"
     try:
         response = grpc_stub.ModelInfer(request)
     except Exception as e:
-        if "unexpected explicit tensor data for input tensor 'INPUT0' for " \
-            "model 'simple', binary data was already supplied" in e.__str__():
-            print('PASS: explicit int')
+        if "failed to get model version from specified version string 'wrong_specification'" in e.__str__():
+            print('PASS: explicit int8')

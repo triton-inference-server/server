@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,498 +30,1315 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
-import "api.proto";
-import "request_status.proto";
-import "server_status.proto";
+import "model_config.proto";
 
 //@@
-//@@.. cpp:var:: service GRPCService
+//@@.. cpp:var:: service InferenceService
 //@@
 //@@   Inference Server GRPC endpoints.
 //@@
-service GRPCService
+service GRPCInferenceService
 {
-  //@@  .. cpp:var:: rpc Status(StatusRequest) returns (StatusResponse)
+  //@@  .. cpp:var:: rpc ServerLive(ServerLiveRequest) returns
+  //@@       (ServerLiveResponse)
   //@@
-  //@@     Get status for entire inference server or for a specified model.
+  //@@     Check liveness of the inference server.
   //@@
-  rpc Status(StatusRequest) returns (StatusResponse) {}
+  rpc ServerLive(ServerLiveRequest) returns (ServerLiveResponse) {}
 
-  //@@  .. cpp:var:: rpc Health(HealthRequest) returns (HealthResponse)
+  //@@  .. cpp:var:: rpc ServerReady(ServerReadyRequest) returns
+  //@@       (ServerReadyResponse)
   //@@
-  //@@     Check liveness and readiness of the inference server.
+  //@@     Check readiness of the inference server.
   //@@
-  rpc Health(HealthRequest) returns (HealthResponse) {}
+  rpc ServerReady(ServerReadyRequest) returns (ServerReadyResponse) {}
 
-  //@@  .. cpp:var:: rpc Infer(InferRequest) returns (InferResponse)
+  //@@  .. cpp:var:: rpc ModelReady(ModelReadyRequest) returns
+  //@@       (ModelReadyResponse)
   //@@
-  //@@     Request inference using a specific model. [ To handle large input
-  //@@     tensors likely need to set the maximum message size to that they
-  //@@     can be transmitted in one pass.
+  //@@     Check readiness of a model in the inference server.
   //@@
-  rpc Infer(InferRequest) returns (InferResponse) {}
+  rpc ModelReady(ModelReadyRequest) returns (ModelReadyResponse) {}
 
-  //@@  .. cpp:var:: rpc StreamInfer(stream InferRequest) returns (stream
-  //@@     InferResponse)
+  //@@  .. cpp:var:: rpc ServerMetadata(ServerMetadataRequest) returns
+  //@@       (ServerMetadataResponse)
   //@@
-  //@@     Request inferences using a specific model in a streaming manner.
-  //@@     Individual inference requests sent through the same stream will be
-  //@@     processed in order and be returned on completion
+  //@@     Get server metadata.
   //@@
-  rpc StreamInfer(stream InferRequest) returns (stream InferResponse) {}
+  rpc ServerMetadata(ServerMetadataRequest) returns (ServerMetadataResponse) {}
 
-  //@@  .. cpp:var:: rpc ModelControl(ModelControlRequest) returns
-  //@@     (ModelControlResponse)
+  //@@  .. cpp:var:: rpc ModelMetadata(ModelMetadataRequest) returns
+  //@@       (ModelMetadataResponse)
   //@@
-  //@@     Request to load / unload a specified model.
+  //@@     Get model metadata.
   //@@
-  rpc ModelControl(ModelControlRequest) returns (ModelControlResponse) {}
+  rpc ModelMetadata(ModelMetadataRequest) returns (ModelMetadataResponse) {}
 
-  //@@  .. cpp:var:: rpc SharedMemoryControl(SharedMemoryControlRequest) returns
-  //@@     (SharedMemoryControlResponse)
+  //@@  .. cpp:var:: rpc ModelInfer(ModelInferRequest) returns
+  //@@       (ModelInferResponse)
   //@@
-  //@@     Request to register / unregister a specified shared memory region.
+  //@@     Perform inference using a specific model.
   //@@
-  rpc SharedMemoryControl(SharedMemoryControlRequest)
-      returns (SharedMemoryControlResponse)
+  rpc ModelInfer(ModelInferRequest) returns (ModelInferResponse) {}
+
+  //@@  .. cpp:var:: rpc ModelStreamInfer(stream ModelInferRequest) returns
+  //@@       (stream ModelStreamInferResponse)
+  //@@
+  //@@     Perform streaming inference.
+  //@@
+  rpc ModelStreamInfer(stream ModelInferRequest)
+      returns (stream ModelStreamInferResponse)
   {
   }
 
-  //@@  .. cpp:var:: rpc Status(RepositoryRequest) returns (RepositoryResponse)
+  //@@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
+  //@@       (ModelConfigResponse)
   //@@
-  //@@     Get status associated with the model repository.
+  //@@     Get model configuration.
   //@@
-  rpc Repository(RepositoryRequest) returns (RepositoryResponse) {}
-}
+  rpc ModelConfig(ModelConfigRequest) returns (ModelConfigResponse) {}
 
-//@@
-//@@.. cpp:var:: message StatusRequest
-//@@
-//@@   Request message for Status gRPC endpoint.
-//@@
-message StatusRequest
-{
+  //@@  .. cpp:var:: rpc ModelStatistics(
+  //@@                     ModelStatisticsRequest)
+  //@@                   returns (ModelStatisticsResponse)
   //@@
-  //@@  .. cpp:var:: string model_name
+  //@@     Get the cumulative inference statistics for a model.
   //@@
-  //@@     The specific model status to be returned. If empty return status
-  //@@     for all models.
-  //@@
-  string model_name = 1;
-}
-
-//@@
-//@@.. cpp:var:: message StatusResponse
-//@@
-//@@   Response message for Status gRPC endpoint.
-//@@
-message StatusResponse
-{
-  //@@
-  //@@  .. cpp:var:: RequestStatus request_status
-  //@@
-  //@@     The status of the request, indicating success or failure.
-  //@@
-  RequestStatus request_status = 1;
-
-  // Dropping ServerStatus to avoid modifying CMakeList to not compile
-  // grpc_service.proto
-}
-
-//@@
-//@@.. cpp:var:: message HealthRequest
-//@@
-//@@   Request message for Health gRPC endpoint.
-//@@
-message HealthRequest
-{
-  //@@
-  //@@  .. cpp:var:: string mode
-  //@@
-  //@@     The requested health action: 'live' requests the liveness
-  //@@     state of the inference server; 'ready' requests the readiness state
-  //@@     of the inference server.
-  //@@
-  string mode = 1;
-}
-
-//@@
-//@@.. cpp:var:: message HealthResponse
-//@@
-//@@   Response message for Health gRPC endpoint.
-//@@
-message HealthResponse
-{
-  //@@
-  //@@  .. cpp:var:: RequestStatus request_status
-  //@@
-  //@@     The status of the request, indicating success or failure.
-  //@@
-  RequestStatus request_status = 1;
-
-  //@@
-  //@@  .. cpp:var:: bool health
-  //@@
-  //@@     The result of the request. True indicates the inference server is
-  //@@     live/ready, false indicates the inference server is not live/ready.
-  //@@
-  bool health = 2;
-}
-
-//@@
-//@@.. cpp:var:: message ModelControlRequest
-//@@
-//@@   Request message for ModelControl gRPC endpoint.
-//@@
-message ModelControlRequest
-{
-  //@@  .. cpp:enum:: Type
-  //@@
-  //@@     Types of control operation
-  //@@
-  enum Type {
-    //@@    .. cpp:enumerator:: Type::UNLOAD = 0
-    //@@
-    //@@       To unload the specified model.
-    //@@
-    UNLOAD = 0;
-
-    //@@    .. cpp:enumerator:: Type::LOAD = 1
-    //@@
-    //@@       To load the specified model. If the model has been loaded,
-    //@@       it will be reloaded to fetch the latest change.
-    //@@
-    LOAD = 1;
+  rpc ModelStatistics(ModelStatisticsRequest) returns (ModelStatisticsResponse)
+  {
   }
 
+  //@@  .. cpp:var:: rpc RepositoryIndex(RepositoryIndexRequest) returns
+  //@@       (RepositoryIndexResponse)
   //@@
-  //@@  .. cpp:var:: string model_name
+  //@@     Get the index of model repository contents.
   //@@
-  //@@     The target model name.
-  //@@
-  string model_name = 1;
+  rpc RepositoryIndex(RepositoryIndexRequest) returns (RepositoryIndexResponse)
+  {
+  }
 
+  //@@  .. cpp:var:: rpc RepositoryModelLoad(RepositoryModelLoadRequest) returns
+  //@@       (RepositoryModelLoadResponse)
   //@@
-  //@@  .. cpp:var:: Type type
+  //@@     Load or reload a model from a repository.
   //@@
-  //@@     The control type that is operated on the specified model.
+  rpc RepositoryModelLoad(RepositoryModelLoadRequest)
+      returns (RepositoryModelLoadResponse)
+  {
+  }
+
+
+  //@@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
+  // returns
+  //@@       (RepositoryModelUnloadResponse)
   //@@
-  Type type = 2;
+  //@@     Unload a model.
+  //@@
+  rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
+      returns (RepositoryModelUnloadResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc SystemSharedMemoryStatus(
+  //@@                     SystemSharedMemoryStatusRequest)
+  //@@                   returns (SystemSharedMemoryStatusRespose)
+  //@@
+  //@@     Get the status of all registered system-shared-memory regions.
+  //@@
+  rpc SystemSharedMemoryStatus(SystemSharedMemoryStatusRequest)
+      returns (SystemSharedMemoryStatusResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc SystemSharedMemoryRegister(
+  //@@                     SystemSharedMemoryRegisterRequest)
+  //@@                   returns (SystemSharedMemoryRegisterResponse)
+  //@@
+  //@@     Register a system-shared-memory region.
+  //@@
+  rpc SystemSharedMemoryRegister(SystemSharedMemoryRegisterRequest)
+      returns (SystemSharedMemoryRegisterResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc SystemSharedMemoryUnregister(
+  //@@                     SystemSharedMemoryUnregisterRequest)
+  //@@                   returns (SystemSharedMemoryUnregisterResponse)
+  //@@
+  //@@     Unregister a system-shared-memory region.
+  //@@
+  rpc SystemSharedMemoryUnregister(SystemSharedMemoryUnregisterRequest)
+      returns (SystemSharedMemoryUnregisterResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc CudaSharedMemoryStatus(
+  //@@                     CudaSharedMemoryStatusRequest)
+  //@@                   returns (CudaSharedMemoryStatusRespose)
+  //@@
+  //@@     Get the status of all registered CUDA-shared-memory regions.
+  //@@
+  rpc CudaSharedMemoryStatus(CudaSharedMemoryStatusRequest)
+      returns (CudaSharedMemoryStatusResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc CudaSharedMemoryRegister(
+  //@@                     CudaSharedMemoryRegisterRequest)
+  //@@                   returns (CudaSharedMemoryRegisterResponse)
+  //@@
+  //@@     Register a CUDA-shared-memory region.
+  //@@
+  rpc CudaSharedMemoryRegister(CudaSharedMemoryRegisterRequest)
+      returns (CudaSharedMemoryRegisterResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc CudaSharedMemoryUnregister(
+  //@@                     CudaSharedMemoryUnregisterRequest)
+  //@@                   returns (CudaSharedMemoryUnregisterResponse)
+  //@@
+  //@@     Unregister a CUDA-shared-memory region.
+  //@@
+  rpc CudaSharedMemoryUnregister(CudaSharedMemoryUnregisterRequest)
+      returns (CudaSharedMemoryUnregisterResponse)
+  {
+  }
 }
 
 //@@
-//@@.. cpp:var:: message ModelControlResponse
+//@@.. cpp:var:: message ServerLiveRequest
 //@@
-//@@   Response message for ModelControl gRPC endpoint.
+//@@   Request message for ServerLive.
 //@@
-message ModelControlResponse
+message ServerLiveRequest {}
+
+//@@
+//@@.. cpp:var:: message ServerLiveResponse
+//@@
+//@@   Response message for ServerLive.
+//@@
+message ServerLiveResponse
 {
   //@@
-  //@@  .. cpp:var:: RequestStatus request_status
+  //@@  .. cpp:var:: bool live
   //@@
-  //@@     The status of the request, indicating success or failure.
+  //@@     True if the inference server is live, false it not live.
   //@@
-  RequestStatus request_status = 1;
+  bool live = 1;
 }
 
 //@@
-//@@.. cpp:var:: message SharedMemoryControlRequest
+//@@.. cpp:var:: message ServerReadyRequest
 //@@
-//@@   Request message for managing registered shared memory regions in TRTIS.
+//@@   Request message for ServerReady.
 //@@
-message SharedMemoryControlRequest
+message ServerReadyRequest {}
+
+//@@
+//@@.. cpp:var:: message ServerReadyResponse
+//@@
+//@@   Response message for ServerReady.
+//@@
+message ServerReadyResponse
 {
-  //@@  .. cpp:var:: message Register
   //@@
-  //@@     Register a shared memory region.
+  //@@  .. cpp:var:: bool ready
   //@@
-  message Register
+  //@@     True if the inference server is ready, false it not ready.
+  //@@
+  bool ready = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ModelReadyRequest
+//@@
+//@@   Request message for ModelReady.
+//@@
+message ModelReadyRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model to check for readiness.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model to check for readiness. If not given the
+  //@@     server will choose a version based on the model and internal policy.
+  //@@
+  string version = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelReadyResponse
+//@@
+//@@   Response message for ModelReady.
+//@@
+message ModelReadyResponse
+{
+  //@@
+  //@@  .. cpp:var:: bool ready
+  //@@
+  //@@     True if the model is ready, false it not ready.
+  //@@
+  bool ready = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ServerMetadataRequest
+//@@
+//@@   Request message for ServerMetadata.
+//@@
+message ServerMetadataRequest {}
+
+//@@
+//@@.. cpp:var:: message ServerMetadataResponse
+//@@
+//@@   Response message for ServerMetadata.
+//@@
+message ServerMetadataResponse
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The server name.
+  //@@
+  string name = 1;
+
+  //@@
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The server version.
+  //@@
+  string version = 2;
+
+  //@@
+  //@@  .. cpp:var:: string extensions (repeated)
+  //@@
+  //@@     The extensions supported by the server.
+  //@@
+  repeated string extensions = 3;
+}
+
+//@@
+//@@.. cpp:var:: message ModelMetadataRequest
+//@@
+//@@   Request message for ModelMetadata.
+//@@
+message ModelMetadataRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model to check for readiness. If not
+  //@@     given the server will choose a version based on the
+  //@@     model and internal policy.
+  //@@
+  string version = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelMetadataResponse
+//@@
+//@@   Response message for ModelMetadata.
+//@@
+message ModelMetadataResponse
+{
+  //@@
+  //@@  .. cpp:var:: message TensorMetadata
+  //@@
+  //@@     Metadata for a tensor.
+  //@@
+  message TensorMetadata
   {
     //@@
-    //@@  .. cpp:var:: string name
+    //@@    .. cpp:var:: string name
     //@@
-    //@@     The name for this shared memory region.
+    //@@       The tensor name.
     //@@
     string name = 1;
 
     //@@
-    //@@  .. cpp:var:: message SystemSharedMemoryIdentifier
+    //@@    .. cpp:var:: string datatype
     //@@
-    //@@     The identifier for this system shared memory region.
+    //@@       The tensor data type.
     //@@
-    message SystemSharedMemoryIdentifier
-    {
-      //@@  .. cpp:var:: string shared_memory_key
-      //@@
-      //@@     The name of the shared memory region that holds the input data
-      //@@     (or where the output data should be written).
-      //@@
-      string shared_memory_key = 1;
-
-      //@@  .. cpp:var:: uint64 offset
-      //@@
-      //@@     This is the offset of the shared memory block from the start
-      //@@     of the shared memory region.
-      //@@     start = offset, end = offset + byte_size;
-      //@@
-      uint64 offset = 2;
-    }
+    string datatype = 2;
 
     //@@
-    //@@  .. cpp:var:: message CUDASharedMemoryIdentifier
+    //@@    .. cpp:var:: int64 shape (repeated)
     //@@
-    //@@     The identifier for this system shared memory region.
+    //@@       The tensor shape. A variable-size dimension is represented
+    //@@       by a -1 value.
     //@@
-    message CUDASharedMemoryIdentifier
-    {
-      //@@  .. cpp:var:: bytes raw_handle
-      //@@
-      //@@     The raw serialized cudaIPC handle.
-      //@@
-      bytes raw_handle = 1;
-
-      //@@  .. cpp:var:: int64 device_id
-      //@@
-      //@@     The GPU device ID on which the cudaIPC handle was created.
-      //@@
-      int64 device_id = 2;
-    }
-
-    //@@  .. cpp:var:: oneof shared_memory_types
-    //@@
-    //@@     Types of shared memory identifiers
-    //@@
-    oneof shared_memory_types
-    {
-      //@@
-      //@@  .. cpp:var:: SystemSharedMemoryIdentifier system_shared_memory
-      //@@
-      //@@     The identifier for this system shared memory region.
-      //@@
-      SystemSharedMemoryIdentifier system_shared_memory = 2;
-
-      //@@
-      //@@  .. cpp:var:: CUDASharedMemoryIdentifier cuda_shared_memory
-      //@@
-      //@@     The identifier for this CUDA shared memory region.
-      //@@
-      CUDASharedMemoryIdentifier cuda_shared_memory = 3;
-    }
-
-    //@@  .. cpp:var:: uint64 byte_size
-    //@@
-    //@@     Size of the shared memory block, in bytes.
-    //@@
-    uint64 byte_size = 4;
+    repeated int64 shape = 3;
   }
 
-  //@@  .. cpp:var:: message Unregister
   //@@
-  //@@     Unregister a specified shared memory region.
+  //@@  .. cpp:var:: string name
   //@@
-  message Unregister
+  //@@     The model name.
+  //@@
+  string name = 1;
+
+  //@@
+  //@@  .. cpp:var:: string versions (repeated)
+  //@@
+  //@@     The versions of the model.
+  //@@
+  repeated string versions = 2;
+
+  //@@
+  //@@  .. cpp:var:: string platform
+  //@@
+  //@@     The model's platform.
+  //@@
+  string platform = 3;
+
+  //@@
+  //@@  .. cpp:var:: TensorMetadata inputs (repeated)
+  //@@
+  //@@     The model's inputs.
+  //@@
+  repeated TensorMetadata inputs = 4;
+
+  //@@
+  //@@  .. cpp:var:: TensorMetadata outputs (repeated)
+  //@@
+  //@@     The model's outputs.
+  //@@
+  repeated TensorMetadata outputs = 5;
+}
+
+//@@
+//@@.. cpp:var:: message InferParameter
+//@@
+//@@   An inference parameter value.
+//@@
+message InferParameter
+{
+  //@@  .. cpp:var:: oneof parameter_choice
+  //@@
+  //@@     The parameter value can be a string, an int64 or
+  //@@     a boolean
+  //@@
+  oneof parameter_choice
+  {
+    //@@    .. cpp:var:: bool bool_param
+    //@@
+    //@@       A boolean parameter value.
+    //@@
+    bool bool_param = 1;
+
+    //@@    .. cpp:var:: int64 int64_param
+    //@@
+    //@@       An int64 parameter value.
+    //@@
+    int64 int64_param = 2;
+
+    //@@    .. cpp:var:: string string_param
+    //@@
+    //@@       A string parameter value.
+    //@@
+    string string_param = 3;
+  }
+}
+
+//@@
+//@@.. cpp:var:: message InferTensorContents
+//@@
+//@@   The data contained in a tensor. For a given data type the
+//@@   tensor contents can be represented in "raw" bytes form or in
+//@@   the repeated type that matches the tensor's data type. Protobuf
+//@@   oneof is not used because oneofs cannot contain repeated fields.
+//@@
+message InferTensorContents
+{
+  //@@
+  //@@  .. cpp:var:: bytes raw_contents
+  //@@
+  //@@     Raw representation of the tensor contents. The size of this
+  //@@     content must match what is expected by the tensor's shape
+  //@@     and data type. The raw data must be the flattened, one-dimensional,
+  //@@     row-major order of the tensor elements without any stride or padding
+  //@@     between the elements. Note that the FP16 data type must be
+  //@@     represented as raw content as there is no standard support for a
+  //@@     16-bit float type.
+  //@@
+  bytes raw_contents = 1;
+
+  //@@
+  //@@  .. cpp:var:: bool bool_contents (repeated)
+  //@@
+  //@@     Representation for BOOL data type. The size must match what is
+  //@@     expected by the tensor's shape. The contents must be the flattened,
+  //@@     one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated bool bool_contents = 2;
+
+  //@@
+  //@@  .. cpp:var:: int32 int_contents (repeated)
+  //@@
+  //@@     Representation for INT8, INT16, and INT32 data types. The size
+  //@@     must match what is expected by the tensor's shape. The contents
+  //@@     must be the flattened, one-dimensional, row-major order of the
+  //@@     tensor elements.
+  //@@
+  repeated int32 int_contents = 3;
+
+  //@@
+  //@@  .. cpp:var:: int64 int64_contents (repeated)
+  //@@
+  //@@     Representation for INT64 data types. The size must match what
+  //@@     is expected by the tensor's shape. The contents must be the
+  //@@     flattened, one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated int64 int64_contents = 4;
+
+  //@@
+  //@@  .. cpp:var:: uint32 uint_contents (repeated)
+  //@@
+  //@@     Representation for UINT8, UINT16, and UINT32 data types. The size
+  //@@     must match what is expected by the tensor's shape. The contents
+  //@@     must be the flattened, one-dimensional, row-major order of the
+  //@@     tensor elements.
+  //@@
+  repeated uint32 uint_contents = 5;
+
+  //@@
+  //@@  .. cpp:var:: uint64 uint64_contents (repeated)
+  //@@
+  //@@     Representation for UINT64 data types. The size must match what
+  //@@     is expected by the tensor's shape. The contents must be the
+  //@@     flattened, one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated uint64 uint64_contents = 6;
+
+  //@@
+  //@@  .. cpp:var:: float fp32_contents (repeated)
+  //@@
+  //@@     Representation for FP32 data type. The size must match what is
+  //@@     expected by the tensor's shape. The contents must be the flattened,
+  //@@     one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated float fp32_contents = 7;
+
+  //@@
+  //@@  .. cpp:var:: double fp64_contents (repeated)
+  //@@
+  //@@     Representation for FP64 data type. The size must match what is
+  //@@     expected by the tensor's shape. The contents must be the flattened,
+  //@@     one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated double fp64_contents = 8;
+
+  //@@
+  //@@  .. cpp:var:: bytes byte_contents (repeated)
+  //@@
+  //@@     Representation for BYTES data type. The size must match what is
+  //@@     expected by the tensor's shape. The contents must be the flattened,
+  //@@     one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated bytes byte_contents = 9;
+}
+
+//@@
+//@@.. cpp:var:: message ModelInferRequest
+//@@
+//@@   Request message for ModelInfer.
+//@@
+message ModelInferRequest
+{
+  //@@
+  //@@  .. cpp:var:: message InferInputTensor
+  //@@
+  //@@     An input tensor for an inference request.
+  //@@
+  message InferInputTensor
   {
     //@@
-    //@@  .. cpp:var:: string name
+    //@@    .. cpp:var:: string name
     //@@
-    //@@     The name for this shared memory region to unregister.
+    //@@       The tensor name.
     //@@
     string name = 1;
+
+    //@@
+    //@@    .. cpp:var:: string datatype
+    //@@
+    //@@       The tensor data type.
+    //@@
+    string datatype = 2;
+
+    //@@
+    //@@    .. cpp:var:: int64 shape (repeated)
+    //@@
+    //@@       The tensor shape.
+    //@@
+    repeated int64 shape = 3;
+
+    //@@    .. cpp:var:: map<string,InferParameter> parameters
+    //@@
+    //@@       Optional inference input tensor parameters.
+    //@@
+    map<string, InferParameter> parameters = 4;
+
+    //@@    .. cpp:var:: InferTensorContents
+    //@@
+    //@@       The input tensor data.
+    //@@
+    InferTensorContents contents = 5;
   }
 
-  //@@  .. cpp:var:: message UnregisterAll
   //@@
-  //@@     Unregister all shared memory regions.
+  //@@  .. cpp:var:: message InferRequestedOutputTensor
   //@@
-  message UnregisterAll {}
-
-  //@@  .. cpp:var:: message GetStatus
+  //@@     An output tensor requested for an inference request.
   //@@
-  //@@     Get the status of all active shared memory regions.
-  //@@
-  message Status {}
-
-  //@@  .. cpp:var:: oneof shared_memory_control
-  //@@
-  //@@     Types of control operations for shared memory
-  //@@
-  oneof shared_memory_control
-  {
-    //@@    .. cpp:var:: Register register
-    //@@
-    //@@       To register the specified shared memory region.
-    //@@
-    Register register = 1;
-
-    //@@    .. cpp:var:: Unregister unregister
-    //@@
-    //@@       To unregister the specified shared memory region.
-    //@@
-    Unregister unregister = 2;
-
-    //@@    .. cpp:var:: UnregisterAll unregister_all
-    //@@
-    //@@       To unregister all active shared memory regions.
-    //@@
-    UnregisterAll unregister_all = 3;
-
-    //@@    .. cpp:var:: Status status
-    //@@
-    //@@       Get the status of all active shared memory regions.
-    //@@
-    Status status = 4;
-  }
-}
-
-//@@
-//@@.. cpp:var:: message SharedMemoryControlResponse
-//@@
-//@@   Response message for SharedMemoryControl gRPC endpoint.
-//@@
-message SharedMemoryControlResponse
-{
-  //@@
-  //@@.. cpp:var:: message Status
-  //@@
-  //@@   Status of all active shared memory regions.
-  //@@
-  message Status
+  message InferRequestedOutputTensor
   {
     //@@
-    //@@  .. cpp:var:: SharedMemoryRegion shared_memory_region
+    //@@    .. cpp:var:: string name
     //@@
-    //@@     The list of active/registered shared memory regions.
+    //@@       The tensor name.
     //@@
-    repeated SharedMemoryRegion shared_memory_region = 1;
+    string name = 1;
+
+    //@@    .. cpp:var:: map<string,InferParameter> parameters
+    //@@
+    //@@       Optional requested output tensor parameters.
+    //@@
+    map<string, InferParameter> parameters = 2;
   }
 
-  //@@
-  //@@  .. cpp:var:: RequestStatus request_status
-  //@@
-  //@@     The status of the request, indicating success or failure.
-  //@@
-  RequestStatus request_status = 1;
-
-  oneof shared_memory_control
-  {
-    //@@
-    //@@  .. cpp:var:: Status shared_memory_status
-    //@@
-    //@@     The status of all active shared memory regions.
-    //@@
-    Status shared_memory_status = 2;
-  }
-}
-
-//@@
-//@@.. cpp:var:: message InferRequest
-//@@
-//@@   Request message for Infer gRPC endpoint.
-//@@
-message InferRequest
-{
   //@@  .. cpp:var:: string model_name
   //@@
   //@@     The name of the model to use for inferencing.
   //@@
   string model_name = 1;
 
-  //@@  .. cpp:var:: int64 version
+  //@@  .. cpp:var:: string model_version
   //@@
-  //@@     The version of the model to use for inference. If -1
-  //@@     the latest/most-recent version of the model is used.
+  //@@     The version of the model to use for inference. If not
+  //@@     given the latest/most-recent version of the model is used.
   //@@
-  int64 model_version = 2;
+  string model_version = 2;
 
-  //@@  .. cpp:var:: InferRequestHeader meta_data
+  //@@  .. cpp:var:: string id
   //@@
-  //@@     Meta-data for the request: input tensors, output
-  //@@     tensors, etc.
+  //@@     Optional identifier for the request. If specified will be
+  //@@     returned in the response.
   //@@
-  InferRequestHeader meta_data = 3;
+  string id = 3;
 
-  //@@  .. cpp:var:: bytes raw_input (repeated)
+  //@@  .. cpp:var:: map<string,InferParameter> parameters
   //@@
-  //@@     The raw input tensor data in the order specified in 'meta_data'.
+  //@@     Optional inference parameters.
   //@@
-  repeated bytes raw_input = 4;
+  map<string, InferParameter> parameters = 4;
+
+  //@@
+  //@@  .. cpp:var:: InferInputTensor inputs (repeated)
+  //@@
+  //@@     The input tensors for the inference.
+  //@@
+  repeated InferInputTensor inputs = 5;
+
+  //@@
+  //@@  .. cpp:var:: InferRequestedOutputTensor outputs (repeated)
+  //@@
+  //@@     The requested output tensors for the inference. Optional, if not
+  //@@     specified all outputs specified in the model config will be
+  //@@     returned.
+  //@@
+  repeated InferRequestedOutputTensor outputs = 6;
 }
 
 //@@
-//@@.. cpp:var:: message InferResponse
+//@@.. cpp:var:: message ModelInferResponse
 //@@
-//@@   Response message for Infer gRPC endpoint.
+//@@   Response message for ModelInfer.
 //@@
-message InferResponse
+message ModelInferResponse
 {
   //@@
-  //@@  .. cpp:var:: RequestStatus request_status
+  //@@  .. cpp:var:: message InferOutputTensor
   //@@
-  //@@     The status of the request, indicating success or failure.
+  //@@     An output tensor returned for an inference request.
   //@@
-  RequestStatus request_status = 1;
-
-  //@@  .. cpp:var:: InferResponseHeader meta_data
-  //@@
-  //@@     The response meta-data for the output tensors.
-  //@@
-  InferResponseHeader meta_data = 2;
-
-  //@@  .. cpp:var:: bytes raw_output (repeated)
-  //@@
-  //@@     The raw output tensor data in the order specified in 'meta_data'.
-  //@@
-  repeated bytes raw_output = 3;
-}
-
-//@@
-//@@.. cpp:var:: message RepositoryRequest
-//@@
-//@@   Request message for Repository gRPC endpoint.
-//@@
-message RepositoryRequest
-{
-  //@@  .. cpp:var:: oneof request_type
-  //@@
-  //@@     Types of the repository request
-  //@@
-  oneof request_type
+  message InferOutputTensor
   {
     //@@
-    //@@    .. cpp:var:: bool index
+    //@@    .. cpp:var:: string name
     //@@
-    //@@       Request for the index of the model repository.
+    //@@       The tensor name.
     //@@
-    bool index = 1;
+    string name = 1;
+
+    //@@
+    //@@    .. cpp:var:: string datatype
+    //@@
+    //@@       The tensor data type.
+    //@@
+    string datatype = 2;
+
+    //@@
+    //@@    .. cpp:var:: int64 shape (repeated)
+    //@@
+    //@@       The tensor shape.
+    //@@
+    repeated int64 shape = 3;
+
+    //@@    .. cpp:var:: InferTensorContents
+    //@@
+    //@@       The output tensor data.
+    //@@
+    InferTensorContents contents = 4;
   }
+
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The name of the model used for inference.
+  //@@
+  string model_name = 1;
+
+  //@@  .. cpp:var:: string model_version
+  //@@
+  //@@     The version of the model used for inference.
+  //@@
+  string model_version = 2;
+
+  //@@  .. cpp:var:: string id
+  //@@
+  //@@     The id of the inference request if one was specified.
+  //@@
+  string id = 3;
+
+  //@@  .. cpp:var:: map<string,InferParameter> parameters
+  //@@
+  //@@     Optional inference response parameters.
+  //@@
+  map<string, InferParameter> parameters = 4;
+
+  //@@
+  //@@  .. cpp:var:: InferOutputTensor outputs (repeated)
+  //@@
+  //@@     The output tensors holding inference results.
+  //@@
+  repeated InferOutputTensor outputs = 5;
 }
 
 //@@
-//@@.. cpp:var:: message RepositoryResponse
+//@@.. cpp:var:: message ModelStreamInferResponse
 //@@
-//@@   Response message for Repository gRPC endpoint.
+//@@   Response message for ModelStreamInfer.
 //@@
-message RepositoryResponse
+message ModelStreamInferResponse
 {
   //@@
-  //@@  .. cpp:var:: RequestStatus request_status
+  //@@  .. cpp:var:: string error_message
   //@@
-  //@@     The status of the request, indicating success or failure.
+  //@@     The message describing the error. The empty message
+  //@@     indicates the inference was successful without errors.
   //@@
-  RequestStatus request_status = 1;
+  string error_message = 1;
 
-  //@@  .. cpp:var:: oneof response_type
   //@@
-  //@@     Types of the repository reponse, which is one-to-one mapping to
-  //@@     the repository request type.
+  //@@  .. cpp:var:: ModelInferResponse infer_response
   //@@
-  oneof response_type
+  //@@     Holds the results of the request.
+  //@@
+  ModelInferResponse infer_response = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelConfigRequest
+//@@
+//@@   Request message for ModelConfig.
+//@@
+message ModelConfigRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model. If not given the model version
+  //@@     is selected automatically based on the version policy.
+  //@@
+  string version = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelConfigResponse
+//@@
+//@@   Response message for ModelConfig.
+//@@
+message ModelConfigResponse
+{
+  //@@
+  //@@  .. cpp:var:: ModelConfig config
+  //@@
+  //@@     The model configuration.
+  //@@
+  ModelConfig config = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ModelStatisticsRequest
+//@@
+//@@   Request message for ModelStatistics.
+//@@
+message ModelStatisticsRequest
+{
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model. If not given returns statistics for
+  //@@     all model versions.
+  //@@
+  string version = 2;
+}
+
+
+//@@
+//@@.. cpp:var:: message StatisticDuration
+//@@
+//@@   Statistic recording a cumulative duration metric.
+//@@
+message StatisticDuration
+{
+  //@@  .. cpp:var:: uint64 count
+  //@@
+  //@@     Cumulative number of times this metric occurred.
+  //@@
+  uint64 count = 1;
+
+  //@@  .. cpp:var:: uint64 total_time_ns
+  //@@
+  //@@     Total collected duration of this metric in nanoseconds.
+  //@@
+  uint64 ns = 2;
+}
+
+//@@
+//@@.. cpp:var:: message InferStatistics
+//@@
+//@@   Inference statistics.
+//@@
+message InferStatistics
+{
+  //@@  .. cpp:var:: StatisticDuration success
+  //@@
+  //@@     Cumulative count and duration for successful inference
+  //@@     request.
+  //@@
+  StatisticDuration success = 1;
+
+  //@@  .. cpp:var:: StatisticDuration fail
+  //@@
+  //@@     Cumulative count and duration for failed inference
+  //@@     request.
+  //@@
+  StatisticDuration fail = 2;
+
+  //@@  .. cpp:var:: StatisticDuration queue
+  //@@
+  //@@     The count and cumulative duration that inference requests wait in
+  //@@     scheduling or other queues.
+  //@@
+  StatisticDuration queue = 3;
+
+  //@@  .. cpp:var:: StatisticDuration compute_input
+  //@@
+  //@@    The count and cumulative duration to prepare input tensor data as
+  //@@    required by the model framework / backend. For example, this duration
+  //@@    should include the time to copy input tensor data to the GPU.
+  //@@
+  StatisticDuration compute_input = 4;
+
+  //@@  .. cpp:var:: StatisticDuration compute_infer
+  //@@
+  //@@     The count and cumulative duration to execute the model.
+  //@@
+  StatisticDuration compute_infer = 5;
+
+  //@@  .. cpp:var:: StatisticDuration compute_output
+  //@@
+  //@@     The count and cumulative duration to extract output tensor data
+  //@@     produced by the model framework / backend. For example, this duration
+  //@@     should include the time to copy output tensor data from the GPU.
+  //@@
+  StatisticDuration compute_output = 6;
+}
+
+//@@
+//@@.. cpp:var:: message InferBatchStatistics
+//@@
+//@@   Inference batch statistics.
+//@@
+message InferBatchStatistics
+{
+  //@@  .. cpp:var:: uint64 batch_size
+  //@@
+  //@@     The size of the batch.
+  //@@
+  uint64 batch_size = 1;
+
+  //@@  .. cpp:var:: StatisticDuration compute_input
+  //@@
+  //@@     The count and cumulative duration to prepare input tensor data as
+  //@@     required by the model framework / backend with the given batch size.
+  //@@     For example, this duration should include the time to copy input
+  //@@     tensor data to the GPU.
+  //@@
+  StatisticDuration compute_input = 2;
+
+  //@@  .. cpp:var:: StatisticDuration compute_infer
+  //@@
+  //@@     The count and cumulative duration to execute the model with the given
+  //@@     batch size.
+  //@@
+  StatisticDuration compute_infer = 3;
+
+  //@@  .. cpp:var:: StatisticDuration compute_output
+  //@@
+  //@@     The count and cumulative duration to extract output tensor data
+  //@@     produced by the model framework / backend with the given batch size.
+  //@@     For example, this duration should include the time to copy output
+  //@@     tensor data from the GPU.
+  //@@
+  StatisticDuration compute_output = 4;
+}
+
+//@@
+//@@.. cpp:var:: message ModelStatistics
+//@@
+//@@   Statistics for a specific model and version.
+//@@
+message ModelStatistics
+{
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model. If not given returns statistics for all
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model.
+  //@@
+  string version = 2;
+
+  //@@  .. cpp:var:: uint64 last_inference
+  //@@
+  //@@     The timestamp of the last inference request made for this model,
+  //@@     as milliseconds since the epoch.
+  //@@
+  uint64 last_inference = 3;
+
+  //@@  .. cpp:var:: InferStatistics inference_stats
+  //@@
+  //@@     The aggregate statistics for the model/version. So, for example,
+  //@@     inference_stats:success indicates the number of successful inference
+  //@@     requests for the model.
+  //@@
+  InferStatistics inference_stats = 4;
+
+  //@@  .. cpp:var:: InferBatchStatistics batch_stats (repeated)
+  //@@
+  //@@     The aggregate statistics for each different batch size that is
+  //@@     executed in the model. The batch statistics indicate how many actual
+  //@@     model executions were performed and show differences due to different
+  //@@     batch size (for example, larger batches typically take longer to
+  //@@     compute).
+  //@@
+  repeated InferBatchStatistics batch_stats = 5;
+}
+
+//@@
+//@@.. cpp:var:: message ModelStatisticsResponse
+//@@
+//@@   Response message for ModelStatistics.
+//@@
+message ModelStatisticsResponse
+{
+  //@@  .. cpp:var:: ModelStatistics model_stats (repeated)
+  //@@
+  //@@     // Statistics for each requested model.
+  //@@
+  repeated ModelStatistics model_stats = 1;
+}
+
+//@@
+//@@.. cpp:var:: message RepositoryIndexRequest
+//@@
+//@@   Request message for RepositoryIndex.
+//@@
+message RepositoryIndexRequest
+{
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the repository. If empty the index is returned
+  //@@     for all repositories.
+  //@@
+  string repository_name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message RepositoryIndexResponse
+//@@
+//@@   Response message for RepositoryIndex.
+//@@
+message RepositoryIndexResponse
+{
+  //@@
+  //@@  .. cpp:var:: message ModelIndex
+  //@@
+  //@@     Index entry for a model.
+  //@@
+  message ModelIndex
   {
     //@@
-    //@@    .. cpp:var:: bool index
+    //@@    .. cpp:var:: string name
     //@@
-    //@@       The index of the model repository.
+    //@@       The name of the model.
     //@@
-    ModelRepositoryIndex index = 2;
+    string name = 1;
   }
+
+  //@@
+  //@@  .. cpp:var:: ModelIndex models (repeated)
+  //@@
+  //@@     An index entry for each model.
+  //@@
+  repeated ModelIndex models = 1;
 }
+
+//@@
+//@@.. cpp:var:: message RepositoryModelLoadRequest
+//@@
+//@@   Request message for RepositoryModelLoad.
+//@@
+message RepositoryModelLoadRequest
+{
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the repository to load from. If empty the model
+  //@@     is loaded from any repository.
+  //@@
+  string repository_name = 1;
+
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the model to load, or reload.
+  //@@
+  string model_name = 2;
+}
+
+//@@
+//@@.. cpp:var:: message RepositoryModelLoadResponse
+//@@
+//@@   Response message for RepositoryModelLoad.
+//@@
+message RepositoryModelLoadResponse {}
+
+//@@
+//@@.. cpp:var:: message RepositoryModelUnloadRequest
+//@@
+//@@   Request message for RepositoryModelUnload.
+//@@
+message RepositoryModelUnloadRequest
+{
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the repository from which the model was originally
+  //@@     loaded. If empty the repository is not considered.
+  //@@
+  string repository_name = 1;
+
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the model to unload.
+  //@@
+  string model_name = 2;
+}
+
+//@@
+//@@.. cpp:var:: message RepositoryModelUnloadResponse
+//@@
+//@@   Response message for RepositoryModelUnload.
+//@@
+message RepositoryModelUnloadResponse {}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryStatusRequest
+//@@
+//@@   Request message for SystemSharedMemoryStatus.
+//@@
+message SystemSharedMemoryStatusRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the region to get status for. If empty the
+  //@@     status is returned for all registered regions.
+  //@@
+  string name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryStatusResponse
+//@@
+//@@   Response message for SystemSharedMemoryStatus.
+//@@
+message SystemSharedMemoryStatusResponse
+{
+  //@@
+  //@@  .. cpp:var:: message RegionStatus
+  //@@
+  //@@     Status for a shared memory region.
+  //@@
+  message RegionStatus
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name for the shared memory region.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: string shared_memory_key
+    //@@
+    //@@       The key of the underlying memory object that contains the
+    //@@       shared memory region.
+    //@@
+    string key = 2;
+
+    //@@    .. cpp:var:: uint64 offset
+    //@@
+    //@@       Offset, in bytes, within the underlying memory object to
+    //@@       the start of the shared memory region.
+    //@@
+    uint64 offset = 3;
+
+    //@@    .. cpp:var:: uint64 byte_size
+    //@@
+    //@@       Size of the shared memory region, in bytes.
+    //@@
+    uint64 byte_size = 4;
+  }
+
+  //@@
+  //@@  .. cpp:var:: map<string,RegionStatus> regions
+  //@@
+  //@@     Status for each of the registered regions, indexed by
+  //@@     region name.
+  //@@
+  map<string, RegionStatus> regions = 1;
+}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryRegisterRequest
+//@@
+//@@   Request message for SystemSharedMemoryRegister.
+//@@
+message SystemSharedMemoryRegisterRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the region to register.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string shared_memory_key
+  //@@
+  //@@     The key of the underlying memory object that contains the
+  //@@     shared memory region.
+  //@@
+  string key = 2;
+
+  //@@  .. cpp:var:: uint64 offset
+  //@@
+  //@@     Offset, in bytes, within the underlying memory object to
+  //@@     the start of the shared memory region.
+  //@@
+  uint64 offset = 3;
+
+  //@@  .. cpp:var:: uint64 byte_size
+  //@@
+  //@@     Size of the shared memory region, in bytes.
+  //@@
+  uint64 byte_size = 4;
+}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryRegisterResponse
+//@@
+//@@   Response message for SystemSharedMemoryRegister.
+//@@
+message SystemSharedMemoryRegisterResponse {}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryUnregisterRequest
+//@@
+//@@   Request message for SystemSharedMemoryUnregister.
+//@@
+message SystemSharedMemoryUnregisterRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the system region to unregister. If empty
+  //@@     all system shared-memory regions are unregistered.
+  //@@
+  string name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryUnregisterResponse
+//@@
+//@@   Response message for SystemSharedMemoryUnregister.
+//@@
+message SystemSharedMemoryUnregisterResponse {}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryStatusRequest
+//@@
+//@@   Request message for CudaSharedMemoryStatus.
+//@@
+message CudaSharedMemoryStatusRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the region to get status for. If empty the
+  //@@     status is returned for all registered regions.
+  //@@
+  string name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryStatusResponse
+//@@
+//@@   Response message for CudaSharedMemoryStatus.
+//@@
+message CudaSharedMemoryStatusResponse
+{
+  //@@
+  //@@  .. cpp:var:: message RegionStatus
+  //@@
+  //@@     Status for a shared memory region.
+  //@@
+  message RegionStatus
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name for the shared memory region.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: uin64 device_id
+    //@@
+    //@@       The GPU device ID where the cudaIPC handle was created.
+    //@@
+    uint64 device_id = 2;
+
+    //@@    .. cpp:var:: uint64 byte_size
+    //@@
+    //@@       Size of the shared memory region, in bytes.
+    //@@
+    uint64 byte_size = 3;
+  }
+
+  //@@
+  //@@  .. cpp:var:: map<string,RegionStatus> regions
+  //@@
+  //@@     Status for each of the registered regions, indexed by
+  //@@     region name.
+  //@@
+  map<string, RegionStatus> regions = 1;
+}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryRegisterRequest
+//@@
+//@@   Request message for CudaSharedMemoryRegister.
+//@@
+message CudaSharedMemoryRegisterRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the region to register.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: bytes raw_handle
+  //@@
+  //@@     The raw serialized cudaIPC handle.
+  //@@
+  bytes raw_handle = 2;
+
+  //@@  .. cpp:var:: int64 device_id
+  //@@
+  //@@     The GPU device ID on which the cudaIPC handle was created.
+  //@@
+  int64 device_id = 3;
+
+  //@@  .. cpp:var:: uint64 byte_size
+  //@@
+  //@@     Size of the shared memory block, in bytes.
+  //@@
+  uint64 byte_size = 4;
+}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryRegisterResponse
+//@@
+//@@   Response message for CudaSharedMemoryRegister.
+//@@
+message CudaSharedMemoryRegisterResponse {}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryUnregisterRequest
+//@@
+//@@   Request message for CudaSharedMemoryUnregister.
+//@@
+message CudaSharedMemoryUnregisterRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the cuda region to unregister. If empty
+  //@@     all cuda shared-memory regions are unregistered.
+  //@@
+  string name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryUnregisterResponse
+//@@
+//@@   Response message for CudaSharedMemoryUnregister.
+//@@
+message CudaSharedMemoryUnregisterResponse {}

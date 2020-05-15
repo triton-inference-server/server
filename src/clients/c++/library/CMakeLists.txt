@@ -54,13 +54,13 @@ if(${TRTIS_ENABLE_GRPC})
   endif() # TRTIS_ENABLE_GPU
   add_dependencies(
       grpc-client-library
-      model-config-library grpc-v2-library proto-library
+      model-config-library grpc-library proto-library
   )
 
   # libgrpcclient.a
   add_library(
       grpcclient_static STATIC
-      $<TARGET_OBJECTS:grpc-v2-library>
+      $<TARGET_OBJECTS:grpc-library>
       $<TARGET_OBJECTS:model-config-library>
       $<TARGET_OBJECTS:proto-library>
       $<TARGET_OBJECTS:grpc-client-library>
@@ -89,7 +89,7 @@ if(${TRTIS_ENABLE_GRPC})
   # libgrpcclient.so
   add_library(
       grpcclient SHARED
-      $<TARGET_OBJECTS:grpc-v2-library>
+      $<TARGET_OBJECTS:grpc-library>
       $<TARGET_OBJECTS:model-config-library>
       $<TARGET_OBJECTS:proto-library>
       $<TARGET_OBJECTS:grpc-client-library>

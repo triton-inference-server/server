@@ -26,13 +26,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import sys
 import numpy as np
 
 import grpc
-from tritongrpcclient import grpc_service_v2_pb2
-from tritongrpcclient import grpc_service_v2_pb2_grpc
-from tritonclientutils import utils
+from tritongrpcclient import grpc_service_pb2
+from tritongrpcclient import grpc_service_pb2_grpc
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -55,54 +53,54 @@ if __name__ == '__main__':
     # each and returns 2 output tensors of 16 integers each. One
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
-    model_name = "simple_string"
+    model_name = "simple"
     model_version = ""
     batch_size = 1
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     # Generate the request
-    request = grpc_service_v2_pb2.ModelInferRequest()
+    request = grpc_service_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
 
+    # Input data
+    input0_data = [i for i in range(16)]
+    input1_data = [1 for i in range(16)]
+
     # Populate the inputs in inference request
-    input0 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+    input0 = grpc_service_pb2.ModelInferRequest().InferInputTensor()
     input0.name = "INPUT0"
-    input0.datatype = "BYTES"
+    input0.datatype = "INT32"
     input0.shape.extend([1, 16])
-    for i in range(16):
-        input0.contents.byte_contents.append(('{}'.format(i)).encode('utf-8'))
+    input0.contents.int_contents[:] = input0_data
 
-    input1 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+    input1 = grpc_service_pb2.ModelInferRequest().InferInputTensor()
     input1.name = "INPUT1"
-    input1.datatype = "BYTES"
+    input1.datatype = "INT32"
     input1.shape.extend([1, 16])
-    for i in range(16):
-        input1.contents.byte_contents.append('1'.encode('utf-8'))
-
+    input1.contents.int_contents[:] = input1_data
     request.inputs.extend([input0, input1])
 
     # Populate the outputs in the inference request
-    output0 = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output0 = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output0.name = "OUTPUT0"
 
-    output1 = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output1 = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output1.name = "OUTPUT1"
     request.outputs.extend([output0, output1])
 
     response = grpc_stub.ModelInfer(request)
 
-    # Deserialize the output raw tensor to numpy array for proper comparison
     output_results = []
     for output in response.outputs:
         shape = []
         for value in output.shape:
             shape.append(value)
         output_results.append(
-            utils.deserialize_bytes_tensor(output.contents.raw_contents))
+            np.frombuffer(output.contents.raw_contents, dtype=np.int32))
         output_results[-1] = np.resize(output_results[-1], shape)
 
     if len(output_results) != 2:
@@ -110,13 +108,25 @@ if __name__ == '__main__':
         sys.exit(1)
 
     for i in range(16):
-        print("{} + 1 = {}".format(i, output_results[0][0][i]))
-        print("{} - 1 = {}".format(i, output_results[1][0][i]))
+        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
+              str(output_results[0][0][i]))
+        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
+              str(output_results[1][0][i]))
+        if (input0_data[i] + input1_data[i]) != output_results[0][0][i]:
+            print("sync infer error: incorrect sum")
+            sys.exit(1)
+        if (input0_data[i] - input1_data[i]) != output_results[1][0][i]:
+            print("sync infer error: incorrect difference")
+            sys.exit(1)
 
-        if (i + 1) != int(output_results[0][0][i]):
-            print("explicit string infer error: incorrect sum")
-            sys.exit(1)
-        if (i - 1) != int(output_results[1][0][i]):
-            print("explicit string infer error: incorrect difference")
-            sys.exit(1)
-    print('PASS: explicit string')
+    # Populating additional content field should generate an error
+    request.inputs[0].contents.raw_contents = np.array(
+        input0_data[0:8]).tobytes()
+    request.inputs[0].contents.int_contents[:] = input0_data[8:]
+
+    try:
+        response = grpc_stub.ModelInfer(request)
+    except Exception as e:
+        if "unexpected explicit tensor data for input tensor 'INPUT0' for " \
+            "model 'simple', binary data was already supplied" in e.__str__():
+            print('PASS: explicit int')
