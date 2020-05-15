@@ -29,12 +29,31 @@ import argparse
 import numpy as np
 from PIL import Image
 import sys
+from functools import partial
+import os
 
 import tritongrpcclient
 import tritongrpcclient.model_config_pb2 as mc
 import tritonhttpclient
 from tritonclientutils.utils import triton_to_np_dtype
 from tritonclientutils.utils import InferenceServerException
+
+if sys.version_info >= (3, 0):
+    import queue
+else:
+    import Queue as queue
+
+
+class UserData:
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+
+# Callback function used for async_stream_infer()
+def completion_callback(user_data, result, error):
+    # passing error raise and handling out
+    user_data._completed_requests.put((result, error))
+
 
 FLAGS = None
 
@@ -100,9 +119,9 @@ def parse_model_grpc(model_metadata, model_config):
         h = input_metadata.shape[1]
         w = input_metadata.shape[2]
 
-    return (model_config.max_batch_size,
-            input_metadata.name, output_metadata.name, c, h, w,
-            input_config.format, input_metadata.datatype)
+    return (model_config.max_batch_size, input_metadata.name,
+            output_metadata.name, c, h, w, input_config.format,
+            input_metadata.datatype)
 
 
 def parse_model_http(model_metadata, model_config):
@@ -166,9 +185,8 @@ def parse_model_http(model_metadata, model_config):
     if 'max_batch_size' in model_config:
         max_batch_size = model_config['max_batch_size']
 
-    return (max_batch_size,
-            input_metadata['name'], output_metadata['name'], c, h, w,
-            input_config['format'], input_metadata['datatype'])
+    return (max_batch_size, input_metadata['name'], output_metadata['name'], c,
+            h, w, input_config['format'], input_metadata['datatype'])
 
 
 def preprocess(img, format, dtype, c, h, w, scaling):
@@ -238,40 +256,31 @@ def postprocess(results, output_name, batch_size):
             print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
 
-def requestGenerator(supports_batching, input_name, output_name, c, h, w, format, dtype, FLAGS):
-    # Preprocess image into input data according to model requirements
-    image_data = None
-    with Image.open(FLAGS.image_filename) as img:
-        image_data = preprocess(img, format, dtype, c, h, w, FLAGS.scaling)
-
-    if not supports_batching:
-        repeated_image_data = image_data
-    else:
-        repeated_image_data = [image_data for _ in range(FLAGS.batch_size)]
-
-    batched_image_data = np.stack(repeated_image_data, axis=0)
+def requestGenerator(batched_image_data, input_name, output_name, dtype, FLAGS):
 
     # Set the input data
     inputs = []
     if FLAGS.protocol.lower() == "grpc":
         inputs.append(
-            tritongrpcclient.InferInput(input_name, batched_image_data.shape, dtype))
+            tritongrpcclient.InferInput(input_name, batched_image_data.shape,
+                                        dtype))
         inputs[0].set_data_from_numpy(batched_image_data)
     else:
         inputs.append(
-            tritonhttpclient.InferInput(input_name, batched_image_data.shape, dtype))
+            tritonhttpclient.InferInput(input_name, batched_image_data.shape,
+                                        dtype))
         inputs[0].set_data_from_numpy(batched_image_data, binary_data=False)
 
     outputs = []
     if FLAGS.protocol.lower() == "grpc":
         outputs.append(
             tritongrpcclient.InferRequestedOutput(output_name,
-                                            class_count=FLAGS.classes))
+                                                  class_count=FLAGS.classes))
     else:
         outputs.append(
             tritonhttpclient.InferRequestedOutput(output_name,
-                                            binary_data=False,
-                                            class_count=FLAGS.classes))
+                                                  binary_data=False,
+                                                  class_count=FLAGS.classes))
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
@@ -284,6 +293,19 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
+    parser.add_argument('-a',
+                        '--async',
+                        dest="async_set",
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Use asynchronous inference API')
+    parser.add_argument('--streaming',
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Use streaming inference API. ' +
+                        'The flag is only available with gRPC protocol.')
     parser.add_argument('-m',
                         '--model-name',
                         type=str,
@@ -329,8 +351,15 @@ if __name__ == '__main__':
                         default='HTTP',
                         help='Protocol (HTTP/gRPC) used to communicate with ' +
                         'the inference service. Default is HTTP.')
-    parser.add_argument('image_filename', type=str, help='Input image.')
+    parser.add_argument('image_filename',
+                        type=str,
+                        nargs='?',
+                        default=None,
+                        help='Input image / Input folder.')
     FLAGS = parser.parse_args()
+
+    if FLAGS.streaming and FLAGS.protocol.lower() != "grpc":
+        raise Exception("Streaming is only allowed with gRPC protocol")
 
     try:
         if FLAGS.protocol.lower() == "grpc":
@@ -342,8 +371,8 @@ if __name__ == '__main__':
             triton_client = tritonhttpclient.InferenceServerClient(
                 url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
-        print("context creation failed: " + str(e))
-        sys.exit()
+        print("client creation failed: " + str(e))
+        sys.exit(1)
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
@@ -352,14 +381,14 @@ if __name__ == '__main__':
             model_name=FLAGS.model_name, model_version=FLAGS.model_version)
     except InferenceServerException as e:
         print("failed to retrieve the metadata: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     try:
         model_config = triton_client.get_model_config(
             model_name=FLAGS.model_name, model_version=FLAGS.model_version)
     except InferenceServerException as e:
         print("failed to retrieve the config: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     if FLAGS.protocol.lower() == "grpc":
         max_batch_size, input_name, output_name, c, h, w, format, dtype = parse_model_grpc(
@@ -368,27 +397,134 @@ if __name__ == '__main__':
         max_batch_size, input_name, output_name, c, h, w, format, dtype = parse_model_http(
             model_metadata, model_config)
 
+    filenames = []
+    if os.path.isdir(FLAGS.image_filename):
+        filenames = [
+            os.path.join(FLAGS.image_filename, f)
+            for f in os.listdir(FLAGS.image_filename)
+            if os.path.isfile(os.path.join(FLAGS.image_filename, f))
+        ]
+    else:
+        filenames = [
+            FLAGS.image_filename,
+        ]
+
+    filenames.sort()
+
+    # Preprocess the images into input data according to model
+    # requirements
+    image_data = []
+    for filename in filenames:
+        img = Image.open(filename)
+        image_data.append(preprocess(img, format, dtype, c, h, w,
+                                     FLAGS.scaling))
+
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just
     # start over with the first images until the batch is filled.
     requests = []
     responses = []
+    result_filenames = []
+    request_ids = []
+    image_idx = 0
+    last_request = False
+    user_data = UserData()
 
-    # Send request
-    try:
-        for inputs, outputs, model_name, model_version in requestGenerator(
-                max_batch_size > 0, input_name, output_name, c, h, w, format, dtype, FLAGS):
-            responses.append(
-                triton_client.infer(FLAGS.model_name,
-                                    inputs,
-                                    model_version=FLAGS.model_version,
-                                    outputs=outputs))
+    # Holds the handles to the ongoing HTTP async requests.
+    async_requests = []
 
-    except InferenceServerException as e:
-        print("inference failed: " + str(e))
-        sys.exit()
+    sent_count = 0
+
+    if FLAGS.streaming:
+        triton_client.start_stream(
+            partial(completion_callback, user_data))
+
+
+    while not last_request:
+        input_filenames = []
+        repeated_image_data = []
+
+        for idx in range(FLAGS.batch_size):
+            input_filenames.append(filenames[image_idx])
+            repeated_image_data.append(image_data[image_idx])
+            image_idx = (image_idx + 1) % len(image_data)
+            if image_idx == 0:
+                last_request = True
+
+        if max_batch_size > 0:
+            batched_image_data = np.stack(repeated_image_data, axis=0)
+        else:
+            batched_image_data = repeated_image_data
+
+        # Send request
+        try:
+            for inputs, outputs, model_name, model_version in requestGenerator(
+                    batched_image_data, input_name, output_name, dtype, FLAGS):
+                sent_count += 1
+                if FLAGS.streaming:
+                    triton_client.async_stream_infer(
+                        FLAGS.model_name,
+                        inputs,
+                        request_id=str(sent_count),
+                        model_version=FLAGS.model_version,
+                        outputs=outputs)
+                elif FLAGS.async_set:
+                    if FLAGS.protocol.lower() == "grpc":
+                        triton_client.async_infer(
+                            FLAGS.model_name,
+                            inputs,
+                            partial(completion_callback, user_data),
+                            request_id=str(sent_count),
+                            model_version=FLAGS.model_version,
+                            outputs=outputs)
+                    else:
+                        async_requests.append(
+                            triton_client.async_infer(
+                                FLAGS.model_name,
+                                inputs,
+                                request_id=str(sent_count),
+                                model_version=FLAGS.model_version,
+                                outputs=outputs))
+                else:
+                    responses.append(
+                        triton_client.infer(FLAGS.model_name,
+                                            inputs,
+                                            request_id=str(sent_count),
+                                            model_version=FLAGS.model_version,
+                                            outputs=outputs))
+
+        except InferenceServerException as e:
+            print("inference failed: " + str(e))
+            if FLAGS.streaming:
+                triton_client.stop_stream()
+            sys.exit(1)
+
+    if FLAGS.streaming:
+        triton_client.stop_stream()
+
+    if FLAGS.protocol.lower() == "grpc":
+        if FLAGS.streaming or FLAGS.async_set:
+            processed_count = 0
+            while processed_count < sent_count:
+                (results, error) = user_data._completed_requests.get()
+                processed_count += 1
+                if error is not None:
+                    print("inference failed: " + str(error))
+                    sys.exit(1)
+                responses.append(results)
+    else:
+        if FLAGS.async_set:
+            # Collect results from the ongoing async requests
+            # for HTTP Async requests.
+            for async_request in async_requests:
+                responses.append(async_request.get_result())
 
     for response in responses:
+        if FLAGS.protocol.lower() == "grpc":
+            this_id = response.get_response().id
+        else:
+            this_id = response.get_response()["id"]
+        print("Request {}, batch size {}".format(this_id, FLAGS.batch_size))
         postprocess(response, output_name, FLAGS.batch_size)
 
     print("PASS")
