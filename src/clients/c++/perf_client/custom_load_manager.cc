@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,21 +28,22 @@
 
 nic::Error
 CustomLoadManager::Create(
-    const bool async, const uint64_t measurement_window_ms,
+    const bool async, const bool streaming,
+    const uint64_t measurement_window_ms,
     const std::string& request_intervals_file, const int32_t batch_size,
     const size_t max_threads, const uint32_t num_of_sequences,
     const size_t sequence_length, const size_t string_length,
     const std::string& string_data, const bool zero_input,
-    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     std::vector<std::string>& user_data,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-    const std::shared_ptr<ContextFactory>& factory,
+    const std::shared_ptr<ModelParser>& parser,
+    const std::shared_ptr<TritonClientFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<CustomLoadManager> local_manager(new CustomLoadManager(
-      async, input_shapes, request_intervals_file, batch_size,
+      async, streaming, request_intervals_file, batch_size,
       measurement_window_ms, max_threads, num_of_sequences, sequence_length,
-      shared_memory_type, output_shm_size, factory));
+      shared_memory_type, output_shm_size, parser, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
@@ -60,17 +61,17 @@ CustomLoadManager::Create(
 }
 
 CustomLoadManager::CustomLoadManager(
-    const bool async,
-    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+    const bool async, const bool streaming,
     const std::string& request_intervals_file, int32_t batch_size,
     const uint64_t measurement_window_ms, const size_t max_threads,
     const uint32_t num_of_sequences, const size_t sequence_length,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-    const std::shared_ptr<ContextFactory>& factory)
+    const std::shared_ptr<ModelParser>& parser,
+    const std::shared_ptr<TritonClientFactory>& factory)
     : RequestRateManager(
-          async, input_shapes, Distribution::CUSTOM, batch_size,
+          async, streaming, Distribution::CUSTOM, batch_size,
           measurement_window_ms, max_threads, num_of_sequences, sequence_length,
-          shared_memory_type, output_shm_size, factory),
+          shared_memory_type, output_shm_size, parser, factory),
       request_intervals_file_(request_intervals_file)
 {
 }
@@ -100,9 +101,7 @@ nic::Error
 CustomLoadManager::GetCustomRequestRate(double* request_rate)
 {
   if (custom_intervals_.empty()) {
-    return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
-        "The custom intervals vector is empty");
+    return nic::Error("The custom intervals vector is empty");
   }
   uint64_t total_time_ns = 0;
   for (auto interval : custom_intervals_) {

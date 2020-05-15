@@ -130,12 +130,7 @@ OpenCudaIPCRegion(
 
 SharedMemoryManager::~SharedMemoryManager()
 {
-  // FIXME: Replace UnregisterAll() call with below commented lines
   UnregisterAll();
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
-  // UnregisterAll(TRITONSERVER_MEMORY_CPU);
-  // UnregisterAll(TRITONSERVER_MEMORY_GPU);
-#endif  // TRTIS_ENABLE_GRPC_V2 || TRTIS_ENABLE_HTTP_V2
 }
 
 TRITONSERVER_Error*
@@ -366,7 +361,7 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
   return nullptr;
 }
 
-#ifdef TRTIS_ENABLE_GRPC_V2
+#ifdef TRTIS_ENABLE_GRPC
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(
     const std::string& name, SystemSharedMemoryStatusResponse*& shm_status)
@@ -469,7 +464,7 @@ SharedMemoryManager::GetStatus(
 
   return nullptr;
 }
-#endif  // TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(

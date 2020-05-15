@@ -59,9 +59,8 @@ SKIP_PATHS = ('builddir',
               'qa/L0_perf_nomodel/baseline',
               'qa/L0_perf_nomodel/legacy_baseline',
               'qa/L0_warmup/raw_mug_data',
-              'src/clients/csharp',
-              'src/clients/c++/experimental_api_v2/library/cencode.c',
-              'src/clients/c++/experimental_api_v2/library/cencode.h',
+              'src/clients/c++/library/cencode.c',
+              'src/clients/c++/library/cencode.h',
               'tools/patch',
               'VERSION')
 

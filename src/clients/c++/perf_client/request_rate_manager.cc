@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,21 +35,21 @@ RequestRateManager::~RequestRateManager()
 
 nic::Error
 RequestRateManager::Create(
-    const bool async, const uint64_t measurement_window_ms,
-    Distribution request_distribution, const int32_t batch_size,
-    const size_t max_threads, const uint32_t num_of_sequences,
-    const size_t sequence_length, const size_t string_length,
-    const std::string& string_data, const bool zero_input,
-    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-    std::vector<std::string>& user_data,
+    const bool async, const bool streaming,
+    const uint64_t measurement_window_ms, Distribution request_distribution,
+    const int32_t batch_size, const size_t max_threads,
+    const uint32_t num_of_sequences, const size_t sequence_length,
+    const size_t string_length, const std::string& string_data,
+    const bool zero_input, std::vector<std::string>& user_data,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-    const std::shared_ptr<ContextFactory>& factory,
+    const std::shared_ptr<ModelParser>& parser,
+    const std::shared_ptr<TritonClientFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<RequestRateManager> local_manager(new RequestRateManager(
-      async, input_shapes, request_distribution, batch_size,
-      measurement_window_ms, max_threads, num_of_sequences, sequence_length,
-      shared_memory_type, output_shm_size, factory));
+      async, streaming, request_distribution, batch_size, measurement_window_ms,
+      max_threads, num_of_sequences, sequence_length, shared_memory_type,
+      output_shm_size, parser, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
@@ -67,21 +67,20 @@ RequestRateManager::Create(
 }
 
 RequestRateManager::RequestRateManager(
-    const bool async,
-    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-    Distribution request_distribution, int32_t batch_size,
-    const uint64_t measurement_window_ms, const size_t max_threads,
-    const uint32_t num_of_sequences, const size_t sequence_length,
-    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-    const std::shared_ptr<ContextFactory>& factory)
+    const bool async, const bool streaming, Distribution request_distribution,
+    int32_t batch_size, const uint64_t measurement_window_ms,
+    const size_t max_threads, const uint32_t num_of_sequences,
+    const size_t sequence_length, const SharedMemoryType shared_memory_type,
+    const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
+    const std::shared_ptr<TritonClientFactory>& factory)
     : LoadManager(
-          async, input_shapes, batch_size, max_threads, sequence_length,
-          shared_memory_type, output_shm_size, factory),
+          async, streaming, batch_size, max_threads, sequence_length,
+          shared_memory_type, output_shm_size, parser, factory),
       request_distribution_(request_distribution), execute_(false)
 {
   if (on_sequence_model_) {
     for (uint64_t i = 0; i < num_of_sequences; i++) {
-      sequence_stat_.emplace_back(new SequenceStat(next_corr_id_++));
+      sequence_stat_.emplace_back(new SequenceStat(next_seq_id_++));
     }
   }
   gen_duration_.reset(
@@ -184,18 +183,53 @@ RequestRateManager::Infer(
     std::shared_ptr<ThreadStat> thread_stat,
     std::shared_ptr<ThreadConfig> thread_config)
 {
-  std::shared_ptr<InferContextMetaData> ctx(new InferContextMetaData());
+  std::shared_ptr<InferContext> ctx(new InferContext());
+  thread_stat->status_ = factory_->CreateTritonClient(&(ctx->infer_client_));
+  ctx->options_.reset(new nic::InferOptions(parser_->ModelName()));
+  ctx->options_->model_version_ = parser_->ModelVersion();
+
   thread_stat->contexts_stat_.emplace_back();
 
-  std::unique_ptr<nic::InferContext::Options> options(nullptr);
   if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
-    thread_stat->status_ = PrepareInfer(&(ctx->ctx_), &options);
+    thread_stat->status_ = PrepareInfer(ctx.get());
   } else {
-    thread_stat->status_ = PrepareSharedMemoryInfer(&(ctx->ctx_), &options);
+    thread_stat->status_ = PrepareSharedMemoryInfer(ctx.get());
   }
   if (!thread_stat->status_.IsOk()) {
     return;
   }
+
+  uint64_t request_id = 0;
+  // request_id to start timestamp map
+  std::shared_ptr<std::map<std::string, AsyncRequestProperties>> async_req_map(
+      new std::map<std::string, AsyncRequestProperties>());
+
+  // Callback function for handling asynchronous requests
+  const auto callback_func = [&](nic::InferResult* result) {
+    std::shared_ptr<nic::InferResult> result_ptr(result);
+    if (thread_stat->cb_status_.IsOk()) {
+      // Add the request timestamp to thread Timestamp vector with
+      // proper locking
+      std::lock_guard<std::mutex> lock(thread_stat->mu_);
+      thread_stat->cb_status_ = result_ptr->RequestStatus();
+      if (thread_stat->cb_status_.IsOk()) {
+        struct timespec end_time_async;
+        clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+        std::string request_id;
+        thread_stat->cb_status_ = result_ptr->Id(&request_id);
+        const auto& it = async_req_map->find(request_id);
+        if (it != async_req_map->end()) {
+          thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+              it->second.start_time_, end_time_async, it->second.sequence_end_,
+              it->second.delayed_));
+          ctx->infer_client_->ClientInferStat(
+              &(thread_stat->contexts_stat_[0]));
+        }
+      }
+    }
+    ctx->inflight_request_cnt_--;
+  };
+
 
   // run inferencing until receiving exit signal to maintain server load.
   do {
@@ -213,7 +247,7 @@ RequestRateManager::Infer(
 
     thread_config->is_paused_ = false;
 
-    uint32_t seq_id = 0, flags = 0;
+    uint32_t seq_id = 0;
 
     // Sleep if required
     std::chrono::steady_clock::time_point now =
@@ -241,39 +275,27 @@ RequestRateManager::Infer(
                      data_loader_->GetTotalStepsNonSequence()) *
                     batch_size_;
       thread_config->non_sequence_data_step_id_ += max_threads_;
-      thread_stat->status_ = UpdateInputs(ctx->ctx_->Inputs(), 0, step_id);
+      thread_stat->status_ = UpdateInputs(ctx->inputs_, 0, step_id);
       if (!thread_stat->status_.IsOk()) {
         return;
       }
     }
 
-    struct timespec start_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
-
     if (on_sequence_model_) {
-      flags = 0;
       // Select one of the sequence at random for this request
       seq_id = rand() % sequence_stat_.size();
       // Need lock to protect the order of dispatch across worker threads.
       // This also helps in reporting the realistic latencies.
       std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
       if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
-        flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
+        ctx->options_->sequence_start_ = true;
         InitNewSequence(seq_id);
       }
       if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
-        flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
+        ctx->options_->sequence_end_ = true;
       }
-      options->SetFlag(
-          ni::InferRequestHeader::FLAG_SEQUENCE_START,
-          flags & ni::InferRequestHeader::FLAG_SEQUENCE_START);
-      options->SetFlag(
-          ni::InferRequestHeader::FLAG_SEQUENCE_END,
-          flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
 
-      // Override the correlation ID.
-      options->SetCorrelationId(sequence_stat_[seq_id]->corr_id_);
-      ctx->ctx_->SetRunOptions(*options);
+      ctx->options_->sequence_id_ = sequence_stat_[seq_id]->seq_id_;
 
       // Update the inputs if required
       if (using_json_data_) {
@@ -281,17 +303,20 @@ RequestRateManager::Infer(
                           sequence_stat_[seq_id]->data_stream_id_) -
                       sequence_stat_[seq_id]->remaining_queries_;
         thread_stat->status_ = UpdateInputs(
-            ctx->ctx_->Inputs(), sequence_stat_[seq_id]->data_stream_id_,
-            step_id);
+            ctx->inputs_, sequence_stat_[seq_id]->data_stream_id_, step_id);
         if (!thread_stat->status_.IsOk()) {
           return;
         }
       }
 
-      Request(ctx, flags, delayed, start_time, thread_stat);
+      Request(
+          ctx, request_id++, delayed, callback_func, async_req_map,
+          thread_stat);
       sequence_stat_[seq_id]->remaining_queries_--;
     } else {
-      Request(ctx, flags, delayed, start_time, thread_stat);
+      Request(
+          ctx, request_id++, delayed, callback_func, async_req_map,
+          thread_stat);
     }
 
     if (early_exit || (!thread_stat->cb_status_.IsOk())) {
@@ -301,19 +326,11 @@ RequestRateManager::Infer(
              i += thread_config->stride_) {
           std::lock_guard<std::mutex> guard(sequence_stat_[i]->mtx_);
           if (sequence_stat_[i]->remaining_queries_ != 0) {
-            uint32_t flags = 0;
-            flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
-            options->SetFlag(
-                ni::InferRequestHeader::FLAG_SEQUENCE_START,
-                flags & ni::InferRequestHeader::FLAG_SEQUENCE_START);
-            options->SetFlag(
-                ni::InferRequestHeader::FLAG_SEQUENCE_END,
-                flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
-
-            // Override the correlation ID.
-            options->SetCorrelationId(sequence_stat_[i]->corr_id_);
-            ctx->ctx_->SetRunOptions(*options);
-            Request(ctx, flags, false /* delayed */, start_time, thread_stat);
+            ctx->options_->sequence_end_ = true;
+            ctx->options_->sequence_id_ = sequence_stat_[i]->seq_id_;
+            Request(
+                ctx, request_id++, false /* delayed */, callback_func,
+                async_req_map, thread_stat);
             sequence_stat_[i]->remaining_queries_ = 0;
           }
         }
@@ -333,43 +350,46 @@ RequestRateManager::Infer(
 
 void
 RequestRateManager::Request(
-    std::shared_ptr<InferContextMetaData> context, const uint32_t flags,
-    const bool delayed, const struct timespec start_time,
+    std::shared_ptr<InferContext> context, const uint64_t request_id,
+    const bool delayed, nic::InferenceServerClient::OnCompleteFn callback_func,
+    std::shared_ptr<std::map<std::string, AsyncRequestProperties>>
+        async_req_map,
     std::shared_ptr<ThreadStat> thread_stat)
 {
   if (async_) {
-    thread_stat->status_ = context->ctx_->AsyncRun(
-        [context, start_time, flags, delayed, thread_stat](
-            nic::InferContext* ctx,
-            std::shared_ptr<nic::InferContext::Request> request) {
-          std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
-              results;
-          nic::Error callback_error =
-              context->ctx_->GetAsyncRunResults(request, &results);
-          if (callback_error.IsOk()) {
-            struct timespec end_time_async;
-            clock_gettime(CLOCK_MONOTONIC, &end_time_async);
-            {
-              // Add the request timestamp to thread Timestamp vector with
-              // proper locking
-              std::lock_guard<std::mutex> lock(thread_stat->mu_);
-              thread_stat->request_timestamps_.emplace_back(
-                  std::make_tuple(start_time, end_time_async, flags, delayed));
-              context->ctx_->GetStat(&(thread_stat->contexts_stat_[0]));
-            }
-          } else if (thread_stat->cb_status_.IsOk()) {
-            thread_stat->cb_status_ = callback_error;
-          }
-          context->inflight_request_cnt_--;
-        });
+    context->options_->request_id_ = std::to_string(request_id);
+    {
+      std::lock_guard<std::mutex> lock(thread_stat->mu_);
+      auto it =
+          async_req_map
+              ->emplace(
+                  context->options_->request_id_, AsyncRequestProperties())
+              .first;
+      clock_gettime(CLOCK_MONOTONIC, &(it->second.start_time_));
+      it->second.sequence_end_ = context->options_->sequence_end_;
+      it->second.delayed_ = delayed;
+    }
+    if (streaming_) {
+      thread_stat->status_ = context->infer_client_->AsyncStreamInfer(
+          *(context->options_), context->inputs_, context->outputs_);
+    } else {
+      thread_stat->status_ = context->infer_client_->AsyncInfer(
+          callback_func, *(context->options_), context->inputs_,
+          context->outputs_);
+    }
     if (!thread_stat->status_.IsOk()) {
       return;
     }
     context->inflight_request_cnt_++;
   } else {
-    std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-    struct timespec end_time_sync;
-    thread_stat->status_ = context->ctx_->Run(&results);
+    struct timespec start_time_sync, end_time_sync;
+    clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
+    nic::InferResult* results;
+    thread_stat->status_ = context->infer_client_->Infer(
+        &results, *(context->options_), context->inputs_, context->outputs_);
+    if (results != nullptr) {
+      delete results;
+    }
     if (!thread_stat->status_.IsOk()) {
       return;
     }
@@ -378,9 +398,14 @@ RequestRateManager::Request(
       // Add the request timestamp to thread Timestamp vector with proper
       // locking
       std::lock_guard<std::mutex> lock(thread_stat->mu_);
-      thread_stat->request_timestamps_.emplace_back(
-          std::make_tuple(start_time, end_time_sync, flags, delayed));
-      context->ctx_->GetStat(&(thread_stat->contexts_stat_[0]));
+      thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+          start_time_sync, end_time_sync, context->options_->sequence_end_,
+          delayed));
+      thread_stat->status_ = context->infer_client_->ClientInferStat(
+          &(thread_stat->contexts_stat_[0]));
+      if (!thread_stat->status_.IsOk()) {
+        return;
+      }
     }
   }
 }

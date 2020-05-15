@@ -76,14 +76,6 @@ if(${TRTIS_ENABLE_GRPC})
   add_definitions(-DTRTIS_ENABLE_GRPC=1)
 endif() # TRTIS_ENABLE_GRPC
 
-if(${TRTIS_ENABLE_HTTP_V2})
-  add_definitions(-DTRTIS_ENABLE_HTTP_V2=1)
-endif() # TRTIS_ENABLE_HTTP_V2
-
-if(${TRTIS_ENABLE_GRPC_V2})
-  add_definitions(-DTRTIS_ENABLE_GRPC_V2=1)
-endif() # TRTIS_ENABLE_GRPC_V2
-
 if(${TRTIS_ENABLE_METRICS})
   add_definitions(-DTRTIS_ENABLE_METRICS=1)
 endif() # TRTIS_ENABLE_METRICS
@@ -186,7 +178,7 @@ include_directories(${Protobuf_INCLUDE_DIRS})
 #
 # GRPC
 #
-if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
+if(${TRTIS_ENABLE_GRPC})
   find_package(gRPC CONFIG REQUIRED)
   message(STATUS "Using gRPC ${gRPC_VERSION}")
   include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)

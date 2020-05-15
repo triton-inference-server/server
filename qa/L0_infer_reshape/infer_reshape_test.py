@@ -33,7 +33,6 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-from tensorrtserver.api import *
 import os
 
 np_dtype_string = np.dtype(object)
@@ -173,7 +172,7 @@ class InferReshapeTest(unittest.TestCase):
     def test_ii1(self):
         self._full_reshape(np.int32, input_shapes=([2,4,5,6],))
     def test_ii2(self):
-        self._full_reshape(np.int32, input_shapes=([4,1], [2]), 
+        self._full_reshape(np.int32, input_shapes=([4,1], [2]),
                            output_shapes=([1,4], [1,2]))
     def test_ii3(self):
         self._full_reshape(np.int32, input_shapes=([1,4,1], [8], [2,2,3]))

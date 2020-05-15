@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,9 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/perf_client/context_factory.h"
 #include "src/clients/c++/perf_client/load_manager.h"
-#include "src/clients/c++/perf_client/perf_utils.h"
 
 #include <condition_variable>
 #include <thread>
@@ -59,6 +57,7 @@ class RequestRateManager : public LoadManager {
   /// specified load on inference server.
   /// \param async Whether to use asynchronous or synchronous API for infer
   /// request.
+  /// \param streaming Whether to use gRPC streaming API for infer request
   /// \param measurement_window_ms The time window for measurements.
   /// \param request_distribution The kind of distribution to use for drawing
   /// out intervals between successive requests.
@@ -67,27 +66,29 @@ class RequestRateManager : public LoadManager {
   /// \param num_of_sequences The number of concurrent sequences that must be
   /// maintained on the server.
   /// \param sequence_length The base length of each sequence.
+  /// \param string_length The length of the string to create for input.
+  /// \param string_data The data to use for generating string input.
   /// \param zero_input Whether to fill the input tensors with zero.
-  /// \param input_shapes The shape of the input tensors.
   /// \param user_data The vector containing path/paths to user-provided data
   /// that can be a directory or path to a json data file.
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size of the shared memory to allocate for the
   /// output.
-  /// \param factory The ContextFactory object used to create
-  /// InferContext.
+  /// \param parser The ModelParser object to get the model details.
+  /// \param factory The TritonClientFactory object used to create
+  /// client to the server.
   /// \param manager Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const bool async, const uint64_t measurement_window_ms,
-      Distribution request_distribution, const int32_t batch_size,
-      const size_t max_threads, const uint32_t num_of_sequences,
-      const size_t sequence_length, const size_t string_length,
-      const std::string& string_data, const bool zero_input,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      std::vector<std::string>& user_data,
+      const bool async, const bool streaming,
+      const uint64_t measurement_window_ms, Distribution request_distribution,
+      const int32_t batch_size, const size_t max_threads,
+      const uint32_t num_of_sequences, const size_t sequence_length,
+      const size_t string_length, const std::string& string_data,
+      const bool zero_input, std::vector<std::string>& user_data,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-      const std::shared_ptr<ContextFactory>& factory,
+      const std::shared_ptr<ModelParser>& parser,
+      const std::shared_ptr<TritonClientFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
   /// Adjusts the rate of issuing requests to be the same as 'request_rate'
@@ -117,13 +118,12 @@ class RequestRateManager : public LoadManager {
   };
 
   RequestRateManager(
-      const bool async,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      Distribution request_distribution, const int32_t batch_size,
-      const uint64_t measurement_window_ms, const size_t max_threads,
-      const uint32_t num_of_sequences, const size_t sequence_length,
-      const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-      const std::shared_ptr<ContextFactory>& factory);
+      const bool async, const bool streaming, Distribution request_distribution,
+      const int32_t batch_size, const uint64_t measurement_window_ms,
+      const size_t max_threads, const uint32_t num_of_sequences,
+      const size_t sequence_length, const SharedMemoryType shared_memory_type,
+      const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
+      const std::shared_ptr<TritonClientFactory>& factory);
 
   /// Generates and update the request schedule as per the given request rate.
   /// \param request_rate The request rate to use for new schedule.
@@ -143,15 +143,20 @@ class RequestRateManager : public LoadManager {
       std::shared_ptr<ThreadConfig> thread_config);
 
   /// A helper function to issue inference request to the server.
-  /// \param ctx InferContextMetaDat.
-  /// \param flags Associated flags with the request.
+  /// \param context InferContext to use for sending the request.
+  /// \param request_id The unique id to be associated with the request.
   /// \param delayed Whether the request fell behind its scheduled time.
-  /// \param start_time The start time of the request to be used for latency
-  /// measurements.
+  /// \param callback_func The callback function to use with asynchronous
+  /// request.
+  /// \param async_req_map The map from ongoing request_id to the
+  /// request information needed to correctly interpret the details.
   /// \param thread_stat The runnning status of the worker thread
   void Request(
-      std::shared_ptr<InferContextMetaData> ctx, const uint32_t flags,
-      const bool delayed, const struct timespec start_time,
+      std::shared_ptr<InferContext> context, const uint64_t request_id,
+      const bool delayed,
+      nic::InferenceServerClient::OnCompleteFn callback_func,
+      std::shared_ptr<std::map<std::string, AsyncRequestProperties>>
+          async_req_map,
       std::shared_ptr<ThreadStat> thread_stat);
 
   std::vector<std::shared_ptr<ThreadConfig>> threads_config_;

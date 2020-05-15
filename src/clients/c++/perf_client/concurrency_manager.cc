@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,22 +34,21 @@ ConcurrencyManager::~ConcurrencyManager()
   StopWorkerThreads();
 }
 
-
 nic::Error
 ConcurrencyManager::Create(
-    const bool async, const int32_t batch_size, const size_t max_threads,
-    const size_t max_concurrency, const size_t sequence_length,
-    const size_t string_length, const std::string& string_data,
-    const bool zero_input,
-    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+    const bool async, const bool streaming, const int32_t batch_size,
+    const size_t max_threads, const size_t max_concurrency,
+    const size_t sequence_length, const size_t string_length,
+    const std::string& string_data, const bool zero_input,
     std::vector<std::string>& user_data,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-    const std::shared_ptr<ContextFactory>& factory,
+    const std::shared_ptr<ModelParser>& parser,
+    const std::shared_ptr<TritonClientFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
-      async, input_shapes, batch_size, max_threads, max_concurrency,
-      sequence_length, shared_memory_type, output_shm_size, factory));
+      async, streaming, batch_size, max_threads, max_concurrency,
+      sequence_length, shared_memory_type, output_shm_size, parser, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
@@ -67,15 +66,14 @@ ConcurrencyManager::Create(
 }
 
 ConcurrencyManager::ConcurrencyManager(
-    const bool async,
-    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-    const int32_t batch_size, const size_t max_threads,
-    const size_t max_concurrency, const size_t sequence_length,
-    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-    const std::shared_ptr<ContextFactory>& factory)
+    const bool async, const bool streaming, const int32_t batch_size,
+    const size_t max_threads, const size_t max_concurrency,
+    const size_t sequence_length, const SharedMemoryType shared_memory_type,
+    const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
+    const std::shared_ptr<TritonClientFactory>& factory)
     : LoadManager(
-          async, input_shapes, batch_size, max_threads, sequence_length,
-          shared_memory_type, output_shm_size, factory),
+          async, streaming, batch_size, max_threads, sequence_length,
+          shared_memory_type, output_shm_size, parser, factory),
       execute_(true), max_concurrency_(max_concurrency)
 {
   if (on_sequence_model_) {
@@ -154,7 +152,7 @@ ConcurrencyManager::Infer(
     std::shared_ptr<ThreadStat> thread_stat,
     std::shared_ptr<ThreadConfig> thread_config)
 {
-  std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
+  std::vector<std::unique_ptr<InferContext>> ctxs;
   uint32_t seq_id = 0, ctx_id = 0;
   std::queue<int> free_ctx_ids;
 
@@ -166,15 +164,54 @@ ConcurrencyManager::Infer(
     ctxs.reserve(max_concurrency_);
   }
 
-  // Variable that can be used across InferContexts
-  std::unique_ptr<nic::InferContext::Options> options(nullptr);
-
   // Variable used to signal request completion
   bool notified = false;
   std::mutex cb_mtx;
   std::condition_variable cb_cv;
 
   std::atomic<int> total_ongoing_requests(0);
+  uint64_t request_id = 0;
+
+  // request_id to start timestamp map
+  std::map<std::string, AsyncRequestProperties> async_req_map;
+
+  // Callback function for handling asynchronous requests
+  const auto callback_func = [&](nic::InferResult* result) {
+    uint32_t ctx_id = 0;
+    std::shared_ptr<nic::InferResult> result_ptr(result);
+    if (thread_stat->cb_status_.IsOk()) {
+      // Add the request timestamp to thread Timestamp vector with
+      // proper locking
+      std::lock_guard<std::mutex> lock(thread_stat->mu_);
+      thread_stat->cb_status_ = result_ptr->RequestStatus();
+      if (thread_stat->cb_status_.IsOk()) {
+        struct timespec end_time_async;
+        clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+        std::string request_id;
+        thread_stat->cb_status_ = result_ptr->Id(&request_id);
+        const auto& it = async_req_map.find(request_id);
+        if (it != async_req_map.end()) {
+          thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+              it->second.start_time_, end_time_async, it->second.sequence_end_,
+              false /* delayed */));
+          ctx_id = it->second.ctx_id_;
+          ctxs[ctx_id]->infer_client_->ClientInferStat(
+              &(thread_stat->contexts_stat_[ctx_id]));
+          async_req_map.erase(request_id);
+        }
+      }
+    }
+    // avoid competition over 'cb_mtx'
+    {
+      std::lock_guard<std::mutex> lk(cb_mtx);
+      free_ctx_ids.push(ctx_id);
+      notified = true;
+    }
+
+    total_ongoing_requests--;
+
+    cb_cv.notify_all();
+  };
 
   // run inferencing until receiving exit signal to maintain server load.
   do {
@@ -209,17 +246,30 @@ ConcurrencyManager::Infer(
     size_t active_ctx_cnt = on_sequence_model_ ? num_reqs : 1;
 
     while (active_ctx_cnt > ctxs.size()) {
-      free_ctx_ids.push(ctxs.size());
-      ctxs.emplace_back(new InferContextMetaData());
+      {
+        std::lock_guard<std::mutex> lock(cb_mtx);
+        free_ctx_ids.push(ctxs.size());
+      }
+      ctxs.emplace_back(new InferContext());
+      thread_stat->status_ =
+          factory_->CreateTritonClient(&(ctxs.back()->infer_client_));
+      ctxs.back()->options_.reset(new nic::InferOptions(parser_->ModelName()));
+      ctxs.back()->options_->model_version_ = parser_->ModelVersion();
       thread_stat->contexts_stat_.emplace_back();
       if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
-        thread_stat->status_ = PrepareInfer(&(ctxs.back()->ctx_), &options);
+        thread_stat->status_ = PrepareInfer(ctxs.back().get());
       } else {
-        thread_stat->status_ =
-            PrepareSharedMemoryInfer(&(ctxs.back()->ctx_), &options);
+        thread_stat->status_ = PrepareSharedMemoryInfer(ctxs.back().get());
       }
       if (!thread_stat->status_.IsOk()) {
         return;
+      }
+      if (streaming_) {
+        thread_stat->status_ =
+            ctxs.back()->infer_client_->StartStream(callback_func);
+        if (!thread_stat->status_.IsOk()) {
+          return;
+        }
       }
     }
 
@@ -235,17 +285,13 @@ ConcurrencyManager::Infer(
                       batch_size_;
         thread_config->non_sequence_data_step_id_ += active_threads_;
         // There will be only one ctx in non-sequence case
-        thread_stat->status_ =
-            UpdateInputs(ctxs[0]->ctx_->Inputs(), 0, step_id);
+        thread_stat->status_ = UpdateInputs(ctxs[ctx_id]->inputs_, 0, step_id);
         if (!thread_stat->status_.IsOk()) {
           return;
         }
       }
 
-      uint32_t flags = 0;
       if (on_sequence_model_) {
-        flags = 0;
-
         size_t offset = 0;
         for (size_t i = 0; i < thread_config->thread_id_; i++) {
           offset += threads_config_[i]->concurrency_;
@@ -262,31 +308,26 @@ ConcurrencyManager::Infer(
         {
           std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
           if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
-            flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
+            ctxs[ctx_id]->options_->sequence_start_ = true;
             InitNewSequence(seq_id);
           }
           if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
-            flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
+            ctxs[ctx_id]->options_->sequence_end_ = true;
           }
-          options->SetFlag(
-              ni::InferRequestHeader::FLAG_SEQUENCE_START,
-              flags & ni::InferRequestHeader::FLAG_SEQUENCE_START);
-          options->SetFlag(
-              ni::InferRequestHeader::FLAG_SEQUENCE_END,
-              flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
 
-          // Override the correlation ID.
-          options->SetCorrelationId(sequence_stat_[seq_id]->corr_id_);
-          ctxs[ctx_id]->ctx_->SetRunOptions(*options);
+          // Set the sequence id in the options.
+          ctxs[ctx_id]->options_->sequence_id_ =
+              sequence_stat_[seq_id]->seq_id_;
 
           // Update the inputs if required
           if (using_json_data_) {
             int step_id = data_loader_->GetTotalSteps(
                               sequence_stat_[seq_id]->data_stream_id_) -
                           sequence_stat_[seq_id]->remaining_queries_;
+
             thread_stat->status_ = UpdateInputs(
-                ctxs[ctx_id]->ctx_->Inputs(),
-                sequence_stat_[seq_id]->data_stream_id_, step_id);
+                ctxs[ctx_id]->inputs_, sequence_stat_[seq_id]->data_stream_id_,
+                step_id);
             if (!thread_stat->status_.IsOk()) {
               return;
             }
@@ -295,55 +336,40 @@ ConcurrencyManager::Infer(
         }
       }
       if (async_) {
-        struct timespec start_time_async;
-        clock_gettime(CLOCK_MONOTONIC, &start_time_async);
-        thread_stat->status_ = ctxs[ctx_id]->ctx_->AsyncRun(
-            [&notified, &cb_mtx, &cb_cv, &ctxs, &thread_stat,
-             &total_ongoing_requests, &free_ctx_ids, start_time_async, flags,
-             ctx_id](
-                nic::InferContext* ctx,
-                std::shared_ptr<nic::InferContext::Request> request) {
-              std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
-                  results;
-              nic::Error callback_error =
-                  ctxs[ctx_id]->ctx_->GetAsyncRunResults(request, &results);
-              if (callback_error.IsOk()) {
-                struct timespec end_time_async;
-                clock_gettime(CLOCK_MONOTONIC, &end_time_async);
-                {
-                  // Add the request timestamp to thread Timestamp vector with
-                  // proper locking
-                  std::lock_guard<std::mutex> lock(thread_stat->mu_);
-                  thread_stat->request_timestamps_.emplace_back(std::make_tuple(
-                      start_time_async, end_time_async, flags,
-                      false /* delayed */));
-                  ctxs[ctx_id]->ctx_->GetStat(
-                      &(thread_stat->contexts_stat_[ctx_id]));
-                }
-              } else if (thread_stat->cb_status_.IsOk()) {
-                // Record the callback error if not already recorded
-                thread_stat->cb_status_ = callback_error;
-              }
-
-              // avoid competition over 'cb_mtx'
-              {
-                std::lock_guard<std::mutex> lk(cb_mtx);
-                free_ctx_ids.push(ctx_id);
-                notified = true;
-              }
-              total_ongoing_requests--;
-
-              cb_cv.notify_all();
-            });
+        ctxs[ctx_id]->options_->request_id_ = std::to_string(request_id++);
+        {
+          std::lock_guard<std::mutex> lock(thread_stat->mu_);
+          auto it = async_req_map
+                        .emplace(
+                            ctxs[ctx_id]->options_->request_id_,
+                            AsyncRequestProperties())
+                        .first;
+          clock_gettime(CLOCK_MONOTONIC, &(it->second.start_time_));
+          it->second.ctx_id_ = ctx_id;
+          it->second.sequence_end_ = ctxs[ctx_id]->options_->sequence_end_;
+        }
+        if (streaming_) {
+          thread_stat->status_ = ctxs[ctx_id]->infer_client_->AsyncStreamInfer(
+              *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
+              ctxs[ctx_id]->outputs_);
+        } else {
+          thread_stat->status_ = ctxs[ctx_id]->infer_client_->AsyncInfer(
+              callback_func, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
+              ctxs[ctx_id]->outputs_);
+        }
         if (!thread_stat->status_.IsOk()) {
           return;
         }
       } else {
-        std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
-            results;
         struct timespec start_time_sync, end_time_sync;
         clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
-        thread_stat->status_ = ctxs[ctx_id]->ctx_->Run(&results);
+        nic::InferResult* results;
+        thread_stat->status_ = ctxs[ctx_id]->infer_client_->Infer(
+            &results, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
+            ctxs[ctx_id]->outputs_);
+        if (results != nullptr) {
+          delete results;
+        }
         if (!thread_stat->status_.IsOk()) {
           return;
         }
@@ -353,10 +379,18 @@ ConcurrencyManager::Infer(
           // locking
           std::lock_guard<std::mutex> lock(thread_stat->mu_);
           thread_stat->request_timestamps_.emplace_back(std::make_tuple(
-              start_time_sync, end_time_sync, flags, false /* delayed */));
-          ctxs[ctx_id]->ctx_->GetStat(&(thread_stat->contexts_stat_[ctx_id]));
+              start_time_sync, end_time_sync,
+              ctxs[ctx_id]->options_->sequence_end_, false /* delayed */));
+          thread_stat->status_ = ctxs[ctx_id]->infer_client_->ClientInferStat(
+              &(thread_stat->contexts_stat_[ctx_id]));
+          if (!thread_stat->status_.IsOk()) {
+            return;
+          }
         }
-        free_ctx_ids.push(ctx_id);
+        {
+          std::lock_guard<std::mutex> lock(cb_mtx);
+          free_ctx_ids.push(ctx_id);
+        }
       }
       total_ongoing_requests++;
     }

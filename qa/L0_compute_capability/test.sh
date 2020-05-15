@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 OPTDIR=${OPTDIR:="/opt"}
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-SERVER=${OPTDIR}/tensorrtserver/bin/tritonserver
+SERVER=${OPTDIR}/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 rm -f *.log

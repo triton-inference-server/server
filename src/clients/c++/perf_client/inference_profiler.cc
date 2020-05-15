@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@ ReportServerSideStats(const ServerSideStats& stats, const int iteration)
   const uint64_t cnt = stats.request_count;
   if (cnt == 0) {
     std::cout << ident << "  Request count: " << cnt << std::endl;
-    return nic::Error(ni::RequestStatusCode::SUCCESS);
+    return nic::Error::Success;
   }
 
   const uint64_t cumm_time_us = stats.cumm_time_ns / 1000;
@@ -70,14 +70,14 @@ ReportServerSideStats(const ServerSideStats& stats, const int iteration)
 
     std::cout << ident << "Composing models: " << std::endl;
     for (const auto& model_stats : stats.composing_models_stat) {
-      const auto& model_info = model_stats.first;
-      std::cout << ident << model_info.first
-                << ", version: " << model_info.second << std::endl;
+      const auto& model_identifier = model_stats.first;
+      std::cout << ident << model_identifier.first
+                << ", version: " << model_identifier.second << std::endl;
       ReportServerSideStats(model_stats.second, iteration + 1);
     }
   }
 
-  return nic::Error(ni::RequestStatusCode::SUCCESS);
+  return nic::Error::Success;
 }
 
 nic::Error
@@ -151,7 +151,7 @@ ReportClientSideStats(
 
   std::cout << client_library_detail << std::endl;
 
-  return nic::Error(ni::RequestStatusCode::SUCCESS);
+  return nic::Error::Success;
 }
 
 nic::Error
@@ -167,7 +167,7 @@ Report(
   std::cout << "  Server: " << std::endl;
   ReportServerSideStats(summary.server_stats, 1);
 
-  return nic::Error(ni::RequestStatusCode::SUCCESS);
+  return nic::Error::Success;
 }
 
 }  // namespace
@@ -177,60 +177,17 @@ InferenceProfiler::Create(
     const bool verbose, const double stability_threshold,
     const uint64_t measurement_window_ms, const size_t max_trials,
     const int64_t percentile, const uint64_t latency_threshold_ms_,
-    std::shared_ptr<ContextFactory>& factory,
+    std::shared_ptr<ModelParser>& parser,
+    std::unique_ptr<TritonClientWrapper> profile_client,
     std::unique_ptr<LoadManager> manager,
     std::unique_ptr<InferenceProfiler>* profiler)
 {
-  std::unique_ptr<nic::ServerStatusContext> status_ctx;
-  RETURN_IF_ERROR(factory->CreateServerStatusContext(&status_ctx));
-
   std::unique_ptr<InferenceProfiler> local_profiler(new InferenceProfiler(
       verbose, stability_threshold, measurement_window_ms, max_trials,
-      (percentile != -1), percentile, latency_threshold_ms_,
-      factory->Protocol(), factory->SchedulerType(), factory->ModelName(),
-      factory->ModelVersion(), std::move(status_ctx), std::move(manager)));
-
-  if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE ||
-      local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE_SEQUENCE) {
-    ni::ServerStatus server_status;
-    RETURN_IF_ERROR(
-        local_profiler->status_ctx_->GetServerStatus(&server_status));
-    RETURN_IF_ERROR(local_profiler->BuildComposingModelMap(server_status));
-  }
+      (percentile != -1), percentile, latency_threshold_ms_, parser,
+      std::move(profile_client), std::move(manager)));
 
   *profiler = std::move(local_profiler);
-  return nic::Error::Success;
-}
-
-nic::Error
-InferenceProfiler::BuildComposingModelMap(const ni::ServerStatus& server_status)
-{
-  RETURN_IF_ERROR(
-      BuildComposingModelMap(model_name_, model_version_, server_status));
-  return nic::Error::Success;
-}
-
-nic::Error
-InferenceProfiler::BuildComposingModelMap(
-    const std::string& model_name, const int64_t& model_version,
-    const ni::ServerStatus& server_status)
-{
-  const auto& itr = server_status.model_status().find(model_name);
-  if (itr == server_status.model_status().end()) {
-    return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
-        "unable to find status for model " + model_name);
-  } else {
-    if (itr->second.config().platform() == "ensemble") {
-      for (const auto& step :
-           itr->second.config().ensemble_scheduling().step()) {
-        this->composing_models_map_[std::make_pair(model_name, model_version)]
-            .emplace(step.model_name(), step.model_version());
-        this->BuildComposingModelMap(
-            step.model_name(), step.model_version(), server_status);
-      }
-    }
-  }
   return nic::Error::Success;
 }
 
@@ -238,17 +195,14 @@ InferenceProfiler::InferenceProfiler(
     const bool verbose, const double stability_threshold,
     const int32_t measurement_window_ms, const size_t max_trials,
     const bool extra_percentile, const size_t percentile,
-    const uint64_t latency_threshold_ms_, const ProtocolType protocol,
-    const ContextFactory::ModelSchedulerType scheduler_type,
-    const std::string& model_name, const int64_t model_version,
-    std::unique_ptr<nic::ServerStatusContext> status_ctx,
+    const uint64_t latency_threshold_ms_, std::shared_ptr<ModelParser>& parser,
+    std::unique_ptr<TritonClientWrapper> profile_client,
     std::unique_ptr<LoadManager> manager)
     : verbose_(verbose), measurement_window_ms_(measurement_window_ms),
       max_trials_(max_trials), extra_percentile_(extra_percentile),
       percentile_(percentile), latency_threshold_ms_(latency_threshold_ms_),
-      protocol_(protocol), scheduler_type_(scheduler_type),
-      model_name_(model_name), model_version_(model_version),
-      status_ctx_(std::move(status_ctx)), manager_(std::move(manager))
+      parser_(parser), profile_client_(std::move(profile_client)),
+      manager_(std::move(manager))
 {
   load_parameters_.stability_threshold = stability_threshold;
   load_parameters_.stability_window = 3;
@@ -341,6 +295,7 @@ InferenceProfiler::Profile(
   return nic::Error::Success;
 }
 
+
 nic::Error
 InferenceProfiler::Profile(
     std::vector<PerfStatus>& summary, bool* meets_threshold)
@@ -382,7 +337,6 @@ InferenceProfiler::Profile(
   return nic::Error::Success;
 }
 
-
 nic::Error
 InferenceProfiler::ProfileHelper(
     const bool clean_starts, PerfStatus& status_summary, bool* is_stable)
@@ -418,7 +372,6 @@ InferenceProfiler::ProfileHelper(
         load_status.infer_per_sec.back() / load_parameters_.stability_window;
     load_status.avg_latency +=
         load_status.latencies.back() / load_parameters_.stability_window;
-
     if (verbose_) {
       if (error.back().IsOk()) {
         std::cout << "  Pass [" << (completed_trials + 1)
@@ -503,57 +456,21 @@ InferenceProfiler::ProfileHelper(
   }
 
   if (early_exit) {
-    return nic::Error(ni::RequestStatusCode::INTERNAL, "Received exit signal.");
+    return nic::Error("Received exit signal.");
   }
   return nic::Error::Success;
 }
 
 nic::Error
 InferenceProfiler::GetServerSideStatus(
-    std::map<std::string, ni::ModelStatus>* model_status)
+    std::map<ModelIdentifier, ModelStatistics>* model_stats)
 {
-  model_status->clear();
-
-  ni::ServerStatus server_status;
-  RETURN_IF_ERROR(status_ctx_->GetServerStatus(&server_status));
-  RETURN_IF_ERROR(GetServerSideStatus(
-      server_status, std::make_pair(model_name_, model_version_),
-      model_status));
-  return nic::Error::Success;
-}
-
-nic::Error
-InferenceProfiler::GetServerSideStatus(
-    ni::ServerStatus& server_status, const ModelInfo model_info,
-    std::map<std::string, ni::ModelStatus>* model_status)
-{
-  const auto& itr = server_status.model_status().find(model_info.first);
-  if (itr == server_status.model_status().end()) {
-    return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
-        "unable to find status for model " + model_info.first);
+  if ((parser_->SchedulerType() == ModelParser::ENSEMBLE) ||
+      (parser_->SchedulerType() == ModelParser::ENSEMBLE_SEQUENCE)) {
+    RETURN_IF_ERROR(profile_client_->ModelInferenceStatistics(model_stats));
   } else {
-    model_status->emplace(model_info.first, itr->second);
-  }
-
-  // Also get status for composing models if any
-  for (const auto& composing_model_info : composing_models_map_[model_info]) {
-    if (composing_models_map_.find(composing_model_info) !=
-        composing_models_map_.end()) {
-      RETURN_IF_ERROR(GetServerSideStatus(
-          server_status, composing_model_info, model_status));
-    } else {
-      const auto& itr =
-          server_status.model_status().find(composing_model_info.first);
-      if (itr == server_status.model_status().end()) {
-        return nic::Error(
-            ni::RequestStatusCode::INTERNAL,
-            "unable to find status for composing model " +
-                composing_model_info.first);
-      } else {
-        model_status->emplace(composing_model_info.first, itr->second);
-      }
-    }
+    RETURN_IF_ERROR(profile_client_->ModelInferenceStatistics(
+        model_stats, parser_->ModelName(), parser_->ModelVersion()));
   }
   return nic::Error::Success;
 }
@@ -562,19 +479,19 @@ InferenceProfiler::GetServerSideStatus(
 nic::Error
 InferenceProfiler::Measure(PerfStatus& status_summary)
 {
-  std::map<std::string, ni::ModelStatus> start_status;
-  std::map<std::string, ni::ModelStatus> end_status;
-  nic::InferContext::Stat start_stat;
-  nic::InferContext::Stat end_stat;
+  std::map<ModelIdentifier, ModelStatistics> start_status;
+  std::map<ModelIdentifier, ModelStatistics> end_status;
+  nic::InferStat start_stat;
+  nic::InferStat end_stat;
 
   RETURN_IF_ERROR(GetServerSideStatus(&start_status));
-  RETURN_IF_ERROR(manager_->GetAccumulatedContextStat(&start_stat));
+  RETURN_IF_ERROR(manager_->GetAccumulatedClientStat(&start_stat));
 
   // Wait for specified time interval in msec
   std::this_thread::sleep_for(
       std::chrono::milliseconds((uint64_t)(measurement_window_ms_ * 1.2)));
 
-  RETURN_IF_ERROR(manager_->GetAccumulatedContextStat(&end_stat));
+  RETURN_IF_ERROR(manager_->GetAccumulatedClientStat(&end_stat));
 
   // Get server status and then print report on difference between
   // before and after status.
@@ -593,18 +510,21 @@ InferenceProfiler::Measure(PerfStatus& status_summary)
 nic::Error
 InferenceProfiler::Summarize(
     const TimestampVector& timestamps,
-    const std::map<std::string, ni::ModelStatus>& start_status,
-    const std::map<std::string, ni::ModelStatus>& end_status,
-    const nic::InferContext::Stat& start_stat,
-    const nic::InferContext::Stat& end_stat, PerfStatus& summary)
+    const std::map<ModelIdentifier, ModelStatistics>& start_status,
+    const std::map<ModelIdentifier, ModelStatistics>& end_status,
+    const nic::InferStat& start_stat, const nic::InferStat& end_stat,
+    PerfStatus& summary)
 {
   size_t valid_sequence_count = 0;
   size_t delayed_request_count = 0;
 
   // Get measurement from requests that fall within the time interval
-  std::pair<uint64_t, uint64_t> valid_range = MeasurementTimestamp(timestamps);
-  std::vector<uint64_t> latencies = ValidLatencyMeasurement(
-      timestamps, valid_range, valid_sequence_count, delayed_request_count);
+  std::pair<uint64_t, uint64_t> valid_range;
+  MeasurementTimestamp(timestamps, &valid_range);
+  std::vector<uint64_t> latencies;
+  ValidLatencyMeasurement(
+      timestamps, valid_range, valid_sequence_count, delayed_request_count,
+      &latencies);
 
   RETURN_IF_ERROR(SummarizeLatency(latencies, summary));
   RETURN_IF_ERROR(SummarizeClientStat(
@@ -617,8 +537,10 @@ InferenceProfiler::Summarize(
   return nic::Error::Success;
 }
 
-std::pair<uint64_t, uint64_t>
-InferenceProfiler::MeasurementTimestamp(const TimestampVector& timestamps)
+void
+InferenceProfiler::MeasurementTimestamp(
+    const TimestampVector& timestamps,
+    std::pair<uint64_t, uint64_t>* valid_range)
 {
   // finding the start time of the first request
   // and the end time of the last request in the timestamp queue
@@ -647,16 +569,17 @@ InferenceProfiler::MeasurementTimestamp(const TimestampVector& timestamps)
   uint64_t start_ns = first_request_start_ns + offset;
   uint64_t end_ns = start_ns + measurement_window_ns;
 
-  return std::make_pair(start_ns, end_ns);
+  *valid_range = std::make_pair(start_ns, end_ns);
 }
 
-std::vector<uint64_t>
+void
 InferenceProfiler::ValidLatencyMeasurement(
     const TimestampVector& timestamps,
     const std::pair<uint64_t, uint64_t>& valid_range,
-    size_t& valid_sequence_count, size_t& delayed_request_count)
+    size_t& valid_sequence_count, size_t& delayed_request_count,
+    std::vector<uint64_t>* valid_latencies)
 {
-  std::vector<uint64_t> valid_latencies;
+  valid_latencies->clear();
   valid_sequence_count = 0;
   for (auto& timestamp : timestamps) {
     uint64_t request_start_ns = TIMESPEC_TO_NANOS(std::get<0>(timestamp));
@@ -666,9 +589,9 @@ InferenceProfiler::ValidLatencyMeasurement(
       // Only counting requests that end within the time interval
       if ((request_end_ns >= valid_range.first) &&
           (request_end_ns <= valid_range.second)) {
-        valid_latencies.push_back(request_end_ns - request_start_ns);
-        if (std::get<2>(timestamp) &
-            ni::InferRequestHeader::FLAG_SEQUENCE_END) {
+        valid_latencies->push_back(request_end_ns - request_start_ns);
+        // Just add the sequence_end flag here.
+        if (std::get<2>(timestamp)) {
           valid_sequence_count++;
         }
         if (std::get<3>(timestamp)) {
@@ -679,9 +602,7 @@ InferenceProfiler::ValidLatencyMeasurement(
   }
 
   // Always sort measured latencies as percentile will be reported as default
-  std::sort(valid_latencies.begin(), valid_latencies.end());
-
-  return valid_latencies;
+  std::sort(valid_latencies->begin(), valid_latencies->end());
 }
 
 nic::Error
@@ -690,7 +611,6 @@ InferenceProfiler::SummarizeLatency(
 {
   if (latencies.size() == 0) {
     return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
         "No valid requests recorded within time interval."
         " Please use a larger time window.");
   }
@@ -741,14 +661,14 @@ InferenceProfiler::SummarizeLatency(
 
 nic::Error
 InferenceProfiler::SummarizeClientStat(
-    const nic::InferContext::Stat& start_stat,
-    const nic::InferContext::Stat& end_stat, const uint64_t duration_ns,
-    const size_t valid_request_count, const size_t valid_sequence_count,
-    const size_t delayed_request_count, PerfStatus& summary)
+    const nic::InferStat& start_stat, const nic::InferStat& end_stat,
+    const uint64_t duration_ns, const size_t valid_request_count,
+    const size_t valid_sequence_count, const size_t delayed_request_count,
+    PerfStatus& summary)
 {
   summary.on_sequence_model =
-      ((scheduler_type_ == ContextFactory::SEQUENCE) ||
-       (scheduler_type_ == ContextFactory::ENSEMBLE_SEQUENCE));
+      ((parser_->SchedulerType() == ModelParser::SEQUENCE) ||
+       (parser_->SchedulerType() == ModelParser::ENSEMBLE_SEQUENCE));
   summary.batch_size = manager_->BatchSize();
   summary.client_stats.request_count = valid_request_count;
   summary.client_stats.sequence_count = valid_sequence_count;
@@ -781,60 +701,58 @@ InferenceProfiler::SummarizeClientStat(
 }
 
 nic::Error
-InferenceProfiler::SummarizeServerModelStats(
-    const std::string& model_name, const int64_t model_version,
-    const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
+InferenceProfiler::SummarizeServerStatsHelper(
+    const ModelIdentifier& model_identifier,
+    const std::map<ModelIdentifier, ModelStatistics>& start_status,
+    const std::map<ModelIdentifier, ModelStatistics>& end_status,
     ServerSideStats* server_stats)
 {
-  // If model_version is -1 then look in the end status to find the
+  // If model_version is an empty string then look in the end status to find the
   // latest (highest valued version) and use that as the version.
-  int64_t status_model_version = 0;
-  if (model_version < 0) {
-    for (const auto& vp : end_status.version_status()) {
-      status_model_version = std::max(status_model_version, vp.first);
+  int64_t status_model_version = -1;
+  if (model_identifier.second.empty()) {
+    for (const auto& id : end_status) {
+      // Model name should match
+      if (model_identifier.first.compare(id.first.first) == 0) {
+        int64_t this_version = std::stoll(id.first.second);
+        status_model_version = std::max(status_model_version, this_version);
+      }
     }
   } else {
-    status_model_version = model_version;
+    status_model_version = std::stoll(model_identifier.second);
   }
 
-  const auto& vend_itr = end_status.version_status().find(status_model_version);
-  if (vend_itr == end_status.version_status().end()) {
-    return nic::Error(
-        ni::RequestStatusCode::INTERNAL, "missing model version status");
+  if (status_model_version == -1) {
+    return nic::Error("failed to determine the requested model version");
+  }
+
+  const std::pair<std::string, std::string> this_id(
+      model_identifier.first, std::to_string(status_model_version));
+
+  const auto& end_itr = end_status.find(this_id);
+  if (end_itr == end_status.end()) {
+    return nic::Error("missing statistics for requested model");
   } else {
-    const auto& end_itr =
-        vend_itr->second.infer_stats().find(manager_->BatchSize());
-    if (end_itr == vend_itr->second.infer_stats().end()) {
-      return nic::Error(
-          ni::RequestStatusCode::INTERNAL, "missing inference stats");
-    } else {
-      uint64_t start_cnt = 0;
-      uint64_t start_cumm_time_ns = 0;
-      uint64_t start_queue_time_ns = 0;
-      uint64_t start_compute_time_ns = 0;
+    uint64_t start_cnt = 0;
+    uint64_t start_cumm_time_ns = 0;
+    uint64_t start_queue_time_ns = 0;
+    uint64_t start_compute_time_ns = 0;
 
-      const auto& vstart_itr =
-          start_status.version_status().find(status_model_version);
-      if (vstart_itr != start_status.version_status().end()) {
-        const auto& start_itr =
-            vstart_itr->second.infer_stats().find(manager_->BatchSize());
-        if (start_itr != vstart_itr->second.infer_stats().end()) {
-          start_cnt = start_itr->second.success().count();
-          start_cumm_time_ns = start_itr->second.success().total_time_ns();
-          start_queue_time_ns = start_itr->second.queue().total_time_ns();
-          start_compute_time_ns = start_itr->second.compute().total_time_ns();
-        }
-      }
-
-      server_stats->request_count =
-          end_itr->second.success().count() - start_cnt;
-      server_stats->cumm_time_ns =
-          end_itr->second.success().total_time_ns() - start_cumm_time_ns;
-      server_stats->queue_time_ns =
-          end_itr->second.queue().total_time_ns() - start_queue_time_ns;
-      server_stats->compute_time_ns =
-          end_itr->second.compute().total_time_ns() - start_compute_time_ns;
+    const auto& start_itr = start_status.find(this_id);
+    if (start_itr != start_status.end()) {
+      start_cnt = start_itr->second.request_count_;
+      start_cumm_time_ns = start_itr->second.cumm_time_ns_;
+      start_queue_time_ns = start_itr->second.queue_time_ns_;
+      start_compute_time_ns = start_itr->second.compute_time_ns_;
     }
+
+    server_stats->request_count = end_itr->second.request_count_ - start_cnt;
+    server_stats->cumm_time_ns =
+        end_itr->second.cumm_time_ns_ - start_cumm_time_ns;
+    server_stats->queue_time_ns =
+        end_itr->second.queue_time_ns_ - start_queue_time_ns;
+    server_stats->compute_time_ns =
+        end_itr->second.compute_time_ns_ - start_compute_time_ns;
   }
 
   return nic::Error::Success;
@@ -842,31 +760,22 @@ InferenceProfiler::SummarizeServerModelStats(
 
 nic::Error
 InferenceProfiler::SummarizeServerStats(
-    const ModelInfo model_info,
-    const std::map<std::string, ni::ModelStatus>& start_status,
-    const std::map<std::string, ni::ModelStatus>& end_status,
+    const ModelIdentifier& model_identifier,
+    const std::map<ModelIdentifier, ModelStatistics>& start_status,
+    const std::map<ModelIdentifier, ModelStatistics>& end_status,
     ServerSideStats* server_stats)
 {
-  RETURN_IF_ERROR(SummarizeServerModelStats(
-      model_info.first, model_info.second,
-      start_status.find(model_info.first)->second,
-      end_status.find(model_info.first)->second, server_stats));
+  RETURN_IF_ERROR(SummarizeServerStatsHelper(
+      model_identifier, start_status, end_status, server_stats));
 
   // Summarize the composing models, if any.
-  for (const auto& composing_model_info : composing_models_map_[model_info]) {
+  for (const auto& composing_model_identifier :
+       (*parser_->GetComposingModelMap())[model_identifier.first]) {
     auto it = server_stats->composing_models_stat
-                  .emplace(composing_model_info, ServerSideStats())
+                  .emplace(composing_model_identifier, ServerSideStats())
                   .first;
-    if (composing_models_map_.find(composing_model_info) !=
-        composing_models_map_.end()) {
-      RETURN_IF_ERROR(SummarizeServerStats(
-          composing_model_info, start_status, end_status, &(it->second)));
-    } else {
-      RETURN_IF_ERROR(SummarizeServerModelStats(
-          composing_model_info.first, composing_model_info.second,
-          start_status.find(composing_model_info.first)->second,
-          end_status.find(composing_model_info.first)->second, &(it->second)));
-    }
+    RETURN_IF_ERROR(SummarizeServerStats(
+        composing_model_identifier, start_status, end_status, &(it->second)));
   }
 
   return nic::Error::Success;
@@ -874,12 +783,12 @@ InferenceProfiler::SummarizeServerStats(
 
 nic::Error
 InferenceProfiler::SummarizeServerStats(
-    const std::map<std::string, ni::ModelStatus>& start_status,
-    const std::map<std::string, ni::ModelStatus>& end_status,
+    const std::map<ModelIdentifier, ModelStatistics>& start_status,
+    const std::map<ModelIdentifier, ModelStatistics>& end_status,
     ServerSideStats* server_stats)
 {
   RETURN_IF_ERROR(SummarizeServerStats(
-      std::make_pair(model_name_, model_version_), start_status, end_status,
-      server_stats));
+      std::make_pair(parser_->ModelName(), parser_->ModelVersion()),
+      start_status, end_status, server_stats));
   return nic::Error::Success;
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -40,6 +40,7 @@ class CustomLoadManager : public RequestRateManager {
   /// specified load on inference server.
   /// \param async Whether to use asynchronous or synchronous API for infer
   /// request.
+  /// \param streaming Whether to use gRPC streaming API for infer request
   /// \param measurement_window_ms The time window for measurements.
   /// \param request_intervals_file The path to the file to use to pick up the
   /// time intervals between the successive requests.
@@ -55,20 +56,22 @@ class CustomLoadManager : public RequestRateManager {
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size of the shared memory to allocate for the
   /// output.
-  /// \param factory The ContextFactory object used to create
-  /// InferContext.
+  /// \param parser The ModelParser object to get the model details.
+  /// \param factory The TritonClientFactory object used to create
+  /// client to the server.
   /// \param manager Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const bool async, const uint64_t measurement_window_ms,
+      const bool async, const bool streaming,
+      const uint64_t measurement_window_ms,
       const std::string& request_intervals_file, const int32_t batch_size,
       const size_t max_threads, const uint32_t num_of_sequences,
       const size_t sequence_length, const size_t string_length,
       const std::string& string_data, const bool zero_input,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       std::vector<std::string>& user_data,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-      const std::shared_ptr<ContextFactory>& factory,
+      const std::shared_ptr<ModelParser>& parser,
+      const std::shared_ptr<TritonClientFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
 
@@ -86,13 +89,13 @@ class CustomLoadManager : public RequestRateManager {
 
  private:
   CustomLoadManager(
-      const bool async,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+      const bool async, const bool streaming,
       const std::string& request_intervals_file, const int32_t batch_size,
       const uint64_t measurement_window_ms, const size_t max_threads,
       const uint32_t num_of_sequences, const size_t sequence_length,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-      const std::shared_ptr<ContextFactory>& factory);
+      const std::shared_ptr<ModelParser>& parser,
+      const std::shared_ptr<TritonClientFactory>& factory);
 
   std::string request_intervals_file_;
   std::vector<std::chrono::nanoseconds> custom_intervals_;

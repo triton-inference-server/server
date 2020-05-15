@@ -63,10 +63,9 @@ COPY src/core src/core
 
 RUN cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install
-          -DTRTIS_ENABLE_GRPC_V2=ON \
-          -DTRTIS_ENABLE_HTTP_V2=ON \
-          . && \
+          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
+          -DTRTIS_ENABLE_GRPC=ON \
+          -DTRTIS_ENABLE_HTTP=ON && \
     make -j16 trtis-clients
 RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \
@@ -83,7 +82,6 @@ COPY qa/images/mug.jpg images/mug.jpg
 # be used to run the client examples.
 RUN python -m pip install --user --upgrade pip && \
     python -m pip install --upgrade --ignore-installed \
-            install/python/tensorrtserver*.whl \
             install/python/triton*.whl \
             numpy pillow
 

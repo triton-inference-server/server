@@ -32,7 +32,7 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/tritonserver.h"
 
-#ifdef TRTIS_ENABLE_GRPC_V2
+#ifdef TRTIS_ENABLE_GRPC
 #include "src/core/grpc_service_v2.grpc.pb.h"
 #endif
 
@@ -110,7 +110,7 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetStatus(SharedMemoryStatus* status);
 
-#ifdef TRTIS_ENABLE_GRPC_V2
+#ifdef TRTIS_ENABLE_GRPC
   /// Populates the status of active system shared memory regions
   /// in the response protobuf. If 'name' is missing then return status of
   /// all active system shared memory regions.
@@ -128,7 +128,7 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetStatus(
       const std::string& name, CudaSharedMemoryStatusResponse*& shm_status);
-#endif  // TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC
 
   /// Populates the status of active system/CUDA shared memory regions
   /// in the status JSON. If 'name' is empty then return status of all
