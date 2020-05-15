@@ -189,7 +189,7 @@ def parse_model_http(model_metadata, model_config):
             h, w, input_config['format'], input_metadata['datatype'])
 
 
-def preprocess(img, format, dtype, c, h, w, scaling):
+def preprocess(img, format, dtype, c, h, w, scaling, protocol):
     """
     Pre-process an image to meet the size, type and format
     requirements specified by the parameters.
@@ -220,7 +220,7 @@ def preprocess(img, format, dtype, c, h, w, scaling):
         scaled = typed
 
     # Swap to CHW if necessary
-    if FLAGS.protocol.lower() == "grpc":
+    if protocol == "grpc":
         if format == mc.ModelInput.FORMAT_NCHW:
             ordered = np.transpose(scaled, (2, 0, 1))
         else:
@@ -417,7 +417,7 @@ if __name__ == '__main__':
     for filename in filenames:
         img = Image.open(filename)
         image_data.append(preprocess(img, format, dtype, c, h, w,
-                                     FLAGS.scaling))
+                                     FLAGS.scaling, FLAGS.protocol.lower()))
 
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just
