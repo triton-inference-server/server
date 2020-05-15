@@ -969,6 +969,7 @@ main(int argc, char** argv)
   std::vector<std::vector<std::string>> result_filenames;
   size_t image_idx = 0;
   size_t done_cnt = 0;
+  size_t sent_count = 0;
   bool last_request = false;
   std::mutex mtx;
   std::condition_variable cv;
@@ -990,7 +991,6 @@ main(int argc, char** argv)
       std::cerr << "failed to establish the stream: " << err << std::endl;
     }
   }
-
 
   while (!last_request) {
     // Reset the input for new request.
@@ -1018,7 +1018,7 @@ main(int argc, char** argv)
 
     result_filenames.emplace_back(std::move(input_filenames));
 
-    options.request_id_ = std::to_string(results.size());
+    options.request_id_ = std::to_string(sent_count);
 
     // Send request.
     if (!async) {
@@ -1055,6 +1055,7 @@ main(int argc, char** argv)
         exit(1);
       }
     }
+    sent_count++;
   }
 
   // For async, retrieve results according to the send order
@@ -1063,7 +1064,7 @@ main(int argc, char** argv)
     {
       std::unique_lock<std::mutex> lk(mtx);
       cv.wait(lk, [&]() {
-        if (done_cnt >= image_data.size()) {
+        if (done_cnt >= sent_count) {
           return true;
         } else {
           return false;
