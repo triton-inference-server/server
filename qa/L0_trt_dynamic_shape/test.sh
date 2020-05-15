@@ -38,7 +38,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-PERF_CLIENT=../clients/perf_client_v2
+PERF_CLIENT=../clients/perf_client
 TRT_OP_TEST=trt_dynamic_shape_test.py
 
 DATADIR="./models"

@@ -26,11 +26,12 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import numpy as np
 
 import grpc
-from tritongrpcclient import grpc_service_v2_pb2
-from tritongrpcclient import grpc_service_v2_pb2_grpc
+from tritongrpcclient import grpc_service_pb2
+from tritongrpcclient import grpc_service_pb2_grpc
+
+FLAGS = None
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -53,76 +54,69 @@ if __name__ == '__main__':
     # each and returns 2 output tensors of 16 integers each. One
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
-    model_name = "graphdef_int8_int32_int32"
+    model_name = "simple"
     model_version = ""
     batch_size = 1
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
-    # Generate the request
-    request = grpc_service_v2_pb2.ModelInferRequest()
-    request.model_name = model_name
+    # Health
+    try:
+        request = grpc_service_pb2.ServerLiveRequest()
+        response = grpc_stub.ServerLive(request)
+        print("server {}".format(response))
+    except Exception as ex:
+        print(ex)
+
+    request = grpc_service_pb2.ServerReadyRequest()
+    response = grpc_stub.ServerReady(request)
+    print("server {}".format(response))
+
+    request = grpc_service_pb2.ModelReadyRequest(
+        name="resnet_v1_50_graphdef", version=model_version)
+    response = grpc_stub.ModelReady(request)
+    print("model {}".format(response))
+
+    # Metadata
+    request = grpc_service_pb2.ServerMetadataRequest()
+    response = grpc_stub.ServerMetadata(request)
+    print("server metadata:\n{}".format(response))
+
+    request = grpc_service_pb2.ModelMetadataRequest(
+        name="resnet_v1_50_graphdef", version=model_version)
+    response = grpc_stub.ModelMetadata(request)
+    print("model metadata:\n{}".format(response))
+
+    # Configuration
+    request = grpc_service_pb2.ModelConfigRequest(
+        name="resnet_v1_50_graphdef", version=model_version)
+    response = grpc_stub.ModelConfig(request)
+    print("model config:\n{}".format(response))
+
+    # Infer
+    request = grpc_service_pb2.ModelInferRequest()
+    request.model_name = "resnet_v1_50_graphdef"
     request.model_version = model_version
+    request.id = "my request id"
 
-    # Input data
-    input0_data = [i for i in range(16)]
-    input1_data = [1 for i in range(16)]
+    input = grpc_service_pb2.ModelInferRequest().InferInputTensor()
+    input.name = "input"
+    input.datatype = "FP32"
+    input.shape.extend([1, 224, 224, 3])
 
-    # Populate the inputs in inference request
-    input0 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
-    input0.name = "INPUT0"
-    input0.datatype = "INT8"
-    input0.shape.extend([1, 16])
-    input0.contents.int_contents[:] = input0_data
+    input_contents = grpc_service_pb2.InferTensorContents()
+    input_contents.raw_contents = bytes(602112 * 'a', 'utf-8')
+    input.contents.CopyFrom(input_contents)
 
-    input1 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
-    input1.name = "INPUT1"
-    input1.datatype = "INT8"
-    input1.shape.extend([1, 16])
-    input1.contents.int_contents[:] = input1_data
-    request.inputs.extend([input0, input1])
+    request.inputs.extend([input])
 
-    # Populate the outputs in the inference request
-    output0 = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
-    output0.name = "OUTPUT0"
-
-    output1 = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
-    output1.name = "OUTPUT1"
-    request.outputs.extend([output0, output1])
+    output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output.name = "resnet_v1_50/predictions/Softmax"
+    request.outputs.extend([output])
 
     response = grpc_stub.ModelInfer(request)
+    print("model infer:\n{}".format(response))
 
-    output_results = []
-    for output in response.outputs:
-        shape = []
-        for value in output.shape:
-            shape.append(value)
-        output_results.append(
-            np.frombuffer(output.contents.raw_contents, dtype=np.int32))
-        output_results[-1] = np.resize(output_results[-1], shape)
-
-    if len(output_results) != 2:
-        print("expected two output results")
-        sys.exit(1)
-
-    for i in range(16):
-        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
-              str(output_results[0][0][i]))
-        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
-              str(output_results[1][0][i]))
-        if (input0_data[i] + input1_data[i]) != output_results[0][0][i]:
-            print("sync infer error: incorrect sum")
-            sys.exit(1)
-        if (input0_data[i] - input1_data[i]) != output_results[1][0][i]:
-            print("sync infer error: incorrect difference")
-            sys.exit(1)
-
-    # Server should catch wrong model version specification
-    request.model_version = "wrong_specification"
-    try:
-        response = grpc_stub.ModelInfer(request)
-    except Exception as e:
-        if "failed to get model version from specified version string 'wrong_specification'" in e.__str__():
-            print('PASS: explicit int8')
+    print("PASS")

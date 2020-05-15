@@ -792,7 +792,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         "expected model-request-count {}, got {}".format(
                                 request_cnt, actual_request_cnt))
 
-        # FIXME Uncomment below after updated V2 statistics schema from
+        # FIXME Uncomment below after updated statistics schema from
         # 'response' branch.
         # Before that, batch stats is not reported
 

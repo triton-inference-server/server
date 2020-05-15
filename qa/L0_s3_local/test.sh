@@ -38,7 +38,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-PERF_CLIENT=../clients/perf_client_v2
+PERF_CLIENT=../clients/perf_client
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 

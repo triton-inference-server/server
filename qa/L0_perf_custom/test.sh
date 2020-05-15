@@ -35,7 +35,7 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-PERF_CLIENT=../clients/perf_client_v2
+PERF_CLIENT=../clients/perf_client
 REPORTER=../common/reporter.py
 
 PROTOCOLS="grpc http"

@@ -935,9 +935,10 @@ InferenceServerHttpClient::Infer(
 
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
 
-  // Set SEND_END when content length is 0 (because CURLOPT_READFUNCTION will
-  // not be called) or if using HTTP V2. In that case, we can't measure SEND_END
-  // properly (send ends after sending request header).
+  // Set SEND_END when content length is 0 (because
+  // CURLOPT_READFUNCTION will not be called). In that case, we can't
+  // measure SEND_END properly (send ends after sending request
+  // header).
   if (sync_request->total_input_byte_size_ == 0) {
     sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }

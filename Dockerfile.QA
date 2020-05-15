@@ -65,15 +65,14 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
     mkdir qa/L0_cmdline_trace/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cmdline_trace/models/. && \
-    cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/simple qa/L0_http_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_http_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_http_v2/models && \
+    cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc/models && \
+    cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc/models && \
+    cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc/models && \
+    cp -r /workspace/docs/examples/model_repository/simple qa/L0_http/models && \
+    cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_http/models && \
+    cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_http/models && \
     cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_client/ && \
     cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
-    cp /opt/tritonserver/bin/simplev2 qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \
     cp /workspace/builddir/trtis-test-utils/install/bin/memory_test qa/L0_memory/.
 
@@ -91,12 +90,12 @@ RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
     mkdir -p qa/custom_models/custom_nobatch_float32_float32_float32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
         qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
-    mkdir -p qa/L0_grpc_v2/models/simple_custom/1 && \
+    mkdir -p qa/L0_grpc/models/simple_custom/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
-        qa/L0_grpc_v2/models/simple_custom/1/. && \
-    mkdir -p qa/L0_http_v2/models/simple_custom/1 && \
+        qa/L0_grpc/models/simple_custom/1/. && \
+    mkdir -p qa/L0_http/models/simple_custom/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
-        qa/L0_http_v2/models/simple_custom/1/. && \
+        qa/L0_http/models/simple_custom/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
         qa/L0_simple_ensemble/models/simple/1/. && \
@@ -122,18 +121,18 @@ RUN mkdir -p qa/L0_custom_param/models/param/1 && \
 RUN mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
-    mkdir -p qa/L0_grpc_v2/models/simple_sequence/1 && \
+    mkdir -p qa/L0_grpc/models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
-        qa/L0_grpc_v2/models/simple_sequence/1/. && \
-    mkdir -p qa/L0_grpc_v2/models_dyna/simple_sequence/1 && \
+        qa/L0_grpc/models/simple_sequence/1/. && \
+    mkdir -p qa/L0_grpc/models_dyna/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
-        qa/L0_grpc_v2/models_dyna/simple_sequence/1/. && \
-    mkdir -p qa/L0_http_v2/models/simple_sequence/1 && \
+        qa/L0_grpc/models_dyna/simple_sequence/1/. && \
+    mkdir -p qa/L0_http/models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
-        qa/L0_http_v2/models/simple_sequence/1/. && \
-    mkdir -p qa/L0_http_v2/models_dyna/simple_sequence/1 && \
+        qa/L0_http/models/simple_sequence/1/. && \
+    mkdir -p qa/L0_http/models_dyna/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
-        qa/L0_http_v2/models_dyna/simple_sequence/1/. && \
+        qa/L0_http/models_dyna/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \

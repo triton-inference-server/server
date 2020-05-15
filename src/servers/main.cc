@@ -54,11 +54,11 @@ static_assert(
 #endif  // TRTIS_ENABLE_GPU
 
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
-#include "src/servers/http_server_v2.h"
+#include "src/servers/http_server.h"
 #endif  // TRTIS_ENABLE_HTTP|| TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_GRPC
-#include "src/servers/grpc_server_v2.h"
+#include "src/servers/grpc_server.h"
 #endif  // TRTIS_ENABLE_GRPC
 
 namespace {
@@ -80,7 +80,7 @@ bool allow_model_control_ = false;
 // default values and modifyied based on command-line args. Set to -1
 // to indicate the protocol is disabled.
 #ifdef TRTIS_ENABLE_HTTP
-std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>
+std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
     http_services_;
 std::vector<std::string> endpoint_names_ = {"health", "infer"};
 bool allow_http_ = true;
@@ -90,13 +90,13 @@ std::vector<int32_t> http_ports_;
 #endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC
-std::unique_ptr<nvidia::inferenceserver::GRPCServerV2> grpc_service_;
+std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
-std::unique_ptr<nvidia::inferenceserver::HTTPServerV2> metrics_service_;
+std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
 #endif  // TRTIS_ENABLE_METRICS
@@ -412,14 +412,14 @@ CheckPortCollision()
 
 #ifdef TRTIS_ENABLE_GRPC
 TRITONSERVER_Error*
-StartGrpcServiceV2(
-    std::unique_ptr<nvidia::inferenceserver::GRPCServerV2>* service,
+StartGrpcService(
+    std::unique_ptr<nvidia::inferenceserver::GRPCServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
-  TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServerV2::Create(
+  TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
       server, trace_manager, shm_manager, grpc_port_,
       grpc_infer_allocation_pool_size_, service);
   if (err == nullptr) {
@@ -436,9 +436,8 @@ StartGrpcServiceV2(
 
 #ifdef TRTIS_ENABLE_HTTP
 TRITONSERVER_Error*
-StartHttpV2Service(
-    std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>*
-        services,
+StartHttpService(
+    std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>* services,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
@@ -446,7 +445,7 @@ StartHttpV2Service(
     std::map<int32_t, std::vector<std::string>>& port_map)
 {
   TRITONSERVER_Error* err =
-      nvidia::inferenceserver::HTTPServerV2::CreateAPIServer(
+      nvidia::inferenceserver::HTTPServer::CreateAPIServer(
           server, trace_manager, shm_manager, port_map, http_thread_cnt_,
           services);
   if (err == nullptr) {
@@ -471,12 +470,12 @@ StartHttpV2Service(
 
 #ifdef TRTIS_ENABLE_METRICS
 TRITONSERVER_Error*
-StartMetricsV2Service(
-    std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>* service,
+StartMetricsService(
+    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server)
 {
   TRITONSERVER_Error* err =
-      nvidia::inferenceserver::HTTPServerV2::CreateMetricsServer(
+      nvidia::inferenceserver::HTTPServer::CreateMetricsServer(
           server, metrics_port_, 1 /* HTTP thread count */, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -528,7 +527,7 @@ StartEndpoints(
   // Enable GRPC endpoints if requested...
   if (allow_grpc_ && (grpc_port_ != -1)) {
     TRITONSERVER_Error* err =
-        StartGrpcServiceV2(&grpc_service_, server, trace_manager, shm_manager);
+        StartGrpcService(&grpc_service_, server, trace_manager, shm_manager);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to start GRPC service");
       return false;
@@ -548,7 +547,7 @@ StartEndpoints(
       }
     }
 
-    TRITONSERVER_Error* err = StartHttpV2Service(
+    TRITONSERVER_Error* err = StartHttpService(
         &http_services_, server, trace_manager, shm_manager, port_map);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to start HTTP service");
@@ -560,7 +559,7 @@ StartEndpoints(
 #ifdef TRTIS_ENABLE_METRICS
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
-    TRITONSERVER_Error* err = StartMetricsV2Service(&metrics_service_, server);
+    TRITONSERVER_Error* err = StartMetricsService(&metrics_service_, server);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to start Metrics service");
       return false;

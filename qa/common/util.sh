@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,7 +55,7 @@ function wait_for_file_str() {
     WAIT_RET=1
 }
 
-# Wait until HTTP V2 server health endpoint show ready. Sets WAIT_RET to 0 on
+# Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
 # success, 1 on failure
 function wait_for_server_ready() {
     local spid="$1"; shift
@@ -87,7 +87,7 @@ function wait_for_server_ready() {
     WAIT_RET=1
 }
 
-# Wait until HTTP V2 server health endpoint show live. Sets WAIT_RET to 0 on
+# Wait until server health endpoint shows live. Sets WAIT_RET to 0 on
 # success, 1 on failure
 function wait_for_server_live() {
     local spid="$1"; shift
@@ -150,8 +150,8 @@ function wait_for_model_stable() {
     echo "=== Timeout $wait_time_secs secs. Not all models stable."
 }
 
-# Run inference server. Return once HTTP V2 server's health endpoint shows
-# ready or timeout expires.  Sets SERVER_PID to pid of SERVER, or 0 if
+# Run inference server. Return once server's health endpoint shows
+# ready or timeout expires. Sets SERVER_PID to pid of SERVER, or 0 if
 # error (including expired timeout)
 function run_server () {
     SERVER_PID=0
@@ -182,7 +182,7 @@ function run_server () {
     fi
 }
 
-# Run inference server. Return once HTTP V2 server's health endpoint shows
+# Run inference server. Return once server's health endpoint shows
 # live or timeout expires.  Sets SERVER_PID to pid of SERVER, or 0 if
 # error (including expired timeout)
 function run_server_tolive () {
