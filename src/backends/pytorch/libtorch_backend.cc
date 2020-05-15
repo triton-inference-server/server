@@ -44,13 +44,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-struct LibTorchBackend::Context::InputMetaData {
-  std::string name_;
-  std::vector<int64_t> shape_;
-  torch::ScalarType torch_type_;
-  std::unique_ptr<AllocatedMemory> input_buffer_;
-};
-
 LibTorchBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size,
     const bool enable_pinned_input, const bool enable_pinned_output,
@@ -418,19 +411,13 @@ LibTorchBackend::Context::SetInputTensors(
 
     // Checked at initialization time to make sure that STRING is not
     // being used for an input, so can just assume fixed-sized here.
-    size_t total_element_cnt = 1;
-    for (auto dim : batchn_shape) {
-      total_element_cnt *= dim;
-    }
-
-    const size_t total_byte_size =
-        total_element_cnt * GetDataTypeByteSize(datatype);
+    const size_t total_byte_size = GetByteSize(datatype, batchn_shape);
 
     // The entire input tensor must be delivered as a single
     // contiguous chunk so create a buffer large enough to hold the
     // entire dynamic batched input.
     input_buffers->emplace_back(new AllocatedMemory(
-        GetByteSize(datatype, batchn_shape),
+        total_byte_size,
         (gpu_device_ == NO_GPU_DEVICE) ? TRITONSERVER_MEMORY_CPU_PINNED
                                        : TRITONSERVER_MEMORY_GPU,
         (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_));
@@ -439,6 +426,11 @@ LibTorchBackend::Context::SetInputTensors(
     int64_t memory_type_id;
     auto input_buffer =
         input_buffers->back()->MutableBuffer(&memory_type, &memory_type_id);
+
+    collector.ProcessTensor(
+        input_name, datatype, batch1_shape, input_buffer, total_byte_size,
+        memory_type, memory_type_id);
+
     torch::TensorOptions options{torch_dtype.second};
     auto updated_options = (memory_type == TRITONSERVER_MEMORY_GPU)
                                ? options.device(torch::kCUDA, memory_type_id)
@@ -494,7 +486,7 @@ LibTorchBackend::Context::ReadOutputTensors(
         &batchn_shape));
 
     responder.ProcessTensor(
-        name, output_config->data_type(), batchn_shape, output_buffer,
+        name, dtype, batchn_shape, output_buffer,
         ((device_ == torch::kCUDA)) ? TRITONSERVER_MEMORY_GPU
                                     : TRITONSERVER_MEMORY_CPU,
         ((device_ == torch::kCUDA)) ? gpu_device_ : 0);
@@ -678,16 +670,9 @@ LibTorchBackend::Context::Run(
   INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
 
   // Run...
-  Status status = Execute(&inputs_, &outputs_);
-  if (!status.IsOk()) {
-    for (auto& response : responses) {
-      if (response != nullptr) {
-        LOG_STATUS_ERROR(
-            InferenceResponse::SendWithStatus(std::move(response), status),
-            "error running LibTorch model");
-      }
-    }
-  }
+  FAIL_ALL_AND_RETURN_IF_ERROR(
+      requests, responses, metric_reporter_.get(), Execute(&inputs_, &outputs_),
+      "error running LibTorch model");
 
   INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
 
