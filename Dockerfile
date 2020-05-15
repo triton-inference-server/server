@@ -275,6 +275,8 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
+                  -DTRTIS_ENABLE_GRPC=ON \
+                  -DTRTIS_ENABLE_HTTP=ON \
                   -DTRTIS_ENABLE_METRICS=ON \
                   -DTRTIS_ENABLE_METRICS_GPU=ON \
                   -DTRTIS_ENABLE_STATS=ON \
@@ -284,14 +286,12 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRTIS_ENABLE_CUSTOM=ON \
                   -DTRTIS_ENABLE_TENSORFLOW=ON \
                   -DTRTIS_ENABLE_TENSORRT=OFF \
-                  -DTRTIS_ENABLE_CAFFE2=OFF \
-                  -DTRTIS_ENABLE_ONNXRUNTIME=OFF \
+                  -DTRTIS_ENABLE_CAFFE2=ON \
+                  -DTRTIS_ENABLE_ONNXRUNTIME=ON \
                   -DTRTIS_ENABLE_ONNXRUNTIME_TENSORRT=OFF \
-                  -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=OFF \
+                  -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON \
                   -DTRTIS_ENABLE_PYTORCH=OFF \
                   -DTRTIS_ENABLE_ENSEMBLE=OFF \
-                  -DTRTIS_ENABLE_GRPC=ON \
-                  -DTRTIS_ENABLE_HTTP=ON \
                   -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                   -DTRTIS_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch" \
                   -DTRTIS_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
