@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,8 +34,8 @@
 #include <rapidjson/document.h>
 #include <sys/stat.h>
 #include "rapidjson/rapidjson.h"
-#include "src/clients/c++/api_v1/library/request_grpc.h"
-#include "src/clients/c++/api_v1/library/request_http.h"
+#include "src/clients/c++/library/grpc_client.h"
+#include "src/clients/c++/library/http_client.h"
 #include "src/core/constants.h"
 
 namespace ni = nvidia::inferenceserver;
@@ -70,6 +70,7 @@ extern volatile bool early_exit;
   }
 
 enum ProtocolType { HTTP = 0, GRPC = 1, UNKNOWN = 2 };
+
 enum Distribution { POISSON = 0, CONSTANT = 1, CUSTOM = 2 };
 enum SearchMode { LINEAR = 0, BINARY = 1, NONE = 2 };
 enum SharedMemoryType {
@@ -113,19 +114,21 @@ bool IsDirectory(const std::string& path);
 // To check whether the path points to a valid system file
 bool IsFile(const std::string& complete_path);
 
+// Calculates the byte size tensor for given shape and datatype.
+int64_t ByteSize(
+    const std::vector<int64_t>& shape, const std::string& datatype);
 
-// Returns the number of elements in the specified input tensor. The SetShape()
-// for the specified input shpuld have been called before invoking this
-// function.
-// \param input pointer to the input tensor
-// \returns the number of elements in the tensor
-size_t GetElementCount(std::shared_ptr<nic::InferContext::Input> input);
+// Get the number of elements in the tensor for given shape.
+int64_t ElementCount(const std::vector<int64_t>& shape);
 
+// Serializes the string tensor to length prepended bytes.
 void SerializeStringTensor(
     std::vector<std::string> string_tensor, std::vector<char>* serialized_data);
 
+// Serializes an explicit tensor read from the data file to the
+// raw bytes.
 nic::Error SerializeExplicitTensor(
-    const rapidjson::Value& tensor, ni::DataType dt,
+    const rapidjson::Value& tensor, const std::string& dt,
     std::vector<char>* decoded_data);
 
 // Generates a random string of specified length using characters specified in
@@ -133,7 +136,8 @@ nic::Error SerializeExplicitTensor(
 std::string GetRandomString(const int string_length);
 
 // Returns the shape string containing the values provided in the vector
-std::string ShapeVecToString(const std::vector<int64_t> shape_vec);
+std::string ShapeVecToString(
+    const std::vector<int64_t> shape_vec, bool skip_first = false);
 
 // Returns the string containing the shape tensor values
 std::string ShapeTensorValuesToString(const int* data_ptr, const int count);

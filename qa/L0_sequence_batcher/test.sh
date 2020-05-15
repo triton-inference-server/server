@@ -40,7 +40,7 @@ BATCHER_TEST=sequence_batcher_test.py
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
-SERVER=${OPTDIR}/tensorrtserver/bin/tritonserver
+SERVER=${OPTDIR}/tritonserver/bin/tritonserver
 
 source ../common/util.sh
 

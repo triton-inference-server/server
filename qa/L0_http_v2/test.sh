@@ -239,7 +239,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Test with dynamic sequence models
-SERVER_ARGS="--model-repository=`pwd`/models_dyna --api-version=2"
+SERVER_ARGS="--model-repository=`pwd`/models_dyna"
 SERVER_LOG="./inference_server_dyna.log"
 CLIENT_LOG="./client_dyna.log"
 run_server

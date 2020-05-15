@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/perf_client/context_factory.h"
 #include "src/clients/c++/perf_client/data_loader.h"
+#include "src/clients/c++/perf_client/model_parser.h"
 #include "src/clients/c++/perf_client/perf_utils.h"
 
 #include <condition_variable>
@@ -49,7 +49,7 @@ class LoadManager {
   /// Get the sum of all contexts' stat
   /// \param contexts_stat Returned the accumulated stat from all contexts
   /// in load manager
-  nic::Error GetAccumulatedContextStat(nic::InferContext::Stat* contexts_stat);
+  nic::Error GetAccumulatedClientStat(nic::InferStat* contexts_stat);
 
   /// \return the batch size used for the inference requests
   size_t BatchSize() const { return batch_size_; }
@@ -59,28 +59,62 @@ class LoadManager {
   virtual nic::Error ResetWorkers()
   {
     return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
         "resetting worker threads not supported for this load manager.");
   }
 
-  struct InferContextMetaData {
-    InferContextMetaData() : inflight_request_cnt_(0) {}
-    InferContextMetaData(InferContextMetaData&&) = delete;
-    InferContextMetaData(const InferContextMetaData&) = delete;
-
-    std::unique_ptr<nic::InferContext> ctx_;
+  /// Wraps the information required to send an inference to the
+  /// server
+  struct InferContext {
+    explicit InferContext() : inflight_request_cnt_(0) {}
+    InferContext(InferContext&&) = delete;
+    InferContext(const InferContext&) = delete;
+    ~InferContext()
+    {
+      for (const auto input : inputs_) {
+        delete input;
+      }
+      for (const auto output : outputs_) {
+        delete output;
+      }
+    }
+    // The triton client to communicate with the server
+    std::unique_ptr<TritonClientWrapper> infer_client_;
+    // The vector of pointers to InferInput objects to be
+    // used for inference request.
+    std::vector<nic::InferInput*> inputs_;
+    // The vector of pointers to InferRequestedOutput objects
+    // to be used with the inference request.
+    std::vector<const nic::InferRequestedOutput*> outputs_;
+    // The InferOptions object holding the details of the
+    // inference.
+    std::unique_ptr<nic::InferOptions> options_;
+    // The total number of inference in-flight.
     std::atomic<size_t> inflight_request_cnt_;
+  };
+
+  /// The properties of an asynchronous request required in
+  /// the callback to effectively interpret the response.
+  struct AsyncRequestProperties {
+    AsyncRequestProperties() : sequence_end_(false), delayed_(true) {}
+    // The id of in the inference context which was used to
+    // send this request.
+    uint32_t ctx_id_;
+    // The timestamp of when the request was started.
+    struct timespec start_time_;
+    // Whether or not the request is at the end of a sequence.
+    bool sequence_end_;
+    // Whether or not the request is delayed as per schedule.
+    bool delayed_;
   };
 
 
  protected:
   LoadManager(
-      const bool async,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length, const SharedMemoryType shared_memory_type,
-      const size_t output_shm_size,
-      const std::shared_ptr<ContextFactory>& factory);
+      const bool async, const bool streaming, const int32_t batch_size,
+      const size_t max_threads, const size_t sequence_length,
+      const SharedMemoryType shared_memory_type, const size_t output_shm_size,
+      const std::shared_ptr<ModelParser>& parser,
+      const std::shared_ptr<TritonClientFactory>& factory);
 
   /// Helper funtion to retrieve the input data for the inferences
   /// \param string_length The length of the random strings to be generated
@@ -100,30 +134,25 @@ class LoadManager {
   nic::Error InitSharedMemory();
 
   /// Helper function to prepare the InferContext for sending inference request.
-  /// \param ctx Returns a new InferContext.
-  /// \param options Returns the options used by 'ctx'.
+  /// \param ctx The target InferContext object.
   /// \return Error object indicating success or failure.
-  nic::Error PrepareInfer(
-      std::unique_ptr<nic::InferContext>* ctx,
-      std::unique_ptr<nic::InferContext::Options>* options);
+  nic::Error PrepareInfer(InferContext* ctx);
 
-  /// Helper function to prepare the InferContext for sending inference request
-  /// in shared memory.
-  /// \param ctx Returns a new InferContext.
-  /// \param options
-  /// Returns the options used by 'ctx'.
-  nic::Error PrepareSharedMemoryInfer(
-      std::unique_ptr<nic::InferContext>* ctx,
-      std::unique_ptr<nic::InferContext::Options>* options);
+
+  /// Helper function to prepare the InferContext for sending inference
+  /// request in shared memory.
+  /// \param ctx The target InferContext object.
+  /// \return Error object indicating success or failure.
+  nic::Error PrepareSharedMemoryInfer(InferContext* ctx);
+
 
   /// Updates the input data to use for inference request
-  /// \param inputs The inputs to the model
+  /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.
   nic::Error UpdateInputs(
-      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-      int stream_index, int step_index);
+      std::vector<nic::InferInput*>& inputs, int stream_index, int step_index);
 
   void InitNewSequence(int sequence_id);
 
@@ -138,27 +167,26 @@ class LoadManager {
 
  private:
   /// Helper function to update the inputs
-  /// \param inputs The inputs to the model
+  /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.
   nic::Error SetInputs(
-      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-      const int stream_index, const int step_index);
+      const std::vector<nic::InferInput*>& inputs, const int stream_index,
+      const int step_index);
 
   /// Helper function to update the shared memory inputs
-  /// \param inputs The inputs to the model
+  /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.
   nic::Error SetInputsSharedMemory(
-      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-      const int stream_index, const int step_index);
+      const std::vector<nic::InferInput*>& inputs, const int stream_index,
+      const int step_index);
 
  protected:
   bool async_;
-  // User provided input shape
-  std::unordered_map<std::string, std::vector<int64_t>> default_input_shapes_;
+  bool streaming_;
   size_t batch_size_;
   size_t max_threads_;
   size_t sequence_length_;
@@ -166,12 +194,13 @@ class LoadManager {
   size_t output_shm_size_;
   bool on_sequence_model_;
 
-  std::shared_ptr<ContextFactory> factory_;
+  std::shared_ptr<ModelParser> parser_;
+  std::shared_ptr<TritonClientFactory> factory_;
 
   bool using_json_data_;
 
   std::unique_ptr<DataLoader> data_loader_;
-  std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx_;
+  std::unique_ptr<TritonClientWrapper> client_;
 
   // Map from shared memory key to its starting address and size
   std::unordered_map<std::string, std::pair<uint8_t*, size_t>>
@@ -179,18 +208,14 @@ class LoadManager {
 
   // Holds the running status of the thread.
   struct ThreadStat {
-    ThreadStat()
-        : status_(ni::RequestStatusCode::SUCCESS),
-          cb_status_(ni::RequestStatusCode::SUCCESS)
-    {
-    }
+    ThreadStat() {}
 
     // The status of the worker thread
     nic::Error status_;
     // The status of the callback thread for async requests
     nic::Error cb_status_;
     // The statistics of the InferContext
-    std::vector<nic::InferContext::Stat> contexts_stat_;
+    std::vector<nic::InferStat> contexts_stat_;
     // The concurrency level that the worker should produce
     size_t concurrency_;
     // A vector of request timestamps <start_time, end_time>
@@ -202,12 +227,12 @@ class LoadManager {
 
   // Holds the status of the inflight sequence
   struct SequenceStat {
-    SequenceStat(uint64_t corr_id)
-        : corr_id_(corr_id), data_stream_id_(0), remaining_queries_(0)
+    SequenceStat(uint64_t seq_id)
+        : seq_id_(seq_id), data_stream_id_(0), remaining_queries_(0)
     {
     }
     // The unique correlation id allocated to the sequence
-    uint64_t corr_id_;
+    uint64_t seq_id_;
     // The data stream id providing data for the sequence
     uint64_t data_stream_id_;
     // The number of queries remaining to complete the sequence
@@ -217,7 +242,7 @@ class LoadManager {
   };
 
   std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
-  std::atomic<ni::CorrelationID> next_corr_id_;
+  std::atomic<uint64_t> next_seq_id_;
 
   // Worker threads that loads the server with inferences
   std::vector<std::thread> threads_;

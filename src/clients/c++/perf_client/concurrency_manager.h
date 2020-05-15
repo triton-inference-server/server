@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -50,30 +50,33 @@ class ConcurrencyManager : public LoadManager {
   /// load on inference server.
   /// \param async Whether to use asynchronous or synchronous API for infer
   /// request.
+  /// \param streaming Whether to use gRPC streaming API for infer request
   /// \param batch_size The batch size used for each request.
   /// \param max_threads The maximum number of working threads to be spawned.
   /// \param max_concurrency The maximum concurrency which will be requested.
   /// \param sequence_length The base length of each sequence.
+  /// \param string_length The length of the string to create for input.
+  /// \param string_data The data to use for generating string input.
   /// \param zero_input Whether to fill the input tensors with zero.
-  /// \param input_shapes The shape of the input tensors.
   /// \param user_data The vector containing path/paths to user-provided data
   /// that can be a directory or path to a json data file.
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size in bytes of the shared memory to
   /// allocate for the output.
-  /// \param factory The ContextFactory object used to create
-  /// InferContext.
+  /// \param parser The ModelParser object to get the model details.
+  /// \param factory The TritonClientFactory object used to create
+  /// client to the server.
   /// \param manager Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const bool async, const int32_t batch_size, const size_t max_threads,
-      const size_t max_concurrency, const size_t sequence_length,
-      const size_t string_length, const std::string& string_data,
-      const bool zero_input,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+      const bool async, const bool streaming, const int32_t batch_size,
+      const size_t max_threads, const size_t max_concurrency,
+      const size_t sequence_length, const size_t string_length,
+      const std::string& string_data, const bool zero_input,
       std::vector<std::string>& user_data,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-      const std::shared_ptr<ContextFactory>& factory,
+      const std::shared_ptr<ModelParser>& parser,
+      const std::shared_ptr<TritonClientFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
   /// Adjusts the number of concurrent requests to be the same as
@@ -84,12 +87,11 @@ class ConcurrencyManager : public LoadManager {
 
  private:
   ConcurrencyManager(
-      const bool async,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      const int32_t batch_size, const size_t max_threads,
-      const size_t max_concurrency, const size_t sequence_length,
-      const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-      const std::shared_ptr<ContextFactory>& factory);
+      const bool async, const bool streaming, const int32_t batch_size,
+      const size_t max_threads, const size_t max_concurrency,
+      const size_t sequence_length, const SharedMemoryType shared_memory_type,
+      const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
+      const std::shared_ptr<TritonClientFactory>& factory);
 
   struct ThreadConfig {
     ThreadConfig(size_t thread_id)

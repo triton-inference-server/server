@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,50 +36,53 @@ find_package(RapidJSON CONFIG REQUIRED)
 set(
   PERF_CLIENT_SRCS
   perf_client.cc
-  context_factory.cc
-  inference_profiler.cc
+  model_parser.cc
   perf_utils.cc
-  data_loader.cc
   load_manager.cc
+  data_loader.cc
   concurrency_manager.cc
   request_rate_manager.cc
   custom_load_manager.cc
-  ../api_v1/examples/shm_utils.cc
+  triton_client_wrapper.cc
+  inference_profiler.cc
+  ../examples/shm_utils.cc
 )
 
 set(
   PERF_CLIENT_HDRS
-  context_factory.h
-  inference_profiler.h
+  model_parser.h
   perf_utils.h
-  data_loader.h
   load_manager.h
+  data_loader.h
   concurrency_manager.h
   request_rate_manager.h
   custom_load_manager.h
-  ../api_v1/examples/shm_utils.h
+  triton_client_wrapper.h
+  inference_profiler.h
+ ../examples/shm_utils.h
 )
 
-add_executable(perf_client
+add_executable(perf_client_v2
   ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
 target_include_directories(
-  perf_client
+  perf_client_v2
   PRIVATE ${RapidJSON_INCLUDE_DIRS})
 target_link_libraries(
-  perf_client
-  PRIVATE TRTIS::request_static
+  perf_client_v2
+  PRIVATE TRTIS::grpcclient_static
+  PRIVATE TRTIS::httpclient_static
   PRIVATE -lb64
 )
 
 # If gpu is enabled then compile with CUDA dependencies
 if(${TRTIS_ENABLE_GPU})
-  target_include_directories(perf_client PRIVATE ${CUDA_INCLUDE_DIRS})
-  target_link_libraries(perf_client PRIVATE ${CUDA_LIBRARIES})
+  target_include_directories(perf_client_v2 PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(perf_client_v2 PRIVATE ${CUDA_LIBRARIES})
 endif()
 
 
 install(
-  TARGETS perf_client
+  TARGETS perf_client_v2
   RUNTIME DESTINATION bin
 )
 

@@ -32,36 +32,21 @@ cmake_minimum_required (VERSION 3.5)
 set(GRPC_ENDPOINT_OBJECTS "")
 set(GRPC_ENDPOINT_LIBRARIES "")
 
-if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
+if(${TRTIS_ENABLE_GRPC})
+  list(APPEND
+    GRPC_ENDPOINT_SRCS
+    grpc_server_v2.cc
+    )
 
-  if(${TRTIS_ENABLE_GRPC})
-    list(APPEND
-      GRPC_ENDPOINT_SRCS
-      grpc_server.cc
-      )
-
-    list(APPEND
-      GRPC_ENDPOINT_HDRS
-      grpc_server.h
-      )
-  endif() # TRTIS_ENABLE_GRPC
-
-  if(${TRTIS_ENABLE_GRPC_V2})
-    list(APPEND
-      GRPC_ENDPOINT_SRCS
-      grpc_server_v2.cc
-      )
-
-    list(APPEND
-      GRPC_ENDPOINT_HDRS
-      grpc_server_v2.h
-      )
-  endif() # TRTIS_ENABLE_GRPC_V2
+  list(APPEND
+    GRPC_ENDPOINT_HDRS
+    grpc_server_v2.h
+    )
 
   add_library(
     grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
     ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
-    )
+  )
 
   if(${TRTIS_ENABLE_GPU})
     target_include_directories(grpc-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -69,11 +54,8 @@ if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
 
   add_dependencies(grpc-endpoint-library proto-library)
   if(${TRTIS_ENABLE_GRPC})
-    add_dependencies(grpc-endpoint-library grpc-library)
-  endif() # TRTIS_ENABLE_GRPC
-  if(${TRTIS_ENABLE_GRPC_V2})
     add_dependencies(grpc-endpoint-library grpc-v2-library)
-  endif() # TRTIS_ENABLE_GRPC_V2
+  endif() # TRTIS_ENABLE_GRPC
 
   set(
     GRPC_ENDPOINT_OBJECTS
@@ -83,15 +65,9 @@ if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
   if(${TRTIS_ENABLE_GRPC})
     list(APPEND
       GRPC_ENDPOINT_OBJECTS
-      $<TARGET_OBJECTS:grpc-library>
-      )
-  endif() # TRTIS_ENABLE_GRPC
-  if(${TRTIS_ENABLE_GRPC_V2})
-    list(APPEND
-      GRPC_ENDPOINT_OBJECTS
       $<TARGET_OBJECTS:grpc-v2-library>
       )
-  endif() # TRTIS_ENABLE_GRPC_V2
+  endif() # TRTIS_ENABLE_GRPC
 
   set(
     GRPC_ENDPOINT_LIBRARIES
@@ -99,7 +75,7 @@ if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
     PRIVATE gRPC::grpc
     PRIVATE protobuf::libprotobuf
     )
-endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+endif() # TRTIS_ENABLE_GRPC
 
 #
 # http endpoint
@@ -107,11 +83,11 @@ endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 set(HTTP_ENDPOINT_OBJECTS "")
 set(HTTP_ENDPOINT_LIBRARIES "")
 
-if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
+if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_METRICS})
+  if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     list(APPEND
       HTTP_ENDPOINT_SRCS
       http_server_v2.cc
@@ -120,7 +96,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
       HTTP_ENDPOINT_HDRS
       http_server_v2.h
       )
-  endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_METRICS
+  endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
@@ -152,7 +128,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
     PRIVATE -lre2
     PRIVATE -lb64
   )
-endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS || TRTIS_ENABLE_HTTP_V2
+endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
 #
 # tracing
@@ -251,18 +227,18 @@ install(
 # simplev2
 #
 set(
-  SIMPLEV2_SRCS
+  SIMPLE_SRCS
   simplev2.cc
 )
 
 set(
-  SIMPLEV2_HDRS
+  SIMPLE_HDRS
 )
 
 add_executable(
   simplev2
-  ${SIMPLEV2_SRCS}
-  ${SIMPLEV2_HDRS}
+  ${SIMPLE_SRCS}
+  ${SIMPLE_HDRS}
   $<TARGET_OBJECTS:proto-library>
 )
 set_target_properties(
@@ -293,7 +269,7 @@ install(
 )
 
 #
-# memory_alloc (only build when TRTIS_ENABLE_GPU given the purpose)
+# memory_alloc
 #
 if(${TRTIS_ENABLE_GPU})
 set(
