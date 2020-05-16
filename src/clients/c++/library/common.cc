@@ -290,6 +290,17 @@ InferRequestedOutput::SetSharedMemory(
   return Error::Success;
 }
 
+Error
+InferRequestedOutput::UnsetSharedMemory()
+{
+  shm_name_ = "";
+  shm_byte_size_ = 0;
+  shm_offset_ = 0;
+  io_type_ = NONE;
+
+  return Error::Success;
+}
+
 InferRequestedOutput::InferRequestedOutput(
     const std::string& name, const size_t class_count)
     : name_(name), class_count_(class_count), io_type_(NONE)
