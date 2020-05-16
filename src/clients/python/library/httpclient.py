@@ -1469,6 +1469,18 @@ class InferRequestedOutput:
         if offset != 0:
             self._parameters['shared_memory_offset'] = offset
 
+    def unset_shared_memory(self):
+        """Clears the shared memory option set by the last call to
+        InferRequestedOutput.set_shared_memory(). After call to this
+        function requested output will no longer be returned in a
+        shared memory region.
+        """
+
+        self._parameters['binary_data'] = self._binary
+        self._parameters.pop('shared_memory_region', None)
+        self._parameters.pop('shared_memory_byte_size', None)
+        self._parameters.pop('shared_memory_offset', None)
+
     def _get_tensor(self):
         """Retrieve the underlying input as json dict.
 
