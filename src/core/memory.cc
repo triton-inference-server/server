@@ -29,10 +29,10 @@
 #include "src/core/logging.h"
 #include "src/core/pinned_memory_manager.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #include "src/core/cuda_memory_manager.h"
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -125,7 +125,7 @@ AllocatedMemory::AllocatedMemory(
     // Allocate memory with the following fallback policy:
     // CUDA memory -> pinned system memory -> non-pinned system memory
     switch (memory_type_) {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       case TRITONSERVER_MEMORY_GPU: {
         auto status = CudaMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, memory_type_id_);
@@ -136,7 +136,7 @@ AllocatedMemory::AllocatedMemory(
         break;
       }
       pinned_memory_allocation:
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
       default: {
         auto status = PinnedMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, &memory_type_, true);
@@ -156,12 +156,12 @@ AllocatedMemory::~AllocatedMemory()
   if (buffer_ != nullptr) {
     switch (memory_type_) {
       case TRITONSERVER_MEMORY_GPU: {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
         auto status = CudaMemoryManager::Free(buffer_, memory_type_id_);
         if (!status.IsOk()) {
           LOG_ERROR << status.Message();
         }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
         break;
       }
 

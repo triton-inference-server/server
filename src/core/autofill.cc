@@ -26,21 +26,21 @@
 
 #include "src/core/autofill.h"
 
-#ifdef TRTIS_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CAFFE2
 #include "src/backends/caffe2/autofill.h"
-#endif  // TRTIS_ENABLE_CAFFE2
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#endif  // TRITON_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_TENSORFLOW
 #include "src/backends/tensorflow/autofill.h"
-#endif  // TRTIS_ENABLE_TENSORFLOW
-#ifdef TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORRT
 #include "src/backends/tensorrt/autofill.h"
-#endif  // TRTIS_ENABLE_TENSORRT
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_ONNXRUNTIME
 #include "src/backends/onnx/autofill.h"
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
-#ifdef TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
 #include "src/backends/pytorch/autofill.h"
-#endif  // TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_PYTORCH
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
@@ -118,15 +118,15 @@ AutoFill::Create(
   // If the config specifies a platform use it to create the
   // appropriate autofill object, otherwise just try creating each
   // autofill object to see if one can detect the platform.
-#if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
-    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME) ||  \
-    defined(TRTIS_ENABLE_PYTORCH)
+#if defined(TRITON_ENABLE_TENSORFLOW) || defined(TRITON_ENABLE_TENSORRT) || \
+    defined(TRITON_ENABLE_CAFFE2) || defined(TRITON_ENABLE_ONNXRUNTIME) ||  \
+    defined(TRITON_ENABLE_PYTORCH)
   const Platform platform = GetPlatform(config.platform());
 #endif
 
   Status status;
 
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORFLOW
   if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afsm;
@@ -154,9 +154,9 @@ AutoFill::Create(
       return Status::Success;
     }
   }
-#endif  // TRTIS_ENABLE_TENSORFLOW
+#endif  // TRITON_ENABLE_TENSORFLOW
 
-#ifdef TRTIS_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_PYTORCH
   if ((platform == Platform::PLATFORM_PYTORCH_LIBTORCH) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afpt;
@@ -167,9 +167,9 @@ AutoFill::Create(
       return Status::Success;
     }
   }
-#endif  // TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_PYTORCH
 
-#ifdef TRTIS_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CAFFE2
   if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afnd;
@@ -180,9 +180,9 @@ AutoFill::Create(
       return Status::Success;
     }
   }
-#endif  // TRTIS_ENABLE_CAFFE2
+#endif  // TRITON_ENABLE_CAFFE2
 
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_ONNXRUNTIME
   // Check for ONNX model must be done before check for TensorRT plan
   // because TensorRT deserializeCudaEngine() function will cause program
   // to exit when it tries to deserialize an ONNX model.
@@ -203,9 +203,9 @@ AutoFill::Create(
       return Status::Success;
     }
   }
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_ONNXRUNTIME
 
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORRT
   if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afp;
@@ -216,14 +216,14 @@ AutoFill::Create(
       return Status::Success;
     }
   }
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
 
   // Unable to determine the platform so just use the simple autofill,
   // or null if that fails.
   {
-#if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
-    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME) ||  \
-    defined(TRTIS_ENABLE_PYTORCH)
+#if defined(TRITON_ENABLE_TENSORFLOW) || defined(TRITON_ENABLE_TENSORRT) || \
+    defined(TRITON_ENABLE_CAFFE2) || defined(TRITON_ENABLE_ONNXRUNTIME) ||  \
+    defined(TRITON_ENABLE_PYTORCH)
     bool print_warning = true;
     if (!LOG_VERBOSE_IS_ON(1)) {
       if (platform == Platform::PLATFORM_UNKNOWN) {
@@ -232,12 +232,12 @@ AutoFill::Create(
                     << " (verify contents of model directory or use "
                        "--log-verbose=1 for more details)";
       } else {
-#ifdef TRTIS_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_CUSTOM
         if (platform == Platform::PLATFORM_CUSTOM) {
           print_warning = false;
         }
 #endif
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
         if (platform == Platform::PLATFORM_ENSEMBLE) {
           print_warning = false;
         }

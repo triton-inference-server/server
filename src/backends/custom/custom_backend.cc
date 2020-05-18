@@ -34,9 +34,9 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace {
 
@@ -167,7 +167,7 @@ CustomBackend::CreateExecutionContext(
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
   } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     cudaDeviceProp cuprops;
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
@@ -184,7 +184,7 @@ CustomBackend::CreateExecutionContext(
                             : cc_itr->second;
 #else
     return Status(Status::Code::INTERNAL, "GPU instances not supported");
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   }
 
   const auto& mn_itr = libraries.find(cc_model_filename);
@@ -212,12 +212,12 @@ CustomBackend::CreateExecutionContext(
       Config().optimization().output_pinned_memory().enable();
 
   std::unique_ptr<MetricModelReporter> metric_reporter;
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
     metric_reporter.reset(new MetricModelReporter(
         Name(), Version(), gpu_device, Config().metric_tags()));
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
@@ -313,7 +313,7 @@ CustomBackend::InitBackend(uint32_t runner_idx)
                                     context->LibraryErrorString(err));
   }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   auto cuerr = cudaGetDevice(&(context->current_execute_device_));
   // Ignore error caused by CPU-only system.
   if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
@@ -322,7 +322,7 @@ CustomBackend::InitBackend(uint32_t runner_idx)
               << cudaGetErrorString(cuerr);
     context->current_execute_device_ = context->gpu_device_;
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   return Status::Success;
 }
@@ -473,11 +473,11 @@ CustomBackend::Context::Run(
 
   INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (current_execute_device_ != CUSTOM_NO_GPU_DEVICE) {
     cudaSetDevice(current_execute_device_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   // Execute the custom backend which will use CustomGetOutput to get
   // the output buffers into which it will write the results for the
@@ -496,7 +496,7 @@ CustomBackend::Context::Run(
       break;
   }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // Record the current device after execution in case other Triton components
   // modify it (i.e. when releasing output buffer)
   auto cuerr = cudaGetDevice(&current_execute_device_);
@@ -507,9 +507,9 @@ CustomBackend::Context::Run(
               << cudaGetErrorString(cuerr);
     current_execute_device_ = gpu_device_;
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // Transfer data to actual buffer if internal buffer is created.
   // This happens in the case where V1 interface is used and actual buffer is
   // on GPU.
@@ -522,7 +522,7 @@ CustomBackend::Context::Run(
     }
   }
   cudaStreamSynchronize(stream_);
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
 
@@ -540,7 +540,7 @@ CustomBackend::Context::Run(
     return;
   }
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
 
   // Report stats and trace
@@ -551,7 +551,7 @@ CustomBackend::Context::Run(
         compute_start_ns, compute_input_end_ns, compute_output_start_ns,
         compute_end_ns);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     if (request->Trace() != nullptr) {
       auto& trace = request->Trace();
       trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
@@ -560,14 +560,14 @@ CustomBackend::Context::Run(
           TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
       trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
   }
 
   // Also reporting batch stats
   base->MutableStatsAggregator()->UpdateInferBatchStats(
       metric_reporter_.get(), total_batch_size, compute_start_ns,
       compute_input_end_ns, compute_output_start_ns, compute_end_ns);
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   // Send the response for each custom payload and release the request
   // as we are done with it. If a payload has an error then send an
@@ -608,7 +608,7 @@ CustomBackend::Context::GetNextInput(
       input_context, cname, content, content_byte_size, &src_memory_type,
       &src_memory_type_id);
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // If the memory type is on GPU, implicitly copying it to CPU memory
   // to ensure backward capability
   if (ok && (src_memory_type == CUSTOM_MEMORY_GPU)) {
@@ -628,7 +628,7 @@ CustomBackend::Context::GetNextInput(
 
     return (err == cudaSuccess);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   return ok;
 }
@@ -684,7 +684,7 @@ CustomBackend::Context::GetOutput(
       output_context, cname, shape_dim_cnt, shape_dims, content_byte_size,
       content, &dst_memory_type, &dst_memory_type_id);
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // If the actual memory type is GPU, returns a CPU memory buffer and
   // implicitly copying the content to actual memory buffer after run.
   if (ok && (dst_memory_type == CUSTOM_MEMORY_GPU)) {
@@ -694,7 +694,7 @@ CustomBackend::Context::GetOutput(
         *content, std::move(internal_buffer), content_byte_size);
     *content = internal_ptr;
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   return ok;
 }
@@ -747,7 +747,7 @@ CustomBackend::Context::GetOutput(
       return false;
     }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     int current_device;
     auto cuerr = cudaGetDevice(&current_device);
     // Ignore error caused by CPU-only system.
@@ -761,7 +761,7 @@ CustomBackend::Context::GetOutput(
         return false;
       }
     }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
     TRITONSERVER_MemoryType actual_memory_type =
         CustomToTritonMemoryType(*memory_type);
@@ -771,7 +771,7 @@ CustomBackend::Context::GetOutput(
         content, content_byte_size, &actual_memory_type,
         &actual_memory_type_id);
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     cuerr = cudaSetDevice(current_device);
     if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
         (cuerr != cudaErrorInsufficientDriver)) {
@@ -779,7 +779,7 @@ CustomBackend::Context::GetOutput(
           Status::Code::INTERNAL, "unable to recover current CUDA device: " +
                                       std::string(cudaGetErrorString(cuerr)));
     }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
     if (!status.IsOk()) {
       LOG_VERBOSE(1) << status.AsString();

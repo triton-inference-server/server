@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
 
 #include "src/core/metrics.h"
 
@@ -33,10 +33,10 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 
-#ifdef TRTIS_ENABLE_METRICS_GPU
+#ifdef TRITON_ENABLE_METRICS_GPU
 #include <cuda_runtime_api.h>
 #include <nvml.h>
-#endif  // TRTIS_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -87,7 +87,7 @@ Metrics::Metrics()
               .Help("Cummulative inference compute output duration in "
                     "microseconds")
               .Register(*registry_)),
-#ifdef TRTIS_ENABLE_METRICS_GPU
+#ifdef TRITON_ENABLE_METRICS_GPU
       gpu_utilization_family_(prometheus::BuildGauge()
                                   .Name("nv_gpu_utilization")
                                   .Help("GPU utilization rate [0.0 - 1.0)")
@@ -114,20 +114,20 @@ Metrics::Metrics()
               .Help("GPU energy consumption in joules since the Triton Server "
                     "started")
               .Register(*registry_)),
-#endif  // TRTIS_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS_GPU
       metrics_enabled_(false), gpu_metrics_enabled_(false)
 {
 }
 
 Metrics::~Metrics()
 {
-#ifdef TRTIS_ENABLE_METRICS_GPU
+#ifdef TRITON_ENABLE_METRICS_GPU
   // Signal the nvml thread to exit and then wait for it...
   if (nvml_thread_ != nullptr) {
     nvml_thread_exit_.store(true);
     nvml_thread_->join();
   }
-#endif  // TRTIS_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS_GPU
 }
 
 bool
@@ -163,7 +163,7 @@ Metrics::EnableGPUMetrics()
 bool
 Metrics::InitializeNvmlMetrics()
 {
-#ifndef TRTIS_ENABLE_METRICS_GPU
+#ifndef TRITON_ENABLE_METRICS_GPU
   return false;
 #else
   nvmlReturn_t nvmlerr = nvmlInit();
@@ -337,7 +337,7 @@ Metrics::InitializeNvmlMetrics()
   }
 
   return true;
-#endif  // TRTIS_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS_GPU
 }
 
 bool
@@ -352,7 +352,7 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
   }
 
   // If GPU metrics is not enabled just silently fail.
-#ifndef TRTIS_ENABLE_METRICS_GPU
+#ifndef TRITON_ENABLE_METRICS_GPU
   return false;
 #else
   char pcibusid_str[64];
@@ -380,7 +380,7 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
 
   *uuid = uuid_str;
   return true;
-#endif  // TRTIS_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS_GPU
 }
 
 std::shared_ptr<prometheus::Registry>
@@ -407,4 +407,4 @@ Metrics::GetSingleton()
 
 }}  // namespace nvidia::inferenceserver
 
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS

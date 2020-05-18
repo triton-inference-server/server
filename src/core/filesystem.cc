@@ -28,11 +28,11 @@
 
 #include <dirent.h>
 
-#ifdef TRTIS_ENABLE_GCS
+#ifdef TRITON_ENABLE_GCS
 #include <google/cloud/storage/client.h>
-#endif  // TRTIS_ENABLE_GCS
+#endif  // TRITON_ENABLE_GCS
 
-#ifdef TRTIS_ENABLE_S3
+#ifdef TRITON_ENABLE_S3
 #include <aws/core/Aws.h>
 #include <aws/core/auth/AWSCredentialsProvider.h>
 #include <aws/s3/S3Client.h>
@@ -40,7 +40,7 @@
 #include <aws/s3/model/HeadBucketRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/ListObjectsRequest.h>
-#endif  // TRTIS_ENABLE_S3
+#endif  // TRITON_ENABLE_S3
 
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/text_format.h>
@@ -248,7 +248,7 @@ LocalFileSystem::WriteTextFile(
   return Status::Success;
 }
 
-#if defined(TRTIS_ENABLE_GCS) || defined(TRTIS_ENABLE_S3)
+#if defined(TRITON_ENABLE_GCS) || defined(TRITON_ENABLE_S3)
 // Helper function to take care of lack of trailing slashes
 std::string
 AppendSlash(const std::string& name)
@@ -259,9 +259,9 @@ AppendSlash(const std::string& name)
 
   return (name + "/");
 }
-#endif  // TRTIS_ENABLE_GCS || TRTIS_ENABLE_S3
+#endif  // TRITON_ENABLE_GCS || TRITON_ENABLE_S3
 
-#ifdef TRTIS_ENABLE_GCS
+#ifdef TRITON_ENABLE_GCS
 
 namespace gcs = google::cloud::storage;
 
@@ -566,9 +566,9 @@ GCSFileSystem::WriteTextFile(
       "Write text file operation not yet implemented " + path);
 }
 
-#endif  // TRTIS_ENABLE_GCS
+#endif  // TRITON_ENABLE_GCS
 
-#ifdef TRTIS_ENABLE_S3
+#ifdef TRITON_ENABLE_S3
 
 namespace s3 = Aws::S3;
 
@@ -1046,40 +1046,40 @@ S3FileSystem::WriteTextFile(
 }
 
 
-#endif  // TRTIS_ENABLE_S3
+#endif  // TRITON_ENABLE_S3
 
 Status
 GetFileSystem(const std::string& path, FileSystem** file_system)
 {
   // Check if this is a GCS path (gs://$BUCKET_NAME)
   if (!path.empty() && !path.rfind("gs://", 0)) {
-#ifndef TRTIS_ENABLE_GCS
+#ifndef TRITON_ENABLE_GCS
     return Status(
         Status::Code::INTERNAL,
         "gs:// file-system not supported. To enable, build with "
-        "-DTRTIS_ENABLE_GCS=ON.");
+        "-DTRITON_ENABLE_GCS=ON.");
 #else
     static GCSFileSystem gcs_fs;
     RETURN_IF_ERROR(gcs_fs.CheckClient());
     *file_system = &gcs_fs;
     return Status::Success;
-#endif  // TRTIS_ENABLE_GCS
+#endif  // TRITON_ENABLE_GCS
   }
 
   // Check if this is an S3 path (s3://$BUCKET_NAME)
   if (!path.empty() && !path.rfind("s3://", 0)) {
-#ifndef TRTIS_ENABLE_S3
+#ifndef TRITON_ENABLE_S3
     return Status(
         Status::Code::INTERNAL,
         "s3:// file-system not supported. To enable, build with "
-        "-DTRTIS_ENABLE_S3=ON.");
+        "-DTRITON_ENABLE_S3=ON.");
 #else
     Aws::SDKOptions options;
     Aws::InitAPI(options);
     static S3FileSystem s3_fs(options, path);
     *file_system = &s3_fs;
     return Status::Success;
-#endif  // TRTIS_ENABLE_S3
+#endif  // TRITON_ENABLE_S3
   }
 
   // Assume path is for local filesystem

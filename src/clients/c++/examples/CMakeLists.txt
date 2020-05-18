@@ -45,8 +45,8 @@ else()
   target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
   target_link_libraries(
     image_client
-    PRIVATE TRTIS::grpcclient_static
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::grpcclient_static
+    PRIVATE TRITON::httpclient_static
     PRIVATE ${OpenCV_LIBS}
   )
   install(
@@ -60,8 +60,8 @@ else()
   add_executable(ensemble_image_client ensemble_image_client.cc)
   target_link_libraries(
     ensemble_image_client
-    PRIVATE TRTIS::grpcclient_static
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::grpcclient_static
+    PRIVATE TRITON::httpclient_static
   )
   install(
     TARGETS ensemble_image_client
@@ -74,7 +74,7 @@ else()
   add_executable(simple_grpc_health_metadata simple_grpc_health_metadata.cc)
   target_link_libraries(
     simple_grpc_health_metadata
-    PRIVATE TRTIS::grpcclient_static
+    PRIVATE TRITON::grpcclient_static
   )
   install(
     TARGETS simple_grpc_health_metadata
@@ -87,7 +87,7 @@ else()
   add_executable(simple_grpc_model_control simple_grpc_model_control.cc)
   target_link_libraries(
     simple_grpc_model_control
-    PRIVATE TRTIS::grpcclient_static
+    PRIVATE TRITON::grpcclient_static
   )
   install(
     TARGETS simple_grpc_model_control
@@ -100,7 +100,7 @@ else()
   add_executable(simple_grpc_infer_client simple_grpc_infer_client.cc)
   target_link_libraries(
     simple_grpc_infer_client
-    PRIVATE TRTIS::grpcclient_static
+    PRIVATE TRITON::grpcclient_static
   )
   install(
     TARGETS simple_grpc_infer_client
@@ -113,7 +113,7 @@ else()
   add_executable(simple_grpc_string_infer_client simple_grpc_string_infer_client.cc)
   target_link_libraries(
     simple_grpc_string_infer_client
-    PRIVATE TRTIS::grpcclient_static
+    PRIVATE TRITON::grpcclient_static
   )
   install(
     TARGETS simple_grpc_string_infer_client
@@ -126,7 +126,7 @@ else()
   add_executable(simple_grpc_async_infer_client simple_grpc_async_infer_client.cc)
   target_link_libraries(
     simple_grpc_async_infer_client
-    PRIVATE TRTIS::grpcclient_static
+    PRIVATE TRITON::grpcclient_static
   )
   install(
     TARGETS simple_grpc_async_infer_client
@@ -139,7 +139,7 @@ else()
   add_executable(simple_grpc_sequence_stream_infer_client simple_grpc_sequence_stream_infer_client.cc)
   target_link_libraries(
     simple_grpc_sequence_stream_infer_client
-    PRIVATE TRTIS::grpcclient_static
+    PRIVATE TRITON::grpcclient_static
   )
   install(
     TARGETS simple_grpc_sequence_stream_infer_client
@@ -152,7 +152,7 @@ else()
   add_executable(simple_grpc_sequence_sync_infer_client simple_grpc_sequence_sync_infer_client.cc)
   target_link_libraries(
     simple_grpc_sequence_sync_infer_client
-    PRIVATE TRTIS::grpcclient_static
+    PRIVATE TRITON::grpcclient_static
   )
   install(
     TARGETS simple_grpc_sequence_sync_infer_client
@@ -174,14 +174,14 @@ else()
   add_executable(simple_grpc_shm_client ${SIMPLE_GRPC_SHM_SRCS} ${SIMPLE_GRPC_SHM_HDRS})
   target_link_libraries(
     simple_grpc_shm_client
-    PRIVATE TRTIS::grpcclient_static
+    PRIVATE TRITON::grpcclient_static
   )
   install(
     TARGETS simple_grpc_shm_client
     RUNTIME DESTINATION bin
   )
 
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     #
     # simple_grpc_cudashm_client
     #
@@ -196,14 +196,14 @@ else()
     target_include_directories(simple_grpc_cudashm_client PRIVATE ${CUDA_INCLUDE_DIRS})
     target_link_libraries(
       simple_grpc_cudashm_client
-      PRIVATE TRTIS::grpcclient_static
+      PRIVATE TRITON::grpcclient_static
       PRIVATE ${CUDA_LIBRARIES}
     )
     install(
       TARGETS simple_grpc_cudashm_client
       RUNTIME DESTINATION bin
     )
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
 
   #
   # simple_http_health_metadata
@@ -211,7 +211,7 @@ else()
   add_executable(simple_http_health_metadata simple_http_health_metadata.cc)
   target_link_libraries(
     simple_http_health_metadata
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::httpclient_static
   )
   install(
     TARGETS simple_http_health_metadata
@@ -224,7 +224,7 @@ else()
   add_executable(simple_http_model_control simple_http_model_control.cc)
   target_link_libraries(
     simple_http_model_control
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::httpclient_static
   )
   install(
     TARGETS simple_http_model_control
@@ -237,7 +237,7 @@ else()
   add_executable(simple_http_infer_client simple_http_infer_client.cc)
   target_link_libraries(
     simple_http_infer_client
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::httpclient_static
   )
   install(
     TARGETS simple_http_infer_client
@@ -250,7 +250,7 @@ else()
   add_executable(simple_http_string_infer_client simple_http_string_infer_client.cc)
   target_link_libraries(
     simple_http_string_infer_client
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::httpclient_static
   )
   install(
     TARGETS simple_http_string_infer_client
@@ -263,7 +263,7 @@ else()
   add_executable(simple_http_async_infer_client simple_http_async_infer_client.cc)
   target_link_libraries(
     simple_http_async_infer_client
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::httpclient_static
   )
   install(
     TARGETS simple_http_async_infer_client
@@ -276,7 +276,7 @@ else()
   add_executable(simple_http_sequence_sync_infer_client simple_http_sequence_sync_infer_client.cc)
   target_link_libraries(
     simple_http_sequence_sync_infer_client
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::httpclient_static
   )
   install(
     TARGETS simple_http_sequence_sync_infer_client
@@ -298,14 +298,14 @@ else()
   add_executable(simple_http_shm_client ${SIMPLE_HTTP_SHM_SRCS} ${SIMPLE_HTTP_SHM_HDRS})
   target_link_libraries(
     simple_http_shm_client
-    PRIVATE TRTIS::httpclient_static
+    PRIVATE TRITON::httpclient_static
   )
   install(
     TARGETS simple_http_shm_client
     RUNTIME DESTINATION bin
   )
 
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     #
     # simple_http_cudashm_client
     #
@@ -320,12 +320,12 @@ else()
     target_include_directories(simple_http_cudashm_client PRIVATE ${CUDA_INCLUDE_DIRS})
     target_link_libraries(
       simple_http_cudashm_client
-      PRIVATE TRTIS::httpclient_static
+      PRIVATE TRITON::httpclient_static
       PRIVATE ${CUDA_LIBRARIES}
     )
     install(
       TARGETS simple_http_cudashm_client
       RUNTIME DESTINATION bin
     )
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
 endif() # WIN32

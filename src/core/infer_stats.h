@@ -37,7 +37,7 @@ namespace nvidia { namespace inferenceserver {
 
 class MetricModelReporter;
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
 
 //
 // InferenceStatsAggregator
@@ -115,12 +115,12 @@ class InferenceStatsAggregator {
   std::map<size_t, InferBatchStats> batch_stats_;
 };
 
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
 //
 // Macros to set infer stats.
 //
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
 #define INFER_STATS_SET_TIMESTAMP(TS_NS) \
   {                                      \
     struct timespec ts;                  \
@@ -133,6 +133,6 @@ class InferenceStatsAggregator {
 #else
 #define INFER_STATS_DECL_TIMESTAMP(TS_NS)
 #define INFER_STATS_SET_TIMESTAMP(TS_NS)
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
 }}  // namespace nvidia::inferenceserver

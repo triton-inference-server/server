@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
 
 #include "src/core/ensemble_scheduler.h"
 
@@ -616,9 +616,9 @@ EnsembleContext::ReshapeTensorDims(
 Status
 EnsembleContext::FinishEnsemble()
 {
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   stats_->SetModelExecutionCount(1);
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
   if (ensemble_status_.IsOk()) {
     ensemble_status_ = CheckAndSetEnsembleOutput();
   }
@@ -715,13 +715,13 @@ EnsembleContext::CheckAndSetEnsembleOutput()
   }
 
   if (cuda_async_copy) {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     cudaStreamSynchronize(stream_);
 #else
     return Status(
         Status::Code::INTERNAL,
         "unexpected CUDA copy flag set while GPU is not supported");
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   }
 
   return Status::Success;
@@ -734,7 +734,7 @@ EnsembleContext::ScheduleSteps(
   // FIXME
 #if 0
   for (const auto& step : steps) {
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
     auto infer_stats = std::make_shared<ModelInferStats>(
         context->is_->StatusManager(), step->backend_->Name());
     infer_stats->CaptureTimestamp(
@@ -749,7 +749,7 @@ EnsembleContext::ScheduleSteps(
     infer_stats->NewTrace(context->stats_->GetTrace());
 #else
     auto infer_stats = std::make_shared<ModelInferStats>();
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
     context->is_->InferAsync(
         step->backend_, step->request_, step->response_provider_, infer_stats,
@@ -758,16 +758,16 @@ EnsembleContext::ScheduleSteps(
             LOG_VERBOSE(1) << "Ensemble infer failed: " << status.Message();
           }
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
           infer_stats->SetFailed(!status.IsOk());
           infer_stats->CaptureTimestamp(
               ModelInferStats::TimestampKind::kRequestEnd);
           infer_stats->Report();
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
           step->infer_status_ = status;
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
           {
             std::lock_guard<std::mutex> lk(context->mutex_);
             // Accumulate the queue and compute durations from this
@@ -778,7 +778,7 @@ EnsembleContext::ScheduleSteps(
             context->stats_->IncrementComputeInferDuration(*infer_stats);
             context->stats_->IncrementComputeOutputDuration(*infer_stats);
           }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
           Proceed(context, step);
         });
@@ -812,7 +812,7 @@ EnsembleScheduler::EnsembleScheduler(
     InferenceServer* const server, const ModelConfig& config)
     : is_(server), stream_(nullptr)
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // create CUDA stream
   auto cuerr = cudaStreamCreate(&stream_);
   if (cuerr != cudaSuccess) {
@@ -820,7 +820,7 @@ EnsembleScheduler::EnsembleScheduler(
     LOG_ERROR << "unable to create stream for " << config.name() << ": "
               << cudaGetErrorString(cuerr);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   // Set 'info_' based on 'config'
   info_.reset(new EnsembleInfo());
@@ -871,16 +871,16 @@ EnsembleScheduler::EnsembleScheduler(
 
 EnsembleScheduler::~EnsembleScheduler()
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (stream_ != nullptr) {
     cudaError_t err = cudaStreamDestroy(stream_);
     if (err != cudaSuccess) {
       LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
     }
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 }
 
 }}  // namespace nvidia::inferenceserver
 
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE

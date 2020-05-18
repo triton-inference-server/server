@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 #include <map>
 #include <vector>
 
-// To avoid namespace and protobuf collision between TRTIS and
+// To avoid namespace and protobuf collision between Triton and
 // TensorFlow, we keep TensorFlow interface isolated to
 // tensorflow_backend_tf. We use a strict C interface to avoid any ABI
 // problems since we don't know how TF is built.
@@ -50,7 +50,7 @@ extern "C" {
 // GPU device number that indicates that no gpu is available.
 #define TRTISTF_NO_GPU_DEVICE -1
 
-// GPU device number that indicates TRTIS should do nothing to control
+// GPU device number that indicates Triton should do nothing to control
 // the device alloaction for the network and let Tensorflow handle it.
 #define TRTISTF_MODEL_DEVICE -2
 

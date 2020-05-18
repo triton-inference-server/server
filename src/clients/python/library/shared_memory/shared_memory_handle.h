@@ -26,17 +26,17 @@
 
 #pragma once
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 struct SharedMemoryHandle {
   std::string triton_shm_name_;
   std::string shm_key_;
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   cudaIpcMemHandle_t cuda_shm_handle_;
   int device_id_;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   void* base_addr_;
   int shm_fd_;
   size_t offset_;

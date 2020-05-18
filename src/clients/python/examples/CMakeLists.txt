@@ -26,7 +26,7 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-if(${TRTIS_ENABLE_HTTP})
+if(${TRITON_ENABLE_HTTP})
   install(
     PROGRAMS
       simple_http_health_metadata.py
@@ -40,9 +40,9 @@ if(${TRTIS_ENABLE_HTTP})
       simple_http_model_control.py
     DESTINATION python
   )
-endif() # TRTIS_ENABLE_HTTP
+endif() # TRITON_ENABLE_HTTP
 
-if(${TRTIS_ENABLE_GRPC})
+if(${TRITON_ENABLE_GRPC})
   install(
     PROGRAMS
       grpc_client.py
@@ -62,13 +62,13 @@ if(${TRTIS_ENABLE_GRPC})
       simple_grpc_model_control.py
     DESTINATION python
   )
-endif() # TRTIS_ENABLE_GRPC
+endif() # TRITON_ENABLE_GRPC
 
-if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_GRPC})
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
   install(
     PROGRAMS
       image_client.py
       ensemble_image_client.py
     DESTINATION python
   )
-endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_GRPC
+endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_GRPC

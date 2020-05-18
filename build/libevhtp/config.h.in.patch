@@ -6,8 +6,8 @@ index e5e434f..0daf25c 100644
  #cmakedefine EVHTP_DEBUG
  #cmakedefine EVHTP_DISABLE_MEMFUNCTIONS
  
-+#cmakedefine EVHTP_TRTIS_ENABLE_TRACING
-+#cmakedefine EVHTP_TRTIS_ENABLE_HTTP_CONTIGUOUS
++#cmakedefine EVHTP_TRITON_ENABLE_TRACING
++#cmakedefine EVHTP_TRITON_ENABLE_HTTP_CONTIGUOUS
 +
  #ifndef EVHTP_DISABLE_REGEX
  #include <onigposix.h>

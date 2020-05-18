@@ -31,7 +31,7 @@ cmake_minimum_required (VERSION 3.5)
 #
 configure_file(libaddsub.ldscript libaddsub.ldscript COPYONLY)
 
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   set(CUDA_LIBRARIES PUBLIC ${CUDA_LIBRARIES})
   cuda_add_library(
     addsub SHARED
@@ -46,7 +46,7 @@ else()
     addsub.cu
   )
   set_target_properties(addsub PROPERTIES LINKER_LANGUAGE CXX)
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
 set_target_properties(
   addsub

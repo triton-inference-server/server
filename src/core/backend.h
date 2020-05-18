@@ -34,7 +34,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
 #define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, MR, S, LOG_MSG) \
   do {                                                                    \
     const auto& status__ = (S);                                           \
@@ -73,7 +73,7 @@ namespace nvidia { namespace inferenceserver {
       return;                                                             \
     }                                                                     \
   } while (false)
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
 class InferenceRequest;
 
@@ -97,7 +97,7 @@ class InferenceBackend {
   // Get the configuration of model being served.
   const ModelConfig& Config() const { return config_; }
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   // Get the stats collector for the model being served.
   InferenceStatsAggregator* MutableStatsAggregator()
   {
@@ -107,7 +107,7 @@ class InferenceBackend {
   {
     return stats_aggregator_;
   }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   // Get the model configuration for a named input.
   Status GetInput(const std::string& name, const ModelInput** input) const;
@@ -193,10 +193,10 @@ class InferenceBackend {
   // Version of the model that this backend represents.
   int64_t version_;
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   // The stats collector for the model that this backend represents.
   InferenceStatsAggregator stats_aggregator_;
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   // Label provider for this model.
   std::shared_ptr<LabelProvider> label_provider_;

@@ -28,7 +28,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
 
 // Start the trace id at 1, because id 0 is reserved to indicate no
 // parent.
@@ -42,6 +42,6 @@ InferenceTrace::Release(std::unique_ptr<InferenceTrace>&& trace)
       reinterpret_cast<TRITONSERVER_InferenceTrace*>(trace.release()), userp);
 }
 
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
 }}  // namespace nvidia::inferenceserver

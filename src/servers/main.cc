@@ -35,9 +35,9 @@
 #include <list>
 #include <mutex>
 
-#ifdef TRTIS_ENABLE_ASAN
+#ifdef TRITON_ENABLE_ASAN
 #include <sanitizer/lsan_interface.h>
-#endif  // TRTIS_ENABLE_ASAN
+#endif  // TRITON_ENABLE_ASAN
 
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
@@ -47,19 +47,19 @@
 #include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 static_assert(
-    TRTIS_MIN_COMPUTE_CAPABILITY >= 1.0,
-    "Invalid TRTIS_MIN_COMPUTE_CAPABILITY specified");
-#endif  // TRTIS_ENABLE_GPU
+    TRITON_MIN_COMPUTE_CAPABILITY >= 1.0,
+    "Invalid TRITON_MIN_COMPUTE_CAPABILITY specified");
+#endif  // TRITON_ENABLE_GPU
 
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
+#if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "src/servers/http_server.h"
-#endif  // TRTIS_ENABLE_HTTP|| TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
 
-#ifdef TRTIS_ENABLE_GRPC
+#ifdef TRITON_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
 namespace {
 
@@ -79,7 +79,7 @@ bool allow_model_control_ = false;
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
 // default values and modifyied based on command-line args. Set to -1
 // to indicate the protocol is disabled.
-#ifdef TRTIS_ENABLE_HTTP
+#ifdef TRITON_ENABLE_HTTP
 std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
     http_services_;
 std::vector<std::string> endpoint_names_ = {"health", "infer"};
@@ -87,28 +87,28 @@ bool allow_http_ = true;
 int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRITON_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_GRPC
+#ifdef TRITON_ENABLE_GRPC
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
 std::string trace_filepath_;
 TRITONSERVER_InferenceTraceLevel trace_level_ =
     TRITONSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
-#if defined(TRTIS_ENABLE_GRPC)
+#if defined(TRITON_ENABLE_GRPC)
 // The number of threads to initialize for handling GRPC infer
 // requests.
 int grpc_infer_thread_cnt_ = 1;
@@ -122,50 +122,50 @@ int grpc_stream_infer_thread_cnt_ = 1;
 // requests doesn't exceed this value there will be no
 // allocation/deallocation of request/response objects.
 int grpc_infer_allocation_pool_size_ = 8;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
-#if defined(TRTIS_ENABLE_HTTP)
+#if defined(TRITON_ENABLE_HTTP)
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRITON_ENABLE_HTTP
 
 // Command-line options
 enum OptionId {
   OPTION_HELP = 1000,
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
   OPTION_LOG_VERBOSE,
   OPTION_LOG_INFO,
   OPTION_LOG_WARNING,
   OPTION_LOG_ERROR,
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
   OPTION_ID,
   OPTION_MODEL_REPOSITORY,
   OPTION_EXIT_ON_ERROR,
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
-#if defined(TRTIS_ENABLE_HTTP)
+#if defined(TRITON_ENABLE_HTTP)
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_PORT,
   OPTION_HTTP_HEALTH_PORT,
   OPTION_HTTP_THREAD_COUNT,
-#endif  // TRTIS_ENABLE_HTTP
-#if defined(TRTIS_ENABLE_GRPC)
+#endif  // TRITON_ENABLE_HTTP
+#if defined(TRITON_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
   OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
-#endif  // TRTIS_ENABLE_GRPC
-#ifdef TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_GRPC
+#ifdef TRITON_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
   OPTION_METRICS_PORT,
-#endif  // TRTIS_ENABLE_METRICS
-#ifdef TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_METRICS
+#ifdef TRITON_ENABLE_TRACING
   OPTION_TRACE_FILEPATH,
   OPTION_TRACE_LEVEL,
   OPTION_TRACE_RATE,
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
   OPTION_MODEL_CONTROL_MODE,
   OPTION_ALLOW_POLL_REPO,
   OPTION_POLL_REPO_SECS,
@@ -203,7 +203,7 @@ struct Option {
 std::vector<Option> options_
 {
   {OPTION_HELP, "help", "Print usage", false},
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
       {OPTION_LOG_VERBOSE, "log-verbose",
        "Set verbose logging level. Zero (0) disables verbose logging and "
        "values >= 1 enable verbose logging"},
@@ -211,7 +211,7 @@ std::vector<Option> options_
       {OPTION_LOG_WARNING, "log-warning",
        "Enable/disable warning-level logging"},
       {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging"},
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
       {OPTION_ID, "id", "Identifier for this server"},
       {OPTION_MODEL_REPOSITORY, "model-store",
        "Path to model repository directory. It may be specified multiple times "
@@ -236,7 +236,7 @@ std::vector<Option> options_
        "is responsive and all models are available. If false "
        "/api/health/ready endpoint indicates ready if server is responsive "
        "even if some/all models are unavailable."},
-#if defined(TRTIS_ENABLE_HTTP)
+#if defined(TRITON_ENABLE_HTTP)
       {OPTION_ALLOW_HTTP, "allow-http",
        "Allow the server to listen for HTTP requests."},
       {OPTION_HTTP_PORT, "http-port",
@@ -245,8 +245,8 @@ std::vector<Option> options_
        "The port for the server to listen on for HTTP Health requests."},
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
        "Number of threads handling HTTP requests."},
-#endif  // TRTIS_ENABLE_HTTP
-#if defined(TRTIS_ENABLE_GRPC)
+#endif  // TRITON_ENABLE_HTTP
+#if defined(TRITON_ENABLE_GRPC)
       {OPTION_ALLOW_GRPC, "allow-grpc",
        "Allow the server to listen for GRPC requests."},
       {OPTION_GRPC_PORT, "grpc-port",
@@ -261,8 +261,8 @@ std::vector<Option> options_
        "allocated for reuse. As long as the number of in-flight requests "
        "doesn't exceed this value there will be no allocation/deallocation of "
        "request/response objects."},
-#endif  // TRTIS_ENABLE_GRPC
-#ifdef TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_GRPC
+#ifdef TRITON_ENABLE_METRICS
       {OPTION_ALLOW_METRICS, "allow-metrics",
        "Allow the server to provide prometheus metrics."},
       {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics",
@@ -270,8 +270,8 @@ std::vector<Option> options_
        "--allow-metrics is true."},
       {OPTION_METRICS_PORT, "metrics-port",
        "The port reporting prometheus metrics."},
-#endif  // TRTIS_ENABLE_METRICS
-#ifdef TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_METRICS
+#ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file",
        "Set the file where trace output will be saved."},
       {OPTION_TRACE_LEVEL, "trace-level",
@@ -279,7 +279,7 @@ std::vector<Option> options_
        "MAX for maximal tracing. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate",
        "Set the trace sampling rate. Default is 1000."},
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
       {OPTION_MODEL_CONTROL_MODE, "model-control-mode",
        "Specify the mode for model management. Options are \"none\", \"poll\" "
        "and \"explicit\". The default is \"poll\". "
@@ -375,7 +375,7 @@ SignalHandler(int signum)
 bool
 CheckPortCollision()
 {
-#if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_GRPC)
+#if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_GRPC)
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
        http_ports_.end()) &&
@@ -384,9 +384,9 @@ CheckPortCollision()
               << "and GRPC requests at the same port" << std::endl;
     return true;
   }
-#endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_HTTP && TRITON_ENABLE_GRPC
 
-#if defined(TRTIS_ENABLE_GRPC) && defined(TRTIS_ENABLE_METRICS)
+#if defined(TRITON_ENABLE_GRPC) && defined(TRITON_ENABLE_METRICS)
   // Check if Metric and GRPC have shared ports
   if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
       allow_metrics_) {
@@ -394,9 +394,9 @@ CheckPortCollision()
               << "GRPC requests" << std::endl;
     return true;
   }
-#endif  // TRTIS_ENABLE_GRPC && TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_GRPC && TRITON_ENABLE_METRICS
 
-#if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_METRICS)
+#if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_METRICS)
   // Check if Metric and HTTP have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), metrics_port_) !=
        http_ports_.end()) &&
@@ -405,12 +405,12 @@ CheckPortCollision()
               << "HTTP requests" << std::endl;
     return true;
   }
-#endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_HTTP && TRITON_ENABLE_METRICS
 
   return false;
 }
 
-#ifdef TRTIS_ENABLE_GRPC
+#ifdef TRITON_ENABLE_GRPC
 TRITONSERVER_Error*
 StartGrpcService(
     std::unique_ptr<nvidia::inferenceserver::GRPCServer>* service,
@@ -432,9 +432,9 @@ StartGrpcService(
 
   return err;
 }
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_HTTP
+#ifdef TRITON_ENABLE_HTTP
 TRITONSERVER_Error*
 StartHttpService(
     std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>* services,
@@ -466,9 +466,9 @@ StartHttpService(
 
   return err;
 }
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRITON_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
 TRITONSERVER_Error*
 StartMetricsService(
     std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
@@ -486,7 +486,7 @@ StartMetricsService(
 
   return err;
 }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
 bool
 StartEndpoints(
@@ -523,7 +523,7 @@ StartEndpoints(
             << server_metadata_json["name"].GetString() << "' listening on"
             << std::endl;
 
-#ifdef TRTIS_ENABLE_GRPC
+#ifdef TRITON_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
   if (allow_grpc_ && (grpc_port_ != -1)) {
     TRITONSERVER_Error* err =
@@ -533,9 +533,9 @@ StartEndpoints(
       return false;
     }
   }
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_HTTP
+#ifdef TRITON_ENABLE_HTTP
   // Enable HTTP endpoints if requested...
   if (allow_http_) {
     std::map<int32_t, std::vector<std::string>> port_map;
@@ -554,9 +554,9 @@ StartEndpoints(
       return false;
     }
   }
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRITON_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
     TRITONSERVER_Error* err = StartMetricsService(&metrics_service_, server);
@@ -565,7 +565,7 @@ StartEndpoints(
       return false;
     }
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
   return true;
 }
@@ -575,7 +575,7 @@ StopEndpoints()
 {
   bool ret = true;
 
-#ifdef TRTIS_ENABLE_HTTP
+#ifdef TRITON_ENABLE_HTTP
   for (auto& http_eps : http_services_) {
     if (http_eps != nullptr) {
       TRITONSERVER_Error* err = http_eps->Stop();
@@ -587,9 +587,9 @@ StopEndpoints()
   }
 
   http_services_.clear();
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRITON_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_GRPC
+#ifdef TRITON_ENABLE_GRPC
   if (grpc_service_) {
     TRITONSERVER_Error* err = grpc_service_->Stop();
     if (err != nullptr) {
@@ -599,9 +599,9 @@ StopEndpoints()
 
     grpc_service_.reset();
   }
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (metrics_service_) {
     TRITONSERVER_Error* err = metrics_service_->Stop();
     if (err != nullptr) {
@@ -611,7 +611,7 @@ StopEndpoints()
 
     metrics_service_.reset();
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
   return ret;
 }
@@ -621,7 +621,7 @@ StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
 {
   *trace_manager = nullptr;
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_Error* err = nullptr;
 
   // Configure tracing if host is specified.
@@ -635,7 +635,7 @@ StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
     *trace_manager = nullptr;
     return false;
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   return true;
 }
@@ -643,12 +643,12 @@ StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
 bool
 StopTracing(nvidia::inferenceserver::TraceManager** trace_manager)
 {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   // We assume that at this point Triton has been stopped gracefully,
   // so can delete the trace manager to finalize the output.
   delete (*trace_manager);
   *trace_manager = nullptr;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   return true;
 }
@@ -709,7 +709,7 @@ ParseDoubleOption(const std::string arg)
 
 // Condition here merely to avoid compilation error, this function will
 // be defined but not used otherwise.
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
 int
 ParseIntBoolOption(std::string arg)
 {
@@ -726,9 +726,9 @@ ParseIntBoolOption(std::string arg)
 
   return ParseIntOption(arg);
 }
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
 TRITONSERVER_InferenceTraceLevel
 ParseTraceLevelOption(std::string arg)
 {
@@ -750,7 +750,7 @@ ParseTraceLevelOption(std::string arg)
   std::cerr << Usage() << std::endl;
   exit(1);
 }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
 struct VgpuOption {
   int gpu_device_;
@@ -856,35 +856,35 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
 
-#ifdef TRTIS_ENABLE_GPU
-  double min_supported_compute_capability = TRTIS_MIN_COMPUTE_CAPABILITY;
+#ifdef TRITON_ENABLE_GPU
+  double min_supported_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
 #else
   double min_supported_compute_capability = 0;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
-#if defined(TRTIS_ENABLE_HTTP)
+#if defined(TRITON_ENABLE_HTTP)
   int32_t http_port = http_port_;
   int32_t http_thread_cnt = http_thread_cnt_;
   int32_t http_health_port = http_port_;
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRITON_ENABLE_HTTP
 
-#if defined(TRTIS_ENABLE_GRPC)
+#if defined(TRITON_ENABLE_GRPC)
   int32_t grpc_port = grpc_port_;
   int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
   int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
   bool allow_gpu_metrics = true;
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   std::string trace_filepath = trace_filepath_;
   TRITONSERVER_InferenceTraceLevel trace_level = trace_level_;
   int32_t trace_rate = trace_rate_;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   bool deprecated_control_mode_set = false;
   bool allow_poll_model_repository = repository_poll_secs > 0;
@@ -894,12 +894,12 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   bool control_mode_set = false;
   TRITONSERVER_ModelControlMode control_mode = TRITONSERVER_MODEL_CONTROL_POLL;
 
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
   bool log_info = true;
   bool log_warn = true;
   bool log_error = true;
   int32_t log_verbose = 0;
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 
   std::vector<struct option> long_options;
   for (const auto& o : options_) {
@@ -914,7 +914,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case '?':
         std::cerr << Usage() << std::endl;
         return false;
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
       case OPTION_LOG_VERBOSE:
         log_verbose = ParseIntBoolOption(optarg);
         break;
@@ -927,7 +927,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_LOG_ERROR:
         log_error = ParseBoolOption(optarg);
         break;
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 
       case OPTION_ID:
         server_id = optarg;
@@ -946,7 +946,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         strict_readiness = ParseBoolOption(optarg);
         break;
 
-#if defined(TRTIS_ENABLE_HTTP)
+#if defined(TRITON_ENABLE_HTTP)
       case OPTION_ALLOW_HTTP:
         allow_http_ = ParseBoolOption(optarg);
         break;
@@ -960,9 +960,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_HTTP_THREAD_COUNT:
         http_thread_cnt = ParseIntOption(optarg);
         break;
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRITON_ENABLE_HTTP
 
-#if defined(TRTIS_ENABLE_GRPC)
+#if defined(TRITON_ENABLE_GRPC)
       case OPTION_ALLOW_GRPC:
         allow_grpc_ = ParseBoolOption(optarg);
         break;
@@ -978,9 +978,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
         grpc_infer_allocation_pool_size = ParseIntOption(optarg);
         break;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
       case OPTION_ALLOW_METRICS:
         allow_metrics_ = ParseBoolOption(optarg);
         break;
@@ -990,9 +990,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_METRICS_PORT:
         metrics_port = ParseIntOption(optarg);
         break;
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
       case OPTION_TRACE_FILEPATH:
         trace_filepath = optarg;
         break;
@@ -1002,7 +1002,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_TRACE_RATE:
         trace_rate = ParseIntOption(optarg);
         break;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
       case OPTION_ALLOW_POLL_REPO:
         allow_poll_model_repository = ParseBoolOption(optarg);
@@ -1067,7 +1067,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     return false;
   }
 
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
   // Initialize our own logging instance since it is used by GRPC and
   // HTTP endpoints. This logging instance is separate from the one in
   // libtritonserver so we must initialize explicitly.
@@ -1075,7 +1075,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   LOG_ENABLE_WARNING(log_warn);
   LOG_ENABLE_ERROR(log_error);
   LOG_SET_VERBOSE(log_verbose);
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 
   repository_poll_secs_ =
       (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
@@ -1109,30 +1109,30 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     }
   }
 
-#if defined(TRTIS_ENABLE_HTTP)
+#if defined(TRITON_ENABLE_HTTP)
   http_port_ = http_port;
   http_health_port_ = http_health_port;
   http_thread_cnt_ = http_thread_cnt;
   http_ports_ = {http_health_port_, http_port_};
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRITON_ENABLE_HTTP
 
-#if defined(TRTIS_ENABLE_GRPC)
+#if defined(TRITON_ENABLE_GRPC)
   grpc_port_ = grpc_port;
   grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
   grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   metrics_port_ = allow_metrics_ ? metrics_port : -1;
   allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   trace_filepath_ = trace_filepath;
   trace_level_ = trace_level;
   trace_rate_ = trace_rate;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   // Check if HTTP, GRPC and metrics port clash
   if (CheckPortCollision()) {
@@ -1188,7 +1188,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
           loptions, std::max(0, exit_timeout_secs)),
       "setting exit timeout");
 
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogInfo(loptions, log_info),
       "setting log info enable");
@@ -1201,16 +1201,16 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogVerbose(loptions, log_verbose),
       "setting log verbose level");
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetMetrics(loptions, allow_metrics_),
       "setting metrics enable");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics),
       "setting GPU metrics enable");
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetTensorFlowSoftPlacement(
@@ -1306,11 +1306,11 @@ main(int argc, char** argv)
   StopEndpoints();
   StopTracing(&trace_manager);
 
-#ifdef TRTIS_ENABLE_ASAN
+#ifdef TRITON_ENABLE_ASAN
   // Can invoke ASAN before exit though this is typically not very
   // useful since there are many objects that are not yet destructed.
   //  __lsan_do_leak_check();
-#endif  // TRTIS_ENABLE_ASAN
+#endif  // TRITON_ENABLE_ASAN
 
   // FIXME. TF backend aborts if we attempt cleanup...
   std::shared_ptr<TRITONSERVER_Server>* keep_alive =

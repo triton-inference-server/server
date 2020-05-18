@@ -579,14 +579,14 @@ DynamicBatchScheduler::FinalizePayloads(
     std::shared_ptr<std::vector<Scheduler::Payload>> payloads,
     const Status& status)
 {
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   bool found_success = false;
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   for (auto& payload : *payloads) {
     payload.status_ = status.IsOk() ? payload.status_ : status;
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
     // All the payloads executed together, so count 1 execution in
     // the first successful payload. Other payloads stay at 0
     // executions.
@@ -595,7 +595,7 @@ DynamicBatchScheduler::FinalizePayloads(
       payload.stats_->SetModelExecutionCount(1);
       found_success = true;
     }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
     // Finalize right away if not preserving order
     if (!preserve_ordering_) {

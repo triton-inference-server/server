@@ -206,50 +206,50 @@ GetByteSize(const ModelOutput& mio)
 Platform
 GetPlatform(const std::string& platform_str)
 {
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORFLOW
   if (platform_str == kTensorFlowGraphDefPlatform) {
     return Platform::PLATFORM_TENSORFLOW_GRAPHDEF;
   }
   if (platform_str == kTensorFlowSavedModelPlatform) {
     return Platform::PLATFORM_TENSORFLOW_SAVEDMODEL;
   }
-#endif  // TRTIS_ENABLE_TENSORFLOW
+#endif  // TRITON_ENABLE_TENSORFLOW
 
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORRT
   if (platform_str == kTensorRTPlanPlatform) {
     return Platform::PLATFORM_TENSORRT_PLAN;
   }
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
 
-#ifdef TRTIS_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CAFFE2
   if (platform_str == kCaffe2NetDefPlatform) {
     return Platform::PLATFORM_CAFFE2_NETDEF;
   }
-#endif  // TRTIS_ENABLE_CAFFE2
+#endif  // TRITON_ENABLE_CAFFE2
 
-#ifdef TRTIS_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_CUSTOM
   if (platform_str == kCustomPlatform) {
     return Platform::PLATFORM_CUSTOM;
   }
-#endif  // TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_CUSTOM
 
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_ONNXRUNTIME
   if (platform_str == kOnnxRuntimeOnnxPlatform) {
     return Platform::PLATFORM_ONNXRUNTIME_ONNX;
   }
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_ONNXRUNTIME
 
-#ifdef TRTIS_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_PYTORCH
   if (platform_str == kPyTorchLibTorchPlatform) {
     return Platform::PLATFORM_PYTORCH_LIBTORCH;
   }
-#endif  // TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_PYTORCH
 
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
   if (platform_str == kEnsemblePlatform) {
     return Platform::PLATFORM_ENSEMBLE;
   }
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
 
   return Platform::PLATFORM_UNKNOWN;
 }

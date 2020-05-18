@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,10 +36,10 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 
-if(${TRTIS_ENABLE_GPU})
-  add_definitions(-DTRTIS_ENABLE_GPU=1)
-  add_definitions(-DTRTIS_MIN_COMPUTE_CAPABILITY=${TRTIS_MIN_COMPUTE_CAPABILITY})
-endif() # TRTIS_ENABLE_GPU
+if(${TRITON_ENABLE_GPU})
+  add_definitions(-DTRITON_ENABLE_GPU=1)
+  add_definitions(-DTRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY})
+endif() # TRITON_ENABLE_GPU
 
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
@@ -47,11 +47,11 @@ include_directories("${PROJECT_BINARY_DIR}")
 #
 # CUDA
 #
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   find_package(CUDA REQUIRED)
   message(STATUS "Using CUDA ${CUDA_VERSION}")
   set(CUDA_NVCC_FLAGS -std=c++11)
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
 #
 # Protobuf

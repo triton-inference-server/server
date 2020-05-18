@@ -160,18 +160,18 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
   }
   request->release_callbacks_.clear();
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   // Take ownership of trace object so it is not lost when we release
   // the request below.
   std::unique_ptr<InferenceTrace> trace = std::move(request->trace_);
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   void* userp = request->release_userp_;
   request->release_fn_(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
       userp);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   // If tracing then record request end (after the callback completes
   // so that any callback overhead is included in the request time)
   // and release the trace.
@@ -179,7 +179,7 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
     trace->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
     InferenceTrace::Release(std::move(trace));
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 }
 
 InferenceRequest*
@@ -412,9 +412,9 @@ InferenceRequest::PrepareForInference()
 
   // Clear the timestamps
   queue_start_ns_ = 0;
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   request_start_ns_ = 0;
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   LOG_VERBOSE(1) << "prepared: " << *this;
 
@@ -567,7 +567,7 @@ InferenceRequest::Normalize()
   return Status::Success;
 }
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
 void
 InferenceRequest::ReportStatistics(
     MetricModelReporter* metric_reporter, bool success,
@@ -596,7 +596,7 @@ InferenceRequest::ReportStatistics(
     }
   }
 }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
 //
 // Input

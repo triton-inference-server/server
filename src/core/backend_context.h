@@ -35,9 +35,9 @@
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -49,9 +49,9 @@ class MetricModelReporter;
 //
 struct BackendContext {
  public:
-#ifndef TRTIS_ENABLE_GPU
+#ifndef TRITON_ENABLE_GPU
   using cudaStream_t = void*;
-#endif  // !TRTIS_ENABLE_GPU
+#endif  // !TRITON_ENABLE_GPU
 
   // GPU device number that indicates that no gpu is available for a
   // context (which is an invalid state since TensorRT requires a

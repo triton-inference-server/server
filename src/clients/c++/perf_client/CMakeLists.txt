@@ -69,13 +69,13 @@ target_include_directories(
   PRIVATE ${RapidJSON_INCLUDE_DIRS})
 target_link_libraries(
   perf_client
-  PRIVATE TRTIS::grpcclient_static
-  PRIVATE TRTIS::httpclient_static
+  PRIVATE TRITON::grpcclient_static
+  PRIVATE TRITON::httpclient_static
   PRIVATE -lb64
 )
 
 # If gpu is enabled then compile with CUDA dependencies
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   target_include_directories(perf_client PRIVATE ${CUDA_INCLUDE_DIRS})
   target_link_libraries(perf_client PRIVATE ${CUDA_LIBRARIES})
 endif()

@@ -30,9 +30,9 @@
 #include <sstream>
 #include "src/core/logging.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -69,11 +69,11 @@ PinnedMemoryManager::~PinnedMemoryManager()
       free(memory_info.first);
     }
   }
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (pinned_memory_buffer_ != nullptr) {
     cudaFreeHost(pinned_memory_buffer_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 }
 
 Status
@@ -184,7 +184,7 @@ PinnedMemoryManager::Create(const Options& options)
   }
 
   void* buffer = nullptr;
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   auto err = cudaHostAlloc(
       &buffer, options.pinned_memory_pool_byte_size_, cudaHostAllocPortable);
   if (err != cudaSuccess) {
@@ -196,7 +196,7 @@ PinnedMemoryManager::Create(const Options& options)
                    << PointerToString(buffer) << "' with size "
                    << options.pinned_memory_pool_byte_size_;
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   instance_.reset(
       new PinnedMemoryManager(buffer, options.pinned_memory_pool_byte_size_));
   return Status::Success;
