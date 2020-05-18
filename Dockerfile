@@ -296,11 +296,11 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch" \
                   -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
                   ../build && \
-            make -j16 trtis && \
+            make -j16 server && \
             mkdir -p /opt/tritonserver/include && \
-            cp -r trtis/install/bin /opt/tritonserver/. && \
-            cp -r trtis/install/lib /opt/tritonserver/. && \
-            cp -r trtis/install/include /opt/tritonserver/include/tritonserver) && \
+            cp -r server/install/bin /opt/tritonserver/. && \
+            cp -r server/install/lib /opt/tritonserver/. && \
+            cp -r server/install/include /opt/tritonserver/include/tritonserver) && \
     (cd /opt/tritonserver && ln -sf /workspace/qa qa) && \
     (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/tensorflow && chmod ugo-w+rx *) && \

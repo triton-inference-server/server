@@ -361,15 +361,15 @@ ExternalProject_Add(aws-sdk-cpp
 # Build Triton Server test utilities
 #
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(TRITON_TEST_UTILS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/trtis-test-utils/install)
+  set(TRITON_TEST_UTILS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/test-util/install)
 else()
   set(TRITON_TEST_UTILS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-ExternalProject_Add(trtis-test-utils
-  PREFIX trtis-test-utils
-  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-test-utils"
-  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-test-utils"
+ExternalProject_Add(test-util
+  PREFIX test-util
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/test-util"
+  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/test-util"
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DTRITON_ENABLE_GPU:BOOL=${TRITON_ENABLE_GPU}
@@ -387,15 +387,15 @@ ExternalProject_Add(trtis-test-utils
 # Build example custom backends
 #
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(TRITON_CUSTOM_BACKENDS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/trtis-custom-backends/install)
+  set(TRITON_CUSTOM_BACKENDS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/custom-backend/install)
 else()
   set(TRITON_CUSTOM_BACKENDS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-ExternalProject_Add(trtis-custom-backends
-  PREFIX trtis-custom-backends
-  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-custom-backends"
-  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-custom-backends"
+ExternalProject_Add(custom-backend
+  PREFIX custom-backend
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/custom-backend"
+  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/custom-backend"
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
@@ -413,7 +413,7 @@ ExternalProject_Add(trtis-custom-backends
 # Build Triton client libraries and examples
 #
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(TRITON_CLIENTS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/trtis-clients/install)
+  set(TRITON_CLIENTS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/client/install)
 else()
   set(TRITON_CLIENTS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
@@ -425,10 +425,10 @@ if (TRITON_CLIENT_CMAKE_DIR)
   set(_CMAKE_TRITON_DIR "-DTRITON_DIR:PATH=${TRITON_CLIENT_CMAKE_DIR}")
 endif()
 
-ExternalProject_Add(trtis-clients
-  PREFIX trtis-clients
-  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-clients"
-  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-clients"
+ExternalProject_Add(client
+  PREFIX client
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/client"
+  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/client"
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DCURL_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/curl/install/${CMAKE_INSTALL_LIBDIR}/cmake/CURL
@@ -451,7 +451,7 @@ ExternalProject_Add(trtis-clients
 # Build Triton Server library and main executable
 #
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(TRITON_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/trtis/install)
+  set(TRITON_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/server/install)
 else()
   set(TRITON_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
@@ -476,10 +476,10 @@ if(${TRITON_ENABLE_GPU})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} cnmem)
 endif() # TRITON_ENABLE_GPU
 
-ExternalProject_Add(trtis
-  PREFIX trtis
-  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis"
-  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis"
+ExternalProject_Add(server
+  PREFIX server
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/server"
+  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/server"
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}

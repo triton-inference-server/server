@@ -85,13 +85,13 @@ Within the container you can perform an incremental server build
 with::
 
   # cd /workspace/builddir
-  # make -j16 trtis
+  # make -j16 server
 
 When the build completes the binary, libraries and headers can be
-found in trtis/install. To overwrite the existing versions::
+found in server/install. To overwrite the existing versions::
 
-  # cp trtis/install/bin/tritonserver /opt/tritonserver/bin/.
-  # cp trtis/install/lib/libtritonserver.so /opt/tritonserver/lib/.
+  # cp server/install/bin/tritonserver /opt/tritonserver/bin/.
+  # cp server/install/lib/libtritonserver.so /opt/tritonserver/lib/.
 
 You can reconfigure the build by running *cmake* as described in
 :ref:`section-building-the-server-with-cmake`.
@@ -356,10 +356,10 @@ Build Inference Server
 After configuring, build the inference server with make::
 
   $ cd builddir
-  $ make -j16 trtis
+  $ make -j16 server
 
 When the build completes the binary, libraries and headers can be
-found in trtis/install.
+found in server/install.
 
 .. _section-building-a-custom-backend:
 
@@ -374,10 +374,10 @@ These custom backends are built using CMake::
   $ mkdir builddir
   $ cd builddir
   $ cmake ../build
-  $ make -j16 trtis-custom-backends
+  $ make -j16 custom-backend
 
 When the build completes the custom backend libraries can be found in
-trtis-custom-backends/install.
+custom-backend/install.
 
 A custom backend is not built-into the inference server. Instead it is
 built as a separate shared library that the inference server

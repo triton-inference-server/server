@@ -147,11 +147,11 @@ Running The Inference Server Without Docker
 
 After :ref:`building the inference server outside of Docker
 <section-building-the-server-with-cmake>`, the *tritonserver* executable
-will be in builddir/trtis/install/bin and the required shared
-libraries will be in builddir/trtis/install/lib. The *tritonserver*
+will be in builddir/server/install/bin and the required shared
+libraries will be in builddir/server/install/lib. The *tritonserver*
 executable and libraries are configured to be installed and executed
 from the /opt/tritonserver directory, so copy
-builddir/trtis/install/* to /opt/tritonserver/. . Then execute
+builddir/server/install/* to /opt/tritonserver/. . Then execute
 *tritonserver* with the desired arguments::
 
   $ /opt/tritonserver/bin/tritonserver --model-repository=/models
