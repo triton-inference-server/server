@@ -75,6 +75,8 @@ $model_stat =
   "name" : $string,
   "version" : $string #optional,
   "last_inference" : $number,
+  "inference_count" : $number,
+  "execution_count" : $number,
   "inference_stats" : $inference_stats,
   "batch_stats" : [ $batch_stat, ... ]
 }
@@ -86,6 +88,25 @@ $model_stat =
 
 - "last_inference" : The timestamp of the last inference request made
   for this model, as milliseconds since the epoch.
+
+- "inference_count" : The cumulative count of successful inference
+  requests made for this model. Each inference in a batched request is
+  counted as an individual inference. For example, if a client sends a
+  single inference request with batch size 64, "inference_count" will
+  be incremented by 64. Similarly, if a clients sends 64 individual
+  requests each with batch size 1, "inference_count" will be
+  incremented by 64.
+
+- "execution_count" : The cumulative count of the number of successful
+  inference executions performed for the model. When dynamic batching
+  is enabled, a single model execution can perform inferencing for
+  more than one inference request. For example, if a clients sends 64
+  individual requests each with batch size 1 and the dynamic batcher
+  batches them into a single large batch for model execution then
+  "execution_count" will be incremented by 1. If, on the other hand,
+  the dynamic batcher is not enabled for that each of the 64
+  individual requests is executed independently, then
+  "execution_count" will be incremented by 64.
 
 - "inference_stats" : The aggregate statistics for the
   model/version. So, for example, "inference_stats":"success"
@@ -135,7 +156,6 @@ $inference_stats =
 $batch_stats =
 {
   "batch_size" : $number,
-  "count" : $number,
   "compute_input" : $duration_stat,
   "compute_infer" : $duration_stat,
   "compute_output" : $duration_stat
@@ -258,16 +278,34 @@ message ModelStatistics
   // as milliseconds since the epoch.
   uint64 last_inference = 3;
 
-  // The aggregate statistics for the model/version. So, for example,
-  // inference_stats:success indicates the number of successful inference
-  // requests for the model.
-  InferStatistics inference_stats = 4;
+  // The cumulative count of successful inference requests made for this
+  // model. Each inference in a batched request is counted as an
+  // individual inference. For example, if a client sends a single
+  // inference request with batch size 64, "inference_count" will be
+  // incremented by 64. Similarly, if a clients sends 64 individual
+  // requests each with batch size 1, "inference_count" will be
+  // incremented by 64.
+  uint64 inference_count = 4;
+
+  // The cumulative count of the number of successful inference executions
+  // performed for the model. When dynamic batching is enabled, a single
+  // model execution can perform inferencing for more than one inference
+  // request. For example, if a clients sends 64 individual requests each
+  // with batch size 1 and the dynamic batcher batches them into a single
+  // large batch for model execution then "execution_count" will be
+  // incremented by 1. If, on the other hand, the dynamic batcher is not
+  // enabled for that each of the 64 individual requests is executed
+  // independently, then "execution_count" will be incremented by 64.
+  uint64 execution_count = 5;
+
+  // The aggregate statistics for the model/version.
+  InferStatistics inference_stats = 6;
 
   // The aggregate statistics for each different batch size that is
   // executed in the model. The batch statistics indicate how many actual
   // model executions were performed and show differences due to different
   // batch size (for example, larger batches typically take longer to compute).
-  InferBatchStatistics batch_stats = 5;
+  InferBatchStatistics batch_stats = 7;
 }
 
 // Inference statistics.
@@ -303,26 +341,20 @@ message InferBatchStatistics
   // The size of the batch.
   uint64 batch_size = 1;
 
-  // The number of times the batch size was executed on the
-  // model. A single model execution performs inferencing for the entire
-  // request batch and can perform inferencing for multiple requests if
-  // dynamic batching is enabled.
-  uint64 count = 2;
-
   // The count and cumulative duration to prepare input tensor data as
   // required by the model framework / backend with the given batch size.
   // For example, this duration should include the time to copy input
   // tensor data to the GPU.
-  StatisticDuration compute_input = 3;
+  StatisticDuration compute_input = 2;
 
   // The count and cumulative duration to execute the model with the given
   // batch size.
-  StatisticDuration compute_infer = 4;
+  StatisticDuration compute_infer = 3;
 
   // The count and cumulative duration to extract output tensor data
   // produced by the model framework / backend with the given batch size.
   // For example, this duration should include the time to copy output
   // tensor data from the GPU.
-  StatisticDuration compute_output = 5;
+  StatisticDuration compute_output = 4;
 }
 ```

@@ -127,10 +127,8 @@ service GRPCInferenceService
   {
   }
 
-
   //@@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
-  // returns
-  //@@       (RepositoryModelUnloadResponse)
+  //@@       returns (RepositoryModelUnloadResponse)
   //@@
   //@@     Unload a model.
   //@@
@@ -806,7 +804,8 @@ message ModelStatisticsRequest
 {
   //@@  .. cpp:var:: string name
   //@@
-  //@@     The name of the model.
+  //@@     The name of the model. If not given returns statistics for
+  //@@     all models.
   //@@
   string name = 1;
 
@@ -955,13 +954,37 @@ message ModelStatistics
   //@@
   uint64 last_inference = 3;
 
+  //@@  .. cpp:var:: uint64 last_inference
+  //@@
+  //@@     The cumulative count of successful inference requests made for this
+  //@@     model. Each inference in a batched request is counted as an
+  //@@     individual inference. For example, if a client sends a single
+  //@@     inference request with batch size 64, "inference_count" will be
+  //@@     incremented by 64. Similarly, if a clients sends 64 individual
+  //@@     requests each with batch size 1, "inference_count" will be
+  //@@     incremented by 64.
+  //@@
+  uint64 inference_count = 4;
+
+  //@@  .. cpp:var:: uint64 last_inference
+  //@@
+  //@@     The cumulative count of the number of successful inference executions
+  //@@     performed for the model. When dynamic batching is enabled, a single
+  //@@     model execution can perform inferencing for more than one inference
+  //@@     request. For example, if a clients sends 64 individual requests each
+  //@@     with batch size 1 and the dynamic batcher batches them into a single
+  //@@     large batch for model execution then "execution_count" will be
+  //@@     incremented by 1. If, on the other hand, the dynamic batcher is not
+  //@@     enabled for that each of the 64 individual requests is executed
+  //@@     independently, then "execution_count" will be incremented by 64.
+  //@@
+  uint64 execution_count = 5;
+
   //@@  .. cpp:var:: InferStatistics inference_stats
   //@@
-  //@@     The aggregate statistics for the model/version. So, for example,
-  //@@     inference_stats:success indicates the number of successful inference
-  //@@     requests for the model.
+  //@@     The aggregate statistics for the model/version.
   //@@
-  InferStatistics inference_stats = 4;
+  InferStatistics inference_stats = 6;
 
   //@@  .. cpp:var:: InferBatchStatistics batch_stats (repeated)
   //@@
@@ -971,7 +994,7 @@ message ModelStatistics
   //@@     batch size (for example, larger batches typically take longer to
   //@@     compute).
   //@@
-  repeated InferBatchStatistics batch_stats = 5;
+  repeated InferBatchStatistics batch_stats = 7;
 }
 
 //@@
@@ -983,7 +1006,7 @@ message ModelStatisticsResponse
 {
   //@@  .. cpp:var:: ModelStatistics model_stats (repeated)
   //@@
-  //@@     // Statistics for each requested model.
+  //@@     Statistics for each requested model.
   //@@
   repeated ModelStatistics model_stats = 1;
 }

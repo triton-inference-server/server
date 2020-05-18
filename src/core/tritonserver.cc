@@ -1738,6 +1738,15 @@ TRITONSERVER_ServerModelStatistics(
           "last_inference",
           rapidjson::Value(backend->StatsAggregator().LastInferenceMs()).Move(),
           allocator);
+      model_stat.AddMember(
+          "inference_count",
+          rapidjson::Value(backend->StatsAggregator().InferenceCount()).Move(),
+          allocator);
+      model_stat.AddMember(
+          "execution_count",
+          rapidjson::Value(backend->StatsAggregator().ExecutionCount()).Move(),
+          allocator);
+
       model_stat.AddMember("inference_stats", inference_stats, allocator);
       model_stat.AddMember("batch_stats", batch_stats, allocator);
       model_stats_json.PushBack(model_stat, allocator);

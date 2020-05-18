@@ -78,9 +78,14 @@ class InferenceStatsAggregator {
   };
 
   // Create an aggregator for model statistics
-  InferenceStatsAggregator() : last_inference_ms_(0) {}
+  InferenceStatsAggregator()
+      : last_inference_ms_(0), inference_count_(0), execution_count_(0)
+  {
+  }
 
   uint64_t LastInferenceMs() const { return last_inference_ms_; }
+  uint64_t InferenceCount() const { return inference_count_; }
+  uint64_t ExecutionCount() const { return execution_count_; }
   const InferStats& ImmutableInferStats() const { return infer_stats_; }
   const std::map<size_t, InferBatchStats>& ImmutableInferBatchStats() const
   {
@@ -94,9 +99,9 @@ class InferenceStatsAggregator {
 
   // Add durations to infer stats for a successful inference request.
   void UpdateSuccess(
-      MetricModelReporter* metric_reporter, const uint64_t request_start_ns,
-      const uint64_t queue_start_ns, const uint64_t compute_start_ns,
-      const uint64_t compute_input_end_ns,
+      MetricModelReporter* metric_reporter, const size_t batch_size,
+      const uint64_t request_start_ns, const uint64_t queue_start_ns,
+      const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
       const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
       const uint64_t request_end_ns);
 
@@ -104,13 +109,15 @@ class InferenceStatsAggregator {
   // 'success_request_count' is the number of sucess requests in the
   // batch that have infer_stats attached.
   void UpdateInferBatchStats(
-      MetricModelReporter* metric_reporter, size_t batch_size,
+      MetricModelReporter* metric_reporter, const size_t batch_size,
       const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
       const uint64_t compute_output_start_ns, const uint64_t compute_end_ns);
 
  private:
   std::mutex mu_;
   uint64_t last_inference_ms_;
+  uint64_t inference_count_;
+  uint64_t execution_count_;
   InferStats infer_stats_;
   std::map<size_t, InferBatchStats> batch_stats_;
 };
