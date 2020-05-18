@@ -128,7 +128,7 @@ if(${TRITON_ENABLE_GRPC})
       TARGETS
         grpcclient
         grpcclient_static
-      EXPORT trtis-export
+      EXPORT triton-export
       LIBRARY DESTINATION lib
       ARCHIVE DESTINATION lib
   )
@@ -239,7 +239,7 @@ if(${TRITON_ENABLE_HTTP})
       TARGETS
         httpclient
         httpclient_static
-      EXPORT trtis-export
+      EXPORT triton-export
       LIBRARY DESTINATION lib
       ARCHIVE DESTINATION lib
   )
@@ -249,7 +249,7 @@ endif() # TRITON_ENABLE_HTTP
 include (CMakePackageConfigHelpers)
 set(_LIB_CMAKE_DIR lib/cmake/TRITON)
 install(
-  EXPORT trtis-export
+  EXPORT triton-export
   FILE TRITONTargets.cmake
   NAMESPACE TRITON::
   DESTINATION ${_LIB_CMAKE_DIR}

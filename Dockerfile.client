@@ -70,7 +70,7 @@ RUN cd build && \
           -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
           -DTRITON_ENABLE_GRPC=ON \
           -DTRITON_ENABLE_HTTP=ON && \
-    make -j16 trtis-clients
+    make -j16 client
 RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *

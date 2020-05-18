@@ -57,6 +57,6 @@ RUN (cd build && \
                   -DTRITON_ENABLE_METRICS_GPU=OFF \
                   -DCMAKE_BUILD_TYPE=Release \
                   -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install/custom-backend-sdk && \
-            make -j16 trtis-custom-backends) && \
+            make -j16 custom-backend) && \
     export VERSION=`cat /workspace/VERSION` && \
     (cd install && tar zcf /workspace/v$VERSION.custombackend.tar.gz custom-backend-sdk)

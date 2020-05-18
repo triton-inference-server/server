@@ -126,12 +126,12 @@ following to configure and build::
 
   $ cd build
   $ cmake -DCMAKE_BUILD_TYPE=Release
-  $ make -j8 trtis-clients
+  $ make -j8 client
 
 When the build completes the libraries can be found in
-trtis-clients/install/lib, the corresponding headers in
-trtis-clients/install/include, and the Python wheel file in
-trtis-clients/install/python. The trtis-clients/install directory will
+client/install/lib, the corresponding headers in
+client/install/include, and the Python wheel file in
+client/install/python. The client/install directory will
 also contain the built client examples that you can learn more about
 in :ref:`section-client-examples`.
 
@@ -161,12 +161,12 @@ are using Microsoft Visual Studio, you should do the following::
 
   > cd build
   > cmake -G"Visual Studio 16 2019" -DCMAKE_BUILD_TYPE=Release
-  > MSBuild.exe trtis-clients.vcxproj -p:Configuration=Release
+  > MSBuild.exe client.vcxproj -p:Configuration=Release
 
 When the build completes the libraries can be found in
-trtis-clients\\install\\lib, the corresponding headers in
-trtis-clients\\install\\include, and the Python wheel file in
-trtis-clients\\install\\python. The trtis-clients\\install directory will
+client\\install\\lib, the corresponding headers in
+client\\install\\include, and the Python wheel file in
+client\\install\\python. The client\\install directory will
 also contain the built client Python examples that you can learn more
 about in :ref:`section-client-examples`. At this time the Windows
 build does not include the C++ examples.
@@ -259,12 +259,12 @@ Then you can build the example application::
 
   $ cd build
   $ cmake -DTRTIS_CLIENT_CMAKE_DIR:PATH=`pwd`/../lib/cmake/TRTIS .
-  $ make -j8 trtis-clients
+  $ make -j8 client
 
 The example CMake file that illustrates how to build is in
-build/trtis-clients/CMakeLists.txt. The build produces both a
+build/client/CMakeLists.txt. The build produces both a
 statically and dynamically linked version of the example application
-into build/trtis-clients/install/bin.
+into build/client/install/bin.
 
 .. _section-client-api:
 

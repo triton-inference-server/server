@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,13 +47,13 @@ set +e
 # Set visitor script to be included on every HTML page
 export VISITS_COUNTING_SCRIPT=//assets.adobedtm.com/b92787824f2e0e9b68dc2e993f9bd995339fe417/satelliteLib-7ba51e58dc61bcb0e9311aadd02a0108ab24cc6c.js
 
-(cd docs && rm -f trtis_docs.zip && \
+(cd docs && rm -f triton_docs.zip && \
         make BUILDDIR=/opt/tritonserver/qa/L0_docs/build clean html) > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-(cd build && zip -r ../trtis_docs.zip html)
+(cd build && zip -r ../triton_docs.zip html)
 if [ $? -ne 0 ]; then
     RET=1
 fi
