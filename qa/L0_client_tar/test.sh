@@ -35,14 +35,14 @@ mkdir triton_client
 # Build
 cd triton_client/build
 cmake -DCMAKE_BUILD_TYPE=Release -DTRITON_CLIENT_CMAKE_DIR:PATH=`pwd`/../lib/cmake/TRITON .
-make -j16 trtis-clients
+make -j16 client
 
 # There is no server running but can still check to make sure that the
 # example application starts correctly.
 set +e
 
 # Shared HTTP
-trtis-clients/install/bin/simple_client_shared > $CLIENT_LOG 2>&1
+client/install/bin/simple_client_shared > $CLIENT_LOG 2>&1
 if [ $? -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Unexpected Pass for simple_client_shared HTTP\n***"
@@ -57,7 +57,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Shared GRPC
-trtis-clients/install/bin/simple_client_shared -i grpc > $CLIENT_LOG 2>&1
+client/install/bin/simple_client_shared -i grpc > $CLIENT_LOG 2>&1
 if [ $? -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Unexpected Pass for simple_client_shared GRPC\n***"
@@ -72,7 +72,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Static HTTP
-trtis-clients/install/bin/simple_client_static > $CLIENT_LOG 2>&1
+client/install/bin/simple_client_static > $CLIENT_LOG 2>&1
 if [ $? -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Unexpected Pass for simple_client_static HTTP\n***"
@@ -87,7 +87,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Static GRPC
-trtis-clients/install/bin/simple_client_static -i grpc > $CLIENT_LOG 2>&1
+client/install/bin/simple_client_static -i grpc > $CLIENT_LOG 2>&1
 if [ $? -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Unexpected Pass for simple_client_static GRPC\n***"

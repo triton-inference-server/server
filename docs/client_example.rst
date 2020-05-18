@@ -106,26 +106,26 @@ Ubuntu 16.04 / Ubuntu 18.04
 ...........................
 
 When the build completes the examples can be found in
-trtis-clients/install. To use the examples, you need to include the
+client/install. To use the examples, you need to include the
 path to the client library in environment variable "LD_LIBRARY_PATH",
 by default it is
-/path/to/tritonserver/repo/build/trtis-clients/install/lib. In
+/path/to/tritonserver/repo/build/client/install/lib. In
 addition to that, you also need to install the tensorrtserver Python
 package and other packages required by the examples::
 
-  $ pip install trtis-clients/install/python/tensorrtserver*.whl numpy pillow
+  $ pip install client/install/python/tensorrtserver*.whl numpy pillow
 
 Windows 10
 ..........
 
 When the build completes the examples can be found in
-trtis-clients/install. The C++ client examples will not be generated
+client/install. The C++ client examples will not be generated
 as those examples have not yet been ported to Windows. However, you
 can use the Python examples to test if the build is successful. To use
 the Python examples, you need to install the tensorrtserver Python
 package and other packages required by the examples::
 
-  > pip install trtis-clients/install/python/tensorrtserver*.whl numpy pillow
+  > pip install client/install/python/tensorrtserver*.whl numpy pillow
 
 Download From GitHub
 ^^^^^^^^^^^^^^^^^^^^

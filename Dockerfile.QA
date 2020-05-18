@@ -50,7 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 RUN cd builddir && \
-    make -j16 trtis-test-utils trtis-custom-backends
+    make -j16 test-util custom-backend
 
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
@@ -74,110 +74,110 @@ RUN mkdir -p qa/common && \
     cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_client/ && \
     cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \
-    cp /workspace/builddir/trtis-test-utils/install/bin/memory_test qa/L0_memory/.
+    cp /workspace/builddir/test-util/install/bin/memory_test qa/L0_memory/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
-RUN if [ -f /workspace/builddir/trtis-test-utils/install/bin/caffe2plan ]; then \
-       cp /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/.; \
+RUN if [ -f /workspace/builddir/test-util/install/bin/caffe2plan ]; then \
+       cp /workspace/builddir/test-util/install/bin/caffe2plan qa/common/.; \
     fi
 
 RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/custom_models/custom_int32_int32_int32/1/. && \
     mkdir -p qa/custom_models/custom_nobatch_int32_int32_int32/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/custom_models/custom_nobatch_int32_int32_int32/1/. && \
     mkdir -p qa/custom_models/custom_float32_float32_float32/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/custom_models/custom_float32_float32_float32/1/. && \
     mkdir -p qa/custom_models/custom_nobatch_float32_float32_float32/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
     mkdir -p qa/L0_grpc/models/simple_custom/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/L0_grpc/models/simple_custom/1/. && \
     mkdir -p qa/L0_http/models/simple_custom/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/L0_http/models/simple_custom/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/L0_simple_ensemble/models/simple/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/2 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/L0_simple_ensemble/models/simple/2/. && \
     mkdir -p qa/L0_multiple_ports/models/simple/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
         qa/L0_multiple_ports/models/simple/1/.
 
 RUN mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
+    cp builddir/custom-backend/install/lib/libimagepreprocess.so \
         qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/.
 
 RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
+    cp builddir/custom-backend/install/lib/libimagepreprocess.so \
         qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1/.
 
 RUN mkdir -p qa/L0_custom_param/models/param/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libparam.so \
+    cp builddir/custom-backend/install/lib/libparam.so \
         qa/L0_custom_param/models/param/1/.
 
 RUN mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+    cp builddir/custom-backend/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
     mkdir -p qa/L0_grpc/models/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+    cp builddir/custom-backend/install/lib/libsequence.so \
         qa/L0_grpc/models/simple_sequence/1/. && \
     mkdir -p qa/L0_grpc/models_dyna/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
+    cp builddir/custom-backend/install/lib/libdyna_sequence.so \
         qa/L0_grpc/models_dyna/simple_sequence/1/. && \
     mkdir -p qa/L0_http/models/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+    cp builddir/custom-backend/install/lib/libsequence.so \
         qa/L0_http/models/simple_sequence/1/. && \
     mkdir -p qa/L0_http/models_dyna/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
+    cp builddir/custom-backend/install/lib/libdyna_sequence.so \
         qa/L0_http/models_dyna/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+    cp builddir/custom-backend/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \
     mkdir -p qa/custom_models/custom_dyna_sequence_int32/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
+    cp builddir/custom-backend/install/lib/libdyna_sequence.so \
         qa/custom_models/custom_dyna_sequence_int32/1/.
 
-RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+RUN cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_infer/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_infer_variable/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_infer_reshape/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_infer_zero/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_sequence_batcher/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_savedmodel_shape/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_perf_custom/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_perf_nomodel/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_perf_client/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_large_payload/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_model_config/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_model_queue/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_simple_lib/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_pinned_memory/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_io/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_warmup/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_cmdline_trace/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_batcher/. && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
