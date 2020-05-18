@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,13 +28,13 @@
 #include <set>
 #include "src/core/status.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #define RETURN_IF_CUDA_ERR(X, MSG)                                           \
   do {                                                                       \
     cudaError_t err__ = (X);                                                 \
@@ -43,11 +43,11 @@ namespace nvidia { namespace inferenceserver {
           Status::Code::INTERNAL, (MSG) + ": " + cudaGetErrorString(err__)); \
     }                                                                        \
   } while (false)
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
-#ifndef TRTIS_ENABLE_GPU
+#ifndef TRITON_ENABLE_GPU
 using cudaStream_t = void*;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 /// Enable peer access for all GPU device pairs
 /// \param min_compute_capability The minimum support CUDA compute
@@ -72,7 +72,7 @@ Status CopyBuffer(
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, bool* cuda_used);
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 /// Validates the compute capability of the GPU indexed
 /// \param gpu_id The index of the target GPU.
 /// \param min_compute_capability The minimum support CUDA compute
@@ -82,7 +82,7 @@ Status CopyBuffer(
 Status CheckGPUCompatibility(
     const int gpu_id, const double min_compute_capability);
 
-/// Obtains a set of gpu ids that is supported by TRTIS.
+/// Obtains a set of gpu ids that is supported by triton.
 /// \param supported_gpus Returns the set of integers which is
 ///  populated by ids of supported GPUS
 /// \param min_compute_capability The minimum support CUDA compute

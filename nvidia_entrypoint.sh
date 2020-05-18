@@ -47,7 +47,6 @@ if [[ "$(find -L /usr -name libcuda.so.1 | grep -v "compat") " == " " || "$(ls /
   echo "   Use 'nvidia-docker run' to start this container; see"
   echo "   https://github.com/NVIDIA/nvidia-docker/wiki/nvidia-docker ."
   ln -s `find / -name libnvidia-ml.so -print -quit` /opt/tritonserver/lib/libnvidia-ml.so.1
-  export TENSORRT_SERVER_CPU_ONLY=1
   export TRITON_SERVER_CPU_ONLY=1
 else
   ( /usr/local/bin/checkSMVER.sh )

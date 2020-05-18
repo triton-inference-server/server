@@ -31,11 +31,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #else
 typedef void cudaIpcMemHandle_t;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 #ifdef __cplusplus
 extern "C" {

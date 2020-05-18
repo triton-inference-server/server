@@ -35,7 +35,7 @@ ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:20.03-tf1-py3
 ############################################################################
 ## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
 ############################################################################
-FROM ${PYTORCH_IMAGE} AS trtserver_pytorch
+FROM ${PYTORCH_IMAGE} AS tritonserver_pytorch
 
 # Must rebuild in the pytorch container to disable some features that
 # are not relevant for inferencing and so that OpenCV libraries are
@@ -56,7 +56,7 @@ RUN cd pytorch && \
 ############################################################################
 ## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
 ############################################################################
-FROM ${BASE_IMAGE} AS trtserver_onnx
+FROM ${BASE_IMAGE} AS tritonserver_onnx
 
 # Currently the prebuilt Onnx Runtime library is built on CUDA 9, thus it
 # needs to be built from source
@@ -127,15 +127,15 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
 ############################################################################
 ## TensorFlow stage: Use TensorFlow container
 ############################################################################
-FROM ${TENSORFLOW_IMAGE} AS trtserver_tf
+FROM ${TENSORFLOW_IMAGE} AS tritonserver_tf
 
 ############################################################################
 ## Build stage: Build inference server
 ############################################################################
-FROM ${BASE_IMAGE} AS trtserver_build
+FROM ${BASE_IMAGE} AS tritonserver_build
 
-ARG TRTIS_VERSION=1.14.0dev
-ARG TRTIS_CONTAINER_VERSION=20.06dev
+ARG TRITON_VERSION=1.14.0dev
+ARG TRITON_CONTAINER_VERSION=20.06dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
@@ -173,7 +173,7 @@ RUN apt-get update && \
 # libtensorflow_cc.so.  Custom TF operations link against
 # libtensorflow_framework.so so it must be present (and that
 # functionality is provided by libtensorflow_trtis.so).
-COPY --from=trtserver_tf \
+COPY --from=tritonserver_tf \
      /usr/local/lib/tensorflow/libtensorflow_trtis.so.1 \
      /opt/tritonserver/lib/tensorflow/
 RUN cd /opt/tritonserver/lib/tensorflow && \
@@ -185,33 +185,33 @@ RUN cd /opt/tritonserver/lib/tensorflow && \
     ln -sf libtensorflow_cc.so.1 libtensorflow_cc.so
 
 # Caffe2 libraries
-COPY --from=trtserver_pytorch \
+COPY --from=tritonserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_detectron_ops_gpu.so \
      /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch \
+COPY --from=tritonserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
      /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch \
+COPY --from=tritonserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
      /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_avx2.so /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_core.so /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_def.so /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_gnu_thread.so /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_avx2.so /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_core.so /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_def.so /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_gnu_thread.so /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tritonserver/lib/pytorch/
 
 # LibTorch headers and libraries
-COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
      /opt/tritonserver/include/torch
-COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
       /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cpu.so \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cpu.so \
       /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cuda.so \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cuda.so \
       /opt/tritonserver/lib/pytorch/
-COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
      /opt/tritonserver/lib/pytorch/
 RUN cd /opt/tritonserver/lib/pytorch && \
     for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
@@ -222,32 +222,32 @@ RUN cd /opt/tritonserver/lib/pytorch && \
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
 ARG ONNX_RUNTIME_VERSION=1.2.0
-COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
+COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
      /opt/tritonserver/include/onnxruntime/
-COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
+COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
-COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cuda/cuda_provider_factory.h \
+COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cuda/cuda_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
-COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/tensorrt/tensorrt_provider_factory.h \
+COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/tensorrt/tensorrt_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
-COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
+COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
-COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
+COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
      /opt/tritonserver/lib/onnx/
 RUN cd /opt/tritonserver/lib/onnx && \
     ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libcpu_extension.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libcpu_extension.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/plugins.xml \
+COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/plugins.xml \
      /opt/tritonserver/lib/onnx/
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tritonserver/lib/onnx/
 RUN cd /opt/tritonserver/lib/onnx && \
     ln -sf libtbb.so.2 libtbb.so && \
@@ -275,42 +275,42 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
-                  -DTRTIS_ENABLE_GRPC=ON \
-                  -DTRTIS_ENABLE_HTTP=ON \
-                  -DTRTIS_ENABLE_METRICS=ON \
-                  -DTRTIS_ENABLE_METRICS_GPU=ON \
-                  -DTRTIS_ENABLE_STATS=ON \
-                  -DTRTIS_ENABLE_TRACING=ON \
-                  -DTRTIS_ENABLE_GCS=ON \
-                  -DTRTIS_ENABLE_S3=ON \
-                  -DTRTIS_ENABLE_CUSTOM=ON \
-                  -DTRTIS_ENABLE_TENSORFLOW=ON \
-                  -DTRTIS_ENABLE_TENSORRT=OFF \
-                  -DTRTIS_ENABLE_CAFFE2=ON \
-                  -DTRTIS_ENABLE_ONNXRUNTIME=ON \
-                  -DTRTIS_ENABLE_ONNXRUNTIME_TENSORRT=OFF \
-                  -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON \
-                  -DTRTIS_ENABLE_PYTORCH=OFF \
-                  -DTRTIS_ENABLE_ENSEMBLE=OFF \
-                  -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
-                  -DTRTIS_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch" \
-                  -DTRTIS_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
+                  -DTRITON_ENABLE_GRPC=ON \
+                  -DTRITON_ENABLE_HTTP=ON \
+                  -DTRITON_ENABLE_METRICS=ON \
+                  -DTRITON_ENABLE_METRICS_GPU=ON \
+                  -DTRITON_ENABLE_STATS=ON \
+                  -DTRITON_ENABLE_TRACING=ON \
+                  -DTRITON_ENABLE_GCS=ON \
+                  -DTRITON_ENABLE_S3=ON \
+                  -DTRITON_ENABLE_CUSTOM=ON \
+                  -DTRITON_ENABLE_TENSORFLOW=ON \
+                  -DTRITON_ENABLE_TENSORRT=OFF \
+                  -DTRITON_ENABLE_CAFFE2=ON \
+                  -DTRITON_ENABLE_ONNXRUNTIME=ON \
+                  -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF \
+                  -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON \
+                  -DTRITON_ENABLE_PYTORCH=OFF \
+                  -DTRITON_ENABLE_ENSEMBLE=OFF \
+                  -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
+                  -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch" \
+                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
                   ../build && \
             make -j16 trtis && \
             mkdir -p /opt/tritonserver/include && \
             cp -r trtis/install/bin /opt/tritonserver/. && \
             cp -r trtis/install/lib /opt/tritonserver/. && \
-            cp -r trtis/install/include /opt/tritonserver/include/trtserver) && \
+            cp -r trtis/install/include /opt/tritonserver/include/tritonserver) && \
     (cd /opt/tritonserver && ln -sf /workspace/qa qa) && \
     (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/tensorflow && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/pytorch && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/onnx && chmod ugo-w+rx *)
 
-ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
-ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
-ENV TRITON_SERVER_VERSION ${TRTIS_VERSION}
-ENV NVIDIA_TRITON_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 ENV PATH /opt/tritonserver/bin:${PATH}
 
 COPY nvidia_entrypoint.sh /opt/tritonserver
@@ -321,13 +321,13 @@ ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=1.14.0dev
-ARG TRTIS_CONTAINER_VERSION=20.06dev
+ARG TRITON_VERSION=1.14.0dev
+ARG TRITON_CONTAINER_VERSION=20.06dev
 
-ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
-ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
-ENV TRITON_SERVER_VERSION ${TRTIS_VERSION}
-ENV NVIDIA_TRITON_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
@@ -344,10 +344,8 @@ ENV MKL_THREADING_LAYER GNU
 # Create a user that can be used to run the triton-server as
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
-ENV TENSORRT_SERVER_USER=triton-server
 ENV TRITON_SERVER_USER=triton-server
-RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
-    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
+RUN if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
         useradd $TRITON_SERVER_USER; \
     fi && \
     [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
@@ -377,20 +375,20 @@ RUN apt-get update && \
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 LICENSE .
-COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.3.376/LICENSE LICENSE.openvino
-COPY --chown=1000:1000 --from=trtserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
-COPY --chown=1000:1000 --from=trtserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
-COPY --chown=1000:1000 --from=trtserver_pytorch /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
-COPY --chown=1000:1000 --from=trtserver_build /opt/tritonserver/bin/tritonserver bin/
-COPY --chown=1000:1000 --from=trtserver_build /opt/tritonserver/lib lib
-COPY --chown=1000:1000 --from=trtserver_build /opt/tritonserver/include include
+COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/LICENSE LICENSE.openvino
+COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
+COPY --chown=1000:1000 --from=tritonserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
+COPY --chown=1000:1000 --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
+COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/bin/tritonserver bin/
+COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib lib
+COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include include
 
 # Install ONNX-Runtime-OpenVINO dependencies to use it in base container
-COPY --chown=1000:1000 --from=trtserver_onnx /workspace/build/Release/openvino_* \
+COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/build/Release/openvino_* \
      /opt/openvino_scripts/
-COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/model_optimizer \
+COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/model_optimizer \
      /opt/openvino_scripts/openvino_2019.3.376/deployment_tools/model_optimizer/
-COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.3.376/tools \
+COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/tools \
      /opt/openvino_scripts/openvino_2019.3.376/tools
 ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.3.376
 ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH

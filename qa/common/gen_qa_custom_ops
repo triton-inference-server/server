@@ -37,15 +37,15 @@
 ##
 ############################################################################
 
-TRTIS_VERSION=20.03
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRTIS_VERSION-tf1-py3}
-PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRTIS_VERSION-py3}
+TRITON_VERSION=20.03
+TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf1-py3}
+PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 
 CUDA_DEVICE=0
 
 ###
 HOST_SRCDIR=/tmp/gen_srcdir
-HOST_DESTDIR=/tmp/$TRTIS_VERSION/qa_custom_ops
+HOST_DESTDIR=/tmp/$TRITON_VERSION/qa_custom_ops
 
 rm -fr $HOST_DESTDIR
 mkdir -p $HOST_DESTDIR/tf_custom_ops $HOST_DESTDIR/libtorch_custom_ops

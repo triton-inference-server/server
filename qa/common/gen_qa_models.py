@@ -1120,7 +1120,7 @@ def create_onnx_modelfile(
 
     graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs, onnx_outputs)
     model_opset = onnx.helper.make_operatorsetid("", FLAGS.onnx_opset)
-    model_def = onnx.helper.make_model(graph_proto, producer_name="TRTIS",
+    model_def = onnx.helper.make_model(graph_proto, producer_name="triton",
                                        opset_imports=[model_opset])
 
     try:

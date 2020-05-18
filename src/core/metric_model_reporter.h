@@ -28,9 +28,9 @@
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
 #include "prometheus/registry.h"
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
 namespace nvidia { namespace inferenceserver {
 
@@ -39,7 +39,7 @@ namespace nvidia { namespace inferenceserver {
 //
 class MetricModelReporter {
  public:
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   MetricModelReporter(
       const std::string& model_name, const int64_t model_version,
       const int device, const MetricTagsMap& model_tags);
@@ -102,7 +102,7 @@ class MetricModelReporter {
   prometheus::Counter* metric_inf_compute_input_duration_us_;
   prometheus::Counter* metric_inf_compute_infer_duration_us_;
   prometheus::Counter* metric_inf_compute_output_duration_us_;
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 };
 
 }}  // namespace nvidia::inferenceserver

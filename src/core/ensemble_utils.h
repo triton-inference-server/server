@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
 
 #include <deque>
 #include <unordered_map>
@@ -45,4 +45,4 @@ void ValidateEnsembleConfig(
 
 }}  // namespace nvidia::inferenceserver
 
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE

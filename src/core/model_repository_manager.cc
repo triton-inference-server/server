@@ -39,32 +39,32 @@
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif
 
-#ifdef TRTIS_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CAFFE2
 #include "src/backends/caffe2/netdef_backend_factory.h"
-#endif  // TRTIS_ENABLE_CAFFE2
-#ifdef TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CUSTOM
 #include "src/backends/custom/custom_backend_factory.h"
-#endif  // TRTIS_ENABLE_CUSTOM
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_ENSEMBLE
 #include "src/backends/ensemble/ensemble_backend_factory.h"
-#endif  // TRTIS_ENABLE_ENSEMBLE
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ONNXRUNTIME
 #include "src/backends/onnx/onnx_backend_factory.h"
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
-#ifdef TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
 #include "src/backends/pytorch/libtorch_backend_factory.h"
-#endif  // TRTIS_ENABLE_PYTORCH
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#endif  // TRITON_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_TENSORFLOW
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/backends/tensorflow/savedmodel_backend_factory.h"
-#endif  // TRTIS_ENABLE_TENSORFLOW
-#ifdef TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORRT
 #include "src/backends/tensorrt/plan_backend_factory.h"
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
 
 namespace nvidia { namespace inferenceserver {
 
@@ -77,7 +77,7 @@ BuildBackendConfigMap(
     const std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limit_mb,
     BackendConfigMap* backend_configs)
 {
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORFLOW
   //// Tensorflow GraphDef and SavedModel
   {
     auto graphdef_config = std::make_shared<GraphDefBackendFactory::Config>();
@@ -90,7 +90,7 @@ BuildBackendConfigMap(
       graphdef_config->per_process_gpu_memory_fraction = tf_gpu_memory_fraction;
     }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     int device_cnt = 0;
     cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
     if ((cuerr == cudaErrorNoDevice) ||
@@ -115,67 +115,67 @@ BuildBackendConfigMap(
       }
       graphdef_config->per_process_gpu_memory_fraction = 0.0;
     }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
     graphdef_config->allow_soft_placement = tf_allow_soft_placement;
 
     (*backend_configs)[kTensorFlowGraphDefPlatform] = graphdef_config;
     (*backend_configs)[kTensorFlowSavedModelPlatform] = graphdef_config;
   }
-#endif  // TRTIS_ENABLE_TENSORFLOW
+#endif  // TRITON_ENABLE_TENSORFLOW
 
-#ifdef TRTIS_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CAFFE2
   //// Caffe NetDef
   {
     auto netdef_config = std::make_shared<NetDefBackendFactory::Config>();
     netdef_config->autofill = !strict_model_config;
     (*backend_configs)[kCaffe2NetDefPlatform] = netdef_config;
   }
-#endif  // TRTIS_ENABLE_CAFFE2
+#endif  // TRITON_ENABLE_CAFFE2
 
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORRT
   //// TensorRT
   {
     auto plan_config = std::make_shared<PlanBackendFactory::Config>();
     plan_config->autofill = !strict_model_config;
     (*backend_configs)[kTensorRTPlanPlatform] = plan_config;
   }
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
 
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_ONNXRUNTIME
   //// OnnxRuntime Onnx
   {
     auto onnx_config = std::make_shared<OnnxBackendFactory::Config>();
     onnx_config->autofill = !strict_model_config;
     (*backend_configs)[kOnnxRuntimeOnnxPlatform] = onnx_config;
   }
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_ONNXRUNTIME
 
-#ifdef TRTIS_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_PYTORCH
   //// PyTorch LibTorch
   {
     auto libtorch_config = std::make_shared<LibTorchBackendFactory::Config>();
     libtorch_config->autofill = !strict_model_config;
     (*backend_configs)[kPyTorchLibTorchPlatform] = libtorch_config;
   }
-#endif  // TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_PYTORCH
 
-#ifdef TRTIS_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_CUSTOM
   //// Custom
   {
     auto custom_config = std::make_shared<CustomBackendFactory::Config>();
     custom_config->inference_server_version = version;
     (*backend_configs)[kCustomPlatform] = custom_config;
   }
-#endif  // TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_CUSTOM
 
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
   //// Ensemble
   {
     auto ensemble_config = std::make_shared<EnsembleBackendFactory::Config>();
     (*backend_configs)[kEnsemblePlatform] = ensemble_config;
   }
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
   ;     // Need this semicolon to keep code formatter from freaking out
 }
 
@@ -370,28 +370,28 @@ class ModelRepositoryManager::BackendLifeCycle {
   BackendMap map_;
   std::mutex map_mtx_;
 
-#ifdef TRTIS_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CAFFE2
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
-#endif  // TRTIS_ENABLE_CAFFE2
-#ifdef TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CUSTOM
   std::unique_ptr<CustomBackendFactory> custom_factory_;
-#endif  // TRTIS_ENABLE_CUSTOM
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_TENSORFLOW
   std::unique_ptr<GraphDefBackendFactory> graphdef_factory_;
   std::unique_ptr<SavedModelBackendFactory> savedmodel_factory_;
-#endif  // TRTIS_ENABLE_TENSORFLOW
-#ifdef TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORRT
   std::unique_ptr<PlanBackendFactory> plan_factory_;
-#endif  // TRTIS_ENABLE_TENSORRT
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_ONNXRUNTIME
   std::unique_ptr<OnnxBackendFactory> onnx_factory_;
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
-#ifdef TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
   std::unique_ptr<LibTorchBackendFactory> libtorch_factory_;
-#endif  // TRTIS_ENABLE_PYTORCH
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_ENSEMBLE
   std::unique_ptr<EnsembleBackendFactory> ensemble_factory_;
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
 };
 
 Status
@@ -403,7 +403,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
       new BackendLifeCycle(min_compute_capability));
 
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORFLOW
   {
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kTensorFlowGraphDefPlatform)->second;
@@ -416,55 +416,55 @@ ModelRepositoryManager::BackendLifeCycle::Create(
     RETURN_IF_ERROR(SavedModelBackendFactory::Create(
         config, &(local_life_cycle->savedmodel_factory_)));
   }
-#endif  // TRTIS_ENABLE_TENSORFLOW
-#ifdef TRTIS_ENABLE_CAFFE2
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_CAFFE2
   {
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kCaffe2NetDefPlatform)->second;
     RETURN_IF_ERROR(NetDefBackendFactory::Create(
         config, &(local_life_cycle->netdef_factory_)));
   }
-#endif  // TRTIS_ENABLE_CAFFE2
-#ifdef TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_TENSORRT
   {
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kTensorRTPlanPlatform)->second;
     RETURN_IF_ERROR(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
-#endif  // TRTIS_ENABLE_TENSORRT
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_ONNXRUNTIME
   {
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kOnnxRuntimeOnnxPlatform)->second;
     RETURN_IF_ERROR(
         OnnxBackendFactory::Create(config, &(local_life_cycle->onnx_factory_)));
   }
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
-#ifdef TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
   {
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kPyTorchLibTorchPlatform)->second;
     RETURN_IF_ERROR(LibTorchBackendFactory::Create(
         config, &(local_life_cycle->libtorch_factory_)));
   }
-#endif  // TRTIS_ENABLE_PYTORCH
-#ifdef TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_CUSTOM
   {
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kCustomPlatform)->second;
     RETURN_IF_ERROR(CustomBackendFactory::Create(
         config, &(local_life_cycle->custom_factory_)));
   }
-#endif  // TRTIS_ENABLE_CUSTOM
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_ENSEMBLE
   {
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kEnsemblePlatform)->second;
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
         server, config, &(local_life_cycle->ensemble_factory_)));
   }
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
 
   *life_cycle = std::move(local_life_cycle);
   return Status::Success;
@@ -814,7 +814,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
   Status status;
   std::unique_ptr<InferenceBackend> is;
   switch (backend_info->platform_) {
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORFLOW
     case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
       status = graphdef_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
@@ -823,44 +823,44 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
       status = savedmodel_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
       break;
-#endif  // TRTIS_ENABLE_TENSORFLOW
-#ifdef TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORRT
     case Platform::PLATFORM_TENSORRT_PLAN:
       status = plan_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
       break;
-#endif  // TRTIS_ENABLE_TENSORRT
-#ifdef TRTIS_ENABLE_CAFFE2
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_CAFFE2
     case Platform::PLATFORM_CAFFE2_NETDEF:
       status = netdef_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
       break;
-#endif  // TRTIS_ENABLE_CAFFE2
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_ONNXRUNTIME
     case Platform::PLATFORM_ONNXRUNTIME_ONNX:
       status = onnx_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
       break;
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
-#ifdef TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
     case Platform::PLATFORM_PYTORCH_LIBTORCH:
       status = libtorch_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
       break;
-#endif  // TRTIS_ENABLE_PYTORCH
-#ifdef TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_CUSTOM
     case Platform::PLATFORM_CUSTOM:
       status = custom_factory_->CreateBackend(
           backend_info->repository_path_, model_name, version, model_config,
           min_compute_capability_, &is);
       break;
-#endif  // TRTIS_ENABLE_CUSTOM
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_ENSEMBLE
     case Platform::PLATFORM_ENSEMBLE:
       status = ensemble_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
       break;
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
     default:
       break;
   }
@@ -1287,7 +1287,7 @@ ModelRepositoryManager::LoadUnloadModels(
 
         // More models should be polled if the polled models are ensembles
         std::set<std::string> next_models;
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
         for (const auto& model : models) {
           auto it = new_infos.find(model);
           // Some models may be marked as deleted and not in 'new_infos'
@@ -1304,7 +1304,7 @@ ModelRepositoryManager::LoadUnloadModels(
             }
           }
         }
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
 
         models.swap(next_models);
       }
@@ -1668,9 +1668,9 @@ ModelRepositoryManager::UpdateDependencyGraph(
     }
   }
 
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
   ValidateEnsembleConfig(&affected_ensembles);
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
 
   return Status::Success;
 }

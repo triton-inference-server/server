@@ -48,26 +48,26 @@
 ##
 ############################################################################
 
-TRTIS_VERSION=20.03
-PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRTIS_VERSION-py3}
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRTIS_VERSION-tf1-py3}
-TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRTIS_VERSION-py3}
+TRITON_VERSION=20.03
+PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
+TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf1-py3}
+TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=0
 
 ###
 HOST_SRCDIR=/tmp/gen_srcdir
-HOST_DESTDIR=/tmp/$TRTIS_VERSION/qa_model_repository
-HOST_VARDESTDIR=/tmp/$TRTIS_VERSION/qa_variable_model_repository
-HOST_IDENTITYDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_model_repository
-HOST_IDENTITYBIGDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_big_model_repository
-HOST_SHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_shapetensor_model_repository
-HOST_RESHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_reshape_model_repository
-HOST_SEQDESTDIR=/tmp/$TRTIS_VERSION/qa_sequence_model_repository
-HOST_DYNASEQDESTDIR=/tmp/$TRTIS_VERSION/qa_dyna_sequence_model_repository
-HOST_VARSEQDESTDIR=/tmp/$TRTIS_VERSION/qa_variable_sequence_model_repository
-HOST_ENSEMBLEDESTDIR=/tmp/$TRTIS_VERSION/qa_ensemble_model_repository
-HOST_NOSHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_noshape_model_repository
-HOST_PLGDESTDIR=/tmp/$TRTIS_VERSION/qa_trt_plugin_model_repository
+HOST_DESTDIR=/tmp/$TRITON_VERSION/qa_model_repository
+HOST_VARDESTDIR=/tmp/$TRITON_VERSION/qa_variable_model_repository
+HOST_IDENTITYDESTDIR=/tmp/$TRITON_VERSION/qa_identity_model_repository
+HOST_IDENTITYBIGDESTDIR=/tmp/$TRITON_VERSION/qa_identity_big_model_repository
+HOST_SHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_shapetensor_model_repository
+HOST_RESHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_reshape_model_repository
+HOST_SEQDESTDIR=/tmp/$TRITON_VERSION/qa_sequence_model_repository
+HOST_DYNASEQDESTDIR=/tmp/$TRITON_VERSION/qa_dyna_sequence_model_repository
+HOST_VARSEQDESTDIR=/tmp/$TRITON_VERSION/qa_variable_sequence_model_repository
+HOST_ENSEMBLEDESTDIR=/tmp/$TRITON_VERSION/qa_ensemble_model_repository
+HOST_NOSHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_noshape_model_repository
+HOST_PLGDESTDIR=/tmp/$TRITON_VERSION/qa_trt_plugin_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR

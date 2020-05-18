@@ -302,7 +302,7 @@ PlanBackend::Context::InitOptimizationProfiles(
   const int total_profiles = engine_->getNbOptimizationProfiles();
 
   // TRT sets the optimization profile index to be 0 implicitly with the first
-  // context creation. As currently TRTIS supports one context per engine,
+  // context creation. As currently triton supports one context per engine,
   // in order to set the specified profile_index, another context is created
   // and the previous context is destroyed.
   auto default_trt_context = engine_->createExecutionContext();
@@ -384,12 +384,12 @@ PlanBackend::CreateExecutionContext(
       Config().optimization().output_pinned_memory().enable();
 
   std::unique_ptr<MetricModelReporter> metric_reporter;
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
     metric_reporter.reset(new MetricModelReporter(
         Name(), Version(), gpu_device, Config().metric_tags()));
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
@@ -528,7 +528,7 @@ PlanBackend::CreateExecutionContext(
   // If preferred batch size is specified, then the batch sizes will be
   // 1, preferred batch sizes, 'max_batch_size'. If any
   // build fails don't attempt for any larger batch sizes.
-#ifdef TRTIS_ENABLE_CUDA_GRAPH
+#ifdef TRITON_ENABLE_CUDA_GRAPH
   const bool use_cuda_graphs = Config().optimization().cuda().graphs();
   if (use_cuda_graphs) {
     std::set<int> cuda_graph_batch_sizes{1};
@@ -1291,7 +1291,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
 }
 
 // CUDA 10.1 starts to support CUDA graphs.
-#ifdef TRTIS_ENABLE_CUDA_GRAPH
+#ifdef TRITON_ENABLE_CUDA_GRAPH
 bool
 PlanBackend::Context::BuildCudaGraph(
     TensorRTContext* trt_context, const int batch_size)
@@ -1377,7 +1377,7 @@ PlanBackend::Run(
     return;
   }
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   // Stop queue timer and start compute timer when the payload is
   // scheduled to run
   for (auto& payload : *payloads) {
@@ -1388,7 +1388,7 @@ PlanBackend::Run(
           contexts_[next_context_[runner_idx]]->gpu_device_);
     }
   }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   auto status = contexts_[next_context_[runner_idx]]->Run(this, payloads);
 
@@ -1396,7 +1396,7 @@ PlanBackend::Run(
   // thread as the completion thread will wait on CUDA events unconditionally,
   // which can be ignored on error.
   if (!status.IsOk()) {
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
     // Stop compute timers.
     for (auto& payload : *payloads) {
       if (payload.stats_ != nullptr) {
@@ -1404,7 +1404,7 @@ PlanBackend::Run(
             ModelInferStats::TimestampKind::kComputeEnd);
       }
     }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
     OnCompleteQueuedPayloads(status);
     // On inference error, place the context back to the queue immediately
@@ -2044,7 +2044,7 @@ PlanBackend::Context::ProcessResponse(
     }
     auto& event_set = events_[std::get<2>(OnCompleteMetaData)];
     auto& payloads = std::get<1>(OnCompleteMetaData);
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
     // Only need to wait for input copy for recording stats
     cudaEventSynchronize(event_set.input_ready_);
     for (auto& payload : *payloads) {
@@ -2053,7 +2053,7 @@ PlanBackend::Context::ProcessResponse(
             ModelInferStats::TimestampKind::kComputeInputEnd);
       }
     }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
     // The model execution associated with the OnCompletePair
     // has consumed the inputs. Put the context back into the available queue
@@ -2062,7 +2062,7 @@ PlanBackend::Context::ProcessResponse(
     context_queue->Put(context_idx);
     NVTX_MARKER("plan_input_available");
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
     cudaEventSynchronize(event_set.ready_for_output_);
     for (auto& payload : *payloads) {
       if (payload.stats_ != nullptr) {
@@ -2070,7 +2070,7 @@ PlanBackend::Context::ProcessResponse(
             ModelInferStats::TimestampKind::kComputeOutputStart);
       }
     }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
     cudaEventSynchronize(event_set.output_ready_);
     NVTX_MARKER("plan_output_ready");
@@ -2106,7 +2106,7 @@ PlanBackend::Context::ProcessResponse(
       }
     }
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
     // Stop compute timers.
     for (auto& payload : *payloads) {
       if (payload.stats_ != nullptr) {
@@ -2114,7 +2114,7 @@ PlanBackend::Context::ProcessResponse(
             ModelInferStats::TimestampKind::kComputeEnd);
       }
     }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
     // Just trigger the callback, Payloads are all-set
     {

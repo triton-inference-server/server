@@ -30,11 +30,11 @@
 #include "src/core/model_config.pb.h"
 #include "src/custom/sdk/custom_instance.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda.h>
 #include "src/core/model_config_cuda.h"
 #include "src/custom/addsub/kernel.h"
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
@@ -71,7 +71,7 @@ class Context : public CustomInstance {
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   int FreeCudaBuffers();
   int AllocateCudaBuffers(size_t byte_size);
 
@@ -81,7 +81,7 @@ class Context : public CustomInstance {
   int ExecuteGPU(
       const uint32_t payload_cnt, CustomPayload* payloads,
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   int GetInputTensorCPU(
       CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
@@ -94,7 +94,7 @@ class Context : public CustomInstance {
   // INT32 or FP32.
   DataType datatype_ = DataType::TYPE_INVALID;
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // CUDA memory buffers for input and output tensors.
   size_t cuda_buffer_byte_size_;
   uint8_t* cuda_input0_;
@@ -104,7 +104,7 @@ class Context : public CustomInstance {
   // The contexts executing on a GPU, the CUDA stream to use for the
   // execution.
   cudaStream_t stream_;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   // Local error codes
   const int kGpuNotSupported = RegisterError("execution on GPU not supported");
@@ -131,17 +131,17 @@ Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
     const int gpu_device)
     : CustomInstance(instance_name, model_config, gpu_device)
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       ,
       cuda_buffer_byte_size_(0), cuda_input0_(nullptr), cuda_input1_(nullptr),
       cuda_output_(nullptr), stream_(nullptr)
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 {
 }
 
 Context::~Context()
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   FreeCudaBuffers();
 
   if (stream_ != nullptr) {
@@ -152,10 +152,10 @@ Context::~Context()
     }
     stream_ = nullptr;
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 int
 Context::FreeCudaBuffers()
 {
@@ -217,7 +217,7 @@ Context::AllocateCudaBuffers(size_t byte_size)
   cuda_buffer_byte_size_ = byte_size;
   return ErrorCodes::Success;
 }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 int
 Context::Init()
@@ -269,7 +269,7 @@ Context::Init()
 
   // Additional initialization if executing on the GPU...
   if (gpu_device_ != CUSTOM_NO_GPU_DEVICE) {
-#ifndef TRTIS_ENABLE_GPU
+#ifndef TRITON_ENABLE_GPU
     return kGpuNotSupported;
 #else
     // Very important to set the CUDA device before performing any
@@ -294,7 +294,7 @@ Context::Init()
                 << cudaGetErrorString(cuerr);
       return kCudaStream;
     }
-#endif  // !TRTIS_ENABLE_GPU
+#endif  // !TRITON_ENABLE_GPU
   }
 
   return ErrorCodes::Success;
@@ -501,7 +501,7 @@ Context::ExecuteCPU(
   return ErrorCodes::Success;
 }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 int
 Context::GetInputTensorGPU(
     CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
@@ -719,7 +719,7 @@ Context::ExecuteGPU(
 
   return ErrorCodes::Success;
 }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 int
 Context::Execute(
@@ -729,11 +729,11 @@ Context::Execute(
   if (gpu_device_ == CUSTOM_NO_GPU_DEVICE) {
     return ExecuteCPU(payload_cnt, payloads, input_fn, output_fn);
   } else {
-#ifndef TRTIS_ENABLE_GPU
+#ifndef TRITON_ENABLE_GPU
     return kGpuNotSupported;
 #else
     return ExecuteGPU(payload_cnt, payloads, input_fn, output_fn);
-#endif  // !TRTIS_ENABLE_GPU
+#endif  // !TRITON_ENABLE_GPU
   }
 }
 

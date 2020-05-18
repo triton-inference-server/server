@@ -822,13 +822,13 @@ main(int argc, char** argv)
         if (arg.compare("system") == 0) {
           shared_memory_type = SharedMemoryType::SYSTEM_SHARED_MEMORY;
         } else if (arg.compare("cuda") == 0) {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
           shared_memory_type = SharedMemoryType::CUDA_SHARED_MEMORY;
 #else
           Usage(
               argv,
-              "cuda shared memory is not supported when TRTIS_ENABLE_GPU=0");
-#endif  // TRTIS_ENABLE_GPU
+              "cuda shared memory is not supported when TRITON_ENABLE_GPU=0");
+#endif  // TRITON_ENABLE_GPU
         }
         break;
       }

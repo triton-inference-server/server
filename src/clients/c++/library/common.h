@@ -42,12 +42,12 @@
 #include <thread>
 #include <vector>
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #else
 struct cudaIpcMemHandle_t {
 };
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver { namespace client {
 

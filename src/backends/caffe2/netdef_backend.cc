@@ -33,10 +33,10 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #include "src/core/cuda_utils.h"
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -157,7 +157,7 @@ NetDefBackend::CreateExecutionContext(
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
   } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     cudaDeviceProp cuprops;
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
@@ -174,7 +174,7 @@ NetDefBackend::CreateExecutionContext(
                             : cc_itr->second;
 #else
     return Status(Status::Code::INTERNAL, "GPU instances not supported");
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   }
 
   const auto& mn_itr = models.find(cc_model_filename);
@@ -213,12 +213,12 @@ NetDefBackend::CreateExecutionContext(
       Config().optimization().output_pinned_memory().enable();
 
   std::unique_ptr<MetricModelReporter> metric_reporter;
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
     metric_reporter.reset(new MetricModelReporter(
         Name(), Version(), gpu_device, Config().metric_tags()));
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
@@ -398,11 +398,11 @@ NetDefBackend::Context::ReadOutputTensors(
   // Finalize and wait for any pending buffer copies.
   cuda_copy |= responder.Finalize();
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   return Status::Success;
 }
 
@@ -556,11 +556,11 @@ NetDefBackend::Context::Run(
           total_batch_size, requests, &responses, &input_buffers, &cuda_copy),
       "error sending Caffe2 response");
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
 
@@ -580,7 +580,7 @@ NetDefBackend::Context::Run(
       ReadOutputTensors(base, total_batch_size, requests, &responses),
       "error sending Caffe2 response");
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
 
   // Report stats and trace
@@ -590,7 +590,7 @@ NetDefBackend::Context::Run(
         metric_reporter_.get(), (responses[i] != nullptr), compute_start_ns,
         compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     if (request->Trace() != nullptr) {
       auto& trace = request->Trace();
       trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
@@ -599,14 +599,14 @@ NetDefBackend::Context::Run(
           TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
       trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
   }
 
   // Also reporting batch stats
   base->MutableStatsAggregator()->UpdateInferBatchStats(
       metric_reporter_.get(), total_batch_size, compute_start_ns,
       compute_input_end_ns, compute_output_start_ns, compute_end_ns);
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   // Send all the responses that haven't already been sent because of
   // an earlier error.

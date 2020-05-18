@@ -34,7 +34,7 @@ namespace nvidia { namespace inferenceserver {
 Status
 EnablePeerAccess(const double min_compute_capability)
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // If we can't enable peer access for one device pair, the best we can
   // do is skipping it...
   std::set<int> supported_gpus;
@@ -66,7 +66,7 @@ EnablePeerAccess(const double min_compute_capability)
         Status::Code::UNSUPPORTED,
         "failed to enable peer access for some device pairs");
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   return Status::Success;
 }
 
@@ -89,7 +89,7 @@ CopyBuffer(
       (dst_memory_type != TRITONSERVER_MEMORY_GPU)) {
     memcpy(dst, src, byte_size);
   } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     // [TODO] use cudaMemcpyDefault if UVM is supported for the device
     auto copy_kind = cudaMemcpyDeviceToDevice;
     if (src_memory_type != TRITONSERVER_MEMORY_GPU) {
@@ -116,13 +116,13 @@ CopyBuffer(
     return Status(
         Status::Code::INTERNAL,
         msg + ": try to use CUDA copy while GPU is not supported");
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   }
 
   return Status::Success;
 }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 Status
 CheckGPUCompatibility(const int gpu_id, const double min_compute_capability)
 {

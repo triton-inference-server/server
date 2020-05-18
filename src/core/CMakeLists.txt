@@ -34,7 +34,7 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${proto-srcs})
 protobuf_generate_python(PROTO_PY ${proto-srcs})
 
 set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
-if(${TRTIS_ENABLE_GRPC})
+if(${TRITON_ENABLE_GRPC})
   set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 endif()
 
@@ -94,25 +94,25 @@ add_library(
 )
 add_dependencies(model-config-library proto-library)
 
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   add_library(
     model-config-cuda-library EXCLUDE_FROM_ALL OBJECT
     model_config_cuda.cc model_config_cuda.h
   )
   target_include_directories(model-config-cuda-library PRIVATE ${CUDA_INCLUDE_DIRS})
   add_dependencies(model-config-cuda-library proto-library)
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
 #
 # Inference server core
 #
-if(${TRTIS_ENABLE_GCS})
+if(${TRITON_ENABLE_GCS})
   find_package(storage_client REQUIRED)
   message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
   set_source_files_properties(filesystem.cc PROPERTIES COMPILE_FLAGS -Wno-missing-field-initializers)
-endif() # TRTIS_ENABLE_GCS
+endif() # TRITON_ENABLE_GCS
 
-if(${TRTIS_ENABLE_S3})
+if(${TRITON_ENABLE_S3})
   find_package(AWSSDK REQUIRED COMPONENTS s3)
   message(STATUS "Using aws-sdk-cpp ${AWSSDK_VERSION}")
 endif()
@@ -180,7 +180,7 @@ set(
   tritonserver.h
 )
 
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   set(
     SERVER_SRCS
     ${SERVER_SRCS}
@@ -191,7 +191,7 @@ if(${TRTIS_ENABLE_GPU})
     ${SERVER_HDRS}
     cuda_memory_manager.h
   )
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
 add_library(
   server-library EXCLUDE_FROM_ALL OBJECT
@@ -199,31 +199,31 @@ add_library(
 )
 add_dependencies(server-library proto-library)
 
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   target_include_directories(
     server-library
     PRIVATE ${CUDA_INCLUDE_DIRS}
     PRIVATE ${CNMEM_PATH}/include
   )
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
-if(${TRTIS_ENABLE_METRICS})
+if(${TRITON_ENABLE_METRICS})
   target_include_directories(
     server-library
     PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
   )
-endif() # TRTIS_ENABLE_METRICS
+endif() # TRITON_ENABLE_METRICS
 
-if(${TRTIS_ENABLE_GCS})
+if(${TRITON_ENABLE_GCS})
   target_include_directories(
     server-library
     PRIVATE $<TARGET_PROPERTY:storage_client,INTERFACE_INCLUDE_DIRECTORIES>
   )
-endif() # TRTIS_ENABLE_GCS
+endif() # TRITON_ENABLE_GCS
 
-if(${TRTIS_ENABLE_S3})
+if(${TRITON_ENABLE_S3})
   target_include_directories(
     server-library
     PRIVATE $<TARGET_PROPERTY:aws-cpp-sdk-s3,INTERFACE_INCLUDE_DIRECTORIES>
   )
-endif() # TRTIS_ENABLE_S3
+endif() # TRITON_ENABLE_S3

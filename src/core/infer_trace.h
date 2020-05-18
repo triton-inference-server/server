@@ -34,7 +34,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
 
 //
 // InferenceTrace
@@ -100,12 +100,12 @@ class InferenceTrace {
   static std::atomic<uint64_t> next_id_;
 };
 
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
 //
 // Macros to generate trace activity
 //
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
 #define INFER_TRACE_ACTIVITY(T, A, TS_NS) \
   {                                       \
     const auto& trace = (T);              \
@@ -123,6 +123,6 @@ class InferenceTrace {
 #else
 #define INFER_TRACE_ACTIVITY(T, A, TS_NS)
 #define INFER_TRACE_ACTIVITY_NOW(T, A)
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
 }}  // namespace nvidia::inferenceserver

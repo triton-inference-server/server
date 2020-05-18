@@ -32,13 +32,13 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/tritonserver.h"
 
-#ifdef TRTIS_ENABLE_GRPC
+#ifdef TRITON_ENABLE_GRPC
 #include "src/core/grpc_service.grpc.pb.h"
 #endif
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -61,7 +61,7 @@ class SharedMemoryManager {
       const std::string& name, const std::string& shm_key, const size_t offset,
       const size_t byte_size);
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   /// Add a shared memory block representing shared memory in CUDA
   /// (GPU) memory to the manager. Return TRITONSERVER_ERROR_ALREADY_EXISTS
   /// if a shared memory block of the same name already exists in the manager.
@@ -74,7 +74,7 @@ class SharedMemoryManager {
   TRITONSERVER_Error* RegisterCUDASharedMemory(
       const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
       const size_t byte_size, const int device_id);
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   /// Get the access information for the shared memory block
   /// with the specified name. Return TRITONSERVER_ERROR_NOT_FOUND
@@ -110,7 +110,7 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetStatus(SharedMemoryStatus* status);
 
-#ifdef TRTIS_ENABLE_GRPC
+#ifdef TRITON_ENABLE_GRPC
   /// Populates the status of active system shared memory regions
   /// in the response protobuf. If 'name' is missing then return status of
   /// all active system shared memory regions.
@@ -128,7 +128,7 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetStatus(
       const std::string& name, CudaSharedMemoryStatusResponse*& shm_status);
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
   /// Populates the status of active system/CUDA shared memory regions
   /// in the status JSON. If 'name' is empty then return status of all

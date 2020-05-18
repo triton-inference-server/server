@@ -32,42 +32,42 @@ namespace nvidia { namespace inferenceserver {
 constexpr char kInferHeaderContentLengthHTTPHeader[] =
     "Inference-Header-Content-Length";
 
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORFLOW
 constexpr char kTensorFlowGraphDefPlatform[] = "tensorflow_graphdef";
 constexpr char kTensorFlowSavedModelPlatform[] = "tensorflow_savedmodel";
 constexpr char kTensorFlowGraphDefFilename[] = "model.graphdef";
 constexpr char kTensorFlowSavedModelFilename[] = "model.savedmodel";
-#endif  // TRTIS_ENABLE_TENSORFLOW
+#endif  // TRITON_ENABLE_TENSORFLOW
 
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORRT
 constexpr char kTensorRTPlanPlatform[] = "tensorrt_plan";
 constexpr char kTensorRTPlanFilename[] = "model.plan";
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
 
-#ifdef TRTIS_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_CAFFE2
 constexpr char kCaffe2NetDefPlatform[] = "caffe2_netdef";
 constexpr char kCaffe2NetDefFilename[] = "model.netdef";
 constexpr char kCaffe2NetDefInitFilenamePrefix[] = "init_";
-#endif  // TRTIS_ENABLE_CAFFE2
+#endif  // TRITON_ENABLE_CAFFE2
 
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_ONNXRUNTIME
 constexpr char kOnnxRuntimeOnnxPlatform[] = "onnxruntime_onnx";
 constexpr char kOnnxRuntimeOnnxFilename[] = "model.onnx";
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_ONNXRUNTIME
 
-#ifdef TRTIS_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_PYTORCH
 constexpr char kPyTorchLibTorchPlatform[] = "pytorch_libtorch";
 constexpr char kPyTorchLibTorchFilename[] = "model.pt";
-#endif  // TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_PYTORCH
 
-#ifdef TRTIS_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_CUSTOM
 constexpr char kCustomPlatform[] = "custom";
 constexpr char kCustomFilename[] = "libcustom.so";
-#endif  // TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_CUSTOM
 
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
 constexpr char kEnsemblePlatform[] = "ensemble";
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
 
 constexpr char kTensorRTExecutionAccelerator[] = "tensorrt";
 constexpr char kOpenVINOExecutionAccelerator[] = "openvino";

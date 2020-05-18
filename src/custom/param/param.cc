@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -43,8 +43,8 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace param {
 
-// Integer error codes. TRTIS requires that success must be 0. All
-// other codes are interpreted by TRTIS as failures.
+// Integer error codes. Triton requires that success must be 0. All
+// other codes are interpreted as failures.
 enum ErrorCodes {
   kSuccess = 0,
   kUnknown,
@@ -170,7 +170,7 @@ Context::Execute(
 
   // The output is a vector of strings, with one element for the input
   // and one element for each parameter from the system and model
-  // configuration. TRTIS requires that each string be represented in
+  // configuration. Triton requires that each string be represented in
   // the output buffer by a 4-byte length followed by the string
   // itself, with no terminating null.
   size_t output_cnt = 0;

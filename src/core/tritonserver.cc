@@ -158,7 +158,7 @@ class TritonServerMetrics {
 TRITONSERVER_Error*
 TritonServerMetrics::Serialize(const char** base, size_t* byte_size)
 {
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   serialized_ = ni::Metrics::SerializedMetrics();
   *base = serialized_.c_str();
   *byte_size = serialized_.size();
@@ -168,7 +168,7 @@ TritonServerMetrics::Serialize(const char** base, size_t* byte_size)
   *byte_size = 0;
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "metrics not supported");
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 }
 
 //
@@ -278,21 +278,21 @@ TritonServerOptions::TritonServerOptions()
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
       metrics_(true), gpu_metrics_(true), exit_timeout_(30),
       pinned_memory_pool_size_(1 << 28),
-#ifdef TRTIS_ENABLE_GPU
-      min_compute_capability_(TRTIS_MIN_COMPUTE_CAPABILITY),
+#ifdef TRITON_ENABLE_GPU
+      min_compute_capability_(TRITON_MIN_COMPUTE_CAPABILITY),
 #else
       min_compute_capability_(0),
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
       tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
 {
-#ifndef TRTIS_ENABLE_METRICS
+#ifndef TRITON_ENABLE_METRICS
   metrics_ = false;
   gpu_metrics_ = false;
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
-#ifndef TRTIS_ENABLE_METRICS_GPU
+#ifndef TRITON_ENABLE_METRICS_GPU
   gpu_metrics_ = false;
-#endif  // TRTIS_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS_GPU
 }
 
 TRITONSERVER_DataType
@@ -646,7 +646,7 @@ TRITONSERVER_InferenceTraceNew(
     uint64_t parent_id, TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
     TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* trace_userp)
 {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = new ni::InferenceTrace(
       level, parent_id, activity_fn, release_fn, trace_userp);
   *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
@@ -655,75 +655,75 @@ TRITONSERVER_InferenceTraceNew(
   *trace = nullptr;
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
 TRITONSERVER_InferenceTraceDelete(TRITONSERVER_InferenceTrace* trace)
 {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
   delete ltrace;
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
 TRITONSERVER_InferenceTraceId(TRITONSERVER_InferenceTrace* trace, uint64_t* id)
 {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
   *id = ltrace->Id();
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
 TRITONSERVER_InferenceTraceParentId(
     TRITONSERVER_InferenceTrace* trace, uint64_t* parent_id)
 {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
   *parent_id = ltrace->ParentId();
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
 TRITONSERVER_InferenceTraceModelName(
     TRITONSERVER_InferenceTrace* trace, const char** model_name)
 {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
   *model_name = ltrace->ModelName().c_str();
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 }
 
 TRITONSERVER_EXPORT TRITONSERVER_Error*
 TRITONSERVER_InferenceTraceModelVersion(
     TRITONSERVER_InferenceTrace* trace, int64_t* model_version)
 {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
   *model_version = ltrace->ModelVersion();
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 }
 
 //
@@ -882,14 +882,14 @@ TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetLogInfo(
     TRITONSERVER_ServerOptions* options, bool log)
 {
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
   // Logging is global for now...
   LOG_ENABLE_INFO(log);
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "logging not supported");
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 }
 
 // Enable or disable warning level logging.
@@ -897,14 +897,14 @@ TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetLogWarn(
     TRITONSERVER_ServerOptions* options, bool log)
 {
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
   // Logging is global for now...
   LOG_ENABLE_WARNING(log);
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "logging not supported");
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 }
 
 // Enable or disable error level logging.
@@ -912,14 +912,14 @@ TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetLogError(
     TRITONSERVER_ServerOptions* options, bool log)
 {
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
   // Logging is global for now...
   LOG_ENABLE_ERROR(log);
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "logging not supported");
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 }
 
 // Set verbose logging level. Level zero disables verbose logging.
@@ -927,13 +927,13 @@ TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetLogVerbose(
     TRITONSERVER_ServerOptions* options, int level)
 {
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
   // Logging is global for now...
   LOG_SET_VERBOSE(level);
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "logging not supported");
-#endif             // TRTIS_ENABLE_LOGGING
+#endif             // TRITON_ENABLE_LOGGING
   return nullptr;  // Success
 }
 
@@ -941,7 +941,7 @@ TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetMetrics(
     TRITONSERVER_ServerOptions* options, bool metrics)
 {
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
   loptions->SetMetrics(metrics);
@@ -949,14 +949,14 @@ TRITONSERVER_ServerOptionsSetMetrics(
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "metrics not supported");
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 }
 
 TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetGpuMetrics(
     TRITONSERVER_ServerOptions* options, bool gpu_metrics)
 {
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
   loptions->SetGpuMetrics(gpu_metrics);
@@ -964,7 +964,7 @@ TRITONSERVER_ServerOptionsSetGpuMetrics(
 #else
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "metrics not supported");
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 }
 
 TRITONSERVER_Error*
@@ -1389,16 +1389,16 @@ TRITONSERVER_ServerNew(
 
   NVTX_INITIALIZE;
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (loptions->Metrics()) {
     ni::Metrics::EnableMetrics();
   }
-#ifdef TRTIS_ENABLE_METRICS_GPU
+#ifdef TRITON_ENABLE_METRICS_GPU
   if (loptions->Metrics() && loptions->GpuMetrics()) {
     ni::Metrics::EnableGPUMetrics();
   }
-#endif  // TRTIS_ENABLE_METRICS_GPU
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS
 
   lserver->SetId(loptions->ServerId());
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
@@ -1612,7 +1612,7 @@ TRITONSERVER_ServerModelStatistics(
     TRITONSERVER_Server* server, const char* model_name,
     const int64_t model_version, TRITONSERVER_Message** model_stats)
 {
-#ifndef TRTIS_ENABLE_STATS
+#ifndef TRITON_ENABLE_STATS
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "statistics not supported");
 #else
@@ -1750,7 +1750,7 @@ TRITONSERVER_ServerModelStatistics(
 
   return nullptr;  // success
 
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 }
 
 TRITONSERVER_Error*
@@ -1840,7 +1840,7 @@ TRITONSERVER_Error*
 TRITONSERVER_ServerMetrics(
     TRITONSERVER_Server* server, TRITONSERVER_Metrics** metrics)
 {
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   TritonServerMetrics* lmetrics = new TritonServerMetrics();
   *metrics = reinterpret_cast<TRITONSERVER_Metrics*>(lmetrics);
   return nullptr;  // Success
@@ -1848,7 +1848,7 @@ TRITONSERVER_ServerMetrics(
   *metrics = nullptr;
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED, "metrics not supported");
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 }
 
 TRITONSERVER_Error*
@@ -1867,7 +1867,7 @@ TRITONSERVER_ServerInferAsync(
   // with the request can be recorded as the request flows through
   // Triton.
   if (trace != nullptr) {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
     ltrace->SetModelName(lrequest->ModelName());
     ltrace->SetModelVersion(lrequest->ActualModelVersion());
@@ -1877,7 +1877,7 @@ TRITONSERVER_ServerInferAsync(
 #else
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
   }
 
   // We wrap the request in a unique pointer to ensure that it flows
@@ -1889,14 +1889,14 @@ TRITONSERVER_ServerInferAsync(
 
   // If there is an error then must explicitly release any trace
   // object associated with the inference request above.
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   if (!status.IsOk()) {
     std::unique_ptr<ni::InferenceTrace>* trace = ureq->MutableTrace();
     if (*trace != nullptr) {
       ni::InferenceTrace::Release(std::move(*trace));
     }
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   // If there is an error then ureq will still have 'lrequest' and we
   // must release it from unique_ptr since the caller should retain

@@ -103,7 +103,7 @@ UnmapSharedMemory(void* mapped_addr, size_t byte_size)
   return nullptr;
 }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 TRITONSERVER_Error*
 OpenCudaIPCRegion(
     const cudaIpcMemHandle_t* cuda_shm_handle, void** data_ptr, int device_id)
@@ -124,7 +124,7 @@ OpenCudaIPCRegion(
 
   return nullptr;
 }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 }  // namespace
 
@@ -195,7 +195,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   return nullptr;  // success
 }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 TRITONSERVER_Error*
 SharedMemoryManager::RegisterCUDASharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
@@ -234,7 +234,7 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 
   return nullptr;  // success
 }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
@@ -334,7 +334,7 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
       RETURN_IF_ERR(
           UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
     } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       cudaError_t err = cudaIpcCloseMemHandle(it->second->mapped_addr_);
       if (err != cudaSuccess) {
         return TRITONSERVER_ErrorNew(
@@ -351,7 +351,7 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
               "failed to unregister CUDA shared memory region: '" + name +
               "', GPUs not supported")
               .c_str());
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
     }
 
     // Remove region information from shared_memory_map_
@@ -361,7 +361,7 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
   return nullptr;
 }
 
-#ifdef TRTIS_ENABLE_GRPC
+#ifdef TRITON_ENABLE_GRPC
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(
     const std::string& name, SystemSharedMemoryStatusResponse*& shm_status)
@@ -464,7 +464,7 @@ SharedMemoryManager::GetStatus(
 
   return nullptr;
 }
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRITON_ENABLE_GRPC
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(
@@ -620,7 +620,7 @@ SharedMemoryManager::UnregisterHelper(
       RETURN_IF_ERR(
           UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
     } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       cudaError_t err = cudaIpcCloseMemHandle(it->second->mapped_addr_);
       if (err != cudaSuccess) {
         return TRITONSERVER_ErrorNew(
@@ -637,7 +637,7 @@ SharedMemoryManager::UnregisterHelper(
               "failed to unregister CUDA shared memory region: '" + name +
               "', GPUs not supported")
               .c_str());
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
     }
 
     // Remove region information from shared_memory_map_

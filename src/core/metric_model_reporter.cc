@@ -26,7 +26,7 @@
 
 #include "src/core/metric_model_reporter.h"
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
 
 #include "src/core/constants.h"
 #include "src/core/metrics.h"
@@ -113,4 +113,4 @@ MetricModelReporter::CreateCounterMetric(
 
 }}  // namespace nvidia::inferenceserver
 
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
