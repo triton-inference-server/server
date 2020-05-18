@@ -296,8 +296,8 @@ LibTorchBackend::Context::ValidateInputs(
               "Input '" + name +
               "' does not follow naming convention i.e. <name>__<index>.");
         }
-        input_index_map_[name] = ip_index;
         ip_index = std::atoi(name.substr(start_pos + 2).c_str());
+        input_index_map_[name] = ip_index;
       }
       catch (std::exception& ex) {
         return Status(
@@ -503,11 +503,11 @@ LibTorchBackend::Context::ReadOutputTensors(
   // Finalize and wait for any pending buffer copies.
   cuda_copy |= responder.Finalize();
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   return Status::Success;
 }
 
@@ -665,7 +665,7 @@ LibTorchBackend::Context::Run(
   }
 
   // Wait for any in-flight input tensor copies to complete.
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
@@ -711,9 +711,9 @@ LibTorchBackend::Context::Run(
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
 
   // Report stats and trace
@@ -723,7 +723,7 @@ LibTorchBackend::Context::Run(
         metric_reporter_.get(), (responses[i] != nullptr), compute_start_ns,
         compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     if (request->Trace() != nullptr) {
       auto& trace = request->Trace();
       trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
@@ -732,14 +732,14 @@ LibTorchBackend::Context::Run(
           TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
       trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
   }
 
   // Also reporting batch stats
   base->MutableStatsAggregator()->UpdateInferBatchStats(
       metric_reporter_.get(), total_batch_size, compute_start_ns,
       compute_input_end_ns, compute_output_start_ns, compute_end_ns);
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   // Send all the responses that haven't already been sent because of
   // an earlier error.
