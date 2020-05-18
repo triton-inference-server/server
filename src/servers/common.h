@@ -57,7 +57,7 @@ namespace nvidia { namespace inferenceserver {
     }                                \
   } while (false)
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #define FAIL_IF_CUDA_ERR(X, MSG)                                           \
   do {                                                                     \
     cudaError_t err__ = (X);                                               \
@@ -67,7 +67,7 @@ namespace nvidia { namespace inferenceserver {
       exit(1);                                                             \
     }                                                                      \
   } while (false)
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 /// Get the integral version from a string, or fail if string does not
 /// represent a valid version.

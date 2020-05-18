@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
 
 #include <memory>
 #include "src/core/model_config.pb.h"
@@ -33,15 +33,15 @@
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
-#ifndef TRTIS_ENABLE_GPU
+#ifndef TRITON_ENABLE_GPU
 using cudaStream_t = void*;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 class InferenceServer;
 
@@ -104,4 +104,4 @@ class EnsembleScheduler : public Scheduler {
 
 }}  // namespace nvidia::inferenceserver
 
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE

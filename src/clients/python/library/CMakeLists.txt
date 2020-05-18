@@ -31,15 +31,15 @@ if(NOT WIN32)
   # libcshm.so
   #
   add_library(cshm SHARED shared_memory/shared_memory.cc)
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(cshm PRIVATE ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
   target_link_libraries(cshm rt)
 
   #
   # libccudashm.so
   #
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     add_library(
         ccudashm SHARED
         cuda_shared_memory/cuda_shared_memory.cc
@@ -50,7 +50,7 @@ if(NOT WIN32)
     target_link_libraries(
         ccudashm
         PRIVATE ${CUDA_LIBRARIES})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
 
 configure_file(../../../../VERSION VERSION COPYONLY)
@@ -58,15 +58,15 @@ configure_file(utils.py utils.py COPYONLY)
 
 if(NOT WIN32)
   configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
 
 #
 # HTTP wheel file
 #
-if(${TRTIS_ENABLE_HTTP})
+if(${TRITON_ENABLE_HTTP})
   set(http_wheel_stamp_file "http_stamp.whl")
   configure_file(httpclient.py httpclient.py COPYONLY)
   configure_file(http_setup.py http_setup.py COPYONLY)
@@ -92,13 +92,13 @@ if(${TRTIS_ENABLE_HTTP})
     CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/http/tritonhttpclient-*.whl\")"
     CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
   )
-endif() # TRTIS_ENABLE_HTTP
+endif() # TRITON_ENABLE_HTTP
 
 
 #
 # gRPC wheel file
 #
-if(${TRTIS_ENABLE_GRPC})
+if(${TRITON_ENABLE_GRPC})
   set(grpc_wheel_stamp_file "grpc_stamp.whl")
 
   configure_file(grpcclient.py grpcclient.py COPYONLY)
@@ -142,7 +142,7 @@ if(${TRTIS_ENABLE_GRPC})
     CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/grpc/tritongrpcclient-*.whl\")"
     CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
   )
-endif() # TRTIS_ENABLE_GRPC
+endif() # TRITON_ENABLE_GRPC
 
 #
 # triton client utils wheel file
@@ -151,7 +151,7 @@ if(NOT WIN32)
   set(utils_wheel_stamp_file "utils_stamp.whl")
   configure_file(utils_setup.py utils_setup.py COPYONLY)
 
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     add_custom_command(
         OUTPUT "${utils_wheel_stamp_file}"
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"

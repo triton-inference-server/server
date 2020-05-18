@@ -47,7 +47,7 @@ target_link_libraries(
   identity
   PRIVATE custombackend
 )
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
 target_include_directories(identity PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   identity
@@ -55,7 +55,7 @@ target_link_libraries(
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
 )
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
 install(
   TARGETS identity

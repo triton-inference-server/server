@@ -299,14 +299,14 @@ main(int argc, char** argv)
     }
   }
 
-  // Get shared memory regions all active/registered within TRTIS
+  // Get shared memory regions active/registered within triton
   ni::CudaSharedMemoryStatusResponse status;
   FAIL_IF_ERR(
       client->CudaSharedMemoryStatus(&status),
       "failed to get shared memory status");
   std::cout << "Shared Memory Status:\n" << status.DebugString() << "\n";
 
-  // Unregister shared memory (One by one or all at a time) from TRTIS
+  // Unregister shared memory
   FAIL_IF_ERR(
       client->UnregisterCudaSharedMemory("input_data"),
       "unable to unregister shared memory input region");

@@ -29,7 +29,7 @@ cmake_minimum_required (VERSION 3.5)
 #
 # caffe2plan
 #
-if(${TRTIS_ENABLE_TENSORRT})
+if(${TRITON_ENABLE_TENSORRT})
 add_executable(caffe2plan caffe2plan.cc)
 target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
@@ -42,7 +42,7 @@ install(
   TARGETS caffe2plan
   RUNTIME DESTINATION bin
 )
-endif() # TRTIS_ENABLE_TENSORRT
+endif() # TRITON_ENABLE_TENSORRT
 
 #
 # CudaMemoryManger

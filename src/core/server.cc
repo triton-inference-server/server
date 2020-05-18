@@ -48,9 +48,9 @@
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include "src/core/cuda_memory_manager.h"
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -77,7 +77,7 @@ class ScopedAtomicIncrement {
 // InferenceServer
 //
 InferenceServer::InferenceServer()
-    : version_(TRTIS_VERSION), ready_state_(ServerReadyState::SERVER_INVALID)
+    : version_(TRITON_VERSION), ready_state_(ServerReadyState::SERVER_INVALID)
 {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -91,22 +91,22 @@ InferenceServer::InferenceServer()
   extensions_.push_back("model_configuration");
   extensions_.push_back("system_shared_memory");
   extensions_.push_back("cuda_shared_memory");
-#ifdef TRTIS_ENABLE_HTTP
+#ifdef TRITON_ENABLE_HTTP
   extensions_.push_back("binary_tensor_data");
-#endif  // TRTIS_ENABLE_HTTP
-#ifdef TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_HTTP
+#ifdef TRITON_ENABLE_STATS
   extensions_.push_back("statistics");
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   strict_model_config_ = true;
   strict_readiness_ = true;
   exit_timeout_secs_ = 30;
   pinned_memory_pool_size_ = 1 << 28;
-#ifdef TRTIS_ENABLE_GPU
-  min_supported_compute_capability_ = TRTIS_MIN_COMPUTE_CAPABILITY;
+#ifdef TRITON_ENABLE_GPU
+  min_supported_compute_capability_ = TRITON_MIN_COMPUTE_CAPABILITY;
 #else
   min_supported_compute_capability_ = 0.0;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   tf_soft_placement_enabled_ = true;
   tf_gpu_memory_fraction_ = 0.0;
@@ -137,7 +137,7 @@ InferenceServer::Init()
     return status;
   }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // Defer the setting of default CUDA memory pool value here as
   // 'min_supported_compute_capability_' is finalized
   std::set<int> supported_gpus;
@@ -157,7 +157,7 @@ InferenceServer::Init()
   if (!status.IsOk()) {
     LOG_ERROR << status.Message();
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 
   status = EnablePeerAccess(min_supported_compute_capability_);
@@ -404,11 +404,11 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
   std::shared_ptr<ScopedAtomicIncrement> inflight(
       new ScopedAtomicIncrement(inflight_request_counter_));
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   INFER_TRACE_ACTIVITY(
       request->Trace(), TRITONSERVER_TRACE_REQUEST_START,
       request->CaptureRequestStartNs());
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   return InferenceRequest::Run(request);
 }

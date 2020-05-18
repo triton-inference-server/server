@@ -28,7 +28,7 @@ cmake_minimum_required (VERSION 3.5)
 
 find_package(Threads REQUIRED)
 
-if(${TRTIS_ENABLE_GRPC})
+if(${TRITON_ENABLE_GRPC})
   #
   # libgrpcclient.so and libgrpcclient_static.a
   #
@@ -49,9 +49,9 @@ if(${TRTIS_ENABLE_GRPC})
       grpc-client-library EXCLUDE_FROM_ALL OBJECT
       ${REQUEST_SRCS} ${REQUEST_HDRS}
   )
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(grpc-client-library PUBLIC ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
   add_dependencies(
       grpc-client-library
       model-config-library grpc-library proto-library
@@ -66,12 +66,12 @@ if(${TRTIS_ENABLE_GRPC})
       $<TARGET_OBJECTS:grpc-client-library>
   )
   add_library(
-      TRTIS::grpcclient_static ALIAS grpcclient_static
+      TRITON::grpcclient_static ALIAS grpcclient_static
   )
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(grpcclient_static PUBLIC ${CUDA_INCLUDE_DIRS})
     target_link_libraries(grpcclient_static PRIVATE ${CUDA_LIBRARIES})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
   target_include_directories(
       grpcclient_static
       PUBLIC
@@ -95,7 +95,7 @@ if(${TRTIS_ENABLE_GRPC})
       $<TARGET_OBJECTS:grpc-client-library>
   )
   add_library(
-      TRTIS::grpcclient ALIAS grpcclient
+      TRITON::grpcclient ALIAS grpcclient
   )
 
   if (NOT WIN32)
@@ -107,9 +107,9 @@ if(${TRTIS_ENABLE_GRPC})
      )
    endif() # NOT WIN32
 
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(grpcclient PUBLIC ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
   target_include_directories(
       grpcclient
       PUBLIC
@@ -138,9 +138,9 @@ if(${TRTIS_ENABLE_GRPC})
       ${CMAKE_CURRENT_BINARY_DIR}/../../../core/model_config.pb.h
       DESTINATION include
   )
-endif() # TRTIS_ENABLE_GRPC
+endif() # TRITON_ENABLE_GRPC
 
-if(${TRTIS_ENABLE_HTTP})
+if(${TRITON_ENABLE_HTTP})
   #
   # libhttpclient.so and libhttpclient_static.a
   #
@@ -174,9 +174,9 @@ if(${TRTIS_ENABLE_HTTP})
       PRIVATE $<TARGET_PROPERTY:CURL::libcurl,INTERFACE_INCLUDE_DIRECTORIES>
       PUBLIC ${RapidJSON_INCLUDE_DIRS}
   )
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(http-client-library PUBLIC ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
 
   # libhttpclient_static.a
   add_library(
@@ -184,12 +184,12 @@ if(${TRTIS_ENABLE_HTTP})
       $<TARGET_OBJECTS:http-client-library>
   )
   add_library(
-      TRTIS::httpclient_static ALIAS httpclient_static
+      TRITON::httpclient_static ALIAS httpclient_static
   )
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(httpclient_static PUBLIC ${CUDA_INCLUDE_DIRS})
     target_link_libraries(httpclient_static PRIVATE ${CUDA_LIBRARIES})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
   target_include_directories(
       httpclient_static
       PUBLIC
@@ -208,7 +208,7 @@ if(${TRTIS_ENABLE_HTTP})
       $<TARGET_OBJECTS:http-client-library>
   )
   add_library(
-      TRTIS::httpclient ALIAS httpclient
+      TRITON::httpclient ALIAS httpclient
   )
 
   if (NOT WIN32)
@@ -220,9 +220,9 @@ if(${TRTIS_ENABLE_HTTP})
      )
   endif() # NOT WIN32
 
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(httpclient PUBLIC ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
   target_include_directories (
       httpclient
       PUBLIC
@@ -243,30 +243,30 @@ if(${TRTIS_ENABLE_HTTP})
       LIBRARY DESTINATION lib
       ARCHIVE DESTINATION lib
   )
-endif() # TRTIS_ENABLE_HTTP
+endif() # TRITON_ENABLE_HTTP
 
 # cmake configuration
 include (CMakePackageConfigHelpers)
-set(_LIB_CMAKE_DIR lib/cmake/TRTIS)
+set(_LIB_CMAKE_DIR lib/cmake/TRITON)
 install(
   EXPORT trtis-export
-  FILE TRTISTargets.cmake
-  NAMESPACE TRTIS::
+  FILE TRITONTargets.cmake
+  NAMESPACE TRITON::
   DESTINATION ${_LIB_CMAKE_DIR}
 )
 write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfigVersion.cmake
-  VERSION ${TRTIS_VERSION}
+  ${CMAKE_CURRENT_BINARY_DIR}/TRITONConfigVersion.cmake
+  VERSION ${TRITON_VERSION}
   COMPATIBILITY ExactVersion
 )
 configure_package_config_file (
-  ${CMAKE_CURRENT_LIST_DIR}/cmake/TRTISConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfig.cmake
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/TRITONConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/TRITONConfig.cmake
   INSTALL_DESTINATION ${_LIB_CMAKE_DIR}
 )
 install(
   FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/TRITONConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/TRITONConfigVersion.cmake
   DESTINATION ${_LIB_CMAKE_DIR}
 )

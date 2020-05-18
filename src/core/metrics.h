@@ -26,7 +26,7 @@
 //
 #pragma once
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
 
 #include <atomic>
 #include <thread>
@@ -138,7 +138,7 @@ class Metrics {
       inf_compute_infer_duration_us_family_;
   prometheus::Family<prometheus::Counter>&
       inf_compute_output_duration_us_family_;
-#ifdef TRTIS_ENABLE_METRICS_GPU
+#ifdef TRITON_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_used_family_;
@@ -155,7 +155,7 @@ class Metrics {
 
   std::unique_ptr<std::thread> nvml_thread_;
   std::atomic<bool> nvml_thread_exit_;
-#endif  // TRTIS_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS_GPU
 
   bool metrics_enabled_;
   bool gpu_metrics_enabled_;
@@ -163,4 +163,4 @@ class Metrics {
 
 }}  // namespace nvidia::inferenceserver
 
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
