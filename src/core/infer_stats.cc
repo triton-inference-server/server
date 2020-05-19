@@ -41,22 +41,24 @@ InferenceStatsAggregator::UpdateFailure(
     const uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
+
   infer_stats_.failure_count_++;
   infer_stats_.failure_duration_ns_ += (request_end_ns - request_start_ns);
 
 #ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
-    metric_reporter->MetricInferenceFailure().Increment();
+    metric_reporter->MetricInferenceFailure().Increment(1);
   }
 #endif  // TRITON_ENABLE_METRICS
 }
 
 void
 InferenceStatsAggregator::UpdateSuccess(
-    MetricModelReporter* metric_reporter, const uint64_t request_start_ns,
-    const uint64_t queue_start_ns, const uint64_t compute_start_ns,
-    const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
-    const uint64_t compute_end_ns, const uint64_t request_end_ns)
+    MetricModelReporter* metric_reporter, const size_t batch_size,
+    const uint64_t request_start_ns, const uint64_t queue_start_ns,
+    const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
+    const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
+    const uint64_t request_end_ns)
 {
   const uint64_t request_duration_ns = request_end_ns - request_start_ns;
   const uint64_t queue_duration_ns = compute_start_ns - queue_start_ns;
@@ -69,6 +71,8 @@ InferenceStatsAggregator::UpdateSuccess(
 
   std::lock_guard<std::mutex> lock(mu_);
 
+  inference_count_ += batch_size;
+
   infer_stats_.success_count_++;
   infer_stats_.request_duration_ns_ += request_duration_ns;
   infer_stats_.queue_duration_ns_ += queue_duration_ns;
@@ -78,7 +82,8 @@ InferenceStatsAggregator::UpdateSuccess(
 
 #ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
-    metric_reporter->MetricInferenceSuccess().Increment();
+    metric_reporter->MetricInferenceSuccess().Increment(1);
+    metric_reporter->MetricInferenceCount().Increment(batch_size);
     metric_reporter->MetricInferenceRequestDuration().Increment(
         request_duration_ns / 1000);
     metric_reporter->MetricInferenceQueueDuration().Increment(
@@ -95,7 +100,7 @@ InferenceStatsAggregator::UpdateSuccess(
 
 void
 InferenceStatsAggregator::UpdateInferBatchStats(
-    MetricModelReporter* metric_reporter, size_t batch_size,
+    MetricModelReporter* metric_reporter, const size_t batch_size,
     const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
     const uint64_t compute_output_start_ns, const uint64_t compute_end_ns)
 {
@@ -108,6 +113,8 @@ InferenceStatsAggregator::UpdateInferBatchStats(
   if (inference_ms > last_inference_ms_) {
     last_inference_ms_ = inference_ms;
   }
+
+  execution_count_++;
 
   auto it = batch_stats_.find(batch_size);
   if (it == batch_stats_.end()) {
@@ -124,7 +131,6 @@ InferenceStatsAggregator::UpdateInferBatchStats(
 #ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
     metric_reporter->MetricInferenceExecutionCount().Increment(1);
-    metric_reporter->MetricInferenceCount().Increment(batch_size);
   }
 #endif  // TRITON_ENABLE_METRICS
 }
