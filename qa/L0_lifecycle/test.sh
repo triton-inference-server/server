@@ -777,7 +777,7 @@ fi
 
 # unload API should return bad request
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/model/graphdef_float32_float32_float32/unload`
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/graphdef_float32_float32_float32/unload`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -798,7 +798,7 @@ rm models/graphdef_float32_float32_float32/*/*
 
 # load API should return bad request
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/model/graphdef_float32_float32_float32/load`
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/graphdef_float32_float32_float32/load`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
