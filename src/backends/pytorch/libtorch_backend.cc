@@ -707,12 +707,6 @@ LibTorchBackend::Context::Run(
           &output_index_map_),
       "error sending LibTorch response");
 
-#ifdef TRITON_ENABLE_GPU
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-#endif  // TRITON_ENABLE_GPU
-
 #ifdef TRITON_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
 
