@@ -527,9 +527,10 @@ class InferenceServerClient:
 
         """
         request_uri = "v2/repository/index"
-        response = self._get(request_uri=request_uri,
-                             headers=headers,
-                             query_params=query_params)
+        response = self._post(request_uri=request_uri,
+                              request_body="",
+                              headers=headers,
+                              query_params=query_params)
         _raise_if_error(response)
 
         content = response.read()
@@ -1199,12 +1200,12 @@ class InferAsyncRequest:
         block : bool
             If block is True, the function will wait till the
             corresponding response is received from the server.
-            Default value is True. 
+            Default value is True.
         timeout : int
             The maximum wait time for the function. This setting is
             ignored if the block is set False. Default is None,
             which means the function will block indefinitely till
-            the corresponding response is received. 
+            the corresponding response is received.
 
         Returns
         -------

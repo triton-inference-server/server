@@ -1821,9 +1821,9 @@ TRITONSERVER_ServerModelIndex(
         "name", rapidjson::StringRef(in.name_.c_str()), allocator);
     if (!in.name_only_) {
       if (in.version_ >= 0) {
-        std::string vstr = std::to_string(in.version_);
-        model_index.AddMember(
-            "version", rapidjson::StringRef(vstr.c_str()), allocator);
+        rapidjson::Value vstr;
+        vstr.SetString(std::to_string(in.version_).c_str(), allocator);
+        model_index.AddMember("version", vstr, allocator);
       }
       model_index.AddMember(
           "state",
