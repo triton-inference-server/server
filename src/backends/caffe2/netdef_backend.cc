@@ -35,7 +35,6 @@
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#include "src/core/cuda_utils.h"
 #endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {

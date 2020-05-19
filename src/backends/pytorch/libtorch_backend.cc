@@ -30,7 +30,6 @@
 #include <exception>
 #include <memory>
 #include "src/core/constants.h"
-#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config_cuda.h"
@@ -39,7 +38,6 @@
 #ifdef TRITON_ENABLE_GPU
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <cuda_runtime_api.h>
-#include "src/core/cuda_utils.h"
 #endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
