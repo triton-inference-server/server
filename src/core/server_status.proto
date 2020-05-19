@@ -72,44 +72,6 @@ enum ModelReadyState {
   MODEL_UNLOADING = 4;
 }
 
-//@@
-//@@.. cpp:enum:: ServerReadyState
-//@@
-//@@   Readiness status for the inference server.
-//@@
-enum ServerReadyState {
-  //@@  .. cpp:enumerator:: ServerReadyState::SERVER_INVALID = 0
-  //@@
-  //@@     The server is in an invalid state and will likely not
-  //@@     response correctly to any requests.
-  //@@
-  SERVER_INVALID = 0;
-
-  //@@  .. cpp:enumerator:: ServerReadyState::SERVER_INITIALIZING = 1
-  //@@
-  //@@     The server is initializing.
-  //@@
-  SERVER_INITIALIZING = 1;
-
-  //@@  .. cpp:enumerator:: ServerReadyState::SERVER_READY = 2
-  //@@
-  //@@     The server is ready and accepting requests.
-  //@@
-  SERVER_READY = 2;
-
-  //@@  .. cpp:enumerator:: ServerReadyState::SERVER_EXITING = 3
-  //@@
-  //@@     The server is exiting and will not respond to requests.
-  //@@
-  SERVER_EXITING = 3;
-
-  //@@  .. cpp:enumerator:: ServerReadyState::SERVER_FAILED_TO_INITIALIZE = 10
-  //@@
-  //@@     The server did not initialize correctly. Most requests will fail.
-  //@@
-  SERVER_FAILED_TO_INITIALIZE = 10;
-}
-
 //@@.. cpp:var:: message SharedMemoryRegion
 //@@
 //@@   The meta-data for the shared memory region registered in the inference

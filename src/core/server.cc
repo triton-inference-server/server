@@ -168,8 +168,9 @@ InferenceServer::Init()
 
   // Create the model manager for the repository. Unless model control
   // is disabled, all models are eagerly loaded when the manager is created.
-  bool polling_enabled = (model_control_mode_ == MODE_POLL);
-  bool model_control_enabled = (model_control_mode_ == MODE_EXPLICIT);
+  bool polling_enabled = (model_control_mode_ == ModelControlMode::MODE_POLL);
+  bool model_control_enabled =
+      (model_control_mode_ == ModelControlMode::MODE_EXPLICIT);
   status = ModelRepositoryManager::Create(
       this, version_, model_repository_paths_, startup_models_,
       strict_model_config_, tf_gpu_memory_fraction_, tf_soft_placement_enabled_,

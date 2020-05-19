@@ -274,7 +274,8 @@ class TritonServerOptions {
 };
 
 TritonServerOptions::TritonServerOptions()
-    : server_id_("inference:0"), model_control_mode_(ni::MODE_POLL),
+    : server_id_("inference:0"),
+      model_control_mode_(ni::ModelControlMode::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
       metrics_(true), gpu_metrics_(true), exit_timeout_(30),
       pinned_memory_pool_size_(1 << 28),
@@ -776,15 +777,15 @@ TRITONSERVER_ServerOptionsSetModelControlMode(
   // convert mode from TRITONSERVER_ to nvidia::inferenceserver
   switch (mode) {
     case TRITONSERVER_MODEL_CONTROL_NONE: {
-      loptions->SetModelControlMode(ni::MODE_NONE);
+      loptions->SetModelControlMode(ni::ModelControlMode::MODE_NONE);
       break;
     }
     case TRITONSERVER_MODEL_CONTROL_POLL: {
-      loptions->SetModelControlMode(ni::MODE_POLL);
+      loptions->SetModelControlMode(ni::ModelControlMode::MODE_POLL);
       break;
     }
     case TRITONSERVER_MODEL_CONTROL_EXPLICIT: {
-      loptions->SetModelControlMode(ni::MODE_EXPLICIT);
+      loptions->SetModelControlMode(ni::ModelControlMode::MODE_EXPLICIT);
       break;
     }
     default: {
