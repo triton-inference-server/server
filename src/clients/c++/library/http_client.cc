@@ -666,7 +666,7 @@ InferenceServerHttpClient::LoadModel(
   Error err;
 
   std::string request_uri(
-      url_ + "/v2/repository/model/" + model_name + "/load");
+      url_ + "/v2/repository/models/" + model_name + "/load");
 
   rapidjson::Document request(rapidjson::kObjectType);
   rapidjson::Document response(rapidjson::kObjectType);
@@ -688,7 +688,7 @@ InferenceServerHttpClient::UnloadModel(
   Error err;
 
   std::string request_uri(
-      url_ + "/v2/repository/model/" + model_name + "/unload");
+      url_ + "/v2/repository/models/" + model_name + "/unload");
 
   rapidjson::Document request(rapidjson::kObjectType);
   rapidjson::Document response(rapidjson::kObjectType);
