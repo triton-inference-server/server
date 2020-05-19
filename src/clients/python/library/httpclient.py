@@ -558,7 +558,7 @@ class InferenceServerClient:
             If unable to load the model.
 
         """
-        request_uri = "v2/repository/model/{}/load".format(quote(model_name))
+        request_uri = "v2/repository/models/{}/load".format(quote(model_name))
         response = self._post(request_uri=request_uri,
                               request_body="",
                               headers=headers,
@@ -587,7 +587,7 @@ class InferenceServerClient:
             If unable to unload the model.
 
         """
-        request_uri = "v2/repository/model/{}/unload".format(quote(model_name))
+        request_uri = "v2/repository/models/{}/unload".format(quote(model_name))
         response = self._post(request_uri=request_uri,
                               request_body="",
                               headers=headers,
@@ -1199,12 +1199,12 @@ class InferAsyncRequest:
         block : bool
             If block is True, the function will wait till the
             corresponding response is received from the server.
-            Default value is True. 
+            Default value is True.
         timeout : int
             The maximum wait time for the function. This setting is
             ignored if the block is set False. Default is None,
             which means the function will block indefinitely till
-            the corresponding response is received. 
+            the corresponding response is received.
 
         Returns
         -------

@@ -46,9 +46,9 @@ APIs. Triton exposes the endpoints at the following URLs.
 ```
 GET v2/repository/index
 
-POST v2/repository/model/${MODEL_NAME}/load
+POST v2/repository/models/${MODEL_NAME}/load
 
-POST v2/repository/model/${MODEL_NAME}/unload
+POST v2/repository/models/${MODEL_NAME}/unload
 ```
 
 ### Index
