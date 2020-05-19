@@ -42,7 +42,26 @@ namespace nvidia { namespace inferenceserver {
 class InferenceBackend;
 class InferenceRequest;
 
-enum ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
+enum class ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
+
+// Readiness status for the inference server.
+enum class ServerReadyState {
+  // The server is in an invalid state and will likely not response
+  // correctly to any requests.
+  SERVER_INVALID,
+
+  // The server is initializing.
+  SERVER_INITIALIZING,
+
+  // The server is ready and accepting requests.
+  SERVER_READY,
+
+  // The server is exiting and will not respond to requests.
+  SERVER_EXITING,
+
+  // The server did not initialize correctly.
+  SERVER_FAILED_TO_INITIALIZE
+};
 
 // Inference server information.
 class InferenceServer {
@@ -90,9 +109,6 @@ class InferenceServer {
 
   // Unload the corresponding model.
   Status UnloadModel(const std::string& model_name);
-
-  // Return the ready state for the server.
-  ServerReadyState ReadyState() const { return ready_state_; }
 
   // Return the server version.
   const std::string& Version() const { return version_; }
