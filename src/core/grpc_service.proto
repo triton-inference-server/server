@@ -696,11 +696,17 @@ message ModelInferResponse
     //@@
     repeated int64 shape = 3;
 
+    //@@    .. cpp:var:: map<string,InferParameter> parameters
+    //@@
+    //@@       Optional output tensor parameters.
+    //@@
+    map<string, InferParameter> parameters = 4;
+
     //@@    .. cpp:var:: InferTensorContents
     //@@
     //@@       The output tensor data.
     //@@
-    InferTensorContents contents = 4;
+    InferTensorContents contents = 5;
   }
 
   //@@  .. cpp:var:: string model_name
