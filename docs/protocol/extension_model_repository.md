@@ -44,7 +44,7 @@ The model-repository extension requires Index, Load and Unload
 APIs. Triton exposes the endpoints at the following URLs.
 
 ```
-GET v2/repository/index
+POST v2/repository/index
 
 POST v2/repository/models/${MODEL_NAME}/load
 
@@ -57,8 +57,20 @@ The index API returns information about every model available in a
 model repository, even if it is not currently loaded into Triton. The
 index API provides a way to determine which models can potentially be
 loaded by the Load API. A model-repository index request is made with
-an HTTP GET to an index endpoint. In the corresponding response the
+an HTTP POST to the index endpoint. In the corresponding response the
 HTTP body contains the JSON response.
+
+The index request object, identified as $repository_index_request, is
+required in the HTTP body of the POST request.
+
+```
+$repository_index_request =
+{
+  "ready" : $boolean #optional,
+}
+```
+
+    "ready" : Optional, default is false. If true return only models ready for inferencing.
 
 A successful index request is indicated by a 200 HTTP status code. The
 response object, identified as $repository_index_response, is returned
@@ -69,12 +81,18 @@ $repository_index_response =
 [
   {
     "name" : $string,
+    "version" : $string #optional,
+    "state" : $string,
+    "reason" : $string
   },
   …
 ]
 ```
 
 - “name” : The name of the model.
+- “version” : The version of the model.
+- “state” : The state of the model.
+- “reason” : The reason, if any, that the model is in the current state.
 
 A failed index request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
@@ -166,6 +184,9 @@ message RepositoryIndexRequest
   // The name of the repository. If empty the index is returned
   // for all repositories.
   string repository_name = 1;
+
+  // If true return only models currently ready for inferencing.
+  bool ready = 2;
 }
 
 message RepositoryIndexResponse
@@ -174,6 +195,15 @@ message RepositoryIndexResponse
   message ModelIndex {
     // The name of the model.
     string name = 1;
+
+    // The version of the model.
+    string version = 2;
+
+    // The state of the model.
+    string state = 3;
+
+    // The reason, if any, that the model is in the given state.
+    string reason = 4;
   }
 
   // An index entry for each model.
