@@ -30,16 +30,18 @@
 NVIDIA Triton Inference Server
 ==============================
 
-    **NEW NAME: We have a new name: Triton Inference Server. Read
-    about why we are making this change and our plans for version 2 of
-    the inference server in** `Roadmap
-    <https://github.com/NVIDIA/triton-inference-server#roadmap>`_.
-
-    **LATEST RELEASE: You are currently on the master branch which
-    tracks under-development progress towards the next release. The
+    **LATEST RELEASE: You are currently on the master-v1 branch which
+    tracks under-development progress towards the next V1 release. The
     latest release of the Triton Inference Server is 1.12.0 and
     is available on branch** `r20.03
     <https://github.com/NVIDIA/triton-inference-server/tree/r20.03>`_.
+
+    **Triton V1 and V2: For the 20.06 release, a legacy V1 version of
+    Triton will be released from this branch. The V1 version of Triton
+    is deprecated and no releases beyond 20.06 are planned. Going
+    forward Triton V2 will continue monthly releases as described on
+    branch** `master
+    <https://github.com/NVIDIA/triton-inference-server>`_.
 
 .. overview-begin-marker-do-not-remove
 
@@ -166,90 +168,6 @@ following features are in beta:
 * The C++ and Python client libraries are not stictly included in the
   inference server compatibility guarantees and so should be
   considered as beta status.
-
-Roadmap
--------
-
-The inference server's new name is Triton Inference Server, which can
-be shortened to just Triton Server in contexts where inferencing is
-already understood. The primary reasons for the name change are to :
-
-* Avoid confusion with the `NVIDIA TensorRT Programmable Inference
-  Accelerator <https://developer.nvidia.com/tensorrt>`_.
-
-* Avoid the perception that Triton Server only supports TensorRT
-  models when in fact the server supports a wide range of model
-  frameworks and formats.
-
-* Highlight that the server is aligning HTTP/REST and GRPC protocols
-  with a set of `KFServing community standard inference protocols
-  <https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2>`_
-  that have been proposed by the `KFServing project
-  <https://github.com/kubeflow/kfserving>`_.
-
-Transitioning from the current protocols (version 1) to the new
-protocols (version 2) will take place over several releases.
-
-* **Current master**
-
-  * Alpha release of server support for KFServing community standard
-    GRPC and HTTP/REST inference protocol.
-  * Alpha release of Python client library that uses KFServing
-    community standard GRPC and HTTP/REST inference protocol.
-  * See `client documentation
-    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/client_experimental.rst>`_
-    for description and examples showing how to enable and use the new
-    GRPC and HTTP/REST inference protocol and Python client library.
-  * Existing HTTP/REST and GRPC protocols, and existing client APIs
-    continue to be supported and remain the default protocols.
-
-* 20.05
-
-  * Beta release of KFServing community standard HTTP/REST and GRPC
-    inference protocol support in server, Python client, and C++
-    client.
-  * Beta release of the `HTTP/REST and GRPC extensions
-    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/protocol>`_
-    to the KFServing inference protocol.
-  * Existing HTTP/REST and GRPC protocols are deprecated but remain
-    the default.
-  * Existing shared library inferface defined in trtserver.h continues
-    to be supported but is deprecated.
-  * Beta release of new shared library interface is defined in
-    tritonserver.h.
-
-* 20.06
-
-  * Triton Server version 2.0.0.
-  * KFserving community standard HTTP/REST and GRPC inference
-    protocols plus all Triton `extensions
-    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/protocol>`_
-    become the default and only supported protocols for the server.
-  * C++ and Python client libraries based on the KFServing standard
-    inference protocols become the default and only supported client
-    libraries.
-  * The new shared library interface defined in tritonserver.h becomes
-    the default and only supported shared library interface.
-  * Original C++ and Python client libraries are removed. Release
-    20.05 is the last release to support these libraries.
-  * Original shared library interface defined in trtserver.h is
-    removed. Release 20.05 is the last release to support the
-    trtserver.h shared library interface.
-
-Throughout the transition the model repository struture and custom
-backend APIs will remain unchanged so that any existing model
-repository and custom backends will continue to work with Triton
-Server.
-
-In the 20.06 release there will be some minor changes to the
-tritonserver command-line executable arguments. It will be necessary
-to revisit and possible adjust invocations of tritonserver executable.
-
-In the 20.06 release there will be some minor changes to the model
-configuration schema. It is expected that these changes will not
-impact the vast majority of model configurations. For impacted models
-the model configuration will need minor edits to become compatible
-with Triton Server version 2.0.0.
 
 Documentation
 -------------

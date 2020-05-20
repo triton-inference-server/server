@@ -54,7 +54,6 @@ NVIDIA Triton Inference Server
    run
    client
    client_example
-   client_experimental
    models_and_schedulers
    model_repository
    model_configuration
@@ -83,7 +82,6 @@ NVIDIA Triton Inference Server
    protobuf_api/protobuf_api_root
    cpp_api/cpp_api_root
    python_api
-   experimental_grpc_python_api
 
 
 Indices and tables
