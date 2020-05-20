@@ -585,7 +585,6 @@ SharedMemoryManager::UnregisterAll(TRITONSERVER_Memory_Type memory_type)
   if (memory_type == TRITONSERVER_MEMORY_CPU) {
     // Serialize all operations that write/read current shared memory regions
     error_message += "system shared memory regions: ";
-    LOG_INFO << "Shared memory count: " << shared_memory_map_.size();
     for (auto it = shared_memory_map_.cbegin(), next_it = it;
          it != shared_memory_map_.cend(); it = next_it) {
       ++next_it;
