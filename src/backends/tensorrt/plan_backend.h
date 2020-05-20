@@ -38,6 +38,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
+
 class PlanBackend : public InferenceBackend {
  public:
   explicit PlanBackend(const double min_compute_capability)
@@ -48,12 +49,12 @@ class PlanBackend : public InferenceBackend {
   ~PlanBackend();
 
   void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads) override;
+      uint32_t runner_idx,
+      std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
-  void WarmUp(
-      uint32_t runner_idx, const WarmupData& sample,
-      std::function<void(Status)> OnCompleteWarmup) override;
+
+  void WarmUp(uint32_t runner_idx, WarmupData& sample) override;
+
 
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
@@ -129,15 +130,14 @@ class PlanBackend : public InferenceBackend {
     // and the caller should call cudaStreamSynchronize before using
     // the data. Otherwise, return false.
     bool SetOutputShapeTensorBuffer(
-        const std::string& name, const int32_t* content,
-        std::vector<int64_t>& content_shape, const bool support_batching,
-        TRITONSERVER_MemoryType src_memory_type, int64_t src_memory_type_id,
-        std::vector<std::unique_ptr<InferenceRequest>>* requests);
+        const int32_t* content, std::unique_ptr<InferenceResponse>* response,
+        InferenceResponse::Output* response_output,
+        const size_t tensor_element_count, cudaStream_t stream);
 
     // See BackendContext::Run()
-    Status Run(
-        const InferenceBackend* base,
-        std::vector<Scheduler::Payload>* payloads) override;
+    void Run(
+        InferenceBackend* base,
+        std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
     void ProcessResponse(
         size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue);
@@ -201,7 +201,8 @@ class PlanBackend : public InferenceBackend {
     Status InitEventSet();
     Status DestroyEventSet();
     Status GetRequestShapeValues(
-        size_t total_batch_size, const Scheduler::Payload& payload,
+        size_t total_batch_size,
+        const std::unique_ptr<InferenceRequest>& request,
         std::map<int, std::vector<int32_t>>* request_shape_values);
 
     std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
@@ -231,8 +232,9 @@ class PlanBackend : public InferenceBackend {
     // Assume that the lifetime of the payload is extended until the completion
     // callback is called
     SyncQueue<std::tuple<
-        std::function<void(Status)>, std::vector<Scheduler::Payload>*, size_t,
-        std::shared_ptr<std::vector<OutputInfo>>>>
+        InferenceBackend*, size_t, const uint64_t, const size_t,
+        std::vector<std::unique_ptr<InferenceRequest>>*,
+        std::shared_ptr<std::vector<std::unique_ptr<InferenceResponse>>>>>
         completion_queue_;
 
     // Map from profile index to the corresponding TensorRT context. Use map
@@ -265,8 +267,9 @@ class PlanBackend : public InferenceBackend {
     // The array size is equal to Context::total_bindings_
     std::vector<void*> buffer_bindings_;
 
-    std::vector<InputInfo> inputs_;
-    std::vector<OutputInfo> outputs_;
+    size_t total_batch_size_;
+    std::vector<std::unique_ptr<InferenceRequest>>* requests_;
+    std::shared_ptr<std::vector<std::unique_ptr<InferenceResponse>>> responses_;
   };
 
   // CUDA engine shared across all model instances on the same device.
