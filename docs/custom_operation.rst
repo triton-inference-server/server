@@ -55,6 +55,17 @@ managed separately from the model repository itself. And more
 seriously, if there are custom layer name conflicts across multiple
 shared libraries there is currently no way to handle it.
 
+When building the custom layer shared library it is important to use
+the same version of TensorRT as is being used in Triton. You can find
+the TensorRT version in the `Triton Release Notes
+<https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html>`_. A
+simple way to ensure you are using the correct version of TensorRT is
+to use the `NGC TensorRT container
+<https://ngc.nvidia.com/catalog/containers/nvidia:tensorrt>`_
+corresponding to the Triton container. For example, if you are using
+the 20.03 version of Triton, use the 20.03 version of the TensorRT
+container.
+
 TensorFlow
 ----------
 
@@ -83,8 +94,19 @@ managed separately from the model repository itself. And more
 seriously, if there are custom layer name conflicts across multiple
 shared libraries there is currently no way to handle it.
 
+When building the custom operations shared library it is important to
+use the same version of TensorFlow as is being used in Triton. You can
+find the TensorFlow version in the `Triton Release Notes
+<https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html>`_. A
+simple way to ensure you are using the correct version of TensorFlow
+is to use the `NGC TensorFlow container
+<https://ngc.nvidia.com/catalog/containers/nvidia:tensorflow>`_
+corresponding to the Triton container. For example, if you are using
+the 20.03 version of Triton, use the 20.03 version of the TensorFlow
+container.
+
 PyTorch
-----------
+-------
 
 Torchscript allows users to `add custom operations
 <https://pytorch.org/tutorials/advanced/torch_script_custom_ops.html>`_
@@ -113,3 +135,14 @@ managed separately from the model repository itself. And more
 seriously, if there are custom layer name conflicts across multiple
 shared libraries or the handles used to register them in PyTorch there
 is currently no way to handle it.
+
+When building the custom operations shared library it is important to
+use the same version of PyTorch as is being used in Triton. You can
+find the PyTorch version in the `Triton Release Notes
+<https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html>`_. A
+simple way to ensure you are using the correct version of PyTorch is
+to use the `NGC PyTorch container
+<https://ngc.nvidia.com/catalog/containers/nvidia:pytorch>`_
+corresponding to the Triton container. For example, if you are using
+the 20.03 version of Triton, use the 20.03 version of the PyTorch
+container.
