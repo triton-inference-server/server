@@ -40,6 +40,7 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/model_repository_manager.h"
 #include "src/core/nvtx.h"
 #include "src/core/response_allocator.h"
 #include "src/core/server.h"
@@ -1800,24 +1801,43 @@ TRITONSERVER_ServerModelConfig(
 
 TRITONSERVER_Error*
 TRITONSERVER_ServerModelIndex(
-    TRITONSERVER_Server* server, TRITONSERVER_Message** repository_index)
+    TRITONSERVER_Server* server, uint32_t flags,
+    TRITONSERVER_Message** repository_index)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  ni::ModelRepositoryIndex model_repository_index;
-  RETURN_IF_STATUS_ERROR(
-      lserver->GetModelRepositoryIndex(&model_repository_index));
+  const bool ready_only = ((flags & TRITONSERVER_INDEX_FLAG_READY) != 0);
+
+  std::vector<ni::ModelRepositoryManager::ModelIndex> index;
+  RETURN_IF_STATUS_ERROR(lserver->RepositoryIndex(ready_only, &index));
 
   rapidjson::Document repository_index_json(rapidjson::kArrayType);
-  for (const auto& model : model_repository_index.models()) {
+  auto& allocator = repository_index_json.GetAllocator();
+
+  for (const auto& in : index) {
     rapidjson::Value model_index;
     model_index.SetObject();
     model_index.AddMember(
-        "name", rapidjson::StringRef(model.name().c_str()),
-        repository_index_json.GetAllocator());
-    repository_index_json.PushBack(
-        model_index, repository_index_json.GetAllocator());
+        "name", rapidjson::StringRef(in.name_.c_str()), allocator);
+    if (!in.name_only_) {
+      if (in.version_ >= 0) {
+        rapidjson::Value vstr;
+        vstr.SetString(std::to_string(in.version_).c_str(), allocator);
+        model_index.AddMember("version", vstr, allocator);
+      }
+      model_index.AddMember(
+          "state",
+          rapidjson::StringRef(ni::ModelReadyStateString(in.state_).c_str()),
+          allocator);
+      if (!in.reason_.empty()) {
+        model_index.AddMember(
+            "reason", rapidjson::StringRef(in.reason_.c_str()), allocator);
+      }
+    }
+
+    repository_index_json.PushBack(model_index, allocator);
   }
+
   *repository_index = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(repository_index_json));
 

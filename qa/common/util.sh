@@ -126,18 +126,13 @@ function wait_for_server_live() {
 function wait_for_model_stable() {
     local wait_time_secs="${1:--1}"; shift
 
-    # DLIS-1295. Need enhanced model index API to do this
-    # correctly. So for now just wait some time...
-    sleep 20
-    return
-
     local wait_secs=$wait_time_secs
     until test $wait_secs -eq 0 ; do
         sleep 1;
 
         set +e
-        total_count=`curl -s localhost:8000/api/status | grep "MODEL_" | wc -l`
-        stable_count=`curl -s localhost:8000/api/status | grep "MODEL_READY\|MODEL_UNAVAILABLE" | wc -l`
+        total_count=`curl -s -X POST localhost:8000/v2/repository/index | json_pp | grep "state" | wc -l`
+        stable_count=`curl -s -X POST localhost:8000/v2/repository/index | json_pp | grep "READY\|UNAVAILABLE" | wc -l`
         count=$((total_count - stable_count))
         set -e
         if [ "$count" == "0" ]; then

@@ -1231,26 +1231,66 @@ void
 HTTPAPIServer::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
-  if (req->method != htp_method_GET) {
+  if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
+  }
+
+  TRITONSERVER_Error* err = nullptr;
+
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+  int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          "unexpected error getting registry index request body");
+    }
+  }
+
+  bool ready = false;
+
+  if (err == nullptr) {
+    // If no request json then just use all default values.
+    size_t buffer_len = evbuffer_get_length(req->buffer_in);
+    if (buffer_len > 0) {
+      rapidjson::Document index_request;
+      err = EVBufferToJson(&index_request, v, &v_idx, buffer_len, n);
+      if (err == nullptr) {
+        const auto& ready_itr = index_request.FindMember("ready");
+        if (ready_itr != index_request.MemberEnd()) {
+          ready = ready_itr->value.GetBool();
+        }
+      }
+    }
   }
 
   evhtp_headers_add_header(
       req->headers_out,
       evhtp_header_new("Content-Type", "application/json", 1, 1));
 
-  TRITONSERVER_Message* message = nullptr;
-  auto err = TRITONSERVER_ServerModelIndex(server_.get(), &message);
   if (err == nullptr) {
-    const char* buffer;
-    size_t byte_size;
-    err = TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size);
-    if (err == nullptr) {
-      evbuffer_add(req->buffer_out, buffer, byte_size);
-      evhtp_send_reply(req, EVHTP_RES_OK);
+    uint32_t flags = TRITONSERVER_INDEX_FLAG_NONE;
+    if (ready) {
+      flags |= TRITONSERVER_INDEX_FLAG_READY;
     }
-    TRITONSERVER_MessageDelete(message);
+
+    TRITONSERVER_Message* message = nullptr;
+    auto err = TRITONSERVER_ServerModelIndex(server_.get(), flags, &message);
+    if (err == nullptr) {
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size);
+      if (err == nullptr) {
+        evbuffer_add(req->buffer_out, buffer, byte_size);
+        evhtp_send_reply(req, EVHTP_RES_OK);
+      }
+
+      TRITONSERVER_MessageDelete(message);
+    }
   }
 
   if (err != nullptr) {

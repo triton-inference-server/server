@@ -30,48 +30,6 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
-//@@
-//@@.. cpp:enum:: ModelReadyState
-//@@
-//@@   Readiness status for models.
-//@@
-enum ModelReadyState {
-  //@@  .. cpp:enumerator:: ModelReadyState::MODEL_UNKNOWN = 0
-  //@@
-  //@@     The model is in an unknown state. The model is not available for
-  //@@     inferencing.
-  //@@
-  MODEL_UNKNOWN = 0;
-
-  //@@  .. cpp:enumerator:: ModelReadyState::MODEL_READY = 1
-  //@@
-  //@@     The model is ready and available for inferencing.
-  //@@
-  MODEL_READY = 1;
-
-  //@@  .. cpp:enumerator:: ModelReadyState::MODEL_UNAVAILABLE = 2
-  //@@
-  //@@     The model is unavailable, indicating that the model failed to
-  //@@     load or has been implicitly or explicitly unloaded. The model is
-  //@@     not available for inferencing.
-  //@@
-  MODEL_UNAVAILABLE = 2;
-
-  //@@  .. cpp:enumerator:: ModelReadyState::MODEL_LOADING = 3
-  //@@
-  //@@     The model is being loaded by the inference server. The model is
-  //@@     not available for inferencing.
-  //@@
-  MODEL_LOADING = 3;
-
-  //@@  .. cpp:enumerator:: ModelReadyState::MODEL_UNLOADING = 4
-  //@@
-  //@@     The model is being unloaded by the inference server. The model is
-  //@@     not available for inferencing.
-  //@@
-  MODEL_UNLOADING = 4;
-}
-
 //@@.. cpp:var:: message SharedMemoryRegion
 //@@
 //@@   The meta-data for the shared memory region registered in the inference
@@ -155,34 +113,4 @@ message SharedMemoryStatus
   //@@     The list of active/registered shared memory regions.
   //@@
   repeated SharedMemoryRegion shared_memory_region = 2;
-}
-
-
-//@@
-//@@.. cpp:var:: message ModelRepositoryIndex
-//@@
-//@@   Index of the model repository monitored by the inference server.
-//@@
-message ModelRepositoryIndex
-{
-  //@@
-  //@@  .. cpp:var:: message ModelEntry
-  //@@
-  //@@     The basic information for a model.
-  //@@
-  message ModelEntry
-  {
-    //@@    .. cpp:var:: string name
-    //@@
-    //@@       The model's name.
-    //@@
-    string name = 1;
-  }
-
-  //@@
-  //@@  .. cpp:var:: ModelEntry models (repeated)
-  //@@
-  //@@     The list of models in the model repository.
-  //@@
-  repeated ModelEntry models = 1;
 }
