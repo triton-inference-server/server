@@ -139,7 +139,7 @@ PlanBackend::Context::~Context()
   DestroyEventSet();
 
   // Notify the completion thread to exit
-  completion_queue_.Put(std::make_tuple(nullptr, nullptr, 0, nullptr));
+  completion_queue_.Put(std::make_tuple(nullptr, 0, 0, 0, nullptr, nullptr));
   if (completion_thread_.joinable()) {
     completion_thread_.join();
   }
@@ -284,9 +284,9 @@ PlanBackend::CreateExecutionContexts(
         return Status::Success;
       },
       [this](
-          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(Status)> func) {
-        Run(runner_idx, payloads, func);
+          uint32_t runner_idx,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
+        Run(runner_idx, std::move(requests));
       }));
 
   LOG_VERBOSE(1) << "plan backend for " << Name() << std::endl << *this;
@@ -1364,61 +1364,47 @@ PlanBackend::~PlanBackend()
 
 void
 PlanBackend::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
+    uint32_t runner_idx,
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
   // Each runner executes using the corresponding context...
   if (runner_idx >= available_context_queue_.size()) {
-    OnCompleteQueuedPayloads(Status(
-        Status::Code::INTERNAL,
-        "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " +
-            std::to_string(available_context_queue_.size())));
+    InferenceRequest::RespondIfError(
+        requests, Status(
+                      Status::Code::INTERNAL,
+                      "unexpected runner index" + std::to_string(runner_idx) +
+                          ", max allowed " +
+                          std::to_string(available_context_queue_.size())));
     return;
   }
 
-#ifdef TRITON_ENABLE_STATS
-  // Stop queue timer and start compute timer when the payload is
-  // scheduled to run
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeStart);
-      payload.stats_->SetGPUDevice(
-          contexts_[next_context_[runner_idx]]->gpu_device_);
+  uint64_t compute_start_ns = 0;
+  INFER_STATS_SET_TIMESTAMP(compute_start_ns);
+
+  contexts_[next_context_[runner_idx]]->Run(this, std::move(requests));
+
+  bool run_failed = true;
+  for (const auto& request : requests) {
+    if (request != nullptr) {
+      run_failed = false;
+      break;
     }
   }
-#endif  // TRITON_ENABLE_STATS
 
-  auto status = contexts_[next_context_[runner_idx]]->Run(this, payloads);
-
-  // On error, handle the response here instead of delegating to the completion
-  // thread as the completion thread will wait on CUDA events unconditionally,
-  // which can be ignored on error.
-  if (!status.IsOk()) {
-#ifdef TRITON_ENABLE_STATS
-    // Stop compute timers.
-    for (auto& payload : *payloads) {
-      if (payload.stats_ != nullptr) {
-        payload.stats_->CaptureTimestamp(
-            ModelInferStats::TimestampKind::kComputeEnd);
-      }
-    }
-#endif  // TRITON_ENABLE_STATS
-
-    OnCompleteQueuedPayloads(status);
+  if (run_failed) {
     // On inference error, place the context back to the queue immediately
     // as all works for the context should be ignored.
     available_context_queue_[runner_idx]->Put(next_context_[runner_idx]);
+
   } else {
     auto context =
         static_cast<Context*>(contexts_[next_context_[runner_idx]].get());
     auto event_set_idx = context->next_set_;
     context->next_set_ = (event_set_idx + 1) % context->EVENT_SET_COUNT;
-    auto outputs = std::make_shared<std::vector<OutputInfo>>();
-    outputs->swap(context->outputs_);
+    // Put the details needed by the ProcessResponse thread on the queue
     context->completion_queue_.Put(std::make_tuple(
-        OnCompleteQueuedPayloads, payloads, event_set_idx, std::move(outputs)));
+        this, event_set_idx, compute_start_ns, context->total_batch_size_,
+        context->requests_, std::move(context->responses_)));
   }
 
   // Set the next context to be executed on this runner, will block
@@ -1426,21 +1412,10 @@ PlanBackend::Run(
   next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
 }
 
-void
-PlanBackend::WarmUp(
-    uint32_t runner_idx, const WarmupData& sample,
-    std::function<void(Status)> OnCompleteWarmup)
-{
-  // Each runner executes using the corresponding context...
-  if (runner_idx >= available_context_queue_.size()) {
-    OnCompleteWarmup(Status(
-        Status::Code::INTERNAL,
-        "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " +
-            std::to_string(available_context_queue_.size())));
-    return;
-  }
 
+void
+PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
+{
   // Different from Run(), the contexts in available_context_queue_[runner_idx]
   // also need to be executed
   //
@@ -1452,35 +1427,25 @@ PlanBackend::WarmUp(
   }
   contexts.push_back(next_context_[runner_idx]);
 
-  std::vector<std::promise<Status>> completion_promises(contexts.size());
+  std::vector<std::promise<bool>> completion_promises(contexts.size());
   Status status;
   for (size_t idx = 0; idx < contexts.size(); idx++) {
-    // Prepare payloads. A set of payloads is required for each context
-    auto payloads = std::make_shared<std::vector<Scheduler::Payload>>();
+    std::vector<std::unique_ptr<InferenceRequest>> requests;
+    requests.emplace_back(std::move(sample.request_));
 
-    // Add the sample request directly to the payloads. For the case of
-    // batch-size 1 no other request is needed.
-    payloads->emplace_back(nullptr, sample.request_, nullptr, nullptr);
+    requests.back()->AddInternalReleaseCallback([&completion_promises, idx]() {
+      completion_promises[idx].set_value(true);
+    });
 
-    // For batch-size > 1 make copies of the request to fill out the
-    // payloads
-    for (size_t idx = 1; idx < sample.batch_size_; idx++) {
-      auto request = std::make_shared<InferenceRequest>(*sample.request_);
-      payloads->emplace_back(nullptr, request, nullptr, nullptr);
-    }
-
-    // Run context
-    if (status.IsOk()) {
-      status = contexts_[contexts[idx]]->Run(this, payloads.get());
-    }
+    contexts_[contexts[idx]]->Run(this, std::move(requests));
 
     // If one of the contexts can't run properly, the whole warmup should abort
-    if (!status.IsOk()) {
+    if (requests.back() == nullptr) {
       // Clean up the rest of the contexts back to queue,
       // the contexts before will be handled by completion function
       for (auto rest_idx = idx; idx < contexts.size(); idx++) {
         available_context_queue_[runner_idx]->Put(contexts[rest_idx]);
-        completion_promises[rest_idx].set_value(status);
+        completion_promises[rest_idx].set_value(false);
       }
       break;
     }
@@ -1489,257 +1454,196 @@ PlanBackend::WarmUp(
     auto context = static_cast<Context*>(contexts_[contexts[idx]].get());
     auto event_set_idx = context->next_set_;
     context->next_set_ = (event_set_idx + 1) % context->EVENT_SET_COUNT;
-    auto outputs = std::make_shared<std::vector<OutputInfo>>();
-    outputs->swap(context->outputs_);
-    auto& completion_promise = completion_promises[idx];
 
     context->completion_queue_.Put(std::make_tuple(
-        [payloads, &completion_promise](Status status) {
-          completion_promise.set_value(status);
-        },
-        payloads.get(), event_set_idx, std::move(outputs)));
+        this, event_set_idx, 0, context->total_batch_size_, context->requests_,
+        std::move(context->responses_)));
   }
 
   // Wait for all inflight executions to be finished.
   for (auto& completion_promise : completion_promises) {
-    auto completion_status = completion_promise.get_future().get();
-    if (!completion_status.IsOk()) {
-      status = completion_status;
-    }
+    completion_promise.get_future().get();
   }
 
   // Need to reset the next context to be executed on this runner
   // as all contexts are in the queue at this point
   next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
-
-  OnCompleteWarmup(status);
 }
 
-bool
-PlanBackend::Context::SetShapeInputBuffer(
-    const std::string& name, const int32_t total_batch_size,
-    const int expected_byte_size, const bool support_batching,
-    std::unique_ptr<InferenceRequest>& request,
-    TRITONSERVER_MemoryType dst_memory_type, int64_t dst_memory_type_id,
-    char* input_buffer)
-{
-  if (request == nullptr) {
-    return false;
-  }
-
-  size_t buffer_copy_offset = support_batching ? sizeof(int32_t) : 0;
-
-  const InferenceRequest::Input* rinput;
-  Status status = request->ImmutableInput(name, &rinput);
-  if (!status.IsOk()) {
-    // FIXME    InferenceRequest::RespondWithError(request, status);
-    return false;
-  }
-
-  auto src_memory_type = dst_memory_type;
-  auto src_memory_type_id = dst_memory_type_id;
-  const void* content;
-  size_t content_byte_size = expected_byte_size;
-
-  // This code assumes that the entire tensor data is in a single
-  // buffer... but the expected_byte_size check below will fail if
-  // that is not the case.
-  status = rinput->DataBuffer(
-      0 /* idx */, &content, &content_byte_size, &src_memory_type,
-      &src_memory_type_id);
-  if (!status.IsOk()) {
-    // FIXME    InferenceRequest::RespondWithError(request, status);
-    return false;
-  }
-
-  if ((expected_byte_size) != (int)content_byte_size) {
-    // FIXME    InferenceRequest::RespondWithError(
-    //        request, Status(
-    //                   Status::Code::INVALID_ARG,
-    //                 "unexpected size " + std::to_string(content_byte_size) +
-    //                   " for inference input '" + name + "', expecting " +
-    //                 std::to_string(expected_byte_size)));
-    return false;
-  }
-
-  bool cuda_copy = false;
-
-  if (content_byte_size > 0) {
-    bool cuda_used = false;
-    status = CopyBuffer(
-        name, src_memory_type, src_memory_type_id, dst_memory_type,
-        dst_memory_type_id, expected_byte_size, content,
-        input_buffer + buffer_copy_offset, stream_, &cuda_used);
-    if (!status.IsOk()) {
-      // FIXME      InferenceRequest::RespondWithError(request, status);
-      return cuda_copy;
-    }
-  }
-
-  if (support_batching) {
-    bool cuda_used = false;
-    status = CopyBuffer(
-        name, TRITONSERVER_MEMORY_CPU, 0, dst_memory_type, dst_memory_type_id,
-        sizeof(int32_t), (void*)&total_batch_size, input_buffer, stream_,
-        &cuda_used);
-    if (!status.IsOk()) {
-      // FIXME      InferenceRequest::RespondWithError(request, status);
-    }
-    cuda_copy |= cuda_used;
-  }
-
-  return cuda_copy;
-}
 
 bool
 PlanBackend::Context::SetOutputShapeTensorBuffer(
-    const std::string& name, const int32_t* content,
-    std::vector<int64_t>& content_shape, const bool support_batching,
-    TRITONSERVER_MemoryType src_memory_type, int64_t src_memory_type_id,
-    std::vector<std::unique_ptr<InferenceRequest>>* requests)
+    const int32_t* content, std::unique_ptr<InferenceResponse>* response,
+    InferenceResponse::Output* response_output,
+    const size_t tensor_element_count, cudaStream_t stream)
 {
-  if (content_shape.empty()) {
-    return false;
+  bool cuda_copy = false;
+  int this_batch_size = (support_batching_) ? *content : 1;
+
+  const size_t expected_byte_size = tensor_element_count * sizeof(int32_t);
+
+  // Allocate a buffer large enough to hold the serialized tensor.
+  TRITONSERVER_MemoryType actual_memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t actual_memory_type_id = 0;
+
+  char* buffer;
+  Status status = response_output->AllocateDataBuffer(
+      (void**)&buffer, expected_byte_size, &actual_memory_type,
+      &actual_memory_type_id);
+  if (!status.IsOk()) {
+    LOG_STATUS_ERROR(
+        InferenceResponse::SendWithStatus(std::move(*response), status),
+        "error sending TRT response");
+    return cuda_copy;
   }
 
-  bool cuda_copy = false;
-  int shape_index = (support_batching ? 1 : 0);
-  int nb_shape_values = content_shape[shape_index];
-  for (auto& request : *requests) {
-    int this_batch_size = request->BatchSize();
-    // Fix the content shape for this request
-    if (support_batching) {
-      content_shape[0] = this_batch_size;
-    }
+  const size_t nb_shape_values = tensor_element_count / this_batch_size;
 
-    const size_t expected_byte_size =
-        nb_shape_values * sizeof(int32_t) * this_batch_size;
+  // Copy the serialized tensor into the allocated buffer.
+  bool cuda_used = false;
+  size_t content_offset = support_batching_ ? 1 : 0;
+  size_t buffer_offset = 0;
+  for (int i = 0; i < this_batch_size; i++) {
+    status = CopyBuffer(
+        response_output->Name(), TRITONSERVER_MEMORY_CPU /* src_memory_type */,
+        0 /* src_memory_type_id */, actual_memory_type, actual_memory_type_id,
+        nb_shape_values * sizeof(int32_t), (void*)(content + content_offset),
+        (void*)(buffer + buffer_offset), stream_, &cuda_used);
+    cuda_copy |= cuda_used;
+    buffer_offset += nb_shape_values * sizeof(int32_t);
+  }
 
-    // If 'request' should have valid output (status ok) and
-    // if 'request' requested this output then copy it from
-    // 'content'. If it did not request this output then just
-    // skip it in the 'content'.
-    if ((request != nullptr) &&
-        false /* FIXME request->RequiresOutput(name) */) {
-      auto dst_memory_type = src_memory_type;
-      int64_t dst_memory_type_id = 0;
-      char* buffer = nullptr;
-
-      Status status(Status::Code::INTERNAL, "NYI...");
-#if 0
-      // FIXME
-      response_provider_->AllocateOutputBuffer(
-          name, (void**)&buffer, expected_byte_size, content_shape,
-          src_memory_type, src_memory_type_id, &dst_memory_type,
-          &dst_memory_type_id);
-#endif
-      if (status.IsOk() && (expected_byte_size != 0)) {
-        if (buffer == nullptr) {
-          status = Status(
-              Status::Code::INTERNAL,
-              "failed to allocate buffer for output '" + name + "'");
-        } else {
-          bool cuda_used = false;
-          size_t content_offset = support_batching ? 1 : 0;
-          size_t buffer_offset = 0;
-          for (int i = 0; i < this_batch_size; i++) {
-            status = CopyBuffer(
-                name, src_memory_type, src_memory_type_id, dst_memory_type,
-                dst_memory_type_id, nb_shape_values * sizeof(int32_t),
-                (void*)(content + content_offset),
-                (void*)(buffer + buffer_offset), stream_, &cuda_used);
-            cuda_copy |= cuda_used;
-            buffer_offset += nb_shape_values * sizeof(int32_t);
-          }
-        }
-      }
-
-      if (!status.IsOk()) {
-        // FIXME        InferenceRequest::RespondWithError(request, status);
-      }
-    }
+  if (!status.IsOk()) {
+    LOG_STATUS_ERROR(
+        InferenceResponse::SendWithStatus(std::move(*response), status),
+        "error sending TensorFlow response");
+    return cuda_copy;
   }
 
   return cuda_copy;
 }
 
-Status
+void
 PlanBackend::Context::Run(
-    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
+    InferenceBackend* base,
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
   Status status;
 
-  LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
-                 << " request payloads";
+  LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
+                 << " requests";
+
   NVTX_RANGE(nvtx_, "Run " + name_);
 
-  // keep indirect buffers from previous run until now as scheduler
-  // thread doesn't check when 'input_ready' event is triggered.
-  inputs_.clear();
-  outputs_.clear();
+  requests_ = &requests;
+  responses_.reset(new std::vector<std::unique_ptr<InferenceResponse>>());
+  total_batch_size_ = 0;
+
 
   cudaSetDevice(gpu_device_);
 
   const InferenceRequest* repr_input_request = nullptr;
 
-  // For each request in 'payloads' collect the total batch size for
-  // this inference execution. The batch-size, number of inputs, and
-  // size of each input has already been checked by each payloads
-  // request provider so don't need to do that here.
-  size_t total_batch_size = 0;
-  for (auto& payload : *payloads) {
-    if (!payload.status_.IsOk()) {
-      return Status(
-          Status::Code::INTERNAL,
-          "unexpected payload with non-OK status given to runner for '" +
-              name_ + "'");
+  // For each request collect the total batch size for this inference
+  // execution. The batch-size, number of inputs, and size of each
+  // input has already been checked so don't need to do that here.
+  for (auto& request : requests) {
+    if (request == nullptr) {
+      InferenceRequest::RespondIfError(
+          requests,
+          Status(
+              Status::Code::INTERNAL,
+              "null request given to TensorRT runner for '" + name_ + "'"));
+      return;
     }
 
-    total_batch_size += payload.request_->BatchSize();
+    total_batch_size_ += std::max(1U, request->BatchSize());
 
-    // All payloads must have equally-sized input tensors so use any
-    // payload as the representative for the input tensors.
-    repr_input_request = payload.request_.get();
+    // All requests must have equally-sized input tensors so use any
+    // request as the representative for the input tensors.
+    repr_input_request = request.get();
   }
 
-  // If there are no valid payloads then no need to run the
-  // inference. The payloads will have their error status set so can
-  // just return.
-  if (total_batch_size == 0) {
-    return Status::Success;
+  // If there are no valid requests then no need to run the
+  // inference. This should never happen unless called with an empty
+  // 'requests' for some reason.
+  if (total_batch_size_ == 0) {
+    return;
+  }
+
+  // Make sure the maximum batch size is not exceeded. The
+  // total_batch_size_ must be 1 for models that don't support batching
+  // (i.e. max_batch_size_ == 0). If max_batch_size is exceeded then
+  // scheduler has done something badly wrong so fail and release all
+  // requests.
+  if ((total_batch_size_ != 1) &&
+      (total_batch_size_ > (size_t)max_batch_size_)) {
+    InferenceRequest::RespondIfError(
+        requests,
+        Status(
+            Status::Code::INTERNAL,
+            "dynamic batch size " + std::to_string(total_batch_size_) +
+                " for '" + name_ + "', max allowed is " +
+                std::to_string(max_batch_size_)),
+        true /* release_requests */);
+    return;
   }
 
   std::map<int32_t, std::vector<int32_t>> request_shape_values;
-  // Scheduler ensures all the payloads have identical shape values so use
+  // Scheduler ensures all the requests have identical shape values so use
   // values from any shape tensor
-  GetRequestShapeValues(
-      total_batch_size, payloads->front(), &request_shape_values);
-
-  // total_batch_size can be 1 for models that don't support batching
-  // (i.e. max_batch_size_ == 0).
-  if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
-    return Status(
-        Status::Code::INTERNAL,
-        "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
-            name_ + "', max allowed is " + std::to_string(max_batch_size_));
+  status = GetRequestShapeValues(
+      total_batch_size_, requests.front(), &request_shape_values);
+  if (!status.IsOk()) {
+    InferenceRequest::RespondIfError(
+        requests, status, true /* release_requests */);
+    return;
   }
 
   auto citr = GetMostOptimizedProfile(
-      total_batch_size, *repr_input_request, request_shape_values);
+      total_batch_size_, *repr_input_request, request_shape_values);
 
   int binding_offset = citr->first * num_expected_bindings_;
 
-  // For each input, concatenate input values from each payload into
+  // At this point we are committed to running inference with all
+  // 'requests'. Create a response for each request. During input
+  // processing if there is an error with any request that error will
+  // be sent immediately with the corresponding response (and the
+  // response unique_ptr will then be nullptr). The request object
+  // itself will not be released until after all inferencing is done
+  // (below) as we may need to access the request object when
+  // determine how to process outputs (for example, even if we don't
+  // need the outputs for a request that has an error, we do need to
+  // know the size of those outputs associated with the request so we
+  // can skip them in the output tensors).
+  responses_->reserve(requests.size());
+
+  for (auto& request : requests) {
+    std::unique_ptr<InferenceResponse> response;
+    Status status = request->ResponseFactory().CreateResponse(&response);
+    if (!status.IsOk()) {
+      InferenceRequest::RespondIfError(request, status);
+      response.reset();
+    }
+
+    responses_->emplace_back(std::move(response));
+  }
+
+  // For each input, concatenate input values from each request into
   // the corresponding binding.
+  BackendInputCollector collector(
+      requests, responses_.get(), enable_pinned_input_, input_copy_stream_);
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
     int io_index = binding_offset + bindex;
     if (!engine_->bindingIsInput(io_index)) {
       continue;
     }
 
+    // FIXME: In case of multiple profiles the name can be different
     const std::string& name = engine_->getBindingName(bindex);
 
-    // Set the shape binding if needed
+    // Set the shape binding if needed. If unable to set the shape binding
+    // then fail all requests.
     if (engine_->isShapeBinding(io_index)) {
       auto it = request_shape_values.find(io_index);
       if (it != request_shape_values.end()) {
@@ -1748,18 +1652,20 @@ PlanBackend::Context::Run(
             citr->second.max_shapes_[io_index], citr->second.nb_shape_values_,
             support_batching_);
       } else {
-        return Status(
+        status = Status(
             Status::Code::INTERNAL,
             "unable to find shape values for shape input '" + name +
                 "' in request for " + name_);
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(), status,
+            "missing shape values for the shape tensor");
       }
       if (status.IsOk()) {
         citr->second.context_->setInputShapeBinding(io_index, &(it->second[0]));
       } else {
-        return Status(
-            Status::Code::INTERNAL,
-            "request specifies invalid shape values for shape input '" + name +
-                "' for " + name_ + ". Error details: " + status.Message());
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(), status,
+            "invalid shape values encountered for shape inputs");
       }
     }
 
@@ -1768,109 +1674,89 @@ PlanBackend::Context::Run(
       continue;
     }
 
+    const InferenceRequest::Input* repr_input;
+    FAIL_ALL_AND_RETURN_IF_ERROR(
+        requests, *responses_, metric_reporter_.get(),
+        repr_input_request->ImmutableInput(name, &repr_input),
+        "failed to obtain the input '" + name + "'");
     // Get the shape of the input. The request has already checked
     // that the request shape is valid so don't need to do it here.
-    size_t batch1_byte_size;
+    const auto& batch1_shape = repr_input->Shape();
 
-    std::vector<int64_t> shape;
-    if (is_dynamic_) {
-      const InferenceRequest::Input* input;
-      RETURN_IF_ERROR(repr_input_request->ImmutableInput(name, &input));
-      shape = input->Shape();
-
-      DataType dt =
-          ConvertTrtTypeToDataType(engine_->getBindingDataType(io_index));
-
-      batch1_byte_size = GetByteSize(dt, shape);
-      if (max_batch_size_ != NO_BATCHING) {
-        // The first element of the vector will be the batch size and should not
-        // be included in the batch1_byte_size computation above.
-        shape.insert(shape.begin(), total_batch_size);
+    // The shape for the entire input batch, [total_batch_size, ...]
+    std::vector<int64_t> batchn_shape;
+    batchn_shape.reserve(batch1_shape.size() + 1);
+    if (max_batch_size_ != NO_BATCHING) {
+      if (!engine_->isShapeBinding(io_index)) {
+        batchn_shape.push_back(total_batch_size_);
       }
-    } else {
-      batch1_byte_size = byte_sizes_[bindex] / std::max(1, max_batch_size_);
     }
+    batchn_shape.insert(
+        batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
+    const DataType datatype = repr_input->DType();
+
+    const size_t total_byte_size = GetByteSize(datatype, batchn_shape);
 
     // Set the binding dimension so that output dimensions can be obtained
     if (is_dynamic_ && (!engine_->isShapeBinding(io_index))) {
       nvinfer1::Dims this_dim;
-      if (!DimVecToDims(shape, &this_dim)) {
-        return Status(
-            Status::Code::INTERNAL,
-            "failed to create dims object for " + DimsListToString(shape) +
-                " for input '" + name + "' for " + name_ + ".");
+      if (!DimVecToDims(batchn_shape, &this_dim)) {
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(),
+            Status(
+                Status::Code::INTERNAL, "failed to create dims object for " +
+                                            DimsListToString(batchn_shape) +
+                                            " for input '" + name + "' for " +
+                                            name_ + "."),
+            "error setting the binding dimension");
       }
       status = ValidateDimension(
           this_dim, citr->second.min_dims_[bindex],
           citr->second.max_dims_[bindex], false);
       if (!status.IsOk()) {
-        return Status(
-            Status::Code::INTERNAL,
-            "request specifies invalid shape for input '" + name + "' for " +
-                name_ + ". Error details: " + status.Message());
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(),
+            Status(
+                Status::Code::INTERNAL,
+                "request specifies invalid shape for input '" + name +
+                    "' for " + name_ + ". Error details: " + status.Message()),
+            "error setting the binding dimension");
       }
       if (!citr->second.context_->setBindingDimensions(io_index, this_dim)) {
-        return Status(
-            Status::Code::INTERNAL, "trt failed to set binding dimension to " +
-                                        DimsDebugString(this_dim) +
-                                        " for input '" + name + "' for " +
-                                        name_);
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(),
+            Status(
+                Status::Code::INTERNAL,
+                "trt failed to set binding dimension to " +
+                    DimsDebugString(this_dim) + " for input '" + name +
+                    "' for " + name_),
+            "error setting the binding dimension");
       }
     }
 
-    if (!engine_->isShapeBinding(io_index)) {
-      // Visit the payloads in order and copy the input tensors to
-      // GPU. Skip payloads that had errors since they are not included
-      // in the dynamic batch.
-      std::vector<size_t> expected_byte_sizes;
-      for (auto& payload : *payloads) {
-        expected_byte_sizes.push_back(
-            payload.request_->BatchSize() * batch1_byte_size);
-      }
-
-      inputs_.emplace_back();
-      auto& input = inputs_.back();
-      input.input_buffer_ = static_cast<char*>(buffers_[bindex]);
-      input.memory_type_ = TRITONSERVER_MEMORY_GPU;
-      input.memory_type_id_ = gpu_device_;
-      SetInputBuffer(
-          name, expected_byte_sizes, payloads, input_copy_stream_, &input);
+    if ((!engine_->isShapeBinding(io_index)) ||
+        (max_batch_size_ != NO_BATCHING)) {
+      collector.ProcessTensor(
+          name, datatype, batch1_shape, static_cast<char*>(buffers_[bindex]),
+          total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
     } else {
-      // Set the shape values using the first payload for extracting the status
-      // of the copy
-      SetShapeInputBuffer(
-          name, total_batch_size, batch1_byte_size, support_batching_,
-          &(*payloads)[0], TRITONSERVER_MEMORY_GPU, gpu_device_,
-          static_cast<char*>(buffers_[bindex]));
-    }
-  }
+      // Set the first 4 bytes for shape
+      bool cuda_used = false;
+      status = CopyBuffer(
+          name, TRITONSERVER_MEMORY_CPU, 0, TRITONSERVER_MEMORY_GPU,
+          gpu_device_, sizeof(int32_t), (void*)&total_batch_size_,
+          static_cast<char*>(buffers_[bindex]), input_copy_stream_, &cuda_used);
+      FAIL_ALL_AND_RETURN_IF_ERROR(
+          requests, *responses_, metric_reporter_.get(), status,
+          "error input data for the batch");
 
-  // No synchronization here as we know that the below copies will be using
-  // 'input_copy_stream_', thus the copies issued above will be done.
-  // i.e. if used 'input_copy_stream_', then the order is preserved. Otherwise,
-  // the copy is h2h and it is synchronized anyway.
-  for (auto& input : inputs_) {
-    for (auto& indirect_buffer : input.indirect_buffers_) {
-      bool cuda_used;
-      TRITONSERVER_MemoryType buffer_memory_type;
-      int64_t buffer_memory_id;
-      size_t buffer_byte_size;
-      auto buffer =
-          std::get<0>(indirect_buffer)
-              ->BufferAt(
-                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
-      auto status = CopyBuffer(
-          "indirect buffer", buffer_memory_type, buffer_memory_id,
-          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
-          input.input_buffer_ + std::get<1>(indirect_buffer),
-          input_copy_stream_, &cuda_used);
-      if (!status.IsOk()) {
-        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
-          (*payloads)[payload_idx].status_ = status;
-        }
-      }
+      collector.ProcessTensor(
+          name, datatype, batch1_shape,
+          (static_cast<char*>(buffers_[bindex]) + sizeof(int32_t)),
+          total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
     }
   }
+  collector.Finalize();
 
   cudaEventRecord(events_[next_set_].input_ready_, input_copy_stream_);
 
@@ -1881,14 +1767,18 @@ PlanBackend::Context::Run(
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
-  auto itr = citr->second.cuda_graph_execs_.find(total_batch_size);
+  auto itr = citr->second.cuda_graph_execs_.find(total_batch_size_);
   if (itr != citr->second.cuda_graph_execs_.end()) {
     cudaError_t err = cudaGraphLaunch(itr->second, stream_);
     if (err != cudaSuccess) {
       cudaStreamSynchronize(stream_);
-      return Status(
-          Status::Code::INTERNAL, "unable to execute graph for inference " +
-                                      name_ + ": " + cudaGetErrorString(err));
+      FAIL_ALL_AND_RETURN_IF_ERROR(
+          requests, *responses_, metric_reporter_.get(),
+          Status(
+              Status::Code::INTERNAL, "unable to execute graph for inference " +
+                                          name_ + ": " +
+                                          cudaGetErrorString(err)),
+          "failed to run TRT inference");
     }
     // CUDA graph doesn't know when input is consumed, need to record
     // the event at the end
@@ -1900,14 +1790,20 @@ PlanBackend::Context::Run(
                    << "] is being executed for " << name_;
     if (is_dynamic_) {
       if (!citr->second.context_->allInputDimensionsSpecified()) {
-        return Status(
-            Status::Code::INTERNAL,
-            "failed to specify the dimensions of all input bindings");
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(),
+            Status(
+                Status::Code::INTERNAL,
+                "failed to specify the dimensions of all input bindings"),
+            "failed to run TRT inference");
       }
       if (!citr->second.context_->allInputShapesSpecified()) {
-        return Status(
-            Status::Code::INTERNAL,
-            "failed to specify the values for all input shape tensors");
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(),
+            Status(
+                Status::Code::INTERNAL,
+                "failed to specify the values for all input shape tensors"),
+            "failed to run TRT inference");
       }
     }
     if (!engine_->hasImplicitBatchDimension()) {
@@ -1915,34 +1811,56 @@ PlanBackend::Context::Run(
               buffer_bindings_.data(), stream_,
               &events_[next_set_].ready_for_input_)) {
         cudaStreamSynchronize(stream_);
-        return Status(
-            Status::Code::INTERNAL, "unable to enqueue for inference " + name_);
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(),
+            Status(
+                Status::Code::INTERNAL,
+                "unable to enqueue for inference " + name_),
+            "failed to run TRT inference");
       }
     } else {
       if (!citr->second.context_->enqueue(
-              total_batch_size, buffer_bindings_.data(), stream_,
+              total_batch_size_, buffer_bindings_.data(), stream_,
               &events_[next_set_].ready_for_input_)) {
         cudaStreamSynchronize(stream_);
-        return Status(
-            Status::Code::INTERNAL, "unable to enqueue for inference " + name_);
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(),
+            Status(
+                Status::Code::INTERNAL,
+                "unable to enqueue for inference " + name_),
+            "failed to run TRT inference");
       }
     }
   }
 
   cudaEventRecord(events_[next_set_].ready_for_output_, stream_);
 
+  // Collect the names of requested outputs. Do not include outputs
+  // for requests that have already responded with an error.
+  std::set<std::string> required_outputs;
+  for (size_t idx = 0; idx < requests.size(); idx++) {
+    const auto& request = requests[idx];
+    const auto& response = (*responses_)[idx];
+    if (response != nullptr) {
+      for (const auto& output_name : request->ImmutableRequestedOutputs()) {
+        required_outputs.insert(output_name);
+      }
+    }
+  }
+
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
-  bool cuda_copy = false;
+  BackendResponder responder(
+      requests, responses_.get(), max_batch_size_, enable_pinned_output_,
+      stream_);
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
     int io_index = binding_offset + bindex;
     if (engine_->bindingIsInput(io_index)) {
       continue;
     }
 
-    outputs_.emplace_back();
-    auto& output = outputs_.back();
-
+    // FIXME: The output name can be different in case of multiple
+    // optimization Profiles.
     const std::string& name = engine_->getBindingName(bindex);
 
     nvinfer1::Dims dims;
@@ -1952,83 +1870,115 @@ PlanBackend::Context::Run(
       dims = engine_->getBindingDimensions(io_index);
     }
 
+    // Make sure each output is of the expected size and copy it into
+    // the payload responses.
+    bool cuda_copy = false;
     if (engine_->isShapeBinding(io_index)) {
+      // Custom handling for shape tensors
       // Obtain the shape value
       if (dims.nbDims != 0) {
         int32_t* shape_value_ptr =
             (int32_t*)malloc(dims.d[0] * sizeof(int32_t));
         if (!citr->second.context_->getShapeBinding(
                 io_index, shape_value_ptr)) {
-          return Status(
-              Status::Code::INTERNAL,
-              "failed to retrieve the output shape values from binding '" +
-                  name + "'");
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              requests, *responses_, metric_reporter_.get(),
+              Status(
+                  Status::Code::INTERNAL,
+                  "failed to retrieve the output shape values from binding '" +
+                      name + "'"),
+              "failed to get TRT response");
         }
 
         // The first shape value must be equal to the total batch_size
         if (support_batching_ &&
-            total_batch_size != (uint32_t)*shape_value_ptr) {
-          return Status(
-              Status::Code::INTERNAL, "unexpected batch shape value " +
-                                          std::to_string(*shape_value_ptr) +
-                                          " for '" + name +
-                                          "', total batch size was " +
-                                          std::to_string(total_batch_size));
+            total_batch_size_ != (uint32_t)*shape_value_ptr) {
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              requests, *responses_, metric_reporter_.get(),
+              Status(
+                  Status::Code::INTERNAL,
+                  "unexpected batch shape value " +
+                      std::to_string(*shape_value_ptr) + " for '" + name +
+                      "', total batch size was " +
+                      std::to_string(total_batch_size_)),
+              "failed to run TRT response");
         }
 
-        std::vector<int64_t> content_shape;
+        std::vector<int64_t> batchn_shape;
         if (support_batching_) {
-          content_shape.push_back(total_batch_size);
-          content_shape.push_back(dims.d[0] - 1);
+          batchn_shape.push_back(total_batch_size_);
+          batchn_shape.push_back(dims.d[0] - 1);
         } else {
-          content_shape.push_back(dims.d[0]);
+          batchn_shape.push_back(dims.d[0]);
         }
 
-        cuda_copy |= SetOutputShapeTensorBuffer(
-            name, shape_value_ptr, content_shape, support_batching_,
-            TRITONSERVER_MEMORY_CPU, 0, payloads);
+        for (size_t idx = 0; idx < responses_->size(); idx++) {
+          auto& request = requests[idx];
+          auto& response = (*responses_)[idx];
+
+          if (support_batching_) {
+            batchn_shape[0] = request->BatchSize();
+          }
+
+          const size_t tensor_element_cnt = GetElementCount(batchn_shape);
+
+          DataType dt = ConvertTrtTypeToDataType(
+              engine_->getBindingDataType(binding_offset + bindex));
+
+          // Only need an response tensor for requested outputs.
+          if ((response != nullptr) &&
+              (request->ImmutableRequestedOutputs().find(name) !=
+               request->ImmutableRequestedOutputs().end())) {
+            InferenceResponse::Output* response_output = nullptr;
+            response->AddOutput(
+                name, dt, batchn_shape, request->BatchSize(), &response_output);
+            cuda_copy |= SetOutputShapeTensorBuffer(
+                shape_value_ptr, &response, response_output, tensor_element_cnt,
+                stream_);
+          }
+        }
 
         free(shape_value_ptr);
       }
     } else {
-      output.output_buffer_ = static_cast<const char*>(buffers_[bindex]);
-      output.memory_type_ = TRITONSERVER_MEMORY_GPU;
-      output.memory_type_id_ = gpu_device_;
+      std::vector<int64_t> batchn_shape;
 
-      if (!is_dynamic_ && support_batching_) {
-        output.output_shape_.insert(
-            output.output_shape_.begin(), total_batch_size);
+      if (engine_->hasImplicitBatchDimension() && support_batching_) {
+        batchn_shape.push_back(total_batch_size_);
       }
 
       for (int i = 0; i < dims.nbDims; ++i) {
-        output.output_shape_.push_back(dims.d[i]);
+        batchn_shape.push_back(dims.d[i]);
       }
 
       DataType dt = ConvertTrtTypeToDataType(
           engine_->getBindingDataType(binding_offset + bindex));
 
-      size_t batch1_byte_size = GetByteSize(dt, output.output_shape_);
+      size_t batch1_byte_size = GetByteSize(dt, batchn_shape);
       if (support_batching_) {
-        batch1_byte_size /= total_batch_size;
+        batch1_byte_size /= total_batch_size_;
       }
 
-      if (byte_sizes_[bindex] < (batch1_byte_size * total_batch_size)) {
-        return Status(
-            Status::Code::INTERNAL,
-            "unexpected size for output '" + name + "', byte-size " +
-                std::to_string(byte_sizes_[bindex]) + " is less than " +
-                std::to_string(total_batch_size) + " * " +
-                std::to_string(batch1_byte_size));
+      if (byte_sizes_[bindex] < (batch1_byte_size * total_batch_size_)) {
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, *responses_, metric_reporter_.get(),
+            Status(
+                Status::Code::INTERNAL,
+                "unexpected size for output '" + name + "', byte-size " +
+                    std::to_string(byte_sizes_[bindex]) + " is less than " +
+                    std::to_string(total_batch_size_) + " * " +
+                    std::to_string(batch1_byte_size)),
+            "failed to run TRT response");
       }
 
-      cuda_copy |=
-          SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
+      responder.ProcessTensor(
+          name, dt, batchn_shape, static_cast<const char*>(buffers_[bindex]),
+          TRITONSERVER_MEMORY_GPU, gpu_device_);
     }
   }
+  responder.Finalize();
 
   cudaEventRecord(events_[next_set_].output_ready_, stream_);
-
-  return Status::Success;
 }
 
 void
@@ -2038,24 +1988,25 @@ PlanBackend::Context::ProcessResponse(
   while (true) {
     NVTX_RANGE(nvtx_, "ProcessResponse " + context_idx);
     auto OnCompleteMetaData = completion_queue_.Get();
-    auto& OnComplete = std::get<0>(OnCompleteMetaData);
-    if (OnComplete == nullptr) {
+    auto base = std::get<0>(OnCompleteMetaData);
+    if (base == nullptr) {
       break;
     }
-    auto& event_set = events_[std::get<2>(OnCompleteMetaData)];
-    auto& payloads = std::get<1>(OnCompleteMetaData);
+    auto& event_set = events_[std::get<1>(OnCompleteMetaData)];
+#ifdef TRITON_ENABLE_STATS
+    auto compute_start_ns = std::get<2>(OnCompleteMetaData);
+#endif  // TRITON_ENABLE_STATS
+
+    auto total_batch_size = std::get<3>(OnCompleteMetaData);
+    auto requests = std::get<4>(OnCompleteMetaData);
+    auto responses = std::get<5>(OnCompleteMetaData);
 #ifdef TRITON_ENABLE_STATS
     // Only need to wait for input copy for recording stats
     cudaEventSynchronize(event_set.input_ready_);
-    for (auto& payload : *payloads) {
-      if (payload.stats_ != nullptr) {
-        payload.stats_->CaptureTimestamp(
-            ModelInferStats::TimestampKind::kComputeInputEnd);
-      }
-    }
+    INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
 #endif  // TRITON_ENABLE_STATS
 
-    // The model execution associated with the OnCompletePair
+    // The model execution associated with the current context
     // has consumed the inputs. Put the context back into the available queue
     // so that it can begin enqueuing new memcpys into the input buffers
     cudaEventSynchronize(event_set.ready_for_input_);
@@ -2064,62 +2015,55 @@ PlanBackend::Context::ProcessResponse(
 
 #ifdef TRITON_ENABLE_STATS
     cudaEventSynchronize(event_set.ready_for_output_);
-    for (auto& payload : *payloads) {
-      if (payload.stats_ != nullptr) {
-        payload.stats_->CaptureTimestamp(
-            ModelInferStats::TimestampKind::kComputeOutputStart);
-      }
-    }
+    INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
 #endif  // TRITON_ENABLE_STATS
 
     cudaEventSynchronize(event_set.output_ready_);
     NVTX_MARKER("plan_output_ready");
-    // Issue the last steps here if outputs are placed in indirect buffer
-    // Note that the copies are expected to be HtoH if any.
-    for (auto& output : *(std::get<3>(OnCompleteMetaData))) {
-      NVTX_RANGE(nvtx_, "IndirectOutputBufferCopy");
-      for (auto& indirect_buffer : output.indirect_buffers_) {
-        bool cuda_used;
-        TRITONSERVER_MemoryType src_memory_type;
-        int64_t src_memory_type_id;
-        // placeholder, copy byte size is determined by dst_byte_size
-        size_t src_byte_size;
-        auto src = indirect_buffer.first->BufferAt(
-            0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-        TRITONSERVER_MemoryType dst_memory_type;
-        int64_t dst_memory_type_id;
-        for (auto& payload_output : indirect_buffer.second) {
-          char* dst = payload_output.second->MutableBuffer(
-              &dst_memory_type, &dst_memory_type_id);
-          auto dst_byte_size = payload_output.second->TotalByteSize();
-          (*payloads)[payload_output.first].status_ = CopyBuffer(
-              "indirect buffer", src_memory_type, src_memory_type_id,
-              dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
-              stream_, &cuda_used);
-          src += dst_byte_size;
-          if (cuda_used) {
-            (*payloads)[payload_output.first].status_ = Status(
-                Status::Code::INTERNAL,
-                "unexpected cuda copy from indirect buffer to output buffer");
-          }
-        }
-      }
-    }
+    INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
 
 #ifdef TRITON_ENABLE_STATS
-    // Stop compute timers.
-    for (auto& payload : *payloads) {
-      if (payload.stats_ != nullptr) {
-        payload.stats_->CaptureTimestamp(
-            ModelInferStats::TimestampKind::kComputeEnd);
+
+    // Report stats and trace
+    for (size_t i = 0; i < requests->size(); ++i) {
+      auto& request = (*requests)[i];
+      request->ReportStatistics(
+          metric_reporter_.get(), ((*responses)[i] != nullptr),
+          compute_start_ns, compute_input_end_ns, compute_output_start_ns,
+          compute_end_ns);
+
+#ifdef TRITON_ENABLE_TRACING
+      if (request->Trace() != nullptr) {
+        auto& trace = request->Trace();
+        trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
+        trace->Report(
+            TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
+        trace->Report(
+            TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
+        trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
       }
+#endif  // TRITON_ENABLE_TRACING
     }
+
+    // Also reporting batch stats
+    base->MutableStatsAggregator()->UpdateInferBatchStats(
+        metric_reporter_.get(), total_batch_size, compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 #endif  // TRITON_ENABLE_STATS
 
-    // Just trigger the callback, Payloads are all-set
-    {
-      NVTX_RANGE(nvtx_, "OnComplete callback");
-      OnComplete(Status::Success);
+    // Send all the responses that haven't already been sent because of
+    // an earlier error.
+    for (auto& response : *responses) {
+      if (response != nullptr) {
+        LOG_STATUS_ERROR(
+            InferenceResponse::Send(std::move(response)),
+            "failed to send TRT backend response");
+      }
+    }
+
+    // Release all requests.
+    for (auto& request : *requests) {
+      InferenceRequest::Release(std::move(request));
     }
   }
 }
@@ -2166,14 +2110,17 @@ PlanBackend::Context::DestroyEventSet()
 
 Status
 PlanBackend::Context::GetRequestShapeValues(
-    size_t total_batch_size, const Scheduler::Payload& payload,
+    size_t total_batch_size, const std::unique_ptr<InferenceRequest>& request,
     std::map<int, std::vector<int32_t>>* request_shape_values)
 {
   // Visit all the inputs and extract the shape values present in the request
   Status status;
-  for (const auto& pr : payload.request_->ImmutableInputs()) {
-    const auto input = pr.second;
-    int io_index = engine_->getBindingIndex(input->Name().c_str());
+  for (const auto& pr : request->ImmutableInputs()) {
+    const std::string& input_name = pr.first;
+    const auto& repr_input = pr.second;
+    const auto& batch1_shape = repr_input->Shape();
+
+    int io_index = engine_->getBindingIndex(input_name.c_str());
     if (engine_->isShapeBinding(io_index)) {
       auto it =
           request_shape_values->emplace(io_index, std::vector<int32_t>()).first;
@@ -2184,11 +2131,11 @@ PlanBackend::Context::GetRequestShapeValues(
       // For now being conservative and requiring that shape tensors
       // be in a single buffer on the CPU. We can handle more cases in
       // future if necessary.
-      const auto& data = input->Data();
+      const auto& data = repr_input->Data();
       if (data->BufferCount() != 1) {
         return Status(
             Status::Code::INVALID_ARG,
-            "shape tensor for input '" + input->Name() +
+            "shape tensor for input '" + input_name +
                 "' must be in single contiguous buffer on CPU");
       }
 
@@ -2201,22 +2148,22 @@ PlanBackend::Context::GetRequestShapeValues(
           (data_memory_type == TRITONSERVER_MEMORY_GPU)) {
         return Status(
             Status::Code::INVALID_ARG,
-            "shape tensor for input '" + input->Name() +
+            "shape tensor for input '" + input_name +
                 "' must be in single contiguous buffer on CPU");
       }
 
       // Shape tensors datatype is INT32.
-      const int64_t element_cnt = GetElementCount(input.Shape());
+      const int64_t element_cnt = GetElementCount(batch1_shape);
       const size_t expected_byte_size =
           element_cnt * GetDataTypeByteSize(DataType::TYPE_INT32);
 
       if (expected_byte_size != data_byte_size) {
         return Status(
-            Status::Code::INVALID_ARG,
-            "shape tensor for input '" + input->Name() +
-                "' expected byte size is " +
-                std::to_string(expected_byte_size) + ", got " +
-                std::to_string(data_byte_size));
+            Status::Code::INVALID_ARG, "shape tensor for input '" + input_name +
+                                           "' expected byte size is " +
+                                           std::to_string(expected_byte_size) +
+                                           ", got " +
+                                           std::to_string(data_byte_size));
       }
 
       const int32_t* dims = reinterpret_cast<const int32_t*>(data_buffer);
