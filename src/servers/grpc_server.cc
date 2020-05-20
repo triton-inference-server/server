@@ -1049,9 +1049,14 @@ CommonHandler::SetUpAllRequests()
                                       grpc::Status* status) {
     TRITONSERVER_Error* err = nullptr;
     if (request.repository_name().empty()) {
+      uint32_t flags = TRITONSERVER_INDEX_FLAG_NONE;
+      if (request.ready()) {
+        flags |= TRITONSERVER_INDEX_FLAG_READY;
+      }
+
       TRITONSERVER_Message* model_index_message = nullptr;
       err = TRITONSERVER_ServerModelIndex(
-          tritonserver_.get(), &model_index_message);
+          tritonserver_.get(), flags, &model_index_message);
       if (err == nullptr) {
         const char* buffer;
         size_t byte_size;
@@ -1073,9 +1078,19 @@ CommonHandler::SetUpAllRequests()
             for (const auto& model : model_index_json.GetArray()) {
               auto model_index = response->add_models();
               model_index->set_name(model["name"].GetString());
+              if (model.FindMember("version") != model.MemberEnd()) {
+                model_index->set_version(model["version"].GetString());
+              }
+              if (model.FindMember("state") != model.MemberEnd()) {
+                model_index->set_state(model["state"].GetString());
+              }
+              if (model.FindMember("reason") != model.MemberEnd()) {
+                model_index->set_reason(model["reason"].GetString());
+              }
             }
           }
         }
+
         TRITONSERVER_MessageDelete(model_index_message);
       }
     } else {

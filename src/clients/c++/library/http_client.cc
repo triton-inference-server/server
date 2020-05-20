@@ -649,8 +649,11 @@ InferenceServerHttpClient::ModelRepositoryIndex(
   Error err;
   std::string request_uri(url_ + "/v2/repository/index");
 
+  rapidjson::Document request(rapidjson::kObjectType);
   long http_code;
-  err = Get(request_uri, headers, query_params, repository_index, &http_code);
+  err = Post(
+      request_uri, request, headers, query_params, repository_index,
+      &http_code);
   if ((http_code != 200) && err.IsOk()) {
     return Error(
         "[INTERNAL] Request failed with missing error message in response");

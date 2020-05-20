@@ -68,6 +68,36 @@
 
 namespace nvidia { namespace inferenceserver {
 
+const std::string&
+ModelReadyStateString(ModelReadyState state)
+{
+  switch (state) {
+    case ModelReadyState::UNKNOWN: {
+      static std::string m("UNKNOWN");
+      return m;
+    }
+    case ModelReadyState::READY: {
+      static std::string m("READY");
+      return m;
+    }
+    case ModelReadyState::UNAVAILABLE: {
+      static std::string m("UNAVAILABLE");
+      return m;
+    }
+    case ModelReadyState::LOADING: {
+      static std::string m("LOADING");
+      return m;
+    }
+    case ModelReadyState::UNLOADING: {
+      static std::string m("UNLOADING");
+      return m;
+    }
+  }
+
+  static std::string m("<unknown>");
+  return m;
+}
+
 namespace {
 
 void
@@ -296,16 +326,16 @@ class ModelRepositoryManager::BackendLifeCycle {
   // live if at least one of the versions is not unknown nor unavailable.
   // If 'strict_readiness' is true, a backend is only live if
   // at least one of the versions is ready.
-  const ModelStateMap GetLiveBackendStates(bool strict_readiness = false);
+  const ModelStateMap LiveBackendStates(bool strict_readiness = false);
 
   // Get the ModelStateMap representation of the backends.
-  const ModelStateMap GetBackendStates();
+  const ModelStateMap BackendStates();
 
   // Get the VersionStateMap representation of the specified model.
-  const VersionStateMap GetVersionStates(const std::string& model_name);
+  const VersionStateMap VersionStates(const std::string& model_name);
 
   // Get the state of a specific model version.
-  Status GetModelState(
+  Status ModelState(
       const std::string& model_name, const int64_t model_version,
       ModelReadyState* state);
 
@@ -471,10 +501,10 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates(
+ModelRepositoryManager::BackendLifeCycle::LiveBackendStates(
     bool strict_readiness)
 {
-  LOG_VERBOSE(1) << "GetLiveBackendStates()";
+  LOG_VERBOSE(1) << "LiveBackendStates()";
   std::lock_guard<std::mutex> map_lock(map_mtx_);
   ModelStateMap live_backend_states;
   for (auto& model_version : map_) {
@@ -484,14 +514,13 @@ ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates(
     for (auto& version_backend : model_version.second) {
       std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
       if (strict_readiness &&
-          version_backend.second->state_ != ModelReadyState::MODEL_READY) {
+          version_backend.second->state_ != ModelReadyState::READY) {
         continue;
       }
 
       // At lease one version is live (ready / loading / unloading)
-      if ((version_backend.second->state_ != ModelReadyState::MODEL_UNKNOWN) &&
-          (version_backend.second->state_ !=
-           ModelReadyState::MODEL_UNAVAILABLE)) {
+      if ((version_backend.second->state_ != ModelReadyState::UNKNOWN) &&
+          (version_backend.second->state_ != ModelReadyState::UNAVAILABLE)) {
         live = true;
         version_map[version_backend.first] = std::make_pair(
             version_backend.second->state_,
@@ -507,9 +536,9 @@ ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates(
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::BackendLifeCycle::GetBackendStates()
+ModelRepositoryManager::BackendLifeCycle::BackendStates()
 {
-  LOG_VERBOSE(1) << "GetBackendStates()";
+  LOG_VERBOSE(1) << "BackendStates()";
   std::lock_guard<std::mutex> map_lock(map_mtx_);
   ModelStateMap backend_states;
   for (auto& model_version : map_) {
@@ -524,14 +553,15 @@ ModelRepositoryManager::BackendLifeCycle::GetBackendStates()
 
     backend_states[model_version.first] = std::move(version_map);
   }
+
   return backend_states;
 }
 
 const ModelRepositoryManager::VersionStateMap
-ModelRepositoryManager::BackendLifeCycle::GetVersionStates(
+ModelRepositoryManager::BackendLifeCycle::VersionStates(
     const std::string& model_name)
 {
-  LOG_VERBOSE(1) << "GetVersionStates() '" << model_name << "'";
+  LOG_VERBOSE(1) << "VersionStates() '" << model_name << "'";
   std::lock_guard<std::mutex> map_lock(map_mtx_);
   VersionStateMap version_map;
   auto mit = map_.find(model_name);
@@ -548,7 +578,7 @@ ModelRepositoryManager::BackendLifeCycle::GetVersionStates(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::GetModelState(
+ModelRepositoryManager::BackendLifeCycle::ModelState(
     const std::string& model_name, const int64_t model_version,
     ModelReadyState* state)
 {
@@ -592,7 +622,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
         if (version_backend.first > latest) {
           std::lock_guard<std::recursive_mutex> lock(
               version_backend.second->mtx_);
-          if (version_backend.second->state_ == ModelReadyState::MODEL_READY) {
+          if (version_backend.second->state_ == ModelReadyState::READY) {
             latest = version_backend.first;
             // Tedious, but have to set handle for any "latest" version
             // at the moment to avoid edge case like the following:
@@ -615,7 +645,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
     }
   } else {
     std::lock_guard<std::recursive_mutex> lock(vit->second->mtx_);
-    if (vit->second->state_ == ModelReadyState::MODEL_READY) {
+    if (vit->second->state_ == ModelReadyState::READY) {
       *backend = vit->second->backend_;
     } else {
       return Status(
@@ -646,8 +676,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
         std::make_pair(version, std::unique_ptr<BackendInfo>()));
     if (res.second) {
       res.first->second.reset(new BackendInfo(
-          repository_path, ModelReadyState::MODEL_UNKNOWN,
-          ActionType::NO_ACTION, model_config));
+          repository_path, ModelReadyState::UNKNOWN, ActionType::NO_ACTION,
+          model_config));
     }
   }
 
@@ -732,21 +762,21 @@ ModelRepositoryManager::BackendLifeCycle::Load(
   backend_info->next_action_ = ActionType::NO_ACTION;
 
   switch (backend_info->state_) {
-    case ModelReadyState::MODEL_READY:
+    case ModelReadyState::READY:
       LOG_INFO << "re-loading: " << model_name << ":" << version;
-      backend_info->state_ = ModelReadyState::MODEL_UNLOADING;
+      backend_info->state_ = ModelReadyState::UNLOADING;
       backend_info->state_reason_.clear();
       backend_info->next_action_ = ActionType::LOAD;
       // The load will be triggered once the unload is done (deleter is called)
       backend_info->backend_.reset();
       break;
-    case ModelReadyState::MODEL_LOADING:
-    case ModelReadyState::MODEL_UNLOADING:
+    case ModelReadyState::LOADING:
+    case ModelReadyState::UNLOADING:
       backend_info->next_action_ = ActionType::LOAD;
       break;
     default:
       LOG_INFO << "loading: " << model_name << ":" << version;
-      backend_info->state_ = ModelReadyState::MODEL_LOADING;
+      backend_info->state_ = ModelReadyState::LOADING;
       backend_info->state_reason_.clear();
       {
         std::thread worker(
@@ -771,22 +801,22 @@ ModelRepositoryManager::BackendLifeCycle::Unload(
   backend_info->next_action_ = ActionType::NO_ACTION;
 
   switch (backend_info->state_) {
-    case ModelReadyState::MODEL_READY:
+    case ModelReadyState::READY:
       LOG_INFO << "unloading: " << model_name << ":" << version;
-      backend_info->state_ = ModelReadyState::MODEL_UNLOADING;
+      backend_info->state_ = ModelReadyState::UNLOADING;
       backend_info->state_reason_.clear();
       backend_info->backend_.reset();
       break;
-    case ModelReadyState::MODEL_LOADING:
-    case ModelReadyState::MODEL_UNLOADING:
+    case ModelReadyState::LOADING:
+    case ModelReadyState::UNLOADING:
       backend_info->next_action_ = ActionType::UNLOAD;
       break;
     default:
       status = Status(
-          Status::Code::NOT_FOUND, "tried to unload model '" + model_name +
-                                       "' version " + std::to_string(version) +
-                                       " which is at model state: " +
-                                       std::to_string(backend_info->state_));
+          Status::Code::NOT_FOUND,
+          "tried to unload model '" + model_name + "' version " +
+              std::to_string(version) + " which is at model state: " +
+              ModelReadyStateString(backend_info->state_));
       break;
   }
 
@@ -890,20 +920,20 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             // requests, then the deleter will be called from the request thread
             {
               std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
-              backend_info->state_ = ModelReadyState::MODEL_UNAVAILABLE;
+              backend_info->state_ = ModelReadyState::UNAVAILABLE;
               backend_info->state_reason_ = "unloaded";
               // Check if next action is requested
               this->TriggerNextAction(model_name, version, backend_info);
             }
           }));
-      backend_info->state_ = ModelReadyState::MODEL_READY;
+      backend_info->state_ = ModelReadyState::READY;
       backend_info->state_reason_.clear();
       LOG_INFO << "successfully loaded '" << model_name << "' version "
                << version;
     } else {
       LOG_ERROR << "failed to load '" << model_name << "' version " << version
                 << ": " << status.AsString();
-      backend_info->state_ = ModelReadyState::MODEL_UNAVAILABLE;
+      backend_info->state_ = ModelReadyState::UNAVAILABLE;
       backend_info->state_reason_ = status.AsString();
     }
   }
@@ -994,48 +1024,17 @@ ModelRepositoryManager::Create(
   for (const auto& model : (*model_repository_manager)->infos_) {
     const auto version_states =
         (*model_repository_manager)
-            ->backend_life_cycle_->GetVersionStates(model.first);
+            ->backend_life_cycle_->VersionStates(model.first);
     // Return general error message, detail of each model's loading state
     // is logged separately.
     if (version_states.empty()) {
       return Status(Status::Code::INTERNAL, "failed to load all models");
     }
     for (const auto& state : version_states) {
-      if (state.second.first != ModelReadyState::MODEL_READY) {
+      if (state.second.first != ModelReadyState::READY) {
         return Status(Status::Code::INTERNAL, "failed to load all models");
       }
     }
-  }
-
-  return Status::Success;
-}
-
-Status
-ModelRepositoryManager::GetModelRepositoryIndex(
-    ModelRepositoryIndex* repository_index)
-{
-  std::set<std::string> duplicated_models;
-  std::set<std::string> models;
-  for (const auto& repository_path : repository_paths_) {
-    std::set<std::string> subdirs;
-    RETURN_IF_ERROR(GetDirectorySubdirs(repository_path, &subdirs));
-
-    for (const auto& subdir : subdirs) {
-      if (!models.emplace(subdir).second) {
-        duplicated_models.insert(subdir);
-      }
-    }
-  }
-
-  // If the model is not unique, ignore it as the model can't be loaded anyway.
-  for (const auto& duplicated_model : duplicated_models) {
-    models.erase(duplicated_model);
-  }
-
-  repository_index->Clear();
-  for (const auto& model : models) {
-    auto entry = repository_index->add_models();
-    entry->set_name(model);
   }
 
   return Status::Success;
@@ -1155,7 +1154,7 @@ ModelRepositoryManager::LoadModelByDependency()
                 int64_t version, ModelReadyState state,
                 size_t total_version_cnt) {
               std::lock_guard<std::mutex> lk(model_state->mtx_);
-              if (state == ModelReadyState::MODEL_READY) {
+              if (state == ModelReadyState::READY) {
                 model_state->loaded_versions_.emplace(version);
               } else {
                 model_state->unloaded_versions_.emplace(version);
@@ -1202,7 +1201,7 @@ ModelRepositoryManager::LoadUnloadModel(
   RETURN_IF_ERROR(LoadUnloadModels({model_name}, type, &polled));
 
   // Check if model is loaded / unloaded properly
-  const auto version_states = backend_life_cycle_->GetVersionStates(model_name);
+  const auto version_states = backend_life_cycle_->VersionStates(model_name);
   if (type == ActionType::LOAD) {
     if (version_states.empty()) {
       return Status(
@@ -1228,7 +1227,7 @@ ModelRepositoryManager::LoadUnloadModel(
     for (const auto version : expected_versions) {
       const auto it = version_states.find(version);
       if ((it == version_states.end()) ||
-          (it->second.first != ModelReadyState::MODEL_READY)) {
+          (it->second.first != ModelReadyState::READY)) {
         not_ready_version_str += std::to_string(version);
         not_ready_version_str += ",";
       }
@@ -1243,7 +1242,7 @@ ModelRepositoryManager::LoadUnloadModel(
   } else {
     std::string ready_version_str;
     for (const auto& version_state : version_states) {
-      if (version_state.second.first == ModelReadyState::MODEL_READY) {
+      if (version_state.second.first == ModelReadyState::READY) {
         ready_version_str += std::to_string(version_state.first);
         ready_version_str += ",";
       }
@@ -1363,29 +1362,79 @@ ModelRepositoryManager::UnloadAllModels()
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::GetLiveBackendStates(bool strict_readiness)
+ModelRepositoryManager::LiveBackendStates(bool strict_readiness)
 {
-  return backend_life_cycle_->GetLiveBackendStates(strict_readiness);
+  return backend_life_cycle_->LiveBackendStates(strict_readiness);
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::GetBackendStates()
+ModelRepositoryManager::BackendStates()
 {
-  return backend_life_cycle_->GetBackendStates();
+  return backend_life_cycle_->BackendStates();
 }
 
 const ModelRepositoryManager::VersionStateMap
-ModelRepositoryManager::GetVersionStates(const std::string& model_name)
+ModelRepositoryManager::VersionStates(const std::string& model_name)
 {
-  return backend_life_cycle_->GetVersionStates(model_name);
+  return backend_life_cycle_->VersionStates(model_name);
 }
 
 Status
-ModelRepositoryManager::GetModelState(
+ModelRepositoryManager::ModelState(
     const std::string& model_name, const int64_t model_version,
     ModelReadyState* state)
 {
-  return backend_life_cycle_->GetModelState(model_name, model_version, state);
+  return backend_life_cycle_->ModelState(model_name, model_version, state);
+}
+
+Status
+ModelRepositoryManager::RepositoryIndex(
+    const bool ready_only, std::vector<ModelIndex>* index)
+{
+  std::set<std::string> seen_models;
+  std::set<std::string> duplicate_models;
+  for (const auto& repository_path : repository_paths_) {
+    std::set<std::string> subdirs;
+    RETURN_IF_ERROR(GetDirectorySubdirs(repository_path, &subdirs));
+    for (const auto& subdir : subdirs) {
+      if (seen_models.find(subdir) != seen_models.end()) {
+        duplicate_models.insert(subdir);
+      }
+
+      seen_models.insert(subdir);
+    }
+  }
+
+  ModelStateMap states = BackendStates();
+
+  for (const auto& model : seen_models) {
+    // If the same model appears in multiple repostories then show it
+    // as unavailable since duplicate models are not allowed to load.
+    if (duplicate_models.find(model) != duplicate_models.end()) {
+      index->emplace_back(
+          model, -1 /* version */, ModelReadyState::UNAVAILABLE,
+          MODEL_READY_REASON_DUPLICATE);
+      continue;
+    }
+
+    // If there is any version/state/reason associated with the model
+    // then include that in the index.
+    auto sitr = states.find(model);
+    if (sitr == states.end()) {
+      if (!ready_only) {
+        index->emplace_back(model);
+      }
+    } else {
+      for (const auto& pr : sitr->second) {
+        if (!ready_only || (pr.second.first == ModelReadyState::READY)) {
+          index->emplace_back(
+              model, pr.first, pr.second.first, pr.second.second);
+        }
+      }
+    }
+  }
+
+  return Status::Success;
 }
 
 Status
