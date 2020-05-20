@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+
 #include "src/core/logging.h"
 #include "src/servers/common.h"
 
@@ -309,10 +310,12 @@ SharedMemoryManager::UnregisterAll()
   std::string error_message =
       "Failed to unregister the following shared memory regions: ";
   std::vector<std::string> unregister_fails;
-  for (const auto& shm_info : shared_memory_map_) {
-    TRITONSERVER_Error* err = UnregisterHelper(shm_info.first);
+  for (auto it = shared_memory_map_.cbegin(), next_it = it;
+       it != shared_memory_map_.cend(); it = next_it) {
+    ++next_it;
+    TRITONSERVER_Error* err = UnregisterHelper(it->first);
     if (err != nullptr) {
-      unregister_fails.push_back(shm_info.first);
+      unregister_fails.push_back(it->first);
     }
   }
 
@@ -582,21 +585,26 @@ SharedMemoryManager::UnregisterAll(TRITONSERVER_Memory_Type memory_type)
   if (memory_type == TRITONSERVER_MEMORY_CPU) {
     // Serialize all operations that write/read current shared memory regions
     error_message += "system shared memory regions: ";
-    for (const auto& shm_info : shared_memory_map_) {
-      if (shm_info.second->kind_ == TRITONSERVER_MEMORY_CPU) {
-        TRITONSERVER_Error* err = UnregisterHelper(shm_info.first, memory_type);
+    LOG_INFO << "Shared memory count: " << shared_memory_map_.size();
+    for (auto it = shared_memory_map_.cbegin(), next_it = it;
+         it != shared_memory_map_.cend(); it = next_it) {
+      ++next_it;
+      if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
+        TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
         if (err != nullptr) {
-          unregister_fails.push_back(shm_info.first);
+          unregister_fails.push_back(it->first);
         }
       }
     }
   } else if (memory_type == TRITONSERVER_MEMORY_GPU) {
     error_message += "cuda shared memory regions: ";
-    for (const auto& shm_info : shared_memory_map_) {
-      if (shm_info.second->kind_ == TRITONSERVER_MEMORY_GPU) {
-        TRITONSERVER_Error* err = UnregisterHelper(shm_info.first, memory_type);
+    for (auto it = shared_memory_map_.cbegin(), next_it = it;
+         it != shared_memory_map_.cend(); it = next_it) {
+      ++next_it;
+      if (it->second->kind_ == TRITONSERVER_MEMORY_GPU) {
+        TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
         if (err != nullptr) {
-          unregister_fails.push_back(shm_info.first);
+          unregister_fails.push_back(it->first);
         }
       }
     }
