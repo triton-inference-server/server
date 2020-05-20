@@ -329,8 +329,11 @@ message ModelInferResponse
     // The tensor shape.
     repeated int64 shape = 3;
 
+    // Tensor parameters.
+    map<string, InferParameter> parameters = 4;
+
     // The output tensor data.
-    InferTensorContents contents = 4;
+    InferTensorContents contents = 5;
   }
 
   // The name of the model used for inference.
