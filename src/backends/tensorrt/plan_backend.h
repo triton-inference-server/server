@@ -232,8 +232,9 @@ class PlanBackend : public InferenceBackend {
     // Assume that the lifetime of the payload is extended until the completion
     // callback is called
     SyncQueue<std::tuple<
-        InferenceBackend*, size_t, const uint64_t, const size_t,
-        std::vector<std::unique_ptr<InferenceRequest>>*,
+        InferenceBackend*, size_t, const uint64_t, const uint64_t,
+        const uint64_t, const size_t,
+        std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>>,
         std::shared_ptr<std::vector<std::unique_ptr<InferenceResponse>>>>>
         completion_queue_;
 
@@ -268,7 +269,10 @@ class PlanBackend : public InferenceBackend {
     std::vector<void*> buffer_bindings_;
 
     size_t total_batch_size_;
-    std::vector<std::unique_ptr<InferenceRequest>>* requests_;
+    uint64_t compute_start_ns_;
+    uint64_t compute_input_end_ns_;
+    uint64_t compute_output_start_ns_;
+    std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>> requests_;
     std::shared_ptr<std::vector<std::unique_ptr<InferenceResponse>>> responses_;
   };
 
