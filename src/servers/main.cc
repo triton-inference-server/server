@@ -57,16 +57,10 @@ static_assert(
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server.h"
 #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
-#if defined(TRTIS_ENABLE_HTTP_V2) || defined(TRTIS_ENABLE_METRICS)
-#include "src/servers/http_server_v2.h"
-#endif  // TRTIS_ENABLE_HTTP_V2|| TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
 #endif  // TRTIS_ENABLE_GRPC
-#ifdef TRTIS_ENABLE_GRPC_V2
-#include "src/servers/grpc_server_v2.h"
-#endif  // TRTIS_ENABLE_GRPC_V2
 
 namespace {
 
@@ -83,9 +77,6 @@ int32_t repository_poll_secs_ = 15;
 // Whether explicit model control is allowed
 bool allow_model_control_ = false;
 
-// Default to using the V1 protocol.
-int32_t api_version_ = 1;
-
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
 // default values and modifyied based on command-line args. Set to -1
 // to indicate the protocol is disabled.
@@ -95,33 +86,21 @@ std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
 std::vector<std::string> endpoint_names = {
     "status",    "health", "infer", "modelcontrol", "sharedmemorycontrol",
     "repository"};
-#endif  // TRTIS_ENABLE_HTTP
-#ifdef TRTIS_ENABLE_HTTP_V2
-std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>
-    http_services_v2_;
-std::vector<std::string> endpoint_names_v2 = {"health", "infer"};
-#endif  // TRTIS_ENABLE_HTTP_V2
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
+
 bool allow_http_ = true;
 int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
-#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
+#endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
-#endif  // TRTIS_ENABLE_GRPC
-#ifdef TRTIS_ENABLE_GRPC_V2
-std::unique_ptr<nvidia::inferenceserver::GRPCServerV2> grpc_service_v2_;
-#endif  // TRTIS_ENABLE_GRPC_V2
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
 bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
-#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
-std::unique_ptr<nvidia::inferenceserver::HTTPServerV2> metrics_service_v2_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
 #endif  // TRTIS_ENABLE_METRICS
@@ -132,7 +111,7 @@ auto trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
 #endif  // TRTIS_ENABLE_TRACING
 
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+#if defined(TRTIS_ENABLE_GRPC)
 // The number of threads to initialize for handling GRPC infer
 // requests.
 int grpc_infer_thread_cnt_ = 1;
@@ -146,12 +125,12 @@ int grpc_stream_infer_thread_cnt_ = 1;
 // requests doesn't exceed this value there will be no
 // allocation/deallocation of request/response objects.
 int grpc_infer_allocation_pool_size_ = 8;
-#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC
 
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
+#if defined(TRTIS_ENABLE_HTTP)
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
-#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
+#endif  // TRTIS_ENABLE_HTTP
 
 // Command-line options
 enum OptionId {
@@ -167,20 +146,19 @@ enum OptionId {
   OPTION_EXIT_ON_ERROR,
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
-  OPTION_API_VERSION,
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
+#if defined(TRTIS_ENABLE_HTTP)
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_PORT,
   OPTION_HTTP_HEALTH_PORT,
   OPTION_HTTP_THREAD_COUNT,
-#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+#endif  // TRTIS_ENABLE_HTTP
+#if defined(TRTIS_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
   OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
-#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC
 #ifdef TRTIS_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
@@ -261,10 +239,7 @@ std::vector<Option> options_
        "is responsive and all models are available. If false "
        "/api/health/ready endpoint indicates ready if server is responsive "
        "even if some/all models are unavailable."},
-      {OPTION_API_VERSION, "api-version",
-       "Version of the GRPC/HTTP API to use. Default is version 1. Allowed "
-       "versions are 1 and 2."},
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
+#if defined(TRTIS_ENABLE_HTTP)
       {OPTION_ALLOW_HTTP, "allow-http",
        "Allow the server to listen for HTTP requests."},
       {OPTION_HTTP_PORT, "http-port",
@@ -273,8 +248,8 @@ std::vector<Option> options_
        "The port for the server to listen on for HTTP Health requests."},
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
        "Number of threads handling HTTP requests."},
-#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+#endif  // TRTIS_ENABLE_HTTP
+#if defined(TRTIS_ENABLE_GRPC)
       {OPTION_ALLOW_GRPC, "allow-grpc",
        "Allow the server to listen for GRPC requests."},
       {OPTION_GRPC_PORT, "grpc-port",
@@ -289,7 +264,7 @@ std::vector<Option> options_
        "allocated for reuse. As long as the number of in-flight requests "
        "doesn't exceed this value there will be no allocation/deallocation of "
        "request/response objects."},
-#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC
 #ifdef TRTIS_ENABLE_METRICS
       {OPTION_ALLOW_METRICS, "allow-metrics",
        "Allow the server to provide prometheus metrics."},
@@ -403,8 +378,7 @@ SignalHandler(int signum)
 bool
 CheckPortCollision()
 {
-#if (defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)) && \
-    (defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2))
+#if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_GRPC)
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
        http_ports_.end()) &&
@@ -413,11 +387,9 @@ CheckPortCollision()
               << "and GRPC requests at the same port" << std::endl;
     return true;
   }
-#endif  // (TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2) && (TRTIS_ENABLE_GRPC ||
-        // TRTIS_ENABLE_GRPC_V2)
+#endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_GRPC
 
-#if (defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)) && \
-    defined(TRTIS_ENABLE_METRICS)
+#if defined(TRTIS_ENABLE_GRPC) && defined(TRTIS_ENABLE_METRICS)
   // Check if Metric and GRPC have shared ports
   if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
       allow_metrics_) {
@@ -425,7 +397,7 @@ CheckPortCollision()
               << "GRPC requests" << std::endl;
     return true;
   }
-#endif  // (TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2) && TRTIS_ENABLE_METRICS
+#endif  // TRTIS_ENABLE_GRPC && TRTIS_ENABLE_METRICS
 
 #if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_METRICS)
   // Check if Metric and HTTP have shared ports
@@ -465,30 +437,6 @@ StartGrpcService(
 }
 #endif  // TRTIS_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_GRPC_V2
-TRITONSERVER_Error*
-StartGrpcServiceV2(
-    std::unique_ptr<nvidia::inferenceserver::GRPCServerV2>* service,
-    const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
-    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
-        shm_manager)
-{
-  TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServerV2::Create(
-      server, trace_manager, shm_manager, grpc_port_,
-      grpc_infer_allocation_pool_size_, service);
-  if (err == nullptr) {
-    err = (*service)->Start();
-  }
-
-  if (err != nullptr) {
-    service->reset();
-  }
-
-  return err;
-}
-#endif  // TRTIS_ENABLE_GRPC_V2
-
 #ifdef TRTIS_ENABLE_HTTP
 TRTSERVER_Error*
 StartHttpService(
@@ -521,41 +469,6 @@ StartHttpService(
 }
 #endif  // TRTIS_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_HTTP_V2
-TRITONSERVER_Error*
-StartHttpV2Service(
-    std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>*
-        services,
-    const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
-    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
-        shm_manager,
-    std::map<int32_t, std::vector<std::string>>& port_map)
-{
-  TRITONSERVER_Error* err =
-      nvidia::inferenceserver::HTTPServerV2::CreateAPIServer(
-          server, trace_manager, shm_manager, port_map, http_thread_cnt_,
-          services);
-  if (err == nullptr) {
-    for (auto& http_eps : *services) {
-      if (http_eps != nullptr) {
-        err = http_eps->Start();
-      }
-    }
-  }
-
-  if (err != nullptr) {
-    for (auto& http_eps : *services) {
-      if (http_eps != nullptr) {
-        http_eps.reset();
-      }
-    }
-  }
-
-  return err;
-}
-#endif  // TRTIS_ENABLE_HTTP_V2
-
 #ifdef TRTIS_ENABLE_METRICS
 TRTSERVER_Error*
 StartMetricsService(
@@ -574,70 +487,22 @@ StartMetricsService(
 
   return err;
 }
-
-TRITONSERVER_Error*
-StartMetricsV2Service(
-    std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>* service,
-    const std::shared_ptr<TRITONSERVER_Server>& server)
-{
-  TRITONSERVER_Error* err =
-      nvidia::inferenceserver::HTTPServerV2::CreateMetricsServer(
-          server, metrics_port_, 1 /* HTTP thread count */, service);
-  if (err == nullptr) {
-    err = (*service)->Start();
-  }
-  if (err != nullptr) {
-    service->reset();
-  }
-
-  return err;
-}
 #endif  // TRTIS_ENABLE_METRICS
 
 bool
 StartEndpoints(
-    const std::shared_ptr<TRITONSERVER_Server>& server,
     const std::shared_ptr<TRTSERVER_Server>& trt_server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
-  if (api_version_ == 1) {
-    const char* id;
-    FAIL_IF_ERR(TRTSERVER_ServerId(trt_server.get(), &id), "getting server ID");
-    std::cout << "Starting endpoints, '" << id << "' listening on" << std::endl;
-  } else {
-    TRITONSERVER_Message* message = nullptr;
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerMetadata(server.get(), &message),
-        "failed to get server metadata message");
-    const char* buffer;
-    size_t byte_size;
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size),
-        "failed to get server metadata json string");
-    rapidjson::Document server_metadata_json;
-    server_metadata_json.Parse(buffer, byte_size);
-    if (server_metadata_json.HasParseError()) {
-      FAIL_IF_TRITON_ERR(
-          TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              std::string(
-                  "failed to parse the server metadata JSON buffer: " +
-                  std::string(
-                      GetParseError_En(server_metadata_json.GetParseError())) +
-                  " at " +
-                  std::to_string(server_metadata_json.GetErrorOffset()))
-                  .c_str()),
-          "");
-    }
-    std::cout << "Starting endpoints, '"
-              << server_metadata_json["name"].GetString() << "' listening on"
-              << std::endl;
-  }
+  const char* id;
+  FAIL_IF_ERR(TRTSERVER_ServerId(trt_server.get(), &id), "getting server ID");
+  std::cout << "Starting endpoints, '" << id << "' listening on" << std::endl;
+
 #ifdef TRTIS_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
-  if (allow_grpc_ && (api_version_ == 1) && (grpc_port_ != -1)) {
+  if (allow_grpc_ && (grpc_port_ != -1)) {
     TRTSERVER_Error* err = StartGrpcService(
         &grpc_service_, trt_server, trace_manager, shm_manager);
     if (err != nullptr) {
@@ -647,21 +512,9 @@ StartEndpoints(
   }
 #endif  // TRTIS_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_GRPC_V2
-  // Enable GRPC V2 endpoints if requested...
-  if (allow_grpc_ && (api_version_ == 2) && (grpc_port_ != -1)) {
-    TRITONSERVER_Error* err = StartGrpcServiceV2(
-        &grpc_service_v2_, server, trace_manager, shm_manager);
-    if (err != nullptr) {
-      LOG_TRITONSERVER_ERROR(err, "failed to start GRPC V2 service");
-      return false;
-    }
-  }
-#endif  // TRTIS_ENABLE_GRPC_V2
-
 #ifdef TRTIS_ENABLE_HTTP
   // Enable HTTP endpoints if requested...
-  if (allow_http_ && (api_version_ == 1)) {
+  if (allow_http_) {
     std::map<int32_t, std::vector<std::string>> port_map;
 
     // Group by port numbers
@@ -680,43 +533,13 @@ StartEndpoints(
   }
 #endif  // TRTIS_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_HTTP_V2
-  // Enable HTTP endpoints if requested...
-  if (allow_http_ && (api_version_ == 2)) {
-    std::map<int32_t, std::vector<std::string>> port_map;
-
-    // Group by port numbers
-    for (size_t i = 0; i < http_ports_.size(); i++) {
-      if (http_ports_[i] != -1) {
-        port_map[http_ports_[i]].push_back(endpoint_names_v2[i]);
-      }
-    }
-
-    TRITONSERVER_Error* err = StartHttpV2Service(
-        &http_services_v2_, server, trace_manager, shm_manager, port_map);
-    if (err != nullptr) {
-      LOG_TRITONSERVER_ERROR(err, "failed to start HTTP V2 service");
-      return false;
-    }
-  }
-#endif  // TRTIS_ENABLE_HTTP_V2
-
 #ifdef TRTIS_ENABLE_METRICS
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
-    if (api_version_ == 1) {
-      TRTSERVER_Error* err = StartMetricsService(&metrics_service_, trt_server);
-      if (err != nullptr) {
-        LOG_TRTSERVER_ERROR(err, "failed to start Metrics service");
-        return false;
-      }
-    } else if (api_version_ == 2) {
-      TRITONSERVER_Error* err =
-          StartMetricsV2Service(&metrics_service_v2_, server);
-      if (err != nullptr) {
-        LOG_TRITONSERVER_ERROR(err, "failed to start Metrics V2 service");
-        return false;
-      }
+    TRTSERVER_Error* err = StartMetricsService(&metrics_service_, trt_server);
+    if (err != nullptr) {
+      LOG_TRTSERVER_ERROR(err, "failed to start Metrics service");
+      return false;
     }
   }
 #endif  // TRTIS_ENABLE_METRICS
@@ -743,20 +566,6 @@ StopEndpoints()
   http_services_.clear();
 #endif  // TRTIS_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_HTTP_V2
-  for (auto& http_eps : http_services_v2_) {
-    if (http_eps != nullptr) {
-      TRITONSERVER_Error* err = http_eps->Stop();
-      if (err != nullptr) {
-        LOG_TRITONSERVER_ERROR(err, "failed to stop HTTP V2 service");
-        ret = false;
-      }
-    }
-  }
-
-  http_services_v2_.clear();
-#endif  // TRTIS_ENABLE_HTTP_V2
-
 #ifdef TRTIS_ENABLE_GRPC
   if (grpc_service_) {
     TRTSERVER_Error* err = grpc_service_->Stop();
@@ -769,18 +578,6 @@ StopEndpoints()
   }
 #endif  // TRTIS_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_GRPC_V2
-  if (grpc_service_v2_) {
-    TRITONSERVER_Error* err = grpc_service_v2_->Stop();
-    if (err != nullptr) {
-      LOG_TRITONSERVER_ERROR(err, "failed to stop GRPC V2 service");
-      ret = false;
-    }
-
-    grpc_service_v2_.reset();
-  }
-#endif  // TRTIS_ENABLE_GRPC_V2
-
 #ifdef TRTIS_ENABLE_METRICS
   if (metrics_service_) {
     TRTSERVER_Error* err = metrics_service_->Stop();
@@ -790,16 +587,6 @@ StopEndpoints()
     }
 
     metrics_service_.reset();
-  }
-
-  if (metrics_service_v2_) {
-    TRITONSERVER_Error* err = metrics_service_v2_->Stop();
-    if (err != nullptr) {
-      LOG_TRITONSERVER_ERROR(err, "failed to stop Metrics V2 service");
-      ret = false;
-    }
-
-    metrics_service_v2_.reset();
   }
 #endif  // TRTIS_ENABLE_METRICS
 
@@ -1056,24 +843,18 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   double min_supported_compute_capability = 0;
 #endif  // TRTIS_ENABLE_GPU
 
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
+#if defined(TRTIS_ENABLE_HTTP)
   int32_t http_port = http_port_;
   int32_t http_thread_cnt = http_thread_cnt_;
   int32_t http_health_port = http_port_;
-#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
+#endif  // TRTIS_ENABLE_HTTP
 
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+#if defined(TRTIS_ENABLE_GRPC)
   int32_t grpc_port = grpc_port_;
   int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
   int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
-#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
-
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_GRPC)
-  int32_t api_version = 1;
-#else
-  int32_t api_version = 2;
-#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_GRPC
+#endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
@@ -1146,11 +927,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_STRICT_READINESS:
         strict_readiness = ParseBoolOption(optarg);
         break;
-      case OPTION_API_VERSION:
-        api_version = ParseIntOption(optarg);
-        break;
 
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
+#if defined(TRTIS_ENABLE_HTTP)
       case OPTION_ALLOW_HTTP:
         allow_http_ = ParseBoolOption(optarg);
         break;
@@ -1166,7 +944,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
 #endif  // TRTIS_ENABLE_HTTP
 
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+#if defined(TRTIS_ENABLE_GRPC)
       case OPTION_ALLOW_GRPC:
         allow_grpc_ = ParseBoolOption(optarg);
         break;
@@ -1182,7 +960,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
         grpc_infer_allocation_pool_size = ParseIntOption(optarg);
         break;
-#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
       case OPTION_ALLOW_METRICS:
@@ -1313,26 +1091,20 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     }
   }
 
-  api_version_ = api_version;
-
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
+#if defined(TRTIS_ENABLE_HTTP)
   http_port_ = http_port;
   http_health_port_ = http_health_port;
   http_thread_cnt_ = http_thread_cnt;
-  if (api_version_ == 2) {
-    http_ports_ = {http_health_port_, http_port_};
-  } else {
-    http_ports_ = {http_port_, http_health_port_, http_port_,
-                   http_port_, http_port_,        http_port_};
-  }
-#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
+  http_ports_ = {http_port_, http_health_port_, http_port_,
+                 http_port_, http_port_,        http_port_};
+#endif  // TRTIS_ENABLE_HTTP
 
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+#if defined(TRTIS_ENABLE_GRPC)
   grpc_port_ = grpc_port;
   grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
   grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
-#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
   metrics_port_ = allow_metrics_ ? metrics_port : -1;
@@ -1349,221 +1121,126 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   if (CheckPortCollision())
     return false;
 
-  // Highly duplicated code conditioned by api_version,
-  // just remove the api_version 1 case when dropping TRTSERVER API
-  if (api_version == 1) {
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsNew(
-            reinterpret_cast<TRTSERVER_ServerOptions**>(server_options)),
-        "creating server options");
-    auto loptions = reinterpret_cast<TRTSERVER_ServerOptions*>(*server_options);
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsNew(
+          reinterpret_cast<TRTSERVER_ServerOptions**>(server_options)),
+      "creating server options");
+  auto loptions = reinterpret_cast<TRTSERVER_ServerOptions*>(*server_options);
 
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetServerId(loptions, server_id.c_str()),
+      "setting server ID");
+#if defined(TRTIS_ENABLE_GRPC)
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetServerProtocolVersion(
+          loptions, 1 /* api_version */),
+      "setting server protocol version");
+#endif  // TRTIS_ENABLE_GRPC
+  for (const auto& model_repository_path : model_repository_paths) {
     FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetServerId(loptions, server_id.c_str()),
-        "setting server ID");
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetServerProtocolVersion(loptions, api_version),
-        "setting server protocol version");
-#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
-    for (const auto& model_repository_path : model_repository_paths) {
-      FAIL_IF_ERR(
-          TRTSERVER_ServerOptionsSetModelRepositoryPath(
-              loptions, model_repository_path.c_str()),
-          "setting model repository path");
-    }
-    TRTSERVER_Model_Control_Mode trt_control_mode;
-    switch (control_mode) {
-      case TRITONSERVER_MODEL_CONTROL_EXPLICIT:
-        trt_control_mode = TRTSERVER_MODEL_CONTROL_EXPLICIT;
-        break;
-      case TRITONSERVER_MODEL_CONTROL_POLL:
-        trt_control_mode = TRTSERVER_MODEL_CONTROL_POLL;
-        break;
-      case TRITONSERVER_MODEL_CONTROL_NONE:
-      default:
-        trt_control_mode = TRTSERVER_MODEL_CONTROL_NONE;
-        break;
-    }
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetModelControlMode(loptions, trt_control_mode),
-        "setting model control mode");
-    for (const auto& model : startup_models_) {
-      FAIL_IF_ERR(
-          TRTSERVER_ServerOptionsSetStartupModel(loptions, model.c_str()),
-          "setting startup model");
-    }
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
-            loptions, pinned_memory_pool_byte_size),
-        "setting total pinned memory byte size");
-    for (const auto& cuda_pool : cuda_pools) {
-      FAIL_IF_ERR(
-          TRTSERVER_ServerOptionsSetCudaMemoryPoolByteSize(
-              loptions, cuda_pool.first, cuda_pool.second),
-          "setting total CUDA memory byte size");
-    }
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetMinSupportedComputeCapability(
-            loptions, min_supported_compute_capability),
-        "setting minimum supported CUDA compute capability");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetExitOnError(loptions, exit_on_error),
-        "setting exit on error");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetStrictModelConfig(
-            loptions, strict_model_config),
-        "setting strict model configuration");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetStrictReadiness(loptions, strict_readiness),
-        "setting strict readiness");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetExitTimeout(
-            loptions, std::max(0, exit_timeout_secs)),
-        "setting exit timeout");
-
-#ifdef TRTIS_ENABLE_LOGGING
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetLogInfo(loptions, log_info),
-        "setting log info enable");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetLogWarn(loptions, log_warn),
-        "setting log warn enable");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetLogError(loptions, log_error),
-        "setting log error enable");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetLogVerbose(loptions, log_verbose),
-        "setting log verbose level");
-#endif  // TRTIS_ENABLE_LOGGING
-
-#ifdef TRTIS_ENABLE_METRICS
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetMetrics(loptions, allow_metrics_),
-        "setting metrics enable");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics),
-        "setting GPU metrics enable");
-#endif  // TRTIS_ENABLE_METRICS
-
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(
-            loptions, tf_allow_soft_placement),
-        "setting tensorflow soft placement");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
-            loptions, tf_gpu_memory_fraction),
-        "setting tensorflow GPU memory fraction");
-    for (const auto& tf_vgpu : tf_vgpus) {
-      FAIL_IF_ERR(
-          TRTSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
-              loptions, tf_vgpu.gpu_device_, tf_vgpu.num_vgpus_,
-              tf_vgpu.mem_limit_mbytes_),
-          "adding tensorflow VGPU instances");
-    }
-  } else {
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsNew(server_options),
-        "creating server options");
-    auto loptions = *server_options;
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetServerId(loptions, server_id.c_str()),
-        "setting server ID");
-    for (const auto& model_repository_path : model_repository_paths) {
-      FAIL_IF_TRITON_ERR(
-          TRITONSERVER_ServerOptionsSetModelRepositoryPath(
-              loptions, model_repository_path.c_str()),
-          "setting model repository path");
-    }
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetModelControlMode(loptions, control_mode),
-        "setting model control mode");
-    for (const auto& model : startup_models_) {
-      FAIL_IF_TRITON_ERR(
-          TRITONSERVER_ServerOptionsSetStartupModel(loptions, model.c_str()),
-          "setting startup model");
-    }
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
-            loptions, pinned_memory_pool_byte_size),
-        "setting total pinned memory byte size");
-    for (const auto& cuda_pool : cuda_pools) {
-      FAIL_IF_TRITON_ERR(
-          TRITONSERVER_ServerOptionsSetCudaMemoryPoolByteSize(
-              loptions, cuda_pool.first, cuda_pool.second),
-          "setting total CUDA memory byte size");
-    }
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
-            loptions, min_supported_compute_capability),
-        "setting minimum supported CUDA compute capability");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetExitOnError(loptions, exit_on_error),
-        "setting exit on error");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetStrictModelConfig(
-            loptions, strict_model_config),
-        "setting strict model configuration");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetStrictReadiness(
-            loptions, strict_readiness),
-        "setting strict readiness");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetExitTimeout(
-            loptions, std::max(0, exit_timeout_secs)),
-        "setting exit timeout");
-
-#ifdef TRTIS_ENABLE_LOGGING
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetLogInfo(loptions, log_info),
-        "setting log info enable");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetLogWarn(loptions, log_warn),
-        "setting log warn enable");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetLogError(loptions, log_error),
-        "setting log error enable");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetLogVerbose(loptions, log_verbose),
-        "setting log verbose level");
-#endif  // TRTIS_ENABLE_LOGGING
-
-#ifdef TRTIS_ENABLE_METRICS
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetMetrics(loptions, allow_metrics_),
-        "setting metrics enable");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics),
-        "setting GPU metrics enable");
-#endif  // TRTIS_ENABLE_METRICS
-
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetTensorFlowSoftPlacement(
-            loptions, tf_allow_soft_placement),
-        "setting tensorflow soft placement");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
-            loptions, tf_gpu_memory_fraction),
-        "setting tensorflow GPU memory fraction");
-    for (const auto& tf_vgpu : tf_vgpus) {
-      FAIL_IF_TRITON_ERR(
-          TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
-              loptions, tf_vgpu.gpu_device_, tf_vgpu.num_vgpus_,
-              tf_vgpu.mem_limit_mbytes_),
-          "adding tensorflow VGPU instances");
-    }
+        TRTSERVER_ServerOptionsSetModelRepositoryPath(
+            loptions, model_repository_path.c_str()),
+        "setting model repository path");
   }
+
+  TRTSERVER_Model_Control_Mode trt_control_mode;
+  switch (control_mode) {
+    case TRITONSERVER_MODEL_CONTROL_EXPLICIT:
+      trt_control_mode = TRTSERVER_MODEL_CONTROL_EXPLICIT;
+      break;
+    case TRITONSERVER_MODEL_CONTROL_POLL:
+      trt_control_mode = TRTSERVER_MODEL_CONTROL_POLL;
+      break;
+    case TRITONSERVER_MODEL_CONTROL_NONE:
+    default:
+      trt_control_mode = TRTSERVER_MODEL_CONTROL_NONE;
+      break;
+  }
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetModelControlMode(loptions, trt_control_mode),
+      "setting model control mode");
+  for (const auto& model : startup_models_) {
+    FAIL_IF_ERR(
+        TRTSERVER_ServerOptionsSetStartupModel(loptions, model.c_str()),
+        "setting startup model");
+  }
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
+          loptions, pinned_memory_pool_byte_size),
+      "setting total pinned memory byte size");
+  for (const auto& cuda_pool : cuda_pools) {
+    FAIL_IF_ERR(
+        TRTSERVER_ServerOptionsSetCudaMemoryPoolByteSize(
+            loptions, cuda_pool.first, cuda_pool.second),
+        "setting total CUDA memory byte size");
+  }
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetMinSupportedComputeCapability(
+          loptions, min_supported_compute_capability),
+      "setting minimum supported CUDA compute capability");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetExitOnError(loptions, exit_on_error),
+      "setting exit on error");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetStrictModelConfig(
+          loptions, strict_model_config),
+      "setting strict model configuration");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetStrictReadiness(loptions, strict_readiness),
+      "setting strict readiness");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetExitTimeout(
+          loptions, std::max(0, exit_timeout_secs)),
+      "setting exit timeout");
+
+#ifdef TRTIS_ENABLE_LOGGING
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogInfo(loptions, log_info),
+      "setting log info enable");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogWarn(loptions, log_warn),
+      "setting log warn enable");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogError(loptions, log_error),
+      "setting log error enable");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogVerbose(loptions, log_verbose),
+      "setting log verbose level");
+#endif  // TRTIS_ENABLE_LOGGING
+
+#ifdef TRTIS_ENABLE_METRICS
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetMetrics(loptions, allow_metrics_),
+      "setting metrics enable");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics),
+      "setting GPU metrics enable");
+#endif  // TRTIS_ENABLE_METRICS
+
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(
+          loptions, tf_allow_soft_placement),
+      "setting tensorflow soft placement");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
+          loptions, tf_gpu_memory_fraction),
+      "setting tensorflow GPU memory fraction");
+  for (const auto& tf_vgpu : tf_vgpus) {
+    FAIL_IF_ERR(
+        TRTSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
+            loptions, tf_vgpu.gpu_device_, tf_vgpu.num_vgpus_,
+            tf_vgpu.mem_limit_mbytes_),
+        "adding tensorflow VGPU instances");
+  }
+
   return true;
 }
+
 }  // namespace
 
 int
 main(int argc, char** argv)
 {
-  // FIXMEV2 currently casting server_ptr / server_options for corresponding
-  // api version: TRTSERVER_XXX for v1, TRITONSERVER_XXX for v2
-  // Parse command-line to create the options for the inference
-  // server.
   TRITONSERVER_ServerOptions* server_options = nullptr;
   if (!Parse(&server_options, argc, argv)) {
     exit(1);
@@ -1577,36 +1254,19 @@ main(int argc, char** argv)
       std::make_shared<nvidia::inferenceserver::SharedMemoryManager>();
 
   // Create the server...
-  TRITONSERVER_Server* server_ptr = nullptr;
-  if (api_version_ == 1) {
-    FAIL_IF_ERR(
-        TRTSERVER_ServerNew(
-            reinterpret_cast<TRTSERVER_Server**>(&server_ptr),
-            reinterpret_cast<TRTSERVER_ServerOptions*>(server_options)),
-        "creating server");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsDelete(
-            reinterpret_cast<TRTSERVER_ServerOptions*>(server_options)),
-        "deleting server options");
-  } else {
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerNew(&server_ptr, server_options), "creating server");
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_ServerOptionsDelete(server_options),
-        "deleting server options");
-  }
+  TRTSERVER_Server* server_ptr = nullptr;
+  FAIL_IF_ERR(
+      TRTSERVER_ServerNew(
+          reinterpret_cast<TRTSERVER_Server**>(&server_ptr),
+          reinterpret_cast<TRTSERVER_ServerOptions*>(server_options)),
+      "creating server");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsDelete(
+          reinterpret_cast<TRTSERVER_ServerOptions*>(server_options)),
+      "deleting server options");
 
-  // FIXMEV2 for the Server object APIs, just use TRITONSERVER_ServerXXX as
-  // we know the underlying object is the same.
-  std::shared_ptr<TRITONSERVER_Server> server(
-      (api_version_ == 1 ? nullptr : server_ptr), TRITONSERVER_ServerDelete);
-  // FIXMEV2 Create a TRTSERVER_Server shared pointer for V1 server frontends,
-  // ideally the frontends only needs the raw pointer of the server as we can
-  // ensure the server object lives longer than the frontend objects.
   std::shared_ptr<TRTSERVER_Server> trt_server(
-      (api_version_ == 1 ? reinterpret_cast<TRTSERVER_Server*>(server_ptr)
-                         : nullptr),
-      TRTSERVER_ServerDelete);
+      server_ptr, TRTSERVER_ServerDelete);
 
   // Configure and start tracing if specified on the command line.
   if (!StartTracing(&trace_manager)) {
@@ -1614,7 +1274,7 @@ main(int argc, char** argv)
   }
 
   // Start the HTTP, GRPC, and metrics endpoints.
-  if (!StartEndpoints(server, trt_server, trace_manager, shm_manager)) {
+  if (!StartEndpoints(trt_server, trace_manager, shm_manager)) {
     exit(1);
   }
 
@@ -1627,8 +1287,8 @@ main(int argc, char** argv)
     // If enabled, poll the model repository to see if there have been
     // any changes.
     if (repository_poll_secs_ > 0) {
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_ServerPollModelRepository(server_ptr),
+      LOG_TRTSERVER_ERROR(
+          TRTSERVER_ServerPollModelRepository(server_ptr),
           "failed to poll model repository");
     }
 
@@ -1640,9 +1300,9 @@ main(int argc, char** argv)
     exit_cv_.wait_for(lock, wait_timeout);
   }
 
-  TRITONSERVER_Error* stop_err = TRITONSERVER_ServerStop(server_ptr);
+  TRTSERVER_Error* stop_err = TRTSERVER_ServerStop(server_ptr);
   const int ret = (stop_err != nullptr) ? 1 : 0;
-  LOG_TRITONSERVER_ERROR(stop_err, "failed to stop server");
+  LOG_TRTSERVER_ERROR(stop_err, "failed to stop server");
 
   // Stop tracing and the HTTP, GRPC, and metrics endpoints.
   StopTracing(trace_manager);
@@ -1654,19 +1314,10 @@ main(int argc, char** argv)
   //  __lsan_do_leak_check();
 #endif  // TRTIS_ENABLE_ASAN
 
-  // FIXME. TF backend aborts if we attempt cleanup...
-  if (api_version_ == 1) {
-    std::shared_ptr<TRTSERVER_Server>* keep_alive =
-        new std::shared_ptr<TRTSERVER_Server>(trt_server);
-    if (keep_alive == nullptr) {
-      return 1;
-    }
-  } else {
-    std::shared_ptr<TRITONSERVER_Server>* keep_alive =
-        new std::shared_ptr<TRITONSERVER_Server>(server);
-    if (keep_alive == nullptr) {
-      return 1;
-    }
+  std::shared_ptr<TRTSERVER_Server>* keep_alive =
+      new std::shared_ptr<TRTSERVER_Server>(trt_server);
+  if (keep_alive == nullptr) {
+    return 1;
   }
 
   return ret;

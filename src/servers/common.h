@@ -32,10 +32,6 @@
 #include "src/core/tritonserver.h"
 #include "src/core/trtserver.h"
 
-#ifdef TRTIS_ENABLE_GRPC_V2
-#include "src/core/grpc_service_v2.pb.h"
-#endif  // TRTIS_ENABLE_GRPC_V2
-
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU

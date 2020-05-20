@@ -437,17 +437,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsNew(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetId(
     TRTSERVER_InferenceRequestOptions* request_options, uint64_t id);
 
-#ifdef TRTIS_ENABLE_GRPC_V2
-/// Set the ID for the request in a request options. The response of the request
-/// will contain the same ID. The request sender can use the ID to correlate
-/// the response to corresponding request if needed. The default value is 0.
-/// \param request_options The request options object.
-/// \param id The ID.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetIdStr(
-    TRTSERVER_InferenceRequestOptions* request_options, const char* id);
-#endif  // TRTIS_ENABLE_GRPC_V2
-
 /// Set the flag associated with the request in a request options. 'flags'
 /// should holds a bitwise-or of all flag values, see
 /// TRTSERVER_Request_Options_Flag for available flags.
@@ -634,15 +623,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseDelete(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseStatus(
     TRTSERVER_InferenceResponse* response);
-
-#ifdef TRTIS_ENABLE_GRPC_V2
-/// Return the V2 request ID for the response.
-/// \param response The response object.
-/// \param Returns the request ID.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseIdStr(
-    TRTSERVER_InferenceResponse* response, const char** id);
-#endif  // TRTIS_ENABLE_GRPC_V2
 
 /// Get the response header as a TRTSERVER_Protobuf object. The caller
 /// takes ownership of the object and must call

@@ -32,74 +32,45 @@ cmake_minimum_required (VERSION 3.5)
 set(GRPC_ENDPOINT_OBJECTS "")
 set(GRPC_ENDPOINT_LIBRARIES "")
 
-if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
-
-  if(${TRTIS_ENABLE_GRPC})
-    list(APPEND
-      GRPC_ENDPOINT_SRCS
-      grpc_server.cc
+if(${TRTIS_ENABLE_GRPC})
+  list(APPEND
+       GRPC_ENDPOINT_SRCS
+       grpc_server.cc
       )
 
-    list(APPEND
-      GRPC_ENDPOINT_HDRS
-      grpc_server.h
+  list(APPEND
+       GRPC_ENDPOINT_HDRS
+       grpc_server.h
       )
-  endif() # TRTIS_ENABLE_GRPC
-
-  if(${TRTIS_ENABLE_GRPC_V2})
-    list(APPEND
-      GRPC_ENDPOINT_SRCS
-      grpc_server_v2.cc
-      )
-
-    list(APPEND
-      GRPC_ENDPOINT_HDRS
-      grpc_server_v2.h
-      )
-  endif() # TRTIS_ENABLE_GRPC_V2
 
   add_library(
-    grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
-    ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
-    )
+      grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
+      ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
+  )
 
   if(${TRTIS_ENABLE_GPU})
     target_include_directories(grpc-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
   endif() # TRTIS_ENABLE_GPU
 
   add_dependencies(grpc-endpoint-library proto-library)
-  if(${TRTIS_ENABLE_GRPC})
-    add_dependencies(grpc-endpoint-library grpc-library)
-  endif() # TRTIS_ENABLE_GRPC
-  if(${TRTIS_ENABLE_GRPC_V2})
-    add_dependencies(grpc-endpoint-library grpc-v2-library)
-  endif() # TRTIS_ENABLE_GRPC_V2
+  add_dependencies(grpc-endpoint-library grpc-library)
 
   set(
     GRPC_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:grpc-endpoint-library>
     $<TARGET_OBJECTS:proto-library>
-    )
-  if(${TRTIS_ENABLE_GRPC})
-    list(APPEND
-      GRPC_ENDPOINT_OBJECTS
-      $<TARGET_OBJECTS:grpc-library>
+  )
+  list(APPEND
+       GRPC_ENDPOINT_OBJECTS
+       $<TARGET_OBJECTS:grpc-library>
       )
-  endif() # TRTIS_ENABLE_GRPC
-  if(${TRTIS_ENABLE_GRPC_V2})
-    list(APPEND
-      GRPC_ENDPOINT_OBJECTS
-      $<TARGET_OBJECTS:grpc-v2-library>
-      )
-  endif() # TRTIS_ENABLE_GRPC_V2
-
   set(
     GRPC_ENDPOINT_LIBRARIES
     PRIVATE gRPC::grpc++
     PRIVATE gRPC::grpc
     PRIVATE protobuf::libprotobuf
-    )
-endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+  )
+endif() # TRTIS_ENABLE_GRPC
 
 #
 # http endpoint
@@ -107,30 +78,18 @@ endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 set(HTTP_ENDPOINT_OBJECTS "")
 set(HTTP_ENDPOINT_LIBRARIES "")
 
-if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
+if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
-    list(APPEND
-      HTTP_ENDPOINT_SRCS
-      http_server.cc
+  list(APPEND
+       HTTP_ENDPOINT_SRCS
+       http_server.cc
       )
-    list(APPEND
-      HTTP_ENDPOINT_HDRS
-      http_server.h
+  list(APPEND
+       HTTP_ENDPOINT_HDRS
+       http_server.h
       )
-  endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
-  if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_METRICS})
-    list(APPEND
-      HTTP_ENDPOINT_SRCS
-      http_server_v2.cc
-      )
-    list(APPEND
-      HTTP_ENDPOINT_HDRS
-      http_server_v2.h
-      )
-  endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_METRICS
 
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
@@ -162,7 +121,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
     PRIVATE -lre2
     PRIVATE -lb64
   )
-endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS || TRTIS_ENABLE_HTTP_V2
+endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
 #
 # tracing
@@ -297,51 +256,6 @@ target_link_libraries(
 endif() # TRTIS_ENABLE_GPU
 install(
   TARGETS simple
-  RUNTIME DESTINATION bin
-)
-
-#
-# simplev2
-#
-set(
-  SIMPLEV2_SRCS
-  simplev2.cc common.cc
-)
-
-set(
-  SIMPLEV2_HDRS
-)
-
-add_executable(
-  simplev2
-  ${SIMPLEV2_SRCS}
-  ${SIMPLEV2_HDRS}
-  $<TARGET_OBJECTS:proto-library>
-)
-set_target_properties(
-  simplev2
-  PROPERTIES
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH ""
-)
-target_link_libraries(
-  simplev2
-  PRIVATE tritonserver
-  PRIVATE protobuf::libprotobuf
-)
-if(${TRTIS_ENABLE_GPU})
-target_include_directories(simplev2 PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  simplev2
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
-  PRIVATE ${CUDA_LIBRARIES}
-)
-endif() # TRTIS_ENABLE_GPU
-install(
-  TARGETS simplev2
   RUNTIME DESTINATION bin
 )
 

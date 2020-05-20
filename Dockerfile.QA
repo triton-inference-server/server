@@ -75,15 +75,8 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
     mkdir qa/L0_cmdline_trace/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cmdline_trace/models/. && \
-    cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/simple qa/L0_http_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_http_v2/models && \
-    cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_http_v2/models && \
     cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_client/ && \
     cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
-    cp /opt/tritonserver/bin/simplev2 qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \
     cp /workspace/builddir/trtis-test-utils/install/bin/memory_test qa/L0_memory/.
 
@@ -135,12 +128,6 @@ RUN mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
     mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
-    mkdir -p qa/L0_grpc_v2/models/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
-        qa/L0_grpc_v2/models/simple_sequence/1/. && \
-    mkdir -p qa/L0_http_v2/models/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
-        qa/L0_http_v2/models/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \
@@ -222,10 +209,8 @@ COPY --from=build /workspace/qa/ qa/
 RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/bin/* qa/clients/. && \
     cp install/lib/librequest.so qa/clients/. && \
-    cp install/lib/libgrpcclient.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \
-    cp install/python/tensorrtserver*.whl qa/pkgs/. && \
-    cp install/python/triton*.whl qa/pkgs/.
+    cp install/python/tensorrtserver*.whl qa/pkgs/.
 
 ############################################################################
 ## Copy artifacts from custom backend container
@@ -286,7 +271,6 @@ COPY --chown=1000:1000 --from=cbe /workspace/qa/ qa/
 # Remove CI tests that are meant to run only on build image and
 # install the tritonserver/triton python client APIs.
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
-    pip3 install --upgrade qa/pkgs/tensorrtserver*.whl && \
-    pip3 install --upgrade qa/pkgs/triton*.whl
+    pip3 install --upgrade qa/pkgs/tensorrtserver*.whl
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}

@@ -132,10 +132,10 @@ SharedMemoryManager::~SharedMemoryManager()
 {
   // FIXME: Replace UnregisterAll() call with below commented lines
   UnregisterAll();
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+#if defined(TRTIS_ENABLE_GRPC)
   // UnregisterAll(TRITONSERVER_MEMORY_CPU);
   // UnregisterAll(TRITONSERVER_MEMORY_GPU);
-#endif  // TRTIS_ENABLE_GRPC_V2 || TRTIS_ENABLE_HTTP_V2
+#endif  // TRTIS_ENABLE_GRPC
 }
 
 TRITONSERVER_Error*
@@ -365,111 +365,6 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
 
   return nullptr;
 }
-
-#ifdef TRTIS_ENABLE_GRPC_V2
-TRITONSERVER_Error*
-SharedMemoryManager::GetStatus(
-    const std::string& name, SystemSharedMemoryStatusResponse*& shm_status)
-{
-  std::lock_guard<std::mutex> lock(mu_);
-
-  if (name.empty()) {
-    for (const auto& shm_info : shared_memory_map_) {
-      if (shm_info.second->kind_ == TRITONSERVER_MEMORY_CPU) {
-        SystemSharedMemoryStatusResponse::RegionStatus region_status;
-
-        region_status.set_name(shm_info.second->name_);
-        region_status.set_key(shm_info.second->shm_key_);
-        region_status.set_offset(shm_info.second->offset_);
-        region_status.set_byte_size(shm_info.second->byte_size_);
-
-        (*shm_status->mutable_regions())[shm_info.second->name_] =
-            region_status;
-      }
-    }
-  } else {
-    auto it = shared_memory_map_.find(name);
-    if (it == shared_memory_map_.end()) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_NOT_FOUND,
-          std::string(
-              "Unable to find system shared memory region: '" + name + "'")
-              .c_str());
-    }
-
-    if (it->second->kind_ == TRITONSERVER_MEMORY_GPU) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_NOT_FOUND,
-          std::string(
-              "The region named '" + name +
-              "' is registered as CUDA shared memory, not system shared memory")
-              .c_str());
-    }
-
-    SystemSharedMemoryStatusResponse::RegionStatus region_status;
-
-    region_status.set_name(it->second->name_);
-    region_status.set_key(it->second->shm_key_);
-    region_status.set_offset(it->second->offset_);
-    region_status.set_byte_size(it->second->byte_size_);
-
-    (*shm_status->mutable_regions())[name] = region_status;
-  }
-
-  return nullptr;
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::GetStatus(
-    const std::string& name, CudaSharedMemoryStatusResponse*& shm_status)
-{
-  std::lock_guard<std::mutex> lock(mu_);
-
-  if (name.empty()) {
-    for (const auto& shm_info : shared_memory_map_) {
-      if (shm_info.second->kind_ == TRITONSERVER_MEMORY_GPU) {
-        CudaSharedMemoryStatusResponse::RegionStatus region_status;
-
-        region_status.set_name(shm_info.second->name_);
-        region_status.set_device_id(shm_info.second->device_id_);
-        region_status.set_byte_size(shm_info.second->byte_size_);
-
-        (*shm_status->mutable_regions())[shm_info.second->name_] =
-            region_status;
-      }
-    }
-  } else {
-    auto it = shared_memory_map_.find(name);
-    if (it == shared_memory_map_.end()) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_NOT_FOUND,
-          std::string(
-              "Unable to find cuda shared memory region: '" + name + "'")
-              .c_str());
-    }
-
-    if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_NOT_FOUND,
-          std::string(
-              "The region named '" + name +
-              "' is registered as system shared memory, not CUDA shared memory")
-              .c_str());
-    }
-
-    CudaSharedMemoryStatusResponse::RegionStatus region_status;
-
-    region_status.set_name(it->second->name_);
-    region_status.set_device_id(it->second->device_id_);
-    region_status.set_byte_size(it->second->byte_size_);
-
-    (*shm_status->mutable_regions())[name] = region_status;
-  }
-
-
-  return nullptr;
-}
-#endif  // TRTIS_ENABLE_GRPC_V2
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(
