@@ -42,7 +42,8 @@ EnsembleBackend::Init(
   RETURN_IF_ERROR(InferenceBackend::Init(path, config, kEnsemblePlatform));
 
   std::unique_ptr<Scheduler> scheduler;
-  RETURN_IF_ERROR(EnsembleScheduler::Create(server, config, &scheduler));
+  RETURN_IF_ERROR(EnsembleScheduler::Create(
+      MutableStatsAggregator(), server, config, &scheduler));
   RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
 
   LOG_VERBOSE(1) << "ensemble backend for " << Name() << std::endl << *this;
@@ -52,14 +53,18 @@ EnsembleBackend::Init(
 
 void
 EnsembleBackend::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
+    uint32_t runner_idx,
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
   LOG_ERROR << "Unexpectedly invoked EnsembleBackend::Run()";
 
-  OnCompleteQueuedPayloads(Status(
-      Status::Code::INTERNAL,
-      "unexpected invocation of EnsembleBackend::Run()"));
+  InferenceRequest::RespondIfError(
+      requests,
+      Status(
+          Status::Code::INTERNAL,
+          "unexpected invocation of EnsembleBackend::Run()"),
+      true /* release_requests */);
+  return;
 }
 
 std::ostream&

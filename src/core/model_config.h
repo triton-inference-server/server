@@ -28,6 +28,7 @@
 #include <google/protobuf/any.pb.h>
 #include <stdint.h>
 #include "src/core/model_config.pb.h"
+#include "src/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -255,5 +256,15 @@ DataType ProtocolStringToDataType(const std::string& dtype);
 /// \param len Length of the string.
 /// \return The data type.
 DataType ProtocolStringToDataType(const char* dtype, size_t len);
+
+/// Get the Triton server data type corresponding to a data type.
+/// \param dtype The data type.
+/// \return The Triton server data type.
+TRITONSERVER_DataType DataTypeToTriton(const DataType dtype);
+
+/// Get the data type corresponding to a Triton server data type.
+/// \param dtype The Triton server data type.
+/// \return The data type.
+DataType TritonToDataType(const TRITONSERVER_DataType dtype);
 
 }}  // namespace nvidia::inferenceserver
