@@ -1047,6 +1047,10 @@ CommonHandler::SetUpAllRequests()
         statistics->set_version(model_stat["version"].GetString());
         statistics->set_last_inference(
             model_stat["last_inference"].GetUint64());
+        statistics->set_inference_count(
+            model_stat["inference_count"].GetUint64());
+        statistics->set_execution_count(
+            model_stat["execution_count"].GetUint64());
         statistics->mutable_inference_stats()->mutable_success()->set_count(
             infer_stats_json["success"]["count"].GetUint64());
         statistics->mutable_inference_stats()->mutable_success()->set_ns(
