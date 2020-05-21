@@ -397,6 +397,14 @@ class InferenceRequest {
       const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
       const uint64_t compute_output_start_ns, const uint64_t compute_end_ns);
 
+  // Report the statistics to stats collectors associated with the request.
+  // Duration and timestamps provide two granularities for stats collectors.
+  void ReportStatisticsWithDuration(
+      MetricModelReporter* metric_reporter, bool success,
+      const uint64_t compute_start_ns, const uint64_t compute_input_duration_ns,
+      const uint64_t compute_infer_duration_ns,
+      const uint64_t compute_output_duration_ns);
+
   // Statistics for each request are aggregated into the corresponding
   // backend's statistics. Optionally this function may be used to
   // add an additional aggregator where statistics are also aggregated.

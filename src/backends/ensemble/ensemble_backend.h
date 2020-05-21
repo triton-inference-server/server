@@ -50,8 +50,8 @@ class EnsembleBackend : public InferenceBackend {
   // Override InferenceBackend::Run() to return proper error if
   // Run() is called for ensemble model.
   void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads) override;
+      uint32_t runner_idx,
+      std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(EnsembleBackend);

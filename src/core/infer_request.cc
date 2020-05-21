@@ -597,6 +597,38 @@ InferenceRequest::ReportStatistics(
     }
   }
 }
+
+void
+InferenceRequest::ReportStatisticsWithDuration(
+    MetricModelReporter* metric_reporter, bool success,
+    const uint64_t compute_start_ns, const uint64_t compute_input_duration_ns,
+    const uint64_t compute_infer_duration_ns,
+    const uint64_t compute_output_duration_ns)
+{
+  INFER_STATS_DECL_TIMESTAMP(request_end_ns);
+
+  if (success) {
+    backend_raw_->MutableStatsAggregator()->UpdateSuccess(
+        metric_reporter, std::max(1U, batch_size_), request_start_ns_,
+        queue_start_ns_, compute_start_ns, request_end_ns,
+        compute_input_duration_ns, compute_infer_duration_ns,
+        compute_output_duration_ns);
+    if (secondary_stats_aggregator_ != nullptr) {
+      secondary_stats_aggregator_->UpdateSuccess(
+          nullptr /* metric_reporter */, std::max(1U, batch_size_),
+          request_start_ns_, queue_start_ns_, compute_start_ns, request_end_ns,
+          compute_input_duration_ns, compute_infer_duration_ns,
+          compute_output_duration_ns);
+    }
+  } else {
+    backend_raw_->MutableStatsAggregator()->UpdateFailure(
+        metric_reporter, request_start_ns_, request_end_ns);
+    if (secondary_stats_aggregator_ != nullptr) {
+      secondary_stats_aggregator_->UpdateFailure(
+          nullptr /* metric_reporter */, request_start_ns_, request_end_ns);
+    }
+  }
+}
 #endif  // TRITON_ENABLE_STATS
 
 //

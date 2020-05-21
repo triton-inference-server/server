@@ -48,6 +48,14 @@ class LabelProvider {
   // label (line 1) is the index-1 label, etc.
   Status AddLabels(const std::string& name, const std::string& filepath);
 
+  // Return the labels associated with 'name'. Return empty vector if no labels
+  // are available.
+  const std::vector<std::string>& GetLabels(const std::string& name);
+
+  // Associate with 'name' a set of 'labels'
+  Status AddLabels(
+      const std::string& name, const std::vector<std::string>& labels);
+
  private:
   DISALLOW_COPY_AND_ASSIGN(LabelProvider);
 
