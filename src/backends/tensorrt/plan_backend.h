@@ -229,14 +229,46 @@ class PlanBackend : public InferenceBackend {
     // avoids busy-looping on different model executions' event states.
     std::thread completion_thread_;
 
-    // Assume that the lifetime of the payload is extended until the completion
-    // callback is called
-    SyncQueue<std::tuple<
-        InferenceBackend*, size_t, const uint64_t, const uint64_t,
-        const uint64_t, const size_t,
-        std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>>,
-        std::shared_ptr<std::vector<std::unique_ptr<InferenceResponse>>>>>
-        completion_queue_;
+    // The details needed by the completion thread to finalize the response for
+    // a model execution.
+    struct Payload {
+      explicit Payload(
+          InferenceBackend* inference_backend, size_t event_set_idx,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests)
+          : inference_backend_(inference_backend),
+            event_set_idx_(event_set_idx), total_batch_size_(0),
+            compute_start_ns_(0), compute_input_end_ns_(0),
+            compute_output_start_ns_(0)
+      {
+        requests_.reset(new std::vector<std::unique_ptr<InferenceRequest>>());
+        *requests_ = std::move(requests);
+        responses_.reset(new std::vector<std::unique_ptr<InferenceResponse>>());
+      }
+
+      // The pointer to the backend handling the request
+      InferenceBackend* inference_backend_;
+
+      // The index to the event set handling the request
+      size_t event_set_idx_;
+
+      // The total batch size for the request
+      size_t total_batch_size_;
+
+      // The timestamps for reporting stats
+      uint64_t compute_start_ns_;
+      uint64_t compute_input_end_ns_;
+      uint64_t compute_output_start_ns_;
+
+      // All the composing InferenceRequest objects
+      std::unique_ptr<std::vector<std::unique_ptr<InferenceRequest>>> requests_;
+      // All the generated InferenceResponse objects
+      std::unique_ptr<std::vector<std::unique_ptr<InferenceResponse>>>
+          responses_;
+    };
+
+    // Assume that the lifetime of composing completion data to extend till
+    // the responses are returned.
+    SyncQueue<std::shared_ptr<Payload>> completion_queue_;
 
     // Map from profile index to the corresponding TensorRT context. Use map
     // to ensure each profile index is mapped to exactly one TensorRT context.
@@ -268,12 +300,8 @@ class PlanBackend : public InferenceBackend {
     // The array size is equal to Context::total_bindings_
     std::vector<void*> buffer_bindings_;
 
-    size_t total_batch_size_;
-    uint64_t compute_start_ns_;
-    uint64_t compute_input_end_ns_;
-    uint64_t compute_output_start_ns_;
-    std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>> requests_;
-    std::shared_ptr<std::vector<std::unique_ptr<InferenceResponse>>> responses_;
+    // The request details of the ongoing model execution
+    std::shared_ptr<Payload> payload_;
   };
 
   // CUDA engine shared across all model instances on the same device.
