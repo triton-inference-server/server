@@ -79,10 +79,6 @@ class ScopedAtomicIncrement {
 InferenceServer::InferenceServer()
     : version_(TRITON_VERSION), ready_state_(ServerReadyState::SERVER_INVALID)
 {
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  start_time_ns_ = TIMESPEC_TO_NANOS(ts);
-
   id_ = "inference:0";
   extensions_.push_back("classification");
   extensions_.push_back("sequence");
@@ -205,7 +201,7 @@ InferenceServer::Stop()
     LOG_INFO << "No server context available. Exiting immediately.";
     return Status::Success;
   } else {
-    LOG_INFO << "Waiting for in-flight inferences to complete.";
+    LOG_INFO << "Waiting for in-flight requests to complete.";
   }
 
   Status status = model_repository_manager_->UnloadAllModels();
@@ -213,8 +209,8 @@ InferenceServer::Stop()
     LOG_ERROR << status.Message();
   }
 
-  // Wait for all in-flight requests to complete and all loaded models
-  // to unload, or for the exit timeout to expire.
+  // Wait for all in-flight non-inference requests to complete and all
+  // loaded models to unload, or for the exit timeout to expire.
   uint32_t exit_timeout_iters = exit_timeout_secs_;
 
   while (true) {
@@ -222,7 +218,8 @@ InferenceServer::Stop()
 
     LOG_INFO << "Timeout " << exit_timeout_iters << ": Found "
              << live_models.size() << " live models and "
-             << inflight_request_counter_ << " in-flight requests";
+             << inflight_request_counter_
+             << " in-flight non-inference requests";
     if (LOG_VERBOSE_IS_ON(1)) {
       for (const auto& m : live_models) {
         for (const auto& v : m.second) {
@@ -240,7 +237,7 @@ InferenceServer::Stop()
     }
 
     exit_timeout_iters--;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
   return Status(
@@ -255,6 +252,7 @@ InferenceServer::PollModelRepository()
   // Look for changes and update the loaded model configurations
   // appropriately.
   if (ready_state_ == ServerReadyState::SERVER_READY) {
+    ScopedAtomicIncrement inflight(inflight_request_counter_);
     RETURN_IF_ERROR(model_repository_manager_->PollAndUpdate());
   }
 
@@ -414,10 +412,6 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
     return Status(Status::Code::UNAVAILABLE, "Server not ready");
   }
 
-  // FIXME Shouldn't need this... request keeps backend alive...
-  std::shared_ptr<ScopedAtomicIncrement> inflight(
-      new ScopedAtomicIncrement(inflight_request_counter_));
-
 #ifdef TRITON_ENABLE_STATS
   INFER_TRACE_ACTIVITY(
       request->Trace(), TRITONSERVER_TRACE_REQUEST_START,
@@ -451,16 +445,6 @@ InferenceServer::UnloadModel(const std::string& model_name)
 
   auto action_type = ModelRepositoryManager::ActionType::UNLOAD;
   return model_repository_manager_->LoadUnloadModel(model_name, action_type);
-}
-
-uint64_t
-InferenceServer::UptimeNs() const
-{
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-
-  uint64_t now_ns = TIMESPEC_TO_NANOS(now);
-  return now_ns - start_time_ns_;
 }
 
 }}  // namespace nvidia::inferenceserver
