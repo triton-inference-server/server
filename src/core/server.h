@@ -225,14 +225,9 @@ class InferenceServer {
   }
 
  private:
-  // Return the uptime of the server in nanoseconds.
-  uint64_t UptimeNs() const;
-
   const std::string version_;
   std::string id_;
   std::vector<const char*> extensions_;
-
-  uint64_t start_time_ns_;
 
   std::set<std::string> model_repository_paths_;
   std::set<std::string> startup_models_;
@@ -252,8 +247,10 @@ class InferenceServer {
   // Current state of the inference server.
   ServerReadyState ready_state_;
 
-  // Number of in-flight requests. During shutdown we attempt to wait
-  // for all in-flight requests to complete before exiting.
+  // Number of in-flight, non-inference requests. During shutdown we
+  // attempt to wait for all in-flight non-inference requests to
+  // complete before exiting (also wait for in-flight inference
+  // requests but that is determined by backend shared_ptr).
   std::atomic<uint64_t> inflight_request_counter_;
 
   std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
