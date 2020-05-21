@@ -145,6 +145,8 @@ InferenceStatsAggregator::UpdateInferBatchStatsWithDuration(
     last_inference_ms_ = inference_ms;
   }
 
+  execution_count_++;
+
   auto it = batch_stats_.find(batch_size);
   if (it == batch_stats_.end()) {
     it = batch_stats_.emplace(batch_size, InferBatchStats()).first;
@@ -157,7 +159,6 @@ InferenceStatsAggregator::UpdateInferBatchStatsWithDuration(
 #ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
     metric_reporter->MetricInferenceExecutionCount().Increment(1);
-    metric_reporter->MetricInferenceCount().Increment(batch_size);
   }
 #endif  // TRITON_ENABLE_METRICS
 }
