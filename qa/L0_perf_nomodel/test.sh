@@ -80,22 +80,30 @@ TEST_NAMES=(
     "${UNDERTEST_NAME} 16MB I/O Latency GRPC"
     "${UNDERTEST_NAME} 16MB I/O Latency HTTP"
     "${UNDERTEST_NAME} Maximum Throughput GRPC"
-    "${UNDERTEST_NAME} Maximum Throughput HTTP")
+    "${UNDERTEST_NAME} Maximum Throughput HTTP"
+    "${UNDERTEST_NAME} 16MB I/O Throughput GRPC"
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP")
 TEST_ANALYSIS_ARGS=(
     --latency
     --latency
     --latency
     --latency
-    "--throughput --concurrency 8"
-    "--throughput --concurrency 8")
+    "--throughput --concurrency 16"
+    "--throughput --concurrency 16"
+    "--throughput --concurrency 16"
+    "--throughput --concurrency 16")
 TEST_DIRS=(
     min_latency_grpc
     min_latency_http
     16mb_latency_grpc
     16mb_latency_http
     max_throughput_grpc
-    max_throughput_http)
+    max_throughput_http
+    16mb_throughput_grpc
+    16mb_throughput_http)
 TEST_PROTOCOLS=(
+    grpc
+    http
     grpc
     http
     grpc
@@ -108,21 +116,27 @@ TEST_TENSOR_SIZES=(
     ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB}
     1
-    1)
+    1
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB})
 TEST_INSTANCE_COUNTS=(
     1
     1
     1
     1
-    4
-    4)
+    2
+    2
+    2
+    2)
 TEST_CONCURRENCY=(
     1
     1
     1
     1
-    8
-    8)
+    16
+    16
+    16
+    16)
 # If TensorRT adds support for variable-size tensors can fix identity
 # model to allow TENSOR_SIZE > 1. For libtorch we need to create an
 # identity model with variable-size input.
@@ -131,6 +145,8 @@ TEST_BACKENDS=(
     "plan custom graphdef savedmodel onnx libtorch netdef"
     "custom graphdef savedmodel onnx netdef"
     "custom graphdef savedmodel onnx netdef"
+    "plan custom graphdef savedmodel onnx libtorch netdef"
+    "plan custom graphdef savedmodel onnx libtorch netdef"
     "plan custom graphdef savedmodel onnx libtorch netdef"
     "plan custom graphdef savedmodel onnx libtorch netdef")
 
