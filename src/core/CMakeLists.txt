@@ -159,6 +159,7 @@ set(
   filesystem.h
   infer_request.h
   infer_response.h
+  json.h
   label_provider.h
   logging.h
   memory.h

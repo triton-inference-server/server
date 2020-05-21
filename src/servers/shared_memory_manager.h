@@ -28,9 +28,11 @@
 #include <cstring>
 #include <mutex>
 #include <unordered_map>
-#include "rapidjson/document.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/tritonserver.h"
+
+#define TRITONJSON_TRITONSERVER_STATUS
+#include "src/core/json.h"
 
 #ifdef TRITON_ENABLE_GRPC
 #include "src/core/grpc_service.grpc.pb.h"
@@ -139,7 +141,7 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetStatus(
       const std::string& name, TRITONSERVER_MemoryType memory_type,
-      rapidjson::Document* shm_status);
+      TritonJson::Value* shm_status);
 
   /// Removes the named shared memory block of the specified type from
   /// the manager. Any future attempt to get the details of this block
