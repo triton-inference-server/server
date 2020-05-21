@@ -73,4 +73,23 @@ LabelProvider::AddLabels(const std::string& name, const std::string& filepath)
   return Status::Success;
 }
 
+const std::vector<std::string>&
+LabelProvider::GetLabels(const std::string& name)
+{
+  static const std::vector<std::string> not_found;
+  auto itr = label_map_.find(name);
+  if (itr == label_map_.end()) {
+    return not_found;
+  }
+  return itr->second;
+}
+
+Status
+LabelProvider::AddLabels(
+    const std::string& name, const std::vector<std::string>& labels)
+{
+  label_map_.emplace(name, labels);
+  return Status::Success;
+}
+
 }}  // namespace nvidia::inferenceserver

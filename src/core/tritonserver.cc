@@ -39,6 +39,7 @@
 #include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/nvtx.h"
@@ -295,80 +296,6 @@ TritonServerOptions::TritonServerOptions()
 #ifndef TRITON_ENABLE_METRICS_GPU
   gpu_metrics_ = false;
 #endif  // TRITON_ENABLE_METRICS_GPU
-}
-
-TRITONSERVER_DataType
-DataTypeToTriton(const ni::DataType dtype)
-{
-  switch (dtype) {
-    case ni::DataType::TYPE_BOOL:
-      return TRITONSERVER_TYPE_BOOL;
-    case ni::DataType::TYPE_UINT8:
-      return TRITONSERVER_TYPE_UINT8;
-    case ni::DataType::TYPE_UINT16:
-      return TRITONSERVER_TYPE_UINT16;
-    case ni::DataType::TYPE_UINT32:
-      return TRITONSERVER_TYPE_UINT32;
-    case ni::DataType::TYPE_UINT64:
-      return TRITONSERVER_TYPE_UINT64;
-    case ni::DataType::TYPE_INT8:
-      return TRITONSERVER_TYPE_INT8;
-    case ni::DataType::TYPE_INT16:
-      return TRITONSERVER_TYPE_INT16;
-    case ni::DataType::TYPE_INT32:
-      return TRITONSERVER_TYPE_INT32;
-    case ni::DataType::TYPE_INT64:
-      return TRITONSERVER_TYPE_INT64;
-    case ni::DataType::TYPE_FP16:
-      return TRITONSERVER_TYPE_FP16;
-    case ni::DataType::TYPE_FP32:
-      return TRITONSERVER_TYPE_FP32;
-    case ni::DataType::TYPE_FP64:
-      return TRITONSERVER_TYPE_FP64;
-    case ni::DataType::TYPE_STRING:
-      return TRITONSERVER_TYPE_BYTES;
-    default:
-      break;
-  }
-
-  return TRITONSERVER_TYPE_INVALID;
-}
-
-ni::DataType
-TritonToDataType(const TRITONSERVER_DataType dtype)
-{
-  switch (dtype) {
-    case TRITONSERVER_TYPE_BOOL:
-      return ni::DataType::TYPE_BOOL;
-    case TRITONSERVER_TYPE_UINT8:
-      return ni::DataType::TYPE_UINT8;
-    case TRITONSERVER_TYPE_UINT16:
-      return ni::DataType::TYPE_UINT16;
-    case TRITONSERVER_TYPE_UINT32:
-      return ni::DataType::TYPE_UINT32;
-    case TRITONSERVER_TYPE_UINT64:
-      return ni::DataType::TYPE_UINT64;
-    case TRITONSERVER_TYPE_INT8:
-      return ni::DataType::TYPE_INT8;
-    case TRITONSERVER_TYPE_INT16:
-      return ni::DataType::TYPE_INT16;
-    case TRITONSERVER_TYPE_INT32:
-      return ni::DataType::TYPE_INT32;
-    case TRITONSERVER_TYPE_INT64:
-      return ni::DataType::TYPE_INT64;
-    case TRITONSERVER_TYPE_FP16:
-      return ni::DataType::TYPE_FP16;
-    case TRITONSERVER_TYPE_FP32:
-      return ni::DataType::TYPE_FP32;
-    case TRITONSERVER_TYPE_FP64:
-      return ni::DataType::TYPE_FP64;
-    case TRITONSERVER_TYPE_BYTES:
-      return ni::DataType::TYPE_STRING;
-    default:
-      break;
-  }
-
-  return ni::DataType::TYPE_INVALID;
 }
 
 #define SetDurationStats(COUNT, DURATION_NS, ALLOCATOR, DURATION_STAT) \
@@ -1141,7 +1068,7 @@ TRITONSERVER_InferenceRequestAddInput(
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
   RETURN_IF_STATUS_ERROR(lrequest->AddOriginalInput(
-      name, TritonToDataType(datatype), shape, dim_count));
+      name, ni::TritonToDataType(datatype), shape, dim_count));
   return nullptr;  // Success
 }
 

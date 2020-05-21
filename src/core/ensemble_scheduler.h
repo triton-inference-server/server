@@ -28,6 +28,7 @@
 #ifdef TRITON_ENABLE_ENSEMBLE
 
 #include <memory>
+#include "src/core/metric_model_reporter.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/scheduler.h"
@@ -60,8 +61,6 @@ struct EnsembleInfo {
 
   std::string ensemble_name_;
 
-  bool allow_batching_;
-
   // the ensemble output (re)shape expected by the ensemble
   std::unordered_map<std::string, DimsList> ensemble_output_shape_;
 
@@ -80,19 +79,22 @@ class EnsembleScheduler : public Scheduler {
   // Create a scheduler to process ensemble requests and
   // to dispatch requests to models in ensemble internally.
   static Status Create(
+      InferenceStatsAggregator* const stats_aggregator,
       InferenceServer* const server, const ModelConfig& config,
       std::unique_ptr<Scheduler>* scheduler);
 
   ~EnsembleScheduler();
 
   // \see Scheduler::Enqueue()
-  void Enqueue(
-      const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request) override;
+  Status Enqueue(std::unique_ptr<InferenceRequest>& request) override;
 
  private:
-  EnsembleScheduler(InferenceServer* const server, const ModelConfig& config);
+  EnsembleScheduler(
+      InferenceStatsAggregator* const stats_aggregator,
+      InferenceServer* const server, const ModelConfig& config);
 
+  std::unique_ptr<MetricModelReporter> metric_reporter_;
+  InferenceStatsAggregator* const stats_aggregator_;
   InferenceServer* const is_;
 
   // Ensemble information that is built from model config

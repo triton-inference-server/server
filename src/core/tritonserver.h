@@ -31,12 +31,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef TRITON_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#else
-typedef void cudaIpcMemHandle_t;
-#endif  // TRITON_ENABLE_GPU
-
 #ifdef __cplusplus
 extern "C" {
 #endif
