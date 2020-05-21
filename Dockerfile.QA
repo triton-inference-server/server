@@ -156,8 +156,6 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_savedmodel_shape/. && \
     cp builddir/custom-backend/install/lib/libidentity.so \
-        qa/L0_perf_custom/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_perf_nomodel/. && \
     cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_perf_client/. && \
