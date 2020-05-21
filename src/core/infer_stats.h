@@ -37,7 +37,6 @@ namespace nvidia { namespace inferenceserver {
 
 class MetricModelReporter;
 
-#ifdef TRITON_ENABLE_STATS
 
 //
 // InferenceStatsAggregator
@@ -45,6 +44,7 @@ class MetricModelReporter;
 // A statistics aggregator.
 //
 class InferenceStatsAggregator {
+#ifdef TRITON_ENABLE_STATS
  public:
   struct InferStats {
     InferStats()
@@ -105,6 +105,15 @@ class InferenceStatsAggregator {
       const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
       const uint64_t request_end_ns);
 
+  // Add durations to infer stats for a successful inference request.
+  void UpdateSuccessWithDuration(
+      MetricModelReporter* metric_reporter, const size_t batch_size,
+      const uint64_t request_start_ns, const uint64_t queue_start_ns,
+      const uint64_t compute_start_ns, const uint64_t request_end_ns,
+      const uint64_t compute_input_duration_ns,
+      const uint64_t compute_infer_duration_ns,
+      const uint64_t compute_output_duration_ns);
+
   // Add durations to batch infer stats for a batch execution.
   // 'success_request_count' is the number of sucess requests in the
   // batch that have infer_stats attached.
@@ -113,6 +122,15 @@ class InferenceStatsAggregator {
       const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
       const uint64_t compute_output_start_ns, const uint64_t compute_end_ns);
 
+  // Add durations to batch infer stats for a batch execution.
+  // 'success_request_count' is the number of sucess requests in the
+  // batch that have infer_stats attached.
+  void UpdateInferBatchStatsWithDuration(
+      MetricModelReporter* metric_reporter, size_t batch_size,
+      const uint64_t compute_input_duration_ns,
+      const uint64_t compute_infer_duration_ns,
+      const uint64_t compute_output_duration_ns);
+
  private:
   std::mutex mu_;
   uint64_t last_inference_ms_;
@@ -120,9 +138,9 @@ class InferenceStatsAggregator {
   uint64_t execution_count_;
   InferStats infer_stats_;
   std::map<size_t, InferBatchStats> batch_stats_;
+#endif  // TRITON_ENABLE_STATS
 };
 
-#endif  // TRITON_ENABLE_STATS
 
 //
 // Macros to set infer stats.

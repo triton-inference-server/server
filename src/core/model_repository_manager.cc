@@ -886,10 +886,38 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
       break;
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
-    case Platform::PLATFORM_ENSEMBLE:
+    case Platform::PLATFORM_ENSEMBLE: {
       status = ensemble_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
+      // Complete label provider with label information from involved backends
+      // Must be done here because involved backends may not be able to obtained
+      // from server because this may happen during server initialization.
+      if (status.IsOk()) {
+        std::set<std::string> no_label_outputs;
+        const auto& label_provider = is->GetLabelProvider();
+        for (const auto& output : model_config.output()) {
+          if (label_provider->GetLabel(output.name(), 0).empty()) {
+            no_label_outputs.emplace(output.name());
+          }
+        }
+        for (const auto& element : model_config.ensemble_scheduling().step()) {
+          for (const auto& pair : element.output_map()) {
+            // Found model that produce one of the missing output
+            if (no_label_outputs.find(pair.second) != no_label_outputs.end()) {
+              std::shared_ptr<InferenceBackend> backend;
+              // Safe to obtain backend because the ensemble can't be loaded
+              // until the involved backends are ready
+              GetInferenceBackend(
+                  element.model_name(), element.model_version(), &backend);
+              label_provider->AddLabels(
+                  pair.second,
+                  backend->GetLabelProvider()->GetLabels(pair.first));
+            }
+          }
+        }
+      }
       break;
+    }
 #endif  // TRITON_ENABLE_ENSEMBLE
     default:
       break;

@@ -60,14 +60,29 @@ InferenceStatsAggregator::UpdateSuccess(
     const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
     const uint64_t request_end_ns)
 {
-  const uint64_t request_duration_ns = request_end_ns - request_start_ns;
-  const uint64_t queue_duration_ns = compute_start_ns - queue_start_ns;
   const uint64_t compute_input_duration_ns =
       compute_input_end_ns - compute_start_ns;
   const uint64_t compute_infer_duration_ns =
       compute_output_start_ns - compute_input_end_ns;
   const uint64_t compute_output_duration_ns =
       compute_end_ns - compute_output_start_ns;
+  UpdateSuccessWithDuration(
+      metric_reporter, batch_size, request_start_ns, queue_start_ns,
+      compute_start_ns, request_end_ns, compute_input_duration_ns,
+      compute_infer_duration_ns, compute_output_duration_ns);
+}
+
+void
+InferenceStatsAggregator::UpdateSuccessWithDuration(
+    MetricModelReporter* metric_reporter, const size_t batch_size,
+    const uint64_t request_start_ns, const uint64_t queue_start_ns,
+    const uint64_t compute_start_ns, const uint64_t request_end_ns,
+    const uint64_t compute_input_duration_ns,
+    const uint64_t compute_infer_duration_ns,
+    const uint64_t compute_output_duration_ns)
+{
+  const uint64_t request_duration_ns = request_end_ns - request_start_ns;
+  const uint64_t queue_duration_ns = compute_start_ns - queue_start_ns;
 
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -131,6 +146,40 @@ InferenceStatsAggregator::UpdateInferBatchStats(
 #ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
     metric_reporter->MetricInferenceExecutionCount().Increment(1);
+  }
+#endif  // TRITON_ENABLE_METRICS
+}
+
+void
+InferenceStatsAggregator::UpdateInferBatchStatsWithDuration(
+    MetricModelReporter* metric_reporter, size_t batch_size,
+    const uint64_t compute_input_duration_ns,
+    const uint64_t compute_infer_duration_ns,
+    const uint64_t compute_output_duration_ns)
+{
+  struct timespec last_ts;
+  clock_gettime(CLOCK_REALTIME, &last_ts);
+  auto inference_ms = TIMESPEC_TO_MILLIS(last_ts);
+
+  std::lock_guard<std::mutex> lock(mu_);
+
+  if (inference_ms > last_inference_ms_) {
+    last_inference_ms_ = inference_ms;
+  }
+
+  auto it = batch_stats_.find(batch_size);
+  if (it == batch_stats_.end()) {
+    it = batch_stats_.emplace(batch_size, InferBatchStats()).first;
+  }
+  it->second.count_++;
+  it->second.compute_input_duration_ns_ += compute_input_duration_ns;
+  it->second.compute_infer_duration_ns_ += compute_infer_duration_ns;
+  it->second.compute_output_duration_ns_ += compute_output_duration_ns;
+
+#ifdef TRITON_ENABLE_METRICS
+  if (metric_reporter != nullptr) {
+    metric_reporter->MetricInferenceExecutionCount().Increment(1);
+    metric_reporter->MetricInferenceCount().Increment(batch_size);
   }
 #endif  // TRITON_ENABLE_METRICS
 }
