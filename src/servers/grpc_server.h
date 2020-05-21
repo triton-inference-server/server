@@ -74,28 +74,16 @@ class GRPCServer {
 
   const int infer_allocation_pool_size_;
 
-  std::unique_ptr<grpc::ServerCompletionQueue> server_live_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> server_ready_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> model_ready_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> server_metadata_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> model_metadata_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> model_config_cq_;
+  std::unique_ptr<grpc::ServerCompletionQueue> common_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_stream_infer_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> common_cq_;
 
   grpc::ServerBuilder grpc_builder_;
   std::unique_ptr<grpc::Server> grpc_server_;
 
-  std::unique_ptr<HandlerBase> server_live_handler_;
-  std::unique_ptr<HandlerBase> server_ready_handler_;
-  std::unique_ptr<HandlerBase> model_ready_handler_;
-  std::unique_ptr<HandlerBase> server_metadata_handler_;
-  std::unique_ptr<HandlerBase> model_metadata_handler_;
-  std::unique_ptr<HandlerBase> model_config_handler_;
+  std::unique_ptr<HandlerBase> common_handler_;
   std::unique_ptr<HandlerBase> model_infer_handler_;
   std::unique_ptr<HandlerBase> model_stream_infer_handler_;
-  std::unique_ptr<HandlerBase> common_handler_;
 
   GRPCInferenceService::AsyncService service_;
   bool running_;

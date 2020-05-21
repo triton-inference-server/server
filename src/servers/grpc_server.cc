@@ -701,6 +701,295 @@ CommonHandler::SetUpAllRequests()
   //    functions
 
   //
+  //  ServerLive
+  //
+  auto OnRegisterServerLive =
+      [this](
+          grpc::ServerContext* ctx, ServerLiveRequest* request,
+          grpc::ServerAsyncResponseWriter<ServerLiveResponse>* responder,
+          void* tag) {
+        this->service_->RequestServerLive(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteServerLive = [this](
+                                 ServerLiveRequest& request,
+                                 ServerLiveResponse* response,
+                                 grpc::Status* status) {
+    bool live = false;
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsLive(tritonserver_.get(), &live);
+
+    response->set_live((err == nullptr) && live);
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<ServerLiveResponse>, ServerLiveRequest,
+      ServerLiveResponse>(
+      "ServerLive", 0, OnRegisterServerLive, OnExecuteServerLive);
+
+  //
+  //  ServerReady
+  //
+  auto OnRegisterServerReady =
+      [this](
+          grpc::ServerContext* ctx, ServerReadyRequest* request,
+          grpc::ServerAsyncResponseWriter<ServerReadyResponse>* responder,
+          void* tag) {
+        this->service_->RequestServerReady(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteServerReady = [this](
+                                  ServerReadyRequest& request,
+                                  ServerReadyResponse* response,
+                                  grpc::Status* status) {
+    bool ready = false;
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsReady(tritonserver_.get(), &ready);
+
+    response->set_ready((err == nullptr) && ready);
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<ServerReadyResponse>, ServerReadyRequest,
+      ServerReadyResponse>(
+      "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady);
+
+  //
+  //  ModelReady
+  //
+  auto OnRegisterModelReady =
+      [this](
+          grpc::ServerContext* ctx, ModelReadyRequest* request,
+          grpc::ServerAsyncResponseWriter<ModelReadyResponse>* responder,
+          void* tag) {
+        this->service_->RequestModelReady(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteModelReady = [this](
+                                 ModelReadyRequest& request,
+                                 ModelReadyResponse* response,
+                                 grpc::Status* status) {
+    bool is_ready = false;
+    int64_t requested_model_version;
+    auto err =
+        GetModelVersionFromString(request.version(), &requested_model_version);
+    if (err == nullptr) {
+      err = TRITONSERVER_ServerModelIsReady(
+          tritonserver_.get(), request.name().c_str(), requested_model_version,
+          &is_ready);
+    }
+
+    response->set_ready(is_ready);
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<ModelReadyResponse>, ModelReadyRequest,
+      ModelReadyResponse>(
+      "ModelReady", 0, OnRegisterModelReady, OnExecuteModelReady);
+
+  //
+  //  ServerMetadata
+  //
+  auto OnRegisterServerMetadata =
+      [this](
+          grpc::ServerContext* ctx, ServerMetadataRequest* request,
+          grpc::ServerAsyncResponseWriter<ServerMetadataResponse>* responder,
+          void* tag) {
+        this->service_->RequestServerMetadata(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteServerMetadata = [this](
+                                     ServerMetadataRequest& request,
+                                     ServerMetadataResponse* response,
+                                     grpc::Status* status) {
+    TRITONSERVER_Message* server_metadata_message = nullptr;
+    TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
+        tritonserver_.get(), &server_metadata_message);
+    if (err == nullptr) {
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          server_metadata_message, &buffer, &byte_size);
+      if (err == nullptr) {
+        rapidjson::Document server_metadata_json;
+        server_metadata_json.Parse(buffer, byte_size);
+        if (server_metadata_json.HasParseError()) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              std::string(
+                  "failed to parse the server metadata JSON buffer: " +
+                  std::string(
+                      GetParseError_En(server_metadata_json.GetParseError())) +
+                  " at " +
+                  std::to_string(server_metadata_json.GetErrorOffset()))
+                  .c_str());
+        } else {
+          response->set_name(server_metadata_json["name"].GetString());
+          response->set_version(server_metadata_json["version"].GetString());
+          for (const auto& extension :
+               server_metadata_json["extensions"].GetArray()) {
+            response->add_extensions(extension.GetString());
+          }
+        }
+      }
+      TRITONSERVER_MessageDelete(server_metadata_message);
+    }
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<ServerMetadataResponse>,
+      ServerMetadataRequest, ServerMetadataResponse>(
+      "ServerMetadata", 0, OnRegisterServerMetadata, OnExecuteServerMetadata);
+
+  //
+  //  ModelMetadata
+  //
+  auto OnRegisterModelMetadata =
+      [this](
+          grpc::ServerContext* ctx, ModelMetadataRequest* request,
+          grpc::ServerAsyncResponseWriter<ModelMetadataResponse>* responder,
+          void* tag) {
+        this->service_->RequestModelMetadata(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteModelMetadata = [this](
+                                    ModelMetadataRequest& request,
+                                    ModelMetadataResponse* response,
+                                    grpc::Status* status) {
+    int64_t requested_model_version;
+    auto err =
+        GetModelVersionFromString(request.version(), &requested_model_version);
+    if (err == nullptr) {
+      TRITONSERVER_Message* model_metadata_message = nullptr;
+      err = TRITONSERVER_ServerModelMetadata(
+          tritonserver_.get(), request.name().c_str(), requested_model_version,
+          &model_metadata_message);
+      if (err == nullptr) {
+        const char* buffer;
+        size_t byte_size;
+        err = TRITONSERVER_MessageSerializeToJson(
+            model_metadata_message, &buffer, &byte_size);
+        if (err == nullptr) {
+          rapidjson::Document model_metadata_json;
+          model_metadata_json.Parse(buffer, byte_size);
+          if (model_metadata_json.HasParseError()) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                std::string(
+                    "failed to parse the model metadata JSON buffer: " +
+                    std::string(
+                        GetParseError_En(model_metadata_json.GetParseError())) +
+                    " at " +
+                    std::to_string(model_metadata_json.GetErrorOffset()))
+                    .c_str());
+          } else {
+            response->set_name(model_metadata_json["name"].GetString());
+            for (const auto& version :
+                 model_metadata_json["versions"].GetArray()) {
+              response->add_versions(version.GetString());
+            }
+            response->set_platform(model_metadata_json["platform"].GetString());
+
+            for (const auto& io_json :
+                 model_metadata_json["inputs"].GetArray()) {
+              ModelMetadataResponse::TensorMetadata* io =
+                  response->add_inputs();
+              io->set_name(io_json["name"].GetString());
+              io->set_datatype(io_json["datatype"].GetString());
+              for (const auto& d : io_json["shape"].GetArray()) {
+                io->add_shape(d.GetInt());
+              }
+            }
+
+            for (const auto& io_json :
+                 model_metadata_json["outputs"].GetArray()) {
+              ModelMetadataResponse::TensorMetadata* io =
+                  response->add_outputs();
+              io->set_name(io_json["name"].GetString());
+              io->set_datatype(io_json["datatype"].GetString());
+              for (const auto& d : io_json["shape"].GetArray()) {
+                io->add_shape(d.GetInt());
+              }
+            }
+          }
+        }
+        TRITONSERVER_MessageDelete(model_metadata_message);
+      }
+    }
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<ModelMetadataResponse>,
+      ModelMetadataRequest, ModelMetadataResponse>(
+      "ModelMetadata", 0, OnRegisterModelMetadata, OnExecuteModelMetadata);
+
+  //
+  //  ModelConfig
+  //
+  auto OnRegisterModelConfig =
+      [this](
+          grpc::ServerContext* ctx, ModelConfigRequest* request,
+          grpc::ServerAsyncResponseWriter<ModelConfigResponse>* responder,
+          void* tag) {
+        this->service_->RequestModelConfig(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteModelConfig = [this](
+                                  ModelConfigRequest& request,
+                                  ModelConfigResponse* response,
+                                  grpc::Status* status) {
+    int64_t requested_model_version;
+    auto err =
+        GetModelVersionFromString(request.version(), &requested_model_version);
+    if (err == nullptr) {
+      TRITONSERVER_Message* model_config_message = nullptr;
+      err = TRITONSERVER_ServerModelConfig(
+          tritonserver_.get(), request.name().c_str(), requested_model_version,
+          &model_config_message);
+      if (err == nullptr) {
+        const char* buffer;
+        size_t byte_size;
+        err = TRITONSERVER_MessageSerializeToJson(
+            model_config_message, &buffer, &byte_size);
+        if (err == nullptr) {
+          ::google::protobuf::util::JsonStringToMessage(
+              {buffer, (int)byte_size}, response->mutable_config());
+        }
+        TRITONSERVER_MessageDelete(model_config_message);
+      }
+    }
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<ModelConfigResponse>, ModelConfigRequest,
+      ModelConfigResponse>(
+      "ModelConfig", 0, OnRegisterModelConfig, OnExecuteModelConfig);
+
+  //
   //  ModelStatistics
   //
   auto OnRegisterModelStatistics =
@@ -1182,591 +1471,6 @@ CommonHandler::SetUpAllRequests()
       RepositoryModelUnloadRequest, RepositoryModelUnloadResponse>(
       "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
       OnExecuteRepositoryModelUnload);
-}
-
-//
-// ServerLiveHandler
-//
-class ServerLiveHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<ServerLiveResponse>,
-          ServerLiveRequest, ServerLiveResponse> {
- public:
-  ServerLiveHandler(
-      const std::string& name,
-      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-ServerLiveHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>();
-  State* state = StateNew(context);
-  service_->RequestServerLive(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-ServerLiveHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  ServerLiveResponse& response = state->response_;
-
-  if (state->step_ == Steps::START) {
-    bool live = false;
-    TRITONSERVER_Error* err =
-        TRITONSERVER_ServerIsLive(tritonserver_.get(), &live);
-
-    response.set_live((err == nullptr) && live);
-
-    grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, status, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one request at a time (to avoid having request cause
-  // too much load on server), so register for next request only after
-  // this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
-//
-// ServerReadyHandler
-//
-class ServerReadyHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<ServerReadyResponse>,
-          ServerReadyRequest, ServerReadyResponse> {
- public:
-  ServerReadyHandler(
-      const std::string& name,
-      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-ServerReadyHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>();
-  State* state = StateNew(context);
-  service_->RequestServerReady(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-ServerReadyHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  ServerReadyResponse& response = state->response_;
-
-  if (state->step_ == Steps::START) {
-    bool ready = false;
-    TRITONSERVER_Error* err =
-        TRITONSERVER_ServerIsReady(tritonserver_.get(), &ready);
-
-    response.set_ready((err == nullptr) && ready);
-
-    grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, status, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one request at a time (to avoid having request cause
-  // too much load on server), so register for next request only after
-  // this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
-//
-// ModelReadyHandler
-//
-class ModelReadyHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<ModelReadyResponse>,
-          ModelReadyRequest, ModelReadyResponse> {
- public:
-  ModelReadyHandler(
-      const std::string& name,
-      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-ModelReadyHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>();
-  State* state = StateNew(context);
-  service_->RequestModelReady(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-ModelReadyHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  const ModelReadyRequest& request = state->request_;
-  ModelReadyResponse& response = state->response_;
-
-  if (state->step_ == Steps::START) {
-    bool is_ready = false;
-    int64_t requested_model_version;
-    auto err =
-        GetModelVersionFromString(request.version(), &requested_model_version);
-    if (err == nullptr) {
-      err = TRITONSERVER_ServerModelIsReady(
-          tritonserver_.get(), request.name().c_str(), requested_model_version,
-          &is_ready);
-    }
-
-    response.set_ready(is_ready);
-
-    grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, status, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one request at a time (to avoid having request cause
-  // too much load on server), so register for next request only after
-  // this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
-//
-// ServerMetadataHandler
-//
-class ServerMetadataHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<ServerMetadataResponse>,
-          ServerMetadataRequest, ServerMetadataResponse> {
- public:
-  ServerMetadataHandler(
-      const std::string& name,
-      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-ServerMetadataHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>();
-  State* state = StateNew(context);
-  service_->RequestServerMetadata(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-ServerMetadataHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  ServerMetadataResponse& response = state->response_;
-
-  if (state->step_ == Steps::START) {
-    TRITONSERVER_Message* server_metadata_message = nullptr;
-    TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
-        tritonserver_.get(), &server_metadata_message);
-    if (err == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      err = TRITONSERVER_MessageSerializeToJson(
-          server_metadata_message, &buffer, &byte_size);
-      if (err == nullptr) {
-        rapidjson::Document server_metadata_json;
-        server_metadata_json.Parse(buffer, byte_size);
-        if (server_metadata_json.HasParseError()) {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              std::string(
-                  "failed to parse the server metadata JSON buffer: " +
-                  std::string(
-                      GetParseError_En(server_metadata_json.GetParseError())) +
-                  " at " +
-                  std::to_string(server_metadata_json.GetErrorOffset()))
-                  .c_str());
-        } else {
-          response.set_name(server_metadata_json["name"].GetString());
-          response.set_version(server_metadata_json["version"].GetString());
-          for (const auto& extension :
-               server_metadata_json["extensions"].GetArray()) {
-            response.add_extensions(extension.GetString());
-          }
-        }
-      }
-      TRITONSERVER_MessageDelete(server_metadata_message);
-    }
-
-    grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, status, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one request at a time (to avoid having request cause
-  // too much load on server), so register for next request only after
-  // this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
-//
-// ModelMetadataHandler
-//
-class ModelMetadataHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<ModelMetadataResponse>,
-          ModelMetadataRequest, ModelMetadataResponse> {
- public:
-  ModelMetadataHandler(
-      const std::string& name,
-      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-ModelMetadataHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>();
-  State* state = StateNew(context);
-  service_->RequestModelMetadata(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-ModelMetadataHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  const ModelMetadataRequest& request = state->request_;
-  ModelMetadataResponse& response = state->response_;
-
-  if (state->step_ == Steps::START) {
-    int64_t requested_model_version;
-    auto err =
-        GetModelVersionFromString(request.version(), &requested_model_version);
-    if (err == nullptr) {
-      TRITONSERVER_Message* model_metadata_message = nullptr;
-      err = TRITONSERVER_ServerModelMetadata(
-          tritonserver_.get(), request.name().c_str(), requested_model_version,
-          &model_metadata_message);
-      if (err == nullptr) {
-        const char* buffer;
-        size_t byte_size;
-        err = TRITONSERVER_MessageSerializeToJson(
-            model_metadata_message, &buffer, &byte_size);
-        if (err == nullptr) {
-          rapidjson::Document model_metadata_json;
-          model_metadata_json.Parse(buffer, byte_size);
-          if (model_metadata_json.HasParseError()) {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL,
-                std::string(
-                    "failed to parse the model metadata JSON buffer: " +
-                    std::string(
-                        GetParseError_En(model_metadata_json.GetParseError())) +
-                    " at " +
-                    std::to_string(model_metadata_json.GetErrorOffset()))
-                    .c_str());
-          } else {
-            response.set_name(model_metadata_json["name"].GetString());
-            for (const auto& version :
-                 model_metadata_json["versions"].GetArray()) {
-              response.add_versions(version.GetString());
-            }
-            response.set_platform(model_metadata_json["platform"].GetString());
-
-            for (const auto& io_json :
-                 model_metadata_json["inputs"].GetArray()) {
-              ModelMetadataResponse::TensorMetadata* io = response.add_inputs();
-              io->set_name(io_json["name"].GetString());
-              io->set_datatype(io_json["datatype"].GetString());
-              for (const auto& d : io_json["shape"].GetArray()) {
-                io->add_shape(d.GetInt());
-              }
-            }
-
-            for (const auto& io_json :
-                 model_metadata_json["outputs"].GetArray()) {
-              ModelMetadataResponse::TensorMetadata* io =
-                  response.add_outputs();
-              io->set_name(io_json["name"].GetString());
-              io->set_datatype(io_json["datatype"].GetString());
-              for (const auto& d : io_json["shape"].GetArray()) {
-                io->add_shape(d.GetInt());
-              }
-            }
-          }
-        }
-        TRITONSERVER_MessageDelete(model_metadata_message);
-      }
-    }
-
-    grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, status, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one request at a time (to avoid having request cause
-  // too much load on server), so register for next request only after
-  // this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
-//
-// ModelConfigHandler
-//
-class ModelConfigHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<ModelConfigResponse>,
-          ModelConfigRequest, ModelConfigResponse> {
- public:
-  ModelConfigHandler(
-      const std::string& name,
-      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-ModelConfigHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>();
-  State* state = StateNew(context);
-  service_->RequestModelConfig(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-ModelConfigHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  const ModelConfigRequest& request = state->request_;
-  ModelConfigResponse& response = state->response_;
-
-  if (state->step_ == Steps::START) {
-    int64_t requested_model_version;
-    auto err =
-        GetModelVersionFromString(request.version(), &requested_model_version);
-    if (err == nullptr) {
-      TRITONSERVER_Message* model_config_message = nullptr;
-      err = TRITONSERVER_ServerModelConfig(
-          tritonserver_.get(), request.name().c_str(), requested_model_version,
-          &model_config_message);
-      if (err == nullptr) {
-        const char* buffer;
-        size_t byte_size;
-        err = TRITONSERVER_MessageSerializeToJson(
-            model_config_message, &buffer, &byte_size);
-        if (err == nullptr) {
-          ::google::protobuf::util::JsonStringToMessage(
-              {buffer, (int)byte_size}, response.mutable_config());
-        }
-        TRITONSERVER_MessageDelete(model_config_message);
-      }
-    }
-
-    grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, status, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one request at a time (to avoid having request cause
-  // too much load on server), so register for next request only after
-  // this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
 }
 
 //
@@ -3147,58 +2851,16 @@ GRPCServer::Start()
       server_addr_, grpc::InsecureServerCredentials());
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
-  server_live_cq_ = grpc_builder_.AddCompletionQueue();
-  server_ready_cq_ = grpc_builder_.AddCompletionQueue();
-  model_ready_cq_ = grpc_builder_.AddCompletionQueue();
-  server_metadata_cq_ = grpc_builder_.AddCompletionQueue();
-  model_metadata_cq_ = grpc_builder_.AddCompletionQueue();
-  model_config_cq_ = grpc_builder_.AddCompletionQueue();
-  model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   common_cq_ = grpc_builder_.AddCompletionQueue();
+  model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
 
-  // Handler for server-live requests.
-  ServerLiveHandler* hserverlive = new ServerLiveHandler(
-      "ServerLiveHandler", server_, &service_, server_live_cq_.get(),
-      2 /* max_state_bucket_count */);
-  hserverlive->Start();
-  server_live_handler_.reset(hserverlive);
-
-  // Handler for server-ready requests.
-  ServerReadyHandler* hserverready = new ServerReadyHandler(
-      "ServerReadyHandler", server_, &service_, server_ready_cq_.get(),
-      2 /* max_state_bucket_count */);
-  hserverready->Start();
-  server_ready_handler_.reset(hserverready);
-
-  // Handler for model-ready requests.
-  ModelReadyHandler* hmodelready = new ModelReadyHandler(
-      "ModelReadyHandler", server_, &service_, model_ready_cq_.get(),
-      2 /* max_state_bucket_count */);
-  hmodelready->Start();
-  model_ready_handler_.reset(hmodelready);
-
-  // Handler for server-metadata requests.
-  ServerMetadataHandler* hservermetadata = new ServerMetadataHandler(
-      "ServerMetadataHandler", server_, &service_, server_metadata_cq_.get(),
-      2 /* max_state_bucket_count */);
-  hservermetadata->Start();
-  server_metadata_handler_.reset(hservermetadata);
-
-  // Handler for model-metadata requests.
-  ModelMetadataHandler* hmodelmetadata = new ModelMetadataHandler(
-      "ModelMetadataHandler", server_, &service_, model_metadata_cq_.get(),
-      2 /* max_state_bucket_count */);
-  hmodelmetadata->Start();
-  model_metadata_handler_.reset(hmodelmetadata);
-
-  // Handler for model-config requests.
-  ModelConfigHandler* hmodelconfig = new ModelConfigHandler(
-      "ModelConfigHandler", server_, &service_, model_config_cq_.get(),
-      2 /* max_state_bucket_count */);
-  hmodelconfig->Start();
-  model_config_handler_.reset(hmodelconfig);
+  // A common Handler for other non-inference requests
+  CommonHandler* hcommon = new CommonHandler(
+      "CommonHandler", server_, shm_manager_, &service_, common_cq_.get());
+  hcommon->Start();
+  common_handler_.reset(hcommon);
 
   // Handler for model inference requests.
   ModelInferHandler* hmodelinfer = new ModelInferHandler(
@@ -3216,12 +2878,6 @@ GRPCServer::Start()
   hmodelstreaminfer->Start();
   model_stream_infer_handler_.reset(hmodelstreaminfer);
 
-  // A common Handler for other non-critical requests
-  CommonHandler* hcommon = new CommonHandler(
-      "CommonHandler", server_, shm_manager_, &service_, common_cq_.get());
-  hcommon->Start();
-  common_handler_.reset(hcommon);
-
   running_ = true;
   LOG_INFO << "Started GRPCInferenceService at " << server_addr_;
   return nullptr;  // success
@@ -3238,26 +2894,14 @@ GRPCServer::Stop()
   // Always shutdown the completion queue after the server.
   grpc_server_->Shutdown();
 
-  server_live_cq_->Shutdown();
-  server_ready_cq_->Shutdown();
-  model_ready_cq_->Shutdown();
-  server_metadata_cq_->Shutdown();
-  model_metadata_cq_->Shutdown();
-  model_config_cq_->Shutdown();
-  model_infer_cq_->Shutdown();
   common_cq_->Shutdown();
+  model_infer_cq_->Shutdown();
   model_stream_infer_cq_->Shutdown();
 
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
-  dynamic_cast<ServerLiveHandler*>(server_live_handler_.get())->Stop();
-  dynamic_cast<ServerReadyHandler*>(server_ready_handler_.get())->Stop();
-  dynamic_cast<ModelReadyHandler*>(model_ready_handler_.get())->Stop();
-  dynamic_cast<ServerMetadataHandler*>(server_metadata_handler_.get())->Stop();
-  dynamic_cast<ModelMetadataHandler*>(model_metadata_handler_.get())->Stop();
-  dynamic_cast<ModelConfigHandler*>(model_config_handler_.get())->Stop();
-  dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
   dynamic_cast<CommonHandler*>(common_handler_.get())->Stop();
+  dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
   dynamic_cast<ModelStreamInferHandler*>(model_stream_infer_handler_.get())
       ->Stop();
 
