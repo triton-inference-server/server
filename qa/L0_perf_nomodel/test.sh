@@ -82,8 +82,24 @@ TEST_NAMES=(
     "${UNDERTEST_NAME} Maximum Throughput GRPC"
     "${UNDERTEST_NAME} Maximum Throughput HTTP"
     "${UNDERTEST_NAME} 16MB I/O Throughput GRPC"
-    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP")
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP"
+    "${UNDERTEST_NAME} 16MB I/O Latency GRPC System Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Latency HTTP System Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Latency GRPC CUDA Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Latency HTTP CUDA Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Throughput GRPC System Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP System Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Throughput GRPC CUDA Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP CUDA Shared Memory")
 TEST_ANALYSIS_ARGS=(
+    --latency
+    --latency
+    --latency
+    --latency
+    "--throughput --concurrency 16"
+    "--throughput --concurrency 16"
+    "--throughput --concurrency 16"
+    "--throughput --concurrency 16"
     --latency
     --latency
     --latency
@@ -100,8 +116,24 @@ TEST_DIRS=(
     max_throughput_grpc
     max_throughput_http
     16mb_throughput_grpc
-    16mb_throughput_http)
+    16mb_throughput_http
+    16mb_latency_grpc_shm
+    16mb_latency_http_shm
+    16mb_latency_grpc_cudashm
+    16mb_latency_http_cudashm
+    16mb_throughput_grpc_shm
+    16mb_throughput_http_shm
+    16mb_throughput_grpc_cudashm
+    16mb_throughput_http_cudashm)
 TEST_PROTOCOLS=(
+    grpc
+    http
+    grpc
+    http
+    grpc
+    http
+    grpc
+    http
     grpc
     http
     grpc
@@ -118,6 +150,13 @@ TEST_TENSOR_SIZES=(
     1
     1
     ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB})
 TEST_INSTANCE_COUNTS=(
     1
@@ -127,8 +166,24 @@ TEST_INSTANCE_COUNTS=(
     2
     2
     2
+    2
+    1
+    1
+    1
+    1
+    2
+    2
+    2
     2)
 TEST_CONCURRENCY=(
+    1
+    1
+    1
+    1
+    16
+    16
+    16
+    16
     1
     1
     1
@@ -147,8 +202,34 @@ TEST_BACKENDS=(
     "custom graphdef savedmodel onnx netdef"
     "plan custom graphdef savedmodel onnx libtorch netdef"
     "plan custom graphdef savedmodel onnx libtorch netdef"
-    "plan custom graphdef savedmodel onnx libtorch netdef"
-    "plan custom graphdef savedmodel onnx libtorch netdef")
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef")
+TEST_SHARED_MEMORIES=(
+    "none"
+    "none"
+    "none"
+    "none"
+    "none"
+    "none"
+    "none"
+    "none"
+    "system"
+    "system"
+    "cuda"
+    "cuda"
+    "system"
+    "system"
+    "cuda"
+    "cuda")
 
 # If the top-level output dir exists then assume that data has already
 # been collected and so just perform the analysis.
@@ -177,6 +258,7 @@ if (( $skip_data != 1 )); then
         TEST_PROTOCOL=${TEST_PROTOCOLS[$idx]}
         TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
         TEST_BACKEND=${TEST_BACKENDS[$idx]}
+        TEST_SHARED_MEMORY=${TEST_SHARED_MEMORIES[$idx]}
         TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
         TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
 
@@ -188,6 +270,7 @@ if (( $skip_data != 1 )); then
                   PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
                   TENSOR_SIZE=${TEST_TENSOR_SIZE} \
                   BACKENDS=${TEST_BACKEND} \
+                  SHARED_MEMORY=${TEST_SHARED_MEMORY} \
                   STATIC_BATCH_SIZES=1 \
                   DYNAMIC_BATCH_SIZES=1 \
                   INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
