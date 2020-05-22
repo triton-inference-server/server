@@ -25,15 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
-fi
-if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
+REPO_VERSION=$1
 
 BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch netdef"}
 STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
@@ -47,6 +39,7 @@ PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=5000}
 PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=5}
 TENSOR_SIZE=${TENSOR_SIZE:=1}
+REPORTER=../common/reporter.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 RESULTDIR=${RESULTDIR:=.}
@@ -59,7 +52,6 @@ source ../common/util.sh
 export CUDA_VISIBLE_DEVICES=0
 
 mkdir -p ${RESULTDIR}
-rm -f *.log *.serverlog *.csv *.metrics
 RET=0
 
 rm -fr ./custom_models && mkdir ./custom_models && \
@@ -141,8 +133,35 @@ for BACKEND in $BACKENDS; do
     fi
     set -e
 
+    echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
+    echo -e "\"s_benchmark_name\":\"nomodel\"," >> ${NAME}.tjson
+    echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${NAME}.tjson
+    echo -e "\"s_framework\":\"${BACKEND}\"," >> ${NAME}.tjson
+    echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
+    echo -e "\"l_concurrency\":${CONCURRENCY}," >> ${NAME}.tjson
+    echo -e "\"l_dynamic_batch_size\":${DYNAMIC_BATCH}," >> ${NAME}.tjson
+    echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
+    echo -e "\"l_size\":${TENSOR_SIZE}," >> ${NAME}.tjson
+    echo -e "\"l_instance_count\":${INSTANCE_CNT}}]" >> ${NAME}.tjson
+
     kill $SERVER_PID
     wait $SERVER_PID
+
+    if [ -f $REPORTER ]; then
+        set +e
+
+        URL_FLAG=
+        if [ ! -z ${BENCHMARK_REPORTER_URL} ]; then
+            URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
+        fi
+
+        $REPORTER -v -o ${NAME}.json --csv ${RESULTDIR}/${NAME}.csv ${URL_FLAG} ${NAME}.tjson
+        if (( $? != 0 )); then
+            RET=1
+        fi
+
+        set -e
+    fi
    done
   done
  done
