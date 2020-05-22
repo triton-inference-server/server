@@ -1082,19 +1082,19 @@ CommonHandler::SetUpAllRequests()
 
         for (const auto& batch_stat : model_stat["batch_stats"].GetArray()) {
           auto batch_statistics = statistics->add_batch_stats();
-          batch_statistics->set_batch_size(batch_stat["batch_size"].GetInt());
+          batch_statistics->set_batch_size(batch_stat["batch_size"].GetUint64());
           batch_statistics->mutable_compute_input()->set_count(
-              batch_stat["compute_input"]["count"].GetInt());
+              batch_stat["compute_input"]["count"].GetUint64());
           batch_statistics->mutable_compute_input()->set_ns(
-              batch_stat["compute_input"]["ns"].GetInt());
+              batch_stat["compute_input"]["ns"].GetUint64());
           batch_statistics->mutable_compute_infer()->set_count(
-              batch_stat["compute_infer"]["count"].GetInt());
+              batch_stat["compute_infer"]["count"].GetUint64());
           batch_statistics->mutable_compute_infer()->set_ns(
-              batch_stat["compute_infer"]["ns"].GetInt());
+              batch_stat["compute_infer"]["ns"].GetUint64());
           batch_statistics->mutable_compute_output()->set_count(
-              batch_stat["compute_output"]["count"].GetInt());
+              batch_stat["compute_output"]["count"].GetUint64());
           batch_statistics->mutable_compute_output()->set_ns(
-              batch_stat["compute_output"]["ns"].GetInt());
+              batch_stat["compute_output"]["ns"].GetUint64());
         }
       }
     }
