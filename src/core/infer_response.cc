@@ -40,7 +40,8 @@ InferenceResponseFactory::CreateResponse(
     std::unique_ptr<InferenceResponse>* response) const
 {
   response->reset(new InferenceResponse(
-      backend_, id_, allocator_, alloc_userp_, response_fn_, response_userp_));
+      backend_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
+      response_delegator_));
 
   return Status::Success;
 }
@@ -116,6 +117,11 @@ InferenceResponse::ClassificationLabel(
 Status
 InferenceResponse::Send(std::unique_ptr<InferenceResponse>&& response)
 {
+  if (response->response_delegator_ != nullptr) {
+    auto ldelegator = std::move(response->response_delegator_);
+    ldelegator(std::move(response));
+    return Status::Success;
+  }
   void* userp = response->response_userp_;
   response->response_fn_(
       reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
@@ -128,6 +134,11 @@ InferenceResponse::SendWithStatus(
     std::unique_ptr<InferenceResponse>&& response, const Status& status)
 {
   response->status_ = status;
+  if (response->response_delegator_ != nullptr) {
+    auto ldelegator = std::move(response->response_delegator_);
+    ldelegator(std::move(response));
+    return Status::Success;
+  }
 
   void* userp = response->response_userp_;
   response->response_fn_(
