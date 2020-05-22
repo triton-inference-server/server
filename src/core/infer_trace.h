@@ -109,8 +109,9 @@ class InferenceTrace {
 #define INFER_TRACE_ACTIVITY(T, A, TS_NS) \
   {                                       \
     const auto& trace = (T);              \
+    const auto ts_ns = (TS_NS);           \
     if (trace != nullptr) {               \
-      trace->Report(A, TS_NS);            \
+      trace->Report(A, ts_ns);            \
     }                                     \
   }
 #define INFER_TRACE_ACTIVITY_NOW(T, A) \

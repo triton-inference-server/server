@@ -1082,7 +1082,8 @@ CommonHandler::SetUpAllRequests()
 
         for (const auto& batch_stat : model_stat["batch_stats"].GetArray()) {
           auto batch_statistics = statistics->add_batch_stats();
-          batch_statistics->set_batch_size(batch_stat["batch_size"].GetUint64());
+          batch_statistics->set_batch_size(
+              batch_stat["batch_size"].GetUint64());
           batch_statistics->mutable_compute_input()->set_count(
               batch_stat["compute_input"]["count"].GetUint64());
           batch_statistics->mutable_compute_input()->set_ns(
