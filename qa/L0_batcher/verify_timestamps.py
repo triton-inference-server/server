@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,27 +35,49 @@ def verify_timestamps(traces, preserve):
     # Order traces by id
     traces = sorted(traces, key=lambda t: t.get('id', -1))
 
-    # Filter the trace that is not meaningful
-    filtered_traces = []
+    # Filter the trace that is not meaningful and group them by 'id'
+    filtered_traces = dict()
+    grpc_id_offset = 0
     for trace in traces:
         if "id" not in trace:
             continue
-        filtered_traces.append(trace)
+        # Skip GRPC traces as actual traces are not genarated via GRPC,
+        # thus GRPC traces are ill-formed
+        if "timestamps" in trace:
+            is_grpc = False
+            for ts in trace["timestamps"]:
+                if "GRPC" in ts["name"]:
+                    is_grpc = True
+                    break
+            if is_grpc:
+                grpc_id_offset += 1
+                continue
 
-    # First find the latest request end timestamp for the batch with large delay
-    large_delay_request_end = 0
+        if (trace['id'] in filtered_traces.keys()):
+            rep_trace = filtered_traces[trace['id']]
+            # Apend the timestamp to the trace representing this 'id'
+            if "timestamps" in trace:
+                rep_trace["timestamps"] += trace["timestamps"]
+        else:
+            # Use this trace to represent this 'id'
+            if "timestamps" not in trace:
+                trace["timestamps"] = []
+            filtered_traces[trace['id']] = trace
+
+    # First find the latest send end timestamp for the batch with large delay
+    large_delay_send_end = 0
     small_delay_traces = []
-    for trace in filtered_traces:
+    for trace_id, trace in filtered_traces.items():
         timestamps = dict()
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
         # Hardcoded delay value here (knowing large delay is 400ms)
-        compute_span = timestamps["compute end"] - timestamps["compute start"]
+        compute_span = timestamps["COMPUTE_END"] - timestamps["COMPUTE_START"]
         # If the 3rd batch is also processed by large delay instance, we don't
         # want to use its responses as baseline
-        if trace["id"] <= 7 and compute_span >= 400 * 1000 * 1000:
-            request_end = timestamps["request handler end"]
-            large_delay_request_end = max(large_delay_request_end, request_end)
+        if trace["id"] <= (7 + grpc_id_offset) and compute_span >= 400 * 1000 * 1000:
+            send_end = timestamps["HTTP_SEND_END"]
+            large_delay_send_end = max(large_delay_send_end, send_end)
         else:
             small_delay_traces.append(trace)
 
@@ -64,11 +86,12 @@ def verify_timestamps(traces, preserve):
         timestamps = dict()
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
-        request_end = timestamps["request handler end"]
-        if request_end > large_delay_request_end:
+        send_end = timestamps["HTTP_SEND_END"]
+        if send_end > large_delay_send_end:
             response_request_after_large_delay_count += 1
     
     # Hardcoded expected count here
+    print(response_request_after_large_delay_count)
     if preserve:
         # If preserve ordering, there must be large delay batch followed by
         # small delay batch and thus at least 4 responses are sent after
@@ -86,45 +109,45 @@ def summarize(protocol, traces):
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
 
-        if ("request handler start" in timestamps) and ("request handler end" in timestamps):
+        if ("REQUEST_START" in timestamps) and ("REQUEST_END" in timestamps):
             key = (trace["model_name"], trace["model_version"])
             if key not in model_count_map:
                 model_count_map[key] = 0
                 model_span_map[key] = dict()
 
             model_count_map[key] += 1
-            if ("http recv start" in timestamps) and ("http send end" in timestamps):
+            if ("HTTP_RECV_START" in timestamps) and ("HTTP_SEND_END" in timestamps):
                 add_span(model_span_map[key], timestamps,
-                         "http infer", "http recv start", "http send end")
+                         "http infer", "HTTP_RECV_START", "HTTP_SEND_END")
                 add_span(model_span_map[key], timestamps,
-                         "http recv", "http recv start", "http recv end")
+                         "http recv", "HTTP_RECV_START", "HTTP_RECV_END")
                 add_span(model_span_map[key], timestamps,
-                         "http send", "http send start", "http send end")
-            elif ("grpc wait/read start" in timestamps) and ("grpc send end" in timestamps):
+                         "http send", "HTTP_SEND_START", "HTTP_SEND_END")
+            elif ("GRPC_WAITREAD_START" in timestamps) and ("GRPC_SEND_END" in timestamps):
                 add_span(model_span_map[key], timestamps,
-                         "grpc infer", "grpc wait/read start", "grpc send end")
+                         "grpc infer", "GRPC_WAITREAD_START", "GRPC_SEND_END")
                 add_span(model_span_map[key], timestamps,
-                         "grpc wait/read", "grpc wait/read start", "grpc wait/read end")
+                         "grpc wait/read", "GRPC_WAITREAD_START", "GRPC_WAITREAD_END")
                 add_span(model_span_map[key], timestamps,
-                         "grpc send", "grpc send start", "grpc send end")
+                         "grpc send", "GRPC_SEND_START", "GRPC_SEND_END")
 
             add_span(model_span_map[key], timestamps,
-                     "request handler", "request handler start", "request handler end")
+                     "request handler", "REQUEST_START", "REQUEST_END")
             
             # The tags below will be missing for ensemble model
-            if ("queue start" in timestamps) and ("compute start" in timestamps):
+            if ("QUEUE_START" in timestamps) and ("COMPUTE_START" in timestamps):
                 add_span(model_span_map[key], timestamps,
-                        "queue", "queue start", "compute start")
-            if ("compute start" in timestamps) and ("compute end" in timestamps):
+                        "queue", "QUEUE_START", "COMPUTE_START")
+            if ("COMPUTE_START" in timestamps) and ("COMPUTE_END" in timestamps):
                 add_span(model_span_map[key], timestamps,
-                        "compute", "compute start", "compute end")
-            if ("compute input end" in timestamps) and ("compute output start" in timestamps):
+                        "compute", "COMPUTE_START", "COMPUTE_END")
+            if ("COMPUTE_INPUT_END" in timestamps) and ("COMPUTE_OUTPUT_START" in timestamps):
                 add_span(model_span_map[key], timestamps,
-                         "compute input", "compute start", "compute input end")
+                         "compute input", "COMPUTE_START", "COMPUTE_INPUT_END")
                 add_span(model_span_map[key], timestamps,
-                         "compute infer", "compute input end", "compute output start")
+                         "compute infer", "COMPUTE_INPUT_END", "COMPUTE_OUTPUT_START")
                 add_span(model_span_map[key], timestamps,
-                         "compute output", "compute output start", "compute end")
+                         "compute output", "COMPUTE_OUTPUT_START", "COMPUTE_END")
 
             if FLAGS.show_trace:
                 print("{} ({}):".format(trace["model_name"], trace["model_version"]))
