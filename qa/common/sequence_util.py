@@ -787,33 +787,33 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                          "expect model stats for model {}".format(model_name))
         self.assertEqual(stats.model_stats[0].version, "1",
                          "expect model stats for model {} version 1".format(model_name))
+
+        batch_stats = stats.model_stats[0].batch_stats
+        self.assertEqual(len(batch_stats), len(batch_exec),
+                          "expected {} different batch-sizes, got {}".format(
+                                 len(batch_exec), len(batch_stats)))
+        
+        for batch_stat in batch_stats:
+             bs = batch_stat.batch_size
+             bc = batch_stat.compute_infer.count
+             self.assertTrue(bs in batch_exec,
+                             "unexpected batch-size {}".format(bs))
+             # Get count from one of the stats
+             self.assertEqual(bc, batch_exec[bs],
+                             "expected model-execution-count {} for batch size {}, got {}".format(
+                                     batch_exec[bs], bs, bc))
+
         actual_request_cnt = stats.model_stats[0].inference_stats.success.count
         self.assertEqual(actual_request_cnt, request_cnt,
                         "expected model-request-count {}, got {}".format(
                                 request_cnt, actual_request_cnt))
 
-        # FIXME Uncomment below after updated statistics schema from
-        # 'response' branch.
-        # Before that, batch stats is not reported
-
-        # batch_stats = stats.model_stats[0].batch_stats
-        # self.assertEqual(len(batch_stats), len(batch_exec),
-        #                  "expected {} different batch-sizes, got {}".format(
-        #                         len(batch_exec), len(batch_stats)))
-
-        # FIXME check if infer count is provided in inference statistics. If not,
-        # below calculates it via batch stats
-        # actual_infer_cnt = 0
-        # for batch_stat in batch_stats:
-        #     bs = batch_stat.batch_size
-        #     bc = batch_stat.compute_infer.count
-        #     self.assertTrue(bs in batch_exec,
-        #                     "unexpected batch-size {}".format(bs))
-        #     # Get count from one of the stats
-        #     self.assertEqual(bc, batch_exec[bs],
-        #                     "expected model-execution-count {} for batch size {}, got {}".format(
-        #                             batch_exec[bs], bs, bc))
-        #     actual_infer_cnt += bs * bc
-        # self.assertEqual(actual_infer_cnt, infer_cnt,
-        #                 "expected model-inference-count {}, got {}".format(
-        #                         infer_cnt, actual_infer_cnt))
+        actual_exec_cnt = stats.model_stats[0].execution_count
+        self.assertEqual(actual_request_cnt, request_cnt,
+                        "expected model-exec-count {}, got {}".format(
+                                request_cnt, actual_exec_cnt))
+        
+        actual_infer_cnt = stats.model_stats[0].inference_count
+        self.assertEqual(actual_infer_cnt, infer_cnt,
+                         "expected model-inference-count {}, got {}".format(
+                                 infer_cnt, actual_infer_cnt))
