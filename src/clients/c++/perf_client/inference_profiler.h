@@ -58,10 +58,13 @@ struct LoadStatus {
 /// Holds the server-side inference statisitcs of the target model and its
 /// composing models
 struct ServerSideStats {
-  uint64_t request_count;
+  uint64_t inference_count;
+  uint64_t execution_count;
   uint64_t cumm_time_ns;
   uint64_t queue_time_ns;
-  uint64_t compute_time_ns;
+  uint64_t compute_input_time_ns;
+  uint64_t compute_infer_time_ns;
+  uint64_t compute_output_time_ns;
 
   std::map<ModelIdentifier, ServerSideStats> composing_models_stat;
 };
@@ -176,10 +179,10 @@ class InferenceProfiler {
     nic::Error err;
     bool meets_threshold;
     if (search_mode == SearchMode::NONE) {
-      //  err = Profile(summary, &meets_threshold);
-      //  if (!err.IsOk()) {
-      //    return err;
-      //  }
+      err = Profile(summary, &meets_threshold);
+      if (!err.IsOk()) {
+        return err;
+      }
     } else if (search_mode == SearchMode::LINEAR) {
       T current_value = start;
       do {

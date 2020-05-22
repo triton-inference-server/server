@@ -286,12 +286,15 @@ TritonClientWrapper::ParseStatistics(
                       std::make_pair(this_stat.name(), this_stat.version()),
                       ModelStatistics())
                   .first;
-    it->second.request_count_ = this_stat.inference_stats().success().count();
+    it->second.inference_count_ = this_stat.inference_count();
+    it->second.execution_count_ = this_stat.execution_count();
     it->second.cumm_time_ns_ = this_stat.inference_stats().success().ns();
     it->second.queue_time_ns_ = this_stat.inference_stats().queue().ns();
-    it->second.compute_time_ns_ =
-        this_stat.inference_stats().compute_input().ns() +
-        this_stat.inference_stats().compute_infer().ns() +
+    it->second.compute_input_time_ns_ =
+        this_stat.inference_stats().compute_input().ns();
+    it->second.compute_infer_time_ns_ =
+        this_stat.inference_stats().compute_infer().ns();
+    it->second.compute_output_time_ns_ =
         this_stat.inference_stats().compute_output().ns();
   }
 }
@@ -310,15 +313,19 @@ TritonClientWrapper::ParseStatistics(
                           this_stat["version"].GetString()),
                       ModelStatistics())
                   .first;
-    it->second.request_count_ =
-        this_stat["inference_stats"]["success"]["count"].GetUint64();
+    it->second.inference_count_ =
+        this_stat["inference_count"].GetUint64();
+    it->second.execution_count_ =
+        this_stat["execution_count"].GetUint64();
     it->second.cumm_time_ns_ =
         this_stat["inference_stats"]["success"]["ns"].GetUint64();
     it->second.queue_time_ns_ =
         this_stat["inference_stats"]["queue"]["ns"].GetUint64();
-    it->second.compute_time_ns_ =
-        this_stat["inference_stats"]["compute_input"]["ns"].GetUint64() +
-        this_stat["inference_stats"]["compute_infer"]["ns"].GetUint64() +
+    it->second.compute_input_time_ns_ =
+        this_stat["inference_stats"]["compute_input"]["ns"].GetUint64();
+    it->second.compute_infer_time_ns_ =
+        this_stat["inference_stats"]["compute_infer"]["ns"].GetUint64();
+    it->second.compute_output_time_ns_ =
         this_stat["inference_stats"]["compute_output"]["ns"].GetUint64();
   }
 }
