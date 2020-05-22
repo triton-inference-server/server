@@ -60,6 +60,7 @@ struct LoadStatus {
 struct ServerSideStats {
   uint64_t inference_count;
   uint64_t execution_count;
+  uint64_t success_count;
   uint64_t cumm_time_ns;
   uint64_t queue_time_ns;
   uint64_t compute_input_time_ns;

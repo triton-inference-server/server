@@ -35,32 +35,30 @@ nic::Error
 ReportServerSideStats(const ServerSideStats& stats, const int iteration)
 {
   const std::string ident = std::string(2 * iteration, ' ');
-  const uint64_t infer_cnt = stats.inference_count;
-  if (infer_cnt == 0) {
-    std::cout << ident << "  Inference count: " << infer_cnt << std::endl;
-    return nic::Error::Success;
-  }
 
   const uint64_t exec_cnt = stats.execution_count;
-  if (exec_cnt == 0) {
-    std::cout << ident << "  Execution count: " << exec_cnt << std::endl;
+  const uint64_t infer_cnt = stats.inference_count;
+
+  const uint64_t cnt = stats.success_count;
+  if (cnt == 0) {
+    std::cout << ident << "  Request count: " << cnt << std::endl;
     return nic::Error::Success;
   }
 
   const uint64_t cumm_time_us = stats.cumm_time_ns / 1000;
-  const uint64_t cumm_avg_us = cumm_time_us / exec_cnt;
+  const uint64_t cumm_avg_us = cumm_time_us / cnt;
 
   const uint64_t queue_time_us = stats.queue_time_ns / 1000;
-  const uint64_t queue_avg_us = queue_time_us / exec_cnt;
+  const uint64_t queue_avg_us = queue_time_us / cnt;
 
   const uint64_t compute_input_time_us = stats.compute_input_time_ns / 1000;
-  const uint64_t compute_input_avg_us = compute_input_time_us / exec_cnt;
+  const uint64_t compute_input_avg_us = compute_input_time_us / cnt;
 
   const uint64_t compute_infer_time_us = stats.compute_infer_time_ns / 1000;
-  const uint64_t compute_infer_avg_us = compute_infer_time_us / exec_cnt;
+  const uint64_t compute_infer_avg_us = compute_infer_time_us / cnt;
 
   const uint64_t compute_output_time_us = stats.compute_output_time_ns / 1000;
-  const uint64_t compute_output_avg_us = compute_output_time_us / exec_cnt;
+  const uint64_t compute_output_avg_us = compute_output_time_us / cnt;
 
   const uint64_t compute_avg_us =
       compute_input_avg_us + compute_infer_avg_us + compute_output_avg_us;
@@ -68,8 +66,9 @@ ReportServerSideStats(const ServerSideStats& stats, const int iteration)
                                 ? (cumm_avg_us - queue_avg_us - compute_avg_us)
                                 : 0;
   std::cout << ident << "  Inference count: " << infer_cnt << std::endl
-  << ident << "  Execution count: " << exec_cnt << std::endl
-  << ident << "  Avg request latency: " << cumm_avg_us << " usec";
+            << ident << "  Execution count: " << exec_cnt << std::endl
+            << ident << "  Successful request count: " << exec_cnt << std::endl
+            << ident << "  Avg request latency: " << cumm_avg_us << " usec";
   if (stats.composing_models_stat.empty()) {
     std::cout << " (overhead " << overhead << " usec + "
               << "queue " << queue_avg_us << " usec + "
@@ -760,6 +759,7 @@ InferenceProfiler::SummarizeServerStatsHelper(
   } else {
     uint64_t start_infer_cnt = 0;
     uint64_t start_exec_cnt = 0;
+    uint64_t start_cnt = 0;
     uint64_t start_cumm_time_ns = 0;
     uint64_t start_queue_time_ns = 0;
     uint64_t start_compute_input_time_ns = 0;
@@ -770,6 +770,7 @@ InferenceProfiler::SummarizeServerStatsHelper(
     if (start_itr != start_status.end()) {
       start_infer_cnt = start_itr->second.inference_count_;
       start_exec_cnt = start_itr->second.execution_count_;
+      start_cnt = start_itr->second.success_count_;
       start_cumm_time_ns = start_itr->second.cumm_time_ns_;
       start_queue_time_ns = start_itr->second.queue_time_ns_;
       start_compute_input_time_ns = start_itr->second.compute_input_time_ns_;
@@ -781,6 +782,7 @@ InferenceProfiler::SummarizeServerStatsHelper(
         end_itr->second.inference_count_ - start_infer_cnt;
     server_stats->execution_count =
         end_itr->second.execution_count_ - start_exec_cnt;
+    server_stats->success_count = end_itr->second.success_count_ - start_cnt;
     server_stats->cumm_time_ns =
         end_itr->second.cumm_time_ns_ - start_cumm_time_ns;
     server_stats->queue_time_ns =

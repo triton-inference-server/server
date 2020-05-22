@@ -32,6 +32,7 @@
 using ModelIdentifier = std::pair<std::string, std::string>;
 
 struct ModelStatistics {
+  uint64_t success_count_;
   uint64_t inference_count_;
   uint64_t execution_count_;
   uint64_t cumm_time_ns_;

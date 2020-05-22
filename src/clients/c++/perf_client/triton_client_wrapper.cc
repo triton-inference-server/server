@@ -288,6 +288,7 @@ TritonClientWrapper::ParseStatistics(
                   .first;
     it->second.inference_count_ = this_stat.inference_count();
     it->second.execution_count_ = this_stat.execution_count();
+    it->second.success_count_ = this_stat.inference_stats().success().count();
     it->second.cumm_time_ns_ = this_stat.inference_stats().success().ns();
     it->second.queue_time_ns_ = this_stat.inference_stats().queue().ns();
     it->second.compute_input_time_ns_ =
@@ -313,10 +314,10 @@ TritonClientWrapper::ParseStatistics(
                           this_stat["version"].GetString()),
                       ModelStatistics())
                   .first;
-    it->second.inference_count_ =
-        this_stat["inference_count"].GetUint64();
-    it->second.execution_count_ =
-        this_stat["execution_count"].GetUint64();
+    it->second.inference_count_ = this_stat["inference_count"].GetUint64();
+    it->second.execution_count_ = this_stat["execution_count"].GetUint64();
+    it->second.success_count_ =
+        this_stat["inference_stats"]["success"]["count"].GetUint64();
     it->second.cumm_time_ns_ =
         this_stat["inference_stats"]["success"]["ns"].GetUint64();
     it->second.queue_time_ns_ =

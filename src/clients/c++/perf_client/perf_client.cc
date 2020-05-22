@@ -1304,16 +1304,16 @@ main(int argc, char** argv)
 
       for (PerfStatus& status : summary) {
         uint64_t avg_queue_ns = status.server_stats.queue_time_ns /
-                                status.server_stats.execution_count;
+                                status.server_stats.success_count;
         uint64_t avg_compute_input_ns =
             status.server_stats.compute_input_time_ns /
-            status.server_stats.execution_count;
+            status.server_stats.success_count;
         uint64_t avg_compute_infer_ns =
             status.server_stats.compute_infer_time_ns /
-            status.server_stats.execution_count;
+            status.server_stats.success_count;
         uint64_t avg_compute_output_ns =
             status.server_stats.compute_output_time_ns /
-            status.server_stats.execution_count;
+            status.server_stats.success_count;
 
         uint64_t avg_compute_ns =
             avg_compute_input_ns + avg_compute_infer_ns + avg_compute_output_ns;
@@ -1374,26 +1374,25 @@ main(int argc, char** argv)
             auto it = status.server_stats.composing_models_stat.find(
                 model_identifier.first);
             const auto& stats = it->second;
-            uint64_t avg_queue_ns = stats.queue_time_ns / stats.execution_count;
+            uint64_t avg_queue_ns = stats.queue_time_ns / stats.success_count;
             uint64_t avg_compute_input_ns =
-                stats.compute_input_time_ns / stats.execution_count;
+                stats.compute_input_time_ns / stats.success_count;
             uint64_t avg_compute_infer_ns =
-                stats.compute_infer_time_ns / stats.execution_count;
+                stats.compute_infer_time_ns / stats.success_count;
             uint64_t avg_compute_output_ns =
-                stats.compute_output_time_ns / stats.execution_count;
+                stats.compute_output_time_ns / stats.success_count;
             uint64_t avg_compute_ns = avg_compute_input_ns +
                                       avg_compute_infer_ns +
                                       avg_compute_output_ns;
-            uint64_t avg_overhead_ns =
-                stats.cumm_time_ns / stats.execution_count;
+            uint64_t avg_overhead_ns = stats.cumm_time_ns / stats.success_count;
             avg_overhead_ns =
                 (avg_overhead_ns > (avg_queue_ns + avg_compute_ns))
                     ? (avg_overhead_ns - avg_queue_ns - avg_compute_ns)
                     : 0;
             // infer / sec of the composing model is calculated using the
             // request count ratio between the composing model and the ensemble
-            double infer_ratio = 1.0 * stats.execution_count /
-                                 status.server_stats.execution_count;
+            double infer_ratio =
+                1.0 * stats.success_count / status.server_stats.success_count;
             double infer_per_sec =
                 infer_ratio * status.client_stats.infer_per_sec;
             if (target_concurrency) {
