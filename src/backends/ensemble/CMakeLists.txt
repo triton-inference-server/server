@@ -50,3 +50,9 @@ add_dependencies(ensemble-backend-library proto-library)
 if(${TRITON_ENABLE_GPU})
   target_include_directories(ensemble-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
+if(${TRITON_ENABLE_METRICS})
+  target_include_directories(
+    ensemble-backend-library
+    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+endif() # TRITON_ENABLE_METRICS
