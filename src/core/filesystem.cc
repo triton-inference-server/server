@@ -634,8 +634,8 @@ S3FileSystem::ParsePath(
 S3FileSystem::S3FileSystem(
     const Aws::SDKOptions& options, const std::string& s3_path)
     : options_(options), s3_regex_(
-                             "s3://([0-9a-zA-Z-.]+):([0-9]+)/([0-9a-z.-]+)(((/"
-                             "[0-9a-zA-Z.-_]+)*)?)")
+                             "s3://([0-9a-zA-Z\-.]+):([0-9]+)/"
+                             "([0-9a-z.\-]+)(((/[0-9a-zA-Z.\-_]+)*)?)")
 {
   Aws::Client::ClientConfiguration config;
   Aws::Auth::AWSCredentials credentials;
