@@ -238,11 +238,8 @@ class PlanBackend : public InferenceBackend {
           : inference_backend_(inference_backend),
             event_set_idx_(event_set_idx), total_batch_size_(0),
             compute_start_ns_(0), compute_input_end_ns_(0),
-            compute_output_start_ns_(0)
+            compute_output_start_ns_(0), requests_(std::move(requests))
       {
-        requests_.reset(new std::vector<std::unique_ptr<InferenceRequest>>());
-        *requests_ = std::move(requests);
-        responses_.reset(new std::vector<std::unique_ptr<InferenceResponse>>());
       }
 
       // The pointer to the backend handling the request
@@ -260,15 +257,14 @@ class PlanBackend : public InferenceBackend {
       uint64_t compute_output_start_ns_;
 
       // All the composing InferenceRequest objects
-      std::unique_ptr<std::vector<std::unique_ptr<InferenceRequest>>> requests_;
+      std::vector<std::unique_ptr<InferenceRequest>> requests_;
       // All the generated InferenceResponse objects
-      std::unique_ptr<std::vector<std::unique_ptr<InferenceResponse>>>
-          responses_;
+      std::vector<std::unique_ptr<InferenceResponse>> responses_;
     };
 
     // Assume that the lifetime of composing completion data to extend till
     // the responses are returned.
-    SyncQueue<std::shared_ptr<Payload>> completion_queue_;
+    SyncQueue<std::unique_ptr<Payload>> completion_queue_;
 
     // Map from profile index to the corresponding TensorRT context. Use map
     // to ensure each profile index is mapped to exactly one TensorRT context.
@@ -301,7 +297,7 @@ class PlanBackend : public InferenceBackend {
     std::vector<void*> buffer_bindings_;
 
     // The request details of the ongoing model execution
-    std::shared_ptr<Payload> payload_;
+    std::unique_ptr<Payload> payload_;
   };
 
   // CUDA engine shared across all model instances on the same device.

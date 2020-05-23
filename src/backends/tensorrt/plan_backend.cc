@@ -139,7 +139,7 @@ PlanBackend::Context::~Context()
   DestroyEventSet();
 
   // Notify the completion thread to exit
-  completion_queue_.Put(nullptr);
+  completion_queue_.Put(std::move(std::unique_ptr<Payload>()));
   if (completion_thread_.joinable()) {
     completion_thread_.join();
   }
@@ -1384,7 +1384,7 @@ PlanBackend::Run(
       static_cast<Context*>(contexts_[next_context_[runner_idx]].get());
 
   bool run_failed = true;
-  for (const auto& request : *context->payload_->requests_) {
+  for (const auto& request : context->payload_->requests_) {
     if (request != nullptr) {
       run_failed = false;
       break;
@@ -1403,7 +1403,7 @@ PlanBackend::Run(
     auto event_set_idx = context->next_set_;
     context->next_set_ = (event_set_idx + 1) % context->EVENT_SET_COUNT;
     // Put the details needed by the ProcessResponse thread on the queue
-    context->completion_queue_.Put(context->payload_);
+    context->completion_queue_.Put(std::move(context->payload_));
   }
 
   // Set the next context to be executed on this runner, will block
@@ -1453,7 +1453,7 @@ PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
     auto context = static_cast<Context*>(contexts_[contexts[idx]].get());
     auto event_set_idx = context->next_set_;
     context->next_set_ = (event_set_idx + 1) % context->EVENT_SET_COUNT;
-    context->completion_queue_.Put(context->payload_);
+    context->completion_queue_.Put(std::move(context->payload_));
   }
 
   // Wait for all inflight executions to be finished.
@@ -1543,10 +1543,10 @@ PlanBackend::Context::Run(
   // For each request collect the total batch size for this inference
   // execution. The batch-size, number of inputs, and size of each
   // input has already been checked so don't need to do that here.
-  for (auto& request : *payload_->requests_) {
+  for (auto& request : payload_->requests_) {
     if (request == nullptr) {
       InferenceRequest::RespondIfError(
-          *payload_->requests_,
+          payload_->requests_,
           Status(
               Status::Code::INTERNAL,
               "null request given to TensorRT runner for '" + name_ + "'"));
@@ -1575,7 +1575,7 @@ PlanBackend::Context::Run(
   if ((payload_->total_batch_size_ != 1) &&
       (payload_->total_batch_size_ > (size_t)max_batch_size_)) {
     InferenceRequest::RespondIfError(
-        *payload_->requests_,
+        payload_->requests_,
         Status(
             Status::Code::INTERNAL,
             "dynamic batch size " +
@@ -1589,11 +1589,11 @@ PlanBackend::Context::Run(
   // Scheduler ensures all the requests have identical shape values so use
   // values from any shape tensor
   status = GetRequestShapeValues(
-      payload_->total_batch_size_, payload_->requests_->front(),
+      payload_->total_batch_size_, payload_->requests_.front(),
       &request_shape_values);
   if (!status.IsOk()) {
     InferenceRequest::RespondIfError(
-        *payload_->requests_, status, true /* release_requests */);
+        payload_->requests_, status, true /* release_requests */);
     return;
   }
 
@@ -1613,9 +1613,9 @@ PlanBackend::Context::Run(
   // need the outputs for a request that has an error, we do need to
   // know the size of those outputs associated with the request so we
   // can skip them in the output tensors).
-  payload_->responses_->reserve(payload_->requests_->size());
+  payload_->responses_.reserve(payload_->requests_.size());
 
-  for (auto& request : *payload_->requests_) {
+  for (auto& request : payload_->requests_) {
     std::unique_ptr<InferenceResponse> response;
     Status status = request->ResponseFactory().CreateResponse(&response);
     if (!status.IsOk()) {
@@ -1623,13 +1623,13 @@ PlanBackend::Context::Run(
       response.reset();
     }
 
-    payload_->responses_->emplace_back(std::move(response));
+    payload_->responses_.emplace_back(std::move(response));
   }
 
   // For each input, concatenate input values from each request into
   // the corresponding binding.
   BackendInputCollector collector(
-      *payload_->requests_, payload_->responses_.get(), enable_pinned_input_,
+      payload_->requests_, &payload_->responses_, enable_pinned_input_,
       input_copy_stream_);
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
     int io_index = binding_offset + bindex;
@@ -1637,7 +1637,6 @@ PlanBackend::Context::Run(
       continue;
     }
 
-    // FIXME: In case of multiple profiles the name can be different
     const std::string& name = engine_->getBindingName(bindex);
 
     // Set the shape binding if needed. If unable to set the shape binding
@@ -1655,14 +1654,14 @@ PlanBackend::Context::Run(
             "unable to find shape values for shape input '" + name +
                 "' in request for " + name_);
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             status, "missing shape values for the shape tensor");
       }
       if (status.IsOk()) {
         citr->second.context_->setInputShapeBinding(io_index, &(it->second[0]));
       } else {
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             status, "invalid shape values encountered for shape inputs");
       }
     }
@@ -1674,7 +1673,7 @@ PlanBackend::Context::Run(
 
     const InferenceRequest::Input* repr_input;
     FAIL_ALL_AND_RETURN_IF_ERROR(
-        *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+        payload_->requests_, payload_->responses_, metric_reporter_.get(),
         repr_input_request->ImmutableInput(name, &repr_input),
         "failed to obtain the input '" + name + "'");
     // Get the shape of the input. The request has already checked
@@ -1700,7 +1699,7 @@ PlanBackend::Context::Run(
       nvinfer1::Dims this_dim;
       if (!DimVecToDims(batchn_shape, &this_dim)) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL, "failed to create dims object for " +
                                             DimsListToString(batchn_shape) +
@@ -1713,7 +1712,7 @@ PlanBackend::Context::Run(
           citr->second.max_dims_[bindex], false);
       if (!status.IsOk()) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
                 "request specifies invalid shape for input '" + name +
@@ -1722,7 +1721,7 @@ PlanBackend::Context::Run(
       }
       if (!citr->second.context_->setBindingDimensions(io_index, this_dim)) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
                 "trt failed to set binding dimension to " +
@@ -1745,7 +1744,7 @@ PlanBackend::Context::Run(
           gpu_device_, sizeof(int32_t), (void*)&payload_->total_batch_size_,
           static_cast<char*>(buffers_[bindex]), input_copy_stream_, &cuda_used);
       FAIL_ALL_AND_RETURN_IF_ERROR(
-          *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+          payload_->requests_, payload_->responses_, metric_reporter_.get(),
           status, "error input data for the batch");
 
       collector.ProcessTensor(
@@ -1772,7 +1771,7 @@ PlanBackend::Context::Run(
     if (err != cudaSuccess) {
       cudaStreamSynchronize(stream_);
       FAIL_ALL_AND_RETURN_IF_ERROR(
-          *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+          payload_->requests_, payload_->responses_, metric_reporter_.get(),
           Status(
               Status::Code::INTERNAL, "unable to execute graph for inference " +
                                           name_ + ": " +
@@ -1790,7 +1789,7 @@ PlanBackend::Context::Run(
     if (is_dynamic_) {
       if (!citr->second.context_->allInputDimensionsSpecified()) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
                 "failed to specify the dimensions of all input bindings"),
@@ -1798,7 +1797,7 @@ PlanBackend::Context::Run(
       }
       if (!citr->second.context_->allInputShapesSpecified()) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
                 "failed to specify the values for all input shape tensors"),
@@ -1811,7 +1810,7 @@ PlanBackend::Context::Run(
               &events_[next_set_].ready_for_input_)) {
         cudaStreamSynchronize(stream_);
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
                 "unable to enqueue for inference " + name_),
@@ -1823,7 +1822,7 @@ PlanBackend::Context::Run(
               &events_[next_set_].ready_for_input_)) {
         cudaStreamSynchronize(stream_);
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
                 "unable to enqueue for inference " + name_),
@@ -1838,9 +1837,9 @@ PlanBackend::Context::Run(
   // Collect the names of requested outputs. Do not include outputs
   // for requests that have already responded with an error.
   std::set<std::string> required_outputs;
-  for (size_t idx = 0; idx < payload_->requests_->size(); idx++) {
-    const auto& request = (*payload_->requests_)[idx];
-    const auto& response = (*payload_->responses_)[idx];
+  for (size_t idx = 0; idx < payload_->requests_.size(); idx++) {
+    const auto& request = payload_->requests_[idx];
+    const auto& response = payload_->responses_[idx];
     if (response != nullptr) {
       for (const auto& output_name : request->ImmutableRequestedOutputs()) {
         required_outputs.insert(output_name);
@@ -1851,7 +1850,7 @@ PlanBackend::Context::Run(
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
   BackendResponder responder(
-      *payload_->requests_, payload_->responses_.get(), max_batch_size_,
+      payload_->requests_, &payload_->responses_, max_batch_size_,
       enable_pinned_output_, stream_);
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
     int io_index = binding_offset + bindex;
@@ -1859,8 +1858,6 @@ PlanBackend::Context::Run(
       continue;
     }
 
-    // FIXME: The output name can be different in case of multiple
-    // optimization Profiles.
     const std::string& name = engine_->getBindingName(bindex);
 
     nvinfer1::Dims dims;
@@ -1882,7 +1879,7 @@ PlanBackend::Context::Run(
         if (!citr->second.context_->getShapeBinding(
                 io_index, shape_value_ptr)) {
           FAIL_ALL_AND_RETURN_IF_ERROR(
-              *payload_->requests_, *payload_->responses_,
+              payload_->requests_, payload_->responses_,
               metric_reporter_.get(),
               Status(
                   Status::Code::INTERNAL,
@@ -1895,7 +1892,7 @@ PlanBackend::Context::Run(
         if (support_batching_ &&
             payload_->total_batch_size_ != (uint32_t)*shape_value_ptr) {
           FAIL_ALL_AND_RETURN_IF_ERROR(
-              *payload_->requests_, *payload_->responses_,
+              payload_->requests_, payload_->responses_,
               metric_reporter_.get(),
               Status(
                   Status::Code::INTERNAL,
@@ -1914,9 +1911,9 @@ PlanBackend::Context::Run(
           batchn_shape.push_back(dims.d[0]);
         }
 
-        for (size_t idx = 0; idx < payload_->responses_->size(); idx++) {
-          auto& request = (*payload_->requests_)[idx];
-          auto& response = (*payload_->responses_)[idx];
+        for (size_t idx = 0; idx < payload_->responses_.size(); idx++) {
+          auto& request = payload_->requests_[idx];
+          auto& response = payload_->responses_[idx];
 
           if (support_batching_) {
             batchn_shape[0] = request->BatchSize();
@@ -1964,7 +1961,7 @@ PlanBackend::Context::Run(
       if (byte_sizes_[bindex] <
           (batch1_byte_size * payload_->total_batch_size_)) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            *payload_->requests_, *payload_->responses_, metric_reporter_.get(),
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
                 "unexpected size for output '" + name + "', byte-size " +
@@ -1990,13 +1987,11 @@ PlanBackend::Context::ProcessResponse(
 {
   while (true) {
     NVTX_RANGE(nvtx_, "ProcessResponse " + context_idx);
-    auto payload = completion_queue_.Get();
-    if (payload == nullptr) {
+    auto payload = std::move(completion_queue_.Get());
+    if (payload.get() == nullptr) {
       break;
     }
     auto& event_set = events_[payload->event_set_idx_];
-    auto requests = std::move(payload->requests_);
-    auto responses = std::move(payload->responses_);
 
     // The model execution associated with the current context
     // has consumed the inputs. Put the context back into the available queue
@@ -2013,10 +2008,10 @@ PlanBackend::Context::ProcessResponse(
 #ifdef TRITON_ENABLE_STATS
 
     // Report stats and trace
-    for (size_t i = 0; i < requests->size(); ++i) {
-      auto& request = (*requests)[i];
+    for (size_t i = 0; i < payload->requests_.size(); ++i) {
+      auto& request = payload->requests_[i];
       request->ReportStatistics(
-          metric_reporter_.get(), ((*responses)[i] != nullptr),
+          metric_reporter_.get(), (payload->responses_[i] != nullptr),
           payload->compute_start_ns_,
           payload->compute_input_end_ns_,
           payload->compute_output_start_ns_, compute_end_ns);
@@ -2049,7 +2044,7 @@ PlanBackend::Context::ProcessResponse(
 
     // Send all the responses that haven't already been sent because of
     // an earlier error.
-    for (auto& response : *responses) {
+    for (auto& response : payload->responses_) {
       if (response != nullptr) {
         LOG_STATUS_ERROR(
             InferenceResponse::Send(std::move(response)),
@@ -2058,7 +2053,7 @@ PlanBackend::Context::ProcessResponse(
     }
 
     // Release all requests.
-    for (auto& request : *requests) {
+    for (auto& request : payload->requests_) {
       InferenceRequest::Release(std::move(request));
     }
   }
