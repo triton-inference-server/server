@@ -51,7 +51,7 @@ class SyncQueue {
     if (queue_.empty()) {
       cv_.wait(lk, [this] { return !queue_.empty(); });
     }
-    auto res = queue_.front();
+    auto res = std::move(queue_.front());
     queue_.pop_front();
     return res;
   }
@@ -61,6 +61,15 @@ class SyncQueue {
     {
       std::lock_guard<std::mutex> lk(mu_);
       queue_.push_back(value);
+    }
+    cv_.notify_all();
+  }
+
+  void Put(Item&& value)
+  {
+    {
+      std::lock_guard<std::mutex> lk(mu_);
+      queue_.push_back(std::move(value));
     }
     cv_.notify_all();
   }
