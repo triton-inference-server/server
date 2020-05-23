@@ -2312,7 +2312,9 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 
   rapidjson::Value model_name_val(model_name, strlen(model_name));
   response_json.AddMember("model_name", model_name_val, allocator);
-  rapidjson::Value model_version_val(model_version);
+  std::string model_version_str = std::to_string(model_version);
+  rapidjson::Value model_version_val(
+      model_version_str.c_str(), model_version_str.length());
   response_json.AddMember("model_version", model_version_val, allocator);
 
   // Go through each response output and transfer information to JSON
