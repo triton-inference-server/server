@@ -1879,8 +1879,7 @@ PlanBackend::Context::Run(
         if (!citr->second.context_->getShapeBinding(
                 io_index, shape_value_ptr)) {
           FAIL_ALL_AND_RETURN_IF_ERROR(
-              payload_->requests_, payload_->responses_,
-              metric_reporter_.get(),
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
               Status(
                   Status::Code::INTERNAL,
                   "failed to retrieve the output shape values from binding '" +
@@ -1892,8 +1891,7 @@ PlanBackend::Context::Run(
         if (support_batching_ &&
             payload_->total_batch_size_ != (uint32_t)*shape_value_ptr) {
           FAIL_ALL_AND_RETURN_IF_ERROR(
-              payload_->requests_, payload_->responses_,
-              metric_reporter_.get(),
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
               Status(
                   Status::Code::INTERNAL,
                   "unexpected batch shape value " +
@@ -2012,16 +2010,14 @@ PlanBackend::Context::ProcessResponse(
       auto& request = payload->requests_[i];
       request->ReportStatistics(
           metric_reporter_.get(), (payload->responses_[i] != nullptr),
-          payload->compute_start_ns_,
-          payload->compute_input_end_ns_,
+          payload->compute_start_ns_, payload->compute_input_end_ns_,
           payload->compute_output_start_ns_, compute_end_ns);
 
 #ifdef TRITON_ENABLE_TRACING
       if (request->Trace() != nullptr) {
         auto& trace = request->Trace();
         trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_START,
-            payload->compute_start_ns_);
+            TRITONSERVER_TRACE_COMPUTE_START, payload->compute_start_ns_);
         trace->Report(
             TRITONSERVER_TRACE_COMPUTE_INPUT_END,
             payload->compute_input_end_ns_);
@@ -2037,8 +2033,7 @@ PlanBackend::Context::ProcessResponse(
     payload->inference_backend_->MutableStatsAggregator()
         ->UpdateInferBatchStats(
             metric_reporter_.get(), payload->total_batch_size_,
-            payload->compute_start_ns_,
-            payload->compute_input_end_ns_,
+            payload->compute_start_ns_, payload->compute_input_end_ns_,
             payload->compute_output_start_ns_, compute_end_ns);
 #endif  // TRITON_ENABLE_STATS
 
