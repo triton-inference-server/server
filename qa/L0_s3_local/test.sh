@@ -42,13 +42,13 @@ PERF_CLIENT=../clients/perf_client
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
-TMPDIR="qa_model_repository"
-cp -r $DATADIR $TMPDIR
+MODELDIR="qa_model_repository"
+cp -r $DATADIR $MODELDIR
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
-cp -r $TMPDIR/libtorch_float32_float32_float32 $TMPDIR/$DUMMY_MODEL
-sed -i 's/libtorch_float32_float32_float32/Model_repo-1.0/g' $TMPDIR/$DUMMY_MODEL/config.pbtxt
+cp -r $MODELDIR/libtorch_float32_float32_float32 $MODELDIR/$DUMMY_MODEL
+sed -i 's/libtorch_float32_float32_float32/Model_repo-1.0/g' $MODELDIR/$DUMMY_MODEL/config.pbtxt
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
@@ -80,7 +80,7 @@ export AWS_ACCESS_KEY_ID=minio && \
 # create and add data to bucket
 python -m pip install awscli-local && \
     awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket1.0 && \
-    awslocal s3 sync $TMPDIR s3://demo-bucket1.0
+    awslocal s3 sync $MODELDIR s3://demo-bucket1.0
 
 RET=0
 
