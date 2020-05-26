@@ -39,8 +39,6 @@
 #include "grpc++/server_builder.h"
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
-#include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
@@ -48,12 +46,14 @@
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
 
+#define TRITONJSON_TRITONSERVER_STATUS
+#include "src/core/json.h"
+
 #ifdef TRITON_ENABLE_TRACING
 #include "src/servers/tracer.h"
 #endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
-
 namespace {
 
 // Unique IDs are only needed when debugging. They only appear in
@@ -818,36 +818,51 @@ CommonHandler::SetUpAllRequests()
     TRITONSERVER_Message* server_metadata_message = nullptr;
     TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
         tritonserver_.get(), &server_metadata_message);
-    if (err == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      err = TRITONSERVER_MessageSerializeToJson(
-          server_metadata_message, &buffer, &byte_size);
-      if (err == nullptr) {
-        rapidjson::Document server_metadata_json;
-        server_metadata_json.Parse(buffer, byte_size);
-        if (server_metadata_json.HasParseError()) {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              std::string(
-                  "failed to parse the server metadata JSON buffer: " +
-                  std::string(
-                      GetParseError_En(server_metadata_json.GetParseError())) +
-                  " at " +
-                  std::to_string(server_metadata_json.GetErrorOffset()))
-                  .c_str());
-        } else {
-          response->set_name(server_metadata_json["name"].GetString());
-          response->set_version(server_metadata_json["version"].GetString());
-          for (const auto& extension :
-               server_metadata_json["extensions"].GetArray()) {
-            response->add_extensions(extension.GetString());
-          }
+    GOTO_IF_ERR(err, earlyexit);
+
+    const char* buffer;
+    size_t byte_size;
+    err = TRITONSERVER_MessageSerializeToJson(
+        server_metadata_message, &buffer, &byte_size);
+    GOTO_IF_ERR(err, earlyexit);
+
+    {
+      TritonJson::Value server_metadata_json(TritonJson::ValueType::OBJECT);
+      err = server_metadata_json.Parse(buffer, byte_size);
+      GOTO_IF_ERR(err, earlyexit);
+
+      const char* name;
+      size_t namelen;
+      err = server_metadata_json.MemberAsString("name", &name, &namelen);
+      GOTO_IF_ERR(err, earlyexit);
+
+      const char* version;
+      size_t versionlen;
+      err =
+          server_metadata_json.MemberAsString("version", &version, &versionlen);
+      GOTO_IF_ERR(err, earlyexit);
+
+      response->set_name(std::string(name, namelen));
+      response->set_version(std::string(version, versionlen));
+
+      if (server_metadata_json.Find("extensions")) {
+        TritonJson::Value extensions_json;
+        err =
+            server_metadata_json.MemberAsArray("extensions", &extensions_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        for (size_t idx = 0; idx < extensions_json.ArraySize(); ++idx) {
+          const char* ext;
+          size_t extlen;
+          err = extensions_json.IndexAsString(idx, &ext, &extlen);
+          GOTO_IF_ERR(err, earlyexit);
+          response->add_extensions(std::string(ext, extlen));
         }
       }
       TRITONSERVER_MessageDelete(server_metadata_message);
     }
 
+  earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
   };
@@ -876,64 +891,139 @@ CommonHandler::SetUpAllRequests()
     int64_t requested_model_version;
     auto err =
         GetModelVersionFromString(request.version(), &requested_model_version);
-    if (err == nullptr) {
+    GOTO_IF_ERR(err, earlyexit);
+
+    {
       TRITONSERVER_Message* model_metadata_message = nullptr;
       err = TRITONSERVER_ServerModelMetadata(
           tritonserver_.get(), request.name().c_str(), requested_model_version,
           &model_metadata_message);
-      if (err == nullptr) {
-        const char* buffer;
-        size_t byte_size;
-        err = TRITONSERVER_MessageSerializeToJson(
-            model_metadata_message, &buffer, &byte_size);
-        if (err == nullptr) {
-          rapidjson::Document model_metadata_json;
-          model_metadata_json.Parse(buffer, byte_size);
-          if (model_metadata_json.HasParseError()) {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL,
-                std::string(
-                    "failed to parse the model metadata JSON buffer: " +
-                    std::string(
-                        GetParseError_En(model_metadata_json.GetParseError())) +
-                    " at " +
-                    std::to_string(model_metadata_json.GetErrorOffset()))
-                    .c_str());
-          } else {
-            response->set_name(model_metadata_json["name"].GetString());
-            for (const auto& version :
-                 model_metadata_json["versions"].GetArray()) {
-              response->add_versions(version.GetString());
-            }
-            response->set_platform(model_metadata_json["platform"].GetString());
+      GOTO_IF_ERR(err, earlyexit);
 
-            for (const auto& io_json :
-                 model_metadata_json["inputs"].GetArray()) {
-              ModelMetadataResponse::TensorMetadata* io =
-                  response->add_inputs();
-              io->set_name(io_json["name"].GetString());
-              io->set_datatype(io_json["datatype"].GetString());
-              for (const auto& d : io_json["shape"].GetArray()) {
-                io->add_shape(d.GetInt());
-              }
-            }
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          model_metadata_message, &buffer, &byte_size);
+      GOTO_IF_ERR(err, earlyexit);
 
-            for (const auto& io_json :
-                 model_metadata_json["outputs"].GetArray()) {
-              ModelMetadataResponse::TensorMetadata* io =
-                  response->add_outputs();
-              io->set_name(io_json["name"].GetString());
-              io->set_datatype(io_json["datatype"].GetString());
-              for (const auto& d : io_json["shape"].GetArray()) {
-                io->add_shape(d.GetInt());
-              }
+      TritonJson::Value model_metadata_json(TritonJson::ValueType::OBJECT);
+      err = model_metadata_json.Parse(buffer, byte_size);
+      GOTO_IF_ERR(err, earlyexit);
+
+      const char* name;
+      size_t namelen;
+      err = model_metadata_json.MemberAsString("name", &name, &namelen);
+      GOTO_IF_ERR(err, earlyexit);
+
+      response->set_name(std::string(name, namelen));
+
+      if (model_metadata_json.Find("versions")) {
+        TritonJson::Value versions_json;
+        err = model_metadata_json.MemberAsArray("versions", &versions_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        for (size_t idx = 0; idx < versions_json.ArraySize(); ++idx) {
+          const char* version;
+          size_t versionlen;
+          err = versions_json.IndexAsString(idx, &version, &versionlen);
+          GOTO_IF_ERR(err, earlyexit);
+          response->add_versions(std::string(version, versionlen));
+        }
+      }
+
+      const char* platform;
+      size_t platformlen;
+      err = model_metadata_json.MemberAsString(
+          "platform", &platform, &platformlen);
+      GOTO_IF_ERR(err, earlyexit);
+      response->set_platform(std::string(platform, platformlen));
+
+      if (model_metadata_json.Find("inputs")) {
+        TritonJson::Value inputs_json;
+        err = model_metadata_json.MemberAsArray("inputs", &inputs_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        for (size_t idx = 0; idx < inputs_json.ArraySize(); ++idx) {
+          TritonJson::Value io_json;
+          err = inputs_json.IndexAsObject(idx, &io_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          ModelMetadataResponse::TensorMetadata* io = response->add_inputs();
+
+          const char* name;
+          size_t namelen;
+          err = io_json.MemberAsString("name", &name, &namelen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          const char* datatype;
+          size_t datatypelen;
+          err = io_json.MemberAsString("datatype", &datatype, &datatypelen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          io->set_name(std::string(name, namelen));
+          io->set_datatype(std::string(datatype, datatypelen));
+
+          if (io_json.Find("shape")) {
+            TritonJson::Value shape_json;
+            err = io_json.MemberAsArray("shape", &shape_json);
+            GOTO_IF_ERR(err, earlyexit);
+
+            for (size_t sidx = 0; sidx < shape_json.ArraySize(); ++sidx) {
+              int64_t d;
+              err = shape_json.IndexAsInt(idx, &d);
+              GOTO_IF_ERR(err, earlyexit);
+
+              io->add_shape(d);
             }
           }
         }
-        TRITONSERVER_MessageDelete(model_metadata_message);
       }
+
+      if (model_metadata_json.Find("outputs")) {
+        TritonJson::Value outputs_json;
+        err = model_metadata_json.MemberAsArray("outputs", &outputs_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        for (size_t idx = 0; idx < outputs_json.ArraySize(); ++idx) {
+          TritonJson::Value io_json;
+          err = outputs_json.IndexAsObject(idx, &io_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          ModelMetadataResponse::TensorMetadata* io = response->add_outputs();
+
+          const char* name;
+          size_t namelen;
+          err = io_json.MemberAsString("name", &name, &namelen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          const char* datatype;
+          size_t datatypelen;
+          err = io_json.MemberAsString("datatype", &datatype, &datatypelen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          io->set_name(std::string(name, namelen));
+          io->set_datatype(std::string(datatype, datatypelen));
+
+          if (io_json.Find("shape")) {
+            TritonJson::Value shape_json;
+            err = io_json.MemberAsArray("shape", &shape_json);
+            GOTO_IF_ERR(err, earlyexit);
+
+            for (size_t sidx = 0; sidx < shape_json.ArraySize(); ++sidx) {
+              int64_t d;
+              err = shape_json.IndexAsInt(idx, &d);
+              GOTO_IF_ERR(err, earlyexit);
+
+              io->add_shape(d);
+            }
+          }
+        }
+      }
+
+      TRITONSERVER_MessageDelete(model_metadata_message);
     }
 
+  earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
   };
@@ -1006,96 +1096,229 @@ CommonHandler::SetUpAllRequests()
                                       ModelStatisticsResponse* response,
                                       grpc::Status* status) {
 #ifdef TRITON_ENABLE_STATS
+    TritonJson::Value model_stats_json(TritonJson::ValueType::OBJECT);
+
     int64_t requested_model_version;
     auto err =
         GetModelVersionFromString(request.version(), &requested_model_version);
-    rapidjson::Document model_stats_json;
-    if (err == nullptr) {
+    GOTO_IF_ERR(err, earlyexit);
+
+    {
       TRITONSERVER_Message* model_stats_message = nullptr;
       err = TRITONSERVER_ServerModelStatistics(
           tritonserver_.get(), request.name().c_str(), requested_model_version,
           &model_stats_message);
-      if (err == nullptr) {
-        const char* buffer;
-        size_t byte_size;
-        err = TRITONSERVER_MessageSerializeToJson(
-            model_stats_message, &buffer, &byte_size);
-        if (err == nullptr) {
-          model_stats_json.Parse(buffer, byte_size);
-          if (model_stats_json.HasParseError()) {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL,
-                std::string(
-                    "failed to parse the model statistics JSON buffer: " +
-                    std::string(
-                        GetParseError_En(model_stats_json.GetParseError())) +
-                    " at " + std::to_string(model_stats_json.GetErrorOffset()))
-                    .c_str());
-          }
-        }
-        TRITONSERVER_MessageDelete(model_stats_message);
-      }
+      GOTO_IF_ERR(err, earlyexit);
+
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          model_stats_message, &buffer, &byte_size);
+      GOTO_IF_ERR(err, earlyexit);
+
+      err = model_stats_json.Parse(buffer, byte_size);
+      GOTO_IF_ERR(err, earlyexit);
+
+      TRITONSERVER_MessageDelete(model_stats_message);
     }
 
-    if (err == nullptr) {
-      for (const auto& model_stat :
-           model_stats_json["model_stats"].GetArray()) {
+    if (model_stats_json.Find("model_stats")) {
+      TritonJson::Value stats_json;
+      err = model_stats_json.MemberAsArray("model_stats", &stats_json);
+      GOTO_IF_ERR(err, earlyexit);
+
+      for (size_t idx = 0; idx < stats_json.ArraySize(); ++idx) {
+        TritonJson::Value model_stat;
+        err = stats_json.IndexAsObject(idx, &model_stat);
+        GOTO_IF_ERR(err, earlyexit);
+
         auto statistics = response->add_model_stats();
 
-        const auto& infer_stats_json = model_stat["inference_stats"];
-        statistics->set_name(model_stat["name"].GetString());
-        statistics->set_version(model_stat["version"].GetString());
-        statistics->set_last_inference(
-            model_stat["last_inference"].GetUint64());
-        statistics->set_inference_count(
-            model_stat["inference_count"].GetUint64());
-        statistics->set_execution_count(
-            model_stat["execution_count"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_success()->set_count(
-            infer_stats_json["success"]["count"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_success()->set_ns(
-            infer_stats_json["success"]["ns"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_fail()->set_count(
-            infer_stats_json["fail"]["count"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_fail()->set_ns(
-            infer_stats_json["fail"]["ns"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_queue()->set_count(
-            infer_stats_json["queue"]["count"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_queue()->set_ns(
-            infer_stats_json["queue"]["ns"].GetUint64());
-        statistics->mutable_inference_stats()
-            ->mutable_compute_input()
-            ->set_count(infer_stats_json["compute_input"]["count"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_compute_input()->set_ns(
-            infer_stats_json["compute_input"]["ns"].GetUint64());
-        statistics->mutable_inference_stats()
-            ->mutable_compute_infer()
-            ->set_count(infer_stats_json["compute_infer"]["count"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_compute_infer()->set_ns(
-            infer_stats_json["compute_infer"]["ns"].GetUint64());
-        statistics->mutable_inference_stats()
-            ->mutable_compute_output()
-            ->set_count(
-                infer_stats_json["compute_output"]["count"].GetUint64());
-        statistics->mutable_inference_stats()->mutable_compute_output()->set_ns(
-            infer_stats_json["compute_output"]["ns"].GetUint64());
+        TritonJson::Value infer_stats_json;
+        err = model_stat.MemberAsObject("inference_stats", &infer_stats_json);
+        GOTO_IF_ERR(err, earlyexit);
 
-        for (const auto& batch_stat : model_stat["batch_stats"].GetArray()) {
+        const char* name;
+        size_t namelen;
+        err = infer_stats_json.MemberAsString("name", &name, &namelen);
+        GOTO_IF_ERR(err, earlyexit);
+
+        const char* version;
+        size_t versionlen;
+        err = infer_stats_json.MemberAsString("version", &version, &versionlen);
+        GOTO_IF_ERR(err, earlyexit);
+
+        statistics->set_name(std::string(name, namelen));
+        statistics->set_version(std::string(version, versionlen));
+
+        uint64_t ucnt;
+        err = infer_stats_json.MemberAsUInt("last_inference", &ucnt);
+        GOTO_IF_ERR(err, earlyexit);
+        statistics->set_last_inference(ucnt);
+
+        err = infer_stats_json.MemberAsUInt("inference_count", &ucnt);
+        GOTO_IF_ERR(err, earlyexit);
+        statistics->set_inference_count(ucnt);
+
+        err = infer_stats_json.MemberAsUInt("execution_count", &ucnt);
+        GOTO_IF_ERR(err, earlyexit);
+        statistics->set_execution_count(ucnt);
+
+        {
+          TritonJson::Value success_json;
+          err = infer_stats_json.MemberAsObject("success", &success_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          err = success_json.MemberAsUInt("count", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()->mutable_success()->set_count(
+              ucnt);
+          err = success_json.MemberAsUInt("ns", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()->mutable_success()->set_ns(
+              ucnt);
+        }
+
+        {
+          TritonJson::Value fail_json;
+          err = infer_stats_json.MemberAsObject("fail", &fail_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          err = fail_json.MemberAsUInt("count", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()->mutable_fail()->set_count(
+              ucnt);
+          err = fail_json.MemberAsUInt("ns", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()->mutable_fail()->set_ns(ucnt);
+        }
+
+        {
+          TritonJson::Value queue_json;
+          err = infer_stats_json.MemberAsObject("queue", &queue_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          err = queue_json.MemberAsUInt("count", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()->mutable_queue()->set_count(
+              ucnt);
+          err = queue_json.MemberAsUInt("ns", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()->mutable_queue()->set_ns(ucnt);
+        }
+
+        {
+          TritonJson::Value compute_input_json;
+          err = infer_stats_json.MemberAsObject(
+              "compute_input", &compute_input_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          err = compute_input_json.MemberAsUInt("count", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()
+              ->mutable_compute_input()
+              ->set_count(ucnt);
+          err = compute_input_json.MemberAsUInt("ns", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()
+              ->mutable_compute_input()
+              ->set_ns(ucnt);
+        }
+
+        {
+          TritonJson::Value compute_infer_json;
+          err = infer_stats_json.MemberAsObject(
+              "compute_infer", &compute_infer_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          err = compute_infer_json.MemberAsUInt("count", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()
+              ->mutable_compute_infer()
+              ->set_count(ucnt);
+          err = compute_infer_json.MemberAsUInt("ns", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()
+              ->mutable_compute_infer()
+              ->set_ns(ucnt);
+        }
+
+        {
+          TritonJson::Value compute_output_json;
+          err = infer_stats_json.MemberAsObject(
+              "compute_output", &compute_output_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          err = compute_output_json.MemberAsUInt("count", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()
+              ->mutable_compute_output()
+              ->set_count(ucnt);
+          err = compute_output_json.MemberAsUInt("ns", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          statistics->mutable_inference_stats()
+              ->mutable_compute_output()
+              ->set_ns(ucnt);
+        }
+
+
+        TritonJson::Value batches_json;
+        err = model_stat.MemberAsArray("batch_stats", &batches_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        for (size_t idx = 0; idx < batches_json.ArraySize(); ++idx) {
+          TritonJson::Value batch_stat;
+          err = batches_json.IndexAsObject(idx, &batch_stat);
+          GOTO_IF_ERR(err, earlyexit);
+
           auto batch_statistics = statistics->add_batch_stats();
-          batch_statistics->set_batch_size(
-              batch_stat["batch_size"].GetUint64());
-          batch_statistics->mutable_compute_input()->set_count(
-              batch_stat["compute_input"]["count"].GetUint64());
-          batch_statistics->mutable_compute_input()->set_ns(
-              batch_stat["compute_input"]["ns"].GetUint64());
-          batch_statistics->mutable_compute_infer()->set_count(
-              batch_stat["compute_infer"]["count"].GetUint64());
-          batch_statistics->mutable_compute_infer()->set_ns(
-              batch_stat["compute_infer"]["ns"].GetUint64());
-          batch_statistics->mutable_compute_output()->set_count(
-              batch_stat["compute_output"]["count"].GetUint64());
-          batch_statistics->mutable_compute_output()->set_ns(
-              batch_stat["compute_output"]["ns"].GetUint64());
+
+          uint64_t ucnt;
+          err = batch_stat.MemberAsUInt("batch_size", &ucnt);
+          GOTO_IF_ERR(err, earlyexit);
+          batch_statistics->set_batch_size(ucnt);
+
+          {
+            TritonJson::Value compute_input_json;
+            err =
+                batch_stat.MemberAsObject("compute_input", &compute_input_json);
+            GOTO_IF_ERR(err, earlyexit);
+
+            err = compute_input_json.MemberAsUInt("count", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            batch_statistics->mutable_compute_input()->set_count(ucnt);
+            err = compute_input_json.MemberAsUInt("ns", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            batch_statistics->mutable_compute_input()->set_ns(ucnt);
+          }
+
+          {
+            TritonJson::Value compute_infer_json;
+            err =
+                batch_stat.MemberAsObject("compute_infer", &compute_infer_json);
+            GOTO_IF_ERR(err, earlyexit);
+
+            err = compute_infer_json.MemberAsUInt("count", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            batch_statistics->mutable_compute_infer()->set_count(ucnt);
+            err = compute_infer_json.MemberAsUInt("ns", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            batch_statistics->mutable_compute_infer()->set_ns(ucnt);
+          }
+
+          {
+            TritonJson::Value compute_output_json;
+            err = batch_stat.MemberAsObject(
+                "compute_output", &compute_output_json);
+            GOTO_IF_ERR(err, earlyexit);
+
+            err = compute_output_json.MemberAsUInt("count", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            batch_statistics->mutable_compute_output()->set_count(ucnt);
+            err = compute_output_json.MemberAsUInt("ns", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            batch_statistics->mutable_compute_output()->set_ns(ucnt);
+          }
         }
       }
     }
@@ -1105,6 +1328,7 @@ CommonHandler::SetUpAllRequests()
         "the server does not suppport model statistics");
 #endif
 
+  earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
   };
@@ -1351,48 +1575,65 @@ CommonHandler::SetUpAllRequests()
       TRITONSERVER_Message* model_index_message = nullptr;
       err = TRITONSERVER_ServerModelIndex(
           tritonserver_.get(), flags, &model_index_message);
-      if (err == nullptr) {
-        const char* buffer;
-        size_t byte_size;
-        err = TRITONSERVER_MessageSerializeToJson(
-            model_index_message, &buffer, &byte_size);
-        if (err == nullptr) {
-          rapidjson::Document model_index_json;
-          model_index_json.Parse(buffer, byte_size);
-          if (model_index_json.HasParseError()) {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL,
-                std::string(
-                    "failed to parse the repository index JSON buffer: " +
-                    std::string(
-                        GetParseError_En(model_index_json.GetParseError())) +
-                    " at " + std::to_string(model_index_json.GetErrorOffset()))
-                    .c_str());
-          } else {
-            for (const auto& model : model_index_json.GetArray()) {
-              auto model_index = response->add_models();
-              model_index->set_name(model["name"].GetString());
-              if (model.FindMember("version") != model.MemberEnd()) {
-                model_index->set_version(model["version"].GetString());
-              }
-              if (model.FindMember("state") != model.MemberEnd()) {
-                model_index->set_state(model["state"].GetString());
-              }
-              if (model.FindMember("reason") != model.MemberEnd()) {
-                model_index->set_reason(model["reason"].GetString());
-              }
-            }
-          }
-        }
+      GOTO_IF_ERR(err, earlyexit);
 
-        TRITONSERVER_MessageDelete(model_index_message);
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          model_index_message, &buffer, &byte_size);
+      GOTO_IF_ERR(err, earlyexit);
+
+      TritonJson::Value model_index_json(TritonJson::ValueType::OBJECT);
+      err = model_index_json.Parse(buffer, byte_size);
+      GOTO_IF_ERR(err, earlyexit);
+
+      err = model_index_json.AssertType(TritonJson::ValueType::ARRAY);
+      GOTO_IF_ERR(err, earlyexit);
+
+      for (size_t idx = 0; idx < model_index_json.ArraySize(); ++idx) {
+        TritonJson::Value index_json;
+        err = model_index_json.IndexAsObject(idx, &index_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        auto model_index = response->add_models();
+
+        const char* name;
+        size_t namelen;
+        err = index_json.MemberAsString("name", &name, &namelen);
+        GOTO_IF_ERR(err, earlyexit);
+        model_index->set_name(std::string(name, namelen));
+
+        if (index_json.Find("version")) {
+          const char* version;
+          size_t versionlen;
+          err = index_json.MemberAsString("version", &version, &versionlen);
+          GOTO_IF_ERR(err, earlyexit);
+          model_index->set_version(std::string(version, versionlen));
+        }
+        if (index_json.Find("state")) {
+          const char* state;
+          size_t statelen;
+          err = index_json.MemberAsString("state", &state, &statelen);
+          GOTO_IF_ERR(err, earlyexit);
+          model_index->set_state(std::string(state, statelen));
+        }
+        if (index_json.Find("reason")) {
+          const char* reason;
+          size_t reasonlen;
+          err = index_json.MemberAsString("reason", &reason, &reasonlen);
+          GOTO_IF_ERR(err, earlyexit);
+          model_index->set_reason(std::string(reason, reasonlen));
+        }
       }
+
+      TRITONSERVER_MessageDelete(model_index_message);
     } else {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
           "'repository_name' specification is not supported");
     }
 
+  earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
   };
@@ -1637,7 +1878,8 @@ ParseSharedMemoryParams(
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
-              "invalid value type for 'shared_memory_byte_size' parameter for "
+              "invalid value type for 'shared_memory_byte_size' parameter "
+              "for "
               "tensor '" +
               tensor.name() + "', expected int64_param.")
               .c_str());
@@ -1804,7 +2046,8 @@ InferGRPCToInput(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             std::string(
-                "when shared memory is used, expected 'content' is not set for "
+                "when shared memory is used, expected 'content' is not set "
+                "for "
                 "input tensor '" +
                 io.name() + "' for model '" + request.model_name() + "'")
                 .c_str());

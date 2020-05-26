@@ -39,19 +39,11 @@
 #include <sanitizer/lsan_interface.h>
 #endif  // TRITON_ENABLE_ASAN
 
-#include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
 #include "src/core/logging.h"
 #include "src/core/tritonserver.h"
 #include "src/servers/common.h"
 #include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
-
-#ifdef TRITON_ENABLE_GPU
-static_assert(
-    TRITON_MIN_COMPUTE_CAPABILITY >= 1.0,
-    "Invalid TRITON_MIN_COMPUTE_CAPABILITY specified");
-#endif  // TRITON_ENABLE_GPU
 
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "src/servers/http_server.h"
@@ -60,6 +52,12 @@ static_assert(
 #ifdef TRITON_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
+
+#ifdef TRITON_ENABLE_GPU
+static_assert(
+    TRITON_MIN_COMPUTE_CAPABILITY >= 1.0,
+    "Invalid TRITON_MIN_COMPUTE_CAPABILITY specified");
+#endif  // TRITON_ENABLE_GPU
 
 namespace {
 
@@ -495,34 +493,6 @@ StartEndpoints(
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
-  TRITONSERVER_Message* message = nullptr;
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerMetadata(server.get(), &message),
-      "failed to get server metadata message");
-  const char* buffer;
-  size_t byte_size;
-  FAIL_IF_ERR(
-      TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size),
-      "failed to get server metadata json string");
-  rapidjson::Document server_metadata_json;
-  server_metadata_json.Parse(buffer, byte_size);
-  if (server_metadata_json.HasParseError()) {
-    FAIL_IF_ERR(
-        TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INTERNAL,
-            std::string(
-                "failed to parse the server metadata JSON buffer: " +
-                std::string(
-                    GetParseError_En(server_metadata_json.GetParseError())) +
-                " at " + std::to_string(server_metadata_json.GetErrorOffset()))
-                .c_str()),
-        "");
-  }
-
-  std::cout << "Starting endpoints, '"
-            << server_metadata_json["name"].GetString() << "' listening on"
-            << std::endl;
-
 #ifdef TRITON_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
   if (allow_grpc_ && (grpc_port_ != -1)) {
