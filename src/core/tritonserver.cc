@@ -1477,7 +1477,7 @@ TRITONSERVER_ServerModelMetadata(
 
   ni::TritonJson::Value metadata(ni::TritonJson::ValueType::OBJECT);
 
-  // Can use string ref in this function even-though model can be
+  // Can use string ref in this function even though model can be
   // unloaded and config becomes invalid, because TritonServeMessage
   // serializes the json when it is constructed below.
   RETURN_IF_STATUS_ERROR(metadata.AddStringRef("name", model_name));
@@ -1507,8 +1507,13 @@ TRITONSERVER_ServerModelMetadata(
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef(
         "datatype", ni::DataTypeToProtocolString(io.data_type())));
 
+    // Input shape. If the model supports batching then must include
+    // '-1' for the batch dimension.
     ni::TritonJson::Value io_metadata_shape(
         metadata, ni::TritonJson::ValueType::ARRAY);
+    if (model_config.max_batch_size() >= 1) {
+      RETURN_IF_STATUS_ERROR(io_metadata_shape.AppendInt(-1));
+    }
     for (const auto d : io.dims()) {
       RETURN_IF_STATUS_ERROR(io_metadata_shape.AppendInt(d));
     }
@@ -1527,8 +1532,13 @@ TRITONSERVER_ServerModelMetadata(
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef(
         "datatype", ni::DataTypeToProtocolString(io.data_type())));
 
+    // Output shape. If the model supports batching then must include
+    // '-1' for the batch dimension.
     ni::TritonJson::Value io_metadata_shape(
         metadata, ni::TritonJson::ValueType::ARRAY);
+    if (model_config.max_batch_size() >= 1) {
+      RETURN_IF_STATUS_ERROR(io_metadata_shape.AppendInt(-1));
+    }
     for (const auto d : io.dims()) {
       RETURN_IF_STATUS_ERROR(io_metadata_shape.AppendInt(d));
     }
