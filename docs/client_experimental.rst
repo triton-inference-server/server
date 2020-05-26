@@ -46,14 +46,14 @@ that uses the new protocol following directions in
 
 The Python GRPC client interface documentation is available at
 `src/clients/python/experimental\_api\_v2/library/grpcclient.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/experimental_api_v2/library/grpcclient.py>`_,
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/experimental_api_v2/library/grpcclient.py>`_,
 `src/clients/python/experimental\_api\_v2/library/httpclient.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/experimental_api_v2/library/httpclient.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/experimental_api_v2/library/httpclient.py>`_
 and in the API Reference.
 
 Examples are available in
 `src/clients/python/experimental\_api\_v2/examples
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/experimental_api_v2/examples>`_. The
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/experimental_api_v2/examples>`_. The
 examples that start with **grpc_** use the `protoc compiler to
 generate the GRPC client stub <https://grpc.io/docs/guides/>`_, the
 examples that start with **simple_grpc_** use the Python GRPC client

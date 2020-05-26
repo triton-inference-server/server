@@ -273,20 +273,20 @@ Client API
 
 The C++ client API exposes a class-based interface for querying server
 and model status and for performing inference. The commented interface
-is available at `src/clients/c++/library/request.h.in
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/library/request.h.in>`_
+is available at `src/clients/c++/api_vi/library/request.h.in
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/api_v1/library/request.h.in>`_
 and in the API Reference.
 
 The Python client API provides similar capabilities as the C++
 API. The commented interface is available at
 `src/clients/python/api_v1/library/\_\_init\_\_.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/library/__init__.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/library/__init__.py>`_
 and in the API Reference.
 
 A simple C++ example application at `src/clients/c++/api_v1/examples/simple\_client.cc.in
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/simple_client.cc.in>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/api_v1/examples/simple_client.cc.in>`_
 and a Python version at `src/clients/python/api_v1/examples/simple\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/simple_client.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/examples/simple_client.py>`_
 demonstrate basic client API usage.
 
 To run the C++ version of the simple example, first build or
@@ -316,9 +316,9 @@ System Shared Memory
 
 A simple C++ example application using system shared memory at
 `src/clients/c++/api_v1/examples/simple\_shm\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/simple_shm_client.cc>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/api_v1/examples/simple_shm_client.cc>`_
 and a Python version at `src/clients/python/api_v1/examples/simple\_shm\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/simple_shm_client.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/examples/simple_shm_client.py>`_
 demonstrate the usage of shared memory with the client API.
 
 To run the C++ version of the simple system shared memory example, first
@@ -338,7 +338,7 @@ build or download it as described in
   15 - 1 = 14
 
 We have added a simple `system shared memory module
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/library/shared_memory/__init__.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/library/shared_memory/__init__.py>`_
 that extends the Python client API to create, set and destroy system shared
 memory. To run the Python version of the simple system shared memory example,
 first build or download it as described in
@@ -352,9 +352,9 @@ CUDA Shared Memory
 
 A simple C++ example application using CUDA shared memory at
 `src/clients/c++/api_v1/examples/simple\_cuda\_shm\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/simple_cuda_shm_client.cc>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/api_v1/examples/simple_cuda_shm_client.cc>`_
 and a Python version at `src/clients/python/api_v1/examples/simple\_shm\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/simple_cuda_shm_client.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/examples/simple_cuda_shm_client.py>`_
 demonstrate the usage of shared memory with the client API.
 
 To run the C++ version of the simple CUDA shared memory example, first
@@ -374,7 +374,7 @@ $ simple_cuda_shm_client
 15 - 1 = 14
 
 We have added a simple `CUDA shared memory module
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/library/cuda_shared_memory/__init__.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/library/cuda_shared_memory/__init__.py>`_
 that extends the Python client API to create, set and destroy CUDA shared
 memory. To run the Python version of the simple CUDA shared memory example,
 first build or download it as described in
@@ -395,9 +395,9 @@ SetRaw().
 
 String tensors are demonstrated in the C++ example application at
 `src/clients/c++/api_v1/examples/simple\_string\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/simple_string_client.cc>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/api_v1/examples/simple_string_client.cc>`_
 and a Python version at `src/clients/python/api_v1/examples/simple\_string\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/simple_string_client.py>`_.
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/examples/simple_string_client.py>`_.
 
 .. _section-client-api-stateful-models:
 
@@ -421,10 +421,10 @@ async_run() methods in the Python API.
 The use of correlation ID and start and end flags are demonstrated in
 the C++ example application at
 `src/clients/c++/api_v1/examples/simple\_sequence\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/simple_sequence_client.cc>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/api_v1/examples/simple_sequence_client.cc>`_
 and a Python version at
 `src/clients/python/api_v1/examples/simple\_sequence\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/simple_sequence_client.py>`_.
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/examples/simple_sequence_client.py>`_.
 
 Shape Tensor
 ^^^^^^^^^^^^

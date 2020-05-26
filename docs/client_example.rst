@@ -189,10 +189,10 @@ Image Classification Example Application
 
 The image classification example that uses the C++ client API is
 available at `src/clients/c++/api_v1/examples/image\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/image_client.cc>`_. The
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/api_v1/examples/image_client.cc>`_. The
 Python version of the image classification client is available at
 `src/clients/python/api_v1/examples/image\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/image_client.py>`_.
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/examples/image_client.py>`_.
 
 To use image\_client (or image\_client.py) you must first have a
 running inference server that is serving one or more image
@@ -289,7 +289,7 @@ on all images in the directory::
 
 The grpc\_image\_client.py application at available at
 `src/clients/python/api_v1/examples/grpc\_image\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/grpc_image_client.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/examples/grpc_image_client.py>`_
 behaves the same as the image\_client except that instead of using the
 inference server client library it uses the GRPC generated client
 library to communicate with the server.
@@ -306,10 +306,10 @@ to send the raw image binaries in the request and receive
 classification results without preprocessing the images on the
 client. The ensemble image classification example that uses the C++
 client API is available at `src/clients/c++/api_v1/examples/ensemble\_image\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/ensemble_image_client.cc>`_.
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/api_v1/examples/ensemble_image_client.cc>`_.
 The Python version of the image classification client is available at
 `src/clients/python/api_v1/examples/ensemble\_image\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/ensemble_image_client.py>`_.
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/python/api_v1/examples/ensemble_image_client.py>`_.
 
 To use ensemble\_image\_client (or ensemble\_image\_client.py) you must first
 have a running inference server that is serving the
@@ -382,7 +382,7 @@ Performance Measurement Application
 -----------------------------------
 
 The perf\_client application located at `src/clients/c++/perf\_client
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/perf_client>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/clients/c%2B%2B/perf_client>`_
 uses the C++ client API to send concurrent requests to the server to
 measure latency and inferences-per-second under varying client
 loads. See the :ref:`section-perf-client` for a full description.
