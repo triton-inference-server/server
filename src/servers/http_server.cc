@@ -2426,9 +2426,9 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
     // For classification replace existing output with serialized
     // classification output.
     if ((info != nullptr) && (info->class_cnt_ > 0)) {
-      // Determine the batch1 byte size of the tensor... needed when
-      // the response tensor batch-size > 1 so that we know how to
-      // stride though the tensor data.
+      // Determine the batch1 byte size of the output tensor... needed
+      // when the response tensor batch-size > 1 so that we know how
+      // to stride though the tensor data.
       size_t batch1_element_count = 1;
       for (size_t sidx = ((batch_size == 0) ? 0 : 1); sidx < dim_count;
            sidx++) {
@@ -2470,6 +2470,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
       RETURN_IF_ERR(AllocEVBuffer(byte_size, &info->evbuffer_, &buffer));
       memcpy(buffer, serialized.c_str(), byte_size);
       base = reinterpret_cast<const void*>(buffer);
+      datatype = TRITONSERVER_TYPE_BYTES;
     }
 
     // Add JSON data, or collect binary data. If 'info' is nullptr
