@@ -51,19 +51,28 @@ try:
 except ImportError:
     bdist_wheel = None
 
-setup(
-    name='tritonclientutils',
-    version=VERSION,
-    author='NVIDIA Inc.',
-    author_email='tanmayv@nvidia.com',
-    description=
-    'Python utils library for NVIDIA Triton Inference Server client',
-    license='BSD',
-    url='http://nvidia.com',
-    keywords=
-    'triton tensorrt inference server utils client',
-    packages=find_packages(),
-    install_requires=REQUIRED,
-    zip_safe=False,
-    cmdclass={'bdist_wheel': bdist_wheel},
-)
+if os.name == 'posix':
+    platform_package_data = ['libcshm.so']
+    if bool(os.environ.get('CUDA_VERSION', 0)):
+        platform_package_data += ['libccudashm.so']
+
+    setup(
+        name='tritonshmutils',
+        version=VERSION,
+        author='NVIDIA Inc.',
+        author_email='tanmayv@nvidia.com',
+        description=
+        'Python utils library for creating and managing system and cuda shared memory regions for NVIDIA Triton Inference Server',
+        license='BSD',
+        url='http://nvidia.com',
+        keywords=
+        'triton tensorrt inference server shared memory cuda system client',
+        packages=find_packages(),
+        install_requires=REQUIRED,
+        package_data={
+            '': platform_package_data,
+        },
+        zip_safe=False,
+        platforms=['posix'],
+        cmdclass={'bdist_wheel': bdist_wheel},
+    )

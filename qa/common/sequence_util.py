@@ -37,8 +37,8 @@ from functools import partial
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-import tritonclientutils.shared_memory as shm
-import tritonclientutils.cuda_shared_memory as cudashm
+import tritonshmutils.shared_memory as shm
+import tritonshmutils.cuda_shared_memory as cudashm
 from tritonclientutils.utils import *
 
 if sys.version_info >= (3, 0):

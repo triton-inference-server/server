@@ -30,7 +30,7 @@ import os
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-import tritonclientutils.cuda_shared_memory as cshm
+import tritonshmutils.cuda_shared_memory as cshm
 from tritonclientutils.utils import *
 
 class CudaSharedMemoryTest(unittest.TestCase):

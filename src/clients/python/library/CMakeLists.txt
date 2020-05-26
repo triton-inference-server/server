@@ -147,41 +147,81 @@ endif() # TRITON_ENABLE_GRPC
 #
 # triton client utils wheel file
 #
+set(utils_wheel_stamp_file "utils_stamp.whl")
+configure_file(utils_setup.py utils_setup.py COPYONLY)
+
+if(${TRITON_ENABLE_GPU})
+  add_custom_command(
+      OUTPUT "${utils_wheel_stamp_file}"
+      COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
+      ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
+      DEPENDS
+        ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+        ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
+        cshm
+        ccudashm
+  )
+else()
+  add_custom_command(
+      OUTPUT "${utils_wheel_stamp_file}"
+      COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
+      ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
+      DEPENDS
+        ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+        ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
+        cshm
+  )
+endif()
+
+add_custom_target(
+    client-wheel-utils ALL
+    DEPENDS
+      "${utils_wheel_stamp_file}"
+)
+
+install(
+    CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/utils/tritonclientutils-*.whl\")"
+    CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
+)
+
+#
+# triton client shared memory utils wheel file
+#
 if(NOT WIN32)
-  set(utils_wheel_stamp_file "utils_stamp.whl")
-  configure_file(utils_setup.py utils_setup.py COPYONLY)
+  set(shm_utils_wheel_stamp_file "shm_utils_stamp.whl")
+  configure_file(shm_utils_setup.py shm_utils_setup.py COPYONLY)
 
   if(${TRITON_ENABLE_GPU})
     add_custom_command(
-        OUTPUT "${utils_wheel_stamp_file}"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
+        OUTPUT "${shm_utils_wheel_stamp_file}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shm_utils_build_wheel.sh"
         ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
         DEPENDS
           ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-          ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
+          ${CMAKE_CURRENT_BINARY_DIR}/shm_utils_setup.py
           cshm
           ccudashm
     )
   else()
     add_custom_command(
-        OUTPUT "${utils_wheel_stamp_file}"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
+        OUTPUT "${shm_utils_wheel_stamp_file}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shm_utils_build_wheel.sh"
         ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
         DEPENDS
           ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-          ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
+          ${CMAKE_CURRENT_BINARY_DIR}/shm_utils_setup.py
           cshm
     )
   endif()
 
   add_custom_target(
-      client-wheel-utils ALL
+      client-wheel-shmutils ALL
       DEPENDS
-        "${utils_wheel_stamp_file}"
+        "${shm_utils_wheel_stamp_file}"
   )
 
   install(
-      CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/utils/tritonclientutils-*.whl\")"
+      CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/shm/tritonshmutils-*.whl\")"
       CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
   )
 endif() # NOT WIN32

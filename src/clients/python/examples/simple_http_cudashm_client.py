@@ -30,7 +30,7 @@ import numpy as np
 import sys
 from builtins import range
 import tritonhttpclient
-import tritonclientutils.cuda_shared_memory as cudashm
+import tritonshmutils.cuda_shared_memory as cudashm
 import tritonclientutils.utils as utils
 
 FLAGS = None

@@ -31,7 +31,7 @@ import os
 import sys
 from builtins import range
 import tritongrpcclient
-import tritonclientutils.shared_memory as shm
+import tritonshmutils.shared_memory as shm
 import tritonclientutils.utils as utils
 from ctypes import *
 

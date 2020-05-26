@@ -29,7 +29,7 @@ import unittest
 import os
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-import tritonclientutils.shared_memory as shm
+import tritonshmutils.shared_memory as shm
 from tritonclientutils.utils import *
 
 class SharedMemoryTest(unittest.TestCase):
