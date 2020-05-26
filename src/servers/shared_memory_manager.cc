@@ -469,38 +469,28 @@ SharedMemoryManager::GetStatus(
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(
     const std::string& name, TRITONSERVER_MemoryType memory_type,
-    rapidjson::Document* shm_status)
+    TritonJson::Value* shm_status)
 {
-  shm_status->SetArray();
-  auto& allocator = shm_status->GetAllocator();
   std::lock_guard<std::mutex> lock(mu_);
 
   if (name.empty()) {
     for (const auto& shm_info : shared_memory_map_) {
       if (shm_info.second->kind_ == memory_type) {
-        rapidjson::Value shm_region;
-        shm_region.SetObject();
-        rapidjson::Value name(
-            shm_info.second->name_.c_str(), shm_info.second->name_.size());
-        shm_region.AddMember("name", name, allocator);
+        TritonJson::Value shm_region(
+            *shm_status, TritonJson::ValueType::OBJECT);
+        RETURN_IF_ERR(shm_region.AddString("name", name.c_str(), name.size()));
         if (memory_type == TRITONSERVER_MEMORY_CPU) {
-          shm_region.AddMember(
-              "key",
-              rapidjson::Value(shm_info.second->shm_key_.c_str(), allocator)
-                  .Move(),
-              allocator);
-          shm_region.AddMember(
-              "offset", rapidjson::Value(shm_info.second->offset_).Move(),
-              allocator);
+          RETURN_IF_ERR(shm_region.AddString(
+              "key", shm_info.second->shm_key_.c_str(),
+              shm_info.second->shm_key_.size()));
+          RETURN_IF_ERR(shm_region.AddUInt("offset", shm_info.second->offset_));
         } else {
-          shm_region.AddMember(
-              "device_id", rapidjson::Value(shm_info.second->device_id_).Move(),
-              allocator);
+          RETURN_IF_ERR(
+              shm_region.AddUInt("device_id", shm_info.second->device_id_));
         }
-        shm_region.AddMember(
-            "byte_size", rapidjson::Value(shm_info.second->byte_size_).Move(),
-            allocator);
-        shm_status->PushBack(shm_region, allocator);
+        RETURN_IF_ERR(
+            shm_region.AddUInt("byte_size", shm_info.second->byte_size_));
+        RETURN_IF_ERR(shm_status->Append(std::move(shm_region)));
       }
     }
   } else {
@@ -533,29 +523,21 @@ SharedMemoryManager::GetStatus(
       }
     }
 
-    rapidjson::Value shm_region;
-    shm_region.SetObject();
-    rapidjson::Value name(it->second->name_.c_str(), it->second->name_.size());
-    shm_region.AddMember("name", name, allocator);
+    TritonJson::Value shm_region(*shm_status, TritonJson::ValueType::OBJECT);
+    RETURN_IF_ERR(shm_region.AddString(
+        "name", it->second->name_.c_str(), it->second->name_.size()));
     if (memory_type == TRITONSERVER_MEMORY_CPU) {
-      shm_region.AddMember(
-          "key",
-          rapidjson::Value(it->second->shm_key_.c_str(), allocator).Move(),
-          allocator);
-      shm_region.AddMember(
-          "offset", rapidjson::Value(it->second->offset_).Move(), allocator);
+      RETURN_IF_ERR(shm_region.AddString(
+          "key", it->second->shm_key_.c_str(), it->second->shm_key_.size()));
+      RETURN_IF_ERR(shm_region.AddUInt("offset", it->second->offset_));
     } else {
-      shm_region.AddMember(
-          "device_id", rapidjson::Value(it->second->device_id_).Move(),
-          allocator);
+      RETURN_IF_ERR(shm_region.AddUInt("device_id", it->second->device_id_));
     }
-    shm_region.AddMember(
-        "byte_size", rapidjson::Value(it->second->byte_size_).Move(),
-        allocator);
-    shm_status->PushBack(shm_region, allocator);
+    RETURN_IF_ERR(shm_region.AddUInt("byte_size", it->second->byte_size_));
+    RETURN_IF_ERR(shm_status->Append(std::move(shm_region)));
   }
 
-  return nullptr;
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error*
