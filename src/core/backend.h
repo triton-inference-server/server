@@ -43,7 +43,7 @@ namespace nvidia { namespace inferenceserver {
         if (response != nullptr) {                                        \
           LOG_STATUS_ERROR(                                               \
               InferenceResponse::SendWithStatus(                          \
-                  std::move(response), status__),                         \
+                  std::move(response), (S)),                              \
               (LOG_MSG));                                                 \
         }                                                                 \
       }                                                                   \
