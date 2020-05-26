@@ -456,15 +456,16 @@ ParseModelGrpc(
   // Output is expected to be a vector. But allow any number of
   // dimensions as long as all but 1 is size 1 (e.g. { 10 }, { 1, 10
   // }, { 10, 1, 1 } are all ok).
+  bool output_batch_dim = (model_info->max_batch_size_ > 0);
   size_t non_one_cnt = 0;
   for (const auto dim : output_metadata.shape()) {
-    if (dim == -1) {
+    if (output_batch_dim) {
+      output_batch_dim = false;
+    } else if (dim == -1) {
       std::cerr << "variable-size dimension in model output not supported"
                 << std::endl;
       exit(1);
-    }
-
-    if (dim > 1) {
+    } else if (dim > 1) {
       non_one_cnt += 1;
       if (non_one_cnt > 1) {
         std::cerr << "expecting model output to be a vector" << std::endl;
@@ -473,11 +474,14 @@ ParseModelGrpc(
     }
   }
 
-  // Model input must have 3 dims, either CHW or HWC
-  if (input_metadata.shape().size() != 3) {
-    std::cerr << "expecting input to have 3 dimensions, model '"
-              << model_metadata.name() << "' input has "
-              << input_metadata.shape().size() << std::endl;
+  // Model input must have 3 dims, either CHW or HWC (not counting the
+  // batch dimension), either CHW or HWC
+  const bool input_batch_dim = (model_info->max_batch_size_ > 0);
+  const int expected_input_dims = 3 + (input_batch_dim ? 1 : 0);
+  if (input_metadata.shape().size() != expected_input_dims) {
+    std::cerr << "expecting input to have " << expected_input_dims
+              << " dimensions, model '" << model_metadata.name()
+              << "' input has " << input_metadata.shape().size() << std::endl;
     exit(1);
   }
 
@@ -499,14 +503,14 @@ ParseModelGrpc(
 
   if (input_config.format() == ni::ModelInput::FORMAT_NHWC) {
     model_info->input_format_ = "FORMAT_NHWC";
-    model_info->input_h_ = input_metadata.shape(0);
-    model_info->input_w_ = input_metadata.shape(1);
-    model_info->input_c_ = input_metadata.shape(2);
+    model_info->input_h_ = input_metadata.shape(input_batch_dim ? 1 : 0);
+    model_info->input_w_ = input_metadata.shape(input_batch_dim ? 2 : 1);
+    model_info->input_c_ = input_metadata.shape(input_batch_dim ? 3 : 2);
   } else {
     model_info->input_format_ = "FORMAT_NCHW";
-    model_info->input_c_ = input_metadata.shape(0);
-    model_info->input_h_ = input_metadata.shape(1);
-    model_info->input_w_ = input_metadata.shape(2);
+    model_info->input_c_ = input_metadata.shape(input_batch_dim ? 1 : 0);
+    model_info->input_h_ = input_metadata.shape(input_batch_dim ? 2 : 1);
+    model_info->input_w_ = input_metadata.shape(input_batch_dim ? 3 : 2);
   }
 
   if (!ParseType(
@@ -604,17 +608,19 @@ ParseModelHttp(
   // Output is expected to be a vector. But allow any number of
   // dimensions as long as all but 1 is size 1 (e.g. { 10 }, { 1, 10
   // }, { 10, 1, 1 } are all ok).
+  bool output_batch_dim = (max_batch_size > 0);
   size_t non_one_cnt = 0;
   const auto output_shape_itr = output_metadata.FindMember("shape");
   if (output_shape_itr != output_metadata.MemberEnd()) {
     const rapidjson::Value& shape_json = output_shape_itr->value;
     for (rapidjson::SizeType i = 0; i < shape_json.Size(); i++) {
-      if (shape_json[i].GetInt() == -1) {
+      if (output_batch_dim) {
+        output_batch_dim = false;
+      } else if (shape_json[i].GetInt() == -1) {
         std::cerr << "variable-size dimension in model output not supported"
                   << std::endl;
         exit(1);
-      }
-      if (shape_json[i].GetInt() > 1) {
+      } else if (shape_json[i].GetInt() > 1) {
         non_one_cnt += 1;
         if (non_one_cnt > 1) {
           std::cerr << "expecting model output to be a vector" << std::endl;
@@ -629,13 +635,16 @@ ParseModelHttp(
   }
 
 
-  // Model input must have 3 dims, either CHW or HWC
+  // Model input must have 3 dims, either CHW or HWC (not counting the
+  // batch dimension), either CHW or HWC
+  const bool input_batch_dim = (max_batch_size > 0);
+  const size_t expected_input_dims = 3 + (input_batch_dim ? 1 : 0);
   const auto input_shape_itr = input_metadata.FindMember("shape");
   if (input_shape_itr != input_metadata.MemberEnd()) {
-    if (input_shape_itr->value.Size() != 3) {
-      std::cerr << "expecting input to have 3 dimensions, model '"
-                << model_metadata["name"].GetString() << "' input has "
-                << input_shape_itr->value.Size() << std::endl;
+    if (input_shape_itr->value.Size() != expected_input_dims) {
+      std::cerr << "expecting input to have " << expected_input_dims
+                << " dimensions, model '" << model_metadata["name"].GetString()
+                << "' input has " << input_shape_itr->value.Size() << std::endl;
       exit(1);
     }
   } else {
@@ -644,7 +653,6 @@ ParseModelHttp(
     exit(1);
   }
 
-  // Model input must have 3 dims, either CHW or HWC
   model_info->input_format_ = std::string(
       input_config["format"].GetString(),
       input_config["format"].GetStringLength());
@@ -666,13 +674,19 @@ ParseModelHttp(
       input_metadata["datatype"].GetStringLength());
 
   if (model_info->input_format_.compare("FORMAT_NHWC") == 0) {
-    model_info->input_h_ = input_shape_itr->value[0].GetInt();
-    model_info->input_w_ = input_shape_itr->value[1].GetInt();
-    model_info->input_c_ = input_shape_itr->value[2].GetInt();
+    model_info->input_h_ =
+        input_shape_itr->value[input_batch_dim ? 1 : 0].GetInt();
+    model_info->input_w_ =
+        input_shape_itr->value[input_batch_dim ? 2 : 1].GetInt();
+    model_info->input_c_ =
+        input_shape_itr->value[input_batch_dim ? 3 : 2].GetInt();
   } else {
-    model_info->input_c_ = input_shape_itr->value[0].GetInt();
-    model_info->input_h_ = input_shape_itr->value[1].GetInt();
-    model_info->input_w_ = input_shape_itr->value[2].GetInt();
+    model_info->input_c_ =
+        input_shape_itr->value[input_batch_dim ? 1 : 0].GetInt();
+    model_info->input_h_ =
+        input_shape_itr->value[input_batch_dim ? 2 : 1].GetInt();
+    model_info->input_w_ =
+        input_shape_itr->value[input_batch_dim ? 3 : 2].GetInt();
   }
 
   if (!ParseType(

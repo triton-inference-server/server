@@ -970,7 +970,7 @@ CommonHandler::SetUpAllRequests()
 
             for (size_t sidx = 0; sidx < shape_json.ArraySize(); ++sidx) {
               int64_t d;
-              err = shape_json.IndexAsInt(idx, &d);
+              err = shape_json.IndexAsInt(sidx, &d);
               GOTO_IF_ERR(err, earlyexit);
 
               io->add_shape(d);
@@ -1011,7 +1011,7 @@ CommonHandler::SetUpAllRequests()
 
             for (size_t sidx = 0; sidx < shape_json.ArraySize(); ++sidx) {
               int64_t d;
-              err = shape_json.IndexAsInt(idx, &d);
+              err = shape_json.IndexAsInt(sidx, &d);
               GOTO_IF_ERR(err, earlyexit);
 
               io->add_shape(d);
