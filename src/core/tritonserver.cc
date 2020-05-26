@@ -289,7 +289,7 @@ class TritonServerOptions {
 };
 
 TritonServerOptions::TritonServerOptions()
-    : server_id_("inference:0"),
+    : server_id_("triton"),
       model_control_mode_(ni::ModelControlMode::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
       metrics_(true), gpu_metrics_(true), exit_timeout_(30),

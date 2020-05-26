@@ -813,7 +813,7 @@ ParsePairOption(const std::string arg)
 bool
 Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 {
-  std::string server_id("inference:0");
+  std::string server_id("triton");
   std::set<std::string> model_repository_paths;
   bool exit_on_error = true;
   bool strict_model_config = true;
