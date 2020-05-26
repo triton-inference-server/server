@@ -65,7 +65,7 @@ PERF_CLIENT_PROTOCOL_ARGS="-i grpc -u localhost:8001" &&
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
-PERF_CLIENT_PERCENTILE_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory \"${SHARED_MEMORY}\""
+PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory \"${SHARED_MEMORY}\""
 
 #
 # Use "identity" model for all model types.
@@ -121,7 +121,7 @@ for BACKEND in $BACKENDS; do
     $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
-                 ${PERF_CLIENT_PERCENTILE_ARGS} \
+                 ${PERF_CLIENT_EXTRA_ARGS} \
                  ${PERF_CLIENT_PROTOCOL_ARGS} -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
                  --shape INPUT0:${SHAPE} \
