@@ -1134,35 +1134,35 @@ CommonHandler::SetUpAllRequests()
 
         auto statistics = response->add_model_stats();
 
-        TritonJson::Value infer_stats_json;
-        err = model_stat.MemberAsObject("inference_stats", &infer_stats_json);
-        GOTO_IF_ERR(err, earlyexit);
-
         const char* name;
         size_t namelen;
-        err = infer_stats_json.MemberAsString("name", &name, &namelen);
+        err = model_stat.MemberAsString("name", &name, &namelen);
         GOTO_IF_ERR(err, earlyexit);
 
         const char* version;
         size_t versionlen;
-        err = infer_stats_json.MemberAsString("version", &version, &versionlen);
+        err = model_stat.MemberAsString("version", &version, &versionlen);
         GOTO_IF_ERR(err, earlyexit);
 
         statistics->set_name(std::string(name, namelen));
         statistics->set_version(std::string(version, versionlen));
 
         uint64_t ucnt;
-        err = infer_stats_json.MemberAsUInt("last_inference", &ucnt);
+        err = model_stat.MemberAsUInt("last_inference", &ucnt);
         GOTO_IF_ERR(err, earlyexit);
         statistics->set_last_inference(ucnt);
 
-        err = infer_stats_json.MemberAsUInt("inference_count", &ucnt);
+        err = model_stat.MemberAsUInt("inference_count", &ucnt);
         GOTO_IF_ERR(err, earlyexit);
         statistics->set_inference_count(ucnt);
 
-        err = infer_stats_json.MemberAsUInt("execution_count", &ucnt);
+        err = model_stat.MemberAsUInt("execution_count", &ucnt);
         GOTO_IF_ERR(err, earlyexit);
         statistics->set_execution_count(ucnt);
+
+        TritonJson::Value infer_stats_json;
+        err = model_stat.MemberAsObject("inference_stats", &infer_stats_json);
+        GOTO_IF_ERR(err, earlyexit);
 
         {
           TritonJson::Value success_json;
