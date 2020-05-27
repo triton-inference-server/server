@@ -75,13 +75,9 @@ int32_t repository_poll_secs_ = 15;
 // default values and modifyied based on command-line args. Set to -1
 // to indicate the protocol is disabled.
 #ifdef TRITON_ENABLE_HTTP
-std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
-    http_services_;
-std::vector<std::string> endpoint_names_ = {"health", "infer"};
+std::unique_ptr<nvidia::inferenceserver::HTTPServer> http_service_;
 bool allow_http_ = true;
 int32_t http_port_ = 8000;
-int32_t http_health_port_ = -1;
-std::vector<int32_t> http_ports_;
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
@@ -133,7 +129,6 @@ enum OptionId {
 #if defined(TRITON_ENABLE_HTTP)
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_PORT,
-  OPTION_HTTP_HEALTH_PORT,
   OPTION_HTTP_THREAD_COUNT,
 #endif  // TRITON_ENABLE_HTTP
 #if defined(TRITON_ENABLE_GRPC)
@@ -211,17 +206,15 @@ std::vector<Option> options_
        "configuration may be absent or only partially specified and the "
        "server will attempt to derive the missing required configuration."},
       {OPTION_STRICT_READINESS, "strict-readiness",
-       "If true /api/health/ready endpoint indicates ready if the server "
+       "If true /v2/health/ready endpoint indicates ready if the server "
        "is responsive and all models are available. If false "
-       "/api/health/ready endpoint indicates ready if server is responsive "
+       "/v2/health/ready endpoint indicates ready if server is responsive "
        "even if some/all models are unavailable."},
 #if defined(TRITON_ENABLE_HTTP)
       {OPTION_ALLOW_HTTP, "allow-http",
        "Allow the server to listen for HTTP requests."},
       {OPTION_HTTP_PORT, "http-port",
        "The port for the server to listen on for HTTP requests."},
-      {OPTION_HTTP_HEALTH_PORT, "http-health-port",
-       "The port for the server to listen on for HTTP Health requests."},
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
        "Number of threads handling HTTP requests."},
 #endif  // TRITON_ENABLE_HTTP
@@ -341,9 +334,8 @@ CheckPortCollision()
 {
 #if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_GRPC)
   // Check if HTTP and GRPC have shared ports
-  if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
-       http_ports_.end()) &&
-      (grpc_port_ != -1) && allow_http_ && allow_grpc_) {
+  if ((grpc_port_ == http_port_) && (grpc_port_ != -1) && allow_http_ &&
+      allow_grpc_) {
     std::cerr << "The server cannot listen to HTTP requests "
               << "and GRPC requests at the same port" << std::endl;
     return true;
@@ -362,9 +354,8 @@ CheckPortCollision()
 
 #if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_METRICS)
   // Check if Metric and HTTP have shared ports
-  if ((std::find(http_ports_.begin(), http_ports_.end(), metrics_port_) !=
-       http_ports_.end()) &&
-      (metrics_port_ != -1) && allow_http_ && allow_metrics_) {
+  if ((http_port_ == metrics_port_) && (metrics_port_ != -1) && allow_http_ &&
+      allow_metrics_) {
     std::cerr << "The server cannot provide metrics on same port used for "
               << "HTTP requests" << std::endl;
     return true;
@@ -401,31 +392,22 @@ StartGrpcService(
 #ifdef TRITON_ENABLE_HTTP
 TRITONSERVER_Error*
 StartHttpService(
-    std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>* services,
+    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
-        shm_manager,
-    std::map<int32_t, std::vector<std::string>>& port_map)
+        shm_manager)
 {
   TRITONSERVER_Error* err =
       nvidia::inferenceserver::HTTPServer::CreateAPIServer(
-          server, trace_manager, shm_manager, port_map, http_thread_cnt_,
-          services);
+          server, trace_manager, shm_manager, http_port_, http_thread_cnt_,
+          service);
   if (err == nullptr) {
-    for (auto& http_eps : *services) {
-      if (http_eps != nullptr) {
-        err = http_eps->Start();
-      }
-    }
+    err = (*service)->Start();
   }
 
   if (err != nullptr) {
-    for (auto& http_eps : *services) {
-      if (http_eps != nullptr) {
-        http_eps.reset();
-      }
-    }
+    service->reset();
   }
 
   return err;
@@ -473,18 +455,9 @@ StartEndpoints(
 
 #ifdef TRITON_ENABLE_HTTP
   // Enable HTTP endpoints if requested...
-  if (allow_http_) {
-    std::map<int32_t, std::vector<std::string>> port_map;
-
-    // Group by port numbers
-    for (size_t i = 0; i < http_ports_.size(); i++) {
-      if (http_ports_[i] != -1) {
-        port_map[http_ports_[i]].push_back(endpoint_names_[i]);
-      }
-    }
-
-    TRITONSERVER_Error* err = StartHttpService(
-        &http_services_, server, trace_manager, shm_manager, port_map);
+  if (allow_http_ && (http_port_ != -1)) {
+    TRITONSERVER_Error* err =
+        StartHttpService(&http_service_, server, trace_manager, shm_manager);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to start HTTP service");
       return false;
@@ -512,17 +485,15 @@ StopEndpoints()
   bool ret = true;
 
 #ifdef TRITON_ENABLE_HTTP
-  for (auto& http_eps : http_services_) {
-    if (http_eps != nullptr) {
-      TRITONSERVER_Error* err = http_eps->Stop();
-      if (err != nullptr) {
-        LOG_TRITONSERVER_ERROR(err, "failed to stop HTTP service");
-        ret = false;
-      }
+  if (http_service_) {
+    TRITONSERVER_Error* err = http_service_->Stop();
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to stop HTTP service");
+      ret = false;
     }
-  }
 
-  http_services_.clear();
+    http_service_.reset();
+  }
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
@@ -801,7 +772,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #if defined(TRITON_ENABLE_HTTP)
   int32_t http_port = http_port_;
   int32_t http_thread_cnt = http_thread_cnt_;
-  int32_t http_health_port = http_port_;
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
@@ -881,10 +851,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_HTTP_PORT:
         http_port = ParseIntOption(optarg);
-        http_health_port = http_port;
-        break;
-      case OPTION_HTTP_HEALTH_PORT:
-        http_health_port = ParseIntOption(optarg);
         break;
       case OPTION_HTTP_THREAD_COUNT:
         http_thread_cnt = ParseIntOption(optarg);
@@ -998,9 +964,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_HTTP)
   http_port_ = http_port;
-  http_health_port_ = http_health_port;
   http_thread_cnt_ = http_thread_cnt;
-  http_ports_ = {http_health_port_, http_port_};
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
