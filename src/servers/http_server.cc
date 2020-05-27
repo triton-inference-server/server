@@ -260,6 +260,8 @@ AllocEVBuffer(const size_t byte_size, evbuffer** evb, void** base)
 TRITONSERVER_Error*
 JsonBytesArrayByteSize(TritonJson::Value& tensor_data, size_t* byte_size)
 {
+  *byte_size = 0;
+
   for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
     TritonJson::Value el;
     RETURN_IF_ERR(tensor_data.At(i, &el));
