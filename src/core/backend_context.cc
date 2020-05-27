@@ -242,6 +242,9 @@ BackendResponder::ProcessTensor(
 
   // Done with the tensor, flush any pending pinned copies.
   need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
+  if (need_sync_ && (event_ != nullptr)) {
+    cudaEventRecord(event_, stream_);
+  }
 }
 
 bool
@@ -249,7 +252,11 @@ BackendResponder::Finalize()
 {
 #ifdef TRITON_ENABLE_GPU
   if (need_sync_) {
-    cudaStreamSynchronize(stream_);
+    if (event_ != nullptr) {
+      cudaEventSynchronize(event_);
+    } else {
+      cudaStreamSynchronize(stream_);
+    }
     need_sync_ = false;
   }
 #endif

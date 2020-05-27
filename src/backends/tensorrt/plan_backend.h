@@ -260,6 +260,8 @@ class PlanBackend : public InferenceBackend {
       std::vector<std::unique_ptr<InferenceRequest>> requests_;
       // All the generated InferenceResponse objects
       std::vector<std::unique_ptr<InferenceResponse>> responses_;
+      // Responder of the payload
+      std::unique_ptr<BackendResponder> responder_;
     };
 
     // Assume that the lifetime of composing completion data to extend till
