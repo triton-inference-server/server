@@ -61,7 +61,13 @@ ModelParser::Init(
     it->second.name_ = input.name();
     it->second.datatype_ = input.datatype();
     bool is_dynamic = false;
+    // Skip the batch size in the shape
+    bool skip = (max_batch_size_ > 0);
     for (const auto dim : input.shape()) {
+      if (skip) {
+        skip = false;
+        continue;
+      }
       if (dim == -1) {
         is_dynamic = true;
       }
@@ -95,7 +101,13 @@ ModelParser::Init(
     auto it = outputs_->emplace(output.name(), ModelTensor()).first;
     it->second.name_ = output.name();
     it->second.datatype_ = output.datatype();
+    // Skip the batch size in the shape
+    bool skip = (max_batch_size_ > 0);
     for (const auto dim : output.shape()) {
+      if (skip) {
+        skip = false;
+        continue;
+      }
       it->second.shape_.push_back(dim);
     }
   }
@@ -190,7 +202,12 @@ ModelParser::Init(
       it->second.name_ = input["name"].GetString();
       it->second.datatype_ = input["datatype"].GetString();
       bool is_dynamic = false;
+      bool skip = (max_batch_size_ > 0);
       for (const auto& dim : input["shape"].GetArray()) {
+        if (skip) {
+          skip = false;
+          continue;
+        }
         if (dim.GetInt() == -1) {
           is_dynamic = true;
         }
@@ -236,7 +253,12 @@ ModelParser::Init(
           outputs_->emplace(output["name"].GetString(), ModelTensor()).first;
       it->second.name_ = output["name"].GetString();
       it->second.datatype_ = output["datatype"].GetString();
+      bool skip = (max_batch_size_ > 0);
       for (const auto& dim : output["shape"].GetArray()) {
+        if (skip) {
+          skip = false;
+          continue;
+        }
         it->second.shape_.push_back(dim.GetInt());
       }
     }
