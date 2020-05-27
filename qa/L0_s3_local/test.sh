@@ -42,6 +42,14 @@ PERF_CLIENT=../clients/perf_client
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
+MODELDIR="qa_model_repository"
+cp -r $DATADIR $MODELDIR
+
+# Create model with name that has all types of allowed characters
+DUMMY_MODEL="Model_repo-1.0"
+cp -r $MODELDIR/libtorch_float32_float32_float32 $MODELDIR/$DUMMY_MODEL
+sed -i 's/libtorch_float32_float32_float32/Model_repo-1.0/g' $MODELDIR/$DUMMY_MODEL/config.pbtxt
+
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
@@ -71,13 +79,13 @@ export AWS_ACCESS_KEY_ID=minio && \
 
 # create and add data to bucket
 python -m pip install awscli-local && \
-    awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket && \
-    awslocal s3 sync $DATADIR s3://demo-bucket
+    awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket1.0 && \
+    awslocal s3 sync $MODELDIR s3://demo-bucket1.0
 
 RET=0
 
 # Test with hostname
-SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket --model-control-mode=explicit"
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=explicit"
 SERVER_LOG="./inference_server_hostname.log"
 
 BACKENDS="graphdef libtorch netdef onnx plan savedmodel"
@@ -107,13 +115,20 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 done
+
+# try to load model with name that checks for all types of allowed characters
+code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${DUMMY_MODEL}/load`
+if [ "$code" != "200" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
 # Test with IP
-SERVER_ARGS="--model-repository=s3://127.0.0.1:4572/demo-bucket --model-control-mode=explicit"
+SERVER_ARGS="--model-repository=s3://127.0.0.1:4572/demo-bucket1.0 --model-control-mode=explicit"
 SERVER_LOG="./inference_server_ip.log"
 
 run_server
@@ -141,6 +156,13 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 done
+
+# try to load model with name that checks for all types of allowed characters
+code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${DUMMY_MODEL}/load`
+if [ "$code" != "200" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 set -e
 
 kill $SERVER_PID
