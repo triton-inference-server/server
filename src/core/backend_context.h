@@ -51,6 +51,7 @@ struct BackendContext {
  public:
 #ifndef TRITON_ENABLE_GPU
   using cudaStream_t = void*;
+  using cudaEvent_t = void*;
 #endif  // !TRITON_ENABLE_GPU
 
   // GPU device number that indicates that no gpu is available for a
@@ -125,13 +126,16 @@ struct BackendContext {
 //
 class BackendResponder {
  public:
+  // The caller can optionally provide 'event' for internal synchronization
+  // instead of using 'stream'.
   explicit BackendResponder(
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
-      const int max_batch_size, const bool pinned_enabled, cudaStream_t stream)
+      const int max_batch_size, const bool pinned_enabled, cudaStream_t stream,
+      cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), responses_(responses),
         max_batch_size_(max_batch_size), pinned_enabled_(pinned_enabled),
-        stream_(stream), pending_pinned_byte_size_(0)
+        stream_(stream), event_(event), pending_pinned_byte_size_(0)
   {
   }
 
@@ -165,6 +169,7 @@ class BackendResponder {
   const int max_batch_size_;
   const bool pinned_enabled_;
   cudaStream_t stream_;
+  cudaEvent_t event_;
 
   using ResponsesList = std::list<std::pair<
       std::unique_ptr<InferenceResponse>*, InferenceResponse::Output*>>;
