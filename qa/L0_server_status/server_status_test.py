@@ -61,7 +61,7 @@ class ServerMetadataTest(unittest.TestCase):
                 if pair[1] == "http":
                     self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                 server_metadata['version'])
-                    self.assertEqual("inference:0", server_metadata['name'])
+                    self.assertEqual("triton", server_metadata['name'])
                     for ext in extensions:
                         self.assertTrue(ext in server_metadata['extensions'])
 
@@ -69,7 +69,7 @@ class ServerMetadataTest(unittest.TestCase):
                 else:
                     self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                      server_metadata.version)
-                    self.assertEqual("inference:0", server_metadata.name)
+                    self.assertEqual("triton", server_metadata.name)
                     for ext in extensions:
                         self.assertTrue(ext in server_metadata.extensions)
 
@@ -94,11 +94,11 @@ class ServerMetadataTest(unittest.TestCase):
                 if pair[1] == "http":
                     self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                      server_metadata['version'])
-                    self.assertEqual("inference:0", server_metadata['name'])
+                    self.assertEqual("triton", server_metadata['name'])
                 else:
                     self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                      server_metadata.version)
-                    self.assertEqual("inference:0", server_metadata.name)
+                    self.assertEqual("triton", server_metadata.name)
 
                 model_metadata = triton_client.get_model_metadata(model_name)
                 self.assertTrue(False, "expected unknown model failure")

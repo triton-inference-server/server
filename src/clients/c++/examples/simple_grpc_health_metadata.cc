@@ -139,7 +139,7 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       client->ServerMetadata(&server_metadata, http_headers),
       "unable to get server metadata");
-  if (server_metadata.name().compare("inference:0") != 0) {
+  if (server_metadata.name().compare("triton") != 0) {
     std::cerr << "error: unexpected server metadata: "
               << server_metadata.DebugString() << std::endl;
     exit(1);
