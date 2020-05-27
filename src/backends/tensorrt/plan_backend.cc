@@ -1849,9 +1849,9 @@ PlanBackend::Context::Run(
 
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
-  BackendResponder responder(
+  payload_->responder_.reset(new BackendResponder(
       payload_->requests_, &payload_->responses_, max_batch_size_,
-      enable_pinned_output_, stream_);
+      enable_pinned_output_, stream_, events_[next_set_].output_ready_));
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
     int io_index = binding_offset + bindex;
     if (engine_->bindingIsInput(io_index)) {
@@ -1969,14 +1969,11 @@ PlanBackend::Context::Run(
             "failed to run TRT response");
       }
 
-      responder.ProcessTensor(
+      payload_->responder_->ProcessTensor(
           name, dt, batchn_shape, static_cast<const char*>(buffers_[bindex]),
           TRITONSERVER_MEMORY_GPU, gpu_device_);
     }
   }
-  responder.Finalize();
-
-  cudaEventRecord(events_[next_set_].output_ready_, stream_);
 }
 
 void
@@ -1998,7 +1995,8 @@ PlanBackend::Context::ProcessResponse(
     context_queue->Put(context_idx);
     NVTX_MARKER("plan_input_available");
 
-    cudaEventSynchronize(event_set.output_ready_);
+    // Call Finalize() here to defer CUDA synchronization as much as possible
+    payload->responder_->Finalize();
     NVTX_MARKER("plan_output_ready");
     // Compute ends when the output data copy is completed
     INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
