@@ -91,14 +91,11 @@ class DynamicBatchScheduler : public Scheduler {
       const uint32_t priority_levels,
       const ModelQueuePolicyMap& queue_policy_map);
   void SchedulerThread(
-      const uint32_t runner_id, const uint32_t completion_id, const int nice,
+      const uint32_t runner_id, const int nice,
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
       std::promise<bool>* is_initialized);
   uint64_t GetDynamicBatch(const int64_t runner_id);
-  void FinalizePayloads(
-      const uint32_t completion_id,
-      std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>> requests,
-      const Status& status);
+  void FinalizeResponses();
 
   // Function the scheduler will call to initialize a runner.
   const StandardInitFunc OnInit_;
@@ -152,18 +149,10 @@ class DynamicBatchScheduler : public Scheduler {
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
 
-  // Holds the sequence of completion-queue indices in order the
-  // requests were issued.
-  std::queue<size_t> completion_id_queue_;
-  // Lock to protect the completion_id_queue_
-  std::mutex completion_id_queue_mtx_;
-
   // Per completion-id queues to store the ready requests
-  std::vector<std::queue<
-      std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>>>>
-      completion_queues_;
+  std::deque<std::unique_ptr<InferenceResponse>> completion_queue_;
   // Lock to protect the completion_queues_
-  std::mutex completion_queues_mtx_;
+  std::mutex completion_queue_mtx_;
 };
 
 }}  // namespace nvidia::inferenceserver

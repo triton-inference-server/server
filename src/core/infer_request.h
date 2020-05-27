@@ -317,7 +317,7 @@ class InferenceRequest {
   {
     response_factory_ = InferenceResponseFactory(
         backend_shared_, id_, allocator, alloc_userp, response_fn,
-        response_userp);
+        response_userp, response_delegator_);
     return Status::Success;
   }
 
@@ -328,6 +328,16 @@ class InferenceRequest {
   {
     release_callbacks_.emplace_back(std::move(callback));
     return Status::Success;
+  }
+
+  // Add a delegator to be invoked on sending the responses of this request.
+  // The response will be passed to 'delegator' and 'delegator' must call the
+  // InferenceResponse::Send() to send the response.
+  Status SetResponseDelegator(
+      std::function<void(std::unique_ptr<InferenceResponse>&&)>&& delegator)
+  {
+    response_delegator_ = std::move(delegator);
+    return response_factory_.SetResponseDelegator(response_delegator_);
   }
 
   // Prepare this request for inference.
@@ -467,6 +477,9 @@ class InferenceRequest {
 
   // Additional release callbacks invoked before 'release_fn_'.
   std::vector<std::function<void()>> release_callbacks_;
+
+  // Delegator to be invoked on sending responses.
+  std::function<void(std::unique_ptr<InferenceResponse>&&)> response_delegator_;
 
   // The response factory associated with this request.
   InferenceResponseFactory response_factory_;
