@@ -31,7 +31,7 @@ import os
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 import tritonshmutils.cuda_shared_memory as cshm
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 class CudaSharedMemoryTest(unittest.TestCase):
     def test_invalid_create_shm(self):

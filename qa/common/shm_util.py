@@ -33,7 +33,7 @@ import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 import tritonshmutils.shared_memory as shm
 import tritonshmutils.cuda_shared_memory as cudashm
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 def _range_repr_dtype(dtype):
     if dtype == np.float64:

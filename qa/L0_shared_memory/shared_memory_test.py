@@ -30,7 +30,7 @@ import os
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 import tritonshmutils.shared_memory as shm
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 class SharedMemoryTest(unittest.TestCase):
     def test_invalid_create_shm(self):

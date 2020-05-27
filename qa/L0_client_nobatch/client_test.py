@@ -33,7 +33,7 @@ import unittest
 import numpy as np
 import tritonhttpclient
 import tritongrpcclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 import test_util as tu
 
 class ClientNoBatchTest(unittest.TestCase):

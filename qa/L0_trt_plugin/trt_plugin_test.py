@@ -33,7 +33,7 @@ import unittest
 import numpy as np
 import os
 import tritonhttpclient as httpclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 class PluginModelTest(unittest.TestCase):
     def _full_exact(self, batch_size, model_name, plugin_name):

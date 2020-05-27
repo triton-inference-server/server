@@ -32,7 +32,7 @@ import sys
 from builtins import range
 import tritongrpcclient
 import tritonshmutils.cuda_shared_memory as cudashm
-import tritonclientutils.utils as utils
+import tritonclientutils as utils
 from ctypes import *
 
 FLAGS = None

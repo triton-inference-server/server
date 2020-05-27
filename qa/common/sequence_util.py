@@ -39,7 +39,7 @@ import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 import tritonshmutils.shared_memory as shm
 import tritonshmutils.cuda_shared_memory as cudashm
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 if sys.version_info >= (3, 0):
   import queue

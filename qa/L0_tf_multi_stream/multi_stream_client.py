@@ -34,7 +34,7 @@ from builtins import range
 import sys
 import tritonhttpclient
 import tritongrpcclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 from time import time
 
 if sys.version_info >= (3, 0):

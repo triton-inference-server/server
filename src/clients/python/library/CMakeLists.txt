@@ -195,7 +195,7 @@ if(NOT WIN32)
     add_custom_command(
         OUTPUT "${shm_utils_wheel_stamp_file}"
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shm_utils_build_wheel.sh"
-        ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
+        ARGS "${CMAKE_CURRENT_BINARY_DIR}/shm/"
         DEPENDS
           ${CMAKE_CURRENT_BINARY_DIR}/VERSION
           ${CMAKE_CURRENT_BINARY_DIR}/shm_utils_setup.py
@@ -206,7 +206,7 @@ if(NOT WIN32)
     add_custom_command(
         OUTPUT "${shm_utils_wheel_stamp_file}"
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shm_utils_build_wheel.sh"
-        ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
+        ARGS "${CMAKE_CURRENT_BINARY_DIR}/shm/"
         DEPENDS
           ${CMAKE_CURRENT_BINARY_DIR}/VERSION
           ${CMAKE_CURRENT_BINARY_DIR}/shm_utils_setup.py

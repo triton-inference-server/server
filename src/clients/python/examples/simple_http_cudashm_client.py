@@ -31,7 +31,7 @@ import sys
 from builtins import range
 import tritonhttpclient
 import tritonshmutils.cuda_shared_memory as cudashm
-import tritonclientutils.utils as utils
+import tritonclientutils as utils
 
 FLAGS = None
 

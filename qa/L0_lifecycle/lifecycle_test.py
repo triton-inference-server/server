@@ -39,7 +39,7 @@ import test_util as tu
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 class LifeCycleTest(unittest.TestCase):
     def _infer_success_models(self, model_base_names, versions, tensor_shape, swap=False):

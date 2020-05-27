@@ -31,7 +31,7 @@ import sys
 from builtins import range
 import tritonhttpclient
 import tritonshmutils.shared_memory as shm
-import tritonclientutils.utils as utils
+import tritonclientutils as utils
 
 FLAGS = None
 

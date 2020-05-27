@@ -32,7 +32,7 @@ import sys
 import queue
 
 import tritongrpcclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 FLAGS = None
 
@@ -47,7 +47,7 @@ class UserData:
 # result and error. InferenceServerClient would povide the results of an
 # inference as tritongrpcclient.InferResult in result. For successful
 # inference, error will be None, otherwise it will be an object of
-# tritonclientutils.utils.InferenceServerException holding the error details
+# tritonclientutils.InferenceServerException holding the error details
 def callback(user_data, result, error):
     if error:
         user_data._completed_requests.put(error)
