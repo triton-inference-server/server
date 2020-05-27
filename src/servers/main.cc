@@ -71,9 +71,6 @@ std::condition_variable exit_cv_;
 // changes.
 int32_t repository_poll_secs_ = 15;
 
-// Whether explicit model control is allowed
-bool allow_model_control_ = false;
-
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
 // default values and modifyied based on command-line args. Set to -1
 // to indicate the protocol is disabled.
@@ -107,14 +104,6 @@ int32_t trace_rate_ = 1000;
 #endif  // TRITON_ENABLE_TRACING
 
 #if defined(TRITON_ENABLE_GRPC)
-// The number of threads to initialize for handling GRPC infer
-// requests.
-int grpc_infer_thread_cnt_ = 1;
-
-// The number of threads to initialize for handling GRPC stream infer
-// requests.
-int grpc_stream_infer_thread_cnt_ = 1;
-
 // The maximum number of inference request/response objects that
 // remain allocated for reuse. As long as the number of in-flight
 // requests doesn't exceed this value there will be no
@@ -150,8 +139,6 @@ enum OptionId {
 #if defined(TRITON_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
   OPTION_GRPC_PORT,
-  OPTION_GRPC_INFER_THREAD_COUNT,
-  OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
@@ -165,9 +152,7 @@ enum OptionId {
   OPTION_TRACE_RATE,
 #endif  // TRITON_ENABLE_TRACING
   OPTION_MODEL_CONTROL_MODE,
-  OPTION_ALLOW_POLL_REPO,
   OPTION_POLL_REPO_SECS,
-  OPTION_ALLOW_MODEL_CONTROL,
   OPTION_STARTUP_MODEL,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
   OPTION_CUDA_MEMORY_POOL_BYTE_SIZE,
@@ -204,19 +189,15 @@ std::vector<Option> options_
 #ifdef TRITON_ENABLE_LOGGING
       {OPTION_LOG_VERBOSE, "log-verbose",
        "Set verbose logging level. Zero (0) disables verbose logging and "
-       "values >= 1 enable verbose logging"},
-      {OPTION_LOG_INFO, "log-info", "Enable/disable info-level logging"},
+       "values >= 1 enable verbose logging."},
+      {OPTION_LOG_INFO, "log-info", "Enable/disable info-level logging."},
       {OPTION_LOG_WARNING, "log-warning",
-       "Enable/disable warning-level logging"},
-      {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging"},
+       "Enable/disable warning-level logging."},
+      {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging."},
 #endif  // TRITON_ENABLE_LOGGING
-      {OPTION_ID, "id", "Identifier for this server"},
+      {OPTION_ID, "id", "Identifier for this server."},
       {OPTION_MODEL_REPOSITORY, "model-store",
-       "Path to model repository directory. It may be specified multiple times "
-       "to add multiple model repositories. Note that if a model is not unique "
-       "across all model repositories at any time, the model will not be "
-       "available. This option is deprecated, the preferred usage is "
-       "--model-repository"},
+       "Equivalent to --model-repository."},
       {OPTION_MODEL_REPOSITORY, "model-repository",
        "Path to model repository directory. It may be specified multiple times "
        "to add multiple model repositories. Note that if a model is not unique "
@@ -249,10 +230,6 @@ std::vector<Option> options_
        "Allow the server to listen for GRPC requests."},
       {OPTION_GRPC_PORT, "grpc-port",
        "The port for the server to listen on for GRPC requests."},
-      {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
-       "Number of threads handling GRPC inference requests."},
-      {OPTION_GRPC_STREAM_INFER_THREAD_COUNT, "grpc-stream-infer-thread-count",
-       "Number of threads handling GRPC stream inference requests."},
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size",
        "The maximum number of inference request/response objects that remain "
@@ -280,34 +257,23 @@ std::vector<Option> options_
 #endif  // TRITON_ENABLE_TRACING
       {OPTION_MODEL_CONTROL_MODE, "model-control-mode",
        "Specify the mode for model management. Options are \"none\", \"poll\" "
-       "and \"explicit\". The default is \"poll\". "
+       "and \"explicit\". The default is \"none\". "
        "For \"none\", the server will load all models in the model "
-       "repositories only once at startup. For \"poll\", the server will poll "
-       "the model repository to detect changes. The poll rate is controlled by "
-       "'repository-poll-secs'. For \"explicit\", the model load and unload is "
-       "initiated by using the model control APIs, and the models in the model "
-       "repository will not be loaded at startup, unless the model is "
-       "specified by --load-model."},
-      {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
-       "[DEPRECATED] Poll the model repository to detect changes. The poll "
-       "rate is controlled by 'repository-poll-secs'. This option is "
-       "deprecated by --model-control-mode, this option can not be specified "
-       "if --model-control-mode is specified."},
+       "repository(s) at startup and will not make any changes to the load "
+       "models after that. For \"poll\", the server will poll the model "
+       "repository(s) to detect changes and will load/unload models based on "
+       "those changes. The poll rate is controlled by 'repository-poll-secs'. "
+       "For \"explicit\", model load and unload is initiated by using the "
+       "model control APIs, and only models specified with --load-model will "
+       "be loaded at startup."},
       {OPTION_POLL_REPO_SECS, "repository-poll-secs",
        "Interval in seconds between each poll of the model repository to check "
-       "for changes. Valid only when --allow-poll-model-repository=true is "
+       "for changes. Valid only when --model-control-mode=poll is "
        "specified."},
-      {OPTION_ALLOW_MODEL_CONTROL, "allow-model-control",
-       "[DEPRECATED] Allow to load or to unload models explicitly using model "
-       "control API. If true the models in the model repository will not be "
-       "loaded at startup, unless the model is specified by --load-model. "
-       "Cannot be specified if --allow-poll-model-repository is true. This "
-       "option is deprecated by --model-control-mode, this option can not be "
-       "specified if --model-control-mode is specified."},
       {OPTION_STARTUP_MODEL, "load-model",
        "Name of the model to be loaded on server startup. It may be specified "
        "multiple times to add multiple models. Note that this option will only "
-       "take affect if --allow-model-control is true."},
+       "take affect if --model-control-mode=explicit is true."},
       {OPTION_PINNED_MEMORY_POOL_BYTE_SIZE, "pinned-memory-pool-byte-size",
        "The total byte size that can be allocated as pinned system memory. "
        "If GPU support is enabled, the server will allocate pinned system "
@@ -840,8 +806,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_GRPC)
   int32_t grpc_port = grpc_port_;
-  int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
-  int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
 #endif  // TRITON_ENABLE_GRPC
 
@@ -856,13 +820,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t trace_rate = trace_rate_;
 #endif  // TRITON_ENABLE_TRACING
 
-  bool deprecated_control_mode_set = false;
-  bool allow_poll_model_repository = repository_poll_secs > 0;
-  bool allow_model_control = allow_model_control_;
+  TRITONSERVER_ModelControlMode control_mode = TRITONSERVER_MODEL_CONTROL_NONE;
   std::set<std::string> startup_models_;
-
-  bool control_mode_set = false;
-  TRITONSERVER_ModelControlMode control_mode = TRITONSERVER_MODEL_CONTROL_POLL;
 
 #ifdef TRITON_ENABLE_LOGGING
   bool log_info = true;
@@ -939,12 +898,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_GRPC_PORT:
         grpc_port = ParseIntOption(optarg);
         break;
-      case OPTION_GRPC_INFER_THREAD_COUNT:
-        grpc_infer_thread_cnt = ParseIntOption(optarg);
-        break;
-      case OPTION_GRPC_STREAM_INFER_THREAD_COUNT:
-        grpc_stream_infer_thread_cnt = ParseIntOption(optarg);
-        break;
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
         grpc_infer_allocation_pool_size = ParseIntOption(optarg);
         break;
@@ -974,16 +927,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
 #endif  // TRITON_ENABLE_TRACING
 
-      case OPTION_ALLOW_POLL_REPO:
-        allow_poll_model_repository = ParseBoolOption(optarg);
-        deprecated_control_mode_set = true;
-        break;
       case OPTION_POLL_REPO_SECS:
         repository_poll_secs = ParseIntOption(optarg);
-        break;
-      case OPTION_ALLOW_MODEL_CONTROL:
-        allow_model_control = ParseBoolOption(optarg);
-        deprecated_control_mode_set = true;
         break;
       case OPTION_STARTUP_MODEL:
         startup_models_.insert(optarg);
@@ -1003,7 +948,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
           std::cerr << Usage() << std::endl;
           return false;
         }
-        control_mode_set = true;
         break;
       }
       case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
@@ -1047,36 +991,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   LOG_SET_VERBOSE(log_verbose);
 #endif  // TRITON_ENABLE_LOGGING
 
-  repository_poll_secs_ =
-      (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
-
-  if (control_mode_set && deprecated_control_mode_set) {
-    std::cerr << "--allow-model-control or --allow-poll-model-repository "
-              << "can not be specified if --model-control-mode is specified"
-              << std::endl;
-    std::cerr << Usage() << std::endl;
-  }
-
-  if (!control_mode_set) {
-    if (allow_model_control && allow_poll_model_repository) {
-      std::cerr << "--allow-model-control and --allow-poll-model-repository "
-                << "can not be both set to true" << std::endl;
-      std::cerr << Usage() << std::endl;
-      return false;
-    }
-
-    if (allow_model_control) {
-      control_mode = TRITONSERVER_MODEL_CONTROL_EXPLICIT;
-    } else if (repository_poll_secs_ > 0) {
-      control_mode = TRITONSERVER_MODEL_CONTROL_POLL;
-    } else {
-      control_mode = TRITONSERVER_MODEL_CONTROL_NONE;
-    }
-  } else {
-    // May sure main() will not try to invoke polling periodically
-    if (control_mode != TRITONSERVER_MODEL_CONTROL_POLL) {
-      repository_poll_secs_ = 0;
-    }
+  repository_poll_secs_ = 0;
+  if (control_mode == TRITONSERVER_MODEL_CONTROL_POLL) {
+    repository_poll_secs_ = std::max(0, repository_poll_secs);
   }
 
 #if defined(TRITON_ENABLE_HTTP)
@@ -1088,8 +1005,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_GRPC)
   grpc_port_ = grpc_port;
-  grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
-  grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
 #endif  // TRITON_ENABLE_GRPC
 
