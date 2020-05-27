@@ -106,8 +106,8 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       client->ModelRepositoryIndex(&repository_index, http_headers),
       "Failed to get repository index");
-  if (repository_index.models().size() != 7) {
-    std::cerr << "expected number of models 7, got "
+  if (repository_index.models().size() != 10) {
+    std::cerr << "expected number of models 10, got "
               << repository_index.models().size() << std::endl;
     exit(1);
   }
