@@ -62,11 +62,16 @@ set(
  ../examples/shm_utils.h
 )
 
-add_executable(perf_client
-  ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
+add_executable(
+  perf_client
+  ${PERF_CLIENT_SRCS}
+  ${PERF_CLIENT_HDRS}
+  $<TARGET_OBJECTS:json-utils-library>
+)
 target_include_directories(
   perf_client
-  PRIVATE ${RapidJSON_INCLUDE_DIRS})
+  PRIVATE ${RapidJSON_INCLUDE_DIRS}
+)
 target_link_libraries(
   perf_client
   PRIVATE TRITON::grpcclient_static

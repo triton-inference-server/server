@@ -264,10 +264,12 @@ main(int argc, char** argv)
   std::cout << "cumulative_receive_time_ns "
             << infer_stat.cumulative_receive_time_ns << std::endl;
 
-  rapidjson::Document model_stat;
-  client->ModelInferenceStatistics(&model_stat, model_name);
+  std::string model_stat;
+  FAIL_IF_ERR(
+      client->ModelInferenceStatistics(&model_stat, model_name),
+      "unable to get model statistics");
   std::cout << "======Model Statistics======" << std::endl;
-  std::cout << nic::GetJsonText(model_stat) << std::endl;
+  std::cout << model_stat << std::endl;
 
   std::cout << "PASS : Infer" << std::endl;
 

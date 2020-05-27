@@ -29,12 +29,14 @@
 
 #include <map>
 #include <memory>
-#include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/rapidjson.h"
-#include "rapidjson/stringbuffer.h"
 #include "src/clients/c++/library/common.h"
+
+#ifdef TRITON_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#else
+struct cudaIpcMemHandle_t {
+};
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
@@ -45,12 +47,6 @@ class HttpInferRequest;
 typedef std::map<std::string, std::string> Headers;
 /// The key-value map type to be included as URL parameters.
 typedef std::map<std::string, std::string> Parameters;
-
-/// Returns reader friendly text representation of
-/// the DOM object.
-/// \param json_dom The json DOM object.
-/// \return Formatted string representation of passed JSON.
-std::string GetJsonText(const rapidjson::Document& json_dom);
 
 //==============================================================================
 /// An InferenceServerHttpClient object is used to perform any kind of
@@ -120,19 +116,20 @@ class InferenceServerHttpClient : public InferenceServerClient {
       const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get its metadata.
-  /// \param server_metadata Returns the server metadata as rapidJSON DOM
-  /// object.
+  /// \param server_metadata Returns JSON representation of the
+  /// metadata as a string.
   /// \param headers Optional map specifying additional HTTP headers to
   /// include in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error ServerMetadata(
-      rapidjson::Document* server_metadata, const Headers& headers = Headers(),
+      std::string* server_metadata, const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the metadata of specified model.
-  /// \param model_metadata Returns model metadata as rapidJSON DOM object.
+  /// \param model_metadata Returns JSON representation of model
+  /// metadata as a string.
   /// \param model_name The name of the model to get metadata.
   /// \param model_version The version of the model to get metadata.
   /// The default value is an empty string which means then the server will
@@ -143,12 +140,13 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error ModelMetadata(
-      rapidjson::Document* model_metadata, const std::string& model_name,
+      std::string* model_metadata, const std::string& model_name,
       const std::string& model_version = "", const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the configuration of specified model.
-  /// \param model_config Returns model config as rapidJSON DOM object.
+  /// \param model_config Returns JSON representation of model
+  /// configuration as a string.
   /// \param model_name The name of the model to get configuration.
   /// \param model_version The version of the model to get configuration.
   /// The default value is an empty string which means then the server will
@@ -159,21 +157,21 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error ModelConfig(
-      rapidjson::Document* model_config, const std::string& model_name,
+      std::string* model_config, const std::string& model_name,
       const std::string& model_version = "", const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the index of model repository
   /// contents.
-  /// \param repository_index Returns the repository index as rapidJSON DOM
-  /// object.
+  /// \param repository_index Returns JSON representation of the
+  /// repository index as a string.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error ModelRepositoryIndex(
-      rapidjson::Document* repository_index, const Headers& headers = Headers(),
+      std::string* repository_index, const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
   /// Request the inference server to load or reload specified model.
@@ -200,8 +198,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Contact the inference server and get the inference statistics for the
   /// specified model name and version.
-  /// \param infer_stat Returns the inference statistics of requested model name
-  /// and version as rapidJSON DOM object.
+  /// \param infer_stat Returns the JSON representation of the
+  /// inference statistics as a string.
   /// \param model_name The name of the model to get inference statistics. The
   /// default value is an empty string which means statistics of all models will
   /// be returned in the response.
@@ -214,14 +212,14 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error ModelInferenceStatistics(
-      rapidjson::Document* infer_stat, const std::string& model_name = "",
+      std::string* infer_stat, const std::string& model_name = "",
       const std::string& model_version = "", const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the status for requested system
   /// shared memory.
-  /// \param status Returns the system shared memory status as rapidJSON DOM
-  /// object.
+  /// \param status Returns the JSON representation of the system
+  /// shared memory status as a string.
   /// \param region_name The name of the region to query status. The default
   /// value is an empty string, which means that the status of all active system
   /// shared memory will be returned.
@@ -231,7 +229,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error SystemSharedMemoryStatus(
-      rapidjson::Document* status, const std::string& region_name = "",
+      std::string* status, const std::string& region_name = "",
       const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
@@ -269,8 +267,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Contact the inference server and get the status for requested CUDA
   /// shared memory.
-  /// \param status Returns the CUDA shared memory status as rapidJSON DOM
-  /// object.
+  /// \param status Returns the JSON representation of the CUDA shared
+  /// memory status as a string.
   /// \param region_name The name of the region to query status. The default
   /// value is an empty string, which means that the status of all active CUDA
   /// shared memory will be returned.
@@ -280,7 +278,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error CudaSharedMemoryStatus(
-      rapidjson::Document* status, const std::string& region_name = "",
+      std::string* status, const std::string& region_name = "",
       const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
@@ -373,10 +371,6 @@ class InferenceServerHttpClient : public InferenceServerClient {
  private:
   InferenceServerHttpClient(const std::string& url, bool verbose);
 
-  void PrepareRequestJson(
-      const InferOptions& options, const std::vector<InferInput*>& inputs,
-      const std::vector<const InferRequestedOutput*>& outputs,
-      rapidjson::Document* request_json);
   Error PreRunProcessing(
       void* curl, std::string& request_uri, const InferOptions& options,
       const std::vector<InferInput*>& inputs,
@@ -386,12 +380,12 @@ class InferenceServerHttpClient : public InferenceServerClient {
   void AsyncTransfer();
   Error Get(
       std::string& request_uri, const Headers& headers,
-      const Parameters& query_params, rapidjson::Document* response,
-      long* http_code);
+      const Parameters& query_params, std::string* response,
+      long* http_code = nullptr);
   Error Post(
-      std::string& request_uri, const rapidjson::Document& request,
+      std::string& request_uri, const std::string& request,
       const Headers& headers, const Parameters& query_params,
-      rapidjson::Document* response, long* http_code);
+      std::string* response);
 
   static size_t ResponseHandler(
       void* contents, size_t size, size_t nmemb, void* userp);

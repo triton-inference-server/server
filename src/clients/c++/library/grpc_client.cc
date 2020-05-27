@@ -1051,7 +1051,7 @@ InferenceServerGrpcClient::PreRunProcessing(
   for (const auto routput : outputs) {
     auto grpc_output = infer_request_.add_outputs();
     grpc_output->set_name(routput->Name());
-    size_t class_count = routput->ClassCount();
+    size_t class_count = routput->ClassificationCount();
     if (class_count != 0) {
       (*grpc_output->mutable_parameters())["classification"].set_int64_param(
           class_count);

@@ -39,6 +39,12 @@ extern "C" {
 #include <src/clients/c++/library/cencode.h>
 }
 
+#define TRITONJSON_STATUSTYPE nvidia::inferenceserver::client::Error
+#define TRITONJSON_STATUSRETURN(M) \
+  return nvidia::inferenceserver::client::Error(M)
+#define TRITONJSON_STATUSSUCCESS nvidia::inferenceserver::client::Error::Success
+#include "src/core/json.h"
+
 #ifdef _WIN32
 #define strncasecmp(x, y, z) _strnicmp(x, y, z)
 #endif  //_WIN32
@@ -114,17 +120,6 @@ Base64Encode(
 
 //==============================================================================
 
-std::string
-GetJsonText(const rapidjson::Document& json_dom)
-{
-  rapidjson::StringBuffer buffer;
-  rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
-  json_dom.Accept(writer);
-  return buffer.GetString();
-}
-
-//==============================================================================
-
 class HttpInferRequest : public InferRequest {
  public:
   HttpInferRequest(
@@ -133,7 +128,9 @@ class HttpInferRequest : public InferRequest {
   ~HttpInferRequest();
 
   // Initialize the request for HTTP transfer. */
-  Error InitializeRequest(rapidjson::Document& response_json);
+  Error InitializeRequest(
+      const InferOptions& options, const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs);
 
   // Adds the input data to be delivered to the server
   Error AddInput(uint8_t* buf, size_t byte_size);
@@ -146,16 +143,21 @@ class HttpInferRequest : public InferRequest {
   friend class InferenceServerHttpClient;
   friend class InferResultHttp;
 
+  Error PrepareRequestJson(
+      const InferOptions& options, const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs,
+      TritonJson::Value* request_json);
+
   // Pointer to the list of the HTTP request header, keep it such that it will
   // be valid during the transfer and can be freed once transfer is completed.
   struct curl_slist* header_list_;
 
-  // CURL status for the HTTP request.
-  CURLcode curl_status_;
+  // HTTP response code for the inference request
+  long http_code_;
 
   size_t total_input_byte_size_;
 
-  rapidjson::StringBuffer request_json_;
+  TritonJson::WriteBuffer request_json_;
 
   // Buffer that accumulates the response body.
   std::unique_ptr<std::string> infer_response_buffer_;
@@ -183,21 +185,152 @@ HttpInferRequest::~HttpInferRequest()
 }
 
 Error
-HttpInferRequest::InitializeRequest(rapidjson::Document& request_json)
+HttpInferRequest::InitializeRequest(
+    const InferOptions& options, const std::vector<InferInput*>& inputs,
+    const std::vector<const InferRequestedOutput*>& outputs)
 {
   data_buffers_ = {};
   total_input_byte_size_ = 0;
-  curl_status_ = CURLE_FAILED_INIT;
+  http_code_ = 400;
+
+  TritonJson::Value request_json(TritonJson::ValueType::OBJECT);
+  Error err = PrepareRequestJson(options, inputs, outputs, &request_json);
+  if (!err.IsOk()) {
+    return err;
+  }
 
   request_json_.Clear();
-  rapidjson::Writer<rapidjson::StringBuffer> writer(request_json_);
-  request_json.Accept(writer);
+  request_json.Write(&request_json_);
 
   // Add the buffer holding the json to be delivered first
-  AddInput((uint8_t*)request_json_.GetString(), request_json_.GetSize());
+  AddInput((uint8_t*)request_json_.Base(), request_json_.Size());
 
   // Prepare buffer to record the response
   infer_response_buffer_.reset(new std::string());
+
+  return Error::Success;
+}
+
+Error
+HttpInferRequest::PrepareRequestJson(
+    const InferOptions& options, const std::vector<InferInput*>& inputs,
+    const std::vector<const InferRequestedOutput*>& outputs,
+    TritonJson::Value* request_json)
+{
+  // Can use string-ref because json is serialized before end of
+  // 'options', 'inputs' and 'outputs' lifetime.
+  request_json->AddStringRef(
+      "id", options.request_id_.c_str(), options.request_id_.size());
+
+  if ((options.sequence_id_ != 0) || (options.priority_ != 0) ||
+      (options.timeout_ != 0)) {
+    TritonJson::Value parameters_json(
+        *request_json, TritonJson::ValueType::OBJECT);
+    {
+      if (options.sequence_id_ != 0) {
+        parameters_json.AddUInt("sequence_id", options.sequence_id_);
+        parameters_json.AddBool("sequence_start", options.sequence_start_);
+        parameters_json.AddBool("sequence_end", options.sequence_end_);
+      }
+
+      if (options.priority_ != 0) {
+        parameters_json.AddUInt("priority", options.priority_);
+      }
+
+      if (options.timeout_ != 0) {
+        parameters_json.AddUInt("timeout", options.timeout_);
+      }
+    }
+
+    request_json->Add("parameters", std::move(parameters_json));
+  }
+
+  if (!inputs.empty()) {
+    TritonJson::Value inputs_json(*request_json, TritonJson::ValueType::ARRAY);
+    for (const auto io : inputs) {
+      TritonJson::Value io_json(*request_json, TritonJson::ValueType::OBJECT);
+      io_json.AddStringRef("name", io->Name().c_str(), io->Name().size());
+      io_json.AddStringRef(
+          "datatype", io->Datatype().c_str(), io->Datatype().size());
+
+      TritonJson::Value shape_json(*request_json, TritonJson::ValueType::ARRAY);
+      for (const auto dim : io->Shape()) {
+        shape_json.AppendUInt(dim);
+      }
+      io_json.Add("shape", std::move(shape_json));
+
+      TritonJson::Value ioparams_json(
+          *request_json, TritonJson::ValueType::OBJECT);
+      if (io->IsSharedMemory()) {
+        std::string region_name;
+        size_t offset;
+        size_t byte_size;
+        Error err = io->SharedMemoryInfo(&region_name, &byte_size, &offset);
+        if (!err.IsOk()) {
+          return err;
+        }
+
+        ioparams_json.AddString(
+            "shared_memory_region", region_name.c_str(), region_name.size());
+        ioparams_json.AddUInt("shared_memory_byte_size", byte_size);
+        if (offset != 0) {
+          ioparams_json.AddUInt("shared_memory_offset", offset);
+        }
+      } else {
+        size_t byte_size;
+        Error err = io->ByteSize(&byte_size);
+        if (!err.IsOk()) {
+          return err;
+        }
+
+        ioparams_json.AddUInt("binary_data_size", byte_size);
+      }
+
+      io_json.Add("parameters", std::move(ioparams_json));
+      inputs_json.Append(std::move(io_json));
+    }
+
+    request_json->Add("inputs", std::move(inputs_json));
+  }
+
+  if (!outputs.empty()) {
+    TritonJson::Value outputs_json(*request_json, TritonJson::ValueType::ARRAY);
+    for (const auto io : outputs) {
+      TritonJson::Value io_json(*request_json, TritonJson::ValueType::OBJECT);
+      io_json.AddStringRef("name", io->Name().c_str(), io->Name().size());
+
+      TritonJson::Value ioparams_json(
+          *request_json, TritonJson::ValueType::OBJECT);
+
+      if (io->ClassificationCount() > 0) {
+        ioparams_json.AddUInt("classification", io->ClassificationCount());
+      }
+
+      if (io->IsSharedMemory()) {
+        std::string region_name;
+        size_t offset;
+        size_t byte_size;
+        Error err = io->SharedMemoryInfo(&region_name, &byte_size, &offset);
+        if (!err.IsOk()) {
+          return err;
+        }
+
+        ioparams_json.AddString(
+            "shared_memory_region", region_name.c_str(), region_name.size());
+        ioparams_json.AddUInt("shared_memory_byte_size", byte_size);
+        if (offset != 0) {
+          ioparams_json.AddUInt("shared_memory_offset", offset);
+        }
+      } else {
+        ioparams_json.AddBool("binary_data", true);
+      }
+
+      io_json.Add("parameters", std::move(ioparams_json));
+      outputs_json.Append(std::move(io_json));
+    }
+
+    request_json->Add("outputs", std::move(outputs_json));
+  }
 
   return Error::Success;
 }
@@ -272,12 +405,12 @@ class InferResultHttp : public InferResult {
  private:
   InferResultHttp(std::shared_ptr<HttpInferRequest> infer_request);
 
-  std::map<std::string, const rapidjson::Value*> output_name_to_result_map_;
+  std::map<std::string, TritonJson::Value> output_name_to_result_map_;
   std::map<std::string, std::pair<const uint8_t*, const size_t>>
       output_name_to_buffer_map_;
 
   Error status_;
-  rapidjson::Document response_json_;
+  TritonJson::Value response_json_;
   std::shared_ptr<HttpInferRequest> infer_request_;
 };
 
@@ -295,12 +428,16 @@ InferResultHttp::ModelName(std::string* name) const
   if (!status_.IsOk()) {
     return status_;
   }
-  const auto& itr = response_json_.FindMember("model_name");
-  if (itr != response_json_.MemberEnd()) {
-    *name = std::string(itr->value.GetString(), itr->value.GetStringLength());
-  } else {
+
+  const char* name_str;
+  size_t name_strlen;
+  Error err =
+      response_json_.MemberAsString("model_name", &name_str, &name_strlen);
+  if (!err.IsOk()) {
     return Error("model name was not returned in the response");
   }
+
+  name->assign(name_str, name_strlen);
   return Error::Success;
 }
 
@@ -310,13 +447,16 @@ InferResultHttp::ModelVersion(std::string* version) const
   if (!status_.IsOk()) {
     return status_;
   }
-  const auto& itr = response_json_.FindMember("model_version");
-  if (itr != response_json_.MemberEnd()) {
-    *version =
-        std::string(itr->value.GetString(), itr->value.GetStringLength());
-  } else {
+
+  const char* version_str;
+  size_t version_strlen;
+  Error err = response_json_.MemberAsString(
+      "model_version", &version_str, &version_strlen);
+  if (!err.IsOk()) {
     return Error("model version was not returned in the response");
   }
+
+  version->assign(version_str, version_strlen);
   return Error::Success;
 }
 
@@ -326,14 +466,45 @@ InferResultHttp::Id(std::string* id) const
   if (!status_.IsOk()) {
     return status_;
   }
-  const auto& itr = response_json_.FindMember("id");
-  if (itr != response_json_.MemberEnd()) {
-    *id = std::string(itr->value.GetString(), itr->value.GetStringLength());
-  } else {
-    return Error("model version was not returned in the response");
+
+  const char* id_str;
+  size_t id_strlen;
+  Error err = response_json_.MemberAsString("id", &id_str, &id_strlen);
+  if (!err.IsOk()) {
+    return Error("model id was not returned in the response");
   }
+
+  id->assign(id_str, id_strlen);
   return Error::Success;
 }
+
+namespace {
+
+Error
+ShapeHelper(
+    const std::string& result_name, const TritonJson::Value& result_json,
+    std::vector<int64_t>* shape)
+{
+  TritonJson::Value shape_json;
+  if (!const_cast<TritonJson::Value&>(result_json).Find("shape", &shape_json)) {
+    return Error(
+        "The response does not contain shape for output name " + result_name);
+  }
+
+  for (size_t i = 0; i < shape_json.ArraySize(); i++) {
+    int64_t dim;
+    Error err = shape_json.IndexAsInt(i, &dim);
+    if (!err.IsOk()) {
+      return err;
+    }
+
+    shape->push_back(dim);
+  }
+
+  return Error::Success;
+}
+
+}  // namespace
 
 Error
 InferResultHttp::Shape(
@@ -342,24 +513,15 @@ InferResultHttp::Shape(
   if (!status_.IsOk()) {
     return status_;
   }
+
   shape->clear();
   auto itr = output_name_to_result_map_.find(output_name);
-  if (itr != output_name_to_result_map_.end()) {
-    const auto shape_itr = itr->second->FindMember("shape");
-    if (shape_itr != itr->second->MemberEnd()) {
-      const rapidjson::Value& shape_json = shape_itr->value;
-      for (rapidjson::SizeType i = 0; i < shape_json.Size(); i++) {
-        shape->push_back(shape_json[i].GetInt());
-      }
-    } else {
-      return Error(
-          "The response does not contain shape for output name " + output_name);
-    }
-  } else {
+  if (itr == output_name_to_result_map_.end()) {
     return Error(
         "The response does not contain results for output name " + output_name);
   }
-  return Error::Success;
+
+  return ShapeHelper(output_name, itr->second, shape);
 }
 
 Error
@@ -370,24 +532,23 @@ InferResultHttp::Datatype(
     return status_;
   }
   auto itr = output_name_to_result_map_.find(output_name);
-  if (itr != output_name_to_result_map_.end()) {
-    const auto datatype_itr = itr->second->FindMember("datatype");
-    if (datatype_itr != itr->second->MemberEnd()) {
-      const rapidjson::Value& datatype_json = datatype_itr->value;
-      *datatype = std::string(
-          datatype_json.GetString(), datatype_json.GetStringLength());
-    } else {
-      return Error(
-          "The response does not contain datatype for output name " +
-          output_name);
-    }
-  } else {
+  if (itr == output_name_to_result_map_.end()) {
     return Error(
-        "The response does not contain datatype or output name " + output_name);
+        "The response does not contain results for output name " + output_name);
   }
+
+  const char* dtype_str;
+  size_t dtype_strlen;
+  Error err = itr->second.MemberAsString("datatype", &dtype_str, &dtype_strlen);
+  if (!err.IsOk()) {
+    return Error(
+        "The response does not contain datatype for output name " +
+        output_name);
+  }
+
+  datatype->assign(dtype_str, dtype_strlen);
   return Error::Success;
 }
-
 
 Error
 InferResultHttp::RawData(
@@ -452,7 +613,14 @@ InferResultHttp::DebugString() const
   if (!status_.IsOk()) {
     return status_.Message();
   }
-  return GetJsonText(response_json_);
+
+  TritonJson::WriteBuffer buffer;
+  Error err = response_json_.Write(&buffer);
+  if (!err.IsOk()) {
+    return "<failed>";
+  }
+
+  return buffer.Contents();
 }
 
 Error
@@ -472,57 +640,67 @@ InferResultHttp::InferResultHttp(
                 << infer_request->infer_response_buffer_->substr(0, offset)
                 << std::endl;
     }
-    response_json_.Parse(
+    status_ = response_json_.Parse(
         (char*)infer_request->infer_response_buffer_.get()->c_str(), offset);
   } else {
     if (infer_request->verbose_) {
       std::cout << "inference response: "
                 << *infer_request->infer_response_buffer_ << std::endl;
     }
-    response_json_.Parse(
+    status_ = response_json_.Parse(
         (char*)infer_request->infer_response_buffer_.get()->c_str());
   }
 
   // There should be a valid JSON response in all cases. Either the
   // successful infer response or an error response.
-  if (response_json_.HasParseError()) {
-    status_ = Error(
-        "failed to parse inference response JSON: " +
-        std::string(GetParseError_En(response_json_.GetParseError())) + " at " +
-        std::to_string(response_json_.GetErrorOffset()));
-  } else if (infer_request->curl_status_ != CURLE_OK) {
-    const auto& itr = response_json_.FindMember("error");
-    if (itr != response_json_.MemberEnd()) {
-      status_ = Error(
-          std::string(itr->value.GetString(), itr->value.GetStringLength()));
+  if (status_.IsOk()) {
+    if (infer_request->http_code_ != 200) {
+      const char* err_str;
+      size_t err_strlen;
+      if (!response_json_.MemberAsString("error", &err_str, &err_strlen)
+               .IsOk()) {
+        status_ = Error("inference failed with unknown error");
+      } else {
+        status_ = Error(std::string(err_str, err_strlen));
+      }
     } else {
-      status_ = Error("inference failed with unknown error");
-    }
-  } else {
-    status_ = Error::Success;
+      TritonJson::Value outputs_json;
+      if (response_json_.Find("outputs", &outputs_json)) {
+        for (size_t i = 0; i < outputs_json.ArraySize(); i++) {
+          TritonJson::Value output_json;
+          status_ = outputs_json.IndexAsObject(i, &output_json);
+          if (!status_.IsOk()) {
+            break;
+          }
 
-    const auto& itr = response_json_.FindMember("outputs");
-    if (itr != response_json_.MemberEnd()) {
-      const rapidjson::Value& outputs = itr->value;
-      for (size_t i = 0; i < outputs.Size(); i++) {
-        const rapidjson::Value& output = outputs[i];
-        const char* output_name = output["name"].GetString();
-        output_name_to_result_map_[output_name] = &output;
-        const auto& pitr = output.FindMember("parameters");
-        if (pitr != output.MemberEnd()) {
-          const rapidjson::Value& param = pitr->value;
-          const auto& bitr = param.FindMember("binary_data_size");
-          if (bitr != param.MemberEnd()) {
-            size_t byte_size = bitr->value.GetInt();
+          const char* name_str;
+          size_t name_strlen;
+          status_ = output_json.MemberAsString("name", &name_str, &name_strlen);
+          if (!status_.IsOk()) {
+            break;
+          }
+
+          std::string output_name(name_str, name_strlen);
+
+          TritonJson::Value param_json;
+          if (output_json.Find("parameters", &param_json)) {
+            uint64_t data_size = 0;
+            status_ = param_json.MemberAsUInt("binary_data_size", &data_size);
+            if (!status_.IsOk()) {
+              break;
+            }
+
             output_name_to_buffer_map_.emplace(
                 output_name,
                 std::pair<const uint8_t*, const size_t>(
                     (uint8_t*)(infer_request->infer_response_buffer_.get()
                                    ->c_str()) +
                         offset,
-                    byte_size));
-            offset += byte_size;
+                    data_size));
+            offset += data_size;
           }
+
+          output_name_to_result_map_[output_name] = std::move(output_json);
         }
       }
     }
@@ -582,7 +760,7 @@ InferenceServerHttpClient::IsServerLive(
   std::string request_uri(url_ + "/v2/health/live");
 
   long http_code;
-  rapidjson::Document response;
+  std::string response;
   err = Get(request_uri, headers, query_params, &response, &http_code);
 
   *live = (http_code == 200) ? true : false;
@@ -599,7 +777,7 @@ InferenceServerHttpClient::IsServerReady(
   std::string request_uri(url_ + "/v2/health/live");
 
   long http_code;
-  rapidjson::Document response;
+  std::string response;
   err = Get(request_uri, headers, query_params, &response, &http_code);
 
   *ready = (http_code == 200) ? true : false;
@@ -622,7 +800,7 @@ InferenceServerHttpClient::IsModelReady(
   request_uri = request_uri + "/ready";
 
   long http_code;
-  rapidjson::Document response;
+  std::string response;
   err = Get(request_uri, headers, query_params, &response, &http_code);
 
   *ready = (http_code == 200) ? true : false;
@@ -633,88 +811,54 @@ InferenceServerHttpClient::IsModelReady(
 
 Error
 InferenceServerHttpClient::ServerMetadata(
-    rapidjson::Document* server_metadata, const Headers& headers,
+    std::string* server_metadata, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(url_ + "/v2");
-
-  long http_code;
-  err = Get(request_uri, headers, query_params, server_metadata, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  return Get(request_uri, headers, query_params, server_metadata);
 }
 
 
 Error
 InferenceServerHttpClient::ModelMetadata(
-    rapidjson::Document* model_metadata, const std::string& model_name,
+    std::string* model_metadata, const std::string& model_name,
     const std::string& model_version, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(url_ + "/v2/models/" + model_name);
   if (!model_version.empty()) {
     request_uri = request_uri + "/versions/" + model_version;
   }
 
-  long http_code;
-  err = Get(request_uri, headers, query_params, model_metadata, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  return Get(request_uri, headers, query_params, model_metadata);
 }
 
 
 Error
 InferenceServerHttpClient::ModelConfig(
-    rapidjson::Document* model_config, const std::string& model_name,
+    std::string* model_config, const std::string& model_name,
     const std::string& model_version, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(url_ + "/v2/models/" + model_name);
   if (!model_version.empty()) {
     request_uri = request_uri + "/versions/" + model_version;
   }
   request_uri = request_uri + "/config";
 
-  long http_code;
-  err = Get(request_uri, headers, query_params, model_config, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  return Get(request_uri, headers, query_params, model_config);
 }
 
 
 Error
 InferenceServerHttpClient::ModelRepositoryIndex(
-    rapidjson::Document* repository_index, const Headers& headers,
+    std::string* repository_index, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
   std::string request_uri(url_ + "/v2/repository/index");
 
-  rapidjson::Document request(rapidjson::kObjectType);
-  long http_code;
-  err = Post(
-      request_uri, request, headers, query_params, repository_index,
-      &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  std::string request;  // empty request body
+  return Post(request_uri, request, headers, query_params, repository_index);
 }
 
 Error
@@ -722,21 +866,12 @@ InferenceServerHttpClient::LoadModel(
     const std::string& model_name, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(
       url_ + "/v2/repository/models/" + model_name + "/load");
 
-  rapidjson::Document request(rapidjson::kObjectType);
-  rapidjson::Document response(rapidjson::kObjectType);
-  long http_code;
-  err =
-      Post(request_uri, request, headers, query_params, &response, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  std::string request;  // empty request body
+  std::string response;
+  return Post(request_uri, request, headers, query_params, &response);
 }
 
 Error
@@ -744,32 +879,21 @@ InferenceServerHttpClient::UnloadModel(
     const std::string& model_name, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(
       url_ + "/v2/repository/models/" + model_name + "/unload");
 
-  rapidjson::Document request(rapidjson::kObjectType);
-  rapidjson::Document response(rapidjson::kObjectType);
-  long http_code;
-  err =
-      Post(request_uri, request, headers, query_params, &response, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  std::string request;  // empty request body
+  std::string response;
+  return Post(request_uri, request, headers, query_params, &response);
 }
 
 
 Error
 InferenceServerHttpClient::ModelInferenceStatistics(
-    rapidjson::Document* infer_stat, const std::string& model_name,
+    std::string* infer_stat, const std::string& model_name,
     const std::string& model_version, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(url_ + "/v2/models");
   if (!model_name.empty()) {
     request_uri += "/" + model_name;
@@ -779,35 +903,21 @@ InferenceServerHttpClient::ModelInferenceStatistics(
   }
   request_uri += "/stats";
 
-  long http_code;
-  err = Get(request_uri, headers, query_params, infer_stat, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  return Get(request_uri, headers, query_params, infer_stat);
 }
 
 Error
 InferenceServerHttpClient::SystemSharedMemoryStatus(
-    rapidjson::Document* status, const std::string& name,
-    const Headers& headers, const Parameters& query_params)
+    std::string* status, const std::string& name, const Headers& headers,
+    const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(url_ + "/v2/systemsharedmemory");
   if (!name.empty()) {
     request_uri = request_uri + "/region/" + name;
   }
   request_uri = request_uri + "/status";
 
-  long http_code;
-  err = Get(request_uri, headers, query_params, status, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  return Get(request_uri, headers, query_params, status);
 }
 
 Error
@@ -815,31 +925,24 @@ InferenceServerHttpClient::RegisterSystemSharedMemory(
     const std::string& name, const std::string& key, const size_t byte_size,
     const size_t offset, const Headers& headers, const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(
       url_ + "/v2/systemsharedmemory/region/" + name + "/register");
 
-  rapidjson::Document request(rapidjson::kObjectType);
-  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  TritonJson::Value request_json(TritonJson::ValueType::OBJECT);
   {
-    rapidjson::Value key_json(key.c_str(), allocator);
-    request.AddMember("key", key_json, allocator);
-    rapidjson::Value offset_json(offset);
-    request.AddMember("offet", offset_json, allocator);
-    rapidjson::Value byte_size_json(byte_size);
-    request.AddMember("byte_size", byte_size_json, allocator);
+    request_json.AddStringRef("key", key.c_str(), key.size());
+    request_json.AddUInt("offset", offset);
+    request_json.AddUInt("byte_size", byte_size);
   }
-  rapidjson::Document response(rapidjson::kObjectType);
 
-  long http_code;
-  err =
-      Post(request_uri, request, headers, query_params, &response, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
+  TritonJson::WriteBuffer buffer;
+  Error err = request_json.Write(&buffer);
+  if (!err.IsOk()) {
+    return err;
   }
-  return err;
+
+  std::string response;
+  return Post(request_uri, buffer.Contents(), headers, query_params, &response);
 }
 
 Error
@@ -847,46 +950,29 @@ InferenceServerHttpClient::UnregisterSystemSharedMemory(
     const std::string& region_name, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(url_ + "/v2/systemsharedmemory");
   if (!region_name.empty()) {
     request_uri = request_uri + "/region/" + region_name;
   }
   request_uri = request_uri + "/unregister";
 
-  rapidjson::Document request(rapidjson::kObjectType);
-  rapidjson::Document response(rapidjson::kObjectType);
-  long http_code;
-  err =
-      Post(request_uri, request, headers, query_params, &response, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  std::string request;  // empty request body
+  std::string response;
+  return Post(request_uri, request, headers, query_params, &response);
 }
 
 Error
 InferenceServerHttpClient::CudaSharedMemoryStatus(
-    rapidjson::Document* status, const std::string& region_name,
-    const Headers& headers, const Parameters& query_params)
+    std::string* status, const std::string& region_name, const Headers& headers,
+    const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(url_ + "/v2/cudasharedmemory");
   if (!region_name.empty()) {
     request_uri = request_uri + "/region/" + region_name;
   }
   request_uri = request_uri + "/status";
 
-  long http_code;
-  err = Get(request_uri, headers, query_params, status, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  return Get(request_uri, headers, query_params, status);
 }
 
 Error
@@ -895,15 +981,13 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
     const size_t device_id, const size_t byte_size, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(
       url_ + "/v2/cudasharedmemory/region/" + name + "/register");
 
-  rapidjson::Document request(rapidjson::kObjectType);
-  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  TritonJson::Value request_json(TritonJson::ValueType::OBJECT);
   {
-    rapidjson::Value raw_handle_json(rapidjson::kObjectType);
+    TritonJson::Value raw_handle_json(
+        request_json, TritonJson::ValueType::OBJECT);
     {
       char* encoded_handle = nullptr;
       int encoded_size;
@@ -913,27 +997,23 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
       if (encoded_handle == nullptr) {
         return Error("Failed to base64 encode the cudaIpcMemHandle_t");
       }
-      const auto encoded_handle_str = std::string(encoded_handle, encoded_size);
-      rapidjson::Value b64_json(
-          rapidjson::StringRef(encoded_handle_str.c_str()), allocator);
+
+      raw_handle_json.AddString("b64", encoded_handle, encoded_size);
       delete encoded_handle;
-      raw_handle_json.AddMember("b64", b64_json, allocator);
     }
-    request.AddMember("raw_handle", raw_handle_json, allocator);
-    rapidjson::Value device_id_json(device_id);
-    request.AddMember("device_id", device_id_json, allocator);
-    rapidjson::Value byte_size_json(byte_size);
-    request.AddMember("byte_size", byte_size_json, allocator);
+    request_json.Add("raw_handle", std::move(raw_handle_json));
+    request_json.AddUInt("device_id", device_id);
+    request_json.AddUInt("byte_size", byte_size);
   }
-  rapidjson::Document response(rapidjson::kObjectType);
-  long http_code;
-  err =
-      Post(request_uri, request, headers, query_params, &response, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
+
+  TritonJson::WriteBuffer buffer;
+  Error err = request_json.Write(&buffer);
+  if (!err.IsOk()) {
+    return err;
   }
-  return err;
+
+  std::string response;
+  return Post(request_uri, buffer.Contents(), headers, query_params, &response);
 }
 
 Error
@@ -941,24 +1021,15 @@ InferenceServerHttpClient::UnregisterCudaSharedMemory(
     const std::string& name, const Headers& headers,
     const Parameters& query_params)
 {
-  Error err;
-
   std::string request_uri(url_ + "/v2/cudasharedmemory");
   if (!name.empty()) {
     request_uri = request_uri + "/region/" + name;
   }
   request_uri = request_uri + "/unregister";
 
-  rapidjson::Document request(rapidjson::kObjectType);
-  rapidjson::Document response(rapidjson::kObjectType);
-  long http_code;
-  err =
-      Post(request_uri, request, headers, query_params, &response, &http_code);
-  if ((http_code != 200) && err.IsOk()) {
-    return Error(
-        "[INTERNAL] Request failed with missing error message in response");
-  }
-  return err;
+  std::string request;  // empty request body
+  std::string response;
+  return Post(request_uri, request, headers, query_params, &response);
 }
 
 Error
@@ -1005,7 +1076,12 @@ InferenceServerHttpClient::Infer(
 
   // During this call SEND_END (except in above case), RECV_START, and
   // RECV_END will be set.
-  sync_request->curl_status_ = curl_easy_perform(easy_handle_);
+  if (curl_easy_perform(easy_handle_) != CURLE_OK) {
+    sync_request->http_code_ = 400;
+  } else {
+    curl_easy_getinfo(
+        easy_handle_, CURLINFO_RESPONSE_CODE, &sync_request->http_code_);
+  }
 
   InferResultHttp::Create(result, sync_request);
 
@@ -1152,142 +1228,6 @@ InferenceServerHttpClient::InferResponseHandler(
   return result_bytes;
 }
 
-void
-InferenceServerHttpClient::PrepareRequestJson(
-    const InferOptions& options, const std::vector<InferInput*>& inputs,
-    const std::vector<const InferRequestedOutput*>& outputs,
-    rapidjson::Document* request_json)
-{
-  // Populate the request JSON.
-  rapidjson::Document::AllocatorType& allocator = request_json->GetAllocator();
-  request_json->SetObject();
-  {
-    rapidjson::Value request_id_json(options.request_id_.c_str(), allocator);
-    request_json->AddMember("id", request_id_json, allocator);
-    rapidjson::Value parameters_json(rapidjson::kObjectType);
-    {
-      if (options.sequence_id_ != 0) {
-        rapidjson::Value sequence_id_json(options.sequence_id_);
-        parameters_json.AddMember("sequence_id", sequence_id_json, allocator);
-        rapidjson::Value sequence_start_json(options.sequence_start_);
-        parameters_json.AddMember(
-            "sequence_start", sequence_start_json, allocator);
-        rapidjson::Value sequence_end_json(options.sequence_end_);
-        parameters_json.AddMember("sequence_end", sequence_end_json, allocator);
-      }
-
-      if (options.priority_ != 0) {
-        rapidjson::Value priority_json(options.priority_);
-        parameters_json.AddMember("priority", priority_json, allocator);
-      }
-
-      if (options.timeout_ != 0) {
-        rapidjson::Value timeout_json(options.timeout_);
-        parameters_json.AddMember("timeout", timeout_json, allocator);
-      }
-    }
-    request_json->AddMember("parameters", parameters_json, allocator);
-  }
-
-  rapidjson::Value inputs_json(rapidjson::kArrayType);
-  {
-    for (const auto this_input : inputs) {
-      rapidjson::Value this_input_json(rapidjson::kObjectType);
-      {
-        rapidjson::Value name_json(this_input->Name().c_str(), allocator);
-        this_input_json.AddMember("name", name_json, allocator);
-        rapidjson::Value shape_json(rapidjson::kArrayType);
-        {
-          for (const auto dim : this_input->Shape()) {
-            rapidjson::Value dim_json(dim);
-            shape_json.PushBack(dim_json, allocator);
-          }
-        }
-        this_input_json.AddMember("shape", shape_json, allocator);
-        rapidjson::Value datatype_json(
-            this_input->Datatype().c_str(), allocator);
-        this_input_json.AddMember("datatype", datatype_json, allocator);
-        rapidjson::Value parameters_json(rapidjson::kObjectType);
-        if (this_input->IsSharedMemory()) {
-          std::string region_name;
-          size_t offset;
-          size_t byte_size;
-          this_input->SharedMemoryInfo(&region_name, &byte_size, &offset);
-          {
-            rapidjson::Value shared_memory_region_json(
-                region_name.c_str(), allocator);
-            parameters_json.AddMember(
-                "shared_memory_region", shared_memory_region_json, allocator);
-            rapidjson::Value shared_memory_byte_size_json(byte_size);
-            parameters_json.AddMember(
-                "shared_memory_byte_size", shared_memory_byte_size_json,
-                allocator);
-            if (offset != 0) {
-              rapidjson::Value shared_memory_offset_json(offset);
-              parameters_json.AddMember(
-                  "shared_memory_offset", shared_memory_offset_json, allocator);
-            }
-          }
-        } else {
-          size_t byte_size;
-          this_input->ByteSize(&byte_size);
-          rapidjson::Value binary_data_size_json(byte_size);
-          parameters_json.AddMember(
-              "binary_data_size", binary_data_size_json, allocator);
-        }
-        this_input_json.AddMember("parameters", parameters_json, allocator);
-      }
-      inputs_json.PushBack(this_input_json, allocator);
-    }
-  }
-  request_json->AddMember("inputs", inputs_json, allocator);
-
-  rapidjson::Value ouputs_json(rapidjson::kArrayType);
-  {
-    for (const auto this_output : outputs) {
-      rapidjson::Value this_output_json(rapidjson::kObjectType);
-      {
-        rapidjson::Value name_json(this_output->Name().c_str(), allocator);
-        this_output_json.AddMember("name", name_json, allocator);
-        rapidjson::Value parameters_json(rapidjson::kObjectType);
-        size_t class_count = this_output->ClassCount();
-        if (class_count != 0) {
-          rapidjson::Value classification_json(class_count);
-          parameters_json.AddMember(
-              "classification", classification_json, allocator);
-        }
-        if (this_output->IsSharedMemory()) {
-          std::string region_name;
-          size_t offset;
-          size_t byte_size;
-          this_output->SharedMemoryInfo(&region_name, &byte_size, &offset);
-          {
-            rapidjson::Value shared_memory_region_json(
-                region_name.c_str(), allocator);
-            parameters_json.AddMember(
-                "shared_memory_region", shared_memory_region_json, allocator);
-            rapidjson::Value shared_memory_byte_size_json(byte_size);
-            parameters_json.AddMember(
-                "shared_memory_byte_size", shared_memory_byte_size_json,
-                allocator);
-            if (offset != 0) {
-              rapidjson::Value shared_memory_offset_json(offset);
-              parameters_json.AddMember(
-                  "shared_memory_offset", shared_memory_offset_json, allocator);
-            }
-          }
-        } else {
-          rapidjson::Value binary_data_json(true);
-          parameters_json.AddMember("binary_data", binary_data_json, allocator);
-        }
-        this_output_json.AddMember("parameters", parameters_json, allocator);
-      }
-      ouputs_json.PushBack(this_output_json, allocator);
-    }
-  }
-  request_json->AddMember("outputs", ouputs_json, allocator);
-}
-
 Error
 InferenceServerHttpClient::PreRunProcessing(
     void* vcurl, std::string& request_uri, const InferOptions& options,
@@ -1298,11 +1238,11 @@ InferenceServerHttpClient::PreRunProcessing(
 {
   CURL* curl = reinterpret_cast<CURL*>(vcurl);
 
-  rapidjson::Document request_json;
-  PrepareRequestJson(options, inputs, outputs, &request_json);
-
   // Prepare the request object to provide the data for inference.
-  http_request->InitializeRequest(request_json);
+  Error err = http_request->InitializeRequest(options, inputs, outputs);
+  if (!err.IsOk()) {
+    return err;
+  }
 
   // Add the buffers holding input tensor data
   for (const auto this_input : inputs) {
@@ -1329,7 +1269,6 @@ InferenceServerHttpClient::PreRunProcessing(
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
   curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
-  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
@@ -1357,7 +1296,7 @@ InferenceServerHttpClient::PreRunProcessing(
 
   std::string infer_hdr{std::string(kInferHeaderContentLengthHTTPHeader) +
                         ": " +
-                        std::to_string(http_request->request_json_.GetSize())};
+                        std::to_string(http_request->request_json_.Size())};
   list = curl_slist_append(list, infer_hdr.c_str());
   list = curl_slist_append(list, "Expect:");
   list = curl_slist_append(list, "Content-Type: application/octet-stream");
@@ -1371,10 +1310,7 @@ InferenceServerHttpClient::PreRunProcessing(
   http_request->header_list_ = list;
 
   if (verbose_) {
-    std::cout << "inference request: "
-              << std::string(
-                     http_request->request_json_.GetString(),
-                     http_request->request_json_.GetSize())
+    std::cout << "inference request: " << http_request->request_json_.Contents()
               << std::endl;
   }
 
@@ -1413,12 +1349,18 @@ InferenceServerHttpClient::AsyncTransfer()
         continue;
       }
 
+      long http_code = 400;
+      if (msg->data.result == CURLE_OK) {
+        curl_easy_getinfo(msg->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+      }
+
       request_list.emplace_back(itr->second);
       ongoing_async_requests_.erase(itr);
       curl_multi_remove_handle(multi_handle_, msg->easy_handle);
       curl_easy_cleanup(msg->easy_handle);
 
       std::shared_ptr<HttpInferRequest> async_request = request_list.back();
+      async_request->http_code_ = http_code;
 
       if (msg->msg != CURLMSG_DONE) {
         // Something wrong happened.
@@ -1432,7 +1374,6 @@ InferenceServerHttpClient::AsyncTransfer()
           std::cerr << "Failed to update context stat: " << err << std::endl;
         }
       }
-      async_request->curl_status_ = msg->data.result;
     }
     lock.unlock();
 
@@ -1455,11 +1396,32 @@ InferenceServerHttpClient::ResponseHandler(
   return result_bytes;
 }
 
+namespace {
+Error
+ParseErrorJson(const std::string& json_str)
+{
+  TritonJson::Value json;
+  Error err = json.Parse(json_str.c_str(), json_str.size());
+  if (!err.IsOk()) {
+    return err;
+  }
+
+  const char* errstr;
+  size_t errlen;
+  err = json.MemberAsString("error", &errstr, &errlen);
+  if (!err.IsOk()) {
+    return err;
+  }
+
+  return Error(std::move(std::string(errstr, errlen)));
+}
+
+}  // namespace
+
 Error
 InferenceServerHttpClient::Get(
     std::string& request_uri, const Headers& headers,
-    const Parameters& query_params, rapidjson::Document* response,
-    long* http_code)
+    const Parameters& query_params, std::string* response, long* http_code)
 {
   if (!query_params.empty()) {
     request_uri = request_uri + "?" + GetQueryString(query_params);
@@ -1476,15 +1438,16 @@ InferenceServerHttpClient::Get(
 
   curl_easy_setopt(curl, CURLOPT_URL, request_uri.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+  curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
 
   // Response data handled by ResponseHandler()
-  std::string response_string;
-  response_string.reserve(256);
+  response->clear();
+  response->reserve(1024);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, response);
 
   // Add user provided headers...
   struct curl_slist* header_list = nullptr;
@@ -1504,30 +1467,22 @@ InferenceServerHttpClient::Get(
     return Error("HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
-  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, http_code);
+  long lhttp_code;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &lhttp_code);
 
   curl_slist_free_all(header_list);
   curl_easy_cleanup(curl);
 
-  if (!response_string.empty()) {
-    response->Parse(response_string.c_str(), response_string.size());
-    if (response->HasParseError()) {
-      return Error(
-          "failed to parse request JSON: " +
-          std::string(GetParseError_En(response->GetParseError())) + " at " +
-          std::to_string(response->GetErrorOffset()));
-    }
+  if (verbose_) {
+    std::cout << *response << std::endl;
+  }
 
-    if (verbose_) {
-      std::cout << GetJsonText(*response) << std::endl;
-    }
-
-    if (response->IsObject()) {
-      const auto& itr = response->FindMember("error");
-      if (itr != response->MemberEnd()) {
-        return Error(itr->value.GetString());
-      }
-    }
+  // If http code was requested for return, then just return it,
+  // otherwise flag an error if the http code is not 200.
+  if (http_code != nullptr) {
+    *http_code = lhttp_code;
+  } else if (lhttp_code != 200) {
+    return ParseErrorJson(*response);
   }
 
   return Error::Success;
@@ -1535,9 +1490,9 @@ InferenceServerHttpClient::Get(
 
 Error
 InferenceServerHttpClient::Post(
-    std::string& request_uri, const rapidjson::Document& request,
+    std::string& request_uri, const std::string& request,
     const Headers& headers, const Parameters& query_params,
-    rapidjson::Document* response, long* http_code)
+    std::string* response)
 {
   if (!query_params.empty()) {
     request_uri = request_uri + "?" + GetQueryString(query_params);
@@ -1552,24 +1507,20 @@ InferenceServerHttpClient::Post(
     return Error("failed to initialize HTTP client");
   }
 
-  // Prepare the string buffer with the request object
-  rapidjson::StringBuffer request_data;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(request_data);
-  request.Accept(writer);
-
   curl_easy_setopt(curl, CURLOPT_URL, request_uri.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, request_data.GetSize());
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request_data.GetString());
+  curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, request.size());
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.c_str());
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
 
   // Response data handled by ResponseHandler()
-  std::string response_string;
-  response_string.reserve(256);
+  response->clear();
+  response->reserve(1024);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, response);
 
   // Add user provided headers...
   struct curl_slist* header_list = nullptr;
@@ -1589,29 +1540,18 @@ InferenceServerHttpClient::Post(
     return Error("HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
-  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, http_code);
+  long http_code;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_slist_free_all(header_list);
   curl_easy_cleanup(curl);
 
-  if (!response_string.empty()) {
-    response->Parse(response_string.c_str(), response_string.size());
-    if (response->HasParseError()) {
-      return Error(
-          "failed to parse request JSON: " +
-          std::string(GetParseError_En(response->GetParseError())) + " at " +
-          std::to_string(response->GetErrorOffset()));
-    }
-    if (verbose_) {
-      std::cout << GetJsonText(*response) << std::endl;
-    }
+  if (verbose_) {
+    std::cout << *response << std::endl;
+  }
 
-    if (response->IsObject()) {
-      const auto& itr = response->FindMember("error");
-      if (itr != response->MemberEnd()) {
-        return Error(itr->value.GetString());
-      }
-    }
+  if (http_code != 200) {
+    return ParseErrorJson(*response);
   }
 
   return Error::Success;

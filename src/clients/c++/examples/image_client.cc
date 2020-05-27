@@ -37,6 +37,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include "src/clients/c++/examples/json_utils.h"
 #include "src/clients/c++/library/grpc_client.h"
 #include "src/clients/c++/library/http_client.h"
 
@@ -862,19 +863,31 @@ main(int argc, char** argv)
 
   ModelInfo model_info;
   if (protocol == ProtocolType::HTTP) {
-    rapidjson::Document model_metadata;
+    std::string model_metadata;
     err = triton_client.http_client_->ModelMetadata(
         &model_metadata, model_name, model_version, http_headers);
     if (!err.IsOk()) {
       std::cerr << "error: failed to get model metadata: " << err << std::endl;
     }
-    rapidjson::Document model_config;
+    rapidjson::Document model_metadata_json;
+    err = nic::ParseJson(&model_metadata_json, model_metadata);
+    if (!err.IsOk()) {
+      std::cerr << "error: failed to parse model metadata: " << err
+                << std::endl;
+    }
+    std::string model_config;
     err = triton_client.http_client_->ModelConfig(
         &model_config, model_name, model_version, http_headers);
     if (!err.IsOk()) {
       std::cerr << "error: failed to get model config: " << err << std::endl;
     }
-    ParseModelHttp(model_metadata, model_config, batch_size, &model_info);
+    rapidjson::Document model_config_json;
+    err = nic::ParseJson(&model_config_json, model_config);
+    if (!err.IsOk()) {
+      std::cerr << "error: failed to parse model config: " << err << std::endl;
+    }
+    ParseModelHttp(
+        model_metadata_json, model_config_json, batch_size, &model_info);
   } else {
     ni::ModelMetadataResponse model_metadata;
     err = triton_client.grpc_client_->ModelMetadata(

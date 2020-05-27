@@ -299,12 +299,12 @@ main(int argc, char** argv)
     }
   }
 
-  // Get shared memory regions  active/registered within triton
-  rapidjson::Document status;
+  // Get shared memory regions active/registered within triton
+  std::string shm_status;
   FAIL_IF_ERR(
-      client->CudaSharedMemoryStatus(&status),
+      client->CudaSharedMemoryStatus(&shm_status),
       "failed to get shared memory status");
-  std::cout << "Shared Memory Status:\n" << nic::GetJsonText(status) << "\n";
+  std::cout << "Shared Memory Status:\n" << shm_status << "\n";
 
   // Unregister shared memory
   FAIL_IF_ERR(
