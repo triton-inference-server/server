@@ -35,12 +35,6 @@ NVIDIA Triton Inference Server
     the inference server in** `Roadmap
     <https://github.com/NVIDIA/triton-inference-server#roadmap>`_.
 
-    **LATEST RELEASE: You are currently on the master branch which
-    tracks under-development progress towards the next release. The
-    latest release of the Triton Inference Server is 1.12.0 and
-    is available on branch** `r20.03
-    <https://github.com/NVIDIA/triton-inference-server/tree/r20.03>`_.
-
 .. overview-begin-marker-do-not-remove
 
 NVIDIA Triton Inference Server provides a cloud inferencing solution
@@ -49,22 +43,40 @@ via an HTTP or GRPC endpoint, allowing remote clients to request
 inferencing for any model being managed by the server. For edge
 deployments, Triton Server is also available as a shared library with
 an API that allows the full functionality of the server to be included
-directly in an application. Triton Server provides the following
-features:
+directly in an application.
+
+What's New In 1.13.0
+--------------------
+
+* Updates for KFserving HTTP/REST and GRPC protocols and corresponding Python
+  and C++ client libraries. See Roadmap section for more information.
+
+* Update GRPC version to 1.24.0.
+
+* Several issues with S3 storage were resolved.
+
+* Fix last_inferrence_timestamp value to correctly show the time when inference
+  last occurred for each model.
+
+* The Caffe2 backend is deprecated. Support for Caffe2 models will be removed in
+  a future release.
+
+Features
+--------
 
 * `Multiple framework support
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/model_repository.html#framework-model-definition>`_. The
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_repository.html#framework-model-definition>`_. The
   server can manage any number and mix of models (limited by system
   disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
   TensorFlow SavedModel, ONNX, PyTorch, and Caffe2 NetDef model
   formats. Also supports TensorFlow-TensorRT and ONNX-TensorRT
   integrated models. Variable-size input and output tensors are
   allowed if supported by the framework. See `Capabilities
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/capabilities.html#capabilities>`_
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/capabilities.html#capabilities>`_
   for detailed support information for each framework.
 
 * `Concurrent model execution support
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/model_configuration.html#instance-groups>`_. Multiple
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_configuration.html#instance-groups>`_. Multiple
   models (or multiple instances of the same model) can run
   simultaneously on the same GPU.
 
@@ -72,13 +84,13 @@ features:
   can accept requests for a batch of inputs and respond with the
   corresponding batch of outputs. Triton Server also supports multiple
   `scheduling and batching
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/model_configuration.html#scheduling-and-batching>`_
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_configuration.html#scheduling-and-batching>`_
   algorithms that combine individual inference requests together to
   improve inference throughput. These scheduling and batching
   decisions are transparent to the client requesting inference.
 
 * `Custom backend support
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/model_repository.html#custom-backends>`_. Triton
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_repository.html#custom-backends>`_. Triton
   Server allows individual models to be implemented with custom
   backends instead of by a deep-learning framework. With a custom
   backend a model can implement any logic desired, while still
@@ -86,7 +98,7 @@ features:
   batching and other features provided by the server.
 
 * `Ensemble support
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/models_and_schedulers.html#ensemble-models>`_. An
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/models_and_schedulers.html#ensemble-models>`_. An
   ensemble represents a pipeline of one or more models and the
   connection of input and output tensors between those models. A
   single inference request to an ensemble will trigger the execution
@@ -96,36 +108,30 @@ features:
   all system GPUs.
 
 * Triton Server provides `multiple modes for model management
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/model_management.html>`_. These
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_management.html>`_. These
   model management modes allow for both implicit and explicit loading
   and unloading of models without requiring a server restart.
 
 * `Model repositories
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/model_repository.html#>`_
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_repository.html#>`_
   may reside on a locally accessible file system (e.g. NFS), in Google
   Cloud Storage or in Amazon S3.
 
 * Readiness and liveness `health endpoints
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/http_grpc_api.html#health>`_
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/http_grpc_api.html#health>`_
   suitable for any orchestration or deployment framework, such as
   Kubernetes.
 
 * `Metrics
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/metrics.html>`_
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/metrics.html>`_
   indicating GPU utilization, server throughput, and server latency.
 
 * `C library inferface
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/library_api.html>`_
+  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/library_api.html>`_
   allows the full functionality of Triton Server to be included
   directly in an application.
 
 .. overview-end-marker-do-not-remove
-
-The current release of the Triton Inference Server is 1.12.0 and
-corresponds to the 20.02 release of the tensorrtserver container on
-`NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
-this release is `r20.03
-<https://github.com/NVIDIA/triton-inference-server/tree/r20.03>`_.
 
 Backwards Compatibility
 -----------------------
@@ -182,7 +188,7 @@ already understood. The primary reasons for the name change are to :
   frameworks and formats.
 
 * Highlight that the server is aligning HTTP/REST and GRPC protocols
-  with a set of `KFServing community standard inference protocols
+  with a set of `KFServing standard inference protocols
   <https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2>`_
   that have been proposed by the `KFServing project
   <https://github.com/kubeflow/kfserving>`_.
@@ -190,28 +196,20 @@ already understood. The primary reasons for the name change are to :
 Transitioning from the current protocols (version 1) to the new
 protocols (version 2) will take place over several releases.
 
-* **Current master**
+* 20.03.1
 
-  * Alpha release of server support for KFServing community standard
-    GRPC and HTTP/REST inference protocol.
-  * Alpha release of Python client library that uses KFServing
-    community standard GRPC and HTTP/REST inference protocol.
-  * See `client documentation
-    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/client_experimental.rst>`_
-    for description and examples showing how to enable and use the new
-    GRPC and HTTP/REST inference protocol and Python client library.
-  * Existing HTTP/REST and GRPC protocols, and existing client APIs
-    continue to be supported and remain the default protocols.
-
-* 20.05
-
-  * Beta release of KFServing community standard HTTP/REST and GRPC
-    inference protocol support in server, Python client, and C++
-    client.
+  * The Triton updates originally planned for 20.05 are now included
+    in the 20.03.1 release (Triton version 1.13.0).
+  * Beta release of KFServing HTTP/REST and GRPC inference protocol
+    support in server, Python client, and C++ client.
   * Beta release of the `HTTP/REST and GRPC extensions
     <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/protocol>`_
     to the KFServing inference protocol.
-  * Existing HTTP/REST and GRPC protocols are deprecated but remain
+  * See `client documentation
+    <https://github.com/NVIDIA/triton-inference-server/blob/r20.03.1/docs/client_experimental.rst>`_
+    for description and examples showing how to enable and use the new
+    client libraries.
+  * Existing V1 HTTP/REST and GRPC protocols are deprecated but remain
     the default.
   * Existing shared library inferface defined in trtserver.h continues
     to be supported but is deprecated.
@@ -220,36 +218,30 @@ protocols (version 2) will take place over several releases.
 
 * 20.06
 
-  * Triton Server version 2.0.0.
-  * KFserving community standard HTTP/REST and GRPC inference
-    protocols plus all Triton `extensions
-    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/protocol>`_
-    become the default and only supported protocols for the server.
-  * C++ and Python client libraries based on the KFServing standard
-    inference protocols become the default and only supported client
-    libraries.
-  * The new shared library interface defined in tritonserver.h becomes
-    the default and only supported shared library interface.
-  * Original C++ and Python client libraries are removed. Release
-    20.05 is the last release to support these libraries.
-  * Original shared library interface defined in trtserver.h is
-    removed. Release 20.05 is the last release to support the
-    trtserver.h shared library interface.
+  * Triton Server will release two containers, one for version 1.14.0
+    and one for version 2.0.0.
+  * The Triton 2.0.0 version will contain only the KFServing HTTP/REST
+    and GRPC inference protocols and the corresponding V2 Python and
+    C++ client libraries and examples.
+  * The Triton 2.0.0 version will support the shared library interface
+    defined in tritonserver.h.
+  * The 1.14.0 release will likely be the last release for Triton V1.
+  * The Triton 1.14.0 version will contain only the V1 HTTP/REST
+    and GRPC inference protocols and the corresponding V1 Python and
+    C++ client libraries and examples.
+  * The Triton 1.14.0 version will support the shared library interface
+    defined in tensorrtserver.h.
 
 Throughout the transition the model repository struture and custom
 backend APIs will remain unchanged so that any existing model
 repository and custom backends will continue to work with Triton
 Server.
 
-In the 20.06 release there will be some minor changes to the
+In the Triton 2.0.0 release there will be some minor changes to the
 tritonserver command-line executable arguments. It will be necessary
-to revisit and possible adjust invocations of tritonserver executable.
-
-In the 20.06 release there will be some minor changes to the model
-configuration schema. It is expected that these changes will not
-impact the vast majority of model configurations. For impacted models
-the model configuration will need minor edits to become compatible
-with Triton Server version 2.0.0.
+to revisit and possible adjust invocations of tritonserver
+executable. Triton 1.14.0 command-line will remain unchanged from
+earlier version 1 releases.
 
 Documentation
 -------------
@@ -266,7 +258,7 @@ and for `earlier releases
 <https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
 
 An `FAQ
-<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/faq.html>`_
+<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/faq.html>`_
 provides answers for frequently asked questions.
 
 READMEs for deployment examples can be found in subdirectories of

@@ -203,7 +203,7 @@ TensorFlow saves trained models in one of two ways: *GraphDef* or
 have a trained model in TensorFlow, you can save it as a GraphDef
 directly or convert it to a GraphDef by using a script like
 `freeze_graph.py
-<https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/tools/freeze_graph.py>`_,
+<https://github.com/tensorflow/tensorflow/blob/master-v1/tensorflow/python/tools/freeze_graph.py>`_,
 or save it as a SavedModel using a `SavedModelBuilder
 <https://www.tensorflow.org/serving/serving_basic>`_ or
 `tf.saved_model.simple_save
@@ -277,7 +277,7 @@ files. By default the file or directory must be named model.onnx.
 Notice that some ONNX models may not be supported by the inference
 server as they are not supported by the underlying ONNX Runtime (due
 to either using `stale ONNX opset version
-<https://github.com/Microsoft/onnxruntime/blob/master/docs/Versioning.md#version-matrix>`_
+<https://github.com/Microsoft/onnxruntime/blob/master-v1/docs/Versioning.md#version-matrix>`_
 or containing operators with `unsupported types
 <https://github.com/microsoft/onnxruntime/issues/1122>`_).
 
@@ -401,7 +401,7 @@ Custom Backend API
 ^^^^^^^^^^^^^^^^^^
 
 A custom backend must implement the C interface defined in `custom.h
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/backends/custom/custom.h>`_. The
+<https://github.com/NVIDIA/triton-inference-server/blob/master-v1/src/backends/custom/custom.h>`_. The
 interface is also documented in the API Reference.
 
 Example Custom Backend
