@@ -112,9 +112,9 @@ DynamicBatchScheduler::Create(
     auto thread_exit = std::make_shared<std::atomic<bool>>(false);
     sched->scheduler_threads_exit_.emplace_back(thread_exit);
     sched->scheduler_threads_.emplace_back(new std::thread(
-        [dyna_sched, runner_id, c, nice, thread_exit, &init_state]() {
+        [dyna_sched, runner_id, nice, thread_exit, &init_state]() {
           dyna_sched->SchedulerThread(
-              runner_id, c, nice, thread_exit, &init_state);
+              runner_id, nice, thread_exit, &init_state);
         }));
     if (!init_state.get_future().get()) {
       if (sched->scheduler_threads_.back()->joinable()) {
@@ -130,10 +130,6 @@ DynamicBatchScheduler::Create(
         Status::Code::INTERNAL,
         "Initialization failed for all dynamic-batch scheduler threads");
   }
-
-  sched->completion_queues_ = std::vector<std::queue<
-      std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>>>>(
-      sched->scheduler_thread_cnt_);
 
   scheduler->reset(sched.release());
 
@@ -212,7 +208,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 
 void
 DynamicBatchScheduler::SchedulerThread(
-    const uint32_t runner_id, const uint32_t completion_id, const int nice,
+    const uint32_t runner_id, const int nice,
     const std::shared_ptr<std::atomic<bool>>& rthread_exit,
     std::promise<bool>* is_initialized)
 {
@@ -326,8 +322,20 @@ DynamicBatchScheduler::SchedulerThread(
             }
           }
           if (preserve_ordering_ && !requests.empty()) {
-            std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
-            completion_id_queue_.push(completion_id);
+            std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+            for (auto& request : requests) {
+              completion_queue_.emplace_back();
+              auto queue_slot = &completion_queue_.back();
+              request->SetResponseDelegator(
+                  [this,
+                   queue_slot](std::unique_ptr<InferenceResponse>&& response) {
+                    {
+                      std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+                      (*queue_slot) = std::move(response);
+                    }
+                    FinalizeResponses();
+                  });
+            }
           }
 
           queued_batch_size_ -= pending_batch_size_;
@@ -359,8 +367,20 @@ DynamicBatchScheduler::SchedulerThread(
         if (status.IsOk()) {
           requests.emplace_back(std::move(request));
           if (preserve_ordering_) {
-            std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
-            completion_id_queue_.push(completion_id);
+            std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+            for (auto& request : requests) {
+              completion_queue_.emplace_back();
+              auto queue_slot = &completion_queue_.back();
+              request->SetResponseDelegator(
+                  [this,
+                   queue_slot](std::unique_ptr<InferenceResponse>&& response) {
+                    {
+                      std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+                      (*queue_slot) = std::move(response);
+                    }
+                    FinalizeResponses();
+                  });
+            }
           }
         } else {
           LOG_ERROR << "Failed to retrieve request from scheduler queue: "
@@ -383,15 +403,6 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     if (!requests.empty()) {
-      // FIXME, need to sort out how preserve_ordering and stats
-      // update should happen
-#if 0
-      auto OnCompleteQueuedPayloads = [this, completion_id,
-                                       payloads](const Status& status) {
-        FinalizePayloads(completion_id, payloads, status);
-      };
-#endif
-
       OnSchedule_(runner_id, std::move(requests));
 
       // For testing we introduce a delay here to make the
@@ -571,65 +582,30 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
   return wait_ns / 1000;
 }
 
-// FIXME
-#if 0
 void
-DynamicBatchScheduler::FinalizePayloads(
-    const uint32_t completion_id,
-    std::shared_ptr<std::vector<Scheduler::Payload>> payloads,
-    const Status& status)
+DynamicBatchScheduler::FinalizeResponses()
 {
-#ifdef TRITON_ENABLE_STATS
-  bool found_success = false;
-#endif  // TRITON_ENABLE_STATS
-
-  for (auto& payload : *payloads) {
-    payload.status_ = status.IsOk() ? payload.status_ : status;
-
-#ifdef TRITON_ENABLE_STATS
-    // All the payloads executed together, so count 1 execution in
-    // the first successful payload. Other payloads stay at 0
-    // executions.
-    if (!found_success && payload.status_.IsOk() &&
-        (payload.stats_ != nullptr)) {
-      payload.stats_->SetModelExecutionCount(1);
-      found_success = true;
-    }
-#endif  // TRITON_ENABLE_STATS
-
-    // Finalize right away if not preserving order
-    if (!preserve_ordering_) {
-      if (payload.complete_function_ != nullptr) {
-        payload.complete_function_(payload.status_);
+  // Need exclusive access of the function to ensure responses are sent
+  // in order
+  static std::mutex finalize_mtx;
+  std::lock_guard<std::mutex> lock(finalize_mtx);
+  // Finalize the completed payloads in-order as far as possible
+  std::deque<std::unique_ptr<InferenceResponse>> responses;
+  {
+    std::lock_guard<std::mutex> queue_lock(completion_queue_mtx_);
+    while (true) {
+      // No response left or ready
+      if (completion_queue_.empty() || (completion_queue_.front() == nullptr)) {
+        break;
       }
+      responses.emplace_back(std::move(completion_queue_.front()));
+      completion_queue_.pop_front();
     }
   }
 
-  if (preserve_ordering_) {
-    std::lock_guard<std::mutex> lock(completion_queues_mtx_);
-    completion_queues_[completion_id].push(payloads);
-    // Finalize the completed payloads in-order as far as possible
-    while (true) {
-      size_t head_completion_id;
-      {
-        std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
-        if (completion_id_queue_.empty() ||
-            completion_queues_[completion_id_queue_.front()].empty()) {
-          break;
-        }
-        head_completion_id = completion_id_queue_.front();
-        completion_id_queue_.pop();
-      }
-
-      for (auto& payload : *completion_queues_[head_completion_id].front()) {
-        if (payload.complete_function_ != nullptr) {
-          payload.complete_function_(payload.status_);
-        }
-      }
-      completion_queues_[head_completion_id].pop();
-    }
+  for (auto& response : responses) {
+    InferenceResponse::Send(std::move(response));
   }
 }
-#endif
 
 }}  // namespace nvidia::inferenceserver
