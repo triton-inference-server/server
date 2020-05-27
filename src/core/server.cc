@@ -79,7 +79,7 @@ class ScopedAtomicIncrement {
 InferenceServer::InferenceServer()
     : version_(TRITON_VERSION), ready_state_(ServerReadyState::SERVER_INVALID)
 {
-  id_ = "inference:0";
+  id_ = "triton";
   extensions_.push_back("classification");
   extensions_.push_back("sequence");
   extensions_.push_back("model_repository");

@@ -135,8 +135,8 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       client->ServerMetadata(&server_metadata, http_headers),
       "unable to get server metadata");
-  if ((std::string(server_metadata["name"].GetString()))
-          .compare("inference:0") != 0) {
+  if ((std::string(server_metadata["name"].GetString())).compare("triton") !=
+      0) {
     std::cerr << "error: unexpected server metadata: "
               << nic::GetJsonText(server_metadata) << std::endl;
     exit(1);

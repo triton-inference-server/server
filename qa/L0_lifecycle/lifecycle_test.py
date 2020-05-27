@@ -72,7 +72,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertFalse(triton_client.is_server_ready())
             md = triton_client.get_server_metadata()
             self.assertEqual(os.environ["TRITON_SERVER_VERSION"], md.version)
-            self.assertEqual("inference:0", md.name)
+            self.assertEqual("triton", md.name)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -82,7 +82,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertFalse(triton_client.is_server_ready())
             md = triton_client.get_server_metadata()
             self.assertEqual(os.environ["TRITON_SERVER_VERSION"], md['version'])
-            self.assertEqual("inference:0", md['name'])
+            self.assertEqual("triton", md['name'])
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
