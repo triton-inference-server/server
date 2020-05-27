@@ -30,10 +30,10 @@ import numpy as np
 from PIL import Image
 import os
 import sys
+import struct
 
 import grpc
-from tritongrpcclient import grpc_service_pb2
-from tritongrpcclient import grpc_service_pb2_grpc
+from tritongrpcclient import grpc_service_pb2, grpc_service_pb2_grpc
 import tritongrpcclient.model_config_pb2 as mc
 
 FLAGS = None
@@ -64,6 +64,17 @@ def model_dtype_to_np(model_dtype):
         return np.dtype(object)
     return None
 
+def deserialize_bytes_tensor(encoded_tensor):
+    strs = list()
+    offset = 0
+    val_buf = encoded_tensor
+    while offset < len(val_buf):
+        l = struct.unpack_from("<I", val_buf, offset)[0]
+        offset += 4
+        sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
+        offset += l
+        strs.append(sb)
+    return (np.array(strs, dtype=bytes))
 
 def parse_model(model_metadata, model_config):
     """
@@ -179,7 +190,7 @@ def postprocess(results, filenames, batch_size):
     if len(results) != 1:
         raise Exception("expected 1 result, got {}".format(len(results)))
 
-    batched_result = np.array(results[0].contents.byte_contents)
+    batched_result = deserialize_bytes_tensor(results[0].contents.raw_contents)
     contents = np.reshape(batched_result, results[0].shape)
 
     if len(contents) != batch_size:

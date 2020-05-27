@@ -133,34 +133,31 @@ for i in \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
-    if [ $SUFFIX == "grpc_image_client" ]; then
-        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
-            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
-            cat $CLIENT_LOG.${SUFFIX}
-            RET=1
-        fi
-    elif [ $SUFFIX == "image_client" ]; then
-        python $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
+    EXTRA_ARGS=""
+    if [[ ($SUFFIX == "image_client") || ($SUFFIX == "ensemble_image_client") ]]; then
+        EXTRA_ARGS="-i grpc -u localhost:8001"
+    fi
+    if [[ ($SUFFIX == "image_client") || ($SUFFIX == "grpc_image_client") ]]; then
+        python $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.async.${SUFFIX}
             RET=1
         fi
-        python $i -m inception_graphdef -s INCEPTION -a --streaming -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.streaming.${SUFFIX}" 2>&1
+        python $i -m inception_graphdef -s INCEPTION -a --streaming -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.streaming.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.streaming.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.streaming.${SUFFIX}
             RET=1
         fi
-        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.${SUFFIX}
             RET=1
         fi
     elif [ $SUFFIX == "ensemble_image_client" ]; then
-        python $i -c 1 -i grpc -u localhost:8001 ../images >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        python $i -c 1 $EXTRA_ARGS ../images >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
             if [ `grep -c "$result" ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
                 echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
