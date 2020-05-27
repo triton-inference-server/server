@@ -39,7 +39,7 @@ PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=5000}
 PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=5}
 TENSOR_SIZE=${TENSOR_SIZE:=1}
-SHARED_MEMORY={$SHARED_MEMORY:="none"}
+SHARED_MEMORY=${SHARED_MEMORY:="none"}
 REPORTER=../common/reporter.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
@@ -144,7 +144,7 @@ for BACKEND in $BACKENDS; do
     echo -e "\"l_dynamic_batch_size\":${DYNAMIC_BATCH}," >> ${NAME}.tjson
     echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
     echo -e "\"l_size\":${TENSOR_SIZE}," >> ${NAME}.tjson
-    echo -e "\"s_shared_memory\":${SHARED_MEMORY}," >> ${NAME}.tjson
+    echo -e "\"s_shared_memory\":\"${SHARED_MEMORY}\"," >> ${NAME}.tjson
     echo -e "\"l_instance_count\":${INSTANCE_CNT}}]" >> ${NAME}.tjson
 
     kill $SERVER_PID
