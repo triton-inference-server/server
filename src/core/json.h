@@ -27,6 +27,7 @@
 
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
+#include <rapidjson/prettywriter.h>
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -78,13 +79,22 @@ class TritonJson {
   //
   class WriteBuffer {
    public:
-    void Clear() { buffer_.Clear(); }
-    const char* Base() const { return buffer_.GetString(); }
-    size_t Size() const { return buffer_.GetSize(); }
+    // Get buffer base address.
+    const char* Base() const { return buffer_.c_str(); }
+
+    // Get a reference to the buffer itself. Useful to efficiently
+    // move the contents out of the buffer.
+    std::string& MutableContents() { return buffer_; }
+
+    // Interface required by rapidjson::Writer
+    typedef char Ch;
+    void Put(char c) { buffer_.push_back(c); }
+    void Clear() { buffer_.clear(); }
+    void Flush() { return; }
+    size_t Size() const { return buffer_.size(); }
 
    private:
-    friend class Value;
-    rapidjson::StringBuffer buffer_;
+    std::string buffer_;
   };
 
   //
@@ -93,23 +103,22 @@ class TritonJson {
   //
   class Value {
    public:
+    // Empty value. Will become a top-level Document value if
+    // initialized by parsing or a non-top-level value if initialized
+    // any other way.
+    explicit Value() : value_(nullptr), allocator_(nullptr) {}
+
     // Construct a top-level JSON document.
     explicit Value(const ValueType type)
-        : is_document_(true), document_(static_cast<rapidjson::Type>(type)),
+        : document_(static_cast<rapidjson::Type>(type)), value_(nullptr),
           allocator_(&document_.GetAllocator())
     {
     }
 
     // Construct a non-top-level JSON value in a 'document'.
     explicit Value(TritonJson::Value& document, const ValueType type)
-        : is_document_(false),
-          value_(new rapidjson::Value(static_cast<rapidjson::Type>(type))),
+        : value_(new rapidjson::Value(static_cast<rapidjson::Type>(type))),
           allocator_(&document.document_.GetAllocator())
-    {
-    }
-
-    // Empty value.
-    explicit Value() : is_document_(false), value_(nullptr), allocator_(nullptr)
     {
     }
 
@@ -117,7 +126,7 @@ class TritonJson {
     // document value, otherwise error is returned.
     TRITONJSON_STATUSTYPE Parse(const char* base, const size_t size)
     {
-      if (!is_document_) {
+      if (value_ != nullptr) {
         TRITONJSON_STATUSRETURN(
             std::string("JSON, parsing only available for top-level document"));
       }
@@ -137,15 +146,30 @@ class TritonJson {
       return Parse(json.data(), json.size());
     }
 
-    // Write JSON representation into a 'buffer'. Can only be called
-    // for a top-level document value, otherwise error is returned.
+    // Write JSON representation into a 'buffer' in a compact
+    // format. Can only be called for a top-level document value,
+    // otherwise error is returned.
     TRITONJSON_STATUSTYPE Write(WriteBuffer* buffer) const
     {
-      if (!is_document_) {
+      if (value_ != nullptr) {
         TRITONJSON_STATUSRETURN(
-            std::string("JSON, parsing only available for top-level document"));
+            std::string("JSON, writing only available for top-level document"));
       }
-      rapidjson::Writer<rapidjson::StringBuffer> writer(buffer->buffer_);
+      rapidjson::Writer<WriteBuffer> writer(*buffer);
+      document_.Accept(writer);
+      return TRITONJSON_STATUSSUCCESS;
+    }
+
+    // Write JSON representation into a 'buffer' in an easy-to-read
+    // format. Can only be called for a top-level document value,
+    // otherwise error is returned.
+    TRITONJSON_STATUSTYPE PrettyWrite(WriteBuffer* buffer) const
+    {
+      if (value_ != nullptr) {
+        TRITONJSON_STATUSRETURN(
+            std::string("JSON, writing only available for top-level document"));
+      }
+      rapidjson::PrettyWriter<WriteBuffer> writer(*buffer);
       document_.Accept(writer);
       return TRITONJSON_STATUSSUCCESS;
     }
@@ -498,7 +522,7 @@ class TritonJson {
     // Error if value is not a string.
     TRITONJSON_STATUSTYPE AsString(const char** value, size_t* len) const
     {
-      if (is_document_ || !value_->IsString()) {
+      if ((value_ == nullptr) || !value_->IsString()) {
         TRITONJSON_STATUSRETURN(
             std::string("JSON, failed accessing non-string as string"));
       }
@@ -510,7 +534,7 @@ class TritonJson {
     // Get value as a boolean. Error if value is not a boolean.
     TRITONJSON_STATUSTYPE AsBool(bool* value) const
     {
-      if (is_document_ || !value_->IsBool()) {
+      if ((value_ == nullptr) || !value_->IsBool()) {
         TRITONJSON_STATUSRETURN(
             std::string("JSON, failed accessing non-boolean as a boolean"));
       }
@@ -522,7 +546,7 @@ class TritonJson {
     // integer.
     TRITONJSON_STATUSTYPE AsInt(int64_t* value) const
     {
-      if (is_document_ || !value_->IsInt64()) {
+      if ((value_ == nullptr) || !value_->IsInt64()) {
         TRITONJSON_STATUSRETURN(std::string(
             "JSON, failed accessing non-signed-integer as signed integer"));
       }
@@ -534,7 +558,7 @@ class TritonJson {
     // unsigned integer.
     TRITONJSON_STATUSTYPE AsUInt(uint64_t* value) const
     {
-      if (is_document_ || !value_->IsUint64()) {
+      if ((value_ == nullptr) || !value_->IsUint64()) {
         TRITONJSON_STATUSRETURN(std::string(
             "JSON, failed accessing non-unsigned-integer as unsigned integer"));
       }
@@ -545,7 +569,7 @@ class TritonJson {
     // Get value as a double. Error if value is not a double.
     TRITONJSON_STATUSTYPE AsDouble(double* value) const
     {
-      if (is_document_ || !value_->IsNumber()) {
+      if ((value_ == nullptr) || !value_->IsNumber()) {
         TRITONJSON_STATUSRETURN(
             std::string("JSON, failed accessing non-number as a double"));
       }
@@ -831,14 +855,14 @@ class TritonJson {
     // existing element in a docuemnt.
     explicit Value(
         rapidjson::Value& v, rapidjson::Document::AllocatorType* allocator)
-        : is_document_(false), value_(&v), allocator_(allocator)
+        : value_(&v), allocator_(allocator)
     {
     }
 
     // Release/clear a value.
     void Release()
     {
-      if (!is_document_) {
+      if (value_ != nullptr) {
         delete value_;
         value_ = nullptr;
       }
@@ -848,7 +872,7 @@ class TritonJson {
     // document as well as an element within a document.
     const rapidjson::Value& AsValue() const
     {
-      if (is_document_) {
+      if (value_ == nullptr) {
         return document_;
       }
       return *value_;
@@ -856,7 +880,7 @@ class TritonJson {
 
     rapidjson::Value& AsMutableValue()
     {
-      if (is_document_) {
+      if (value_ == nullptr) {
         return document_;
       }
       return *value_;
@@ -864,7 +888,6 @@ class TritonJson {
 
     // If this object a document or value. Based on this only one or
     // document_ or value_ is valid.
-    bool is_document_;
     rapidjson::Document document_;
     rapidjson::Value* value_;
     rapidjson::Document::AllocatorType* allocator_;

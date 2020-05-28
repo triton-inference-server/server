@@ -827,7 +827,7 @@ CommonHandler::SetUpAllRequests()
     GOTO_IF_ERR(err, earlyexit);
 
     {
-      TritonJson::Value server_metadata_json(TritonJson::ValueType::OBJECT);
+      TritonJson::Value server_metadata_json;
       err = server_metadata_json.Parse(buffer, byte_size);
       GOTO_IF_ERR(err, earlyexit);
 
@@ -906,7 +906,7 @@ CommonHandler::SetUpAllRequests()
           model_metadata_message, &buffer, &byte_size);
       GOTO_IF_ERR(err, earlyexit);
 
-      TritonJson::Value model_metadata_json(TritonJson::ValueType::OBJECT);
+      TritonJson::Value model_metadata_json;
       err = model_metadata_json.Parse(buffer, byte_size);
       GOTO_IF_ERR(err, earlyexit);
 
@@ -1096,7 +1096,7 @@ CommonHandler::SetUpAllRequests()
                                       ModelStatisticsResponse* response,
                                       grpc::Status* status) {
 #ifdef TRITON_ENABLE_STATS
-    TritonJson::Value model_stats_json(TritonJson::ValueType::OBJECT);
+    TritonJson::Value model_stats_json;
 
     int64_t requested_model_version;
     auto err =
@@ -1583,7 +1583,7 @@ CommonHandler::SetUpAllRequests()
           model_index_message, &buffer, &byte_size);
       GOTO_IF_ERR(err, earlyexit);
 
-      TritonJson::Value model_index_json(TritonJson::ValueType::OBJECT);
+      TritonJson::Value model_index_json;
       err = model_index_json.Parse(buffer, byte_size);
       GOTO_IF_ERR(err, earlyexit);
 
