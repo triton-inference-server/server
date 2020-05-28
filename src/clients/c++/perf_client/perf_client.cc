@@ -279,7 +279,10 @@ Usage(char** argv, const std::string& msg = std::string())
                    9)
             << std::endl;
   std::cerr << std::setw(9) << std::left
-            << " -v: " << FormatMessage("Enables the verbose mode.", 9)
+            << " -v: " << FormatMessage("Enables verbose mode.", 9)
+            << std::endl;
+  std::cerr << std::setw(9) << std::left
+            << " -v -v: " << FormatMessage("Enables extra verbose mode.", 9)
             << std::endl;
   std::cerr << std::endl;
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
@@ -559,6 +562,7 @@ int
 main(int argc, char** argv)
 {
   bool verbose = false;
+  bool extra_verbose = false;
   bool streaming = false;
   size_t max_threads = 4;
   // average length of a sentence
@@ -836,6 +840,7 @@ main(int argc, char** argv)
         output_shm_size = std::atoi(optarg);
         break;
       case 'v':
+        extra_verbose = verbose;
         verbose = true;
         break;
       case 'z':
@@ -1030,7 +1035,7 @@ main(int argc, char** argv)
   // messages.
   FAIL_IF_ERR(
       TritonClientFactory::Create(
-          url, protocol, http_headers, false /*verbose*/, &factory),
+          url, protocol, http_headers, extra_verbose, &factory),
       "failed to create client factory");
 
   std::unique_ptr<TritonClientWrapper> triton_client_wrapper;
