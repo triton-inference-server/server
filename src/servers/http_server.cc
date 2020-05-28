@@ -1309,7 +1309,7 @@ HTTPAPIServer::HandleRepositoryIndex(
     // If no request json then just use all default values.
     size_t buffer_len = evbuffer_get_length(req->buffer_in);
     if (buffer_len > 0) {
-      TritonJson::Value index_request(TritonJson::ValueType::OBJECT);
+      TritonJson::Value index_request;
       err = EVBufferToJson(&index_request, v, &v_idx, buffer_len, n);
       if (err == nullptr) {
         TritonJson::Value ready_json;
@@ -1639,7 +1639,7 @@ HTTPAPIServer::HandleSystemSharedMemory(
       }
 
       if (err == nullptr) {
-        TritonJson::Value register_request(TritonJson::ValueType::OBJECT);
+        TritonJson::Value register_request;
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
@@ -1749,7 +1749,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
         }
       }
       if (err == nullptr) {
-        TritonJson::Value register_request(TritonJson::ValueType::OBJECT);
+        TritonJson::Value register_request;
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
@@ -1852,7 +1852,7 @@ HTTPAPIServer::EVBufferToInput(
 
   // Extract just the json header from the HTTP body. 'header_length'
   // == 0 means that the entire HTTP body should be parsed as json.
-  TritonJson::Value request_json(TritonJson::ValueType::OBJECT);
+  TritonJson::Value request_json;
   int json_header_len = 0;
   if (header_length == 0) {
     json_header_len = evbuffer_get_length(input_buffer);
