@@ -478,7 +478,8 @@ SharedMemoryManager::GetStatus(
       if (shm_info.second->kind_ == memory_type) {
         TritonJson::Value shm_region(
             *shm_status, TritonJson::ValueType::OBJECT);
-        RETURN_IF_ERR(shm_region.AddString("name", name.c_str(), name.size()));
+        RETURN_IF_ERR(shm_region.AddString(
+            "name", shm_info.first.c_str(), shm_info.first.size()));
         if (memory_type == TRITONSERVER_MEMORY_CPU) {
           RETURN_IF_ERR(shm_region.AddString(
               "key", shm_info.second->shm_key_.c_str(),
