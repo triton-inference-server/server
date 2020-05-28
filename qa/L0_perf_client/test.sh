@@ -457,8 +457,8 @@ for PROTOCOL in grpc http; do
         set -e
     done
 
-    # Shape tensor I/O model
-    for SHARED_MEMORY_TYPE in none system cuda; do
+    # Shape tensor I/O model (server needs the shape tensor on the CPU)
+    for SHARED_MEMORY_TYPE in none system; do
         set +e
         $PERF_CLIENT -v -i $PROTOCOL -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
     --shape DUMMY_INPUT0:4,4 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -b 8 \

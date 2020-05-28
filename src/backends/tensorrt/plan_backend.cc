@@ -1731,12 +1731,7 @@ PlanBackend::Context::Run(
       }
     }
 
-    if ((!engine_->isShapeBinding(io_index)) ||
-        (max_batch_size_ != NO_BATCHING)) {
-      collector.ProcessTensor(
-          name, datatype, batch1_shape, static_cast<char*>(buffers_[bindex]),
-          total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
-    } else {
+    if ((engine_->isShapeBinding(io_index)) && (support_batching_)) {
       // Set the first 4 bytes for shape
       bool cuda_used = false;
       status = CopyBuffer(
@@ -1750,6 +1745,10 @@ PlanBackend::Context::Run(
       collector.ProcessTensor(
           name, datatype, batch1_shape,
           (static_cast<char*>(buffers_[bindex]) + sizeof(int32_t)),
+          total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
+    } else {
+      collector.ProcessTensor(
+          name, datatype, batch1_shape, static_cast<char*>(buffers_[bindex]),
           total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
     }
   }

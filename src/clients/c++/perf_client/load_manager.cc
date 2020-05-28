@@ -466,6 +466,15 @@ LoadManager::PrepareInfer(InferContext* ctx)
     }
   }
 
+  for (const auto& output : *(parser_->Outputs())) {
+    std::string region_name(TensorToRegionName(output.first));
+
+    nic::InferRequestedOutput* requested_output;
+    RETURN_IF_ERROR(
+        nic::InferRequestedOutput::Create(&requested_output, output.first));
+    ctx->outputs_.push_back(requested_output);
+  }
+
   return nic::Error::Success;
 }
 
