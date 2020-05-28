@@ -1,1 +1,1 @@
-instance group invalid_gpu_0 of model invalid_gpu specifies invalid or unsupported gpu id of 42. The minimum required CUDA compute compatibility is
+instance group invalid_gpu_0 of model invalid_gpu specifies invalid or unsupported gpu id 42. GPUs with at least the minimum required CUDA compute compatibility
