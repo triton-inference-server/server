@@ -345,7 +345,8 @@ ENV MKL_THREADING_LAYER GNU
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
 ENV TRITON_SERVER_USER=triton-server
-RUN if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
+RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
+    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
         useradd $TRITON_SERVER_USER; \
     fi && \
     [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
