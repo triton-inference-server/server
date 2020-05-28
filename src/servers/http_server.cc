@@ -686,12 +686,15 @@ CheckSharedMemoryData(
     uint64_t* offset, uint64_t* byte_size)
 {
   *use_shm = false;
+  *offset = 0;
+  *byte_size = 0;
 
   TritonJson::Value params_json;
   if (request_input.Find("parameters", &params_json)) {
     {
       TritonJson::Value region_json;
       if (params_json.Find("shared_memory_region", &region_json)) {
+        *use_shm = true;
         size_t len;
         RETURN_IF_ERR(region_json.AsString(shm_region, &len));
       }
@@ -1873,7 +1876,7 @@ HTTPAPIServer::EVBufferToInput(
   TritonJson::Value params_json;
   if (request_json.Find("parameters", &params_json)) {
     TritonJson::Value seq_json;
-    if (request_json.Find("sequence_id", &seq_json)) {
+    if (params_json.Find("sequence_id", &seq_json)) {
       uint64_t seq_id;
       RETURN_IF_ERR(seq_json.AsUInt(&seq_id));
       RETURN_IF_ERR(
@@ -1884,7 +1887,7 @@ HTTPAPIServer::EVBufferToInput(
 
     {
       TritonJson::Value start_json;
-      if (request_json.Find("sequence_start", &start_json)) {
+      if (params_json.Find("sequence_start", &start_json)) {
         bool start;
         RETURN_IF_ERR(start_json.AsBool(&start));
         if (start) {
@@ -1893,7 +1896,7 @@ HTTPAPIServer::EVBufferToInput(
       }
 
       TritonJson::Value end_json;
-      if (request_json.Find("sequence_end", &end_json)) {
+      if (params_json.Find("sequence_end", &end_json)) {
         bool end;
         RETURN_IF_ERR(end_json.AsBool(&end));
         if (end) {
@@ -1906,7 +1909,7 @@ HTTPAPIServer::EVBufferToInput(
 
     {
       TritonJson::Value priority_json;
-      if (request_json.Find("priority", &priority_json)) {
+      if (params_json.Find("priority", &priority_json)) {
         uint64_t p;
         RETURN_IF_ERR(priority_json.AsUInt(&p));
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriority(irequest, p));
@@ -1915,7 +1918,7 @@ HTTPAPIServer::EVBufferToInput(
 
     {
       TritonJson::Value timeout_json;
-      if (request_json.Find("timeout", &timeout_json)) {
+      if (params_json.Find("timeout", &timeout_json)) {
         uint64_t t;
         RETURN_IF_ERR(timeout_json.AsUInt(&t));
         RETURN_IF_ERR(
