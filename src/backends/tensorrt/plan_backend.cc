@@ -1630,7 +1630,7 @@ PlanBackend::Context::Run(
   // the corresponding binding.
   BackendInputCollector collector(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
-      input_copy_stream_);
+      input_copy_stream_, events_[next_set_].input_ready_);
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
     int io_index = binding_offset + bindex;
     if (!engine_->bindingIsInput(io_index)) {
@@ -1753,8 +1753,6 @@ PlanBackend::Context::Run(
     }
   }
   collector.Finalize();
-
-  cudaEventRecord(events_[next_set_].input_ready_, input_copy_stream_);
 
   // Ensure inputs are ready before execution. Output buffers will always be
   // available at this point as the execution and output copy are on the same
@@ -1996,6 +1994,7 @@ PlanBackend::Context::ProcessResponse(
 
     // Call Finalize() here to defer CUDA synchronization as much as possible
     payload->responder_->Finalize();
+    cudaEventSynchronize(event_set.output_ready_);
     NVTX_MARKER("plan_output_ready");
     // Compute ends when the output data copy is completed
     INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
