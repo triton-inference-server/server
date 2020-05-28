@@ -875,8 +875,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const std::vector<std::string>& endpoints, const int32_t port,
-      const int thread_cnt)
+      const int32_t port, const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
@@ -2533,24 +2532,14 @@ TRITONSERVER_Error*
 HTTPServer::CreateAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
-    const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
-    std::vector<std::unique_ptr<HTTPServer>>* http_servers)
+    const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
+    const int thread_cnt, std::unique_ptr<HTTPServer>* http_server)
 {
-  if (port_map.empty()) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        "HTTP is enabled but none of the service endpoints have a valid port "
-        "assignment");
-  }
-  http_servers->clear();
-  for (auto const& ep_map : port_map) {
-    std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
-    http_servers->emplace_back(new HTTPAPIServer(
-        server, trace_manager, shm_manager, ep_map.second, ep_map.first,
-        thread_cnt));
-    LOG_INFO << "Started HTTPService at " << addr;
-  }
+  http_server->reset(
+      new HTTPAPIServer(server, trace_manager, shm_manager, port, thread_cnt));
+
+  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  LOG_INFO << "Started HTTPService at " << addr;
 
   return nullptr;
 }
@@ -2560,9 +2549,6 @@ HTTPServer::CreateMetricsServer(
     const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
     const int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server)
 {
-  std::string addr = "0.0.0.0:" + std::to_string(port);
-  LOG_INFO << "Starting Metrics Service at " << addr;
-
 #ifndef TRITON_ENABLE_METRICS
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, "Metrics support is disabled");
@@ -2570,6 +2556,10 @@ HTTPServer::CreateMetricsServer(
 
 #ifdef TRITON_ENABLE_METRICS
   metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
+
+  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  LOG_INFO << "Started Metrics Service at " << addr;
+
   return nullptr;
 #endif  // TRITON_ENABLE_METRICS
 }

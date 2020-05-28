@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,79 +41,12 @@ len=${#HP_ARR[@]}
 rm -f $CLIENT_LOG $SERVER_LOG
 
 RET=0
-# HTTP Health w/o Main Port
-for (( n=0; n<$len; n++ )) ; do
-  SERVER_ARGS_ADD_HTTP="--http-health-port ${HP_ARR[n]} --allow-http 1"
-  SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
-
-  run_server_nowait
-  sleep 5
-  if [ "$SERVER_PID" == "0" ]; then
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
-      cat $SERVER_LOG
-      exit 1
-  fi
-
-  set +e
-  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -hp ${HP_ARR[n]} -i http
-  if [ $? -ne 0 ]; then
-      RET=1
-  fi
-  set -e
-
-  kill $SERVER_PID
-  wait $SERVER_PID
-done
-
-# HTTP main port + Health
-P=(8004 -1)
-for (( i=0; i<2; i++ )) ; do
-  for (( n=0; n<$len; n++ )) ; do
-    SERVER_ARGS_ADD_HTTP="--http-port ${P[i]} --http-health-port ${HP_ARR[n]} \
-      --allow-http 1"
-    SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
-
-    set +e
-    run_server_nowait
-    sleep 5
-    set -e
-    if ! [[ "${P[i]}" == "-1" && "${HP_ARR[n]}" == "-1" ]] ; then
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            exit 1
-        else
-          set +e
-          python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p ${P[i]} -hp ${HP_ARR[n]} -i http
-          if [ $? -ne 0 ]; then
-              RET=1
-          fi
-          set -e
-
-          kill $SERVER_PID
-          wait $SERVER_PID
-        fi
-    fi
-  done
-done
 
 # CUSTOM CASES
 
-# set http port to -1 after setting health to 8007
-SERVER_ARGS_ADD_HTTP="--http-health-port 8007 --http-port -1 --allow-http 1"
-SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
-set +e
-run_server_nowait
-sleep 5
-if kill $SERVER_PID && wait $SERVER_PID ; then
-    echo -e "\n***\n*** Should not have started $SERVER\n***"
-    RET=1
-    cat $SERVER_LOG
-fi
-set -e
 # allow overrules - grpc still works
-SERVER_ARGS_ADD_HTTP="--http-port -1 --http-health-port 8007 --allow-http 0"
-SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS_ADD_HTTP="--http-port -1 --allow-http 0"
+SERVER_ARGS="--model-repository=$DATADIR --http-port -1 --allow-http 0"
 run_server_nowait
 sleep 5
 if [ "$SERVER_PID" == "0" ]; then
@@ -123,9 +56,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 kill $SERVER_PID
 wait $SERVER_PID
+
 # overlap with grpc default
-SERVER_ARGS_ADD_HTTP="--http-health-port 8001"
-SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS="--model-repository=$DATADIR --http-port 8001"
 set +e
 run_server_nowait
 sleep 5
@@ -135,10 +68,33 @@ if kill $SERVER_PID && wait $SERVER_PID ; then
     cat $SERVER_LOG
 fi
 set -e
+
+# overlap with http default
+SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8000"
+set +e
+run_server_nowait
+sleep 5
+if kill $SERVER_PID && wait $SERVER_PID ; then
+    echo -e "\n***\n*** Should not have started $SERVER\n***"
+    RET=1
+    cat $SERVER_LOG
+fi
+set -e
+
 # overlap with metrics default
-SERVER_ARGS_ADD_HTTP="--http-status-port 8002 --http-health-port 8007 \
-  --http-profile-port 8007 --http-infer-port 8007"
-SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS="--model-repository=$DATADIR --http-port 8002"
+set +e
+run_server_nowait
+sleep 5
+if kill $SERVER_PID && wait $SERVER_PID ; then
+    echo -e "\n***\n*** Should not have started $SERVER\n***"
+    RET=1
+    cat $SERVER_LOG
+fi
+set -e
+
+# overlap with metrics default
+SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8002"
 set +e
 run_server_nowait
 sleep 5
@@ -150,8 +106,7 @@ fi
 set -e
 
 # disable metrics - no overlap with metrics default
-SERVER_ARGS_ADD_HTTP="--http-health-port 8002 --allow-metrics 0"
-SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS="--model-repository=$DATADIR --http-port 8002 --allow-metrics 0"
 run_server_nowait
 sleep 5
 if [ "$SERVER_PID" == "0" ]; then
@@ -160,11 +115,11 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 set +e
-python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -hp 8002
-if [ $? -ne 0 ]; then
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8002/v2/health/ready`
+set -e
+if [ "$code" != "200" ]; then
     RET=1
 fi
-set -e
 kill $SERVER_PID
 wait $SERVER_PID
 

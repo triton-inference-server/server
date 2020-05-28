@@ -411,7 +411,7 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=none \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -646,9 +646,8 @@ for i in savedmodel ; do
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/simple_${i}_float32_float32_float32/config.pbtxt
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --allow-model-control=true \
-             --allow-poll-model-repository=false --exit-timeout-secs=5 \
-             --strict-model-config=false"
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
+             --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -688,7 +687,7 @@ for i in netdef ; do
 done
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
-             --allow-model-control=true --allow-poll-model-repository=false \
+             --model-control-mode=explicit \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
              --load-model=graphdef_float32_float32_float32 \
@@ -730,7 +729,7 @@ for i in netdef ; do
 done
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
-             --allow-model-control=true --allow-poll-model-repository=false \
+             --model-control-mode=explicit \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
              --load-model=graphdef_float32_float32_float32 \
@@ -827,7 +826,7 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=none \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server

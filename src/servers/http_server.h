@@ -28,7 +28,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <vector>
 #include "src/core/tritonserver.h"
 #include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
@@ -41,9 +40,8 @@ class HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
-      const std::map<int32_t, std::vector<std::string>>& port_map,
-      const int thread_cnt,
-      std::vector<std::unique_ptr<HTTPServer>>* http_servers);
+      const int32_t port, const int thread_cnt,
+      std::unique_ptr<HTTPServer>* http_server);
 
   static TRITONSERVER_Error* CreateMetricsServer(
       const std::shared_ptr<TRITONSERVER_Server>& server, int32_t port,

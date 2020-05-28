@@ -139,7 +139,8 @@ fi
 set -e
 
 # trace-rate == 6, trace-level=MIN
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=$MODELSDIR"
+SERVER_ARGS="--http-thread-count=1 --trace-file=trace_6.log \
+             --trace-level=MIN --trace-rate=6 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_6.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -186,7 +187,8 @@ fi
 set -e
 
 # trace-rate == 9, trace-level=MAX
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_9.log --trace-level=MAX --trace-rate=9 --model-repository=$MODELSDIR"
+SERVER_ARGS="--http-thread-count=1 --trace-file=trace_9.log \
+             --trace-level=MAX --trace-rate=9 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_9.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -257,7 +259,8 @@ cp -r $ENSEMBLEDIR/nop_TYPE_INT32_-1 $MODELSDIR/. && \
     cp libidentity.so $MODELSDIR/nop_TYPE_INT32_-1/1/.
 
 # trace-rate == 1, trace-level=MAX
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_ensemble.log --trace-level=MAX --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--http-thread-count=1 --trace-file=trace_ensemble.log \
+             --trace-level=MAX --trace-rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_ensemble.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
