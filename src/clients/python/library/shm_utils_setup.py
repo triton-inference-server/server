@@ -45,8 +45,7 @@ try:
             self.root_is_pure = False
 
         def get_tag(self):
-            pyver, abi, plat = _bdist_wheel.get_tag(self)
-            pyver, abi = 'py3', 'none'
+            pyver, abi, plat = 'py3', 'none', 'manylinux1_x86_64'
             return pyver, abi, plat
 except ImportError:
     bdist_wheel = None
