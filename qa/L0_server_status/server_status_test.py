@@ -37,7 +37,7 @@ import requests
 import infer_util as iu
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 class ServerMetadataTest(unittest.TestCase):
 

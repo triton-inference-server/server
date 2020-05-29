@@ -33,7 +33,7 @@ import threading
 import unittest
 import numpy as np
 import infer_util as iu
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 from ctypes import *
 
 _max_queue_delay_ms = 10000

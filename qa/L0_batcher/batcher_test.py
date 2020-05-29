@@ -37,8 +37,8 @@ import infer_util as iu
 import test_util as tu
 
 import tritongrpcclient as grpcclient
-import tritonclientutils.shared_memory as shm
-import tritonclientutils.cuda_shared_memory as cudashm
+import tritonshmutils.shared_memory as shm
+import tritonshmutils.cuda_shared_memory as cudashm
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))

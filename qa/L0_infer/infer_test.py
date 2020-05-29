@@ -33,7 +33,7 @@ import infer_util as iu
 import test_util as tu
 import os
 
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))

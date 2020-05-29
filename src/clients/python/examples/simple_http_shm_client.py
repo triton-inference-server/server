@@ -30,8 +30,8 @@ import numpy as np
 import sys
 from builtins import range
 import tritonhttpclient
-import tritonclientutils.shared_memory as shm
-import tritonclientutils.utils as utils
+import tritonshmutils.shared_memory as shm
+import tritonclientutils as utils
 
 FLAGS = None
 

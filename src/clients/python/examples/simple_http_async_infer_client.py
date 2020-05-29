@@ -31,7 +31,7 @@ import numpy as np
 import sys
 
 import tritonhttpclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

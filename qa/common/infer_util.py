@@ -31,10 +31,10 @@ import test_util as tu
 import shm_util as su
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-import tritonclientutils.shared_memory as shm
-import tritonclientutils.cuda_shared_memory as cudashm
+import tritonshmutils.shared_memory as shm
+import tritonshmutils.cuda_shared_memory as cudashm
 from functools import partial
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 if sys.version_info >= (3, 0):
   import queue

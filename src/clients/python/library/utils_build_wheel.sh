@@ -45,27 +45,10 @@ function main() {
   echo $(date) : "=== Using builddir: ${WHLDIR}"
   mkdir -p ${WHLDIR}/tritonclientutils/
 
-  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
-    mkdir -p ${WHLDIR}/tritonclientutils/shared_memory
-    cp libcshm.so \
-      "${WHLDIR}/tritonclientutils/shared_memory/."
-    cp shared_memory/__init__.py \
-      "${WHLDIR}/tritonclientutils/shared_memory/."
-
-    if [ -f libccudashm.so ] && [ -f cuda_shared_memory/__init__.py ]; then
-      mkdir -p ${WHLDIR}/tritonclientutils/cuda_shared_memory
-      cp libccudashm.so \
-        "${WHLDIR}/tritonclientutils/cuda_shared_memory/."
-      cp cuda_shared_memory/__init__.py \
-        "${WHLDIR}/tritonclientutils/cuda_shared_memory/."
-    fi
-  fi
-
   cp utils.py \
-    "${WHLDIR}/tritonclientutils/."
+    "${WHLDIR}/tritonclientutils/__init__.py"
 
   cp utils_setup.py "${WHLDIR}"
-  touch ${WHLDIR}/tritonclientutils/__init__.py
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"

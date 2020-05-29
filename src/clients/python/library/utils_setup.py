@@ -45,33 +45,24 @@ try:
             self.root_is_pure = False
 
         def get_tag(self):
-            pyver, abi, plat = _bdist_wheel.get_tag(self)
-            pyver, abi = 'py3', 'none'
+            pyver, abi, plat = 'py3', 'none', 'any'
             return pyver, abi, plat
 except ImportError:
     bdist_wheel = None
 
-if not os.name == 'nt':
-    platform_package_data = ['libcshm.so']
-    if bool(os.environ.get('CUDA_VERSION', 0)):
-        platform_package_data += ['libccudashm.so']
-
-    setup(
-        name='tritonclientutils',
-        version=VERSION,
-        author='NVIDIA Inc.',
-        author_email='tanmayv@nvidia.com',
-        description=
-        'Python utils library for creating and managing system and cuda shared memory regions',
-        license='BSD',
-        url='http://nvidia.com',
-        keywords=
-        'triton tensorrt inference server system memory cuda system client',
-        packages=find_packages(),
-        install_requires=REQUIRED,
-        package_data={
-            '': platform_package_data,
-        },
-        zip_safe=False,
-        cmdclass={'bdist_wheel': bdist_wheel},
-    )
+setup(
+    name='tritonclientutils',
+    version=VERSION,
+    author='NVIDIA Inc.',
+    author_email='tanmayv@nvidia.com',
+    description=
+    'Python utils library for NVIDIA Triton Inference Server client',
+    license='BSD',
+    url='http://nvidia.com',
+    keywords=
+    'triton tensorrt inference server utils client',
+    packages=find_packages(),
+    install_requires=REQUIRED,
+    zip_safe=False,
+    cmdclass={'bdist_wheel': bdist_wheel},
+)

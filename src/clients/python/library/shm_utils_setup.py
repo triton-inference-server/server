@@ -24,40 +24,54 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-sys.path.append("../common")
+import os
+from setuptools import find_packages
+from setuptools import setup
 
-import unittest
-import numpy as np
-import infer_util as iu
-from tritonclientutils import *
+if 'VERSION' not in os.environ:
+    raise Exception('envvar VERSION must be specified')
 
-class TrtCudaGraphTest(unittest.TestCase):
-    def setUp(self):
-        self.dtype_ = np.float32
-        self.model_name_ = 'plan'
+VERSION = os.environ['VERSION']
 
-    def _check_infer(self, tensor_shape, batch_size=1):
-        try:
-            iu.infer_exact(self, self.model_name_, (batch_size,) + tensor_shape,
-                            batch_size, self.dtype_, self.dtype_, self.dtype_,
-                            model_version=1, use_http_json_tensors=False,
-                            use_grpc=False, use_streaming=False)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+REQUIRED = ['numpy']
 
-    def test_fixed_shape(self):
-        tensor_shape = (16,)
-        self._check_infer(tensor_shape)
-        # Inference that should not have CUDA graph captured
-        self._check_infer(tensor_shape, 5)
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
-    def test_dynamic_shape(self):
-        tensor_shape = (20,)
-        self._check_infer(tensor_shape)
-        # Inference that should not have CUDA graph captured
-        self._check_infer(tensor_shape, 5)
+    class bdist_wheel(_bdist_wheel):
 
+        def finalize_options(self):
+            _bdist_wheel.finalize_options(self)
+            self.root_is_pure = False
 
-if __name__ == '__main__':
-    unittest.main()
+        def get_tag(self):
+            pyver, abi, plat = 'py3', 'none', 'manylinux1_x86_64'
+            return pyver, abi, plat
+except ImportError:
+    bdist_wheel = None
+
+if os.name == 'posix':
+    platform_package_data = ['libcshm.so']
+    if bool(os.environ.get('CUDA_VERSION', 0)):
+        platform_package_data += ['libccudashm.so']
+
+    setup(
+        name='tritonshmutils',
+        version=VERSION,
+        author='NVIDIA Inc.',
+        author_email='tanmayv@nvidia.com',
+        description=
+        'Python utils library for creating and managing system and cuda shared memory regions for NVIDIA Triton Inference Server',
+        license='BSD',
+        url='http://nvidia.com',
+        keywords=
+        'triton tensorrt inference server shared memory cuda system client',
+        packages=find_packages(),
+        install_requires=REQUIRED,
+        package_data={
+            '': platform_package_data,
+        },
+        zip_safe=False,
+        platforms=['posix'],
+        cmdclass={'bdist_wheel': bdist_wheel},
+    )

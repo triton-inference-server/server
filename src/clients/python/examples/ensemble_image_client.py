@@ -35,8 +35,8 @@ import sys
 import tritongrpcclient
 import tritongrpcclient.model_config_pb2 as model_config
 import tritonhttpclient
-from tritonclientutils.utils import triton_to_np_dtype
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import triton_to_np_dtype
+from tritonclientutils import InferenceServerException
 
 FLAGS = None
 

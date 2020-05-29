@@ -39,7 +39,7 @@ import numpy as np
 import test_util as tu
 from functools import partial
 import tritongrpcclient as grpcclient
-from tritonclientutils.utils import np_to_triton_dtype
+from tritonclientutils import np_to_triton_dtype
 
 if sys.version_info >= (3, 0):
   import queue

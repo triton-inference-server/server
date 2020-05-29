@@ -30,7 +30,7 @@ import numpy as np
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-from tritonclientutils.utils import np_to_triton_dtype
+from tritonclientutils import np_to_triton_dtype
 
 FLAGS = None
 

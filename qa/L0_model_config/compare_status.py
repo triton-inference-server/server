@@ -30,7 +30,7 @@ import sys
 import json
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-from tritonclientutils.utils import *
+from tritonclientutils import *
 from google.protobuf import text_format
 from google.protobuf import json_format
 import tritongrpcclient.model_config_pb2 as mc
