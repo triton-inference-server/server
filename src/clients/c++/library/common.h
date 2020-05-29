@@ -129,6 +129,8 @@ class InferenceServerClient {
   {
   }
 
+  virtual ~InferenceServerClient() = default;
+
   /// Obtain the cumulative inference statistics of the client.
   /// \param Returns the InferStat object holding current statistics.
   /// \return Error object indicating success or failure.
