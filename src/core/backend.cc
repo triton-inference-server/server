@@ -89,8 +89,10 @@ void
 WarmupRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
   TRITONSERVER_InferenceRequestDelete(request);
-  auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
-  warmup_promise->set_value();
+  if (userp != nullptr) {
+    auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
+    warmup_promise->set_value();
+  }
 }
 
 }  // namespace
@@ -205,9 +207,14 @@ InferenceBackend::SetConfiguredScheduler(
                      << "'";
 
       std::promise<void> warmup_promise;
-      // only now we can set the proper request complete callback
-      sample.request_->SetReleaseCallback(
+      // only now we can set the proper request complete callback,
+      // only one request in the batch can set the promise.
+      sample.requests_[0]->SetReleaseCallback(
           WarmupRequestComplete, &warmup_promise);
+      for (size_t idx = 1; idx < sample.requests_.size(); idx++) {
+        sample.requests_[idx]->SetReleaseCallback(
+            WarmupRequestComplete, nullptr);
+      }
       WarmUp(runner_idx, sample);
       warmup_promise.get_future().get();
     }
@@ -306,11 +313,8 @@ InferenceBackend::Run(
 void
 InferenceBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
 {
-  std::vector<std::unique_ptr<InferenceRequest>> requests;
-  requests.emplace_back(std::move(sample.request_));
-
   // Unless necessary, simply invoke Run()
-  Run(runner_idx, std::move(requests));
+  Run(runner_idx, std::move(sample.requests_));
 }
 
 Status
@@ -449,7 +453,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       // Append batch size only if the model supports batching
       // and not control inpt.
       if ((config_.max_batch_size() != 0) && is_original_input) {
-        input_meta_shape.push_back(warmup_setting.batch_size());
+        input_meta_shape.push_back(1);
       }
       for (auto d : input_meta.second.dims()) {
         input_meta_shape.push_back(d);
@@ -465,11 +469,9 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
             &input_sps.back()));
         input = input_sps.back().get();
       }
-      for (size_t cnt = 0; cnt < warmup_setting.batch_size(); cnt++) {
-        RETURN_IF_ERROR(input->AppendData(
-            allocated_ptr, batch_byte_size,
-            TRITONSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
-      }
+      RETURN_IF_ERROR(input->AppendData(
+          allocated_ptr, batch_byte_size,
+          TRITONSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
     }
 
     RETURN_IF_ERROR(warmup_data.request_->PrepareForInference());
@@ -480,6 +482,11 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 
     RETURN_IF_ERROR(warmup_data.request_->SetResponseCallback(
         &warmup_allocator, nullptr, WarmupResponseComplete, nullptr));
+
+    for (size_t cnt = 0; cnt < warmup_setting.batch_size(); cnt++) {
+      warmup_data.requests_.emplace_back(
+          InferenceRequest::Copy(*warmup_data.request_));
+    }
   }
 
   return Status::Success;

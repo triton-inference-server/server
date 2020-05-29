@@ -63,8 +63,10 @@ void
 WarmupRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
   TRITONSERVER_InferenceRequestDelete(request);
-  auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
-  warmup_promise->set_value();
+  if (userp != nullptr) {
+    auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
+    warmup_promise->set_value();
+  }
 }
 
 }  // namespace
@@ -1439,7 +1441,10 @@ PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
   for (size_t idx = 0; idx < contexts.size(); idx++) {
     // Duplicate the sample request and override the release callback.
     std::vector<std::unique_ptr<InferenceRequest>> requests;
-    requests.emplace_back(InferenceRequest::Copy(*sample.request_));
+    for (auto& request : sample.requests_) {
+      requests.emplace_back(InferenceRequest::Copy(*request));
+      requests.back()->SetReleaseCallback(WarmupRequestComplete, nullptr);
+    }
     requests.back()->SetReleaseCallback(
         WarmupRequestComplete, &completion_promises[idx]);
 
@@ -1475,7 +1480,9 @@ PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
   for (auto& completion_promise : completion_promises) {
     completion_promise.get_future().get();
   }
-  InferenceRequest::Release(std::move(sample.request_));
+  for (auto& request : sample.requests_) {
+    InferenceRequest::Release(std::move(request));
+  }
 
   // Need to reset the next context to be executed on this runner
   // as all contexts are in the queue at this point

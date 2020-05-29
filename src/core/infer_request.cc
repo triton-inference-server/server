@@ -249,6 +249,7 @@ InferenceRequest::Copy(const InferenceRequest& from)
   lrequest->collect_stats_ = false;
 
   lrequest->inputs_ = from.inputs_;
+  lrequest->original_requested_outputs_ = from.original_requested_outputs_;
   lrequest->requested_outputs_ = from.requested_outputs_;
   lrequest->release_fn_ = from.release_fn_;
   lrequest->release_userp_ = from.release_userp_;

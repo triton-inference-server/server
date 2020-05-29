@@ -139,7 +139,12 @@ class InferenceBackend {
     WarmupData(const std::string& sample_name) : sample_name_(sample_name) {}
 
     std::string sample_name_;
+
+    // Ownership of sample request should be held by WarmupData
     std::unique_ptr<InferenceRequest> request_;
+
+    // Request populated for batch execution
+    std::vector<std::unique_ptr<InferenceRequest>> requests_;
 
     // Placeholder for input data
     std::unique_ptr<AllocatedMemory> zero_data_;
