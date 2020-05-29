@@ -159,7 +159,7 @@ InferenceServer::Init()
   status = EnablePeerAccess(min_supported_compute_capability_);
   if (!status.IsOk()) {
     // failed to enable peer access is not critical, just inefficient.
-    LOG_ERROR << status.Message();
+    LOG_WARNING << status.Message();
   }
 
   // Create the model manager for the repository. Unless model control
