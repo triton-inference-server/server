@@ -1085,49 +1085,48 @@ HTTPAPIServer::InferResponseAlloc(
 
   AllocPayload::OutputInfo* info = nullptr;
 
+  // If we don't find an output then it means that the output wasn't
+  // explicitly specified in the request. In that case we create an
+  // OutputInfo for it that uses default setting of JSON.
+  auto pr = output_map.find(tensor_name);
+  if (pr == output_map.end()) {
+    info = new AllocPayload::OutputInfo(AllocPayload::OutputInfo::JSON, 0);
+  } else {
+    // Take ownership of the OutputInfo object.
+    info = pr->second;
+    output_map.erase(pr);
+  }
+
+  // If the output is in shared memory...
+  if (info->kind_ == AllocPayload::OutputInfo::SHM) {
+    // ...then make sure shared memory size is at least as big as
+    // the size of the output.
+    if (byte_size > info->byte_size_) {
+      delete info;
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          std::string(
+              "shared memory size specified with the request for output '" +
+              std::string(tensor_name) + "' (" +
+              std::to_string(info->byte_size_) + " bytes) should be at least " +
+              std::to_string(byte_size) + " bytes to hold the results")
+              .c_str());
+    }
+
+    *buffer = const_cast<void*>(info->base_);
+    *actual_memory_type = info->memory_type_;
+    *actual_memory_type_id = info->device_id_;
+
+    // Don't need info for shared-memory output...
+    delete info;
+
+    LOG_VERBOSE(1) << "HTTP: using shared-memory for '" << tensor_name
+                   << "', size: " << byte_size << ", addr: " << *buffer;
+    return nullptr;  // Success
+  }
+
   // Don't need to do anything if no memory was requested.
   if (byte_size > 0) {
-    // If we don't find an output then it means that the output wasn't
-    // explicitly specified in the request. In that case we create an
-    // OutputInfo for it that uses default setting of JSON.
-    auto pr = output_map.find(tensor_name);
-    if (pr == output_map.end()) {
-      info = new AllocPayload::OutputInfo(AllocPayload::OutputInfo::JSON, 0);
-    } else {
-      // Take ownership of the OutputInfo object.
-      info = pr->second;
-      output_map.erase(pr);
-    }
-
-    // If the output is in shared memory...
-    if (info->kind_ == AllocPayload::OutputInfo::SHM) {
-      // ...then make sure shared memory size is at least as big as
-      // the size of the output.
-      if (byte_size > info->byte_size_) {
-        delete info;
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INTERNAL,
-            std::string(
-                "shared memory size specified with the request for output '" +
-                std::string(tensor_name) + "' (" +
-                std::to_string(info->byte_size_) +
-                " bytes) should be at least " + std::to_string(byte_size) +
-                " bytes to hold the results")
-                .c_str());
-      }
-
-      *buffer = const_cast<void*>(info->base_);
-      *actual_memory_type = info->memory_type_;
-      *actual_memory_type_id = info->device_id_;
-
-      // Don't need info for shared-memory output...
-      delete info;
-
-      LOG_VERBOSE(1) << "HTTP: using shared-memory for '" << tensor_name
-                     << "', size: " << byte_size << ", addr: " << *buffer;
-      return nullptr;  // Success
-    }
-
     // Can't allocate for any memory type other than CPU. If asked to
     // allocate on GPU memory then force allocation on CPU instead.
     if (*actual_memory_type != TRITONSERVER_MEMORY_CPU) {
@@ -1150,11 +1149,12 @@ HTTPAPIServer::InferResponseAlloc(
     // Ownership passes to 'buffer_userp' which has the same lifetime
     // as the buffer itself.
     info->evbuffer_ = evhttp_buffer;
-    *buffer_userp = reinterpret_cast<void*>(info);
 
     LOG_VERBOSE(1) << "HTTP using buffer for: '" << tensor_name
                    << "', size: " << byte_size << ", addr: " << *buffer;
   }
+
+  *buffer_userp = reinterpret_cast<void*>(info);
 
   return nullptr;  // Success
 }
@@ -2481,8 +2481,6 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
     // then using shared memory so don't need this step.
     if (info != nullptr) {
       if (info->kind_ == AllocPayload::OutputInfo::BINARY) {
-        ordered_buffers.push_back(info->evbuffer_);
-
         TritonJson::Value parameters_json;
         if (!output_json.Find("parameters", &parameters_json)) {
           parameters_json =
@@ -2492,6 +2490,9 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
               output_json.Add("parameters", std::move(parameters_json)));
         } else {
           RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
+        }
+        if (byte_size > 0) {
+          ordered_buffers.push_back(info->evbuffer_);
         }
       } else {
         TritonJson::Value data_json(
