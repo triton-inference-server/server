@@ -152,7 +152,8 @@ class InferenceRequest {
       InferenceBackend* backend, const int64_t requested_model_version)
       : needs_normalization_(true), backend_raw_(backend),
         requested_model_version_(requested_model_version), flags_(0),
-        correlation_id_(0), batch_size_(0), priority_(0), timeout_us_(0)
+        correlation_id_(0), batch_size_(0), priority_(0), timeout_us_(0),
+        collect_stats_(true)
   {
   }
 
@@ -379,7 +380,14 @@ class InferenceRequest {
   // Create a copy of 'from' suitable for use as a "null" request as
   // required for the direct sequence batcher. The returned copy will
   // contain only the minimum content required for a null request.
+  // The statistics of the copy will not be collected.
   static InferenceRequest* CopyAsNull(const InferenceRequest& from);
+
+  // Create a copy of 'from' suitable for use. The caller must be aware that
+  // the callbacks are copied and input data are shared. 'from' must have longer
+  // lifecycle than returned copy.
+  // The statistics of the copy will not be collected.
+  static InferenceRequest* Copy(const InferenceRequest& from);
 
   uint64_t QueueStartNs() const { return queue_start_ns_; }
   uint64_t CaptureQueueStartNs()
@@ -487,6 +495,9 @@ class InferenceRequest {
   // Request timestamps. Queue start is needed for schedulers even
   // when statistics are not being collected.
   uint64_t queue_start_ns_;
+
+  // Whether the stats of the request should be collected.
+  bool collect_stats_;
 
 #ifdef TRITON_ENABLE_STATS
   uint64_t request_start_ns_;

@@ -59,6 +59,14 @@ CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
   return Status::Success;
 }
 
+void
+WarmupRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
+{
+  TRITONSERVER_InferenceRequestDelete(request);
+  auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
+  warmup_promise->set_value();
+}
+
 }  // namespace
 
 PlanBackend::Context::Context(
@@ -1426,31 +1434,38 @@ PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
   }
   contexts.push_back(next_context_[runner_idx]);
 
-  std::vector<std::promise<bool>> completion_promises(contexts.size());
+  std::vector<std::promise<void>> completion_promises(contexts.size());
   Status status;
   for (size_t idx = 0; idx < contexts.size(); idx++) {
+    // Duplicate the sample request and override the release callback.
     std::vector<std::unique_ptr<InferenceRequest>> requests;
-    requests.emplace_back(std::move(sample.request_));
-
-    requests.back()->AddInternalReleaseCallback([&completion_promises, idx]() {
-      completion_promises[idx].set_value(true);
-    });
+    requests.emplace_back(InferenceRequest::Copy(*sample.request_));
+    requests.back()->SetReleaseCallback(
+        WarmupRequestComplete, &completion_promises[idx]);
 
     contexts_[contexts[idx]]->Run(this, std::move(requests));
 
     // If one of the contexts can't run properly, the whole warmup should abort
-    if (requests.back() == nullptr) {
+    auto context = static_cast<Context*>(contexts_[contexts[idx]].get());
+    bool run_failed = true;
+    for (const auto& request : context->payload_->requests_) {
+      if (request != nullptr) {
+        run_failed = false;
+        break;
+      }
+    }
+    if (run_failed) {
       // Clean up the rest of the contexts back to queue,
       // the contexts before will be handled by completion function
-      for (auto rest_idx = idx; idx < contexts.size(); idx++) {
+      available_context_queue_[runner_idx]->Put(contexts[idx]);
+      for (auto rest_idx = idx + 1; rest_idx < contexts.size(); rest_idx++) {
         available_context_queue_[runner_idx]->Put(contexts[rest_idx]);
-        completion_promises[rest_idx].set_value(false);
+        completion_promises[rest_idx].set_value();
       }
       break;
     }
 
     // Place in completion queue
-    auto context = static_cast<Context*>(contexts_[contexts[idx]].get());
     auto event_set_idx = context->next_set_;
     context->next_set_ = (event_set_idx + 1) % context->EVENT_SET_COUNT;
     context->completion_queue_.Put(std::move(context->payload_));
@@ -1460,6 +1475,7 @@ PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
   for (auto& completion_promise : completion_promises) {
     completion_promise.get_future().get();
   }
+  InferenceRequest::Release(std::move(sample.request_));
 
   // Need to reset the next context to be executed on this runner
   // as all contexts are in the queue at this point

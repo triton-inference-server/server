@@ -192,6 +192,7 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
       new InferenceRequest(from.backend_raw_, from.requested_model_version_));
   lrequest->needs_normalization_ = false;
   lrequest->batch_size_ = from.batch_size_;
+  lrequest->collect_stats_ = false;
 
   // Two pass: first to obtain the max input byte size for allocating a large
   // enough buffer for all inputs; second to construct the inputs
@@ -234,6 +235,26 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     lrequest->inputs_.emplace(
         std::make_pair(pr.first, std::addressof(pr.second)));
   }
+
+  return lrequest.release();
+}
+
+InferenceRequest*
+InferenceRequest::Copy(const InferenceRequest& from)
+{
+  std::unique_ptr<InferenceRequest> lrequest(
+      new InferenceRequest(from.backend_raw_, from.requested_model_version_));
+  lrequest->needs_normalization_ = false;
+  lrequest->batch_size_ = from.batch_size_;
+  lrequest->collect_stats_ = false;
+
+  lrequest->inputs_ = from.inputs_;
+  lrequest->requested_outputs_ = from.requested_outputs_;
+  lrequest->release_fn_ = from.release_fn_;
+  lrequest->release_userp_ = from.release_userp_;
+  lrequest->release_callbacks_ = from.release_callbacks_;
+  lrequest->response_delegator_ = from.response_delegator_;
+  lrequest->response_factory_ = from.response_factory_;
 
   return lrequest.release();
 }
@@ -574,6 +595,10 @@ InferenceRequest::ReportStatistics(
     const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
     const uint64_t compute_output_start_ns, const uint64_t compute_end_ns)
 {
+  if (!collect_stats_) {
+    return;
+  }
+
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
@@ -605,6 +630,10 @@ InferenceRequest::ReportStatisticsWithDuration(
     const uint64_t compute_infer_duration_ns,
     const uint64_t compute_output_duration_ns)
 {
+  if (!collect_stats_) {
+    return;
+  }
+
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {

@@ -77,6 +77,8 @@ ResponseAllocator warmup_allocator =
 void
 WarmupResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
 {
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceResponseError(iresponse), "warmup error");
   // Just delete the response, warmup doesn't check for correctness
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(iresponse),
@@ -388,16 +390,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     }
 
     // Second pass to prepare original inputs.
+    std::vector<std::shared_ptr<InferenceRequest::Input>> input_sps;
     for (const auto& input_meta : warmup_setting.inputs()) {
-      std::vector<int64_t> input_meta_shape;
-      // Append batch size only if the model supports batching
-      if (config_.max_batch_size() != 0) {
-        input_meta_shape.push_back(warmup_setting.batch_size());
-      }
-      for (auto d : input_meta.second.dims()) {
-        input_meta_shape.push_back(d);
-      }
-
       auto batch1_element_count = GetElementCount(input_meta.second.dims());
       auto batch_byte_size = batch1_element_count *
                              GetDataTypeByteSize(input_meta.second.data_type());
@@ -449,17 +443,27 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       }
 
       const ModelInput* input_config;
+      bool is_original_input = GetInput(input_meta.first, &input_config).IsOk();
       InferenceRequest::Input* input = nullptr;
-      if (GetInput(input_meta.first, &input_config).IsOk()) {
+      std::vector<int64_t> input_meta_shape;
+      // Append batch size only if the model supports batching
+      // and not control inpt.
+      if ((config_.max_batch_size() != 0) && is_original_input) {
+        input_meta_shape.push_back(warmup_setting.batch_size());
+      }
+      for (auto d : input_meta.second.dims()) {
+        input_meta_shape.push_back(d);
+      }
+      if (is_original_input) {
         RETURN_IF_ERROR(warmup_data.request_->AddOriginalInput(
             input_meta.first, input_meta.second.data_type(), input_meta_shape,
             &input));
       } else {
-        std::shared_ptr<InferenceRequest::Input> input_sp;
+        input_sps.emplace_back();
         RETURN_IF_ERROR(warmup_data.request_->AddOverrideInput(
             input_meta.first, input_meta.second.data_type(), input_meta_shape,
-            &input_sp));
-        input = input_sp.get();
+            &input_sps.back()));
+        input = input_sps.back().get();
       }
       for (size_t cnt = 0; cnt < warmup_setting.batch_size(); cnt++) {
         RETURN_IF_ERROR(input->AppendData(
@@ -469,6 +473,10 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     }
 
     RETURN_IF_ERROR(warmup_data.request_->PrepareForInference());
+    // Override inputs must be added after PrepareForInference() is called
+    for (const auto& sp : input_sps) {
+      RETURN_IF_ERROR(warmup_data.request_->AddOverrideInput(sp));
+    }
 
     RETURN_IF_ERROR(warmup_data.request_->SetResponseCallback(
         &warmup_allocator, nullptr, WarmupResponseComplete, nullptr));
