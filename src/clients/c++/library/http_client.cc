@@ -492,7 +492,7 @@ InferResultHttp::InferResultHttp(
   // successful infer response or an error response.
   if (response_json_.HasParseError()) {
     status_ = Error(
-        "failed to parse the request JSON buffer: " +
+        "failed to parse response JSON: " +
         std::string(GetParseError_En(response_json_.GetParseError())) + " at " +
         std::to_string(response_json_.GetErrorOffset()));
   } else if (infer_request->curl_status_ != CURLE_OK) {
@@ -1508,7 +1508,7 @@ InferenceServerHttpClient::Get(
     response->Parse(response_string.c_str(), response_string.size());
     if (response->HasParseError()) {
       return Error(
-          "failed to parse the request JSON buffer: " +
+          "failed to parse request JSON: " +
           std::string(GetParseError_En(response->GetParseError())) + " at " +
           std::to_string(response->GetErrorOffset()));
     }
@@ -1593,7 +1593,7 @@ InferenceServerHttpClient::Post(
     response->Parse(response_string.c_str(), response_string.size());
     if (response->HasParseError()) {
       return Error(
-          "failed to parse the request JSON buffer: " +
+          "failed to parse request JSON: " +
           std::string(GetParseError_En(response->GetParseError())) + " at " +
           std::to_string(response->GetErrorOffset()));
     }
