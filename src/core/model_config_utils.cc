@@ -1057,14 +1057,23 @@ ValidateModelConfig(
 
         for (const int32_t gid : group.gpus()) {
           if (supported_gpus.find(gid) == supported_gpus.end()) {
+            std::string supported_gpus_str;
+            for (const auto& cc : supported_gpus) {
+              if (!supported_gpus_str.empty()) {
+                supported_gpus_str += ", ";
+              }
+              supported_gpus_str += std::to_string(cc);
+            }
             return Status(
                 Status::Code::INVALID_ARG,
                 "instance group " + group.name() + " of model " +
                     config.name() +
-                    " specifies invalid or unsupported gpu id of " +
+                    " specifies invalid or unsupported gpu id " +
                     std::to_string(gid) +
-                    ". The minimum required CUDA compute compatibility is " +
-                    std::to_string(TRITON_MIN_COMPUTE_CAPABILITY));
+                    ". GPUs with at least the minimum required CUDA compute "
+                    "compatibility of " +
+                    std::to_string(min_compute_capability) +
+                    " are: " + supported_gpus_str);
           }
         }
 #endif  // !TRITON_ENABLE_GPU
