@@ -809,7 +809,6 @@ OnnxBackend::Context::SetInputTensors(
       TRITONSERVER_MemoryType mem_type;
       auto input_buffer = input_buffers->back()->MutableBuffer(&mem_type);
       size_t buffer_offset = 0;
-      bool string_cuda_copy = false;
       for (size_t ridx = 0; ridx < requests.size(); ++ridx) {
         const InferenceRequest::Input* in;
         auto status = requests[ridx]->ImmutableInput(name, &in);
@@ -853,13 +852,6 @@ OnnxBackend::Context::SetInputTensors(
         }
         buffer_offset += expected_byte_sizes[ridx];
       }
-
-#ifdef TRITON_ENABLE_GPU
-      // Synchronize to ensure the buffer is ready to be modified
-      if (string_cuda_copy) {
-        cudaStreamSynchronize(stream_);
-      }
-#endif  // TRITON_ENABLE_GPU
 
       std::vector<const char*> string_data;
       // Modify input buffer and set string expected by ORT
