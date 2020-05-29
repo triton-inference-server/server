@@ -78,9 +78,9 @@ release = str(version_long)
 # link here as well:
 version = version + """<br/>
 Version select: <select onChange="window.location.href = this.value" onFocus="this.selectedIndex = -1">
-    <option value="https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/index.html">Current release</option>
-    <option value="https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/index.html">master (unstable)</option>
-    <option value="https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html">Older releases</option>
+    <option value="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html">Current release</option>
+    <option value="https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/index.html">master (unstable)</option>
+    <option value="https://docs.nvidia.com/deeplearning/triton-inference-server/archives/index.html">Older releases</option>
 </select>"""
 
 # -- General configuration ---------------------------------------------------
