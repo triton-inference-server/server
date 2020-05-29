@@ -74,6 +74,7 @@ install(
 install(
   FILES
     ../../core/model_config.h
+    ../../core/tritonserver.h
     ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
   DESTINATION include/src/core
 )
