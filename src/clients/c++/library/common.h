@@ -564,8 +564,10 @@ class RequestTimers {
 ///
 class InferRequest {
  public:
-  InferRequest(InferenceServerClient::OnCompleteFn callback = nullptr)
-      : callback_(callback)
+  InferRequest(
+      InferenceServerClient::OnCompleteFn callback = nullptr,
+      const bool verbose = false)
+      : callback_(callback), verbose_(verbose)
   {
   }
   virtual ~InferRequest() = default;
@@ -574,6 +576,7 @@ class InferRequest {
 
  protected:
   InferenceServerClient::OnCompleteFn callback_;
+  const bool verbose_;
 
  private:
   // The timers for infer request.
