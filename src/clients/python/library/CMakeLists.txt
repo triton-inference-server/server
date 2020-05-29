@@ -150,28 +150,14 @@ endif() # TRITON_ENABLE_GRPC
 set(utils_wheel_stamp_file "utils_stamp.whl")
 configure_file(utils_setup.py utils_setup.py COPYONLY)
 
-if(${TRITON_ENABLE_GPU})
-  add_custom_command(
-      OUTPUT "${utils_wheel_stamp_file}"
-      COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
-      ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
-      DEPENDS
-        ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-        ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
-        cshm
-        ccudashm
-  )
-else()
-  add_custom_command(
-      OUTPUT "${utils_wheel_stamp_file}"
-      COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
-      ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
-      DEPENDS
-        ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-        ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
-        cshm
-  )
-endif()
+add_custom_command(
+    OUTPUT "${utils_wheel_stamp_file}"
+    COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
+    ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
+    DEPENDS
+      ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+      ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
+)
 
 add_custom_target(
     client-wheel-utils ALL
@@ -192,27 +178,20 @@ if(NOT WIN32)
   configure_file(shm_utils_setup.py shm_utils_setup.py COPYONLY)
 
   if(${TRITON_ENABLE_GPU})
-    add_custom_command(
-        OUTPUT "${shm_utils_wheel_stamp_file}"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shm_utils_build_wheel.sh"
-        ARGS "${CMAKE_CURRENT_BINARY_DIR}/shm/"
-        DEPENDS
-          ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-          ${CMAKE_CURRENT_BINARY_DIR}/shm_utils_setup.py
-          cshm
-          ccudashm
-    )
+    set(SHM_UTILS_DEPENDS cshm ccudashm)
   else()
-    add_custom_command(
-        OUTPUT "${shm_utils_wheel_stamp_file}"
-        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shm_utils_build_wheel.sh"
-        ARGS "${CMAKE_CURRENT_BINARY_DIR}/shm/"
-        DEPENDS
-          ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-          ${CMAKE_CURRENT_BINARY_DIR}/shm_utils_setup.py
-          cshm
-    )
+    set(SHM_UTILS_DEPENDS cshm)
   endif()
+
+  add_custom_command(
+      OUTPUT "${shm_utils_wheel_stamp_file}"
+      COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shm_utils_build_wheel.sh"
+      ARGS "${CMAKE_CURRENT_BINARY_DIR}/shm/"
+      DEPENDS
+        ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+        ${CMAKE_CURRENT_BINARY_DIR}/shm_utils_setup.py
+        ${SHM_UTILS_DEPENDS}
+  )
 
   add_custom_target(
       client-wheel-shmutils ALL

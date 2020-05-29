@@ -49,7 +49,6 @@ function main() {
     "${WHLDIR}/tritonclientutils/__init__.py"
 
   cp utils_setup.py "${WHLDIR}"
-  # touch ${WHLDIR}/tritonclientutils/__init__.py
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
