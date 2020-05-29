@@ -40,9 +40,6 @@ rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 # Descriptive name for the current results
 UNDERTEST_NAME=${NVIDIA_TRITON_SERVER_VERSION}
 
-# Subdirectory containing results to compare against.
-BASELINE_DIR=baseline
-
 # Confidence percentile to use when stabilizing and reporting
 # results. A value of 0 indicates that average value should be used
 # for stabilizing results.
@@ -63,8 +60,6 @@ PERF_CLIENT_STABILIZE_WINDOW=5000
 PERF_CLIENT_STABILIZE_THRESHOLD=5.0
 
 RUNTEST=./run_test.sh
-ANALYZE=./perf_analysis.py
-ANALYZE_LOG_EXT=analysis
 
 # The model used for data collection has a single input and a single
 # output. The model does minimal work (just copy input to
@@ -82,16 +77,15 @@ TEST_NAMES=(
     "${UNDERTEST_NAME} Maximum Throughput GRPC"
     "${UNDERTEST_NAME} Maximum Throughput HTTP"
     "${UNDERTEST_NAME} 16MB I/O Throughput GRPC"
-    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP")
-TEST_ANALYSIS_ARGS=(
-    --latency
-    --latency
-    --latency
-    --latency
-    "--throughput --concurrency 16"
-    "--throughput --concurrency 16"
-    "--throughput --concurrency 16"
-    "--throughput --concurrency 16")
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP"
+    "${UNDERTEST_NAME} 16MB I/O Latency GRPC System Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Latency HTTP System Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Latency GRPC CUDA Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Latency HTTP CUDA Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Throughput GRPC System Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP System Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Throughput GRPC CUDA Shared Memory"
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP CUDA Shared Memory")
 TEST_DIRS=(
     min_latency_grpc
     min_latency_http
@@ -100,8 +94,24 @@ TEST_DIRS=(
     max_throughput_grpc
     max_throughput_http
     16mb_throughput_grpc
-    16mb_throughput_http)
+    16mb_throughput_http
+    16mb_latency_grpc_shm
+    16mb_latency_http_shm
+    16mb_latency_grpc_cudashm
+    16mb_latency_http_cudashm
+    16mb_throughput_grpc_shm
+    16mb_throughput_http_shm
+    16mb_throughput_grpc_cudashm
+    16mb_throughput_http_cudashm)
 TEST_PROTOCOLS=(
+    grpc
+    http
+    grpc
+    http
+    grpc
+    http
+    grpc
+    http
     grpc
     http
     grpc
@@ -118,6 +128,13 @@ TEST_TENSOR_SIZES=(
     1
     1
     ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB})
 TEST_INSTANCE_COUNTS=(
     1
@@ -127,8 +144,24 @@ TEST_INSTANCE_COUNTS=(
     2
     2
     2
+    2
+    1
+    1
+    1
+    1
+    2
+    2
+    2
     2)
 TEST_CONCURRENCY=(
+    1
+    1
+    1
+    1
+    16
+    16
+    16
+    16
     1
     1
     1
@@ -147,107 +180,80 @@ TEST_BACKENDS=(
     "custom graphdef savedmodel onnx netdef"
     "plan custom graphdef savedmodel onnx libtorch netdef"
     "plan custom graphdef savedmodel onnx libtorch netdef"
-    "plan custom graphdef savedmodel onnx libtorch netdef"
-    "plan custom graphdef savedmodel onnx libtorch netdef")
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef"
+    "custom graphdef savedmodel onnx netdef")
+TEST_SHARED_MEMORIES=(
+    "none"
+    "none"
+    "none"
+    "none"
+    "none"
+    "none"
+    "none"
+    "none"
+    "system"
+    "system"
+    "cuda"
+    "cuda"
+    "system"
+    "system"
+    "cuda"
+    "cuda")
 
-# If the top-level output dir exists then assume that data has already
-# been collected and so just perform the analysis.
-rm -f *.${ANALYZE_LOG_EXT}
-
-skip_data=0
-if [ -e ${REPO_VERSION} ]; then
-    echo -e "\n***\n*** Data Collection Skipped\n***"
-    skip_data=1
-else
-    mkdir -p ${REPO_VERSION}
-fi
-
-#
-# Data Collection
-#
-
-if (( $skip_data != 1 )); then
-
-    RET=0
-    set +e
-
-    for idx in "${!TEST_NAMES[@]}"; do
-        TEST_NAME=${TEST_NAMES[$idx]}
-        TEST_DIR=${TEST_DIRS[$idx]}
-        TEST_PROTOCOL=${TEST_PROTOCOLS[$idx]}
-        TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
-        TEST_BACKEND=${TEST_BACKENDS[$idx]}
-        TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
-        TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
-
-        RESULTNAME=${TEST_NAME} \
-                  RESULTDIR=${REPO_VERSION}/${TEST_DIR} \
-                  PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE} \
-                  PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW} \
-                  PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD} \
-                  PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
-                  TENSOR_SIZE=${TEST_TENSOR_SIZE} \
-                  BACKENDS=${TEST_BACKEND} \
-                  STATIC_BATCH_SIZES=1 \
-                  DYNAMIC_BATCH_SIZES=1 \
-                  INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
-                  CONCURRENCY=${TEST_CONCURRENCY} \
-                  bash -x ${RUNTEST} ${REPO_VERSION}
-        if (( $? != 0 )); then
-            RET=1
-        fi
-    done
-
-    set -e
-
-    if (( $RET == 0 )); then
-        echo -e "\n***\n*** Data Collection Passed\n***"
-    else
-        echo -e "\n***\n*** Data Collection FAILED\n***"
-        exit $RET
-    fi
-fi
+mkdir -p ${REPO_VERSION}
 
 #
-# Analyze
+# Run Performance tests
 #
 
 RET=0
 set +e
 
-for BASELINE_NAME in $(ls ${BASELINE_DIR}); do
-    ANALYZE_LOG=${BASELINE_NAME}.${ANALYZE_LOG_EXT}
+for idx in "${!TEST_NAMES[@]}"; do
+    TEST_NAME=${TEST_NAMES[$idx]}
+    TEST_DIR=${TEST_DIRS[$idx]}
+    TEST_PROTOCOL=${TEST_PROTOCOLS[$idx]}
+    TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
+    TEST_BACKEND=${TEST_BACKENDS[$idx]}
+    TEST_SHARED_MEMORY=${TEST_SHARED_MEMORIES[$idx]}
+    TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
+    TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
 
-    for idx in "${!TEST_NAMES[@]}"; do
-        TEST_NAME=${TEST_NAMES[$idx]}
-        TEST_DIR=${TEST_DIRS[$idx]}
-        TEST_ANALYSIS_ARG=${TEST_ANALYSIS_ARGS[$idx]}
-
-        echo -e "====================\n" >> ${ANALYZE_LOG} 2>&1
-
-        $ANALYZE --name="${TEST_NAME}" \
-                 ${TEST_ANALYSIS_ARG} \
-                 --slowdown-threshold=${PERF_CLIENT_SLOWDOWN_THRESHOLD} \
-                 --speedup-threshold=${PERF_CLIENT_SPEEDUP_THRESHOLD} \
-                 --baseline-name=${BASELINE_NAME} \
-                 --baseline=${BASELINE_DIR}/${BASELINE_NAME}/${TEST_DIR} \
-                 --undertest-name=${UNDERTEST_NAME} \
-                 --undertest=${REPO_VERSION}/${TEST_DIR} >> ${ANALYZE_LOG} 2>&1
-        if (( $? != 0 )); then
-            echo -e "** ${TEST_NAME} Analysis Failed"
-            RET=1
-        fi
-
-        echo -e "\n" >> ${ANALYZE_LOG} 2>&1
-    done
+    RESULTNAME=${TEST_NAME} \
+                RESULTDIR=${REPO_VERSION}/${TEST_DIR} \
+                PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE} \
+                PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW} \
+                PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD} \
+                PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
+                TENSOR_SIZE=${TEST_TENSOR_SIZE} \
+                BACKENDS=${TEST_BACKEND} \
+                SHARED_MEMORY=${TEST_SHARED_MEMORY} \
+                STATIC_BATCH_SIZES=1 \
+                DYNAMIC_BATCH_SIZES=1 \
+                INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
+                CONCURRENCY=${TEST_CONCURRENCY} \
+                bash -x ${RUNTEST} ${REPO_VERSION}
+    if (( $? != 0 )); then
+        RET=1
+    fi
 done
 
 set -e
 
 if (( $RET == 0 )); then
-    echo -e "\n***\n*** Analysis Passed\n***"
+    echo -e "\n***\n*** Data Collection Passed\n***"
 else
-    echo -e "\n***\n*** Analysis FAILED\n***"
+    echo -e "\n***\n*** Data Collection FAILED\n***"
+    exit $RET
 fi
 
 exit $RET
