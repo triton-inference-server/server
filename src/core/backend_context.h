@@ -147,7 +147,8 @@ class BackendResponder {
 
   // Finalize processing of all responses for all output
   // tensors. Return true if cudaMemcpyAsync is called, and the caller
-  // should call cudaStreamSynchronize before using the data.
+  // should call cudaStreamSynchronize (or cudaEventSynchronize on 'event')
+  // before using the data.
   bool Finalize();
 
  private:
@@ -205,12 +206,15 @@ class BackendResponder {
 //
 class BackendInputCollector {
  public:
+  // The caller can optionally provide 'event' for internal synchronization
+  // instead of using 'stream'.
   explicit BackendInputCollector(
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
-      const bool pinned_enabled, cudaStream_t stream)
+      const bool pinned_enabled, cudaStream_t stream,
+      cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), responses_(responses),
-        pinned_enabled_(pinned_enabled), stream_(stream),
+        pinned_enabled_(pinned_enabled), stream_(stream), event_(event),
         pending_pinned_byte_size_(0)
   {
   }
@@ -224,7 +228,8 @@ class BackendInputCollector {
 
   // Finalize processing of all requests for all input tensors. Return
   // true if cudaMemcpyAsync is called, and the caller should call
-  // cudaStreamSynchronize before using the data.
+  // should call cudaStreamSynchronize (or cudaEventSynchronize on 'event')
+  // before using the data.
   bool Finalize();
 
  private:
@@ -246,6 +251,7 @@ class BackendInputCollector {
   std::vector<std::unique_ptr<InferenceResponse>>* responses_;
   const bool pinned_enabled_;
   cudaStream_t stream_;
+  cudaEvent_t event_;
 
   using RequestsList = std::list<std::pair<
       std::unique_ptr<InferenceResponse>*, const InferenceRequest::Input*>>;

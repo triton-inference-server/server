@@ -251,7 +251,7 @@ bool
 BackendResponder::Finalize()
 {
 #ifdef TRITON_ENABLE_GPU
-  if (need_sync_) {
+  if ((!deferred_pinned_.empty()) && need_sync_) {
     if (event_ != nullptr) {
       cudaEventSynchronize(event_);
     } else {
@@ -259,7 +259,7 @@ BackendResponder::Finalize()
     }
     need_sync_ = false;
   }
-#endif
+#endif  // TRITON_ENABLE_GPU
 
   // After the above sync all the GPU->pinned copies are complete. Any
   // deferred copies of pinned->CPU can now be done.
@@ -307,6 +307,12 @@ BackendResponder::Finalize()
     }
   }
 
+#ifdef TRITON_ENABLE_GPU
+  // Record the new event location if deferred copies occur
+  if ((!deferred_pinned_.empty()) && need_sync_ && (event_ != nullptr)) {
+    cudaEventRecord(event_, stream_);
+  }
+#endif  // TRITON_ENABLE_GPU
   deferred_pinned_.clear();
 
   return need_sync_;
@@ -582,11 +588,15 @@ bool
 BackendInputCollector::Finalize()
 {
 #ifdef TRITON_ENABLE_GPU
-  if (need_sync_) {
-    cudaStreamSynchronize(stream_);
+  if ((!deferred_pinned_.empty()) && need_sync_) {
+    if (event_ != nullptr) {
+      cudaEventSynchronize(event_);
+    } else {
+      cudaStreamSynchronize(stream_);
+    }
     need_sync_ = false;
   }
-#endif
+#endif  // TRITON_ENABLE_GPU
 
   // After the above sync all the GPU->pinned copies are complete. Any
   // deferred copies of pinned->CPU can now be done.
@@ -618,6 +628,12 @@ BackendInputCollector::Finalize()
     }
   }
 
+#ifdef TRITON_ENABLE_GPU
+  // Record the new event location if deferred copies occur
+  if ((!deferred_pinned_.empty()) && need_sync_ && (event_ != nullptr)) {
+    cudaEventRecord(event_, stream_);
+  }
+#endif  // TRITON_ENABLE_GPU
   deferred_pinned_.clear();
 
   return need_sync_;
