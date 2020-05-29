@@ -127,7 +127,9 @@ GetJsonText(const rapidjson::Document& json_dom)
 
 class HttpInferRequest : public InferRequest {
  public:
-  HttpInferRequest(InferenceServerClient::OnCompleteFn callback = nullptr);
+  HttpInferRequest(
+      InferenceServerClient::OnCompleteFn callback = nullptr,
+      const bool verbose = false);
   ~HttpInferRequest();
 
   // Initialize the request for HTTP transfer. */
@@ -151,15 +153,14 @@ class HttpInferRequest : public InferRequest {
   // be valid during the transfer and can be freed once transfer is completed.
   struct curl_slist* header_list_;
 
-  // Status code for the HTTP request.
-  CURLcode http_status_;
+  // CURL status for the HTTP request.
+  CURLcode curl_status_;
 
   size_t total_input_byte_size_;
 
   rapidjson::StringBuffer request_json_;
 
-  // Buffer that accumulates the serialized response at the
-  // end of the body.
+  // Buffer that accumulates the response body.
   std::unique_ptr<std::string> infer_response_buffer_;
 
   // The pointers to the input data.
@@ -169,8 +170,9 @@ class HttpInferRequest : public InferRequest {
 };
 
 
-HttpInferRequest::HttpInferRequest(InferenceServerClient::OnCompleteFn callback)
-    : InferRequest(callback), easy_handle_(curl_easy_init()),
+HttpInferRequest::HttpInferRequest(
+    InferenceServerClient::OnCompleteFn callback, const bool verbose)
+    : InferRequest(callback, verbose), easy_handle_(curl_easy_init()),
       header_list_(nullptr), total_input_byte_size_(0), response_json_size_(0)
 {
 }
@@ -192,6 +194,7 @@ HttpInferRequest::InitializeRequest(rapidjson::Document& request_json)
 {
   data_buffers_ = {};
   total_input_byte_size_ = 0;
+  curl_status_ = CURLE_FAILED_INIT;
 
   request_json_.Clear();
   rapidjson::Writer<rapidjson::StringBuffer> writer(request_json_);
@@ -253,7 +256,7 @@ HttpInferRequest::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
 
 class InferResultHttp : public InferResult {
  public:
-  static Error Create(
+  static void Create(
       InferResult** infer_result,
       std::shared_ptr<HttpInferRequest> infer_request);
 
@@ -280,22 +283,25 @@ class InferResultHttp : public InferResult {
   std::map<std::string, std::pair<const uint8_t*, const size_t>>
       output_name_to_buffer_map_;
 
+  Error status_;
   rapidjson::Document response_json_;
   std::shared_ptr<HttpInferRequest> infer_request_;
 };
 
-Error
+void
 InferResultHttp::Create(
     InferResult** infer_result, std::shared_ptr<HttpInferRequest> infer_request)
 {
   *infer_result =
       reinterpret_cast<InferResult*>(new InferResultHttp(infer_request));
-  return Error::Success;
 }
 
 Error
 InferResultHttp::ModelName(std::string* name) const
 {
+  if (!status_.IsOk()) {
+    return status_;
+  }
   const auto& itr = response_json_.FindMember("model_name");
   if (itr != response_json_.MemberEnd()) {
     *name = std::string(itr->value.GetString(), itr->value.GetStringLength());
@@ -308,6 +314,9 @@ InferResultHttp::ModelName(std::string* name) const
 Error
 InferResultHttp::ModelVersion(std::string* version) const
 {
+  if (!status_.IsOk()) {
+    return status_;
+  }
   const auto& itr = response_json_.FindMember("model_version");
   if (itr != response_json_.MemberEnd()) {
     *version =
@@ -321,6 +330,9 @@ InferResultHttp::ModelVersion(std::string* version) const
 Error
 InferResultHttp::Id(std::string* id) const
 {
+  if (!status_.IsOk()) {
+    return status_;
+  }
   const auto& itr = response_json_.FindMember("id");
   if (itr != response_json_.MemberEnd()) {
     *id = std::string(itr->value.GetString(), itr->value.GetStringLength());
@@ -334,6 +346,9 @@ Error
 InferResultHttp::Shape(
     const std::string& output_name, std::vector<int64_t>* shape) const
 {
+  if (!status_.IsOk()) {
+    return status_;
+  }
   shape->clear();
   auto itr = output_name_to_result_map_.find(output_name);
   if (itr != output_name_to_result_map_.end()) {
@@ -358,6 +373,9 @@ Error
 InferResultHttp::Datatype(
     const std::string& output_name, std::string* datatype) const
 {
+  if (!status_.IsOk()) {
+    return status_;
+  }
   auto itr = output_name_to_result_map_.find(output_name);
   if (itr != output_name_to_result_map_.end()) {
     const auto datatype_itr = itr->second->FindMember("datatype");
@@ -383,6 +401,9 @@ InferResultHttp::RawData(
     const std::string& output_name, const uint8_t** buf,
     size_t* byte_size) const
 {
+  if (!status_.IsOk()) {
+    return status_;
+  }
   auto itr = output_name_to_buffer_map_.find(output_name);
   if (itr != output_name_to_buffer_map_.end()) {
     *buf = itr->second.first;
@@ -400,6 +421,9 @@ InferResultHttp::StringData(
     const std::string& output_name,
     std::vector<std::string>* string_result) const
 {
+  if (!status_.IsOk()) {
+    return status_;
+  }
   std::string datatype;
   Error err = Datatype(output_name, &datatype);
   if (!err.IsOk()) {
@@ -432,19 +456,16 @@ InferResultHttp::StringData(
 std::string
 InferResultHttp::DebugString() const
 {
+  if (!status_.IsOk()) {
+    return status_.Message();
+  }
   return GetJsonText(response_json_);
 }
 
 Error
 InferResultHttp::RequestStatus() const
 {
-  const auto& itr = response_json_.FindMember("error");
-  if (itr != response_json_.MemberEnd()) {
-    return Error(
-        std::string(itr->value.GetString(), itr->value.GetStringLength()));
-  }
-
-  return Error::Success;
+  return status_;
 }
 
 InferResultHttp::InferResultHttp(
@@ -453,33 +474,60 @@ InferResultHttp::InferResultHttp(
 {
   size_t offset = infer_request->response_json_size_;
   if (offset != 0) {
+    if (infer_request->verbose_) {
+      std::cout << infer_request->infer_response_buffer_->substr(0, offset)
+                << std::endl;
+    }
     response_json_.Parse(
         (char*)infer_request->infer_response_buffer_.get()->c_str(), offset);
   } else {
+    if (infer_request->verbose_) {
+      std::cout << *infer_request->infer_response_buffer_ << std::endl;
+    }
     response_json_.Parse(
         (char*)infer_request->infer_response_buffer_.get()->c_str());
   }
-  const auto& itr = response_json_.FindMember("outputs");
-  if (itr != response_json_.MemberEnd()) {
-    const rapidjson::Value& outputs = itr->value;
-    for (size_t i = 0; i < outputs.Size(); i++) {
-      const rapidjson::Value& output = outputs[i];
-      const char* output_name = output["name"].GetString();
-      output_name_to_result_map_[output_name] = &output;
-      const auto& pitr = output.FindMember("parameters");
-      if (pitr != output.MemberEnd()) {
-        const rapidjson::Value& param = pitr->value;
-        const auto& bitr = param.FindMember("binary_data_size");
-        if (bitr != param.MemberEnd()) {
-          size_t byte_size = bitr->value.GetInt();
-          output_name_to_buffer_map_.emplace(
-              output_name,
-              std::pair<const uint8_t*, const size_t>(
-                  (uint8_t*)(infer_request->infer_response_buffer_.get()
-                                 ->c_str()) +
-                      offset,
-                  byte_size));
-          offset += byte_size;
+
+  // There should be a valid JSON response in all cases. Either the
+  // successful infer response or an error response.
+  if (response_json_.HasParseError()) {
+    status_ = Error(
+        "failed to parse response JSON: " +
+        std::string(GetParseError_En(response_json_.GetParseError())) + " at " +
+        std::to_string(response_json_.GetErrorOffset()));
+  } else if (infer_request->curl_status_ != CURLE_OK) {
+    const auto& itr = response_json_.FindMember("error");
+    if (itr != response_json_.MemberEnd()) {
+      status_ = Error(
+          std::string(itr->value.GetString(), itr->value.GetStringLength()));
+    } else {
+      status_ = Error("inference failed with unknown error");
+    }
+  } else {
+    status_ = Error::Success;
+
+    const auto& itr = response_json_.FindMember("outputs");
+    if (itr != response_json_.MemberEnd()) {
+      const rapidjson::Value& outputs = itr->value;
+      for (size_t i = 0; i < outputs.Size(); i++) {
+        const rapidjson::Value& output = outputs[i];
+        const char* output_name = output["name"].GetString();
+        output_name_to_result_map_[output_name] = &output;
+        const auto& pitr = output.FindMember("parameters");
+        if (pitr != output.MemberEnd()) {
+          const rapidjson::Value& param = pitr->value;
+          const auto& bitr = param.FindMember("binary_data_size");
+          if (bitr != param.MemberEnd()) {
+            size_t byte_size = bitr->value.GetInt();
+            output_name_to_buffer_map_.emplace(
+                output_name,
+                std::pair<const uint8_t*, const size_t>(
+                    (uint8_t*)(infer_request->infer_response_buffer_.get()
+                                   ->c_str()) +
+                        offset,
+                    byte_size));
+            offset += byte_size;
+          }
         }
       }
     }
@@ -920,7 +968,8 @@ InferenceServerHttpClient::Infer(
   }
   request_uri = request_uri + "/infer";
 
-  std::shared_ptr<HttpInferRequest> sync_request(new HttpInferRequest());
+  std::shared_ptr<HttpInferRequest> sync_request(
+      new HttpInferRequest(nullptr /* callback */, verbose_));
 
   sync_request->Timer().Reset();
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
@@ -948,7 +997,7 @@ InferenceServerHttpClient::Infer(
 
   // During this call SEND_END (except in above case), RECV_START, and
   // RECV_END will be set.
-  sync_request->http_status_ = curl_easy_perform(sync_request->easy_handle_);
+  sync_request->curl_status_ = curl_easy_perform(sync_request->easy_handle_);
 
   InferResultHttp::Create(result, sync_request);
 
@@ -990,7 +1039,7 @@ InferenceServerHttpClient::AsyncInfer(
   request_uri = request_uri + "/infer";
 
   HttpInferRequest* raw_async_request =
-      new HttpInferRequest(std::move(callback));
+      new HttpInferRequest(std::move(callback), verbose_);
   async_request.reset(raw_async_request);
 
   if (!async_request->easy_handle_) {
@@ -1285,6 +1334,7 @@ InferenceServerHttpClient::PreRunProcessing(
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
   curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
+  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
@@ -1377,7 +1427,7 @@ InferenceServerHttpClient::AsyncTransfer()
           std::cerr << "Failed to update context stat: " << err << std::endl;
         }
       }
-      async_request->http_status_ = msg->data.result;
+      async_request->curl_status_ = msg->data.result;
     }
     lock.unlock();
 
@@ -1458,7 +1508,7 @@ InferenceServerHttpClient::Get(
     response->Parse(response_string.c_str(), response_string.size());
     if (response->HasParseError()) {
       return Error(
-          "failed to parse the request JSON buffer: " +
+          "failed to parse request JSON: " +
           std::string(GetParseError_En(response->GetParseError())) + " at " +
           std::to_string(response->GetErrorOffset()));
     }
@@ -1543,7 +1593,7 @@ InferenceServerHttpClient::Post(
     response->Parse(response_string.c_str(), response_string.size());
     if (response->HasParseError()) {
       return Error(
-          "failed to parse the request JSON buffer: " +
+          "failed to parse request JSON: " +
           std::string(GetParseError_En(response->GetParseError())) + " at " +
           std::to_string(response->GetErrorOffset()));
     }
