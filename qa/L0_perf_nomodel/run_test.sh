@@ -39,6 +39,7 @@ PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=5000}
 PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=5}
 TENSOR_SIZE=${TENSOR_SIZE:=1}
+SHARED_MEMORY=${SHARED_MEMORY:="none"}
 REPORTER=../common/reporter.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
@@ -64,6 +65,7 @@ PERF_CLIENT_PROTOCOL_ARGS="-i grpc -u localhost:8001" &&
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
+PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory \"${SHARED_MEMORY}\""
 
 #
 # Use "identity" model for all model types.
@@ -119,7 +121,7 @@ for BACKEND in $BACKENDS; do
     $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
-                 ${PERF_CLIENT_PERCENTILE_ARGS} \
+                 ${PERF_CLIENT_EXTRA_ARGS} \
                  ${PERF_CLIENT_PROTOCOL_ARGS} -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
                  --shape INPUT0:${SHAPE} \
@@ -133,16 +135,17 @@ for BACKEND in $BACKENDS; do
     fi
     set -e
 
-    echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
-    echo -e "\"s_benchmark_name\":\"nomodel\"," >> ${NAME}.tjson
-    echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${NAME}.tjson
-    echo -e "\"s_framework\":\"${BACKEND}\"," >> ${NAME}.tjson
-    echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
-    echo -e "\"l_concurrency\":${CONCURRENCY}," >> ${NAME}.tjson
-    echo -e "\"l_dynamic_batch_size\":${DYNAMIC_BATCH}," >> ${NAME}.tjson
-    echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
-    echo -e "\"l_size\":${TENSOR_SIZE}," >> ${NAME}.tjson
-    echo -e "\"l_instance_count\":${INSTANCE_CNT}}]" >> ${NAME}.tjson
+    echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_benchmark_name\":\"nomodel\"," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_framework\":\"${BACKEND}\"," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_concurrency\":${CONCURRENCY}," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_dynamic_batch_size\":${DYNAMIC_BATCH}," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_size\":${TENSOR_SIZE}," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_shared_memory\":\"${SHARED_MEMORY}\"," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_instance_count\":${INSTANCE_CNT}}]" >> ${RESULTDIR}/${NAME}.tjson
 
     kill $SERVER_PID
     wait $SERVER_PID
@@ -155,7 +158,7 @@ for BACKEND in $BACKENDS; do
             URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
         fi
 
-        $REPORTER -v -o ${NAME}.json --csv ${RESULTDIR}/${NAME}.csv ${URL_FLAG} ${NAME}.tjson
+        $REPORTER -v -o ${RESULTDIR}/${NAME}.json --csv ${RESULTDIR}/${NAME}.csv ${URL_FLAG} ${RESULTDIR}/${NAME}.tjson
         if (( $? != 0 )); then
             RET=1
         fi
