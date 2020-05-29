@@ -31,7 +31,7 @@ import sys
 import queue
 
 import tritongrpcclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 FLAGS = None
 

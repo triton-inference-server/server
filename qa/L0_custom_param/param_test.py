@@ -33,7 +33,7 @@ import sys
 from builtins import range
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-from tritonclientutils.utils import np_to_triton_dtype
+from tritonclientutils import np_to_triton_dtype
 
 FLAGS = None
 

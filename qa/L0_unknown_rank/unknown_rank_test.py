@@ -27,7 +27,7 @@
 import unittest
 import numpy as np
 import tritonhttpclient
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 class UnknownRankTest(unittest.TestCase):
     # helper function to generate requests to the server

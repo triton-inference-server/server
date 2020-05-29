@@ -43,5 +43,5 @@ Client Utils
 
 This module exposes additional supporting utilities.
 
-.. automodule:: tritonclientutils.utils
+.. automodule:: tritonclientutils
    :members:

@@ -31,8 +31,8 @@ import os
 import sys
 from builtins import range
 import tritongrpcclient
-import tritonclientutils.cuda_shared_memory as cudashm
-import tritonclientutils.utils as utils
+import tritonshmutils.cuda_shared_memory as cudashm
+import tritonclientutils as utils
 from ctypes import *
 
 FLAGS = None

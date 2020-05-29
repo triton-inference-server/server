@@ -28,7 +28,7 @@
 import argparse
 
 import tritongrpcclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

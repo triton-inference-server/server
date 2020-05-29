@@ -34,7 +34,7 @@ import gevent
 import gevent.pool
 import struct
 
-from tritonclientutils.utils import *
+from tritonclientutils import *
 
 
 def _get_error(response):

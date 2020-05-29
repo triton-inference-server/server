@@ -33,7 +33,7 @@ import numpy as np
 import test_util as tu
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-from tritonclientutils.utils import np_to_triton_dtype, InferenceServerException
+from tritonclientutils import np_to_triton_dtype, InferenceServerException
 
 class LargePayLoadTest(unittest.TestCase):
     def setUp(self):

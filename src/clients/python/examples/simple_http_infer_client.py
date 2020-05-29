@@ -30,7 +30,7 @@ import numpy as np
 import sys
 
 import tritonhttpclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 def test_infer(model_name, input0_data, input1_data, headers=None):
     inputs = []

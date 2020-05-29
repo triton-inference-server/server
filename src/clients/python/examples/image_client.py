@@ -35,8 +35,8 @@ import os
 import tritongrpcclient
 import tritongrpcclient.model_config_pb2 as mc
 import tritonhttpclient
-from tritonclientutils.utils import triton_to_np_dtype
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import triton_to_np_dtype
+from tritonclientutils import InferenceServerException
 
 if sys.version_info >= (3, 0):
     import queue

@@ -37,7 +37,7 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 import tritonhttpclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 class TrtDynamicShapeTest(unittest.TestCase):
     def setUp(self):

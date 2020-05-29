@@ -30,7 +30,7 @@ sys.path.append("../common")
 import unittest
 import numpy as np
 import tritonhttpclient as httpclient
-from tritonclientutils.utils import InferenceServerException
+from tritonclientutils import InferenceServerException
 
 class TFTRTOptimizationTest(unittest.TestCase):
     def setUp(self):
