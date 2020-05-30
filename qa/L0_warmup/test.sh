@@ -149,6 +149,11 @@ for BACKEND in ${BACKENDS}; do
         echo -e "\n***\n*** Failed. Expected warmup for stateful model\n***"
         RET=1
     fi
+    grep "warmup error" $SERVER_LOG
+    if [ $? -eq 0 ]; then
+        echo -e "\n***\n*** Failed. Expected no warmup error\n***"
+        RET=1
+    fi
 
     set -e
 
@@ -267,6 +272,11 @@ for BACKEND in ${BACKENDS}; do
             echo -e "\n***\n*** Failed. Expected warmup for string stateful model\n***"
             RET=1
         fi
+        grep "warmup error" $SERVER_LOG
+        if [ $? -eq 0 ]; then
+            echo -e "\n***\n*** Failed. Expected no warmup error\n***"
+            RET=1
+        fi
 
         set -e
 
@@ -321,6 +331,11 @@ for BACKEND in ${BACKENDS}; do
         grep "is running warmup sample 'image sample'" $SERVER_LOG
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Failed. Expected warmup for image model\n***"
+            RET=1
+        fi
+        grep "warmup error" $SERVER_LOG
+        if [ $? -eq 0 ]; then
+            echo -e "\n***\n*** Failed. Expected no warmup error\n***"
             RET=1
         fi
 
