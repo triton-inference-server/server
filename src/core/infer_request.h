@@ -383,12 +383,6 @@ class InferenceRequest {
   // The statistics of the copy will not be collected.
   static InferenceRequest* CopyAsNull(const InferenceRequest& from);
 
-  // Create a copy of 'from' suitable for use. The caller must be aware that
-  // the callbacks are copied and input data are shared. 'from' must have longer
-  // lifecycle than returned copy.
-  // The statistics of the copy will not be collected.
-  static InferenceRequest* Copy(const InferenceRequest& from);
-
   uint64_t QueueStartNs() const { return queue_start_ns_; }
   uint64_t CaptureQueueStartNs()
   {
