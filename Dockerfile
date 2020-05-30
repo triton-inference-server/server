@@ -62,7 +62,7 @@ FROM ${BASE_IMAGE} AS tritonserver_onnx
 # needs to be built from source
 
 # Onnx Runtime release version
-ARG ONNX_RUNTIME_VERSION=1.2.0
+ARG ONNX_RUNTIME_VERSION=1.3.0
 
 # Get release version of Onnx Runtime
 WORKDIR /workspace
