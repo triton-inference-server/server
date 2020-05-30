@@ -139,12 +139,12 @@ class InferenceBackend {
     WarmupData(const std::string& sample_name) : sample_name_(sample_name) {}
 
     std::string sample_name_;
-    std::unique_ptr<InferenceRequest> request_;
+    std::vector<std::unique_ptr<InferenceRequest>> requests_;
 
     // Placeholder for input data
     std::unique_ptr<AllocatedMemory> zero_data_;
     std::unique_ptr<AllocatedMemory> random_data_;
-    std::vector<std::string> provided_data_;
+    std::vector<std::unique_ptr<std::string>> provided_data_;
   };
 
   // Run model on the context associated with 'runner_idx' to execute
