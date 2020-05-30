@@ -146,9 +146,6 @@ class HttpInferRequest : public InferRequest {
   friend class InferenceServerHttpClient;
   friend class InferResultHttp;
 
-  // Pointer to easy handle that is processing the request
-  CURL* easy_handle_;
-
   // Pointer to the list of the HTTP request header, keep it such that it will
   // be valid during the transfer and can be freed once transfer is completed.
   struct curl_slist* header_list_;
@@ -172,8 +169,8 @@ class HttpInferRequest : public InferRequest {
 
 HttpInferRequest::HttpInferRequest(
     InferenceServerClient::OnCompleteFn callback, const bool verbose)
-    : InferRequest(callback, verbose), easy_handle_(curl_easy_init()),
-      header_list_(nullptr), total_input_byte_size_(0), response_json_size_(0)
+    : InferRequest(callback, verbose), header_list_(nullptr),
+      total_input_byte_size_(0), response_json_size_(0)
 {
 }
 
@@ -182,10 +179,6 @@ HttpInferRequest::~HttpInferRequest()
   if (header_list_ != nullptr) {
     curl_slist_free_all(header_list_);
     header_list_ = nullptr;
-  }
-
-  if (easy_handle_ != nullptr) {
-    curl_easy_cleanup(easy_handle_);
   }
 }
 
@@ -475,14 +468,16 @@ InferResultHttp::InferResultHttp(
   size_t offset = infer_request->response_json_size_;
   if (offset != 0) {
     if (infer_request->verbose_) {
-      std::cout << infer_request->infer_response_buffer_->substr(0, offset)
+      std::cout << "inference response: "
+                << infer_request->infer_response_buffer_->substr(0, offset)
                 << std::endl;
     }
     response_json_.Parse(
         (char*)infer_request->infer_response_buffer_.get()->c_str(), offset);
   } else {
     if (infer_request->verbose_) {
-      std::cout << *infer_request->infer_response_buffer_ << std::endl;
+      std::cout << "inference response: "
+                << *infer_request->infer_response_buffer_ << std::endl;
     }
     response_json_.Parse(
         (char*)infer_request->infer_response_buffer_.get()->c_str());
@@ -492,7 +487,7 @@ InferResultHttp::InferResultHttp(
   // successful infer response or an error response.
   if (response_json_.HasParseError()) {
     status_ = Error(
-        "failed to parse response JSON: " +
+        "failed to parse inference response JSON: " +
         std::string(GetParseError_En(response_json_.GetParseError())) + " at " +
         std::to_string(response_json_.GetErrorOffset()));
   } else if (infer_request->curl_status_ != CURLE_OK) {
@@ -536,26 +531,6 @@ InferResultHttp::InferResultHttp(
 
 //==============================================================================
 
-InferenceServerHttpClient::~InferenceServerHttpClient()
-{
-  exiting_ = true;
-  // thread not joinable if AsyncInfer() is not called
-  // (it is default constructed thread before the first AsyncInfer() call)
-  if (worker_.joinable()) {
-    cv_.notify_all();
-    worker_.join();
-  }
-
-  if (multi_handle_ != nullptr) {
-    for (auto& request : ongoing_async_requests_) {
-      CURL* easy_handle = request.second->easy_handle_;
-      // Just remove, easy_cleanup will be done in ~HttpInferRequest()
-      curl_multi_remove_handle(multi_handle_, easy_handle);
-    }
-    curl_multi_cleanup(multi_handle_);
-  }
-}
-
 Error
 InferenceServerHttpClient::Create(
     std::unique_ptr<InferenceServerHttpClient>* client,
@@ -563,6 +538,39 @@ InferenceServerHttpClient::Create(
 {
   client->reset(new InferenceServerHttpClient(server_url, verbose));
   return Error::Success;
+}
+
+InferenceServerHttpClient::InferenceServerHttpClient(
+    const std::string& url, bool verbose)
+    : InferenceServerClient(verbose), url_(url),
+      easy_handle_(reinterpret_cast<void*>(curl_easy_init())),
+      multi_handle_(curl_multi_init())
+{
+}
+
+InferenceServerHttpClient::~InferenceServerHttpClient()
+{
+  exiting_ = true;
+
+  // thread not joinable if AsyncInfer() is not called
+  // (it is default constructed thread before the first AsyncInfer() call)
+  if (worker_.joinable()) {
+    cv_.notify_all();
+    worker_.join();
+  }
+
+  if (easy_handle_ != nullptr) {
+    curl_easy_cleanup(reinterpret_cast<CURL*>(easy_handle_));
+  }
+
+  if (multi_handle_ != nullptr) {
+    for (auto& request : ongoing_async_requests_) {
+      CURL* easy_handle = reinterpret_cast<CURL*>(request.first);
+      curl_multi_remove_handle(multi_handle_, easy_handle);
+      curl_easy_cleanup(easy_handle);
+    }
+    curl_multi_cleanup(multi_handle_);
+  }
 }
 
 Error
@@ -979,8 +987,8 @@ InferenceServerHttpClient::Infer(
   }
 
   err = PreRunProcessing(
-      request_uri, options, inputs, outputs, headers, query_params,
-      sync_request);
+      easy_handle_, request_uri, options, inputs, outputs, headers,
+      query_params, sync_request);
   if (!err.IsOk()) {
     return err;
   }
@@ -997,7 +1005,7 @@ InferenceServerHttpClient::Infer(
 
   // During this call SEND_END (except in above case), RECV_START, and
   // RECV_END will be set.
-  sync_request->curl_status_ = curl_easy_perform(sync_request->easy_handle_);
+  sync_request->curl_status_ = curl_easy_perform(easy_handle_);
 
   InferResultHttp::Create(result, sync_request);
 
@@ -1025,6 +1033,7 @@ InferenceServerHttpClient::AsyncInfer(
     return Error(
         "Callback function must be provided along with AsyncInfer() call.");
   }
+
   std::shared_ptr<HttpInferRequest> async_request;
   if (!multi_handle_) {
     return Error("failed to start HTTP asynchronous client");
@@ -1042,16 +1051,14 @@ InferenceServerHttpClient::AsyncInfer(
       new HttpInferRequest(std::move(callback), verbose_);
   async_request.reset(raw_async_request);
 
-  if (!async_request->easy_handle_) {
-    return Error("failed to initialize HTTP client");
-  }
-
   async_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
 
+  CURL* multi_easy_handle = curl_easy_init();
   Error err = PreRunProcessing(
-      request_uri, options, inputs, outputs, headers, query_params,
-      async_request);
+      reinterpret_cast<void*>(multi_easy_handle), request_uri, options, inputs,
+      outputs, headers, query_params, async_request);
   if (!err.IsOk()) {
+    curl_easy_cleanup(multi_easy_handle);
     return err;
   }
 
@@ -1059,12 +1066,12 @@ InferenceServerHttpClient::AsyncInfer(
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto insert_result = ongoing_async_requests_.emplace(std::make_pair(
-        reinterpret_cast<uintptr_t>(async_request->easy_handle_),
-        async_request));
-
+        reinterpret_cast<uintptr_t>(multi_easy_handle), async_request));
     if (!insert_result.second) {
+      curl_easy_cleanup(multi_easy_handle);
       return Error("Failed to insert new asynchronous request context.");
     }
+
     async_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
     if (async_request->total_input_byte_size_ == 0) {
       // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
@@ -1072,20 +1079,13 @@ InferenceServerHttpClient::AsyncInfer(
       // (send ends after sending request header).
       async_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
     }
-    curl_multi_add_handle(multi_handle_, async_request->easy_handle_);
+
+    curl_multi_add_handle(multi_handle_, multi_easy_handle);
   }
 
   cv_.notify_all();
   return Error::Success;
 }
-
-InferenceServerHttpClient::InferenceServerHttpClient(
-    const std::string& url, bool verbose)
-    : InferenceServerClient(verbose), url_(url),
-      multi_handle_(curl_multi_init())
-{
-}
-
 
 size_t
 InferenceServerHttpClient::InferRequestProvider(
@@ -1290,18 +1290,18 @@ InferenceServerHttpClient::PrepareRequestJson(
 
 Error
 InferenceServerHttpClient::PreRunProcessing(
-    std::string& request_uri, const InferOptions& options,
+    void* vcurl, std::string& request_uri, const InferOptions& options,
     const std::vector<InferInput*>& inputs,
     const std::vector<const InferRequestedOutput*>& outputs,
     const Headers& headers, const Parameters& query_params,
-    std::shared_ptr<HttpInferRequest>& request)
+    std::shared_ptr<HttpInferRequest>& http_request)
 {
+  CURL* curl = reinterpret_cast<CURL*>(vcurl);
+
   rapidjson::Document request_json;
   PrepareRequestJson(options, inputs, outputs, &request_json);
 
   // Prepare the request object to provide the data for inference.
-  std::shared_ptr<HttpInferRequest> http_request =
-      std::static_pointer_cast<HttpInferRequest>(request);
   http_request->InitializeRequest(request_json);
 
   // Add the buffers holding input tensor data
@@ -1321,11 +1321,6 @@ InferenceServerHttpClient::PreRunProcessing(
   }
 
   // Prepare curl
-  CURL* curl = http_request->easy_handle_;
-  if (!curl) {
-    return Error("failed to initialize HTTP client");
-  }
-
   if (!query_params.empty()) {
     request_uri = request_uri + "?" + GetQueryString(query_params);
   }
@@ -1372,9 +1367,16 @@ InferenceServerHttpClient::PreRunProcessing(
   }
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
 
-
   // The list will be freed when the request is destructed
   http_request->header_list_ = list;
+
+  if (verbose_) {
+    std::cout << "inference request: "
+              << std::string(
+                     http_request->request_json_.GetString(),
+                     http_request->request_json_.GetSize())
+              << std::endl;
+  }
 
   return Error::Success;
 }
@@ -1396,29 +1398,32 @@ InferenceServerHttpClient::AsyncTransfer()
       // wake up if an async request has been generated
       return !this->ongoing_async_requests_.empty();
     });
+
     curl_multi_perform(multi_handle_, &place_holder);
     while ((msg = curl_multi_info_read(multi_handle_, &place_holder))) {
-      // update request status
       uintptr_t identifier = reinterpret_cast<uintptr_t>(msg->easy_handle);
       auto itr = ongoing_async_requests_.find(identifier);
       // This shouldn't happen
       if (itr == ongoing_async_requests_.end()) {
-        fprintf(
-            stderr,
-            "Unexpected error: received completed request that"
-            " is not in the list of asynchronous requests.\n");
+        std::cerr << "Unexpected error: received completed request that is not "
+                     "in the list of asynchronous requests"
+                  << std::endl;
         curl_multi_remove_handle(multi_handle_, msg->easy_handle);
         curl_easy_cleanup(msg->easy_handle);
         continue;
       }
+
       request_list.emplace_back(itr->second);
-      ongoing_async_requests_.erase(identifier);
+      ongoing_async_requests_.erase(itr);
       curl_multi_remove_handle(multi_handle_, msg->easy_handle);
+      curl_easy_cleanup(msg->easy_handle);
+
       std::shared_ptr<HttpInferRequest> async_request = request_list.back();
 
       if (msg->msg != CURLMSG_DONE) {
         // Something wrong happened.
-        fprintf(stderr, "Unexpected error: received CURLMsg=%d\n", msg->msg);
+        std::cerr << "Unexpected error: received CURLMsg=" << msg->msg
+                  << std::endl;
       } else {
         async_request->Timer().CaptureTimestamp(
             RequestTimers::Kind::REQUEST_END);

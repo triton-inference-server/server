@@ -54,7 +54,11 @@ std::string GetJsonText(const rapidjson::Document& json_dom);
 
 //==============================================================================
 /// An InferenceServerHttpClient object is used to perform any kind of
-/// communication with the InferenceServer using HTTP protocol.
+/// communication with the InferenceServer using HTTP protocol. None
+/// of the methods of InferenceServerHttpClient are thread safe. The
+/// class is intended to be used by a single thread and simultaneously
+/// calling different methods with different threads is not supported
+/// and will cause undefined behavior.
 ///
 /// \code
 ///   std::unique_ptr<InferenceServerHttpClient> client;
@@ -374,7 +378,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
       const std::vector<const InferRequestedOutput*>& outputs,
       rapidjson::Document* request_json);
   Error PreRunProcessing(
-      std::string& request_uri, const InferOptions& options,
+      void* curl, std::string& request_uri, const InferOptions& options,
       const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs,
       const Headers& headers, const Parameters& query_params,
@@ -402,6 +406,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
   const std::string url_;
 
   using AsyncReqMap = std::map<uintptr_t, std::shared_ptr<HttpInferRequest>>;
+  // curl easy handle shared for all synchronous requests
+  void* easy_handle_;
   // curl multi handle for processing asynchronous requests
   void* multi_handle_;
   // map to record ongoing asynchronous requests with pointer to easy handle
