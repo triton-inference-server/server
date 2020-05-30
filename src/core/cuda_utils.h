@@ -47,7 +47,7 @@ namespace nvidia { namespace inferenceserver {
 
 #ifndef TRITON_ENABLE_GPU
 using cudaStream_t = void*;
-#endif  // TRITON_ENABLE_GPU
+#endif  // !TRITON_ENABLE_GPU
 
 /// Enable peer access for all GPU device pairs
 /// \param min_compute_capability The minimum support CUDA compute

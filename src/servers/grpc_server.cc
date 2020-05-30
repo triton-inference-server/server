@@ -1322,15 +1322,17 @@ CommonHandler::SetUpAllRequests()
         }
       }
     }
-#else
-    auto err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE,
-        "the server does not suppport model statistics");
-#endif
 
   earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
+#else
+    auto err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE,
+        "the server does not suppport model statistics");
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+#endif
   };
 
   new CommonCallData<

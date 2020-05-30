@@ -837,7 +837,7 @@ OnnxBackend::Context::SetInputTensors(
                     src_byte_size, src_buffer,
                     input_buffer + buffer_offset + input_offset, stream_,
                     &cuda_used);
-                *cuda_copy |= cuda_used;
+                string_cuda_copy |= cuda_used;
               }
             }
             if (status.IsOk()) {
