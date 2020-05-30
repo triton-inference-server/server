@@ -787,6 +787,9 @@ BaseBackend::Context::Run(
                                                 : TRITONSERVER_MEMORY_CPU,
             (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0);
       }
+
+      LOG_VERBOSE(1) << "input '" << input_name << "' is GPU tensor: "
+                     << TRTISTF_TensorIsGPUTensor(tensor);
     }
 
     // Finalize...
@@ -926,6 +929,9 @@ BaseBackend::Context::Run(
                 : TRITONSERVER_MEMORY_CPU,
             (TRTISTF_TensorIsGPUTensor(output_tensor)) ? gpu_device_ : 0);
       }
+
+      LOG_VERBOSE(1) << "output '" << name << "' is GPU tensor: "
+                     << TRTISTF_TensorIsGPUTensor(output_tensor);
 
       output_tensor_itr = output_tensor_itr->next_;
     }
