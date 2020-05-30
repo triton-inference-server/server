@@ -201,7 +201,7 @@ InferenceBackend::SetConfiguredScheduler(
   auto OnWarmup = [this, &samples](uint32_t runner_idx) -> Status {
     auto& runner_samples = samples[runner_idx];
     for (auto& sample : runner_samples) {
-      LOG_VERBOSE(1) << "model '" << sample.request_->ModelName()
+      LOG_VERBOSE(1) << "model '" << sample.requests_.back()->ModelName()
                      << "' instance " << std::to_string(runner_idx)
                      << " is running warmup sample '" << sample.sample_name_
                      << "'";
@@ -313,7 +313,14 @@ InferenceBackend::Run(
 void
 InferenceBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
 {
-  // Unless necessary, simply invoke Run()
+  // Capture timestamp before run to avoid incorrect accumulation from
+  // sequential warmup runs
+  for (auto& request : sample.requests_) {
+#ifdef TRITON_ENABLE_STATS
+    request->CaptureRequestStartNs();
+#endif  // TRITON_ENABLE_STATS
+    request->CaptureQueueStartNs();
+  }
   Run(runner_idx, std::move(sample.requests_));
 }
 
@@ -322,6 +329,11 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 {
   samples->clear();
   for (const auto& warmup_setting : config_.model_warmup()) {
+    if (warmup_setting.batch_size() == 0) {
+      LOG_VERBOSE(1) << "Skipping batch 0 warmup sample '"
+                     << warmup_setting.name() << "'";
+      continue;
+    }
     LOG_VERBOSE(1) << "Generating warmup sample data for '"
                    << warmup_setting.name() << "'";
 
@@ -385,107 +397,100 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     }
 
     // Prepare the inference request for the specified sample.
-    warmup_data.request_.reset(new InferenceRequest(this, Version()));
-
-    // Request all outputs
-    for (const auto& io : Config().output()) {
-      RETURN_IF_ERROR(
-          warmup_data.request_->AddOriginalRequestedOutput(io.name()));
-    }
-
-    // Second pass to prepare original inputs.
-    std::vector<std::shared_ptr<InferenceRequest::Input>> input_sps;
-    for (const auto& input_meta : warmup_setting.inputs()) {
-      auto batch1_element_count = GetElementCount(input_meta.second.dims());
-      auto batch_byte_size = batch1_element_count *
-                             GetDataTypeByteSize(input_meta.second.data_type());
-      if (batch_byte_size == 0) {
-        batch_byte_size = batch1_element_count * sizeof(int32_t);
-      }
-
-      const char* allocated_ptr;
-      switch (input_meta.second.input_data_type_case()) {
-        case ModelWarmup_Input::InputDataTypeCase::kZeroData:
-          allocated_ptr = zero_buffer;
-          break;
-        case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
-          if (input_meta.second.data_type() == DataType::TYPE_STRING) {
-            allocated_ptr = zero_buffer;
-          } else {
-            allocated_ptr = random_buffer;
-          }
-          break;
-        }
-        case ModelWarmup_Input::InputDataTypeCase::kInputDataFile: {
-          // For data provided from file, we can set buffer in first pass
-          warmup_data.provided_data_.emplace_back();
-          auto& input_data = warmup_data.provided_data_.back();
-          RETURN_IF_ERROR(ReadTextFile(
-              JoinPath({model_dir_, kWarmupDataFolder,
-                        input_meta.second.input_data_file()}),
-              &input_data));
-
-          if (input_meta.second.data_type() == DataType::TYPE_STRING) {
-            batch_byte_size = input_data.size();
-          } else if (((size_t)batch_byte_size) > input_data.size()) {
-            return Status(
-                Status::Code::INVALID_ARG,
-                "warmup setting expects " + std::to_string(batch_byte_size) +
-                    " bytes, but the data "
-                    "provided from " +
-                    input_meta.second.input_data_file() + "only has " +
-                    std::to_string(input_data.size()) + " bytes");
-          }
-          allocated_ptr = input_data.data();
-          break;
-        }
-        default:
-          return Status(
-              Status::Code::INVALID_ARG, "warmup setting expects input '" +
-                                             input_meta.first +
-                                             "' to have input_data_type set");
-      }
-
-      const ModelInput* input_config;
-      bool is_original_input = GetInput(input_meta.first, &input_config).IsOk();
-      InferenceRequest::Input* input = nullptr;
-      std::vector<int64_t> input_meta_shape;
-      // Append batch size only if the model supports batching
-      // and not control inpt.
-      if ((config_.max_batch_size() != 0) && is_original_input) {
-        input_meta_shape.push_back(1);
-      }
-      for (auto d : input_meta.second.dims()) {
-        input_meta_shape.push_back(d);
-      }
-      if (is_original_input) {
-        RETURN_IF_ERROR(warmup_data.request_->AddOriginalInput(
-            input_meta.first, input_meta.second.data_type(), input_meta_shape,
-            &input));
-      } else {
-        input_sps.emplace_back();
-        RETURN_IF_ERROR(warmup_data.request_->AddOverrideInput(
-            input_meta.first, input_meta.second.data_type(), input_meta_shape,
-            &input_sps.back()));
-        input = input_sps.back().get();
-      }
-      RETURN_IF_ERROR(input->AppendData(
-          allocated_ptr, batch_byte_size,
-          TRITONSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
-    }
-
-    RETURN_IF_ERROR(warmup_data.request_->PrepareForInference());
-    // Override inputs must be added after PrepareForInference() is called
-    for (const auto& sp : input_sps) {
-      RETURN_IF_ERROR(warmup_data.request_->AddOverrideInput(sp));
-    }
-
-    RETURN_IF_ERROR(warmup_data.request_->SetResponseCallback(
-        &warmup_allocator, nullptr, WarmupResponseComplete, nullptr));
-
     for (size_t cnt = 0; cnt < warmup_setting.batch_size(); cnt++) {
-      warmup_data.requests_.emplace_back(
-          InferenceRequest::Copy(*warmup_data.request_));
+      warmup_data.requests_.emplace_back(new InferenceRequest(this, Version()));
+      auto& lrequest = warmup_data.requests_.back();
+
+      // Second pass to prepare original inputs.
+      std::vector<std::shared_ptr<InferenceRequest::Input>> input_sps;
+      for (const auto& input_meta : warmup_setting.inputs()) {
+        auto batch1_element_count = GetElementCount(input_meta.second.dims());
+        auto batch_byte_size =
+            batch1_element_count *
+            GetDataTypeByteSize(input_meta.second.data_type());
+        if (batch_byte_size == 0) {
+          batch_byte_size = batch1_element_count * sizeof(int32_t);
+        }
+
+        const char* allocated_ptr;
+        switch (input_meta.second.input_data_type_case()) {
+          case ModelWarmup_Input::InputDataTypeCase::kZeroData:
+            allocated_ptr = zero_buffer;
+            break;
+          case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
+            if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+              allocated_ptr = zero_buffer;
+            } else {
+              allocated_ptr = random_buffer;
+            }
+            break;
+          }
+          case ModelWarmup_Input::InputDataTypeCase::kInputDataFile: {
+            // For data provided from file, we can set buffer in first pass
+            warmup_data.provided_data_.emplace_back(new std::string());
+            auto input_data = warmup_data.provided_data_.back().get();
+            RETURN_IF_ERROR(ReadTextFile(
+                JoinPath({model_dir_, kWarmupDataFolder,
+                          input_meta.second.input_data_file()}),
+                input_data));
+            if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+              batch_byte_size = input_data->size();
+            } else if (((size_t)batch_byte_size) > input_data->size()) {
+              return Status(
+                  Status::Code::INVALID_ARG,
+                  "warmup setting expects " + std::to_string(batch_byte_size) +
+                      " bytes, but the data "
+                      "provided from " +
+                      input_meta.second.input_data_file() + "only has " +
+                      std::to_string(input_data->size()) + " bytes");
+            }
+            allocated_ptr = input_data->data();
+            break;
+          }
+          default:
+            return Status(
+                Status::Code::INVALID_ARG, "warmup setting expects input '" +
+                                               input_meta.first +
+                                               "' to have input_data_type set");
+        }
+
+        const ModelInput* input_config;
+        bool is_original_input =
+            GetInput(input_meta.first, &input_config).IsOk();
+        InferenceRequest::Input* input = nullptr;
+        std::vector<int64_t> input_meta_shape;
+        // Append batch size only if the model supports batching
+        // and not control inpt.
+        if ((config_.max_batch_size() != 0) && is_original_input) {
+          input_meta_shape.push_back(1);
+        }
+        for (auto d : input_meta.second.dims()) {
+          input_meta_shape.push_back(d);
+        }
+        if (is_original_input) {
+          RETURN_IF_ERROR(lrequest->AddOriginalInput(
+              input_meta.first, input_meta.second.data_type(), input_meta_shape,
+              &input));
+        } else {
+          input_sps.emplace_back();
+          RETURN_IF_ERROR(lrequest->AddOverrideInput(
+              input_meta.first, input_meta.second.data_type(), input_meta_shape,
+              &input_sps.back()));
+          input = input_sps.back().get();
+        }
+        RETURN_IF_ERROR(input->AppendData(
+            allocated_ptr, batch_byte_size,
+            TRITONSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
+      }
+
+      RETURN_IF_ERROR(lrequest->PrepareForInference());
+      // Override inputs must be added after PrepareForInference() is called
+      for (const auto& sp : input_sps) {
+        RETURN_IF_ERROR(lrequest->AddOverrideInput(sp));
+      }
+
+      RETURN_IF_ERROR(lrequest->SetResponseCallback(
+          &warmup_allocator, nullptr, WarmupResponseComplete, nullptr));
     }
   }
 

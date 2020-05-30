@@ -52,9 +52,7 @@ class PlanBackend : public InferenceBackend {
       uint32_t runner_idx,
       std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
-
   void WarmUp(uint32_t runner_idx, WarmupData& sample) override;
-
 
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
@@ -69,6 +67,10 @@ class PlanBackend : public InferenceBackend {
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
   friend std::ostream& operator<<(std::ostream&, const PlanBackend&);
+
+  Status DuplicateWarmupRequests(
+      const std::vector<std::unique_ptr<InferenceRequest>>& warmup_requests,
+      std::vector<std::unique_ptr<InferenceRequest>>* requests);
 
   // For each model instance there is a context.
   struct Context : BackendContext {

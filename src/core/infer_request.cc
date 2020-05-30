@@ -239,27 +239,6 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   return lrequest.release();
 }
 
-InferenceRequest*
-InferenceRequest::Copy(const InferenceRequest& from)
-{
-  std::unique_ptr<InferenceRequest> lrequest(
-      new InferenceRequest(from.backend_raw_, from.requested_model_version_));
-  lrequest->needs_normalization_ = false;
-  lrequest->batch_size_ = from.batch_size_;
-  lrequest->collect_stats_ = false;
-
-  lrequest->inputs_ = from.inputs_;
-  lrequest->original_requested_outputs_ = from.original_requested_outputs_;
-  lrequest->requested_outputs_ = from.requested_outputs_;
-  lrequest->release_fn_ = from.release_fn_;
-  lrequest->release_userp_ = from.release_userp_;
-  lrequest->release_callbacks_ = from.release_callbacks_;
-  lrequest->response_delegator_ = from.response_delegator_;
-  lrequest->response_factory_ = from.response_factory_;
-
-  return lrequest.release();
-}
-
 Status
 InferenceRequest::MutableOriginalInput(
     const std::string& name, InferenceRequest::Input** input)

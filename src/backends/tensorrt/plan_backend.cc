@@ -59,6 +59,51 @@ CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
   return Status::Success;
 }
 
+// Utilities for warmup feature
+TRITONSERVER_Error*
+WarmupResponseAlloc(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
+    int64_t* actual_memory_type_id)
+{
+  *buffer = malloc(byte_size);
+  if (*buffer != nullptr) {
+    *actual_memory_type = TRITONSERVER_MEMORY_CPU;
+    *actual_memory_type_id = 0;
+    return nullptr;
+  }
+
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INTERNAL,
+      "failed to allocate output buffer for warmup.");
+}
+
+TRITONSERVER_Error*
+WarmupResponseRelease(
+    TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id)
+{
+  free(buffer);
+  return nullptr;
+}
+
+ResponseAllocator warmup_allocator =
+    ResponseAllocator(WarmupResponseAlloc, WarmupResponseRelease);
+
+void
+WarmupResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
+{
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceResponseError(iresponse), "warmup error");
+  // Just delete the response, warmup doesn't check for correctness
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceResponseDelete(iresponse),
+      "deleting warmup response");
+}
+
 void
 WarmupRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
@@ -1437,26 +1482,33 @@ PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
   contexts.push_back(next_context_[runner_idx]);
 
   std::vector<std::promise<void>> completion_promises(contexts.size());
-  Status status;
   for (size_t idx = 0; idx < contexts.size(); idx++) {
-    // Duplicate the sample request and override the release callback.
     std::vector<std::unique_ptr<InferenceRequest>> requests;
-    for (auto& request : sample.requests_) {
-      requests.emplace_back(InferenceRequest::Copy(*request));
-      requests.back()->SetReleaseCallback(WarmupRequestComplete, nullptr);
-    }
+    // Duplicate the sample request if it is not the last context.
+    bool run_failed =
+        !DuplicateWarmupRequests(sample.requests_, &requests).IsOk();
     requests.back()->SetReleaseCallback(
         WarmupRequestComplete, &completion_promises[idx]);
+    // Capture timestamp before run to avoid incorrect accumulation from
+    // sequential warmup runs
+    for (auto& request : requests) {
+#ifdef TRITON_ENABLE_STATS
+      request->CaptureRequestStartNs();
+#endif  // TRITON_ENABLE_STATS
+      request->CaptureQueueStartNs();
+    }
 
-    contexts_[contexts[idx]]->Run(this, std::move(requests));
-
-    // If one of the contexts can't run properly, the whole warmup should abort
     auto context = static_cast<Context*>(contexts_[contexts[idx]].get());
-    bool run_failed = true;
-    for (const auto& request : context->payload_->requests_) {
-      if (request != nullptr) {
-        run_failed = false;
-        break;
+    if (!run_failed) {
+      context->Run(this, std::move(requests));
+      // If one of the contexts can't run properly, the whole warmup should
+      // abort
+      run_failed = true;
+      for (const auto& request : context->payload_->requests_) {
+        if (request != nullptr) {
+          run_failed = false;
+          break;
+        }
       }
     }
     if (run_failed) {
@@ -1487,6 +1539,36 @@ PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
   // Need to reset the next context to be executed on this runner
   // as all contexts are in the queue at this point
   next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
+}
+
+Status
+PlanBackend::DuplicateWarmupRequests(
+    const std::vector<std::unique_ptr<InferenceRequest>>& warmup_requests,
+    std::vector<std::unique_ptr<InferenceRequest>>* requests)
+{
+  for (auto& request : warmup_requests) {
+    // Need to construct the request via standard procedure to set up
+    // unexposed request members properly
+    requests->emplace_back(new InferenceRequest(this, Version()));
+    auto& lrequest = requests->back();
+    for (const auto& input_pair : request->OriginalInputs()) {
+      InferenceRequest::Input* linput;
+      RETURN_IF_ERROR(lrequest->AddOriginalInput(
+          input_pair.first, input_pair.second.DType(),
+          input_pair.second.OriginalShape(), &linput));
+      RETURN_IF_ERROR(linput->SetData(input_pair.second.Data()));
+    }
+    lrequest->PrepareForInference();
+    for (const auto& override_input_pair : request->OverrideInputs()) {
+      RETURN_IF_ERROR(lrequest->AddOverrideInput(override_input_pair.second));
+    }
+
+    RETURN_IF_ERROR(lrequest->SetResponseCallback(
+        &warmup_allocator, nullptr, WarmupResponseComplete, nullptr));
+    RETURN_IF_ERROR(
+        lrequest->SetReleaseCallback(WarmupRequestComplete, nullptr));
+  }
+  return Status::Success;
 }
 
 
