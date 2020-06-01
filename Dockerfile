@@ -83,17 +83,13 @@ RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
 
 # Install OpenVINO
 # https://github.com/microsoft/onnxruntime/blob/master/tools/ci_build/github/linux/docker/Dockerfile.ubuntu_openvino
-ARG OPENVINO_VERSION=2019_R3.1
+ARG OPENVINO_VERSION=2020.2
 RUN /tmp/scripts/install_openvino.sh -o ${OPENVINO_VERSION}
-ENV INTEL_CVSDK_DIR /data/dldt/openvino_2019.3.376
-ENV INTEL_OPENVINO_DIR /data/dldt/openvino_2019.3.376
-ENV InferenceEngine_DIR /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/build
+ENV INTEL_OPENVINO_DIR /data/dldt/openvino_${OPENVINO_VERSION}
+ENV LD_LIBRARY_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_OPENVINO_DIR/deployment_tools/:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:$INTEL_OPENVINO_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
 
-ENV LD_LIBRARY_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/temp/omp/lib:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
-
-ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
-ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
-ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
+ENV PYTHONPATH $INTEL_OPENVINO_DIR/tools:$PYTHONPATH
+ENV IE_PLUGINS_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64
 
 RUN wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-gmmlib_19.1.1_amd64.deb && \
     wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-core_1.0.2-1787_amd64.deb && \
