@@ -426,14 +426,14 @@ class ModelMetadataTest(unittest.TestCase):
                             model_name, model_metadata['name'], "expected status for model " + model_name)
                         self.assertEqual(len(model_metadata['versions']), 1,
                             "expected status for 1 versions for model " + model_name)
-                        self.assertEqual("7", model_metadata['versions'][0])                 
+                        self.assertEqual("7", model_metadata['versions'][0])
                     else:
                         self.assertEqual(
                             model_name, model_metadata.name, "expected status for model " + model_name)
                         self.assertEqual(len(model_metadata.versions), 1,
                             "expected status for 1 versions for model " + model_name)
                         self.assertEqual("7", model_metadata.versions[0])
-                        
+
                     # Only version 7 should be ready and show infer stat.
                     for v in (1, 7):
                         if v == 7:
