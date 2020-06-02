@@ -191,7 +191,7 @@ void
 Postprocess(
     const std::unique_ptr<nic::InferResult> result,
     const std::vector<std::string>& filenames, const size_t batch_size,
-    const std::string& output_name, const size_t topk)
+    const std::string& output_name, const size_t topk, const bool batching)
 {
   if (!result->RequestStatus().IsOk()) {
     std::cerr << "inference  failed with error: " << result->RequestStatus()
@@ -211,12 +211,21 @@ Postprocess(
     std::cerr << "unable to get shape for " << output_name << std::endl;
     exit(1);
   }
-  // Validate shape
-  if ((shape.size() != 2) || (shape[0] != (int)batch_size) ||
-      (shape[1] != (int)topk)) {
-    std::cerr << "received incorrect shapes for " << output_name << std::endl;
-    exit(1);
+
+  // Validate shape. Special handling for non-batch model
+  if (!batching) {
+    if ((shape.size() != 1) || (shape[0] != (int)topk)) {
+      std::cerr << "received incorrect shapes for " << output_name << std::endl;
+      exit(1);
+    }
+  } else {
+    if ((shape.size() != 2) || (shape[0] != (int)batch_size) ||
+        (shape[1] != (int)topk)) {
+      std::cerr << "received incorrect shapes for " << output_name << std::endl;
+      exit(1);
+    }
   }
+
   std::string datatype;
   err = result->Datatype(output_name, &datatype);
   if (!err.IsOk()) {
@@ -582,8 +591,9 @@ ParseModelHttp(
   int max_batch_size = 0;
   const auto bs_itr = model_config.FindMember("max_batch_size");
   if (bs_itr != model_config.MemberEnd()) {
-    max_batch_size = bs_itr->value.GetInt();
+    max_batch_size = bs_itr->value.GetUint();
   }
+  model_info->max_batch_size_ = max_batch_size;
 
   // Model specifying maximum batch size of 0 indicates that batching
   // is not supported and so the input tensors do not expect a "N"
@@ -746,8 +756,8 @@ main(int argc, char** argv)
   bool verbose = false;
   bool async = false;
   bool streaming = false;
-  size_t batch_size = 1;
-  size_t topk = 1;
+  int batch_size = 1;
+  int topk = 1;
   ScaleType scale = ScaleType::NONE;
   std::string preprocess_output_filename;
   std::string model_name;
@@ -930,11 +940,7 @@ main(int argc, char** argv)
   std::vector<int64_t> shape;
   // Include the batch dimension if required
   if (model_info.max_batch_size_ != 0) {
-    if (batch_size > 0) {
       shape.push_back(batch_size);
-    } else {
-      shape.push_back(1);
-    }
   }
   if (model_info.input_format_.compare("FORMAT_NHWC") == 0) {
     shape.push_back(model_info.input_h_);
@@ -1016,7 +1022,7 @@ main(int argc, char** argv)
 
     // Set input to be the next 'batch_size' images (preprocessed).
     std::vector<std::string> input_filenames;
-    for (size_t idx = 0; idx < batch_size; ++idx) {
+    for (int idx = 0; idx < batch_size; ++idx) {
       input_filenames.push_back(image_filenames[image_idx]);
       err = input_ptr->AppendRaw(image_data[image_idx]);
       if (!err.IsOk()) {
@@ -1093,7 +1099,7 @@ main(int argc, char** argv)
               << std::endl;
     Postprocess(
         std::move(results[idx]), result_filenames[idx], batch_size,
-        model_info.output_name_, topk);
+        model_info.output_name_, topk, model_info.max_batch_size_ != 0);
   }
 
   return 0;

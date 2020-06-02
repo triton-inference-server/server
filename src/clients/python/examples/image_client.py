@@ -253,7 +253,7 @@ def preprocess(img, format, dtype, c, h, w, scaling, protocol):
     return ordered
 
 
-def postprocess(results, output_name, batch_size):
+def postprocess(results, output_name, batch_size, batching):
     """
     Post-process results to show classifications.
     """
@@ -263,7 +263,10 @@ def postprocess(results, output_name, batch_size):
         raise Exception("expected {} results, got {}".format(
             batch_size, len(output_array)))
 
+    # Include special handling for non-batching models 
     for results in output_array:
+        if not batching:
+            results = [results]
         for result in results:
             if output_array.dtype.type == np.bytes_:
                 cls = "".join(chr(x) for x in result).split(':')
@@ -470,7 +473,7 @@ if __name__ == '__main__':
         if max_batch_size > 0:
             batched_image_data = np.stack(repeated_image_data, axis=0)
         else:
-            batched_image_data = repeated_image_data
+            batched_image_data = repeated_image_data[0]
 
         # Send request
         try:
@@ -541,6 +544,6 @@ if __name__ == '__main__':
         else:
             this_id = response.get_response()["id"]
         print("Request {}, batch size {}".format(this_id, FLAGS.batch_size))
-        postprocess(response, output_name, FLAGS.batch_size)
+        postprocess(response, output_name, FLAGS.batch_size, max_batch_size > 0)
 
     print("PASS")
