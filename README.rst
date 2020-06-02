@@ -33,7 +33,7 @@ NVIDIA Triton Inference Server
     **NEW NAME: We have a new name: Triton Inference Server. Read
     about why we are making this change and our plans for version 2 of
     the inference server in** `Roadmap
-    <https://github.com/NVIDIA/triton-inference-server#roadmap>`_.
+    <https://github.com/NVIDIA/triton-inference-server/tree/r20.03.1#roadmap>`_.
 
 .. overview-begin-marker-do-not-remove
 
@@ -65,18 +65,18 @@ Features
 --------
 
 * `Multiple framework support
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_repository.html#framework-model-definition>`_. The
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/model_repository.html#framework-model-definition>`_. The
   server can manage any number and mix of models (limited by system
   disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
   TensorFlow SavedModel, ONNX, PyTorch, and Caffe2 NetDef model
   formats. Also supports TensorFlow-TensorRT and ONNX-TensorRT
   integrated models. Variable-size input and output tensors are
   allowed if supported by the framework. See `Capabilities
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/capabilities.html#capabilities>`_
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/capabilities.html#capabilities>`_
   for detailed support information for each framework.
 
 * `Concurrent model execution support
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_configuration.html#instance-groups>`_. Multiple
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/model_configuration.html#instance-groups>`_. Multiple
   models (or multiple instances of the same model) can run
   simultaneously on the same GPU.
 
@@ -84,13 +84,13 @@ Features
   can accept requests for a batch of inputs and respond with the
   corresponding batch of outputs. Triton Server also supports multiple
   `scheduling and batching
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_configuration.html#scheduling-and-batching>`_
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/model_configuration.html#scheduling-and-batching>`_
   algorithms that combine individual inference requests together to
   improve inference throughput. These scheduling and batching
   decisions are transparent to the client requesting inference.
 
 * `Custom backend support
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_repository.html#custom-backends>`_. Triton
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/model_repository.html#custom-backends>`_. Triton
   Server allows individual models to be implemented with custom
   backends instead of by a deep-learning framework. With a custom
   backend a model can implement any logic desired, while still
@@ -98,7 +98,7 @@ Features
   batching and other features provided by the server.
 
 * `Ensemble support
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/models_and_schedulers.html#ensemble-models>`_. An
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/models_and_schedulers.html#ensemble-models>`_. An
   ensemble represents a pipeline of one or more models and the
   connection of input and output tensors between those models. A
   single inference request to an ensemble will trigger the execution
@@ -108,26 +108,26 @@ Features
   all system GPUs.
 
 * Triton Server provides `multiple modes for model management
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_management.html>`_. These
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/model_management.html>`_. These
   model management modes allow for both implicit and explicit loading
   and unloading of models without requiring a server restart.
 
 * `Model repositories
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/model_repository.html#>`_
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/model_repository.html#>`_
   may reside on a locally accessible file system (e.g. NFS), in Google
   Cloud Storage or in Amazon S3.
 
 * Readiness and liveness `health endpoints
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/http_grpc_api.html#health>`_
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/http_grpc_api.html#health>`_
   suitable for any orchestration or deployment framework, such as
   Kubernetes.
 
 * `Metrics
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/metrics.html>`_
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/metrics.html>`_
   indicating GPU utilization, server throughput, and server latency.
 
 * `C library inferface
-  <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/library_api.html>`_
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/library_api.html>`_
   allows the full functionality of Triton Server to be included
   directly in an application.
 
@@ -147,16 +147,16 @@ The following inferfaces will maintain backwards compatibility for all
 future 1.x.y releases (see below for exceptions):
 
 * Model configuration as defined in `model_config.proto
-  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/model_config.proto>`_.
+  <https://github.com/NVIDIA/triton-inference-server/blob/r20.03.1/src/core/model_config.proto>`_.
 
 * The inference server HTTP and GRPC APIs as defined in `api.proto
-  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/api.proto>`_
+  <https://github.com/NVIDIA/triton-inference-server/blob/r20.03.1/src/core/api.proto>`_
   and `grpc_service.proto
-  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/grpc_service.proto>`_,
+  <https://github.com/NVIDIA/triton-inference-server/blob/r20.03.1/src/core/grpc_service.proto>`_,
   except as noted below.
 
 * The V1 and V2 custom backend interfaces as defined in `custom.h
-  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/backends/custom/custom.h>`_.
+  <https://github.com/NVIDIA/triton-inference-server/blob/r20.03.1/src/backends/custom/custom.h>`_.
 
 As new features are introduced they may temporarily have beta status
 where they are subject to change in non-backwards-compatible
@@ -165,7 +165,7 @@ backwards-compatibility guarantees described above. Currently the
 following features are in beta:
 
 * The inference server library API as defined in `trtserver.h
-  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/trtserver.h>`_
+  <https://github.com/NVIDIA/triton-inference-server/blob/r20.03.1/src/core/trtserver.h>`_
   is currently in beta and may undergo non-backwards-compatible
   changes.
 
@@ -189,7 +189,7 @@ already understood. The primary reasons for the name change are to :
 
 * Highlight that the server is aligning HTTP/REST and GRPC protocols
   with a set of `KFServing standard inference protocols
-  <https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2>`_
+  <https://github.com/kubeflow/kfserving/tree/r20.03.1/docs/predict-api/v2>`_
   that have been proposed by the `KFServing project
   <https://github.com/kubeflow/kfserving>`_.
 
@@ -203,7 +203,7 @@ protocols (version 2) will take place over several releases.
   * Beta release of KFServing HTTP/REST and GRPC inference protocol
     support in server, Python client, and C++ client.
   * Beta release of the `HTTP/REST and GRPC extensions
-    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/protocol>`_
+    <https://github.com/NVIDIA/triton-inference-server/tree/r20.03.1/docs/protocol>`_
     to the KFServing inference protocol.
   * See `client documentation
     <https://github.com/NVIDIA/triton-inference-server/blob/r20.03.1/docs/client_experimental.rst>`_
@@ -248,27 +248,27 @@ Documentation
 
 The User Guide, Developer Guide, and API Reference `documentation for
 the current release
-<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/index.html>`_
+<https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html>`_
 provide guidance on installing, building, and running Triton Inference
 Server.
 
 You can also view the `documentation for the master branch
-<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/index.html>`_
+<https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/index.html>`_
 and for `earlier releases
-<https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
+<https://docs.nvidia.com/deeplearning/triton-inference-server/archives/index.html>`_.
 
 An `FAQ
-<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/faq.html>`_
+<https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/faq.html>`_
 provides answers for frequently asked questions.
 
 READMEs for deployment examples can be found in subdirectories of
 deploy/, for example, `deploy/single_server/README.rst
-<https://github.com/NVIDIA/triton-inference-server/tree/master/deploy/single_server/README.rst>`_.
+<https://github.com/NVIDIA/triton-inference-server/tree/r20.03.1/deploy/single_server/README.rst>`_.
 
 The `Release Notes
-<https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_
+<https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html>`_
 and `Support Matrix
-<https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html>`_
+<https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html>`_
 indicate the required versions of the NVIDIA Driver and CUDA, and also
 describe which GPUs are supported by Triton Server.
 
