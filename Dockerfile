@@ -87,6 +87,9 @@ RUN cmake --version
 # Install OpenVINO
 # https://github.com/microsoft/onnxruntime/blob/master/tools/ci_build/github/linux/docker/Dockerfile.ubuntu_openvino
 ARG OPENVINO_VERSION=2020.2
+# Nested text replacement to skip installing CMake via distribution
+# as it downgrades the version (need >= 3.11.0)
+RUN sed -i 's/\.\/install_dependencies\.sh/sed -i "s\/cmake \\\\\\\\\/\\\\\\\\\/" install_dependencies\.sh\n\.\/install_dependencies\.sh/' /tmp/scripts/install_openvino.sh
 RUN /tmp/scripts/install_openvino.sh -o ${OPENVINO_VERSION}
 ENV INTEL_OPENVINO_DIR /data/dldt/openvino_${OPENVINO_VERSION}
 ENV LD_LIBRARY_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_OPENVINO_DIR/deployment_tools/:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:$INTEL_OPENVINO_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
