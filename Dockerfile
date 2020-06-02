@@ -66,13 +66,6 @@ ARG ONNX_RUNTIME_VERSION=1.3.0
 
 WORKDIR /workspace
 
-# Install newer version of CMake (>= 3.11.0)
-RUN apt purge -y --auto-remove cmake
-RUN wget https://github.com/Kitware/CMake/releases/download/v3.17.3/cmake-3.17.3-Linux-x86_64.sh
-RUN mkdir /workspace/cmake && \
-    bash cmake-3.17.3-Linux-x86_64.sh --skip-license --prefix=/workspace/cmake
-ENV PATH /workspace/cmake:$PATH
-
 # Get release version of Onnx Runtime
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git && \
@@ -87,6 +80,9 @@ ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 RUN sed -i "s/backend-test-tools.*//" ${SCRIPT_DIR}/install_onnx.sh
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
     ${SCRIPT_DIR}/install_ubuntu.sh -p 3.6 -o 18.04 && ${SCRIPT_DIR}/install_deps.sh -p 3.6
+
+ENV PATH /usr/bin:$PATH
+RUN cmake --version
 
 # Install OpenVINO
 # https://github.com/microsoft/onnxruntime/blob/master/tools/ci_build/github/linux/docker/Dockerfile.ubuntu_openvino
