@@ -64,8 +64,16 @@ FROM ${BASE_IMAGE} AS tritonserver_onnx
 # Onnx Runtime release version
 ARG ONNX_RUNTIME_VERSION=1.3.0
 
-# Get release version of Onnx Runtime
 WORKDIR /workspace
+
+# Install newer version of CMake (>= 3.11.0)
+RUN apt purge -y --auto-remove cmake
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.17.3/cmake-3.17.3-Linux-x86_64.sh
+RUN mkdir /workspace/cmake && \
+    bash cmake-3.17.3-Linux-x86_64.sh --skip-license --prefix=/workspace/cmake
+ENV PATH /workspace/cmake:$PATH
+
+# Get release version of Onnx Runtime
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
@@ -74,7 +82,6 @@ RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive https://github.com/Micr
     (cd onnxruntime && \
             git submodule update --init --recursive)
 
-ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 
 RUN sed -i "s/backend-test-tools.*//" ${SCRIPT_DIR}/install_onnx.sh
