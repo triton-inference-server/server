@@ -64,6 +64,7 @@ if(${TRITON_ENABLE_GRPC})
       $<TARGET_OBJECTS:model-config-library>
       $<TARGET_OBJECTS:proto-library>
       $<TARGET_OBJECTS:grpc-client-library>
+      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::grpcclient_static ALIAS grpcclient_static
@@ -93,6 +94,7 @@ if(${TRITON_ENABLE_GRPC})
       $<TARGET_OBJECTS:model-config-library>
       $<TARGET_OBJECTS:proto-library>
       $<TARGET_OBJECTS:grpc-client-library>
+      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::grpcclient ALIAS grpcclient
@@ -144,9 +146,6 @@ if(${TRITON_ENABLE_HTTP})
   #
   # libhttpclient.so and libhttpclient_static.a
   #
-
-  find_package(RapidJSON CONFIG REQUIRED)
-
   find_package(CURL CONFIG REQUIRED)
   message(STATUS "Using curl ${CURL_VERSION}")
   add_definitions(-DCURL_STATICLIB)
@@ -172,7 +171,6 @@ if(${TRITON_ENABLE_HTTP})
   target_include_directories(
       http-client-library
       PRIVATE $<TARGET_PROPERTY:CURL::libcurl,INTERFACE_INCLUDE_DIRECTORIES>
-      PUBLIC ${RapidJSON_INCLUDE_DIRS}
   )
   if(${TRITON_ENABLE_GPU})
     target_include_directories(http-client-library PUBLIC ${CUDA_INCLUDE_DIRS})
@@ -182,6 +180,7 @@ if(${TRITON_ENABLE_HTTP})
   add_library(
       httpclient_static STATIC
       $<TARGET_OBJECTS:http-client-library>
+      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::httpclient_static ALIAS httpclient_static
@@ -206,6 +205,7 @@ if(${TRITON_ENABLE_HTTP})
   add_library(
       httpclient SHARED
       $<TARGET_OBJECTS:http-client-library>
+      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::httpclient ALIAS httpclient

@@ -45,6 +45,10 @@ else()
       json-utils-library EXCLUDE_FROM_ALL OBJECT
       json_utils.h json_utils.cc
   )
+  target_include_directories(
+    json-utils-library
+    PUBLIC ${RapidJSON_INCLUDE_DIRS}
+  )
 
   #
   # image_client
@@ -58,7 +62,6 @@ else()
   target_include_directories(
     image_client
     PRIVATE ${OpenCV_INCLUDE_DIRS}
-    PUBLIC ${RapidJSON_INCLUDE_DIRS}
   )
   target_link_libraries(
     image_client
@@ -78,10 +81,6 @@ else()
     ensemble_image_client
     ensemble_image_client.cc
     $<TARGET_OBJECTS:json-utils-library>
-  )
-  target_include_directories(
-    image_client
-    PUBLIC ${RapidJSON_INCLUDE_DIRS}
   )
   target_link_libraries(
     ensemble_image_client
@@ -238,10 +237,6 @@ else()
     simple_http_health_metadata.cc
     $<TARGET_OBJECTS:json-utils-library>
   )
-  target_include_directories(
-      simple_http_health_metadata
-      PUBLIC ${RapidJSON_INCLUDE_DIRS}
-  )
   target_link_libraries(
     simple_http_health_metadata
     PRIVATE TRITON::httpclient_static
@@ -258,10 +253,6 @@ else()
     simple_http_model_control
     simple_http_model_control.cc
     $<TARGET_OBJECTS:json-utils-library>
-  )
-  target_include_directories(
-      simple_http_model_control
-      PUBLIC ${RapidJSON_INCLUDE_DIRS}
   )
   target_link_libraries(
     simple_http_model_control

@@ -31,8 +31,6 @@ if(WIN32)
 		      "are UNIX specific.")
 else()
 
-find_package(RapidJSON CONFIG REQUIRED)
-
 set(
   PERF_CLIENT_SRCS
   perf_client.cc
@@ -67,10 +65,6 @@ add_executable(
   ${PERF_CLIENT_SRCS}
   ${PERF_CLIENT_HDRS}
   $<TARGET_OBJECTS:json-utils-library>
-)
-target_include_directories(
-  perf_client
-  PRIVATE ${RapidJSON_INCLUDE_DIRS}
 )
 target_link_libraries(
   perf_client
