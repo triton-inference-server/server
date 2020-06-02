@@ -75,7 +75,7 @@ def verify_timestamps(traces, preserve):
         compute_span = timestamps["COMPUTE_END"] - timestamps["COMPUTE_START"]
         # If the 3rd batch is also processed by large delay instance, we don't
         # want to use its responses as baseline
-        if trace["id"] <= (7 + grpc_id_offset) and compute_span >= 400 * 1000 * 1000:
+        if trace["id"] <= (8 + grpc_id_offset) and compute_span >= 400 * 1000 * 1000:
             send_end = timestamps["HTTP_SEND_END"]
             large_delay_send_end = max(large_delay_send_end, send_end)
         else:
