@@ -381,7 +381,7 @@ done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
 SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
-             --exit-timeout-secs=5"
+             --model-control-mode=poll --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -442,7 +442,7 @@ for i in graphdef ; do
 done
 
 SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
-             --exit-timeout-secs=5"
+             --model-control-mode=poll --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -510,7 +510,7 @@ for i in savedmodel plan ; do
 done
 
 SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
-             --exit-timeout-secs=5"
+             --model-control-mode=poll --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -540,7 +540,7 @@ for i in savedmodel plan ; do
 done
 
 SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
-             --exit-timeout-secs=5 --strict-model-config=false"
+             --model-control-mode=poll --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -576,7 +576,7 @@ cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. &
     rm -rf models/savedmodel_float32_float32_float32/3
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
-             --repository-poll-secs=1 --exit-timeout-secs=5"
+             --model-control-mode=poll --repository-poll-secs=1 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -647,7 +647,8 @@ for i in savedmodel ; do
 done
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
-             --exit-timeout-secs=5 --strict-model-config=false"
+             --exit-timeout-secs=5 --strict-model-config=false
+             --strict-readiness=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -688,6 +689,7 @@ done
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
+             --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
              --load-model=graphdef_float32_float32_float32 \
@@ -730,6 +732,7 @@ done
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
+             --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
              --load-model=graphdef_float32_float32_float32 \
@@ -765,7 +768,8 @@ done
 # Polling enabled (default), control API should not work
 # This test also keeps using "--model-store" to ensure backward compatibility
 SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=0 \
-             --exit-timeout-secs=5 --strict-model-config=false"
+             --exit-timeout-secs=5 --strict-model-config=false \
+             --model-control-mode=poll"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then

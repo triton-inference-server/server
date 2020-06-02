@@ -710,6 +710,14 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     }
   }
 
+  if (versions.empty()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "at least one version must be available under the version policy of "
+        "model '" +
+            model_name + "'");
+  }
+
   return status;
 }
 
@@ -1250,6 +1258,14 @@ ModelRepositoryManager::LoadUnloadModel(
     std::set<int64_t> expected_versions;
     RETURN_IF_ERROR(
         VersionsToLoad(repository, model_name, config, &expected_versions));
+
+    if (expected_versions.empty()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "at least one version must be available under the version policy of "
+          "model '" +
+              model_name + "'");
+    }
 
     std::string not_ready_version_str;
     for (const auto version : expected_versions) {
@@ -1969,14 +1985,6 @@ ModelRepositoryManager::VersionsToLoad(
       // all
       versions->insert(existing_versions.begin(), existing_versions.end());
     }
-  }
-
-  if (versions->empty()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "at least one version must be available under the version policy of "
-        "model '" +
-            name + "'");
   }
 
   return Status::Success;
