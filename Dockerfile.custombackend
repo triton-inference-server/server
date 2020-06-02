@@ -42,7 +42,8 @@ RUN apt-get update && \
             libopencv-core-dev \
             libssl-dev \
             libtool \
-            pkg-config
+            pkg-config \
+            rapidjson-dev
 
 # Build the custom backend library and example custom backends
 WORKDIR /workspace
