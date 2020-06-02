@@ -215,13 +215,13 @@ Postprocess(
   // Validate shape. Special handling for non-batch model
   if (!batching) {
     if ((shape.size() != 1) || (shape[0] != (int)topk)) {
-      std::cerr << "received incorrect shapes for " << output_name << std::endl;
+      std::cerr << "received incorrect shape for " << output_name << std::endl;
       exit(1);
     }
   } else {
     if ((shape.size() != 2) || (shape[0] != (int)batch_size) ||
         (shape[1] != (int)topk)) {
-      std::cerr << "received incorrect shapes for " << output_name << std::endl;
+      std::cerr << "received incorrect shape for " << output_name << std::endl;
       exit(1);
     }
   }
@@ -940,7 +940,7 @@ main(int argc, char** argv)
   std::vector<int64_t> shape;
   // Include the batch dimension if required
   if (model_info.max_batch_size_ != 0) {
-      shape.push_back(batch_size);
+    shape.push_back(batch_size);
   }
   if (model_info.input_format_.compare("FORMAT_NHWC") == 0) {
     shape.push_back(model_info.input_h_);
