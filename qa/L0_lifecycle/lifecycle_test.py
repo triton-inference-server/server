@@ -286,7 +286,7 @@ class LifeCycleTest(unittest.TestCase):
         except Exception as ex:
             self.assertTrue(
                 ex.message().startswith(
-                    "Request for unknown model: 'graphdef_float32_float32_float32' is not found"))
+                    "Request for unknown model: 'graphdef_float32_float32_float32' has no available versions"))
 
     def test_parse_ignore_zero_prefixed_version(self):
         tensor_shape = (1, 16)
@@ -1193,19 +1193,19 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Check model repository index
-        # 4 models should be shown:
-        #     simple_savedmodel_float32_float32_float32
-        #     simple_graphdef_float32_float32_float32
-        #     savedmodel_float32_float32_float32
-        #     graphdef_float32_float32_float32
+        # All models should be in ready state except netdef_float32_float32_float32
+        # which appears in two repositories.
         model_bases.append("simple_graphdef")
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
             index = triton_client.get_model_repository_index()
             indexed = list()
-            self.assertEqual(len(index), 4)
+            self.assertEqual(len(index), 8)
             for i in index:
                 indexed.append(i["name"])
+                if i["name"] == "netdef_float32_float32_float32":
+                    self.assertEqual(i["state"], "UNAVAILABLE")
+                    self.assertEqual(i["reason"], "model appears in two or more repositories")
             for model_base in model_bases:
                 model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
                 self.assertTrue(model_name in indexed)
@@ -1213,9 +1213,12 @@ class LifeCycleTest(unittest.TestCase):
             triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
             index = triton_client.get_model_repository_index()
             indexed = list()
-            self.assertEqual(len(index.models), 4)
+            self.assertEqual(len(index.models), 8)
             for i in index.models:
                 indexed.append(i.name)
+                if i.name == "netdef_float32_float32_float32":
+                    self.assertEqual(i.state, "UNAVAILABLE")
+                    self.assertEqual(i.reason, "model appears in two or more repositories")
             for model_base in model_bases:
                 model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
                 self.assertTrue(model_name in indexed)
