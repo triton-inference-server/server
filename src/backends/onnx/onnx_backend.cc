@@ -641,11 +641,13 @@ OnnxBackend::Context::Run(
   std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
   std::vector<const char*> input_names;
   bool cuda_copy = false;
+  BackendInputCollector collector(
+      requests, &responses, enable_pinned_input_, stream_);
   FAIL_ALL_AND_RETURN_IF_ERROR(
       requests, responses, metric_reporter_.get(),
       SetInputTensors(
-          total_batch_size, requests, &responses, &input_buffers, &input_names,
-          &cuda_copy),
+          total_batch_size, requests, &responses, &collector, &input_buffers,
+          &input_names, &cuda_copy),
       "error sending ONNX response");
 
   // Request to retrieve all output specified in model config
@@ -726,11 +728,10 @@ OnnxBackend::Context::SetInputTensors(
     size_t total_batch_size,
     const std::vector<std::unique_ptr<InferenceRequest>>& requests,
     std::vector<std::unique_ptr<InferenceResponse>>* responses,
+    BackendInputCollector* collector,
     std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     std::vector<const char*>* input_names, bool* cuda_copy)
 {
-  BackendInputCollector collector(
-      requests, responses, enable_pinned_input_, stream_);
   // All requests must have equally-sized input tensors so use any
   // request as the representative for the input tensors.
   for (const auto& pr : requests[0]->ImmutableInputs()) {
@@ -771,7 +772,7 @@ OnnxBackend::Context::SetInputTensors(
           batchn_shape.data(), batchn_shape.size(),
           ConvertToOnnxDataType(datatype), &input_tensors_.back()));
 
-      collector.ProcessTensor(
+      collector->ProcessTensor(
           name, datatype, batch1_shape, input_buffer, total_byte_size, mem_type,
           0);
     } else {
@@ -876,7 +877,7 @@ OnnxBackend::Context::SetInputTensors(
     }
   }
   // Finalize...
-  *cuda_copy |= collector.Finalize();
+  *cuda_copy |= collector->Finalize();
   return Status::Success;
 }
 

@@ -410,11 +410,10 @@ NetDefBackend::Context::SetInputTensors(
     size_t total_batch_size,
     const std::vector<std::unique_ptr<InferenceRequest>>& requests,
     std::vector<std::unique_ptr<InferenceResponse>>* responses,
+    BackendInputCollector* collector,
     std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     bool* cuda_copy)
 {
-  BackendInputCollector collector(
-      requests, responses, enable_pinned_input_, stream_);
   // All requests must have equally-sized input tensors so use any
   // request as the representative for the input tensors.
   for (const auto& pr : requests[0]->ImmutableInputs()) {
@@ -446,7 +445,7 @@ NetDefBackend::Context::SetInputTensors(
     auto input_buffer = input_buffers->back()->MutableBuffer(&mem_type);
     auto total_byte_size = input_buffers->back()->TotalByteSize();
 
-    collector.ProcessTensor(
+    collector->ProcessTensor(
         name, datatype, batch1_shape, input_buffer, total_byte_size, mem_type,
         0);
 
@@ -458,7 +457,7 @@ NetDefBackend::Context::SetInputTensors(
     }
   }
   // Finalize...
-  *cuda_copy |= collector.Finalize();
+  *cuda_copy |= collector->Finalize();
   return Status::Success;
 }
 
@@ -549,10 +548,13 @@ NetDefBackend::Context::Run(
 
   // Inputs from the request...
   bool cuda_copy = false;
+  BackendInputCollector collector(
+      requests, &responses, enable_pinned_input_, stream_);
   FAIL_ALL_AND_RETURN_IF_ERROR(
       requests, responses, metric_reporter_.get(),
       SetInputTensors(
-          total_batch_size, requests, &responses, &input_buffers, &cuda_copy),
+          total_batch_size, requests, &responses, &collector, &input_buffers,
+          &cuda_copy),
       "error sending Caffe2 response");
 
 #ifdef TRITON_ENABLE_GPU

@@ -85,6 +85,7 @@ class NetDefBackend : public InferenceBackend {
         size_t total_batch_size,
         const std::vector<std::unique_ptr<InferenceRequest>>& requests,
         std::vector<std::unique_ptr<InferenceResponse>>* responses,
+        BackendInputCollector* collector,
         std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
         bool* cuda_copy);
 
