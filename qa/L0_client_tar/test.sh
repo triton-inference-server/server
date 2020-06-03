@@ -32,75 +32,42 @@ rm -fr triton_client
 mkdir triton_client
 (cd triton_client && tar xzvf /workspace/*.tar.gz)
 
-# Build
-cd triton_client/build
-cmake -DCMAKE_BUILD_TYPE=Release -DTRITON_CLIENT_CMAKE_DIR:PATH=`pwd`/../lib/cmake/TRITON .
-make -j16 client
+RET=0
 
-# There is no server running but can still check to make sure that the
-# example application starts correctly.
-set +e
-
-# Shared HTTP
-client/install/bin/simple_client_shared > $CLIENT_LOG 2>&1
-if [ $? -ne 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Unexpected Pass for simple_client_shared HTTP\n***"
-    exit 1
+# Check image_client and perf_client
+if [[ ! -x "triton_client/bin/image_client" ]]; then
+    echo -e "*** image_client executable not present\n"
+    RET=1
+fi
+if [[ ! -x "triton_client/bin/perf_client" ]]; then
+    echo -e "*** perf_client executable not present\n"
+    RET=1
 fi
 
-grep -c "Couldn't connect to server" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
+# Check static libraries
+for l in libgrpcclient.so libgrpcclient_static.a libhttpclient.so libhttpclient_static.a; do
+    if [[ ! -f "triton_client/lib/$l" ]]; then
+        echo -e "*** library $l not present\n"
+        RET=1
+    fi
+done
+
+# Check wheels
+WHLS=tritonclientutils-1.14.0.dev0-py3-none-any.whl \
+     tritongrpcclient-1.14.0.dev0-py3-none-any.whl \
+     tritonhttpclient-1.14.0.dev0-py3-none-any.whl \
+     tritonshmutils-1.14.0.dev0-py3-none-manylinux1_x86_64.whl
+for l in $WHLS; do
+    if [[ ! -f "triton_client/lib/$l" ]]; then
+        echo -e "*** wheel $l not present\n"
+        RET=1
+    fi
+done
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
 fi
 
-# Shared GRPC
-client/install/bin/simple_client_shared -i grpc > $CLIENT_LOG 2>&1
-if [ $? -ne 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Unexpected Pass for simple_client_shared GRPC\n***"
-    exit 1
-fi
-
-grep -c "failed to connect" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-
-# Static HTTP
-client/install/bin/simple_client_static > $CLIENT_LOG 2>&1
-if [ $? -ne 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Unexpected Pass for simple_client_static HTTP\n***"
-    exit 1
-fi
-
-grep -c "Couldn't connect to server" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-
-# Static GRPC
-client/install/bin/simple_client_static -i grpc > $CLIENT_LOG 2>&1
-if [ $? -ne 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Unexpected Pass for simple_client_static GRPC\n***"
-    exit 1
-fi
-
-grep -c "failed to connect" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-
-set -e
-
-echo -e "\n***\n*** Test Passed\n***"
+exit $RET
