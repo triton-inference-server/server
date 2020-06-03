@@ -406,9 +406,12 @@ def create_onnx_modelfile(
         onnx_nodes.append(onnx.helper.make_node("Identity", [in_name], [out_name]))
 
     graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs, onnx_outputs)
-    model_opset = onnx.helper.make_operatorsetid("", FLAGS.onnx_opset)
-    model_def = onnx.helper.make_model(graph_proto, producer_name="triton",
-                                       opset_imports=[model_opset])
+    if FLAGS.onnx_opset > 0:
+        model_opset = onnx.helper.make_operatorsetid("", FLAGS.onnx_opset)
+        model_def = onnx.helper.make_model(graph_proto, producer_name="triton",
+                                           opset_imports=[model_opset])
+    else:
+        model_def = onnx.helper.make_model(graph_proto, producer_name="triton")
 
     try:
         os.makedirs(model_version_dir)
@@ -974,8 +977,8 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--onnx', required=False, action='store_true',
                         help='Generate Onnx Runtime Onnx models')
-    parser.add_argument('--onnx_opset', type=int, required=False, default=11,
-                        help='Opset used for Onnx models. Default is 11')
+    parser.add_argument('--onnx_opset', type=int, required=False, default=0,
+                        help='Opset used for Onnx models. Default is to use ONNXRT default')
     parser.add_argument('--libtorch', required=False, action='store_true',
                         help='Generate Pytorch LibTorch models')
     parser.add_argument('--tensorrt', required=False, action='store_true',
