@@ -52,11 +52,33 @@ WORKDIR /workspace
 RUN cd builddir && \
     make -j16 test-util custom-backend
 
+# Install dependencies for Go client (golang, protoc)
+RUN wget https://dl.google.com/go/go1.14.4.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.14.4.linux-amd64.tar.gz && \
+    rm -rf go1.14.4.linux-amd64.tar.gz
+
+ENV PATH $PATH:/usr/local/go/bin
+ENV PATH "$PATH:$(go env GOPATH)/bin"
+
+# need to nable Go modules to install protoc-gen-go 
+ENV GO111MODULE "on"
+RUN go get github.com/golang/protobuf/protoc-gen-go@v1.3
+ENV GO111MODULE "auto"
+
+RUN PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip && \
+    curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP && \
+    unzip -o $PROTOC_ZIP -d /usr/local bin/protoc && \
+    unzip -o $PROTOC_ZIP -d /usr/local 'include/*' && \
+    rm -f $PROTOC_ZIP && \
+    go get google.golang.org/grpc
+
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
+    mkdir qa/L0_simple_go_client/models && \
+    cp -r docs/examples/model_repository/simple qa/L0_simple_go_client/models/. && \
     mkdir qa/L0_backend_release/simple_models && \
     cp -r docs/examples/model_repository/simple qa/L0_backend_release/simple_models/. && \
     mkdir qa/L0_shared_memory/models && \
