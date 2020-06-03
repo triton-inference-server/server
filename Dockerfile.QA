@@ -53,9 +53,10 @@ RUN cd builddir && \
     make -j16 test-util custom-backend
 
 # Install dependencies for Go client (golang, protoc)
-RUN wget https://dl.google.com/go/go1.14.4.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.14.4.linux-amd64.tar.gz && \
-    rm -rf go1.14.4.linux-amd64.tar.gz
+RUN GO_TAR=go1.14.4.linux-amd64.tar.gz && \
+    wget https://dl.google.com/go/$GO_TAR && \
+    tar -C /usr/local -xzf $GO_TAR && \
+    rm -rf $GO_TAR
 
 ENV PATH $PATH:/usr/local/go/bin
 ENV PATH "$PATH:$(go env GOPATH)/bin"
