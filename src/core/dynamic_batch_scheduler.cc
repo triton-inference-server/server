@@ -414,21 +414,17 @@ DynamicBatchScheduler::SchedulerThread(
       }
     }
 
-// FIXME handle rejected request by sending appropriate response
-#if 0
     // Finish rejected requests if any
     if (rejected_requests != nullptr) {
       static Status rejected_status =
           Status(Status::Code::UNAVAILABLE, "Request timeout expired");
       for (auto& rejected_queue : *rejected_requests) {
         for (auto& rejected_request : rejected_queue) {
-          if (rejected_request.complete_function_ != nullptr) {
-            rejected_request.complete_function_(rejected_status);
-          }
+          InferenceRequest::RespondIfError(
+              rejected_request, rejected_status, true);
         }
       }
     }
-#endif
 
     // FIXME, this isn't really true anymore so needs to be revisited.
     //
