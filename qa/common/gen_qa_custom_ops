@@ -91,6 +91,7 @@ python3 $SRCDIR/gen_qa_custom_ops_models.py --graphdef --savedmodel \
     --models_dir=$DESTDIR --zero_out_lib_path=$DESTDIR/libzeroout.so \
     --cuda_op_lib_path=$DESTDIR/libcudaop.so \
     --busy_op_lib_path=$DESTDIR/libbusyop.so
+chmod -R 777 $DESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TFSCRIPT
@@ -113,11 +114,9 @@ fi
 cat >$HOST_SRCDIR/$PYTSCRIPT <<EOF
 #!/bin/bash -x
 set -e
-
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
-chown -R $(id -u):$(id -g) $DESTDIR
-
-cp /tmp/torch_extensions/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+cp /root/.cache/torch_extensions/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+chmod -R 777 $DESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$PYTSCRIPT
@@ -130,7 +129,7 @@ docker pull $PYTORCH_IMAGE
 docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$PYTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR/libtorch_custom_ops,target=$DESTDIR \
-       -u $(id -u):$(id -g) $PYTORCH_IMAGE
+       $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
