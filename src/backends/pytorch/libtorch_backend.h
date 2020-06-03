@@ -97,6 +97,7 @@ class LibTorchBackend : public InferenceBackend {
         size_t total_batch_size,
         const std::vector<std::unique_ptr<InferenceRequest>>& requests,
         std::vector<std::unique_ptr<InferenceResponse>>* responses,
+        BackendInputCollector* collector,
         std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
         std::vector<torch::jit::IValue>* inputs, bool* cuda_copy);
 

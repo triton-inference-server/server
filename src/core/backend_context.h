@@ -42,8 +42,8 @@
 namespace nvidia { namespace inferenceserver {
 
 #ifndef TRITON_ENABLE_GPU
-  using cudaStream_t = void*;
-  using cudaEvent_t = void*;
+using cudaStream_t = void*;
+using cudaEvent_t = void*;
 #endif  // !TRITON_ENABLE_GPU
 
 class InferenceBackend;
@@ -54,7 +54,6 @@ class MetricModelReporter;
 //
 struct BackendContext {
  public:
-
   // GPU device number that indicates that no gpu is available for a
   // context (which is an invalid state since TensorRT requires a
   // GPU).

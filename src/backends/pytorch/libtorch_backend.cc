@@ -382,12 +382,10 @@ LibTorchBackend::Context::SetInputTensors(
     size_t total_batch_size,
     const std::vector<std::unique_ptr<InferenceRequest>>& requests,
     std::vector<std::unique_ptr<InferenceResponse>>* responses,
+    BackendInputCollector* collector,
     std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     std::vector<torch::jit::IValue>* inputs, bool* cuda_copy)
 {
-  BackendInputCollector collector(
-      requests, responses, enable_pinned_input_, stream_);
-
   // All requests must have equally-sized input tensors so use any
   // request as the representative for the input tensors.
   for (const auto& pr : requests[0]->ImmutableInputs()) {
@@ -433,7 +431,7 @@ LibTorchBackend::Context::SetInputTensors(
     auto input_buffer =
         input_buffers->back()->MutableBuffer(&memory_type, &memory_type_id);
 
-    collector.ProcessTensor(
+    collector->ProcessTensor(
         input_name, datatype, batch1_shape, input_buffer, total_byte_size,
         memory_type, memory_type_id);
 
@@ -456,7 +454,7 @@ LibTorchBackend::Context::SetInputTensors(
   }
 
   // Finalize...
-  *cuda_copy |= collector.Finalize();
+  *cuda_copy |= collector->Finalize();
   return Status::Success;
 }
 
@@ -642,11 +640,13 @@ LibTorchBackend::Context::Run(
   bool cuda_copy = false;
 
   // Collect the request inputs into contiguous input tensors.
+  BackendInputCollector collector(
+      requests, &responses, enable_pinned_input_, stream_);
   FAIL_ALL_AND_RETURN_IF_ERROR(
       requests, responses, metric_reporter_.get(),
       SetInputTensors(
-          total_batch_size, requests, &responses, &input_buffers, &inputs_,
-          &cuda_copy),
+          total_batch_size, requests, &responses, &collector, &input_buffers,
+          &inputs_, &cuda_copy),
       "error sending LibTorch response");
 
   // Collect the names of requested outputs. Do not include outputs
