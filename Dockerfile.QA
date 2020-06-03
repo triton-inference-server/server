@@ -266,7 +266,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six
+RUN pip3 install --upgrade wheel numpy pillow future grpcio requests gsutil awscli six
 
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
