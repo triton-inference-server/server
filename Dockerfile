@@ -242,13 +242,15 @@ RUN cd /opt/tritonserver/lib/onnx && \
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
 ARG OPENVINO_VERSION=2020.2
+COPY --from=tritonserver_onnx /workspace/build/Release/external/ngraph/lib/libovep_ngraph.so \
+     /opt/tritonserver/lib/onnx/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libcpu_extension.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/plugins.xml \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libngraph.so \
      /opt/tritonserver/lib/onnx/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tritonserver/lib/onnx/
@@ -387,16 +389,6 @@ COPY --chown=1000:1000 --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE 
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib lib
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include include
-
-# Install ONNX-Runtime-OpenVINO dependencies to use it in base container
-COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/build/Release/openvino_* \
-     /opt/openvino_scripts/
-COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/model_optimizer \
-     /opt/openvino_scripts/openvino_${OPENVINO_VERSION}/deployment_tools/model_optimizer/
-COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/tools \
-     /opt/openvino_scripts/openvino_${OPENVINO_VERSION}/tools
-ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_${OPENVINO_VERSION}
-ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
