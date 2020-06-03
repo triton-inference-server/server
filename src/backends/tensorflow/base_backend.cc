@@ -544,20 +544,20 @@ SetStringOutputBuffer(
     TRTISTF_Tensor* tensor, std::unique_ptr<InferenceResponse>* response,
     InferenceResponse::Output* response_output,
     const size_t tensor_element_count, const size_t tensor_offset,
-    cudaStream_t stream)
+    cudaStream_t stream, std::string* serialized)
 {
   bool cuda_copy = false;
 
   // Serialize the output tensor strings. Each string is serialized as
   // a 4-byte length followed by the string itself with no
   // null-terminator.
-  std::string serialized;
+  serialized->clear();
   for (size_t e = 0; e < tensor_element_count; ++e) {
     size_t len;
     const char* cstr = TRTISTF_TensorString(tensor, tensor_offset + e, &len);
-    serialized.append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+    serialized->append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
     if (len > 0) {
-      serialized.append(cstr, len);
+      serialized->append(cstr, len);
     }
   }
 
@@ -567,7 +567,7 @@ SetStringOutputBuffer(
 
   void* buffer;
   Status status = response_output->AllocateDataBuffer(
-      &buffer, serialized.size(), &actual_memory_type, &actual_memory_type_id);
+      &buffer, serialized->size(), &actual_memory_type, &actual_memory_type_id);
   if (!status.IsOk()) {
     LOG_STATUS_ERROR(
         InferenceResponse::SendWithStatus(std::move(*response), status),
@@ -580,7 +580,7 @@ SetStringOutputBuffer(
   status = CopyBuffer(
       response_output->Name(), TRITONSERVER_MEMORY_CPU /* src_memory_type */,
       0 /* src_memory_type_id */, actual_memory_type, actual_memory_type_id,
-      serialized.size(), reinterpret_cast<const void*>(serialized.c_str()),
+      serialized->size(), reinterpret_cast<const void*>(serialized->c_str()),
       buffer, stream, &cuda_used);
   cuda_copy |= cuda_used;
 
@@ -701,10 +701,9 @@ BaseBackend::Context::Run(
   // must use TF-specific string tensor APIs.
   bool cuda_copy = false;
 
+  BackendInputCollector collector(
+      requests, &responses, enable_pinned_input_, stream_);
   {
-    BackendInputCollector collector(
-        requests, &responses, enable_pinned_input_, stream_);
-
     for (const auto& pr : repr_input_request->ImmutableInputs()) {
       const std::string& input_name = pr.first;
       const auto& repr_input = pr.second;
@@ -866,11 +865,11 @@ BaseBackend::Context::Run(
   // into each. For tensors with string data type we must handle
   // ourselves since we must use TF-specific string tensor APIs.
   cuda_copy = false;
-
+  // The serialized string buffer must be valid until output copies are done
+  std::vector<std::unique_ptr<std::string>> string_buffer;
+  BackendResponder responder(
+      requests, &responses, max_batch_size_, enable_pinned_output_, stream_);
   {
-    BackendResponder responder(
-        requests, &responses, max_batch_size_, enable_pinned_output_, stream_);
-
     TRTISTF_TensorList* output_tensor_itr = output_tensors.get();
     for (const auto& name : model_output_names) {
       TRTISTF_Tensor* output_tensor = output_tensor_itr->tensor_;
@@ -912,9 +911,10 @@ BaseBackend::Context::Run(
             response->AddOutput(
                 name, datatype, batchn_shape, request->BatchSize(),
                 &response_output);
+            string_buffer.emplace_back(new std::string());
             cuda_copy |= SetStringOutputBuffer(
                 output_tensor, &response, response_output, tensor_element_cnt,
-                tensor_offset, stream_);
+                tensor_offset, stream_, string_buffer.back().get());
           }
 
           tensor_offset += tensor_element_cnt;

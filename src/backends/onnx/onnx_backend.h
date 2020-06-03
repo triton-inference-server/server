@@ -109,6 +109,7 @@ class OnnxBackend : public InferenceBackend {
         size_t total_batch_size,
         const std::vector<std::unique_ptr<InferenceRequest>>& requests,
         std::vector<std::unique_ptr<InferenceResponse>>* responses,
+        BackendInputCollector* collector,
         std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
         std::vector<const char*>* input_names, bool* cuda_copy);
 
