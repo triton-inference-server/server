@@ -50,7 +50,8 @@ RUN apt-get update && \
             python3 \
             python3-pip \
             python3-dev \
-            rapidjson-dev && \
+            rapidjson-dev \
+            vim && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools
 
