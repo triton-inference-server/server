@@ -124,7 +124,7 @@ set +e
 
 $TRACE_SUMMARY -t trace_1.log > summary_1.log
 
-if [ `grep -c "compute input end" summary_1.log` != "0" ]; then
+if [ `grep -c "COMPUTE_INPUT_END" summary_1.log` != "20" ]; then
     cat summary_1.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -172,7 +172,7 @@ set +e
 
 $TRACE_SUMMARY -t trace_6.log > summary_6.log
 
-if [ `grep -c "compute input end" summary_6.log` != "0" ]; then
+if [ `grep -c "COMPUTE_INPUT_END" summary_6.log` != "3" ]; then
     cat summary_6.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -220,7 +220,7 @@ set +e
 
 $TRACE_SUMMARY -t trace_9.log > summary_9.log
 
-if [ `grep -c "compute input end" summary_9.log` != "2" ]; then
+if [ `grep -c "COMPUTE_INPUT_END" summary_9.log` != "2" ]; then
     cat summary_9.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -286,14 +286,8 @@ set +e
 
 $TRACE_SUMMARY -t trace_ensemble.log > summary_ensemble.log
 
-if [ `grep -c "compute input end" summary_ensemble.log` != "7" ]; then
-    cat summary_9.log
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
 if [ `grep -c ^simple summary_ensemble.log` != "1" ]; then
-    cat summary_9.log
+    cat summary_ensemble.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
