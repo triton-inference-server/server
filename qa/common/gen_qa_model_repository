@@ -50,6 +50,7 @@
 
 TRITON_VERSION=20.03
 ORT_VERSION=1.2.0
+ORT_OPSET=11
 
 ORT_IMAGE=ubuntu:18.04
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
@@ -140,21 +141,20 @@ set -e
 apt-get update && apt-get install -y --no-install-recommends python3 python3-pip
 pip3 install --upgrade onnxruntime==${ORT_VERSION}
 
-cd $SRCDIR
-python3 $SRCDIR/gen_qa_models.py --onnx --models_dir=$DESTDIR
-chown -R $(id -u):$(id -g) $DESTDIR
-python3 $SRCDIR/gen_qa_models.py --onnx --variable --models_dir=$VARDESTDIR
-chown -R $(id -u):$(id -g) $VARDESTDIR
-python3 $SRCDIR/gen_qa_identity_models.py --onnx --models_dir=$IDENTITYDESTDIR
-chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
-python3 $SRCDIR/gen_qa_reshape_models.py --onnx --variable --models_dir=$RESHAPEDESTDIR
-chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
-python3 $SRCDIR/gen_qa_sequence_models.py --onnx --models_dir=$SEQDESTDIR
-chown -R $(id -u):$(id -g) $SEQDESTDIR
-python3 $SRCDIR/gen_qa_sequence_models.py --onnx --variable --models_dir=$VARSEQDESTDIR
-chown -R $(id -u):$(id -g) $VARSEQDESTDIR
-python3 $SRCDIR/gen_qa_dyna_sequence_models.py --onnx --models_dir=$DYNASEQDESTDIR
-chown -R $(id -u):$(id -g) $DYNASEQDESTDIR
+python3 $SRCDIR/gen_qa_models.py --onnx --onnx_opset=$ORT_OPSET --models_dir=$DESTDIR
+chmod -R 777 $DESTDIR
+python3 $SRCDIR/gen_qa_models.py --onnx --onnx_opset=$ORT_OPSET --variable --models_dir=$VARDESTDIR
+chmod -R 777 $VARDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --onnx --onnx_opset=$ORT_OPSET --models_dir=$IDENTITYDESTDIR
+chmod -R 777 $IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --onnx --onnx_opset=$ORT_OPSET --variable --models_dir=$RESHAPEDESTDIR
+chmod -R 777 $RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ORT_OPSET --models_dir=$SEQDESTDIR
+chmod -R 777 $SEQDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ORT_OPSET --variable --models_dir=$VARSEQDESTDIR
+chmod -R 777 $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ORT_OPSET --models_dir=$DYNASEQDESTDIR
+chmod -R 777 $DYNASEQDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$ORTSCRIPT
@@ -173,7 +173,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ORTSCRIPT \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
-       -u $(id -u):$(id -g) $ORT_IMAGE
+       $ORT_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
@@ -183,21 +183,20 @@ fi
 cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
 #!/bin/bash
 set -e
-cd $SRCDIR
 python3 $SRCDIR/gen_qa_models.py --netdef --libtorch --models_dir=$DESTDIR
-chown -R $(id -u):$(id -g) $DESTDIR
+chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --netdef --libtorch --variable --models_dir=$VARDESTDIR
-chown -R $(id -u):$(id -g) $VARDESTDIR
+chmod -R 777 $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --netdef --libtorch --models_dir=$IDENTITYDESTDIR
-chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
+chmod -R 777 $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --netdef --libtorch --variable --models_dir=$RESHAPEDESTDIR
-chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
+chmod -R 777 $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --netdef --libtorch --models_dir=$SEQDESTDIR
-chown -R $(id -u):$(id -g) $SEQDESTDIR
+chmod -R 777 $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --netdef --libtorch --variable --models_dir=$VARSEQDESTDIR
-chown -R $(id -u):$(id -g) $VARSEQDESTDIR
+chmod -R 777 $VARSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --netdef --libtorch --models_dir=$DYNASEQDESTDIR
-chown -R $(id -u):$(id -g) $DYNASEQDESTDIR
+chmod -R 777 $DYNASEQDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$C2SCRIPT
@@ -216,7 +215,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$C2SCRIPT \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
-       -u $(id -u):$(id -g) $PYTORCH_IMAGE
+       $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
@@ -226,30 +225,29 @@ fi
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash
 set -e
-cd $SRCDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
-chown -R $(id -u):$(id -g) $DESTDIR
+chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
-chown -R $(id -u):$(id -g) $VARDESTDIR
+chmod -R 777 $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --graphdef --savedmodel --models_dir=$IDENTITYDESTDIR
-chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
+chmod -R 777 $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --graphdef --savedmodel --variable --models_dir=$RESHAPEDESTDIR
-chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
+chmod -R 777 $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$SEQDESTDIR
-chown -R $(id -u):$(id -g) $SEQDESTDIR
+chmod -R 777 $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VARSEQDESTDIR
-chown -R $(id -u):$(id -g) $VARSEQDESTDIR
+chmod -R 777 $VARSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --graphdef --savedmodel --models_dir=$DYNASEQDESTDIR
-chown -R $(id -u):$(id -g) $DYNASEQDESTDIR
+chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_noshape_models.py --savedmodel --models_dir=$NOSHAPEDESTDIR
-chown -R $(id -u):$(id -g) $NOSHAPEDESTDIR
+chmod -R 777 $NOSHAPEDESTDIR
 python3 $SRCDIR/gen_qa_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_model_repository
 python3 $SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_model_repository
 python3 $SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_reshape_model_repository
 python3 $SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_identity_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_sequence_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
-chown -R $(id -u):$(id -g) $ENSEMBLEDESTDIR
+chmod -R 777 $ENSEMBLEDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TFSCRIPT
@@ -270,7 +268,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_NOSHAPEDESTDIR,target=$NOSHAPEDESTDIR \
        --mount type=bind,source=$HOST_ENSEMBLEDESTDIR,target=$ENSEMBLEDESTDIR \
-       -u $(id -u):$(id -g) $TENSORFLOW_IMAGE
+       $TENSORFLOW_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
@@ -281,33 +279,32 @@ cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 #!/bin/bash
 set -e
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
-cd $SRCDIR
 # Models using shape tensor i/o
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
-chown -R $(id -u):$(id -g) $SHAPEDESTDIR
+chmod -R 777 $SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
-chown -R $(id -u):$(id -g) $DESTDIR
+chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
-chown -R $(id -u):$(id -g) $VARDESTDIR
+chmod -R 777 $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
-chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
+chmod -R 777 $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
-chown -R $(id -u):$(id -g) $IDENTITYBIGDESTDIR
+chmod -R 777 $IDENTITYBIGDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RESHAPEDESTDIR
-chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
+chmod -R 777 $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
-chown -R $(id -u):$(id -g) $SEQDESTDIR
+chmod -R 777 $SEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$DYNASEQDESTDIR
-chown -R $(id -u):$(id -g) $DYNASEQDESTDIR
+chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
-chown -R $(id -u):$(id -g) $VARSEQDESTDIR
+chmod -R 777 $VARSEQDESTDIR
 # make shared library for custom clip plugin
 (cd /workspace/tensorrt/samples/python/uff_custom_plugin && cmake . && make && \
 cp libclipplugin.so $PLGDESTDIR/.)
 LD_PRELOAD=$PLGDESTDIR/libclipplugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
-chown -R $(id -u):$(id -g) $PLGDESTDIR
+chmod -R 777 $PLGDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TRTSCRIPT
@@ -329,7 +326,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
-       -u $(id -u):$(id -g) $TENSORRT_IMAGE
+       $TENSORRT_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
