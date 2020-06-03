@@ -199,7 +199,7 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   size_t max_byte_size = 0;
   const std::string* max_input_name;
   for (const auto& input : from.OriginalInputs()) {
-    if (input.second.Data()->TotalByteSize() > max_byte_size) {
+    if (input.second.Data()->TotalByteSize() >= max_byte_size) {
       max_byte_size = input.second.Data()->TotalByteSize();
       max_input_name = &(input.first);
     }
@@ -215,6 +215,10 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     Input* new_input;
     lrequest->AddOriginalInput(
         input.first, input.second.DType(), input.second.Shape(), &new_input);
+
+    // Must normalize shape here...
+    *new_input->MutableShape() = new_input->OriginalShape();
+
     // Note that the input that have max byte size will be responsible for
     // holding the artifical data, while other inputs will hold a reference to
     // it with byte size that matches 'from'
@@ -231,6 +235,7 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
       &null_allocator, nullptr, NullResponseComplete, nullptr);
   lrequest->SetReleaseCallback(NullRequestComplete, nullptr);
 
+  // Must normalize inputs here...
   for (auto& pr : lrequest->original_inputs_) {
     lrequest->inputs_.emplace(
         std::make_pair(pr.first, std::addressof(pr.second)));
