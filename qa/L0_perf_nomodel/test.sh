@@ -69,145 +69,90 @@ RUNTEST=./run_test.sh
 # by 4.
 TENSOR_SIZE_16MB=$((4*1024*1024))
 
-TEST_NAMES=(
-    "${UNDERTEST_NAME} Minimum Latency GRPC"
-    "${UNDERTEST_NAME} Minimum Latency HTTP"
+if [ "$TEST_SHARED_MEMORY" == "system" ]; then
+    UNDERTEST_NAME="$UNDERTEST_NAME System Shared Memory";
+    SUFFIX="_shm"
+elif [ "$TEST_SHARED_MEMORY" == "cuda" ]; then
+    UNDERTEST_NAME="$UNDERTEST_NAME CUDA Shared Memory";
+    SUFFIX="_cudashm"
+else
+    TEST_SHARED_MEMORY="none"
+    TEST_NAMES=(
+        "${UNDERTEST_NAME} Minimum Latency GRPC"
+        "${UNDERTEST_NAME} Minimum Latency HTTP"
+        "${UNDERTEST_NAME} Maximum Throughput GRPC"
+        "${UNDERTEST_NAME} Maximum Throughput HTTP")
+    TEST_DIRS=(
+        min_latency_grpc
+        min_latency_http
+        max_throughput_grpc
+        max_throughput_http)
+    SUFFIX=""
+    TEST_BACKENDS=(
+        "plan custom graphdef savedmodel onnx libtorch netdef"
+        "plan custom graphdef savedmodel onnx libtorch netdef"
+        "plan custom graphdef savedmodel onnx libtorch netdef"
+        "plan custom graphdef savedmodel onnx libtorch netdef")
+    TEST_CONCURRENCY=(
+        1
+        1
+        16
+        16)
+    TEST_INSTANCE_COUNTS=(
+        1
+        1
+        2
+        2)
+    TEST_TENSOR_SIZES=(
+        1
+        1
+        1
+        1)
+    TEST_PROTOCOLS=(
+        grpc
+        http
+        grpc
+        http)
+fi
+TEST_NAMES+=(
     "${UNDERTEST_NAME} 16MB I/O Latency GRPC"
     "${UNDERTEST_NAME} 16MB I/O Latency HTTP"
-    "${UNDERTEST_NAME} Maximum Throughput GRPC"
-    "${UNDERTEST_NAME} Maximum Throughput HTTP"
     "${UNDERTEST_NAME} 16MB I/O Throughput GRPC"
-    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP"
-    "${UNDERTEST_NAME} 16MB I/O Latency GRPC System Shared Memory"
-    "${UNDERTEST_NAME} 16MB I/O Latency HTTP System Shared Memory"
-    "${UNDERTEST_NAME} 16MB I/O Latency GRPC CUDA Shared Memory"
-    "${UNDERTEST_NAME} 16MB I/O Latency HTTP CUDA Shared Memory"
-    "${UNDERTEST_NAME} 16MB I/O Throughput GRPC System Shared Memory"
-    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP System Shared Memory"
-    "${UNDERTEST_NAME} 16MB I/O Throughput GRPC CUDA Shared Memory"
-    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP CUDA Shared Memory")
-TEST_DIRS=(
-    min_latency_grpc
-    min_latency_http
-    16mb_latency_grpc
-    16mb_latency_http
-    max_throughput_grpc
-    max_throughput_http
-    16mb_throughput_grpc
-    16mb_throughput_http
-    16mb_latency_grpc_shm
-    16mb_latency_http_shm
-    16mb_latency_grpc_cudashm
-    16mb_latency_http_cudashm
-    16mb_throughput_grpc_shm
-    16mb_throughput_http_shm
-    16mb_throughput_grpc_cudashm
-    16mb_throughput_http_cudashm)
-TEST_PROTOCOLS=(
-    grpc
-    http
-    grpc
-    http
-    grpc
-    http
-    grpc
-    http
-    grpc
-    http
-    grpc
-    http
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP")
+TEST_DIRS+=(
+    16mb_latency_grpc${SUFFIX}
+    16mb_latency_http${SUFFIX}
+    16mb_throughput_grpc${SUFFIX}
+    16mb_throughput_http${SUFFIX})
+TEST_PROTOCOLS+=(
     grpc
     http
     grpc
     http)
-TEST_TENSOR_SIZES=(
-    1
-    1
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
-    1
-    1
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
+TEST_TENSOR_SIZES+=(
     ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB})
-TEST_INSTANCE_COUNTS=(
+TEST_INSTANCE_COUNTS+=(
     1
     1
-    1
-    1
-    2
-    2
-    2
-    2
-    1
-    1
-    1
-    1
-    2
-    2
     2
     2)
-TEST_CONCURRENCY=(
+TEST_CONCURRENCY+=(
     1
     1
-    1
-    1
-    16
-    16
-    16
-    16
-    1
-    1
-    1
-    1
-    16
-    16
     16
     16)
 # If TensorRT adds support for variable-size tensors can fix identity
 # model to allow TENSOR_SIZE > 1. For libtorch we need to create an
 # identity model with variable-size input.
-TEST_BACKENDS=(
-    "plan custom graphdef savedmodel onnx libtorch netdef"
-    "plan custom graphdef savedmodel onnx libtorch netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "plan custom graphdef savedmodel onnx libtorch netdef"
-    "plan custom graphdef savedmodel onnx libtorch netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
+TEST_BACKENDS+=(
     "custom graphdef savedmodel onnx netdef"
     "custom graphdef savedmodel onnx netdef"
     "custom graphdef savedmodel onnx netdef"
     "custom graphdef savedmodel onnx netdef"
     "custom graphdef savedmodel onnx netdef")
-TEST_SHARED_MEMORIES=(
-    "none"
-    "none"
-    "none"
-    "none"
-    "none"
-    "none"
-    "none"
-    "none"
-    "system"
-    "system"
-    "cuda"
-    "cuda"
-    "system"
-    "system"
-    "cuda"
-    "cuda")
 
 mkdir -p ${REPO_VERSION}
 
@@ -224,7 +169,6 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_PROTOCOL=${TEST_PROTOCOLS[$idx]}
     TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
     TEST_BACKEND=${TEST_BACKENDS[$idx]}
-    TEST_SHARED_MEMORY=${TEST_SHARED_MEMORIES[$idx]}
     TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
     TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
 
