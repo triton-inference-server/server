@@ -425,9 +425,6 @@ InferenceRequest::PrepareForInference()
 Status
 InferenceRequest::Normalize()
 {
-  if (priority_ == 0) {
-    priority_ = backend_raw_->DefaultPriorityLevel();
-  }
   const ModelConfig& model_config = backend_raw_->Config();
 
   // Initialize the requested outputs to be used during inference. If
