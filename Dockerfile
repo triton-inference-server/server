@@ -223,7 +223,7 @@ RUN cd /opt/tritonserver/lib/pytorch && \
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
-ARG ONNX_RUNTIME_VERSION=1.2.0
+ARG ONNX_RUNTIME_VERSION=1.3.0
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
@@ -241,15 +241,16 @@ RUN cd /opt/tritonserver/lib/onnx && \
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
-COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
+ARG OPENVINO_VERSION=2020.2
+COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libcpu_extension.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libcpu_extension.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/plugins.xml \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/plugins.xml \
      /opt/tritonserver/lib/onnx/
-COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
      /opt/tritonserver/lib/onnx/
-COPY --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tritonserver/lib/onnx/
 RUN cd /opt/tritonserver/lib/onnx && \
     ln -sf libtbb.so.2 libtbb.so && \
@@ -375,10 +376,11 @@ RUN apt-get update && \
     fi && \
     rm -rf /var/lib/apt/lists/*
 
+ARG OPENVINO_VERSION=2020.2
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 LICENSE .
-COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/LICENSE LICENSE.openvino
+COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/LICENSE LICENSE.openvino
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
 COPY --chown=1000:1000 --from=tritonserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
 COPY --chown=1000:1000 --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
@@ -389,21 +391,12 @@ COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include inclu
 # Install ONNX-Runtime-OpenVINO dependencies to use it in base container
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/build/Release/openvino_* \
      /opt/openvino_scripts/
-COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/model_optimizer \
-     /opt/openvino_scripts/openvino_2019.3.376/deployment_tools/model_optimizer/
-COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_2019.3.376/tools \
-     /opt/openvino_scripts/openvino_2019.3.376/tools
-ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.3.376
+COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/model_optimizer \
+     /opt/openvino_scripts/openvino_${OPENVINO_VERSION}/deployment_tools/model_optimizer/
+COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/tools \
+     /opt/openvino_scripts/openvino_${OPENVINO_VERSION}/tools
+ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_${OPENVINO_VERSION}
 ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
-
-# ONNX Runtime requires Python3 and additional packages to
-# convert ONNX models to OpenVINO models in its OpenVINO execution accelerator.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3-pip && \
-    rm -rf /var/lib/apt/lists/* && \
-    pip3 install --upgrade wheel setuptools test-generator==0.1.1 && \
-    (cd $INTEL_CVSDK_DIR/deployment_tools/model_optimizer && \
-        pip3 install -r requirements_onnx.txt)
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
