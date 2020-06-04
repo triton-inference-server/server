@@ -70,9 +70,6 @@ class InferenceRequest {
     // mutable method would allow it to get out-of-sync.
     const std::string& Name() const { return name_; }
 
-    // Whether or not the input is a tensorrt shape tensor
-    bool IsShapeTensor() const { return is_shape_tensor_; }
-
     // Data type of the input tensor.
     DataType DType() const { return datatype_; }
 
@@ -91,12 +88,15 @@ class InferenceRequest {
     // The data for this input.
     const std::shared_ptr<Memory>& Data() const { return data_; }
 
+    // Whether or not the input is a tensorrt shape tensor
+    bool IsShapeTensor() const { return is_shape_tensor_; }
+
+    // Set the input to be treated as a shape tensor.
+    Status SetShapeTensor(const bool is_shape_tensor);
+
     // Set the data for this input. Error if input already has some
     // data.
     Status SetData(const std::shared_ptr<Memory>& data);
-
-    // Set the input to be treated as a shape tensor.
-    Status SetAsShapeTensor();
 
     // Append a new buffer of data to this input.
     Status AppendData(

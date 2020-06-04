@@ -536,8 +536,9 @@ InferenceRequest::Normalize()
       const ModelInput* input_config;
       RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
       if (input_config->is_shape_tensor()) {
-        input.SetAsShapeTensor();
         *input.MutableShape() = input.OriginalShape();
+        // Set the input as shape tensor
+        input.SetShapeTensor(true);
         continue;
       }
 
@@ -724,9 +725,9 @@ InferenceRequest::Input::Input(
 }
 
 Status
-InferenceRequest::Input::SetAsShapeTensor()
+InferenceRequest::Input::SetShapeTensor(const bool is_shape_tensor)
 {
-  is_shape_tensor_ = true;
+  is_shape_tensor_ = is_shape_tensor;
   return Status::Success;
 }
 
