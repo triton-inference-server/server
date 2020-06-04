@@ -35,6 +35,10 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
+# can fail when the requests are distributed to multiple devices.
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
 
@@ -48,13 +52,11 @@ RET=0
 
 # If BACKENDS not specified, set to all
 BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx plan custom"}
+export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
-
-# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
-# can fail when the requests are distributed to multiple devices.
-export CUDA_VISIBLE_DEVICES=0
+export ENSEMBLES
 
 # Setup non-variable-size model repositories. The same models are in each
 # repository but they are configured as:

@@ -780,7 +780,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             bconfig = config.sequence_batching
             self.assertEqual(bconfig.max_sequence_idle_microseconds, _max_sequence_idle_ms * 1000) # 5 secs
 
-    def check_status(self, model_name, batch_exec, request_cnt, infer_cnt):
+    def check_status(self, model_name, batch_exec, exec_cnt, infer_cnt):
         stats = self.triton_client_.get_inference_statistics(model_name, "1")
         self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
         self.assertEqual(stats.model_stats[0].name, model_name,
@@ -788,31 +788,28 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         self.assertEqual(stats.model_stats[0].version, "1",
                          "expect model stats for model {} version 1".format(model_name))
 
-        batch_stats = stats.model_stats[0].batch_stats
-        self.assertEqual(len(batch_stats), len(batch_exec),
-                          "expected {} different batch-sizes, got {}".format(
-                                 len(batch_exec), len(batch_stats)))
-        
-        for batch_stat in batch_stats:
-             bs = batch_stat.batch_size
-             bc = batch_stat.compute_infer.count
-             self.assertTrue(bs in batch_exec,
-                             "unexpected batch-size {}".format(bs))
-             # Get count from one of the stats
-             self.assertEqual(bc, batch_exec[bs],
-                             "expected model-execution-count {} for batch size {}, got {}".format(
-                                     batch_exec[bs], bs, bc))
+        if batch_exec is not None:
+            batch_stats = stats.model_stats[0].batch_stats
+            print(batch_stats)
+            self.assertEqual(len(batch_stats), len(batch_exec),
+                             "expected {} different batch-sizes, got {}".format(
+                               len(batch_exec), len(batch_stats)))
 
-        actual_request_cnt = stats.model_stats[0].inference_stats.success.count
-        self.assertEqual(actual_request_cnt, request_cnt,
-                        "expected model-request-count {}, got {}".format(
-                                request_cnt, actual_request_cnt))
+            for batch_stat in batch_stats:
+                bs = batch_stat.batch_size
+                bc = batch_stat.compute_infer.count
+                self.assertTrue(bs in batch_exec,
+                                "did not find expected batch-size {}".format(bs))
+                # Get count from one of the stats
+                self.assertEqual(bc, batch_exec[bs],
+                                 "expected model-execution-count {} for batch size {}, got {}".format(
+                                   batch_exec[bs], bs, bc))
 
         actual_exec_cnt = stats.model_stats[0].execution_count
-        self.assertEqual(actual_request_cnt, request_cnt,
+        self.assertEqual(actual_exec_cnt, exec_cnt,
                         "expected model-exec-count {}, got {}".format(
-                                request_cnt, actual_exec_cnt))
-        
+                                exec_cnt, actual_exec_cnt))
+
         actual_infer_cnt = stats.model_stats[0].inference_count
         self.assertEqual(actual_infer_cnt, infer_cnt,
                          "expected model-inference-count {}, got {}".format(

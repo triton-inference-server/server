@@ -35,6 +35,10 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
+# can fail when the requests are distributed to multiple devices.
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT_LOG="./client.log"
 BATCHER_TEST=batcher_test.py
 VERIFY_TIMESTAMPS=verify_timestamps.py
@@ -49,10 +53,7 @@ RET=0
 
 # If BACKENDS not specified, set to all
 BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
-
-# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
-# can fail when the requests are distributed to multiple devices.
-export CUDA_VISIBLE_DEVICES=0
+export BACKENDS
 
 # Setup non-variable-size model repository
 rm -fr *.log *.serverlog models && mkdir models
