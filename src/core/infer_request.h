@@ -70,6 +70,9 @@ class InferenceRequest {
     // mutable method would allow it to get out-of-sync.
     const std::string& Name() const { return name_; }
 
+    // Whether or not the input is a tensorrt shape tensor
+    bool IsShapeTensor() const { return is_shape_tensor_; }
+
     // Data type of the input tensor.
     DataType DType() const { return datatype_; }
 
@@ -91,6 +94,9 @@ class InferenceRequest {
     // Set the data for this input. Error if input already has some
     // data.
     Status SetData(const std::shared_ptr<Memory>& data);
+
+    // Set the input to be treated as a shape tensor.
+    Status SetAsShapeTensor();
 
     // Append a new buffer of data to this input.
     Status AppendData(
@@ -128,6 +134,7 @@ class InferenceRequest {
     DataType datatype_;
     std::vector<int64_t> original_shape_;
     std::vector<int64_t> shape_;
+    bool is_shape_tensor_;
     std::shared_ptr<Memory> data_;
   };
 
@@ -152,8 +159,7 @@ class InferenceRequest {
       InferenceBackend* backend, const int64_t requested_model_version)
       : needs_normalization_(true), backend_raw_(backend),
         requested_model_version_(requested_model_version), flags_(0),
-        correlation_id_(0), batch_size_(0), timeout_us_(0),
-        collect_stats_(true)
+        correlation_id_(0), batch_size_(0), timeout_us_(0), collect_stats_(true)
   {
     SetPriority(0);
   }

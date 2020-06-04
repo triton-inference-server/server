@@ -194,17 +194,68 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   lrequest->batch_size_ = from.batch_size_;
   lrequest->collect_stats_ = false;
 
-  // Two pass: first to obtain the max input byte size for allocating a large
-  // enough buffer for all inputs; second to construct the inputs
+  // Three passes: first to construct input for the shape tensors inputs, second
+  // to obtain the max input byte size for allocating a large enough buffer for
+  // all non shape tensor inputs; third to construct the inputs for these
+  // tensors.
+  //  First pass
+  for (const auto& input : from.OriginalInputs()) {
+    // Handle only shape tensors in this pass
+    if (!input.second.IsShapeTensor()) {
+      continue;
+    }
+
+    // Prepare the memory to hold input data
+    size_t byte_size = input.second.Data()->TotalByteSize();
+    auto mem_type = TRITONSERVER_MEMORY_CPU;
+    int64_t mem_id = 0;
+    std::shared_ptr<MutableMemory> data =
+        std::make_shared<AllocatedMemory>(byte_size, mem_type, mem_id);
+
+    // Get the source buffer. Assumes shape tensors be in a single buffer on the
+    // CPU
+    const auto& from_data = input.second.Data();
+    size_t from_data_byte_size;
+    TRITONSERVER_MemoryType from_data_memory_type;
+    int64_t from_data_memory_id;
+    const char* from_data_buffer = from_data->BufferAt(
+        0 /* idx */, &from_data_byte_size, &from_data_memory_type,
+        &from_data_memory_id);
+
+    if (from_data_byte_size != byte_size) {
+      LOG_WARNING
+          << "The byte size of shape tensor to be copied does not match";
+    }
+
+    // Copy the shape values to the input buffer
+    std::memcpy(data->MutableBuffer(), from_data_buffer, from_data_byte_size);
+
+    Input* new_input;
+    lrequest->AddOriginalInput(
+        input.first, input.second.DType(), input.second.Shape(), &new_input);
+
+    // Must normalize shape here...
+    *new_input->MutableShape() = new_input->OriginalShape();
+
+    new_input->SetData(data);
+  }
+
+
+  // Second pass
   size_t max_byte_size = 0;
   const std::string* max_input_name;
   for (const auto& input : from.OriginalInputs()) {
+    // Skip shape tensors in this pass
+    if (input.second.IsShapeTensor()) {
+      continue;
+    }
     if (input.second.Data()->TotalByteSize() >= max_byte_size) {
       max_byte_size = input.second.Data()->TotalByteSize();
       max_input_name = &(input.first);
     }
   }
 
+  // Third pass
   // [DLIS-1268] should use one growable static buffer for all null requests
   auto mem_type = TRITONSERVER_MEMORY_CPU;
   int64_t mem_id = 0;
@@ -212,6 +263,10 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
       std::make_shared<AllocatedMemory>(max_byte_size, mem_type, mem_id);
   auto data_base = data->BufferAt(0, &max_byte_size, &mem_type, &mem_id);
   for (const auto& input : from.OriginalInputs()) {
+    // skip shape tensors in this pass
+    if (input.second.IsShapeTensor()) {
+      continue;
+    }
     Input* new_input;
     lrequest->AddOriginalInput(
         input.first, input.second.DType(), input.second.Shape(), &new_input);
@@ -481,6 +536,7 @@ InferenceRequest::Normalize()
       const ModelInput* input_config;
       RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
       if (input_config->is_shape_tensor()) {
+        input.SetAsShapeTensor();
         *input.MutableShape() = input.OriginalShape();
         continue;
       }
@@ -654,7 +710,8 @@ InferenceRequest::Input::Input(
     const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count)
     : name_(name), datatype_(datatype),
-      original_shape_(shape, shape + dim_count), data_(new MemoryReference)
+      original_shape_(shape, shape + dim_count), is_shape_tensor_(false),
+      data_(new MemoryReference)
 {
 }
 
@@ -662,8 +719,15 @@ InferenceRequest::Input::Input(
     const std::string& name, const DataType datatype,
     const std::vector<int64_t>& shape)
     : name_(name), datatype_(datatype), original_shape_(shape),
-      data_(new MemoryReference)
+      is_shape_tensor_(false), data_(new MemoryReference)
 {
+}
+
+Status
+InferenceRequest::Input::SetAsShapeTensor()
+{
+  is_shape_tensor_ = true;
+  return Status::Success;
 }
 
 Status
@@ -760,6 +824,9 @@ operator<<(std::ostream& out, const InferenceRequest::Input& input)
       << ", type: " << DataTypeToProtocolString(input.DType())
       << ", original shape: " << DimsListToString(input.OriginalShape())
       << ", shape: " << DimsListToString(input.Shape());
+  if (input.IsShapeTensor()) {
+    out << ", is_shape_tensor: True";
+  }
   return out;
 }
 

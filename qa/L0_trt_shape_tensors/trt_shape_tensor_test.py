@@ -513,11 +513,12 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
 
             for t in threads:
                 t.start()
+                time.sleep(1)
             for t in threads:
                 t.join()
 
             self.check_deferred_exception()
-            self.check_status(model_name, {2: 3, 1: 6}, 9, 12)
+            self.check_status(model_name, {4: 3, 3: 6}, 9, 12)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
