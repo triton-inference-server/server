@@ -42,7 +42,6 @@ import sequence_util as su
 import tritongrpcclient as grpcclient
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',0)))
 
 _model_instances = 1
 _max_queue_delay_ms = 10000
@@ -99,7 +98,6 @@ class InferShapeTensorTest(unittest.TestCase):
                 use_streaming=False,
                 shm_suffix=shm_suffix,
                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 batch_size=bs)
 
             end_ms = int(round(time.time() * 1000))
@@ -174,21 +172,18 @@ class InferShapeTensorTest(unittest.TestCase):
             'plan',
             np.float32, [[32, 32]], [[8, 4, 4]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
             batch_size=8)
         iu.infer_shape_tensor(
             self,
             'plan',
             np.float32, [[4, 4]], [[8, 32, 32]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
             batch_size=8)
         iu.infer_shape_tensor(
             self,
             'plan',
             np.float32, [[4, 4]], [[8, 4, 4]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
             batch_size=8)
 
     def test_nobatch(self):
@@ -196,20 +191,17 @@ class InferShapeTensorTest(unittest.TestCase):
             self,
             'plan_nobatch',
             np.float32, [[32, 32]], [[4, 4]],
-            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY)
         iu.infer_shape_tensor(
             self,
             'plan_nobatch',
             np.float32, [[4, 4]], [[32, 32]],
-            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY)
         iu.infer_shape_tensor(
             self,
             'plan_nobatch',
             np.float32, [[4, 4]], [[4, 4]],
-            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY)
 
     def test_wrong_shape_values(self):
         over_shape_values = [[32, 33]]
@@ -220,7 +212,6 @@ class InferShapeTensorTest(unittest.TestCase):
                 np.float32,
                 over_shape_values, [[8, 4, 4]],
                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 batch_size=8)
         # InferenceServerException will be raised from different namespace,
         # use dynamic type characteristic to catch both ex
@@ -418,7 +409,7 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
-            if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+            if TEST_SYSTEM_SHARED_MEMORY:
                 self.cleanup_shm_regions(precreated_shm0_handles)
                 self.cleanup_shm_regions(precreated_shm1_handles)
                 self.cleanup_shm_regions(precreated_shm2_handles)
@@ -530,7 +521,7 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
-            if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+            if TEST_SYSTEM_SHARED_MEMORY:
                 self.cleanup_shm_regions(precreated_shm0_handles)
                 self.cleanup_shm_regions(precreated_shm1_handles)
                 self.cleanup_shm_regions(precreated_shm2_handles)
@@ -662,7 +653,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
-            if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+            if TEST_SYSTEM_SHARED_MEMORY:
                 self.cleanup_shm_regions(precreated_shm0_handles)
                 self.cleanup_shm_regions(precreated_shm1_handles)
                 self.cleanup_shm_regions(precreated_shm2_handles)
@@ -782,7 +773,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
-            if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+            if TEST_SYSTEM_SHARED_MEMORY:
                 self.cleanup_shm_regions(precreated_shm0_handles)
                 self.cleanup_shm_regions(precreated_shm1_handles)
                 self.cleanup_shm_regions(precreated_shm2_handles)

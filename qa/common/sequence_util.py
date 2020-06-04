@@ -150,7 +150,9 @@ class SequenceBatcherTestUtil(unittest.TestCase):
     # Returns (name, byte size, shm_handle)
     def precreate_register_shape_tensor_regions(self, value_list, dtype, i,
                                             batch_size=1, tensor_shape=(1,)):
-        if _test_system_shared_memory or _test_cuda_shared_memory:
+        self.assertFalse(_test_cuda_shared_memory,
+                        "Shape tensors does not support CUDA shared memory")
+        if _test_system_shared_memory:
             shm_region_handles = []
             for j, (shape_value, value) in enumerate(value_list):
                 input_list = list()
@@ -181,42 +183,25 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 shape_op_name = 'shape_op{}{}'.format(i,j)
                 op_name = 'op{}{}'.format(i,j)
                 resized_op_name = 'resized_op{}{}'.format(i,j)
-                if _test_system_shared_memory:
-                    shm_ip_handle = shm.create_shared_memory_region(
-                        ip_name, '/'+ip_name, input_byte_size)
-                    shm_shape_ip_handle = shm.create_shared_memory_region(
-                        shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
-                    shm_shape_op_handle = shm.create_shared_memory_region(
-                        shape_op_name, '/'+shape_op_name, shape_output_byte_size)
-                    shm_op_handle = shm.create_shared_memory_region(
-                        op_name, '/'+op_name, output_byte_size)
-                    shm_resized_op_handle = shm.create_shared_memory_region(
-                        resized_op_name, '/'+resized_op_name, resized_output_byte_size)
-                    shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                    shm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
-                    self.triton_client_.register_system_shared_memory(ip_name, '/'+ip_name, input_byte_size)
-                    self.triton_client_.register_system_shared_memory(shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
-                    self.triton_client_.register_system_shared_memory(shape_op_name, '/'+shape_op_name, shape_output_byte_size)
-                    self.triton_client_.register_system_shared_memory(op_name, '/'+op_name, output_byte_size)
-                    self.triton_client_.register_system_shared_memory(resized_op_name, '/'+resized_op_name, resized_output_byte_size)
-                elif _test_cuda_shared_memory:
-                    shm_ip_handle = cudashm.create_shared_memory_region(
-                        ip_name, input_byte_size, 0)
-                    shm_shape_ip_handle = cudashm.create_shared_memory_region(
-                        shape_ip_name, shape_input_byte_size, 0)
-                    shm_shape_op_handle = cudashm.create_shared_memory_region(
-                        shape_op_name, shape_output_byte_size, 0)
-                    shm_op_handle = cudashm.create_shared_memory_region(
-                        op_name, output_byte_size, 0)
-                    shm_resized_op_handle = cudashm.create_shared_memory_region(
-                        resized_op_name, resized_output_byte_size, 0)
-                    cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                    cudashm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
-                    self.triton_client_.register_cuda_shared_memory(ip_name, cudashm.get_raw_handle(shm_ip_handle), 0, input_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(shape_ip_name, cudashm.get_raw_handle(shm_shape_ip_handle), 0, shape_input_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(shape_op_name, cudashm.get_raw_handle(shm_shape_op_handle), 0, shape_output_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(op_name, cudashm.get_raw_handle(shm_op_handle), 0, output_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(resized_op_name, cudashm.get_raw_handle(shm_resized_op_handle), 0, resized_output_byte_size)
+                
+                shm_ip_handle = shm.create_shared_memory_region(
+                    ip_name, '/'+ip_name, input_byte_size)
+                shm_shape_ip_handle = shm.create_shared_memory_region(
+                    shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
+                shm_shape_op_handle = shm.create_shared_memory_region(
+                    shape_op_name, '/'+shape_op_name, shape_output_byte_size)
+                shm_op_handle = shm.create_shared_memory_region(
+                    op_name, '/'+op_name, output_byte_size)
+                shm_resized_op_handle = shm.create_shared_memory_region(
+                    resized_op_name, '/'+resized_op_name, resized_output_byte_size)
+                shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                shm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
+                self.triton_client_.register_system_shared_memory(ip_name, '/'+ip_name, input_byte_size)
+                self.triton_client_.register_system_shared_memory(shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
+                self.triton_client_.register_system_shared_memory(shape_op_name, '/'+shape_op_name, shape_output_byte_size)
+                self.triton_client_.register_system_shared_memory(op_name, '/'+op_name, output_byte_size)
+                self.triton_client_.register_system_shared_memory(resized_op_name, '/'+resized_op_name, resized_output_byte_size)
+                
                 shm_region_handles.append((ip_name, input_byte_size, shm_ip_handle))
                 shm_region_handles.append((shape_ip_name, shape_input_byte_size, shm_shape_ip_handle))
                 shm_region_handles.append((shape_op_name, shape_output_byte_size, shm_shape_op_handle))
@@ -229,7 +214,9 @@ class SequenceBatcherTestUtil(unittest.TestCase):
     # Returns (name, byte size, shm_handle)
     def precreate_register_dynaseq_shape_tensor_regions(self, value_list, dtype, i,
                                             batch_size=1, tensor_shape=(1,)):
-        if _test_system_shared_memory or _test_cuda_shared_memory:
+        self.assertFalse(_test_cuda_shared_memory,
+                        "Shape tensors does not support CUDA shared memory")
+        if _test_system_shared_memory:
             shm_region_handles = []
             for j, (shape_value, value) in enumerate(value_list):
                 input_list = list()
@@ -265,50 +252,29 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 shape_op_name = 'shape_op{}{}'.format(i,j)
                 op_name = 'op{}{}'.format(i,j)
                 resized_op_name = 'resized_op{}{}'.format(i,j)
-                if _test_system_shared_memory:
-                    shm_ip_handle = shm.create_shared_memory_region(
-                        ip_name, '/'+ip_name, input_byte_size)
-                    shm_shape_ip_handle = shm.create_shared_memory_region(
-                        shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
-                    shm_dummy_ip_handle = shm.create_shared_memory_region(
-                        dummy_ip_name, '/'+dummy_ip_name, dummy_input_byte_size)
-                    shm_shape_op_handle = shm.create_shared_memory_region(
-                        shape_op_name, '/'+shape_op_name, shape_output_byte_size)
-                    shm_op_handle = shm.create_shared_memory_region(
-                        op_name, '/'+op_name, output_byte_size)
-                    shm_resized_op_handle = shm.create_shared_memory_region(
-                        resized_op_name, '/'+resized_op_name, resized_output_byte_size)
-                    shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                    shm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
-                    shm.set_shared_memory_region(shm_dummy_ip_handle, dummy_input_list)
-                    self.triton_client_.register_system_shared_memory(ip_name, '/'+ip_name, input_byte_size)
-                    self.triton_client_.register_system_shared_memory(shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
-                    self.triton_client_.register_system_shared_memory(dummy_ip_name, '/'+dummy_ip_name, dummy_input_byte_size)
-                    self.triton_client_.register_system_shared_memory(shape_op_name, '/'+shape_op_name, shape_output_byte_size)
-                    self.triton_client_.register_system_shared_memory(op_name, '/'+op_name, output_byte_size)
-                    self.triton_client_.register_system_shared_memory(resized_op_name, '/'+resized_op_name, resized_output_byte_size)
-                elif _test_cuda_shared_memory:
-                    shm_ip_handle = cudashm.create_shared_memory_region(
-                        ip_name, input_byte_size, 0)
-                    shm_shape_ip_handle = cudashm.create_shared_memory_region(
-                        shape_ip_name, shape_input_byte_size, 0)
-                    shm_dummy_ip_handle = cudashm.create_shared_memory_region(
-                        dummy_ip_name, dummy_input_byte_size, 0)
-                    shm_shape_op_handle = cudashm.create_shared_memory_region(
-                        shape_op_name, shape_output_byte_size, 0)
-                    shm_op_handle = cudashm.create_shared_memory_region(
-                        op_name, output_byte_size, 0)
-                    shm_resized_op_handle = cudashm.create_shared_memory_region(
-                        resized_op_name, resized_output_byte_size, 0)
-                    cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                    cudashm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
-                    cudashm.set_shared_memory_region(shm_dummy_ip_handle, dummy_input_list)
-                    self.triton_client_.register_cuda_shared_memory(ip_name, cudashm.get_raw_handle(shm_ip_handle), 0, input_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(shape_ip_name, cudashm.get_raw_handle(shm_shape_ip_handle), 0, shape_input_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(dummy_ip_name, cudashm.get_raw_handle(shm_dummy_ip_handle), 0, dummy_input_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(shape_op_name, cudashm.get_raw_handle(shm_shape_op_handle), 0, shape_output_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(op_name, cudashm.get_raw_handle(shm_op_handle), 0, output_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(resized_op_name, cudashm.get_raw_handle(shm_resized_op_handle), 0, resized_output_byte_size)
+
+                shm_ip_handle = shm.create_shared_memory_region(
+                    ip_name, '/'+ip_name, input_byte_size)
+                shm_shape_ip_handle = shm.create_shared_memory_region(
+                    shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
+                shm_dummy_ip_handle = shm.create_shared_memory_region(
+                    dummy_ip_name, '/'+dummy_ip_name, dummy_input_byte_size)
+                shm_shape_op_handle = shm.create_shared_memory_region(
+                    shape_op_name, '/'+shape_op_name, shape_output_byte_size)
+                shm_op_handle = shm.create_shared_memory_region(
+                    op_name, '/'+op_name, output_byte_size)
+                shm_resized_op_handle = shm.create_shared_memory_region(
+                    resized_op_name, '/'+resized_op_name, resized_output_byte_size)
+                shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                shm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
+                shm.set_shared_memory_region(shm_dummy_ip_handle, dummy_input_list)
+                self.triton_client_.register_system_shared_memory(ip_name, '/'+ip_name, input_byte_size)
+                self.triton_client_.register_system_shared_memory(shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
+                self.triton_client_.register_system_shared_memory(dummy_ip_name, '/'+dummy_ip_name, dummy_input_byte_size)
+                self.triton_client_.register_system_shared_memory(shape_op_name, '/'+shape_op_name, shape_output_byte_size)
+                self.triton_client_.register_system_shared_memory(op_name, '/'+op_name, output_byte_size)
+                self.triton_client_.register_system_shared_memory(resized_op_name, '/'+resized_op_name, resized_output_byte_size)
+
                 shm_region_handles.append((ip_name, input_byte_size, shm_ip_handle))
                 shm_region_handles.append((shape_ip_name, shape_input_byte_size, shm_shape_ip_handle))
                 shm_region_handles.append((dummy_ip_name, dummy_input_byte_size, shm_dummy_ip_handle))
@@ -638,8 +604,8 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         tensor_shape = (1,1)
         # shape tensor is 1-D tensor that doesn't contain batch size as first value
         shape_tensor_shape = (1,)
-        self.assertFalse(_test_system_shared_memory and _test_cuda_shared_memory,
-                        "Cannot set both System and CUDA shared memory flags to 1")
+        self.assertFalse(_test_cuda_shared_memory,
+                        "Shape tensors does not support CUDA shared memory")
 
         client_utils = grpcclient
         triton_client = client_utils.InferenceServerClient("localhost:8001", verbose=True)
@@ -676,7 +642,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
                 # Set IO values
                 shape_values.append(np.full(shape_tensor_shape, shape_value, dtype=np.int32))
-                if not (_test_system_shared_memory or _test_cuda_shared_memory):
+                if not _test_system_shared_memory:
                     if using_dynamic_batcher:
                         if input_dtype == np.object:
                             dummy_in0 = np.full(tensor_shape, value, dtype=np.int32)
@@ -727,17 +693,14 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     raise error
                 # Get value of "OUTPUT", for shared memory, need to get it via
                 # shared memory utils
-                if (not _test_system_shared_memory) and (not _test_cuda_shared_memory):
+                if (not _test_system_shared_memory):
                     out = results.as_numpy("OUTPUT")
                 else:
                     output = results.get_output("OUTPUT")
                     output_offset = 6*processed_count+4 if using_dynamic_batcher else 5*processed_count+3
                     output_shape = output.shape
                     output_type = np.int32 if using_dynamic_batcher else np.float32
-                    if _test_system_shared_memory:
-                        out = shm.get_contents_as_numpy(shm_region_handles[output_offset][2], output_type, output_shape)
-                    else:
-                        out = cudashm.get_contents_as_numpy(shm_region_handles[output_offset][2], output_type, output_shape)
+                    out = shm.get_contents_as_numpy(shm_region_handles[output_offset][2], output_type, output_shape)
                 result = out[0][0]
 
                 # Validate the (debatched) shape of the resized output matches
