@@ -44,26 +44,13 @@ FROM ${BUILD_IMAGE} AS build
 ENV DEBIAN_FRONTEND=noninteractive
 
 # image_preprocess custom backend requires opencv
-# go client requires golang
 RUN apt-get update && apt-get install -y --no-install-recommends \
             libopencv-dev \
-            libopencv-core-dev \
-            golang-go \
-            protobuf-compiler
-
-apt-get update && apt-get install -y --no-install-recommends \
-            golang-go \
-            protobuf-compiler
+            libopencv-core-dev
 
 WORKDIR /workspace
 RUN cd builddir && \
     make -j16 test-util custom-backend
-
-# need protoc-gen-go to generate go specific gRPC modules
-RUN go get github.com/golang/protobuf/protoc-gen-go && \
-    go get google.golang.org/grpc
-
-ENV PATH "$PATH:$(go env GOPATH)/bin"
 
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
@@ -265,6 +252,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
         exit 1; \
     fi
 
+# go client requires golang
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               libopencv-dev \
@@ -274,7 +262,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               python3-pip \
                               python3-protobuf \
                               python3-setuptools \
-                              swig && \
+                              swig \
+                              golang-go \
+                              protobuf-compiler && \
     rm -rf /var/lib/apt/lists/*
 
 # CI/QA expects "python" executable (not python3).
@@ -282,6 +272,10 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 RUN pip3 install --upgrade wheel numpy pillow future grpcio requests gsutil awscli six
+
+# need protoc-gen-go to generate go specific gRPC modules
+RUN go get github.com/golang/protobuf/protoc-gen-go && \
+    go get google.golang.org/grpc
 
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
@@ -295,3 +289,4 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     pip3 install --upgrade qa/pkgs/triton*.whl
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
+ENV PATH "$PATH:$(go env GOPATH)/bin"
