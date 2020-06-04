@@ -85,14 +85,14 @@ class InferenceRequest {
     const std::vector<int64_t>& Shape() const { return shape_; }
     std::vector<int64_t>* MutableShape() { return &shape_; }
 
-    // The data for this input.
-    const std::shared_ptr<Memory>& Data() const { return data_; }
-
     // Whether or not the input is a tensorrt shape tensor
     bool IsShapeTensor() const { return is_shape_tensor_; }
 
     // Set the input to be treated as a shape tensor.
     Status SetShapeTensor(const bool is_shape_tensor);
+
+    // The data for this input.
+    const std::shared_ptr<Memory>& Data() const { return data_; }
 
     // Set the data for this input. Error if input already has some
     // data.
