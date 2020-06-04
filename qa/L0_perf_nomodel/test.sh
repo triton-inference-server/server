@@ -88,11 +88,6 @@ else
         max_throughput_grpc
         max_throughput_http)
     SUFFIX=""
-    TEST_BACKENDS=(
-        "plan custom graphdef savedmodel onnx libtorch netdef"
-        "plan custom graphdef savedmodel onnx libtorch netdef"
-        "plan custom graphdef savedmodel onnx libtorch netdef"
-        "plan custom graphdef savedmodel onnx libtorch netdef")
     TEST_CONCURRENCY=(
         1
         1
@@ -144,15 +139,8 @@ TEST_CONCURRENCY+=(
     1
     16
     16)
-# If TensorRT adds support for variable-size tensors can fix identity
-# model to allow TENSOR_SIZE > 1. For libtorch we need to create an
-# identity model with variable-size input.
-TEST_BACKENDS+=(
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef"
-    "custom graphdef savedmodel onnx netdef")
+TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch netdef"
+
 
 mkdir -p ${REPO_VERSION}
 
@@ -168,7 +156,6 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_DIR=${TEST_DIRS[$idx]}
     TEST_PROTOCOL=${TEST_PROTOCOLS[$idx]}
     TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
-    TEST_BACKEND=${TEST_BACKENDS[$idx]}
     TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
     TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
 
@@ -179,7 +166,7 @@ for idx in "${!TEST_NAMES[@]}"; do
                 PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD} \
                 PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
                 TENSOR_SIZE=${TEST_TENSOR_SIZE} \
-                BACKENDS=${TEST_BACKEND} \
+                BACKENDS=${TEST_BACKENDS} \
                 SHARED_MEMORY=${TEST_SHARED_MEMORY} \
                 STATIC_BATCH_SIZES=1 \
                 DYNAMIC_BATCH_SIZES=1 \

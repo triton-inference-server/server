@@ -89,9 +89,7 @@ for BACKEND in $BACKENDS; do
 
     MODEL_NAME=${BACKEND}_zero_1_float32
     REPO_DIR=./custom_models && \
-        [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_reshape_model_repository && \
-        [ $BACKEND != "plan" ] && [ $BACKEND != "libtorch" ] && \
-        REPO_DIR=$DATADIR/qa_identity_model_repository
+        [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_identity_model_repository
     SHAPE=${TENSOR_SIZE}
     KIND="KIND_GPU" && [ $BACKEND == "custom" ] && KIND="KIND_CPU"
 
