@@ -70,13 +70,13 @@ class CudaMemoryManager {
   static Status Free(void* ptr, int64_t device_id);
 
  protected:
-  CudaMemoryManager() = default;
-
   // Provide explicit control on the lifecycle of the CUDA memory manager,
   // for testing only.
   static void Reset();
 
  private:
+  CudaMemoryManager(bool has_allocation) : has_allocation_(has_allocation) {}
+  bool has_allocation_;
   static std::unique_ptr<CudaMemoryManager> instance_;
 };
 
