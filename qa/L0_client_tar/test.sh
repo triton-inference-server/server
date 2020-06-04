@@ -53,12 +53,13 @@ for l in libgrpcclient.so libgrpcclient_static.a libhttpclient.so libhttpclient_
 done
 
 # Check wheels
-WHLS=tritonclientutils-1.14.0.dev0-py3-none-any.whl \
-     tritongrpcclient-1.14.0.dev0-py3-none-any.whl \
-     tritonhttpclient-1.14.0.dev0-py3-none-any.whl \
-     tritonshmutils-1.14.0.dev0-py3-none-manylinux1_x86_64.whl
+WHLVERSION=`cat /workspace/VERSION | sed 's/dev/\.dev0/'`
+WHLS="tritonclientutils-${WHLVERSION}-py3-none-any.whl \
+      tritongrpcclient-${WHLVERSION}-py3-none-any.whl \
+      tritonhttpclient-${WHLVERSION}-py3-none-any.whl \
+      tritonshmutils-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"
 for l in $WHLS; do
-    if [[ ! -f "triton_client/lib/$l" ]]; then
+    if [[ ! -f "triton_client/python/$l" ]]; then
         echo -e "*** wheel $l not present\n"
         RET=1
     fi
