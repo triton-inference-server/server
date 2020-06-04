@@ -134,7 +134,8 @@ class PlanBackend : public InferenceBackend {
     bool SetOutputShapeTensorBuffer(
         const int32_t* content, std::unique_ptr<InferenceResponse>* response,
         InferenceResponse::Output* response_output,
-        const size_t tensor_element_count, cudaStream_t stream);
+        const size_t tensor_element_count, const int64_t batch_size,
+        cudaStream_t stream);
 
     // See BackendContext::Run()
     void Run(

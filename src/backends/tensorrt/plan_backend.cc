@@ -1576,10 +1576,10 @@ bool
 PlanBackend::Context::SetOutputShapeTensorBuffer(
     const int32_t* content, std::unique_ptr<InferenceResponse>* response,
     InferenceResponse::Output* response_output,
-    const size_t tensor_element_count, cudaStream_t stream)
+    const size_t tensor_element_count, const int64_t batch_size,
+    cudaStream_t stream)
 {
   bool cuda_copy = false;
-  int this_batch_size = (support_batching_) ? *content : 1;
 
   const size_t expected_byte_size = tensor_element_count * sizeof(int32_t);
 
@@ -1598,20 +1598,20 @@ PlanBackend::Context::SetOutputShapeTensorBuffer(
     return cuda_copy;
   }
 
-  const size_t nb_shape_values = tensor_element_count / this_batch_size;
+  const size_t nb_shape_values = tensor_element_count / batch_size;
 
   // Copy the serialized tensor into the allocated buffer.
   bool cuda_used = false;
   size_t content_offset = support_batching_ ? 1 : 0;
   size_t buffer_offset = 0;
-  for (int i = 0; i < this_batch_size; i++) {
+  for (int i = 0; i < batch_size; i++) {
     status = CopyBuffer(
         response_output->Name(), TRITONSERVER_MEMORY_CPU /* src_memory_type */,
         0 /* src_memory_type_id */, actual_memory_type, actual_memory_type_id,
         nb_shape_values * sizeof(int32_t), (void*)(content + content_offset),
         (void*)(buffer + buffer_offset), stream_, &cuda_used);
     cuda_copy |= cuda_used;
-    buffer_offset += nb_shape_values * sizeof(int32_t);
+    buffer_offset += (nb_shape_values * sizeof(int32_t));
   }
 
   if (!status.IsOk()) {
@@ -1837,7 +1837,8 @@ PlanBackend::Context::Run(
     }
 
     if ((engine_->isShapeBinding(io_index)) && (support_batching_)) {
-      // Set the first 4 bytes for shape
+      // Set the first 4 bytes to the shape value representing the
+      // batch size.
       bool cuda_used = false;
       status = CopyBuffer(
           name, TRITONSERVER_MEMORY_CPU, 0, TRITONSERVER_MEMORY_GPU,
@@ -1847,10 +1848,15 @@ PlanBackend::Context::Run(
           payload_->requests_, payload_->responses_, metric_reporter_.get(),
           status, "error input data for the batch");
 
-      collector.ProcessTensor(
-          name, datatype, batch1_shape,
+      // Copy rest of the shape values to the buffer.
+      status = CopyBuffer(
+          name, TRITONSERVER_MEMORY_CPU, 0, TRITONSERVER_MEMORY_GPU,
+          gpu_device_, total_byte_size, (void*)&request_shape_values[bindex],
           (static_cast<char*>(buffers_[bindex]) + sizeof(int32_t)),
-          total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
+          input_copy_stream_, &cuda_used);
+      FAIL_ALL_AND_RETURN_IF_ERROR(
+          payload_->requests_, payload_->responses_, metric_reporter_.get(),
+          status, "error input data");
     } else {
       collector.ProcessTensor(
           name, datatype, batch1_shape, static_cast<char*>(buffers_[bindex]),
@@ -2033,7 +2039,7 @@ PlanBackend::Context::Run(
                 name, dt, batchn_shape, request->BatchSize(), &response_output);
             cuda_copy |= SetOutputShapeTensorBuffer(
                 shape_value_ptr, &response, response_output, tensor_element_cnt,
-                stream_);
+                batchn_shape[0], stream_);
           }
         }
 
