@@ -442,8 +442,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                stats_batch_size = 1 if MODEL_INSTANCES > 2 else 2
-                self.check_status(model_name, {stats_batch_size: 4 * min(2, MODEL_INSTANCES)}, 8, 8)
+                stats_batch_size = 2 if MODEL_INSTANCES == 1 else 1
+                exec_cnt = 4 if MODEL_INSTANCES == 1 else 8
+                self.check_status(model_name, {stats_batch_size: 4 * min(2, MODEL_INSTANCES)},
+                                  exec_cnt, 8)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -523,20 +525,24 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 threads[1].start()
                 threads[3].start()
-                time.sleep(1)
+                time.sleep(3)
                 threads[0].start()
                 threads[2].start()
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                # Batch size is always 4 as the batch will be padded for
-                # execution
+                # Batch size is 4 for the first two inferences and
+                # then 2 for the second two inferences. This is
+                # because we request the longer sequences first
+                # (threads 1 and 3) in slots 0 and 1 and so after
+                # shorter sequences are complete there are only slots
+                # 0 and 1 to execute.
                 if MODEL_INSTANCES == 1:
-                    self.check_status(model_name, {4: 4}, 12, 12)
+                    self.check_status(model_name, {2:2, 4:2}, 4, 12)
                 elif MODEL_INSTANCES == 2:
-                    self.check_status(model_name, {2: 8}, 12, 12)
+                    self.check_status(model_name, {2:4, 1:4}, 8, 12)
                 elif MODEL_INSTANCES == 4:
-                    self.check_status(model_name, {1: 12}, 12, 12)
+                    self.check_status(model_name, {1:12}, 12, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -621,7 +627,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES)}, 12, 12)
+                self.check_status(model_name, {(4 / MODEL_INSTANCES):(3 * MODEL_INSTANCES)},
+                                  3 * MODEL_INSTANCES, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -716,12 +723,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (3,) }))
 
-                for t in threads:
-                    t.start()
+                threads[0].start()
+                threads[1].start()
+                threads[2].start()
+                time.sleep(3)
+                threads[3].start()
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {2: 3, 1: 6}, 12, 12)
+                self.check_status(model_name, {4:9}, 9, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -821,7 +831,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 3}, 12, 12)
+                self.check_status(model_name, {4: 3}, 3, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -919,11 +929,12 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                if MODEL_INSTANCES != 4:
-                    batch_exec = {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES), 1: 3}
+                if MODEL_INSTANCES == 1:
+                    self.check_status(model_name, {4:3,1:3}, 6, 15)
+                elif MODEL_INSTANCES == 2:
+                    self.check_status(model_name, {2:6,1:3}, 9, 15)
                 else:
-                    batch_exec = {1: (3 * MODEL_INSTANCES) + 3}
-                self.check_status(model_name, batch_exec, 15, 15)
+                    self.check_status(model_name, {1:15}, 15, 15)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1034,13 +1045,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 threads[1].start()
                 threads[2].start()
                 threads[3].start()
-                time.sleep(2)
+                time.sleep(3)
                 threads[4].start()
                 threads[5].start()
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 3}, 12, 12)
+                self.check_status(model_name, {4: 3}, 3, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1152,19 +1163,23 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
+                time.sleep(2)
                 threads[1].start()
+                time.sleep(2)
                 threads[2].start()
+                time.sleep(2)
                 threads[3].start()
                 time.sleep(2)
                 threads[4].start()
+                time.sleep(2)
                 threads[5].start()
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                # Expecting the requests of the same sequence to be in the same
-                # slot, so the execution for thelast long sequence will be
-                # padded to a batch.
-                self.check_status(model_name, {4: 3, 3: 2}, 14, 14)
+                # Expecting 3 batch-size 4 inferences and then the
+                # 1006 sequence will follow 1003 (a different
+                # implementation could also follow 1002...)
+                self.check_status(model_name, {4:3, 3:2}, 5, 14)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1262,7 +1277,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 threads[1].start()
                 threads[2].start()
                 threads[3].start()
-                time.sleep(2)
+                time.sleep(3)
                 threads[4].start()
                 for t in threads:
                     t.join()
@@ -1271,7 +1286,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     batch_exec = {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES), 1: 2}
                 else:
                     batch_exec = {1: (3 * MODEL_INSTANCES) + 2}
-                self.check_status(model_name, batch_exec, 14, 14)
+                self.check_status(model_name, batch_exec, (3 * MODEL_INSTANCES) + 2, 14)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1386,7 +1401,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 4}, 16, 16)
+                self.check_status(model_name, {4: 4}, 4, 16)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
