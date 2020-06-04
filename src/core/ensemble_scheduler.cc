@@ -179,6 +179,7 @@ class EnsembleContext {
   // Request specific information that obtained from ensemble request and
   // should be applied to all internal requests
   uint32_t flags_;
+  std::string request_id_;
   uint64_t correlation_id_;
   uint32_t priority_;
 
@@ -277,6 +278,7 @@ EnsembleContext::EnsembleContext(
   }
 
   if (ensemble_status_.IsOk()) {
+    request_id_ = request_->Id();
     correlation_id_ = request_->CorrelationId();
     flags_ = request_->Flags();
     priority_ = request_->Priority();
@@ -577,6 +579,7 @@ EnsembleContext::InitStep(const size_t step_idx, std::unique_ptr<Step>* step)
 
   step->reset(new Step(step_idx));
 
+  irequest->SetId(request_id_);
   irequest->SetCorrelationId(correlation_id_);
   irequest->SetFlags(flags_);
   irequest->SetPriority(priority_);
@@ -769,8 +772,15 @@ EnsembleContext::ScheduleSteps(
 {
   for (auto& step : steps) {
     step->ctx_ = context;
-    context->is_->InferAsync(step->request_);
-    step.release();
+    {
+      std::lock_guard<std::mutex> lock(context->mutex_);
+      context->ensemble_status_ = context->is_->InferAsync(step->request_);
+      if (!context->ensemble_status_.IsOk()) {
+        context->ensemble_status_ = context->FinishEnsemble();
+        break;
+      }
+      step.release();
+    }
   }
 }
 
