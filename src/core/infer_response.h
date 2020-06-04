@@ -137,6 +137,9 @@ class InferenceResponse {
     // The shape of the output tensor.
     const std::vector<int64_t>& Shape() const { return shape_; }
 
+    // Reshape the output tensor if specified in output config.
+    void Reshape(const ModelOutput* output_config);
+
     // The batch size of the output, as understood by Triton. A
     // batch-size of 0 indicates that the model doesn't support
     // batching in a way that Triton understands.
