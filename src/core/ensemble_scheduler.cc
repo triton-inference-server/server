@@ -286,8 +286,18 @@ EnsembleContext::EnsembleContext(
       auto it = tensor_data_.find(input->Name());
       if (it != tensor_data_.end()) {
         auto& tensor_data = it->second;
-        tensor_data.first.reset(new InferenceRequest::Input(
-            input->Name(), input->DType(), input->OriginalShape()));
+        // Shape() represents reshaped value without batch dimension,
+        // thus need to fill it if necessary.
+        if (request_->BatchSize() != 0) {
+          std::vector<int64_t> shape{request_->BatchSize()};
+          shape.insert(
+              shape.end(), input->Shape().begin(), input->Shape().end());
+          tensor_data.first.reset(new InferenceRequest::Input(
+              input->Name(), input->DType(), shape));
+        } else {
+          tensor_data.first.reset(new InferenceRequest::Input(
+              input->Name(), input->DType(), input->Shape()));
+        }
         tensor_data.first->SetData(input->Data());
         tensor_data.second = request_->BatchSize();
       } else {
@@ -543,9 +553,8 @@ EnsembleContext::InitStep(const size_t step_idx, std::unique_ptr<Step>* step)
 
   const bool allow_batching = (backend->Config().max_batch_size() > 0);
 
-  // passing raw pointer as all involved backends are kept alive by the context
   auto irequest = std::unique_ptr<InferenceRequest>(
-      new InferenceRequest(backend.get(), istep.model_version_));
+      new InferenceRequest(backend, istep.model_version_));
 
   // Request for ensemble model cannot override the timeout values for the
   // composing models. Thus currently the timeout field in request has no

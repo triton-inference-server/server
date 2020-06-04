@@ -73,6 +73,12 @@ InferenceResponse::AddOutput(
 
   LOG_VERBOSE(1) << "add response output: " << outputs_.back();
 
+  if (backend_ != nullptr) {
+    const ModelOutput* output_config;
+    RETURN_IF_ERROR(backend_->GetOutput(name, &output_config));
+    outputs_.back().Reshape(output_config);
+  }
+
   if (output != nullptr) {
     *output = std::addressof(outputs_.back());
   }
@@ -90,6 +96,12 @@ InferenceResponse::AddOutput(
       name, datatype, std::move(shape), batch_size, allocator_, alloc_userp_);
 
   LOG_VERBOSE(1) << "add response output: " << outputs_.back();
+
+  if (backend_ != nullptr) {
+    const ModelOutput* output_config;
+    RETURN_IF_ERROR(backend_->GetOutput(name, &output_config));
+    outputs_.back().Reshape(output_config);
+  }
 
   if (output != nullptr) {
     *output = std::addressof(outputs_.back());
@@ -156,6 +168,34 @@ InferenceResponse::Output::~Output()
   if (!status.IsOk()) {
     LOG_ERROR << "failed to release buffer for output '" << name_
               << "': " << status.AsString();
+  }
+}
+
+void
+InferenceResponse::Output::Reshape(const ModelOutput* output_config)
+{
+  if (output_config->has_reshape()) {
+    std::deque<int64_t> variable_size_values;
+    int64_t batch_dim_offset = (batch_size_ > 0) ? 1 : 0;
+    const auto& from_shape = output_config->reshape().shape();
+    const auto& to_shape = output_config->dims();
+    for (int64_t idx = 0; idx < from_shape.size(); idx++) {
+      if (from_shape[idx] == -1) {
+        variable_size_values.push_back(shape_[idx + batch_dim_offset]);
+      }
+    }
+    shape_.clear();
+    if (batch_size_ > 0) {
+      shape_.push_back(batch_size_);
+    }
+    for (const auto& dim : to_shape) {
+      if (dim == -1) {
+        shape_.push_back(variable_size_values.front());
+        variable_size_values.pop_front();
+      } else {
+        shape_.push_back(dim);
+      }
+    }
   }
 }
 
