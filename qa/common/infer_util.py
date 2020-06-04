@@ -479,13 +479,11 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input_shapes,
                use_http=True, use_grpc=True,
                use_streaming=True, shm_suffix="", use_system_shared_memory=False,
-               use_cuda_shared_memory=False, priority=0, timeout_us=0,
+               priority=0, timeout_us=0,
                batch_size=1):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     tester.assertTrue(pf == "plan" or pf == "plan_nobatch")
     tester.assertEqual(len(input_shape_values), len(dummy_input_shapes))
-    if use_system_shared_memory and use_cuda_shared_memory:
-        raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
 
     configs = []
     if use_http:
@@ -498,10 +496,7 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
     io_cnt = len(input_shape_values)
 
     # FIXME wrap up shm handle cleanup
-    # For (cuda) shared memory, it's only set for shape tensor for simplicity.
-    # Regular tensor with (cuda) shared memory should be well-tested in other
-    # tests.
-    # item is (handle, byte_size, is_cuda)
+    # item is (handle, byte_size)
     input_shm_handle_list = []
     output_shm_handle_list= []
     dummy_input_list = []
@@ -542,16 +537,10 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
         output_byte_size = input_byte_size * batch_size
         if use_system_shared_memory:
             input_shm_handle_list.append((shm.create_shared_memory_region(input_name+shm_suffix,
-                                                            '/'+input_name+shm_suffix, input_byte_size), input_byte_size, False))
+                                                            '/'+input_name+shm_suffix, input_byte_size), input_byte_size))
             output_shm_handle_list.append((shm.create_shared_memory_region(output_name+shm_suffix,
-                                                            '/'+output_name+shm_suffix, output_byte_size), output_byte_size, False))
+                                                            '/'+output_name+shm_suffix, output_byte_size), output_byte_size))
             shm.set_shared_memory_region(input_shm_handle_list[-1][0], [in0,])
-        elif use_cuda_shared_memory:
-            input_shm_handle_list.append((cudashm.create_shared_memory_region(input_name+shm_suffix,
-                                                            input_byte_size, 0), input_byte_size, True))
-            output_shm_handle_list.append((cudashm.create_shared_memory_region(output_name+shm_suffix,
-                                                            output_byte_size, 0), output_byte_size, True))
-            cudashm.set_shared_memory_region(input_shm_handle_list[-1][0], [in0,])
 
     model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
     # Run inference and check results for each config
@@ -581,17 +570,13 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
 
             # -2: dummy; -1: input
             inputs[-2].set_data_from_numpy(dummy_input_list[io_num])
-            if (not use_system_shared_memory) and (not use_cuda_shared_memory):
+            if (not use_system_shared_memory):
                 inputs[-1].set_data_from_numpy(input_list[io_num])
             else:
                 input_byte_size = input_shm_handle_list[io_num][1]
                 output_byte_size = output_shm_handle_list[io_num][1]
-                if use_system_shared_memory:
-                    triton_client.register_system_shared_memory(input_name+shm_suffix, "/"+input_name+shm_suffix, input_byte_size)
-                    triton_client.register_system_shared_memory(output_name+shm_suffix, "/"+output_name+shm_suffix, output_byte_size)
-                else:
-                    triton_client.register_cuda_shared_memory(input_name+shm_suffix, cudashm.get_raw_handle(input_shm_handle_list[io_num][0]), 0, input_byte_size)
-                    triton_client.register_cuda_shared_memory(output_name+shm_suffix, cudashm.get_raw_handle(output_shm_handle_list[io_num][0]), 0, output_byte_size)
+                triton_client.register_system_shared_memory(input_name+shm_suffix, "/"+input_name+shm_suffix, input_byte_size)
+                triton_client.register_system_shared_memory(output_name+shm_suffix, "/"+output_name+shm_suffix, output_byte_size)
                 inputs[-1].set_shared_memory(input_name+shm_suffix, input_byte_size)
                 outputs[-1].set_shared_memory(output_name+shm_suffix, output_byte_size)
 
@@ -621,7 +606,7 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
 
             # get outputs as numpy array
             dummy_out = results.as_numpy(dummy_output_name)
-            if (not use_system_shared_memory) and (not use_cuda_shared_memory):
+            if (not use_system_shared_memory):
                 out = results.as_numpy(output_name)
             else:
                 output = results.get_output(output_name)
@@ -629,10 +614,7 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
                     output_shape = output.shape
                 else:
                     output_shape = output["shape"]
-                if use_system_shared_memory:
-                    out = shm.get_contents_as_numpy(output_shm_handle_list[io_num][0], np.int32, output_shape)
-                else:
-                    out = cudashm.get_contents_as_numpy(output_shm_handle_list[io_num][0], np.int32, output_shape)
+                out = shm.get_contents_as_numpy(output_shm_handle_list[io_num][0], np.int32, output_shape)
 
             # if out shape is 2D, it is batched
             if (len(out.shape) == 2):
@@ -658,20 +640,11 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
             if use_system_shared_memory:
                 triton_client.unregister_system_shared_memory(input_name+shm_suffix)
                 triton_client.unregister_system_shared_memory(output_name+shm_suffix)
-            elif use_cuda_shared_memory:
-                triton_client.unregister_cuda_shared_memory(input_name+shm_suffix)
-                triton_client.unregister_cuda_shared_memory(output_name+shm_suffix)
 
     for handle in input_shm_handle_list:
-        if (handle[2]):
-            cudashm.destroy_shared_memory_region(handle[0])
-        else:
-            shm.destroy_shared_memory_region(handle[0])
+        shm.destroy_shared_memory_region(handle[0])
     for handle in output_shm_handle_list:
-        if (handle[2]):
-            cudashm.destroy_shared_memory_region(handle[0])
-        else:
-            shm.destroy_shared_memory_region(handle[0])
+        shm.destroy_shared_memory_region(handle[0])
 
 
 # Perform inference using a "nop" model that expects some form or
