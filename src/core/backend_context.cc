@@ -664,7 +664,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
         std::move(*response),
         Status(
             Status::Code::INVALID_ARG,
-            "unexpected total batch size " +
+            "unexpected total byte size " +
                 std::to_string(
                     tensor_buffer_offset +
                     request_input->Data()->TotalByteSize()) +
