@@ -774,10 +774,15 @@ EnsembleContext::ScheduleSteps(
     step->ctx_ = context;
     {
       std::lock_guard<std::mutex> lock(context->mutex_);
-      context->ensemble_status_ = context->is_->InferAsync(step->request_);
-      if (!context->ensemble_status_.IsOk()) {
-        context->ensemble_status_ = context->FinishEnsemble();
-        break;
+
+      // Need to check the ensemble_status_ to ensure the FinishEnsemble()
+      // is called only once.
+      if (context->ensemble_status_.IsOk()) {
+        context->ensemble_status_ = context->is_->InferAsync(step->request_);
+        if (!context->ensemble_status_.IsOk()) {
+          context->ensemble_status_ = context->FinishEnsemble();
+          break;
+        }
       }
       step.release();
     }
