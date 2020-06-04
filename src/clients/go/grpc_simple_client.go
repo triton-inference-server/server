@@ -161,7 +161,7 @@ func ModelInferRequest(client triton.GRPCInferenceServiceClient, rawInput [][]by
 }
 
 // Convert int32 input data into raw bytes (assumes Little Endian)
-func Preprocess(inputs [][]uint32) [][]byte {
+func Preprocess(inputs [][]int32) [][]byte {
 	inputData0 := inputs[0]
 	inputData1 := inputs[1]
 
@@ -170,9 +170,9 @@ func Preprocess(inputs [][]uint32) [][]byte {
 	// Temp variable to hold our converted int32 -> []byte
 	bs := make([]byte, 4)
 	for i := 0; i < inputSize; i++ {
-		binary.LittleEndian.PutUint32(bs, inputData0[i])
+		binary.LittleEndian.PutUint32(bs, uint32(inputData0[i]))
 		inputBytes0 = append(inputBytes0, bs...)
-		binary.LittleEndian.PutUint32(bs, inputData1[i])
+		binary.LittleEndian.PutUint32(bs, uint32(inputData1[i]))
 		inputBytes1 = append(inputBytes1, bs...)
 	}
 
@@ -228,13 +228,13 @@ func main() {
 	modelMetadataResponse := ModelMetadataRequest(client, FLAGS.ModelName, "")
 	fmt.Println(modelMetadataResponse)
 
-	inputData0 := make([]uint32, inputSize)
-	inputData1 := make([]uint32, inputSize)
+	inputData0 := make([]int32, inputSize)
+	inputData1 := make([]int32, inputSize)
 	for i := 0; i < inputSize; i++ {
-		inputData0[i] = uint32(i)
+		inputData0[i] = int32(i)
 		inputData1[i] = 1
 	}
-	inputs := [][]uint32{inputData0, inputData1}
+	inputs := [][]int32{inputData0, inputData1}
 	rawInput := Preprocess(inputs)
 
 	/* We use a simple model that takes 2 input tensors of 16 integers
@@ -254,5 +254,9 @@ func main() {
 	for i := 0; i < outputSize; i++ {
 		fmt.Printf("%d + %d = %d\n", inputData0[i], inputData1[i], outputData0[i])
 		fmt.Printf("%d - %d = %d\n", inputData0[i], inputData1[i], outputData1[i])
+		if ((inputData0[i] + inputData1[i] != outputData0[i]) ||
+				inputData0[i] - inputData1[i] != outputData1[i]) {
+			log.Fatalf("Incorrect results from inference")
+		}
 	}
 }
