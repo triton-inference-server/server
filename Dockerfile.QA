@@ -44,34 +44,26 @@ FROM ${BUILD_IMAGE} AS build
 ENV DEBIAN_FRONTEND=noninteractive
 
 # image_preprocess custom backend requires opencv
+# go client requires golang
 RUN apt-get update && apt-get install -y --no-install-recommends \
             libopencv-dev \
-            libopencv-core-dev
+            libopencv-core-dev \
+            golang-go \
+            protobuf-compiler
+
+apt-get update && apt-get install -y --no-install-recommends \
+            golang-go \
+            protobuf-compiler
 
 WORKDIR /workspace
 RUN cd builddir && \
     make -j16 test-util custom-backend
 
-# Install dependencies for Go client (golang, protoc)
-RUN GO_TAR=go1.14.4.linux-amd64.tar.gz && \
-    wget https://dl.google.com/go/$GO_TAR && \
-    tar -C /usr/local -xzf $GO_TAR && \
-    rm -rf $GO_TAR
-
-ENV PATH $PATH:/usr/local/go/bin
-ENV PATH "$PATH:$(go env GOPATH)/bin"
-
-# need to nable Go modules to install protoc-gen-go 
-ENV GO111MODULE "on"
-RUN go get github.com/golang/protobuf/protoc-gen-go@v1.3
-ENV GO111MODULE "auto"
-
-RUN PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip && \
-    curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP && \
-    unzip -o $PROTOC_ZIP -d /usr/local bin/protoc && \
-    unzip -o $PROTOC_ZIP -d /usr/local 'include/*' && \
-    rm -f $PROTOC_ZIP && \
+# need protoc-gen-go to generate go specific gRPC modules
+RUN go get github.com/golang/protobuf/protoc-gen-go && \
     go get google.golang.org/grpc
+
+ENV PATH "$PATH:$(go env GOPATH)/bin"
 
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace

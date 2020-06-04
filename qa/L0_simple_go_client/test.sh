@@ -45,13 +45,14 @@ fi
 
 RET=0
 
-git clone https://github.com/NVIDIA/triton-inference-server.git && \
-    cd triton-inference-server/src/clients/go && \
-    bash gen_go_stubs.sh
+git clone --single-branch --depth=1 -b $UPS
+        https://github.com/NVIDIA/triton-inference-server.git && \
+        cd triton-inference-server/src/clients/go && \
+        bash gen_go_stubs.sh
 
 set +e
 
-# Run using shared memory for both inputs and outputs (GRPC then HTTP)
+# Runs test for GRPC variant of go client
 go run $SIMPLE_GO_CLIENT >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
