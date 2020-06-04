@@ -275,13 +275,13 @@ done
 # ragged models
 if [[ $BACKENDS == *"custom"* ]]; then
   rm -fr ragged_models && mkdir ragged_models
-  cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
-  (cd ragged_models/custom_dyna_sequence_int32 && \
+  cp -r ../custom_models/custom_sequence_int32 ragged_models/.
+  (cd ragged_models/custom_sequence_int32 && \
           sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 
   export NO_BATCHING=0
   export MODEL_INSTANCES=1
-  export BATCHER_TYPE="VARIABLE"
+  export BATCHER_TYPE="FIXED"
   MODEL_DIR=ragged_models
 
   # Need to launch the server for each test so that the model status
@@ -289,7 +289,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
   # used for execution). Test everything with fixed-tensor-size
   # models and variable-tensor-size models.
   for i in test_ragged_batch_allowed ; do
-      export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=3
+      export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
       export TRITONSERVER_DELAY_SCHEDULER=12
 
       SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
