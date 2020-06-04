@@ -130,7 +130,13 @@ AllocatedMemory::AllocatedMemory(
         auto status = CudaMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, memory_type_id_);
         if (!status.IsOk()) {
-          LOG_ERROR << status.Message();
+          static bool warning_logged = false;
+          if (!warning_logged) {
+            LOG_WARNING << status.Message()
+                        << ", falling back to pinned system memory";
+            warning_logged = true;
+          }
+
           goto pinned_memory_allocation;
         }
         break;
