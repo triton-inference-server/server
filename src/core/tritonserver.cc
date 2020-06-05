@@ -43,7 +43,9 @@
 #include "src/core/server.h"
 #include "src/core/status.h"
 
-#define TRITONJSON_INTERNAL_STATUS
+#define TRITONJSON_STATUSTYPE Status
+#define TRITONJSON_STATUSRETURN(M) return Status(Status::Code::INTERNAL, (M))
+#define TRITONJSON_STATUSSUCCESS Status::Success
 #include "src/core/json.h"
 
 namespace ni = nvidia::inferenceserver;

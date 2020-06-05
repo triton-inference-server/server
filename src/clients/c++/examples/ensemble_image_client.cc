@@ -32,6 +32,7 @@
 #include <iterator>
 #include <sstream>
 #include <string>
+#include "src/clients/c++/examples/json_utils.h"
 #include "src/clients/c++/library/grpc_client.h"
 #include "src/clients/c++/library/http_client.h"
 
@@ -280,14 +281,20 @@ main(int argc, char** argv)
   // of the images to be processed is limited by the maximum batch size
   size_t batch_size = 0;
   if (protocol == "http") {
-    rapidjson::Document model_config;
+    std::string model_config;
     err = triton_client.http_client_->ModelConfig(&model_config, model_name);
     if (!err.IsOk()) {
       std::cerr << "error: failed to get model config: " << err << std::endl;
     }
 
-    const auto bs_itr = model_config.FindMember("max_batch_size");
-    if (bs_itr != model_config.MemberEnd()) {
+    rapidjson::Document model_config_json;
+    err = nic::ParseJson(&model_config_json, model_config);
+    if (!err.IsOk()) {
+      std::cerr << "error: failed to parse model config: " << err << std::endl;
+    }
+
+    const auto bs_itr = model_config_json.FindMember("max_batch_size");
+    if (bs_itr != model_config_json.MemberEnd()) {
       batch_size = bs_itr->value.GetInt();
     }
   } else {

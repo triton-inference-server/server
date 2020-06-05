@@ -31,7 +31,10 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/tritonserver.h"
 
-#define TRITONJSON_TRITONSERVER_STATUS
+#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
+#define TRITONJSON_STATUSRETURN(M) \
+  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
+#define TRITONJSON_STATUSSUCCESS nullptr
 #include "src/core/json.h"
 
 #ifdef TRITON_ENABLE_GRPC

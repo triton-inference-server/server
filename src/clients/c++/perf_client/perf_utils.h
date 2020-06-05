@@ -32,8 +32,8 @@
 #include <random>
 
 #include <rapidjson/document.h>
+#include <rapidjson/rapidjson.h>
 #include <sys/stat.h>
-#include "rapidjson/rapidjson.h"
 #include "src/clients/c++/library/grpc_client.h"
 #include "src/clients/c++/library/http_client.h"
 #include "src/core/constants.h"

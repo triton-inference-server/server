@@ -104,6 +104,19 @@ if(${TRITON_ENABLE_GPU})
 endif() # TRITON_ENABLE_GPU
 
 #
+# JSON utilities used by both clients and server
+#
+find_package(RapidJSON CONFIG REQUIRED)
+add_library(
+    triton-json-library EXCLUDE_FROM_ALL OBJECT
+    json.h
+)
+target_include_directories(
+  triton-json-library
+  PUBLIC ${RapidJSON_INCLUDE_DIRS}
+)
+
+#
 # Inference server core
 #
 if(${TRITON_ENABLE_GCS})
@@ -159,7 +172,6 @@ set(
   filesystem.h
   infer_request.h
   infer_response.h
-  json.h
   label_provider.h
   logging.h
   memory.h

@@ -42,13 +42,6 @@
 #include <thread>
 #include <vector>
 
-#ifdef TRITON_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#else
-struct cudaIpcMemHandle_t {
-};
-#endif  // TRITON_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class InferResult;
@@ -282,6 +275,20 @@ class InferInput {
   Error SetSharedMemory(
       const std::string& name, size_t byte_size, size_t offset = 0);
 
+  /// \return true if this input is being provided in shared memory.
+  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
+
+  /// Get information about the shared memory being used for this
+  /// input.
+  /// \param name Returns the name of the shared memory region.
+  /// \param byte_size Returns the size, in bytes, of the shared
+  /// memory region.
+  /// \param offset Returns the offset within the shared memory
+  /// region.
+  /// \return Error object indicating success or failure.
+  Error SharedMemoryInfo(
+      std::string* name, size_t* byte_size, size_t* offset) const;
+
   /// Append tensor values for this input from a vector or
   /// strings. This method can only be used for tensors with BYTES
   /// data-type. The strings are assigned in row-major order to the
@@ -307,9 +314,6 @@ class InferInput {
       const std::string& name, const std::vector<int64_t>& dims,
       const std::string& datatype);
 
-  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
-  Error SharedMemoryInfo(
-      std::string* name, size_t* batch_byte_size, size_t* offset) const;
   Error PrepareForRequest();
   Error GetNext(
       uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input);
@@ -360,6 +364,10 @@ class InferRequestedOutput {
   /// \return The name of the tensor.
   const std::string& Name() const { return name_; }
 
+  /// Get the number of classifications requested for this output, or
+  /// 0 if the output is not being returned as classifications.
+  size_t ClassificationCount() const { return class_count_; }
+
   /// Set the output tensor data to be written to specified shared
   /// memory region.
   /// \param region_name The name of the shared memory region.
@@ -379,6 +387,20 @@ class InferRequestedOutput {
   /// request.
   Error UnsetSharedMemory();
 
+  /// \return true if this output is being returned in shared memory.
+  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
+
+  /// Get information about the shared memory being used for this
+  /// output.
+  /// \param name Returns the name of the shared memory region.
+  /// \param byte_size Returns the size, in bytes, of the shared
+  /// memory region.
+  /// \param offset Returns the offset within the shared memory
+  /// region.
+  /// \return Error object indicating success or failure.
+  Error SharedMemoryInfo(
+      std::string* name, size_t* byte_size, size_t* offset) const;
+
  private:
 #ifdef TRITON_INFERENCE_SERVER_CLIENT_CLASS
   friend TRITON_INFERENCE_SERVER_CLIENT_CLASS;
@@ -386,10 +408,6 @@ class InferRequestedOutput {
 
   explicit InferRequestedOutput(
       const std::string& name, const size_t class_count = 0);
-  size_t ClassCount() const { return class_count_; }
-  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
-  Error SharedMemoryInfo(
-      std::string* name, size_t* batch_byte_size, size_t* offset) const;
 
   std::string name_;
   size_t class_count_;

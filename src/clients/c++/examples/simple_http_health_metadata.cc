@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
+#include "src/clients/c++/examples/json_utils.h"
 #include "src/clients/c++/library/http_client.h"
 
 namespace ni = nvidia::inferenceserver;
@@ -130,51 +131,73 @@ main(int argc, char** argv)
     exit(1);
   }
 
+  {
+    std::string server_metadata;
+    FAIL_IF_ERR(
+        client->ServerMetadata(&server_metadata, http_headers),
+        "unable to get server metadata");
 
-  rapidjson::Document server_metadata;
-  FAIL_IF_ERR(
-      client->ServerMetadata(&server_metadata, http_headers),
-      "unable to get server metadata");
-  if ((std::string(server_metadata["name"].GetString())).compare("triton") !=
-      0) {
-    std::cerr << "error: unexpected server metadata: "
-              << nic::GetJsonText(server_metadata) << std::endl;
-    exit(1);
+    rapidjson::Document server_metadata_json;
+    FAIL_IF_ERR(
+        nic::ParseJson(&server_metadata_json, server_metadata),
+        "failed to parse server metadata");
+    if ((std::string(server_metadata_json["name"].GetString()))
+            .compare("triton") != 0) {
+      std::cerr << "error: unexpected server metadata: " << server_metadata
+                << std::endl;
+      exit(1);
+    }
   }
 
+  {
+    std::string model_metadata;
+    FAIL_IF_ERR(
+        client->ModelMetadata(
+            &model_metadata, model_name, model_version, http_headers),
+        "unable to get model metadata");
 
-  rapidjson::Document model_metadata;
-  FAIL_IF_ERR(
-      client->ModelMetadata(
-          &model_metadata, model_name, model_version, http_headers),
-      "unable to get model metadata");
-  if ((std::string(model_metadata["name"].GetString())).compare(model_name) !=
-      0) {
-    std::cerr << "error: unexpected model metadata: "
-              << nic::GetJsonText(model_metadata) << std::endl;
-    exit(1);
+    rapidjson::Document model_metadata_json;
+    FAIL_IF_ERR(
+        nic::ParseJson(&model_metadata_json, model_metadata),
+        "failed to parse model metadata");
+    if ((std::string(model_metadata_json["name"].GetString()))
+            .compare(model_name) != 0) {
+      std::cerr << "error: unexpected model metadata: " << model_metadata
+                << std::endl;
+      exit(1);
+    }
   }
 
-  rapidjson::Document model_config;
-  FAIL_IF_ERR(
-      client->ModelConfig(
-          &model_config, model_name, model_version, http_headers),
-      "unable to get model config");
-  if ((std::string(model_config["name"].GetString())).compare(model_name) !=
-      0) {
-    std::cerr << "error: unexpected model config: "
-              << nic::GetJsonText(model_config) << std::endl;
-    exit(1);
+  {
+    std::string model_config;
+    FAIL_IF_ERR(
+        client->ModelConfig(
+            &model_config, model_name, model_version, http_headers),
+        "unable to get model config");
+
+    rapidjson::Document model_config_json;
+    FAIL_IF_ERR(
+        nic::ParseJson(&model_config_json, model_config),
+        "failed to parse model config");
+    if ((std::string(model_config_json["name"].GetString()))
+            .compare(model_name) != 0) {
+      std::cerr << "error: unexpected model config: " << model_config
+                << std::endl;
+      exit(1);
+    }
   }
 
-  nic::Error err = client->ModelMetadata(
-      &model_metadata, "wrong_model_name", model_version, http_headers);
-  if (err.IsOk()) {
-    std::cerr << "error: expected an error but got: " << err << std::endl;
-    exit(1);
+  {
+    std::string model_metadata;
+    nic::Error err = client->ModelMetadata(
+        &model_metadata, "wrong_model_name", model_version, http_headers);
+    if (err.IsOk()) {
+      std::cerr << "error: expected an error but got: " << err << std::endl;
+      exit(1);
+    }
   }
 
-  std::cout << err << std::endl;
+  std::cout << "SUCCESS" << std::endl;
 
   return 0;
 }
