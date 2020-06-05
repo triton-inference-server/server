@@ -37,7 +37,3 @@ HTTP/GRPC API
 Model Configuration
 -------------------
 * :doc:`src/core/model_config.proto <model_config.proto>`
-
-Status
-------
-* :doc:`src/core/server_status.proto <server_status.proto>`
