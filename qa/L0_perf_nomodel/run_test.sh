@@ -78,10 +78,18 @@ for BACKEND in $BACKENDS; do
         continue
     fi
 
-    MAX_LATENCY=300
-    MAX_BATCH=${STATIC_BATCH} && (( $DYNAMIC_BATCH > $STATIC_BATCH )) && MAX_BATCH=${DYNAMIC_BATCH}
+    # plan model support max batch size of 32 only. Skip for 16MB I/O tests
+    if [ $BACKEND == "plan" ]; then
+        continue
+    fi
 
-    if (( $DYNAMIC_BATCH > 1 )); then
+    # set naming (special case for libtorch model)
+    INPUT_NAME="INPUT0" && [ $BACKEND == "libtorch" ] && INPUT_NAME="INPUT__0"
+
+    MAX_LATENCY=300
+    MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
+
+    if [ $DYNAMIC_BATCH > 1 ]; then
         NAME=${BACKEND}_sbatch${STATIC_BATCH}_dbatch${DYNAMIC_BATCH}_instance${INSTANCE_CNT}
     else
         NAME=${BACKEND}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}
@@ -102,14 +110,14 @@ for BACKEND in $BACKENDS; do
         (cd models/$MODEL_NAME && \
             sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt)
     fi
-    if (( $DYNAMIC_BATCH > 1 )); then
+    if [ $DYNAMIC_BATCH > 1 ]; then
         (cd models/$MODEL_NAME && \
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
 
     SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
     run_server
-    if (( $SERVER_PID == 0 )); then
+    if [ $SERVER_PID == 0 ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
         exit 1
@@ -122,13 +130,13 @@ for BACKEND in $BACKENDS; do
                  ${PERF_CLIENT_EXTRA_ARGS} \
                  ${PERF_CLIENT_PROTOCOL_ARGS} -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
-                 --shape INPUT0:${SHAPE} \
+                 --shape ${INPUT_NAME}:${SHAPE} \
                  -f ${RESULTDIR}/${NAME}.csv >> ${RESULTDIR}/${NAME}.log 2>&1
-    if (( $? != 0 )); then
+    if [ $? -ne 0 ]; then
         RET=1
     fi
     curl localhost:8002/metrics -o ${RESULTDIR}/${NAME}.metrics >> ${RESULTDIR}/${NAME}.log 2>&1
-    if (( $? != 0 )); then
+    if [ $? -ne 0 ]; then
         RET=1
     fi
     set -e
@@ -157,7 +165,7 @@ for BACKEND in $BACKENDS; do
         fi
 
         $REPORTER -v -o ${RESULTDIR}/${NAME}.json --csv ${RESULTDIR}/${NAME}.csv ${URL_FLAG} ${RESULTDIR}/${NAME}.tjson
-        if (( $? != 0 )); then
+        if [ $? -ne 0 ]; then
             RET=1
         fi
 
@@ -168,7 +176,7 @@ for BACKEND in $BACKENDS; do
  done
 done
 
-if (( $RET == 0 )); then
+if [ $RET == 0 ]; then
     echo -e "\n***\n*** Test ${RESULTNAME} Passed\n***"
 else
     echo -e "\n***\n*** Test ${RESULTNAME} FAILED\n***"
