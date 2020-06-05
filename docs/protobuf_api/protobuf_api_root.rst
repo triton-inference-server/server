@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -28,11 +28,9 @@
 Protobuf API
 ============
 
-HTTP/GRPC API
--------------
-* :doc:`src/core/api.proto <api.proto>`
+GRPC API
+--------
 * :doc:`src/core/grpc_service.proto <grpc_service.proto>`
-* :doc:`src/core/request_status.proto <request_status.proto>`
 
 Model Configuration
 -------------------
