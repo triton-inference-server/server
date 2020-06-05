@@ -363,7 +363,7 @@ ConcurrencyManager::Infer(
       } else {
         struct timespec start_time_sync, end_time_sync;
         clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
-        nic::InferResult* results;
+        nic::InferResult* results = nullptr;
         thread_stat->status_ = ctxs[ctx_id]->infer_client_->Infer(
             &results, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
             ctxs[ctx_id]->outputs_);
