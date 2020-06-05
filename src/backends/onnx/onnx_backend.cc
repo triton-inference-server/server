@@ -276,7 +276,7 @@ OnnxBackend::CreateExecutionContext(
 #ifdef TRITON_ENABLE_ONNXRUNTIME_OPENVINO
         need_lock = true;
         RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_OpenVINO(
-            session_options, "CPU"));
+            session_options, ""));
         LOG_VERBOSE(1) << "OpenVINO Execution Accelerator is set for "
                        << instance_name << " on device CPU";
 #else
