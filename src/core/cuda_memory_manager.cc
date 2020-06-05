@@ -97,11 +97,13 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
       }
     }
 
-    RETURN_IF_CNMEM_ERROR(
-        cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW),
-        std::string("Failed to finalize CUDA memory manager"));
+    if (!devices.empty()) {
+      RETURN_IF_CNMEM_ERROR(
+          cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW),
+          std::string("Failed to finalize CUDA memory manager"));
+    }
     // Use to finalize CNMeM properly when out of scope
-    instance_.reset(new CudaMemoryManager());
+    instance_.reset(new CudaMemoryManager(!devices.empty()));
   } else {
     return Status(
         Status::Code::INTERNAL,
@@ -117,6 +119,10 @@ CudaMemoryManager::Alloc(void** ptr, uint64_t size, int64_t device_id)
   if (instance_ == nullptr) {
     return Status(
         Status::Code::UNAVAILABLE, "CudaMemoryManager has not been created");
+  } else if (!instance_->has_allocation_) {
+    return Status(
+        Status::Code::UNAVAILABLE,
+        "CudaMemoryManager has no preallocated CUDA memory");
   }
 
   int current_device;
@@ -147,6 +153,10 @@ CudaMemoryManager::Free(void* ptr, int64_t device_id)
   if (instance_ == nullptr) {
     return Status(
         Status::Code::UNAVAILABLE, "CudaMemoryManager has not been created");
+  } else if (!instance_->has_allocation_) {
+    return Status(
+        Status::Code::UNAVAILABLE,
+        "CudaMemoryManager has no preallocated CUDA memory");
   }
 
   int current_device;
