@@ -34,6 +34,7 @@
 #include <iostream>
 #include <list>
 #include <mutex>
+#include <set>
 
 #ifdef TRITON_ENABLE_ASAN
 #include <sanitizer/lsan_interface.h>
