@@ -26,9 +26,9 @@
 #pragma once
 
 #include <cstring>
+#include <map>
+#include <memory>
 #include <mutex>
-#include <unordered_map>
-#include "src/core/server_status.pb.h"
 #include "src/core/tritonserver.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
@@ -37,9 +37,6 @@
 #define TRITONJSON_STATUSSUCCESS nullptr
 #include "src/core/json.h"
 
-#ifdef TRITON_ENABLE_GRPC
-#include "src/core/grpc_service.grpc.pb.h"
-#endif
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -123,8 +120,6 @@ class SharedMemoryManager {
   TRITONSERVER_Error* UnregisterAll(TRITONSERVER_MemoryType memory_type);
 
  private:
-  /// A helper function to remove the named shared memory blocks.
-  TRITONSERVER_Error* UnregisterHelper(const std::string& name);
 
   /// A helper function to remove the named shared memory blocks of
   /// specified type
