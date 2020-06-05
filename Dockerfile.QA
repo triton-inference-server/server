@@ -192,7 +192,11 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     mkdir -p qa/L0_sequence_batcher_shm && \
     cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_shm && \
     mkdir -p qa/L0_sequence_batcher_cudashm && \
-    cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_cudashm
+    cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_cudashm && \
+    mkdir -p qa/L0_perf_nomodel_shm && \
+    cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_shm && \
+    mkdir -p qa/L0_perf_nomodel_cudashm && \
+    cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.
