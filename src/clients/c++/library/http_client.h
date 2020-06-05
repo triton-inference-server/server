@@ -319,9 +319,9 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// \param result Returns the result of inference.
   /// \param options The options for inference request.
   /// \param inputs The vector of InferInput describing the model inputs.
-  /// \param outputs Optional vector of InferRequestedOutput describing how the
-  /// output must be returned. If not provided then all the outputs in the model
-  /// config will be returned as default settings.
+  /// \param outputs The vector of InferRequestedOutput describing how the
+  /// output must be returned. The server will return the result for only
+  /// these requested outputs.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in request.
   /// \param query_params Optional map specifying parameters that must be
@@ -351,9 +351,9 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// \param callback The callback function to be invoked on request completion.
   /// \param options The options for inference request.
   /// \param inputs The vector of InferInput describing the model inputs.
-  /// \param outputs Optional vector of InferRequestedOutput describing how the
-  /// output must be returned. If not provided then all the outputs in the model
-  /// config will be returned as default settings.
+  /// \param outputs The vector of InferRequestedOutput describing how the
+  /// output must be returned. The server will return the result for only
+  /// these requested outputs.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in request.
   /// \param query_params Optional map specifying parameters that must be
