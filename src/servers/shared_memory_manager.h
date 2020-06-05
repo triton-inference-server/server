@@ -120,7 +120,6 @@ class SharedMemoryManager {
   TRITONSERVER_Error* UnregisterAll(TRITONSERVER_MemoryType memory_type);
 
  private:
-
   /// A helper function to remove the named shared memory blocks of
   /// specified type
   TRITONSERVER_Error* UnregisterHelper(
