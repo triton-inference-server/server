@@ -69,14 +69,14 @@ RUNTEST=./run_test.sh
 # by 4.
 TENSOR_SIZE_16MB=$((4*1024*1024))
 
-if [ "$TEST_SHARED_MEMORY" == "system" ]; then
+if [ "$BENCHMARK_TEST_SHARED_MEMORY" == "system" ]; then
     UNDERTEST_NAME="$UNDERTEST_NAME System Shared Memory";
     SUFFIX="_shm"
-elif [ "$TEST_SHARED_MEMORY" == "cuda" ]; then
+elif [ "$BENCHMARK_TEST_SHARED_MEMORY" == "cuda" ]; then
     UNDERTEST_NAME="$UNDERTEST_NAME CUDA Shared Memory";
     SUFFIX="_cudashm"
 else
-    TEST_SHARED_MEMORY="none"
+    BENCHMARK_TEST_SHARED_MEMORY="none"
     TEST_NAMES=(
         "${UNDERTEST_NAME} Minimum Latency GRPC"
         "${UNDERTEST_NAME} Minimum Latency HTTP"
@@ -167,7 +167,7 @@ for idx in "${!TEST_NAMES[@]}"; do
                 PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
                 TENSOR_SIZE=${TEST_TENSOR_SIZE} \
                 BACKENDS=${TEST_BACKENDS} \
-                SHARED_MEMORY=${TEST_SHARED_MEMORY} \
+                SHARED_MEMORY=${BENCHMARK_TEST_SHARED_MEMORY} \
                 STATIC_BATCH_SIZES=1 \
                 DYNAMIC_BATCH_SIZES=1 \
                 INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
