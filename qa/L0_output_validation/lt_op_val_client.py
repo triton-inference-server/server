@@ -46,22 +46,6 @@ class OutputValidationTest(unittest.TestCase):
         msg = response.json()["error"]
         self.assertTrue(msg.startswith("The output OUTPUT__1 in the model configuration refers to an output index which doesn't exist. This model has 1 outputs"))
 
-    # for shape mismatch
-    def test_shape(self):
-        url = 'http://localhost:8000/v2/models/libtorch_shape_1_float32/infer'
-        body = '{"inputs":[{"name":"INPUT__0","shape":[1,1],"datatype":"FP32","data":[1.0]}],"outputs":[{"name":"OUTPUT__0"}]}'
-        response = requests.post(url, data=body)
-        msg=response.json()["error"]
-        self.assertTrue(msg.startswith("tensor 'OUTPUT__0': the model expects 4 dimensions (shape [1,1,1,1]) but the model configuration specifies 4 dimensions (an initial batch dimension because max_batch_size > 0 followed by the explicit tensor shape, making complete shape [-1,2,1,1])"))
-
-    # for reshape mismatch
-    def test_reshape(self):
-        url = 'http://localhost:8000/v2/models/libtorch_reshape_1_float32/infer'
-        body = '{"inputs":[{"name":"INPUT__0","shape":[1,1],"datatype":"FP32","data":[1.0]}],"outputs":[{"name":"OUTPUT__0"}]}'
-        response = requests.post(url, data=body)
-        msg=response.json()["error"]
-        self.assertTrue(msg.startswith("tensor 'OUTPUT__0': the model expects 4 dimensions (shape [1,1,1,1]) but the model configuration specifies 3 dimensions (an initial batch dimension because max_batch_size > 0 followed by the explicit tensor shape, making complete shape [-1,1,1]"))
-
     # for naming convention violation
     def test_name(self):
         url = 'http://localhost:8000/v2/models/libtorch_name_1_float32/infer'
