@@ -143,7 +143,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def _multi_sequence_impl(self, trials, expected_batch_exec, sleep_secs, tensor_shapes):
+    def _multi_sequence_impl(self, trials, expected_batch_exec, expected_exec_cnt, sleep_secs, tensor_shapes):
         for trial in trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
@@ -227,7 +227,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, expected_batch_exec, 11, 11)
+                self.check_status(model_name, expected_batch_exec, expected_exec_cnt, 11)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -239,33 +239,32 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
 
     def test_multi_sequence(self):
         # Send four sequences in series and make sure they get
-        # completely batched into batch-size 4 inferences.
-        self._multi_sequence_impl(_trials, {4: 3}, 1, (1, 1, 1, 1))
+        # batched correctly.
+        self._multi_sequence_impl(_trials, {4:2, 3:1}, 3, 1, (1, 1, 1, 1))
 
     def test_multi_parallel_sequence(self):
         # Send four sequences in parallel and make sure they get
-        # completely batched into batch-size 4 inferences.
-        self._multi_sequence_impl(_trials, {4: 3}, 0, (1, 1, 1, 1))
+        # batched correctly.
+        self._multi_sequence_impl(_trials, {4:2, 3:1}, 3, 0, (1, 1, 1, 1))
 
     def test_multi_sequence_different_shape(self):
         # Send four sequences in parallel where the requests in each
-        # sequence have different shape. Sequence should not be
-        # (completely) batched due to input tensor size differences.
-        self._multi_sequence_impl(_ragged_batch_supported_trials, {1: 11}, 0, (4, 3, 1, 2))
+        # sequence have different shape. Sequences should not be
+        # batched due to input tensor size differences.
+        self._multi_sequence_impl(_ragged_batch_supported_trials, {1:11}, 11, 0, (4, 3, 1, 2))
 
     def test_multi_sequence_different_shape_allow_ragged(self):
         # Send four sequences in parallel where the requests in each
         # sequence have different shape. Input is marked as allowing
         # ragged and so sequences should be batched even with input
         # tensor size differences.
-        self._multi_sequence_impl(_ragged_batch_supported_trials, {4: 3}, 0, (4, 3, 1, 2))
+        self._multi_sequence_impl(_ragged_batch_supported_trials, {4:2, 3:1}, 3, 1, (4, 3, 1, 2))
 
     def test_backlog(self):
-        # Test model instances together are configured with
-        # total-max-batch-size 4. Send 5 equal-length sequences in
-        # parallel and make sure they get completely batched into
-        # batch-size 4 inferences plus the 5th should go in the
-        # backlog and then get handled once there is a free slot.
+        # Send 5 equal-length sequences in parallel and make sure they
+        # get completely batched into batch-size 4 inferences plus the
+        # 5th should go in the backlog and then get handled once there
+        # is a free slot.
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
@@ -344,7 +343,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 3, 1: 3}, 15, 15)
+                self.check_status(model_name, {4: 3, 1: 3}, 6, 15)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -356,11 +355,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.cleanup_shm_regions(precreated_shm4_handles)
 
     def test_backlog_fill(self):
-        # Test model instances together are configured with
-        # total-max-batch-size 4. Send 4 sequences in parallel, two of
-        # which are shorter. Send 2 additional sequences that should
-        # go into backlog but should immediately fill into the short
-        # sequences.
+        # Send 4 sequences in parallel, two of which are shorter. Send
+        # 2 additional sequences that should go into backlog but
+        # should immediately fill into the short sequences.
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
@@ -452,7 +449,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 3}, 12, 12)
+                self.check_status(model_name, {4: 3}, 3, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -564,7 +561,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Expecting the requests of the same sequence to be in the same
                 # slot, so the execution for thelast long sequence will be
                 # padded to a batch.
-                self.check_status(model_name, {4: 3, 3: 2}, 14, 14)
+                self.check_status(model_name, {4: 3, 1: 2}, 5, 14)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
