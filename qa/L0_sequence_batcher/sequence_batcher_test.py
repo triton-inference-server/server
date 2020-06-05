@@ -90,6 +90,14 @@ if os.environ['BATCHER_TYPE'] == "VARIABLE":
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
 
+# Checks whether the provided model name belongs to an ensemble
+# model.
+def is_ensemble(model_name):
+    for prefix in ENSEMBLE_PREFIXES:
+        if model_name.startswith(prefix):
+            return True
+    return False
+
 class SequenceBatcherTest(su.SequenceBatcherTestUtil):
     def get_datatype(self, trial):
         # Get the datatype to use based on what models are available (see test.sh)
@@ -442,9 +450,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                stats_batch_size = 2 if MODEL_INSTANCES == 1 else 1
-                exec_cnt = 4 if MODEL_INSTANCES == 1 else 8
-                self.check_status(model_name, {stats_batch_size: 4 * min(2, MODEL_INSTANCES)},
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
+                    self.check_status(model_name, {1:8}, 8, 8)
+                else:
+                    stats_batch_size = 2 if MODEL_INSTANCES == 1 else 1
+                    exec_cnt = 4 if MODEL_INSTANCES == 1 else 8
+                    self.check_status(model_name, {stats_batch_size: 4 * min(2, MODEL_INSTANCES)},
                                   exec_cnt, 8)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
@@ -531,18 +543,22 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                # Batch size is 4 for the first two inferences and
-                # then 2 for the second two inferences. This is
-                # because we request the longer sequences first
-                # (threads 1 and 3) in slots 0 and 1 and so after
-                # shorter sequences are complete there are only slots
-                # 0 and 1 to execute.
-                if MODEL_INSTANCES == 1:
-                    self.check_status(model_name, {2:2, 4:2}, 4, 12)
-                elif MODEL_INSTANCES == 2:
-                    self.check_status(model_name, {2:4, 1:4}, 8, 12)
-                elif MODEL_INSTANCES == 4:
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
                     self.check_status(model_name, {1:12}, 12, 12)
+                else:
+                    # Batch size is 4 for the first two inferences and
+                    # then 2 for the second two inferences. This is
+                    # because we request the longer sequences first
+                    # (threads 1 and 3) in slots 0 and 1 and so after
+                    # shorter sequences are complete there are only slots
+                    # 0 and 1 to execute.
+                    if MODEL_INSTANCES == 1:
+                        self.check_status(model_name, {2:2, 4:2}, 4, 12)
+                    elif MODEL_INSTANCES == 2:
+                        self.check_status(model_name, {2:4, 1:4}, 8, 12)
+                    elif MODEL_INSTANCES == 4:
+                        self.check_status(model_name, {1:12}, 12, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -627,7 +643,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {(4 / MODEL_INSTANCES):(3 * MODEL_INSTANCES)},
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
+                    self.check_status(model_name, {1:12}, 12, 12)
+                else:
+                    self.check_status(model_name, {(4 / MODEL_INSTANCES):(3 * MODEL_INSTANCES)},
                                   3 * MODEL_INSTANCES, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
@@ -731,7 +751,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4:9}, 9, 12)
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
+                    self.check_status(model_name, {1:12}, 12, 12)
+                else:
+                    self.check_status(model_name, {4:9}, 9, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -831,7 +855,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 3}, 3, 12)
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
+                    self.check_status(model_name, {1:12}, 12, 12)
+                else:
+                    self.check_status(model_name, {4: 3}, 3, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -929,12 +957,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                if MODEL_INSTANCES == 1:
-                    self.check_status(model_name, {4:3,1:3}, 6, 15)
-                elif MODEL_INSTANCES == 2:
-                    self.check_status(model_name, {2:6,1:3}, 9, 15)
-                else:
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
                     self.check_status(model_name, {1:15}, 15, 15)
+                else:
+                    if MODEL_INSTANCES == 1:
+                        self.check_status(model_name, {4:3,1:3}, 6, 15)
+                    elif MODEL_INSTANCES == 2:
+                        self.check_status(model_name, {2:6,1:3}, 9, 15)
+                    else:
+                        self.check_status(model_name, {1:15}, 15, 15)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1051,7 +1083,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 3}, 3, 12)
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
+                    self.check_status(model_name, {1: 12}, 12, 12)
+                else:
+                    self.check_status(model_name, {4: 3}, 3, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1176,10 +1212,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                # Expecting 3 batch-size 4 inferences and then the
-                # 1006 sequence will follow 1003 (a different
-                # implementation could also follow 1002...)
-                self.check_status(model_name, {4:3, 3:2}, 5, 14)
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
+                    self.check_status(model_name, {1:14}, 14, 14)
+                else:
+                    # Expecting 3 batch-size 4 inferences and then the
+                    # 1006 sequence will follow 1003 (a different
+                    # implementation could also follow 1002...)
+                    self.check_status(model_name, {4:3, 3:2}, 5, 14)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1282,11 +1322,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                if MODEL_INSTANCES != 4:
-                    batch_exec = {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES), 1: 2}
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
+                    self.check_status(model_name, {1:14}, 14, 14)
                 else:
-                    batch_exec = {1: (3 * MODEL_INSTANCES) + 2}
-                self.check_status(model_name, batch_exec, (3 * MODEL_INSTANCES) + 2, 14)
+                    if MODEL_INSTANCES != 4:
+                        batch_exec = {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES), 1: 2}
+                    else:
+                        batch_exec = {1: (3 * MODEL_INSTANCES) + 2}
+                    self.check_status(model_name, batch_exec, (3 * MODEL_INSTANCES) + 2, 14)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1401,7 +1445,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 4}, 4, 16)
+                if is_ensemble(model_name):
+                    # Requests do not get batched for the ensemble model
+                    self.check_status(model_name, {1:16}, 16, 16)
+                else:
+                    self.check_status(model_name, {4: 4}, 4, 16)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
