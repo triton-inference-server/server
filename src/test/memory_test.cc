@@ -71,24 +71,49 @@ class CudaMemoryManagerTest : public ::testing::Test {
   ni::CudaMemoryManager::Options options_;
 };
 
-TEST_F(CudaMemoryManagerTest, Init)
+TEST_F(CudaMemoryManagerTest, InitOOM)
 {
   // Set to reserve too much memory
-  {
-    double cc = 6.0;
-    std::map<int, uint64_t> s{{0, uint64_t(1) << 40 /* 1024 GB */}};
-    const ni::CudaMemoryManager::Options options{cc, s};
-    auto status = ni::CudaMemoryManager::Create(options);
-    EXPECT_FALSE(status.IsOk()) << "Expect creation error";
-  }
+  double cc = 6.0;
+  std::map<int, uint64_t> s{{0, uint64_t(1) << 40 /* 1024 GB */}};
+  const ni::CudaMemoryManager::Options options{cc, s};
+  auto status = ni::CudaMemoryManager::Create(options);
+  EXPECT_FALSE(status.IsOk()) << "Expect creation error";
+}
 
-  {
-    double cc = 6.0;
-    std::map<int, uint64_t> s{{0, 1 << 10 /* 1024 bytes */}};
-    const ni::CudaMemoryManager::Options options{cc, s};
-    auto status = ni::CudaMemoryManager::Create(options);
-    EXPECT_TRUE(status.IsOk()) << status.Message();
-  }
+TEST_F(CudaMemoryManagerTest, InitSuccess)
+{
+  double cc = 6.0;
+  std::map<int, uint64_t> s{{0, 1 << 10 /* 1024 bytes */}};
+  const ni::CudaMemoryManager::Options options{cc, s};
+  auto status = ni::CudaMemoryManager::Create(options);
+  EXPECT_TRUE(status.IsOk()) << status.Message();
+}
+
+TEST_F(CudaMemoryManagerTest, InitNoDeviceConfig)
+{
+  double cc = 6.0;
+  std::map<int, uint64_t> s;
+  const ni::CudaMemoryManager::Options options{cc, s};
+  auto status = ni::CudaMemoryManager::Create(options);
+  EXPECT_TRUE(status.IsOk()) << status.Message();
+
+  void* ptr = nullptr;
+  status = ni::CudaMemoryManager::Alloc(&ptr, 1, 0);
+  ASSERT_FALSE(status.IsOk()) << "Unexpected successful allocation";
+}
+
+TEST_F(CudaMemoryManagerTest, InitZeroByte)
+{
+  double cc = 6.0;
+  std::map<int, uint64_t> s{{0, 0}};
+  const ni::CudaMemoryManager::Options options{cc, s};
+  auto status = ni::CudaMemoryManager::Create(options);
+  EXPECT_TRUE(status.IsOk()) << status.Message();
+
+  void* ptr = nullptr;
+  status = ni::CudaMemoryManager::Alloc(&ptr, 1, 0);
+  ASSERT_FALSE(status.IsOk()) << "Unexpected successful allocation";
 }
 
 TEST_F(CudaMemoryManagerTest, AllocSuccess)
