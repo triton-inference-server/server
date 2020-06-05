@@ -45,7 +45,7 @@ fi
 
 RET=0
 
-git clone --single-branch --depth=1 -b $UPS
+git clone --single-branch --depth=1 -b ${UPSTREAM_BRANCH_NAME} \
         https://github.com/NVIDIA/triton-inference-server.git && \
         cd triton-inference-server/src/clients/go && \
         bash gen_go_stubs.sh
