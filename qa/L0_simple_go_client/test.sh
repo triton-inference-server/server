@@ -27,7 +27,7 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
-SIMPLE_GO_CLIENT=simple_go_client.go
+SIMPLE_GO_CLIENT=../clients/grpc_simple_client.go
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
@@ -45,10 +45,14 @@ fi
 
 RET=0
 
-git clone --single-branch --depth=1 -b ${UPSTREAM_BRANCH_NAME} \
-        https://github.com/NVIDIA/triton-inference-server.git && \
-        cd triton-inference-server/src/clients/go && \
-        bash gen_go_stubs.sh
+# Fix to allow global stubs import
+sed -i 's/.\/nvidia_inferenceserver/nvidia_inferenceserver/g' $SIMPLE_GO_CLIENT
+
+PACKAGE_PATH="${GOPATH}/src/nvidia_inferenceserver"
+
+mkdir -p ${PACKAGE_PATH}
+# Requires protoc and protoc-gen-go plugin: https://github.com/golang/protobuf#installation
+protoc -I core --go_out=plugins=grpc:${PACKAGE_PATH} core/*.proto
 
 set +e
 
