@@ -96,45 +96,6 @@ class SharedMemoryManager {
       const std::string& name, size_t offset, void** shm_mapped_addr,
       TRITONSERVER_MemoryType* memory_type, int64_t* device_id);
 
-  /// FIXME remove the Unregister/GetStatus that don't require mem type arg
-
-  /// Removes the named shared memory block from the manager. Any future
-  /// attempt to get the details of this block will result in an array
-  /// till another block with the same name is added to the manager.
-  /// \param name The name of the shared memory block to remove.
-  /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* Unregister(const std::string& name);
-
-  /// Unregister all shared memory blocks from the manager.
-  /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* UnregisterAll();
-
-  /// Populates the status of active shared memory regions in the
-  /// specified protobuf message.
-  /// \param status Returns status of active shared meeory blocks
-  /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* GetStatus(SharedMemoryStatus* status);
-
-#ifdef TRITON_ENABLE_GRPC
-  /// Populates the status of active system shared memory regions
-  /// in the response protobuf. If 'name' is missing then return status of
-  /// all active system shared memory regions.
-  /// \param name The name of the shared memory block to get the status of.
-  /// \param shm_status Returns status of active shared meeory blocks
-  /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* GetStatus(
-      const std::string& name, SystemSharedMemoryStatusResponse*& shm_status);
-
-  /// Populates the status of active CUDA shared memory regions
-  /// in the response protobuf. If 'name' is missing then return status of
-  /// all active CUDA shared memory regions.
-  /// \param name The name of the shared memory block to get the status of.
-  /// \param shm_status Returns status of active shared meeory blocks.
-  /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* GetStatus(
-      const std::string& name, CudaSharedMemoryStatusResponse*& shm_status);
-#endif  // TRITON_ENABLE_GRPC
-
   /// Populates the status of active system/CUDA shared memory regions
   /// in the status JSON. If 'name' is empty then return status of all
   /// active system/CUDA shared memory regions as specified by 'memory_type'.

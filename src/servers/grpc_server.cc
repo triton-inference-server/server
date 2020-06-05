@@ -1362,9 +1362,44 @@ CommonHandler::SetUpAllRequests()
       [this](
           SystemSharedMemoryStatusRequest& request,
           SystemSharedMemoryStatusResponse* response, grpc::Status* status) {
-        TRITONSERVER_Error* err =
-            shm_manager_->GetStatus(request.name(), response);
+        TritonJson::Value shm_status_json(TritonJson::ValueType::ARRAY);
+        TRITONSERVER_Error* err = shm_manager_->GetStatus(
+            request.name(), TRITONSERVER_MEMORY_CPU, &shm_status_json);
+        GOTO_IF_ERR(err, earlyexit);
 
+        for (size_t idx = 0; idx < shm_status_json.ArraySize(); ++idx) {
+          TritonJson::Value shm_region_json;
+          err = shm_status_json.IndexAsObject(idx, &shm_region_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          const char* name;
+          size_t namelen;
+          err = shm_region_json.MemberAsString("name", &name, &namelen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          const char* key;
+          size_t keylen;
+          err = shm_region_json.MemberAsString("key", &key, &keylen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          uint64_t offset;
+          err = shm_region_json.MemberAsUInt("offset", &offset);
+          GOTO_IF_ERR(err, earlyexit);
+
+          uint64_t byte_size;
+          err = shm_region_json.MemberAsUInt("byte_size", &byte_size);
+          GOTO_IF_ERR(err, earlyexit);
+
+          SystemSharedMemoryStatusResponse::RegionStatus region_status;
+          region_status.set_name(std::string(name, namelen));
+          region_status.set_key(std::string(key, keylen));
+          region_status.set_offset(offset);
+          region_status.set_byte_size(byte_size);
+
+          (*response->mutable_regions())[name] = region_status;
+        }
+
+      earlyexit:
         GrpcStatusUtil::Create(status, err);
         TRITONSERVER_ErrorDelete(err);
       };
@@ -1463,9 +1498,38 @@ CommonHandler::SetUpAllRequests()
       [this](
           CudaSharedMemoryStatusRequest& request,
           CudaSharedMemoryStatusResponse* response, grpc::Status* status) {
-        TRITONSERVER_Error* err =
-            shm_manager_->GetStatus(request.name(), response);
+        TritonJson::Value shm_status_json(TritonJson::ValueType::ARRAY);
+        TRITONSERVER_Error* err = shm_manager_->GetStatus(
+            request.name(), TRITONSERVER_MEMORY_GPU, &shm_status_json);
+        GOTO_IF_ERR(err, earlyexit);
 
+        for (size_t idx = 0; idx < shm_status_json.ArraySize(); ++idx) {
+          TritonJson::Value shm_region_json;
+          err = shm_status_json.IndexAsObject(idx, &shm_region_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          const char* name;
+          size_t namelen;
+          err = shm_region_json.MemberAsString("name", &name, &namelen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          uint64_t device_id;
+          err = shm_region_json.MemberAsUInt("device_id", &device_id);
+          GOTO_IF_ERR(err, earlyexit);
+
+          uint64_t byte_size;
+          err = shm_region_json.MemberAsUInt("byte_size", &byte_size);
+          GOTO_IF_ERR(err, earlyexit);
+
+
+          CudaSharedMemoryStatusResponse::RegionStatus region_status;
+          region_status.set_name(std::string(name, namelen));
+          region_status.set_device_id(device_id);
+          region_status.set_byte_size(byte_size);
+
+          (*response->mutable_regions())[name] = region_status;
+        }
+      earlyexit:
         GrpcStatusUtil::Create(status, err);
         TRITONSERVER_ErrorDelete(err);
       };
