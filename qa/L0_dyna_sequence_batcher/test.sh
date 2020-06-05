@@ -103,8 +103,8 @@ done
 
 export NO_BATCHING=0
 for i in \
-    test_multi_sequence_different_shape \
-    test_multi_sequence \
+        test_multi_sequence_different_shape \
+        test_multi_sequence \
         test_multi_parallel_sequence \
         test_backlog \
         test_backlog_fill \
