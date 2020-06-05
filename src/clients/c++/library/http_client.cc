@@ -330,6 +330,9 @@ HttpInferRequest::PrepareRequestJson(
     }
 
     request_json->Add("outputs", std::move(outputs_json));
+  } else {
+    return Error(
+        "request should include atleast one InferRequestedOutput object");
   }
 
   return Error::Success;
