@@ -85,6 +85,12 @@ class InferenceRequest {
     const std::vector<int64_t>& Shape() const { return shape_; }
     std::vector<int64_t>* MutableShape() { return &shape_; }
 
+    // Whether or not the input is a tensorrt shape tensor
+    bool IsShapeTensor() const { return is_shape_tensor_; }
+
+    // Set the input to be treated as a shape tensor.
+    Status SetShapeTensor(const bool is_shape_tensor);
+
     // The data for this input.
     const std::shared_ptr<Memory>& Data() const { return data_; }
 
@@ -128,6 +134,7 @@ class InferenceRequest {
     DataType datatype_;
     std::vector<int64_t> original_shape_;
     std::vector<int64_t> shape_;
+    bool is_shape_tensor_;
     std::shared_ptr<Memory> data_;
   };
 
@@ -152,8 +159,7 @@ class InferenceRequest {
       InferenceBackend* backend, const int64_t requested_model_version)
       : needs_normalization_(true), backend_raw_(backend),
         requested_model_version_(requested_model_version), flags_(0),
-        correlation_id_(0), batch_size_(0), timeout_us_(0),
-        collect_stats_(true)
+        correlation_id_(0), batch_size_(0), timeout_us_(0), collect_stats_(true)
   {
     SetPriority(0);
   }
