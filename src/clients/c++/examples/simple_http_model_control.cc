@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
+#include "src/clients/c++/examples/json_utils.h"
 #include "src/clients/c++/library/http_client.h"
 
 namespace ni = nvidia::inferenceserver;
@@ -102,14 +103,20 @@ main(int argc, char** argv)
       nic::InferenceServerHttpClient::Create(&client, url, verbose),
       "unable to create http client");
 
-  rapidjson::Document repository_index;
-  FAIL_IF_ERR(
-      client->ModelRepositoryIndex(&repository_index, http_headers),
-      "Failed to get repository index");
-  if (repository_index.Size() != 9) {
-    std::cerr << "expected number of models 9, got " << repository_index.Size()
-              << std::endl;
-    exit(1);
+  {
+    std::string repository_index;
+    FAIL_IF_ERR(
+        client->ModelRepositoryIndex(&repository_index, http_headers),
+        "Failed to get repository index");
+    rapidjson::Document repository_index_json;
+    FAIL_IF_ERR(
+        nic::ParseJson(&repository_index_json, repository_index),
+        "failed to parse model config");
+    if (repository_index_json.Size() != 9) {
+      std::cerr << "expected number of models 9, got "
+                << repository_index_json.Size() << std::endl;
+      exit(1);
+    }
   }
 
 

@@ -347,6 +347,7 @@ add_library(
   $<TARGET_OBJECTS:server-library>
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
+  $<TARGET_OBJECTS:triton-json-library>
   ${CUDA_OBJS}
   ${BACKEND_OBJS}
 )

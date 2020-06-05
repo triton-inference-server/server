@@ -41,7 +41,8 @@ RUN yum install -y \
         libtool \
         make \
         python3 \
-        python3-pip && \
+        python3-pip \
+        rapidjson-devel && \
     yum clean all && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools

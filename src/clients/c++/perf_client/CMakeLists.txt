@@ -31,8 +31,6 @@ if(WIN32)
 		      "are UNIX specific.")
 else()
 
-find_package(RapidJSON CONFIG REQUIRED)
-
 set(
   PERF_CLIENT_SRCS
   perf_client.cc
@@ -62,11 +60,12 @@ set(
  ../examples/shm_utils.h
 )
 
-add_executable(perf_client
-  ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
-target_include_directories(
+add_executable(
   perf_client
-  PRIVATE ${RapidJSON_INCLUDE_DIRS})
+  ${PERF_CLIENT_SRCS}
+  ${PERF_CLIENT_HDRS}
+  $<TARGET_OBJECTS:json-utils-library>
+)
 target_link_libraries(
   perf_client
   PRIVATE TRITON::grpcclient_static

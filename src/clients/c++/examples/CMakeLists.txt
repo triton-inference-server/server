@@ -38,11 +38,31 @@ else()
   )
 
   #
+  # json_utils
+  #
+  find_package(RapidJSON CONFIG REQUIRED)
+  add_library(
+      json-utils-library EXCLUDE_FROM_ALL OBJECT
+      json_utils.h json_utils.cc
+  )
+  target_include_directories(
+    json-utils-library
+    PUBLIC ${RapidJSON_INCLUDE_DIRS}
+  )
+
+  #
   # image_client
   #
   find_package(OpenCV REQUIRED)
-  add_executable(image_client image_client.cc)
-  target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
+  add_executable(
+    image_client
+    image_client.cc
+    $<TARGET_OBJECTS:json-utils-library>
+  )
+  target_include_directories(
+    image_client
+    PRIVATE ${OpenCV_INCLUDE_DIRS}
+  )
   target_link_libraries(
     image_client
     PRIVATE TRITON::grpcclient_static
@@ -57,7 +77,11 @@ else()
   #
   # ensemble_image_client
   #
-  add_executable(ensemble_image_client ensemble_image_client.cc)
+  add_executable(
+    ensemble_image_client
+    ensemble_image_client.cc
+    $<TARGET_OBJECTS:json-utils-library>
+  )
   target_link_libraries(
     ensemble_image_client
     PRIVATE TRITON::grpcclient_static
@@ -208,7 +232,11 @@ else()
   #
   # simple_http_health_metadata
   #
-  add_executable(simple_http_health_metadata simple_http_health_metadata.cc)
+  add_executable(
+    simple_http_health_metadata
+    simple_http_health_metadata.cc
+    $<TARGET_OBJECTS:json-utils-library>
+  )
   target_link_libraries(
     simple_http_health_metadata
     PRIVATE TRITON::httpclient_static
@@ -221,7 +249,11 @@ else()
   #
   # simple_http_model_control
   #
-  add_executable(simple_http_model_control simple_http_model_control.cc)
+  add_executable(
+    simple_http_model_control
+    simple_http_model_control.cc
+    $<TARGET_OBJECTS:json-utils-library>
+  )
   target_link_libraries(
     simple_http_model_control
     PRIVATE TRITON::httpclient_static

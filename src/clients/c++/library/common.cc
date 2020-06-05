@@ -314,9 +314,10 @@ InferRequestedOutput::SharedMemoryInfo(
   if (io_type_ != SHARED_MEMORY) {
     return Error("The input has not been set with the shared memory.");
   }
+
   *name = shm_name_;
-  *offset = shm_offset_;
   *byte_size = shm_byte_size_;
+  *offset = shm_offset_;
 
   return Error::Success;
 }
