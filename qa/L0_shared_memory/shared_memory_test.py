@@ -256,7 +256,7 @@ class SharedMemoryTest(unittest.TestCase):
             error_msg, "input2_data", 128)
         if len(error_msg) > 0:
             self.assertTrue(
-                "unexpected total batch size 128 for input 'INPUT1', expecting 64" in error_msg[-1])
+                "unexpected total byte size 128 for input 'INPUT1', expecting 64" in error_msg[-1])
         shm_handles.append(shm_ip2_handle)
         self._cleanup_server(shm_handles)
 
