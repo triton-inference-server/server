@@ -668,11 +668,13 @@ EnsembleContext::FinishEnsemble()
       infer_stats.compute_input_duration_ns_,
       infer_stats.compute_infer_duration_ns_,
       infer_stats.compute_output_duration_ns_);
-  stats_aggregator_->UpdateInferBatchStatsWithDuration(
-      metric_reporter_, std::max(1U, request_->BatchSize()),
-      infer_stats.compute_input_duration_ns_,
-      infer_stats.compute_infer_duration_ns_,
-      infer_stats.compute_output_duration_ns_);
+  if (ensemble_status_.IsOk()) {
+    stats_aggregator_->UpdateInferBatchStatsWithDuration(
+        metric_reporter_, std::max(1U, request_->BatchSize()),
+        infer_stats.compute_input_duration_ns_,
+        infer_stats.compute_infer_duration_ns_,
+        infer_stats.compute_output_duration_ns_);
+  }
 #endif
   if (ensemble_status_.IsOk()) {
     InferenceResponse::Send(std::move(response));
