@@ -57,6 +57,11 @@ WORKDIR /workspace
 RUN mkdir -p qa/common && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
+    mkdir qa/L0_simple_go_client/models && \
+    cp -r docs/examples/model_repository/simple qa/L0_simple_go_client/models/. && \
+    mkdir -p qa/L0_simple_go_client/core && \
+    cp /workspace/src/core/*.proto qa/L0_simple_go_client/core/. && \
+    cp /workspace/src/clients/go/*.go qa/L0_simple_go_client/. && \
     mkdir qa/L0_backend_release/simple_models && \
     cp -r docs/examples/model_repository/simple qa/L0_backend_release/simple_models/. && \
     mkdir qa/L0_shared_memory/models && \
@@ -250,6 +255,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
         exit 1; \
     fi
 
+# go client requires golang
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               libopencv-dev \
@@ -259,7 +265,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               python3-pip \
                               python3-protobuf \
                               python3-setuptools \
-                              swig && \
+                              swig \
+                              golang-go \
+                              protobuf-compiler && \
     rm -rf /var/lib/apt/lists/*
 
 # CI/QA expects "python" executable (not python3).
@@ -267,6 +275,10 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 RUN pip3 install --upgrade wheel numpy pillow future grpcio requests gsutil awscli six
+
+# need protoc-gen-go to generate go specific gRPC modules
+RUN go get github.com/golang/protobuf/protoc-gen-go && \
+    go get google.golang.org/grpc
 
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
@@ -280,3 +292,5 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     pip3 install --upgrade qa/pkgs/triton*.whl
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
+ENV GOPATH /root/go
+ENV PATH $PATH:$GOPATH/bin
