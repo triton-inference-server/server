@@ -27,7 +27,7 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
-SIMPLE_GO_CLIENT=../clients/grpc_simple_client.go
+SIMPLE_GO_CLIENT=grpc_simple_client.go
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
