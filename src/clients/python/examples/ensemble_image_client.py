@@ -40,33 +40,6 @@ from tritonclientutils import InferenceServerException
 
 FLAGS = None
 
-
-def parse_model(url, protocol, model_name, verbose=False):
-    """
-    Check the configuration of a model to make sure it meets the
-    requirements for an image classification network (as expected by
-    this client)
-    """
-    ctx = ServerStatusContext(url, protocol, model_name, verbose)
-    server_status = ctx.get_server_status()
-
-    if model_name not in server_status.model_status:
-        raise Exception("unable to get status for '" + model_name + "'")
-
-    status = server_status.model_status[model_name]
-    config = status.config
-
-    if len(config.input) != 1:
-        raise Exception("expecting 1 input, got {}".format(len(config.input)))
-    if len(config.output) != 1:
-        raise Exception("expecting 1 output, got {}".format(len(config.output)))
-
-    input = config.input[0]
-    output = config.output[0]
-
-    return (input.name, output.name, config.max_batch_size)
-
-
 def parse_model_grpc(model_metadata, model_config):
     """
     Check the configuration of a model to make sure it meets the
