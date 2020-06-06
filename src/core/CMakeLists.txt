@@ -115,6 +115,7 @@ target_include_directories(
   triton-json-library
   PUBLIC ${RapidJSON_INCLUDE_DIRS}
 )
+set_target_properties(triton-json-library PROPERTIES LINKER_LANGUAGE CXX)
 
 #
 # Inference server core
