@@ -289,12 +289,6 @@ class InferenceProfiler {
   nic::Error GetServerSideStatus(
       std::map<ModelIdentifier, ModelStatistics>* model_status);
 
-  // A helper fuction for obtaining the status of the models provided by the
-  // server.
-  nic::Error GetServerSideStatus(
-      ModelStatistics& server_status, const ModelIdentifier model_identifier,
-      std::map<ModelIdentifier, ModelStatistics>* model_status);
-
   /// Sumarize the measurement with the provided statistics.
   /// \param timestamps The timestamps of the requests completed during the
   /// measurement.

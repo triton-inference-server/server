@@ -46,7 +46,6 @@
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
 #include "src/core/server.h"
-#include "src/core/server_status.pb.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include "src/core/cuda_memory_manager.h"
