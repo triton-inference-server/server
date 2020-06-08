@@ -137,6 +137,13 @@ if(${TRITON_ENABLE_GRPC})
 
   install(
       FILES
+      ${CMAKE_CURRENT_SOURCE_DIR}/common.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/grpc_client.h
+      DESTINATION include
+  )
+
+  install(
+      FILES
       ${CMAKE_CURRENT_BINARY_DIR}/../../../core/model_config.pb.h
       DESTINATION include
   )
@@ -233,6 +240,13 @@ if(${TRITON_ENABLE_HTTP})
       httpclient
       PRIVATE CURL::libcurl
       PUBLIC Threads::Threads
+  )
+
+  install(
+      FILES
+      ${CMAKE_CURRENT_SOURCE_DIR}/common.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/http_client.h
+      DESTINATION include
   )
 
   install(
