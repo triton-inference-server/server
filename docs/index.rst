@@ -34,7 +34,7 @@ NVIDIA Triton Inference Server
      You are currently viewing unstable developer preview
      of the documentation. To see the documentation for the latest
      stable release click `here
-     <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/index.html>`_.
+     <https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html>`_.
 
 .. include:: ../README.rst
    :start-after: overview-begin-marker-do-not-remove
@@ -52,12 +52,11 @@ NVIDIA Triton Inference Server
    quickstart
    install
    run
-   client
    client_example
-   client_experimental
-   models_and_schedulers
+   client_library
    model_repository
    model_configuration
+   models_and_schedulers
    model_management
    optimization
    metrics
@@ -83,7 +82,6 @@ NVIDIA Triton Inference Server
    protobuf_api/protobuf_api_root
    cpp_api/cpp_api_root
    python_api
-   experimental_grpc_python_api
 
 
 Indices and tables

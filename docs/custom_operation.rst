@@ -37,7 +37,7 @@ TensorRT
 --------
 
 TensorRT allows a user to create `custom layers
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-developer-guide/index.html#extending>`_
+<https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#extending>`_
 which can then be used in TensorRT models. For those models to run in
 Triton the custom layers must be made available.
 
@@ -63,7 +63,7 @@ simple way to ensure you are using the correct version of TensorRT is
 to use the `NGC TensorRT container
 <https://ngc.nvidia.com/catalog/containers/nvidia:tensorrt>`_
 corresponding to the Triton container. For example, if you are using
-the 20.03 version of Triton, use the 20.03 version of the TensorRT
+the 20.06 version of Triton, use the 20.06 version of the TensorRT
 container.
 
 TensorFlow
@@ -102,7 +102,7 @@ simple way to ensure you are using the correct version of TensorFlow
 is to use the `NGC TensorFlow container
 <https://ngc.nvidia.com/catalog/containers/nvidia:tensorflow>`_
 corresponding to the Triton container. For example, if you are using
-the 20.03 version of Triton, use the 20.03 version of the TensorFlow
+the 20.06 version of Triton, use the 20.06 version of the TensorFlow
 container.
 
 PyTorch
@@ -115,8 +115,8 @@ can load your custom C++ operations into Triton. For example, if you
 follow the instructions in the `pytorch/extension-script
 <https://github.com/pytorch/extension-script>`_ repository and your
 Torchscript custom operations are compiled into libpytcustom.so,
-starting the inference server with the following command makes those
-operations available to all PyTorch models::
+starting Triton with the following command makes those operations
+available to all PyTorch models::
 
   $ LD_PRELOAD=libpytcustom.so tritonserver --model-repository=/tmp/models ...
 
@@ -144,5 +144,5 @@ simple way to ensure you are using the correct version of PyTorch is
 to use the `NGC PyTorch container
 <https://ngc.nvidia.com/catalog/containers/nvidia:pytorch>`_
 corresponding to the Triton container. For example, if you are using
-the 20.03 version of Triton, use the 20.03 version of the PyTorch
+the 20.06 version of Triton, use the 20.06 version of the PyTorch
 container.

@@ -33,11 +33,15 @@ Model Configuration
 Each model in a :ref:`section-model-repository` must include a model
 configuration that provides required and optional information about
 the model. Typically, this configuration is provided in a config.pbtxt
-file specified as :doc:`ModelConfig <protobuf_api/model_config.proto>`
+file specified as `ModelConfig
+<https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/model_config.proto>`_
 protobuf. In some cases, discussed in
 :ref:`section-generated-model-configuration`, the model configuration
-can be generated automatically by the inference server and so does not
-need to be provided explicitly.
+can be generated automatically by Triton and so does not need to be
+provided explicitly.
+
+Minimal Model Configuration
+---------------------------
 
 A minimal model configuration must specify :cpp:var:`name
 <nvidia::inferenceserver::ModelConfig::name>`, :cpp:var:`platform
@@ -47,9 +51,9 @@ A minimal model configuration must specify :cpp:var:`name
 :cpp:var:`input <nvidia::inferenceserver::ModelConfig::input>`, and
 :cpp:var:`output <nvidia::inferenceserver::ModelConfig::output>`.
 
-As a running example consider a TensorRT model called *mymodel* that
-has two inputs, *input0* and *input1*, and one output, *output0*, all
-of which are 16 entry float32 tensors. The minimal configuration is::
+As an example consider a TensorRT model called *mymodel* that has two
+inputs, *input0* and *input1*, and one output, *output0*, all of which
+are 16 entry float32 tensors. The minimal configuration is::
 
   name: "mymodel"
   platform: "tensorrt_plan"
@@ -74,13 +78,8 @@ of which are 16 entry float32 tensors. The minimal configuration is::
     }
   ]
 
-**PyTorch Naming Convention:** Due to the absence of names for inputs and outputs
-in the model, the "name" attribute of both the inputs and outputs in the
-configuration must follow a specific naming convention i.e. "\<name\>__\<index\>".
-Where <name> can be any string and <index> refers to the position of the
-corresponding input/output. This means if there are two inputs and two outputs
-they must be name as: "INPUT__0", "INPUT__1" and "OUTPUT__0", "OUTPUT__1" such
-that "INPUT__0" refers to first input and INPUT__1 refers to the second input.
+Name and Platform
+^^^^^^^^^^^^^^^^^
 
 The name of the model must match the :cpp:var:`name
 <nvidia::inferenceserver::ModelConfig::name>` of the model repository
@@ -89,99 +88,124 @@ directory containing the model. The :cpp:var:`platform
 **tensorrt_plan**, **tensorflow_graphdef**, **tensorflow_savedmodel**,
 **caffe2_netdef**, **onnxruntime_onnx**, **pytorch_libtorch** or **custom**.
 
+Maximum Batch Size
+^^^^^^^^^^^^^^^^^^
+
+The :cpp:var:`max_batch_size
+<nvidia::inferenceserver::ModelConfig::max_batch_size>` value
+indicates the maximum batch size that the model supports for the
+**type of batching that can be exploited by Triton**. If the model's
+batch dimension is the first dimension, and all inputs and outputs to
+the model have this batch dimension, then Triton can use its
+:ref:`section-dynamic-batcher` or :ref:`section-sequence-batcher` to
+automatically use batching with the model. In this case
+*max_batch_size* should be set to a value >=1 that indicates the
+maximum batch size that Triton should use with the model.
+
+For models that do not support batching, or do not support batching in
+the specific was described above, *max_batch_size* must be set to
+zero.
+
+Inputs and Outputs
+^^^^^^^^^^^^^^^^^^
+
+Each model input and output must specify a name, datatype, and shape.
+
+The name specified for an input or output tensor must match the name
+expected by the model. **PyTorch Naming Convention:** Due to the
+absence of names for inputs and outputs in a TorchScript model, the
+"name" attribute of both the inputs and outputs in the configuration
+must follow a specific naming convention i.e. "\<name\>__\<index\>".
+Where <name> can be any string and <index> refers to the position of
+the corresponding input/output. This means if there are two inputs and
+two outputs they must be named as: "INPUT__0", "INPUT__1" and
+"OUTPUT__0", "OUTPUT__1" such that "INPUT__0" refers to first input
+and INPUT__1 refers to the second input, etc.
+
 The datatypes allowed for input and output tensors varies based on the
 type of the model. Section :ref:`section-datatypes` describes the
 allowed datatypes and how they map to the datatypes of each model
 type.
 
-Input shape specified by :cpp:var:`dims
-<nvidia::inferenceserver::ModelInput::dims>` indicates the shape of
-input expected by the inference API.  Output shape specified by
-:cpp:var:`dims <nvidia::inferenceserver::ModelOutput::dims>` indicates
-the shape of output returned by the inference API. Both input and
-output shape must have rank >= 1, that is, the empty shape **[ ]** is
-not allowed. The :ref:`reshape <section-reshape>` property must be
-used if the underlying framework model or custom backend requires an
-input or output with an empty shape.
+An input shape indicates the shape of an input tensor expected by the
+model and by Triton in inference requests. An output shape indicates
+the shape of an output tensor produced by the model and returned by
+Triton in response to an inference request. Both input and output
+shape must have rank >= 1, that is, the empty shape **[ ]** is not
+allowed.
 
-For models that support batched inputs the :cpp:var:`max_batch_size
-<nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
->= 1. The Triton Inference Server assumes that the batching occurs
-along a first dimension that is not listed in the inputs or
-outputs. For the above example, the server expects to receive input
-tensors with shape **[ x, 16 ]** and produces an output tensor with
-shape **[ x, 16 ]**, where **x** is the batch size of the request.
+Input and output shapes are specified by a combination of
+*max_batch_size* and the dimensions specified by :cpp:var:`input dims
+<nvidia::inferenceserver::ModelInput::dims>` or :cpp:var:`output dims
+<nvidia::inferenceserver::ModelOutput::dims>`. For models with
+*max_batch_size* > 0, the full shape is formed as [ -1 ] + <dims>,
+where <dims> is the shape specified by by :cpp:var:`input dims
+<nvidia::inferenceserver::ModelInput::dims>` or :cpp:var:`output dims
+<nvidia::inferenceserver::ModelOutput::dims>`. For models with
+*max_batch_size* == 0, the full shape is formed as <dims>. For
+example, for the following configuration the shape of "input0" is [
+-1, 16 ] and the shape of "output0" is [ -1, 4 ]::
 
-For models that do not support batched inputs the
-:cpp:var:`max_batch_size
-<nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
-zero. If the above example specified a :cpp:var:`max_batch_size
-<nvidia::inferenceserver::ModelConfig::max_batch_size>` of zero, the
-inference server would expect to receive input tensors with shape **[
-16 ]**, and would produce an output tensor with shape **[ 16 ]**.
-
-For models that support input and output tensors with variable-size
-dimensions, those dimensions can be listed as -1 in the input and
-output configuration. For example, if a model requires a 2-dimensional
-input tensor where the first dimension must be size 4 but the second
-dimension can be any size, the model configuration for that input
-would include **dims: [ 4, -1 ]**. The inference server would then
-accept inference requests where that input tensor's second dimension
-was any value >= 0. The model configuration can be more restrictive
-than what is allowed by the underlying model. For example, even though
-the model allows the second dimension to be any size, the model
-configuration could be specific as **dims: [ 4, 4 ]**. In this case,
-the inference server would only accept inference requests where the
-input tensor's shape was exactly **[ 4, 4 ]**.
-
-For models that support shape tensors, :cpp:var:`is_shape_tensor
-<nvidia::inferenceserver::ModelInput::is_shape_tensor>` must be
-appropriately set for inputs and :cpp:var:`is_shape_tensor
-<nvidia::inferenceserver::ModelOutput::is_shape_tensor>` must be
-correctly set for outputs.
-Consider the following example configuration to understand how to
-use shape tensors with batching::
-
-  name: "myshapetensormodel"
+  name: "mymodel"
   platform: "tensorrt_plan"
   max_batch_size: 8
   input [
     {
       name: "input0"
       data_type: TYPE_FP32
-      dims: [ -1 ]
-    },
-    {
-      name: "input1"
-      data_type: TYPE_INT32
-      dims: [ 1 ]
-      is_shape_tensor: true
+      dims: [ 16 ]
     }
   ]
   output [
     {
       name: "output0"
       data_type: TYPE_FP32
-      dims: [ -1 ]
+      dims: [ 4 ]
     }
   ]
 
-As discussed before, the Triton Inference Server assumes that
-batching occurs along the first dimension which is not listed in
-in the input or output tensor dims. However, for shape tensors,
-batching occurs at the first shape value. For the above example,
-an inference request must provide inputs with the following
-shapes::
+For a configuration that is identical except that *max_batch_size* ==
+0, the shape of "input0" is [ 16 ] and the shape of "output0" is [ 4 ]::
 
-  "input0": [ x, -1]
-  "input1": [ 1 ]
-  "output0": [ x, -1]
+  name: "mymodel"
+  platform: "tensorrt_plan"
+  max_batch_size: 0
+  input [
+    {
+      name: "input0"
+      data_type: TYPE_FP32
+      dims: [ 16 ]
+    }
+  ]
+  output [
+    {
+      name: "output0"
+      data_type: TYPE_FP32
+      dims: [ 4 ]
+    }
+  ]
 
-Where **x** is the batch size of the request. The server requires
-the shape tensors to be marked as shape tensors in the model when
-using batching. Note that "input1" has shape **[ 1 ]** and not
-**[ 2 ]**. The server will prepend the shape value **x** at "input1"
-before issuing the request to model.
+For models that support input and output tensors with variable-size
+dimensions, those dimensions can be listed as -1 in the input and
+output configuration. For example, if a model requires a 2-dimensional
+input tensor where the first dimension must be size 4 but the second
+dimension can be any size, the model configuration for that input
+would include **dims: [ 4, -1 ]**. Triton would then accept inference
+requests where that input tensor's second dimension was any value
+>= 0. The model configuration can be more restrictive than what is
+allowed by the underlying model. For example, even though the model
+allows the second dimension to be any size, the model configuration
+could be specific as **dims: [ 4, 4 ]**. In this case, Triton would
+only accept inference requests where the input tensor's shape was
+exactly **[ 4, 4 ]**.
+
+The :ref:`reshape <section-reshape>` property must be used if there is
+a mismatch between the input shape that Triton receives in an
+inference request and the input shape expected by the
+model. Similarly, the :ref:`reshape <section-reshape>` property must
+be used if there is a mismatch between the output shape produced by
+the model and the shape that Triton returns in a response to an
+inference request.
 
 .. _section-generated-model-configuration:
 
@@ -189,39 +213,38 @@ Generated Model Configuration
 -----------------------------
 
 By default, the model configuration file containing the required
-settings must be provided with each model. However, if the server is
+settings must be provided with each model. However, if Triton is
 started with the -\\-strict-model-config=false option, then in some
 cases the required portions of the model configuration file can be
-generated automatically by the inference server. The required portion
-of the model configuration are those settings shown in the example
-minimal configuration above. Specifically:
+generated automatically by Triton. The required portion of the model
+configuration are those settings shown in the example minimal
+configuration above. Specifically:
 
 * :ref:`TensorRT Plan <section-tensorrt-models>` models do not require
-  a model configuration file because the inference server can derive
-  all the required settings automatically.
+  a model configuration file because Triton can derive all the
+  required settings automatically.
 
 * :ref:`TensorFlow SavedModel <section-tensorflow-models>` models do
-  not require a model configuration file because the inference server
-  can derive all the required settings automatically.
+  not require a model configuration file because Triton can derive all
+  the required settings automatically.
 
 * :ref:`ONNX Runtime ONNX <section-onnx-models>` models do not require
-  a model configuration file because the inference server can derive
-  all the required settings automatically. However, if the model supports
-  batching, the initial batch dimension must be variable-size for all inputs
-  and outputs.
+  a model configuration file because Triton can derive all the
+  required settings automatically. However, if the model supports
+  batching, the initial batch dimension must be variable-size for all
+  inputs and outputs.
 
 * :ref:`PyTorch TorchScript <section-pytorch-models>` models have an optional
   output configuration in the model configuration file to support cases where
   there are variable number and/or datatypes of output.
 
 When using -\\-strict-model-config=false you can see the model
-configuration that was generated for a model by using the :ref:`Status
-API <section-api-status>`.
+configuration that was generated for a model by using the
+:ref:`metadata endpoint <section-http-and-grpc-api>`.
 
-The Triton Inference Server only generates the required portion of
-the model configuration file. You must still provide the optional
-portions of the model configuration if necessary, such as
-:cpp:var:`version_policy
+Triton only generates the required portion of the model configuration
+file. You must still provide the optional portions of the model
+configuration if necessary, such as :cpp:var:`version_policy
 <nvidia::inferenceserver::ModelConfig::version_policy>`,
 :cpp:var:`optimization
 <nvidia::inferenceserver::ModelConfig::optimization>`,
@@ -235,25 +258,27 @@ portions of the model configuration if necessary, such as
 <nvidia::inferenceserver::ModelConfig::cc_model_filenames>`, and
 :cpp:var:`tags <nvidia::inferenceserver::ModelConfig::tags>`.
 
-When serving a classification model, keep in mind that :cpp:var:`label_filename
-<nvidia::inferenceserver::ModelOutput::label_filename>` can not be automatically
-derived. You will need to either create a **config.pbtxt** file specifying all
-required :cpp:var:`output<nvidia::inferenceserver::ModelOutput>` along with the
+When serving a classification model, keep in mind that
+:cpp:var:`label_filename
+<nvidia::inferenceserver::ModelOutput::label_filename>` cannot be
+automatically derived. You will need to either create a
+**config.pbtxt** file specifying all required
+:cpp:var:`output<nvidia::inferenceserver::ModelOutput>` along with the
 :cpp:var:`label_filename<nvidia::inferenceserver::ModelOutput::label_filename>`,
-or handle the mapping from model output to label in the client code directly.
+or handle the mapping from model output to label in the client code
+directly.
 
 .. _section-datatypes:
 
 Datatypes
 ---------
 
-The following table shows the tensor datatypes supported by the
-Triton Inference Server. The first column shows the name of the
-datatype as it appears in the model configuration file. The other
-columns show the corresponding datatype for the model frameworks
-supported by the server and for the Python numpy library. If a model
-framework does not have an entry for a given datatype, then the
-inference server does not support that datatype for that model.
+The following table shows the tensor datatypes supported by
+Triton. The first column shows the name of the datatype as it appears
+in the model configuration file. The other columns show the
+corresponding datatype for the model frameworks and for the Python
+numpy library. If a model framework does not have an entry for a given
+datatype, then Triton does not support that datatype for that model.
 
 +--------------+--------------+--------------+--------------+--------------+---------+--------------+
 |Type          |TensorRT      |TensorFlow    |Caffe2        |ONNX Runtime  |PyTorch  |NumPy         |
@@ -355,6 +380,57 @@ output should be specified as::
     }
     ...
 
+Shape Tensors
+-------------
+
+For models that support shape tensors, :cpp:var:`is_shape_tensor
+<nvidia::inferenceserver::ModelInput::is_shape_tensor>` must be
+appropriately set for inputs and :cpp:var:`is_shape_tensor
+<nvidia::inferenceserver::ModelOutput::is_shape_tensor>` must be
+correctly set for outputs.
+Consider the following example configuration to understand how to
+use shape tensors with batching::
+
+  name: "myshapetensormodel"
+  platform: "tensorrt_plan"
+  max_batch_size: 8
+  input [
+    {
+      name: "input0"
+      data_type: TYPE_FP32
+      dims: [ -1 ]
+    },
+    {
+      name: "input1"
+      data_type: TYPE_INT32
+      dims: [ 1 ]
+      is_shape_tensor: true
+    }
+  ]
+  output [
+    {
+      name: "output0"
+      data_type: TYPE_FP32
+      dims: [ -1 ]
+    }
+  ]
+
+As discussed before, Triton assumes that batching occurs along the
+first dimension which is not listed in in the input or output tensor
+dims. However, for shape tensors, batching occurs at the first shape
+value. For the above example, an inference request must provide inputs
+with the following shapes::
+
+  "input0": [ x, -1]
+  "input1": [ 1 ]
+  "output0": [ x, -1]
+
+Where **x** is the batch size of the request. Triton requires the
+shape tensors to be marked as shape tensors in the model when using
+batching. Note that "input1" has shape **[ 1 ]** and not **[ 2
+]**. Triton will prepend the shape value **x** at "input1" before
+issuing the request to model.
+
 .. _section-version-policy:
 
 Version Policy
@@ -384,13 +460,13 @@ the following policies.
 If no version policy is specified, then :cpp:var:`Latest
 <nvidia::inferenceserver::ModelVersionPolicy::Latest>` (with
 num_version = 1) is used as the default, indicating that only the most
-recent version of the model is made available by the inference
-server. In all cases, the addition or removal of version
-subdirectories from the model repository can change which model
-version is used on subsequent inference requests.
+recent version of the model is made available by Triton. In all cases,
+the addition or removal of version subdirectories from the model
+repository can change which model version is used on subsequent
+inference requests.
 
-Continuing the above example, the following configuration specifies
-that all versions of the model will be available from the server::
+The following configuration specifies that all versions of the model
+will be available from the server::
 
   name: "mymodel"
   platform: "tensorrt_plan"
@@ -421,10 +497,10 @@ that all versions of the model will be available from the server::
 Instance Groups
 ---------------
 
-The Triton Inference Server can provide multiple :ref:`execution
-instances <section-concurrent-model-execution>` of a model so that
-multiple simultaneous inference requests for that model can be handled
-simultaneously. The model configuration :cpp:var:`ModelInstanceGroup
+Triton can provide multiple :ref:`execution instances
+<section-concurrent-model-execution>` of a model so that multiple
+inference requests for that model can be handled simultaneously. The
+model configuration :cpp:var:`ModelInstanceGroup
 <nvidia::inferenceserver::ModelInstanceGroup>` is used to specify the
 number of execution instances that should be made available and what
 compute resource should be used for those instances.
@@ -476,13 +552,12 @@ on the CPU::
 Scheduling And Batching
 -----------------------
 
-The Triton Inference Server supports batch inferencing by allowing
-individual inference requests to specify a batch of inputs. The
-inferencing for a batch of inputs is performed at the same time which
-is especially important for GPUs since it can greatly increase
-inferencing throughput. In many use-cases the individual inference
-requests are not batched, therefore, they do not benefit from the
-throughput benefits of batching.
+Triton supports batch inferencing by allowing individual inference
+requests to specify a batch of inputs. The inferencing for a batch of
+inputs is performed at the same time which is especially important for
+GPUs since it can greatly increase inferencing throughput. In many use
+cases the individual inference requests are not batched, therefore,
+they do not benefit from the throughput benefits of batching.
 
 The inference server contains multiple scheduling and batching
 algorithms that support many different model types and use-cases. More
@@ -506,11 +581,10 @@ the model.
 Dynamic Batcher
 ^^^^^^^^^^^^^^^
 
-Dynamic batching is a feature of the inference server that allows
-inference requests to be combined by the server, so that a batch is
-created dynamically, resulting in the same increased throughput seen
-for batched inference requests. The dynamic batcher should be used for
-:ref:`stateless <section-models-and-schedulers>` models. The
+Dynamic batching is a feature of Triton that allows inference requests
+to be combined by the server, so that a batch is created dynamically,
+resulting in increased throughput. The dynamic batcher should be used
+for :ref:`stateless <section-models-and-schedulers>` models. The
 dynamically created batches are distributed to all :ref:`instances
 <section-instance-groups>` configured for the model.
 
@@ -548,8 +622,8 @@ allowed by the model. But see the following section for the delay
 option that changes this behavior.
 
 The size of generated batches can be examined in aggregate using Count
-metrics, see :ref:`section-metrics`. Inference server verbose logging
-can be used to examine the size of individual batches.
+metrics, see :ref:`section-metrics`. Triton verbose logging can be
+used to examine the size of individual batches.
 
 Delayed Batching
 ................
@@ -655,14 +729,14 @@ Sequence batching is enabled and configured independently for each
 model using the :cpp:var:`ModelSequenceBatching
 <nvidia::inferenceserver::ModelSequenceBatching>` settings in the
 model configuration. These settings control the sequence timeout as
-well as configuring how the inference server will send control signals
-to the model indicating sequence start, end, ready and
-correlation ID. See :ref:`section-models-and-schedulers` for more
-information and examples.
+well as configuring how Triton will send control signals to the model
+indicating sequence start, end, ready and correlation ID. See
+:ref:`section-models-and-schedulers` for more information and
+examples.
 
 The size of generated batches can be examined in aggregate using Count
-metrics, see :ref:`section-metrics`. Inference server verbose logging
-can be used to examine the size of individual batches.
+metrics, see :ref:`section-metrics`. Triton verbose logging can be
+used to examine the size of individual batches.
 
 .. _section-ensemble-scheduler:
 
@@ -670,14 +744,16 @@ Ensemble Scheduler
 ^^^^^^^^^^^^^^^^^^
 
 The ensemble scheduler must be used for :ref:`ensemble models
-<section-ensemble-models>` and cannot be used for any other type of model.
+<section-ensemble-models>` and cannot be used for any other type of
+model.
 
-The ensemble scheduler is enabled and configured independently for each
-model using the :cpp:var:`ModelEnsembleScheduling
+The ensemble scheduler is enabled and configured independently for
+each model using the :cpp:var:`ModelEnsembleScheduling
 <nvidia::inferenceserver::ModelEnsembleScheduling>` settings in the
-model configuration. The settings describe the models that are included in the
-ensemble and the flow of tensor values between the models. See
-:ref:`section-ensemble-models` for more information and examples.
+model configuration. The settings describe the models that are
+included in the ensemble and the flow of tensor values between the
+models. See :ref:`section-ensemble-models` for more information and
+examples.
 
 .. _section-optimization-policy:
 
@@ -688,8 +764,8 @@ The model configuration :cpp:var:`ModelOptimizationPolicy
 <nvidia::inferenceserver::ModelOptimizationPolicy>` is used to specify
 optimization and prioritization settings for a model. These settings
 control if/how a model is optimized by the backend framework and how
-it is scheduled and executed by the inference server. See the protobuf
-documentation for the currently available settings.
+it is scheduled and executed by Triton. See the protobuf documentation
+for the currently available settings.
 
 .. _section-optimization-policy-tensorrt:
 
@@ -709,14 +785,16 @@ throughput and latency improvements.
 Model Warmup
 ------------
 
-For some framework backends, model initialization may be delayed until the
-first inference is requested, TF-TRT optimization for example, which introduces
-unexpected latency seen by the client. The model configuration
-:cpp:var:`ModelWarmup <nvidia::inferenceserver::ModelWarmup>` is used to specify
-warmup settings for a model. The settings define a series of inference requests
-that the inference server should create to warm-up each model instance. A model
-instance will be served only if it completes the requests successfully.
-Note that the effect of warming up models varies depending on the framework
-backend, and it will cause the server to be less responsive to model update, so
-the users should experiment and choose the configuration that suits their need.
-See the protobuf documentation for the currently available settings.
+For some framework backends, model initialization may be delayed until
+the first inference is requested, TF-TRT optimization for example,
+which introduces unexpected latency seen by the client. The model
+configuration :cpp:var:`ModelWarmup
+<nvidia::inferenceserver::ModelWarmup>` is used to specify warmup
+settings for a model. The settings define a series of inference
+requests that Triton will create to warm-up each model instance. A
+model instance will be served only if it completes the requests
+successfully.  Note that the effect of warming up models varies
+depending on the framework backend, and it will cause Triton to be
+less responsive to model update, so the users should experiment and
+choose the configuration that suits their need.  See the protobuf
+documentation for the currently available settings.

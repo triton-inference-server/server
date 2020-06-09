@@ -37,9 +37,10 @@ http://localhost:8002/metrics. The metrics are only available by
 accessing the endpoint, and are not pushed or published to any remote
 server.
 
-The inference server -\\-allow-metrics=false option can be used to
-disable metric reporting and the -\\-metrics-port option can be used
-to select a different port.
+The Triton -\\-allow-metrics=false option can be used to disable all
+metric reporting and -\\-allow-gpu-metrics=false can be used to
+disable just the GPU Utilization and GPU Memory metrics. The
+-\\-metrics-port option can be used to select a different port.
 
 The following table describes the available metrics.
 
@@ -55,7 +56,7 @@ The following table describes the available metrics.
 |              |                |                                       |           |           |
 +              +----------------+---------------------------------------+-----------+-----------+
 |              || Energy        || GPU energy consumption in joules     |Per GPU    |Per second |
-|              || Consumption   || since the server started             |           |           |
+|              || Consumption   || since Triton started                 |           |           |
 +              +----------------+---------------------------------------+-----------+-----------+
 |              |GPU Utilization || GPU utilization rate                 |Per GPU    |Per second |
 |              |                || (0.0 - 1.0)                          |           |           |
