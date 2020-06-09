@@ -75,9 +75,6 @@ directory. It contains a custom image preprocess model, Caffe2
 ResNet50, and an ensemble model that are used by the :ref:`ensemble
 example <section-ensemble-image-classification-example>`.
 
-FIXME prepare custom backend and copy into repo. See L0_perf_client
-(needs fix to get model from example repo)
-
 Before using the example ensemble model repository, in addition to
 fetching public model definition files as mentioned above, you must
 build the custom backend for the custom image preprocess model (see
