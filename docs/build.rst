@@ -71,7 +71,7 @@ with your local repo’s source files mounted so that your local changes
 can be incrementally built. This is done by first building the
 *tritonserver_build* container::
 
-  $ docker build --pull -t tritonserver_build --target trtserver_build .
+  $ docker build --pull -t tritonserver_build --target tritonserver_build .
 
 By mounting /path/to/tritonserver/src into the container at
 /workspace/src, changes to your local repo will be reflected in the
