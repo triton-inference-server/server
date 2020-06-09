@@ -51,7 +51,7 @@ import textwrap
 # -- Project information -----------------------------------------------------
 
 project = u'NVIDIA Triton Inference Server'
-copyright = u'2018, NVIDIA Corporation'
+copyright = u'2018-2020, NVIDIA Corporation'
 author = u'NVIDIA Corporation'
 
 version_long = u'0.0.0'
@@ -150,7 +150,7 @@ exhale_args = {
     "exhaleExecutesDoxygen": True,
     "exhaleDoxygenStdin": textwrap.dedent('''
         JAVADOC_AUTOBRIEF = YES
-    INPUT = ../src/core/trtserver.h ../src/clients/c++/api_v1/library/request.h ../src/clients/c++/api_v1/library/request_grpc.h ../src/clients/c++/api_v1/library/request_http.h ../src/backends/custom/custom.h ../src/custom/sdk/custom_instance.h
+    INPUT = ../src/core/tritonserver.h ../src/clients/c++/library/common.h ../src/clients/c++/library/grpc_client.h ../src/clients/c++/library/http_client.h ../src/backends/custom/custom.h ../src/custom/sdk/custom_instance.h
     ''')
 }
 
@@ -174,7 +174,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # documentation.
 #
 html_theme_options = {
-    'canonical_url': 'https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/index.html',
+    'canonical_url': 'https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html',
     'collapse_navigation': False,
     'display_version': True,
     'logo_only': False,
@@ -248,7 +248,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'NVIDIATritonServer', u'NVIDIA Triton Inference Server Documentation',
-     author, 'NVIDIATritonServer', 'One line description of project.',
+     author, 'NVIDIATritonServer', 'ML/DL inference server',
      'Miscellaneous'),
 ]
 

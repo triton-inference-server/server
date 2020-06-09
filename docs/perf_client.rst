@@ -76,7 +76,7 @@ Request Concurrency
 
 By default perf\_client measures your model's latency and throughput
 using the lowest possible load on the model. To do this perf\_client
-sends one inference request to the server and waits for the response.
+sends one inference request to Triton and waits for the response.
 When that response is received, the perf\_client immediately sends
 another request, and then repeats this process during the measurement
 windows. The number of outstanding inference requests is referred to
@@ -393,7 +393,6 @@ can achieve by using shared memory in your application. Use
 Communication Protocol
 ^^^^^^^^^^^^^^^^^^^^^^
 
-By default perf\_client uses HTTP to communicate with the inference
-server. The GRPC protocol can be specificed with the -i option. If
-GRPC is selected the -\\-streaming option can also be specified for GRPC
-streaming.
+By default perf\_client uses HTTP to communicate with Triton. The GRPC
+protocol can be specificed with the -i option. If GRPC is selected the
+-\\-streaming option can also be specified for GRPC streaming.

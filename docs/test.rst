@@ -29,8 +29,7 @@ Testing
 =======
 
 Currently there is no CI testing enabled for the open-source version
-of the Triton Inference Server. We will enable CI testing in a
-future update.
+of Triton. We will enable CI testing in a future update.
 
 However, there is a set of tests in the qa/ directory that can be run
 manually to provide extensive testing. Before running these tests you
@@ -41,8 +40,8 @@ Generate QA Model Repositories
 ------------------------------
 
 The QA model repositories contain some simple models that are used to
-verify the correctness of the inference server. To generate the QA
-model repositories::
+verify the correctness of Triton. To generate the QA model
+repositories::
 
   $ cd qa/common
   $ ./gen_qa_model_repository
@@ -57,11 +56,11 @@ in the scripts for how to target a specific GPU.
 Build QA Container
 ------------------
 
-Next you need to build a QA version of the inference server
-container. This container will contain the inference server, the QA
-tests, and all the dependencies needed to run the QA tests. You must
-first build the tritonserver_client, tritonserver_cbe,
-tritonserver_build and tritonserver containers as described in
+Next you need to build a QA version of the Triton container. This
+container will contain Triton, the QA tests, and all the dependencies
+needed to run the QA tests. You must first build the
+tritonserver_client, tritonserver_cbe, tritonserver_build and
+tritonserver containers as described in
 :ref:`section-getting-the-client-libraries` and
 :ref:`section-building` and then build the QA container::
 
@@ -73,7 +72,7 @@ Run QA Container
 Now run the QA container and mount the QA model repositories into the
 container so the tests will be able to access them::
 
-  $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver tritonserver_qa
+  $ docker run --gpus=all -it --rm -v/tmp:/data/inferenceserver tritonserver_qa
 
 Within the container the QA tests are in /opt/tritonserver/qa. To run a test::
 

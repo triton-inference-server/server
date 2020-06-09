@@ -33,23 +33,22 @@ Models And Schedulers
 By incorporating :ref:`multiple frameworks
 <section-framework-model-definition>` and also :ref:`custom backends
 <section-custom-backends>`, the Triton Inference Server supports a
-wide variety of models. The inference server also supports multiple
-:ref:`scheduling and batching configurations
-<section-scheduling-and-batching>` that further expand the class of
-models that the inference server can handle.
+wide variety of models. Triton also supports multiple :ref:`scheduling
+and batching configurations <section-scheduling-and-batching>` that
+further expand the class of models that can be handled.
 
-This section describes *stateless*, *stateful* and *ensemble* models and how the
-inference server provides schedulers to support those model types.
+This section describes *stateless*, *stateful* and *ensemble* models
+and how Triton provides schedulers to support those model types.
 
 .. _section-stateless-models:
 
 Stateless Models
 ----------------
 
-With respect to the inference server's schedulers, a *stateless* model
-(or stateless custom backend) does not maintain state between
-inference requests. Each inference performed on a stateless model is
-independent of all other inferences using that model.
+With respect to Triton's schedulers, a *stateless* model (or stateless
+custom backend) does not maintain state between inference
+requests. Each inference performed on a stateless model is independent
+of all other inferences using that model.
 
 Examples of stateless models are CNNs such as image classification and
 object detection. The :ref:`default scheduler
@@ -59,9 +58,9 @@ object detection. The :ref:`default scheduler
 RNNs and similar models which do have internal memory can be stateless
 as long as the state they maintain does not span inference
 requests. For example, an RNN that iterates over all elements in a
-batch is considered stateless by the inference server if the internal
-state is not carried between inference requests. The :ref:`default
-scheduler <section-default-scheduler>` can be used for these stateless
+batch is considered stateless by Triton if the internal state is not
+carried between inference requests. The :ref:`default scheduler
+<section-default-scheduler>` can be used for these stateless
 models. The :ref:`dynamic batcher <section-dynamic-batcher>` cannot be
 used since the model is typically not expecting the batch to represent
 multiple inference requests.
@@ -71,14 +70,13 @@ multiple inference requests.
 Stateful Models
 ---------------
 
-With respect to the inference server's schedulers, a *stateful* model
-(or stateful custom backend) does maintain state between inference
-requests. The model is expecting multiple inference requests that
-together form a sequence of inferences that must be routed to the same
-model instance so that the state being maintained by the model is
-correctly updated. Moreover, the model may require that the inference
-server provide *control* signals indicating, for example, sequence
-start.
+With respect to Triton's schedulers, a *stateful* model (or stateful
+custom backend) does maintain state between inference requests. The
+model is expecting multiple inference requests that together form a
+sequence of inferences that must be routed to the same model instance
+so that the state being maintained by the model is correctly
+updated. Moreover, the model may require that Triton provide *control*
+signals indicating, for example, sequence start.
 
 The :ref:`sequence batcher <section-sequence-batcher>` must be used
 for these stateful models. As explained below, the sequence batcher
@@ -93,15 +91,15 @@ As explained in :ref:`section-client-api-stateful-models`, when making
 inference requests for a stateful model, the client application must
 provide the same correlation ID to all requests in a sequence, and
 must also mark the start and end of the sequence. The correlation ID
-allows the inference server to identify that the requests belong to
-the same sequence.
+allows Triton to identify that the requests belong to the same
+sequence.
 
 Control Inputs
 ^^^^^^^^^^^^^^
 
 For a stateful model to operate correctly with the sequence batcher,
 the model must typically accept one or more *control* input tensors
-that the inference server uses to communicate with the model. The
+that Triton uses to communicate with the model. The
 :cpp:var:`nvidia::inferenceserver::ModelSequenceBatching::Control`
 section of the sequence batcher configuration indicates how the model
 exposes the tensors that the sequence batcher should use for these
@@ -282,15 +280,15 @@ configuration.
 Each model instance is maintaining state for each batch slot, and is
 expecting all inference requests for a given sequence to be routed to
 the same slot so that the state is correctly updated. For this example
-that means that the inference server can simultaneously perform
-inference for up to four sequences.
+that means that Triton can simultaneously perform inference for up to
+four sequences.
 
 Using the Direct scheduling strategy, the sequence batcher:
 
 * Recognizes when an inference request starts a new sequence and
   allocates a batch slot for that sequence. If no batch slot is
-  available for the new sequence, the server places the inference
-  request in a backlog.
+  available for the new sequence, Triton places the inference request
+  in a backlog.
 
 * Recognizes when an inference request is part of a sequence that has
   an allocated batch slot and routes the request to that slot.
@@ -305,14 +303,14 @@ Using the Direct scheduling strategy, the sequence batcher:
 
 The following figure shows how multiple sequences are scheduled onto
 the model instances using the Direct scheduling strategy. On the left
-the figure shows several sequences of requests arriving at the
-inference server. Each sequence could be made up of any number of
-inference requests and those individual inference requests could
-arrive in any order relative to inference requests in other sequences,
-except that the execution order shown on the right assumes that the
-first inference request of sequence 0 arrives before any inference
-request in sequences 1-5, the first inference request of sequence 1
-arrives before any inference request in sequences 2-5, etc.
+the figure shows several sequences of requests arriving at
+Triton. Each sequence could be made up of any number of inference
+requests and those individual inference requests could arrive in any
+order relative to inference requests in other sequences, except that
+the execution order shown on the right assumes that the first
+inference request of sequence 0 arrives before any inference request
+in sequences 1-5, the first inference request of sequence 1 arrives
+before any inference request in sequences 2-5, etc.
 
 The right of the figure shows how the inference request sequences are
 scheduled onto the model instances over time.
@@ -442,7 +440,7 @@ Using the Oldest scheduling strategy, the sequence batcher:
 * Recognizes when an inference request starts a new sequence and
   attempts to find a model instance that has room for a candidate
   sequence. If no model instance has room for a new candidate
-  sequence, the server places the inference request in a backlog.
+  sequence, Triton places the inference request in a backlog.
 
 * Recognizes when an inference request is part of a sequence that is
   already a candidate sequence in some model instance and routes the
@@ -459,16 +457,16 @@ Using the Oldest scheduling strategy, the sequence batcher:
 
 The following figure shows how multiple sequences are scheduled onto
 the model instance specified by the above example configuration. On
-the left the figure shows four sequences of requests arriving at the
-inference server. Each sequence is composed of multiple inference
-requests as shown in the figure. The center of the figure shows how
-the inference request sequences are batched onto the model instance
-over time, assuming that the inference requests for each sequence
-arrive at the same rate with sequence A arriving just before B, which
-arrives just before C, etc. The Oldest strategy forms a dynamic batch
-from the oldest requests but never includes more than one request from
-a given sequence in a batch (for example, the last two inferences in
-sequence D are not batched together).
+the left the figure shows four sequences of requests arriving at
+Triton. Each sequence is composed of multiple inference requests as
+shown in the figure. The center of the figure shows how the inference
+request sequences are batched onto the model instance over time,
+assuming that the inference requests for each sequence arrive at the
+same rate with sequence A arriving just before B, which arrives just
+before C, etc. The Oldest strategy forms a dynamic batch from the
+oldest requests but never includes more than one request from a given
+sequence in a batch (for example, the last two inferences in sequence
+D are not batched together).
 
 .. image:: images/dyna_sequence_example1.png
 
@@ -477,13 +475,13 @@ sequence D are not batched together).
 Ensemble Models
 ---------------
 
-An ensemble model represents a *pipeline* of one or more models and the
-connection of input and output tensors between those models. Ensemble models are
-intended to be used to encapsulate a procedure that involves
-multiple models, such as "data preprocessing -> inference -> data postprocessing".
-Using ensemble models for this purpose can avoid the overhead of transferring
-intermediate tensors and minimize the number of requests that must be sent to
-the inference server.
+An ensemble model represents a *pipeline* of one or more models and
+the connection of input and output tensors between those
+models. Ensemble models are intended to be used to encapsulate a
+procedure that involves multiple models, such as "data preprocessing
+-> inference -> data postprocessing".  Using ensemble models for this
+purpose can avoid the overhead of transferring intermediate tensors
+and minimize the number of requests that must be sent to Triton.
 
 The :ref:`ensemble scheduler <section-ensemble-scheduler>` must be used for
 ensemble models, regardless of the scheduler used by the models within the
@@ -583,9 +581,9 @@ all values in the input_map and the output_map.
 
 The models composing the ensemble may also have dynamic batching
 enabled.  Since ensemble models are just routing the data between
-composing models, the inference server can take requests into an
-ensemble model without modifying the ensemble's configuration to
-exploit the dynamic batching of the composing models.
+composing models, Triton can take requests into an ensemble model
+without modifying the ensemble's configuration to exploit the dynamic
+batching of the composing models.
 
 Assuming that only the ensemble model, the preprocess model, the classification
 model and the segmentation model are being served, the client applications will

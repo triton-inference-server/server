@@ -34,14 +34,14 @@ The Triton Inference Server has many features that you can use to
 decrease latency and increase throughput for your model. This section
 discusses these features and demonstrates how you can use them to
 improve the performance of your model. As a prerequisite you should
-follow the :ref:`section-quickstart` to get the server and client
-examples running with the example model repository.
+follow the :ref:`section-quickstart` to get Triton and client examples
+running with the example model repository.
 
 Unless you already have a client application suitable for measuring
-the performance of your model on the inference server, you should
-familiarize yourself with :ref:`perf\_client
-<section-perf-client>`. The perf\_client application is an essential
-tool for optimizing your model's performance.
+the performance of your model on Triton, you should familiarize
+yourself with :ref:`perf\_client <section-perf-client>`. The
+perf\_client application is an essential tool for optimizing your
+model's performance.
 
 As a running example demonstrating the optimization features and
 options, we will use a Caffe2 ResNet50 model that you can obtain by
@@ -62,21 +62,20 @@ The results show that our non-optimized model configuration gives a
 throughput of about 200 inferences per second. Note how there is a
 significant throughput increase going from one concurrent request to
 two concurrent requests and then throughput levels off. With one
-concurrent request the inference server is idle during the time when
-the response is returned to the client and the next request is
-received at the server. Throughput increases with a concurrency of 2
-because the inference server overlaps the processing of one request
-with the communication of the other. Because we are running
-perf\_client on the same system as the inference server, 2 requests are
-enough to completely hide the communication latency.
+concurrent request Triton is idle during the time when the response is
+returned to the client and the next request is received at the
+server. Throughput increases with a concurrency of 2 because Triton
+overlaps the processing of one request with the communication of the
+other. Because we are running perf\_client on the same system as
+Triton, 2 requests are enough to completely hide the communication
+latency.
 
 Optimization Settings
 ---------------------
 
-For most models, the inference server feature that provides the
-largest performance improvement is the
-:ref:`section-dynamic-batcher`. If your model does not support
-batching then you can skip ahead to
+For most models, the Triton feature that provides the largest
+performance improvement is the :ref:`section-dynamic-batcher`. If your
+model does not support batching then you can skip ahead to
 :ref:`section-opt-model-instances`.
 
 .. _section-opt-dynamic-batcher:
@@ -87,14 +86,13 @@ Dynamic Batcher
 The dynamic batcher combines individual inference requests into a
 larger batch that will often execute much more efficiently than
 executing the individual requests independently. To enable the dynamic
-batcher stop the inference server, add the following lines to the end
-of the model configuration file for resnet50\_netdef, and then restart
-the inference server::
+batcher stop Triton, add the following lines to the end of the model
+configuration file for resnet50\_netdef, and then restart Triton::
 
   dynamic_batching { }
 
-The dynamic batcher allows the inference server to handle a higher
-number of concurrent requests because those requests are combined for
+The dynamic batcher allows Triton to handle a higher number of
+concurrent requests because those requests are combined for
 inference. So run perf\_client with request concurrency from 1 to 8::
 
   $ perf_client -m resnet50_netdef --percentile=95 --concurrency-range 1:8
@@ -109,9 +107,9 @@ inference. So run perf\_client with request concurrency from 1 to 8::
   Concurrency: 7, 369.6 infer/sec, latency 21382 usec
   Concurrency: 8, 426.6 infer/sec, latency 19526 usec
 
-With eight concurrent requests the dynamic batcher allows the
-inference server to provide about 425 inferences per second without
-increasing latency compared to not using the dynamic batcher.
+With eight concurrent requests the dynamic batcher allows Triton to
+provide about 425 inferences per second without increasing latency
+compared to not using the dynamic batcher.
 
 You can also explicitly specify what batch sizes you would like the
 dynamic batcher to prefer when creating batches. For example, to
@@ -123,13 +121,12 @@ preferred sizes can be given but in this case we just have one)::
 
 Instead of having perf\_client collect data for a range of request
 concurrency values we can instead use a simple rule that typically
-applies when perf\_client is running on the same system as the
-inference server. The rule is that for maximum throughput set the
-request concurrency to be 2 * <preferred batch size> * <model instance
-count>. We will discuss model instances :ref:`below
-<section-opt-model-instances>`, for now we are working with one model
-instance. So for preferred-batch-size 4 we want to run perf\_client
-with request concurrency of 2 * 4 * 1 = 8::
+applies when perf\_client is running on the same system as Triton. The
+rule is that for maximum throughput set the request concurrency to be
+2 * <preferred batch size> * <model instance count>. We will discuss
+model instances :ref:`below <section-opt-model-instances>`, for now we
+are working with one model instance. So for preferred-batch-size 4 we
+want to run perf\_client with request concurrency of 2 * 4 * 1 = 8::
 
   $ perf_client -m resnet50_netdef --percentile=95 --concurrency-range 8
   ...
@@ -141,24 +138,22 @@ with request concurrency of 2 * 4 * 1 = 8::
 Model Instances
 ^^^^^^^^^^^^^^^
 
-The inference server allows you to specify how many copies of each
-model you want to make available for inferencing. By default you get
-one copy of each model, but you can specify any number of instances in
-the model configuration by using
-:ref:`section-instance-groups`. Typically, having two instances of a
-model will improve performance because it allows overlap of memory
-transfer operations (for example, CPU to/from GPU) with inference
-compute. Multiple instances also improve GPU utilization by allowing
-more inference work to be executed simultaneously on the GPU. Smaller
-models may benefit from more than two instances; you can use
-perf\_client to experiment.
+Triton allows you to specify how many copies of each model you want to
+make available for inferencing. By default you get one copy of each
+model, but you can specify any number of instances in the model
+configuration by using :ref:`section-instance-groups`. Typically,
+having two instances of a model will improve performance because it
+allows overlap of memory transfer operations (for example, CPU to/from
+GPU) with inference compute. Multiple instances also improve GPU
+utilization by allowing more inference work to be executed
+simultaneously on the GPU. Smaller models may benefit from more than
+two instances; you can use perf\_client to experiment.
 
-To specify two instances of the resnet50\_netdef model: stop the
-inference server, remove any dynamic batching settings you may have
-previously added to the model configuration (we discuss combining
-dynamic batcher and multiple model instances below), add the following
-lines to the end of the model configuration file,
-and then restart the inference server::
+To specify two instances of the resnet50\_netdef model: stop Triton,
+remove any dynamic batching settings you may have previously added to
+the model configuration (we discuss combining dynamic batcher and
+multiple model instances below), add the following lines to the end of
+the model configuration file, and then restart Triton::
 
   instance_group [ { count: 2 }]
 
@@ -201,10 +196,10 @@ best satisfy your throughput and latency requirements.
 Framework-Specific Optimization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The inference server has several optimization settings that apply to
-only a subset of the supported model frameworks. These optimization
-settings are controlled by the model configuration :ref:`optimization
-policy <section-optimization-policy>`.
+Triton has several optimization settings that apply to only a subset
+of the supported model frameworks. These optimization settings are
+controlled by the model configuration :ref:`optimization policy
+<section-optimization-policy>`.
 
 One especially powerful optimization that we will explore here is to
 use :ref:`section-optimization-policy-tensorrt` in conjunction with a
@@ -228,19 +223,18 @@ configuration that does not enable any performance features
   Concurrency: 3, 137.2 infer/sec, latency 21947 usec
   Concurrency: 4, 136.8 infer/sec, latency 29661 usec
 
-To enable TensorRT optimization for the model: stop the inference
-server, add the following lines to the end of the model configuration
-file, and then restart the inference server::
+To enable TensorRT optimization for the model: stop Triton, add the
+following lines to the end of the model configuration file, and then
+restart Triton::
 
   optimization { execution_accelerators {
     gpu_execution_accelerator : [ { name : "tensorrt" } ]
   }}
 
-As the inference server starts you should check the console output and
-wait until the server prints the "Staring endpoints" message. ONNX
-model loading can be significantly slower when TensorRT optimization
-is enabled.  Now run perf\_client using the same options as for the
-baseline::
+As Triton starts you should check the console output and wait until
+Triton prints the "Staring endpoints" message. ONNX model loading can
+be significantly slower when TensorRT optimization is enabled.  Now
+run perf\_client using the same options as for the baseline::
 
   $ perf_client -m densenet_onnx --percentile=95 --concurrency-range 1:4
   ...
@@ -291,15 +285,15 @@ model configuration that does not enable any performance features
   Concurrency: 3, 122.8 infer/sec, latency 30308 usec
   Concurrency: 4, 123.4 infer/sec, latency 39465 usec
 
-To enable TensorRT optimization for the model: stop the inference
-server, add the lines from above to the end of the model configuration
-file, and then restart the inference server. As the inference server
-starts you should check the console output and wait until the server
-prints the "Staring endpoints" message. Now run perf\_client using the
-same options as for the baseline. Note that the first run of
-perf\_client might timeout because the TensorRT optimization is
-performed when the inference request is received and may take
-significant time. If this happens just run perf\_client again::
+To enable TensorRT optimization for the model: stop Triton, add the
+lines from above to the end of the model configuration file, and then
+restart Triton. As Triton starts you should check the console output
+and wait until the server prints the "Staring endpoints" message. Now
+run perf\_client using the same options as for the baseline. Note that
+the first run of perf\_client might timeout because the TensorRT
+optimization is performed when the inference request is received and
+may take significant time. If this happens just run perf\_client
+again::
 
   $ perf_client -m inception_graphdef --percentile=95 --concurrency-range 1:4
   ...
