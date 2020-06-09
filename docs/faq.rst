@@ -56,11 +56,11 @@ Can Triton Inference Server be used in non-Docker environments?
 ---------------------------------------------------------------
 
 Yes. Triton Inference Server has a CMake build that allows the server
- to be built from source making it more portable to non-Docker
- environments. For more details, see
- :ref:`section-building-the-server-with-cmake`. After building you can
- then run Triton outside of Docker as described in
- :ref:`section-running-triton-without-docker`.
+to be built from source making it more portable to non-Docker
+environments. For more details, see
+:ref:`section-building-the-server-with-cmake`. After building you can
+then run Triton outside of Docker as described in
+:ref:`section-running-triton-without-docker`.
 
 Do you provide client libraries for languages other than C++ and Python?
 ------------------------------------------------------------------------
