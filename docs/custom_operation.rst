@@ -37,7 +37,7 @@ TensorRT
 --------
 
 TensorRT allows a user to create `custom layers
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-developer-guide/index.html#extending>`_
+<https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#extending>`_
 which can then be used in TensorRT models. For those models to run in
 Triton the custom layers must be made available.
 
@@ -115,8 +115,8 @@ can load your custom C++ operations into Triton. For example, if you
 follow the instructions in the `pytorch/extension-script
 <https://github.com/pytorch/extension-script>`_ repository and your
 Torchscript custom operations are compiled into libpytcustom.so,
-starting the inference server with the following command makes those
-operations available to all PyTorch models::
+starting Triton with the following command makes those operations
+available to all PyTorch models::
 
   $ LD_PRELOAD=libpytcustom.so tritonserver --model-repository=/tmp/models ...
 

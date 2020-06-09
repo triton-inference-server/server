@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -28,8 +28,44 @@
 Python API
 ==========
 
-Client
-------
+GRPC Client
+-----------
 
-.. automodule:: tensorrtserver.api
+This module contains the GRPC client including the ability to send
+health, status, metadata and inference requests to a Triton server.
+
+.. automodule:: tritongrpcclient
+   :members:
+
+HTTP/REST Client
+----------------
+
+This module contains the HTTP/REST client including the ability to
+send health, status, metadata and inference requests to a Triton
+server.
+
+.. automodule:: tritonhttpclient
+   :members:
+
+
+Client Utilities
+----------------
+
+This module includes common utilities used by both GRPC and HTTP/REST
+clients.
+
+.. automodule:: tritonclientutils
+   :members:
+
+
+Shared Memory Utilities
+-----------------------
+
+This module contains an example API for accessing system and CUDA
+shared memory for use with Triton.
+
+.. automodule:: tritonshmutils.shared_memory
+   :members:
+
+.. automodule:: tritonshmutils.cuda_shared_memory
    :members:

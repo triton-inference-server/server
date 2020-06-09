@@ -25,20 +25,17 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Installing the Server
-=====================
+.. _section-installing-triton:
+
+Installing Triton
+=================
 
 The Triton Inference Server is available as a pre-built Docker
 container or you can :ref:`build it from source
 <section-building>`.
 
-.. _section-installing-prebuilt-containers:
-
-Installing Prebuilt Containers
-------------------------------
-
-The inference server is provided as a pre-built container on the
-`NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_.
+The Triton Docker container is available on the `NVIDIA GPU Cloud
+(NGC) <https://ngc.nvidia.com>`_.
 
 Before you can pull a container from the NGC container registry, you
 must have Docker and nvidia-docker installed. For DGX users, this is
@@ -48,8 +45,8 @@ For users other than DGX, follow the `nvidia-docker installation
 documentation <https://github.com/NVIDIA/nvidia-docker>`_ to install
 the most recent version of CUDA, Docker, and nvidia-docker.
 
-After performing the above setup, you can pull the Triton Inference
-Server container using the following command::
+After performing the above setup, you can pull the Triton container
+using the following command::
 
   docker pull nvcr.io/nvidia/tritonserver:20.03.1-py3
 

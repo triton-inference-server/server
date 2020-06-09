@@ -30,95 +30,124 @@
 Model Repository
 ================
 
-The Triton Inference Server accesses models from one or more locally
-accessible file paths, from Google Cloud Storage, and from Amazon
-S3. These paths are specified when the server is started using the
--\\-model-repository option.
+The Triton Inference Server serves models from one or more model
+repositories that are specified when the server is stated. While
+Triton is running, the models being served can be modified as
+described in :ref:`section-model-management`.
+
+Model Repository Locations
+--------------------------
+
+Triton can access models from one or more locally accessible file
+paths, from Google Cloud Storage, and from Amazon S3. These repository
+paths are specified when Triton is started using the
+-\\-model-repository option. The -\\-model-repository option can be
+specified multiple times to included models from multiple
+repositories.
+
+Local File System
+^^^^^^^^^^^^^^^^^
 
 For a locally accessible file-system the absolute path must be
-specified, for example,
--\\-model-repository=/path/to/model/repository. For a model repository
-residing in Google Cloud Storage, the path must be prefixed with
-gs://, for example,
--\\-model-repository=gs://bucket/path/to/model/repository.  For a
-model repository residing in Amazon S3, the path must be prefixed with
-s3://, for example,
--\\-model-repository=s3://bucket/path/to/model/repository. When
-using a local instance of S3, the prefix s3:// must be followed
-by the host and port (separated by a semicolon) and subsequently
-the bucket path. For example,
--\\-model-repository=s3://host:port/bucket/path/to/model/repository.
+specified::
 
-When using Amazon S3, the credentials and default region can be passed
-by using either the `aws config
-<https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html>_` 
+  $ tritonserver --model-repository=/path/to/model/repository ...
+
+Google Cloud Storage
+^^^^^^^^^^^^^^^^^^^^
+
+For a model repository residing in Google Cloud Storage, the
+repository path must be prefixed with gs://::
+
+  $ tritonserver --model-repository=gs://bucket/path/to/model/repository ...
+
+S3
+^^
+
+For a model repository residing in Amazon S3, the path must be
+prefixed with s3://::
+
+  $ tritonserver --model-repository=s3://bucket/path/to/model/repository ...
+
+For a local or private instance of S3, the prefix s3:// must be
+followed by the host and port (separated by a semicolon) and
+subsequently the bucket path::
+
+  $ tritonserver --model-repository=s3://host:port/bucket/path/to/model/repository ...
+
+When using S3, the credentials and default region can be passed by
+using either the `aws config
+<https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html>_`
 command or via the respective `environment variables
 <https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html>`_.
 If the environment variables are set they will take a higher priority
-and be used by the Triton Inference Server instead of the credentials 
-set using the aws config command. 
+and be used by Triton instead of the credentials set using the aws
+config command.
 
-:ref:`section-example-model-repository` describes how to create an
-example repository with a couple of image classification models.
+Repository Layout
+-----------------
 
-An example of a typical model repository layout is shown below::
+The directories and files that compose a model repository must follow
+a required layout. Assuming a repository path is specified as::
+
+  $ tritonserver --model-repository=<model-repository-path>
+
+The corresponding repository layout must be::
 
   <model-repository-path>/
-    model_0/
-      config.pbtxt
-      output0_labels.txt
-      1/
-        model.plan
-      2/
-        model.plan
-    model_1/
-      config.pbtxt
-      output0_labels.txt
-      output1_labels.txt
-      0/
-        model.graphdef
-      7/
-        model.graphdef
+    <model-name>/
+      [config.pbtxt]
+      [<output-labels-file> ...]
+      <version>/
+        <model-definition-file>
+      <version>/
+        <model-definition-file>
+      ...
+    <model-name>/
+      [config.pbtxt]
+      [<output-labels-file> ...]
+      <version>/
+        <model-definition-file>
+      <version>/
+        <model-definition-file>
+      ...
+    ...
 
-See :ref:`section-model-management` for discussion of how the
-inference server manages the models specified in the model
-repositories. The :ref:`Status API <section-api-status>` can be used
-to determine if any models failed to load successfully. The server's
-console log will also show the reason for any failures during startup.
+Within the top-level model repository directory there must be zero or
+more <model-name> sub-directories. Each of the <model-name>
+sub-directories contains the repository information for the
+corresponding model. The config.pbtxt file describes the
+:ref:`section-model-configuration` for the model. For some models,
+config.pbtxt is required while for others it is optional. See
+:ref:`section-generated-model-configuration` for more information.
 
-The name of the model directory (model_0 and model_1 in the above
-example) must match the name of the model specified in the :ref:`model
-configuration file <section-model-configuration>`, config.pbtxt. The
-model name is used in the :ref:`client API <section-client-api>` and
-:ref:`server API <section-http-and-grpc-api>` to identify the
-model. Each model directory must have at least one numeric
-subdirectory. Each of these subdirectories holds a version of the
-model with the version number corresponding to the directory name.
+A <model-name> directory can contain zero or more <output-labels-file>
+that are used to provide labels for outputs that represent
+classifications. The label file must be specified in the
+:cpp:var:`label_filename
+<nvidia::inferenceserver::ModelOutput::label_filename>` property of
+the output it corresponds to in the :ref:`model configuration
+<section-model-configuration>`.
 
-For more information about how the model versions are handled by the
-server see :ref:`section-model-versions`.  Within each version
-subdirectory there are one or more model definition files that specify
-the actual model, except for :ref:`ensemble models
+Each <model-name> directory must have at least one numeric
+sub-directory representing a version of the model.  For more
+information about how the model versions are handled by Triton see
+:ref:`section-model-versions`.  Within each version sub-directory
+there are one or more model definition files that specify the actual
+model, except for :ref:`ensemble models
 <section-ensemble-models>`. The model definition can be either a
 :ref:`framework-specific model file
 <section-framework-model-definition>` or a shared library implementing
 a :ref:`custom backend <section-custom-backends>`.
-
-The \*_labels.txt files are optional and are used to provide labels for
-outputs that represent classifications. The label file must be
-specified in the :cpp:var:`label_filename
-<nvidia::inferenceserver::ModelOutput::label_filename>` property of
-the output it corresponds to in the :ref:`model configuration
-<section-model-configuration>`.
 
 .. _section-modifying-the-model-repository:
 
 Modifying the Model Repository
 ------------------------------
 
-The inference server has multiple execution modes that control how the
-models within the model repository are managed. These modes are
-described in :ref:`section-model-management`.
+Triton has multiple execution modes that control how the models within
+the model repository are managed. These modes are described in
+:ref:`section-model-management`.
 
 .. _section-model-versions:
 
@@ -128,18 +157,18 @@ Model Versions
 Each model can have one or more versions available in the model
 repository. Each version is stored in its own, numerically named,
 subdirectory where the name of the subdirectory corresponds to the
-version number of the model. The subdirectories that are not numerically named,
-or that have zero prefix will be ignored. Each model specifies a :ref:`version
-policy <section-version-policy>` that controls which of the versions
-in the model repository are made available by the server at any given
-time.
+version number of the model. The subdirectories that are not
+numerically named, or that have zero prefix will be ignored. Each
+model configuration specifies a :ref:`version policy
+<section-version-policy>` that controls which of the versions in the
+model repository are made available by Triton at any given time.
 
 .. _section-framework-model-definition:
 
 Framework Model Definition
 --------------------------
 
-Each model version subdirectory must contain at least one model
+Each model version sub-directory must contain at least one model
 definition. By default, the name of this file or directory must be:
 
 * **model.plan** for TensorRT models
@@ -178,7 +207,7 @@ described above.
 A minimal model repository for a single TensorRT model would look
 like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       config.pbtxt
       1/
@@ -188,7 +217,7 @@ As described in :ref:`section-generated-model-configuration` the
 config.pbtxt is optional for some models. In cases where it is not
 required the minimal model repository would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       1/
         model.plan
@@ -199,10 +228,9 @@ TensorFlow Models
 ^^^^^^^^^^^^^^^^^
 
 TensorFlow saves trained models in one of two ways: *GraphDef* or
-*SavedModel*. The inference server supports both formats. Once you
-have a trained model in TensorFlow, you can save it as a GraphDef
-directly or convert it to a GraphDef by using a script like
-`freeze_graph.py
+*SavedModel*. Triton supports both formats. Once you have a trained
+model in TensorFlow, you can save it as a GraphDef directly or convert
+it to a GraphDef by using a script like `freeze_graph.py
 <https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/tools/freeze_graph.py>`_,
 or save it as a SavedModel using a `SavedModelBuilder
 <https://www.tensorflow.org/serving/serving_basic>`_ or
@@ -216,7 +244,7 @@ A TensorFlow GraphDef is a single file that by default must be named
 model.graphdef. A minimal model repository for a single TensorFlow
 GraphDef model would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       config.pbtxt
       1/
@@ -226,7 +254,7 @@ A TensorFlow SavedModel is a directory containing multiple files. By
 default the directory must be named model.savedmodel. A minimal model
 repository for a single TensorFlow SavedModel model would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       config.pbtxt
       1/
@@ -237,7 +265,7 @@ As described in :ref:`section-generated-model-configuration` the
 config.pbtxt is optional for some models. In cases where it is not
 required the minimal model repository would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       1/
         model.savedmodel/
@@ -250,11 +278,11 @@ TensorRT/TensorFlow Models
 
 TensorFlow 1.7 and later integrates TensorRT to enable TensorFlow
 models to benefit from the inference optimizations provided by
-TensorRT. The inference server supports models that have been
-optimized with TensorRT and can serve those models just like any other
-TensorFlow model. The inference server’s TensorRT version (available
-in the Release Notes) must match the TensorRT version that was used
-when the model was created.
+TensorRT. Triton supports models that have been optimized with
+TensorRT and can serve those models just like any other TensorFlow
+model. Triton’s TensorRT version (available in the
+Release Notes) must match the TensorRT version that was used when the
+model was created.
 
 A TensorRT/TensorFlow integrated model is specific to CUDA Compute
 Capability and so it is typically necessary to use the :ref:`model
@@ -274,9 +302,9 @@ ONNX Models
 
 An ONNX model is a single file or a directory containing multiple
 files. By default the file or directory must be named model.onnx.
-Notice that some ONNX models may not be supported by the inference
-server as they are not supported by the underlying ONNX Runtime (due
-to either using `stale ONNX opset version
+Notice that some ONNX models may not be supported by Triton as they
+are not supported by the underlying ONNX Runtime (due to either using
+`stale ONNX opset version
 <https://github.com/Microsoft/onnxruntime/blob/master/docs/Versioning.md#version-matrix>`_
 or containing operators with `unsupported types
 <https://github.com/microsoft/onnxruntime/issues/1122>`_).
@@ -298,7 +326,7 @@ the *tensorrt* execution provider.
 A minimal model repository for a single ONNX model contained in a
 single file would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       config.pbtxt
       1/
@@ -308,7 +336,7 @@ As described in :ref:`section-generated-model-configuration` the
 config.pbtxt is optional for some models. In cases where it is not
 required the minimal model repository would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       1/
         model.onnx
@@ -321,20 +349,9 @@ model file within this directory must be named model.onnx. A minimal
 model repository for a single ONNX model contained in a directory
 would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       config.pbtxt
-      1/
-        model.onnx/
-           model.onnx
-           <other model files>
-
-As described in :ref:`section-generated-model-configuration` the
-config.pbtxt is optional for some models. In cases where it is not
-required the minimal model repository would look like::
-
-  models/
-    <model-name>/
       1/
         model.onnx/
            model.onnx
@@ -343,16 +360,15 @@ required the minimal model repository would look like::
 .. _section-pytorch-models:
 
 PyTorch Models
-^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
-An PyTorch model is a single file that by default must be named model.pt.
-Notice that a PyTorch model must be traced with an example input and saved as a
-TorchScript Module as shown `here <https://pytorch.org/tutorials/advanced/cpp_export.html>`_.
-It is possible that some models traced with different versions of PyTorch may
-not be supported by the inference server due to changes in the underlying opset.
-A minimal model repository for a single PyTorch model would look like::
+An PyTorch model is a single file that by default must be named
+model.pt.  It is possible that some models traced with different
+versions of PyTorch may not be supported by Triton due to changes in
+the underlying opset.  A minimal model repository for a single PyTorch
+model would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       config.pbtxt
       1/
@@ -365,7 +381,7 @@ A Caffe2 model definition is called a *NetDef*. A Caffe2 NetDef is a
 single file that by default must be named model.netdef. A minimal
 model repository for a single NetDef model would look like::
 
-  models/
+  <model-repository-path>/
     <model-name>/
       config.pbtxt
       1/
@@ -378,7 +394,7 @@ Custom Backends
 
 A model using a custom backend is represented in the model repository
 in the same way as models using a deep-learning framework backend.
-Each model version subdirectory must contain at least one shared
+Each model version sub-directory must contain at least one shared
 library that implements the custom model backend. By default, the name
 of this shared library must be **libcustom.so** but the default name
 can be overridden using the *default_model_filename* property in the
@@ -394,8 +410,7 @@ different shared libraries for different compute capabilities.
 Currently, only model repositories on the local filesystem support
 custom backends. A custom backend contained in a model repository in
 cloud storage (for example, a repository accessed with the gs://
-prefix or s3:// prefix as described above) cannot be loaded by the
-inference server.
+prefix or s3:// prefix as described above) cannot be loaded.
 
 Custom Backend API
 ^^^^^^^^^^^^^^^^^^
@@ -424,7 +439,8 @@ in the same way as models using a deep-learning framework backend.
 Currently, the ensemble backend does not require any version specific data,
 so each model version subdirectory must exist but should be empty.
 
-An example of an ensemble backend in a model repository can be found in the
+An example of an ensemble backend in a model repository can be found
+in the
 `docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble
 <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble>`_
 directory.

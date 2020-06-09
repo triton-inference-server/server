@@ -49,22 +49,21 @@ Regardless of which method you choose (starting with a pre-built
 container from NGC or building from source), you must perform the
 following prerequisite steps:
 
-* Clone the Triton Inference Server GitHub repo. Even if you choose
-  to get the pre-built inference server from NGC, you need the GitHub
-  repo for the example model repository and to build the example
-  applications. Go to
+* Clone the Triton Inference Server GitHub repo. Even if you choose to
+  get the pre-built Triton from NGC, you need the GitHub repo for the
+  example model repository. Go to
   https://github.com/NVIDIA/triton-inference-server and then select
-  the *clone* or *download* drop down button. After clone the repo be
-  sure to select the r<xx.yy> release branch that corresponds to the
-  version of the server you want to use::
+  the *clone* or *download* drop down button. After cloning the repo
+  be sure to select the r<xx.yy> release branch that corresponds to
+  the version of Triton you want to use::
 
   $ git checkout r20.03.1
 
 * Create a model repository containing one or more models that you
-  want the inference server to serve. An example model repository is
-  included in the docs/examples/model_repository directory of the
-  GitHub repo. Before using the repository, you must fetch any missing
-  model definition files from their public model zoos via the provided
+  want Triton to serve. An example model repository is included in the
+  docs/examples/model_repository directory of the GitHub repo. Before
+  using the repository, you must fetch any missing model definition
+  files from their public model zoos via the provided
   docs/examples/fetch_models.sh script::
 
   $ cd docs/examples
@@ -84,19 +83,17 @@ additional steps:
 Using A Prebuilt Docker Container
 ---------------------------------
 
-Make sure you log into NGC as described in
-:ref:`section-quickstart-prerequisites` before attempting the steps in this
-section.  Use docker pull to get the Triton Inference Server
-container from NGC::
+Use docker pull to get the Triton Inference Server container from
+NGC::
 
   $ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3
 
-Where <xx.yy> is the version of the inference server that you want to
-pull. Once you have the container follow these steps to run the server
-and the example client applications.
+Where <xx.yy> is the version of Triton that you want to pull. Once you
+have the container follow these steps to run Triton and the example
+client applications.
 
-#. :ref:`Run the inference server <section-quickstart-run-triton-inference-server>`.
-#. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
+#. :ref:`Run Triton <section-quickstart-run-triton-inference-server>`.
+#. :ref:`Verify that Triton is running correct <section-quickstart-verify-inference-server-status>`.
 #. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
 
@@ -105,11 +102,11 @@ and the example client applications.
 Building With Docker
 --------------------
 
-Make sure you complete the steps in :ref:`section-quickstart-prerequisites`
-before attempting to build the inference server. To build the
-inference server from source, change to the root directory of the
-GitHub repo and checkout the release version of the branch that you
-want to build (or the master branch if you want to build the
+Make sure you complete the steps in
+:ref:`section-quickstart-prerequisites` before attempting to build
+Triton. To build Triton from source, change to the root directory of
+the GitHub repo and checkout the release version of the branch that
+you want to build (or the master branch if you want to build the
 under-development version)::
 
   $ git checkout r20.03.1
@@ -118,11 +115,11 @@ Then use docker to build::
 
   $ docker build --pull -t tritonserver .
 
-After the build completes follow these steps to run the server and the
+After the build completes follow these steps to run Triton and the
 example client applications.
 
-#. :ref:`Run the inference server <section-quickstart-run-triton-inference-server>`.
-#. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
+#. :ref:`Run Triton <section-quickstart-run-triton-inference-server>`.
+#. :ref:`Verify that Triton is running correct <section-quickstart-verify-inference-server-status>`.
 #. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
 
@@ -131,18 +128,18 @@ example client applications.
 Building With CMake
 -------------------
 
-Make sure you complete the steps in :ref:`section-quickstart-prerequisites`
-before attempting to build the inference server. To build with CMake
-you must decide which features of the inference server you want, build
-any required dependencies, and the lastly build the Triton Inference
-Server itself. See :ref:`section-building-the-server-with-cmake` for
+Make sure you complete the steps in
+:ref:`section-quickstart-prerequisites` before attempting to build
+Triton. To build with CMake you must decide which features of Triton
+you want, build any required dependencies, and the lastly build the
+Triton itself. See :ref:`section-building-the-server-with-cmake` for
 details on how to build with CMake.
 
-After the build completes follow these steps to run the server and the
+After the build completes follow these steps to run Triton and the
 example client applications.
 
-#. :ref:`Run the inference server <section-quickstart-run-triton-inference-server>`.
-#. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
+#. :ref:`Run Triton <section-quickstart-run-triton-inference-server>`.
+#. :ref:`Verify that Triton is running correct <section-quickstart-verify-inference-server-status>`.
 #. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
 
@@ -152,67 +149,48 @@ Run Triton Inference Server
 ---------------------------
 
 Assuming the example model repository is available in
-/full/path/to/example/model/repository, if you build using Docker use
-the following command to run the inference server container::
+/full/path/to/example/model/repository, if you built using Docker use
+the following command to run the Triton container::
 
-  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/example/model/repository:/models <docker image> tritonserver --model-repository=/models
+  $ docker run --gpus=1 --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/example/model/repository:/models <docker image> tritonserver --model-repository=/models
 
 Where <docker image> is *nvcr.io/nvidia/tritonserver:<xx.yy>-py3* if
-you pulled the inference server container from NGC, or is
-*tritonserver* if you built the inference server from source.
+you pulled the Triton container from NGC, or is *tritonserver* if you
+built Triton from source.
 
-If you built using CMake run the inference server directly on your host system::
+If you built using CMake run Triton directly on your host system::
 
     $ tritonserver --model-repository=/full/path/to/example/model/repository
 
-In either case, after you start the inference server you will see
-output on the console showing the server starting up and loading the
-model. When you see output like the following, the inference server is
-ready to accept inference requests::
+In either case, after you start Triton you will see output on the
+console showing the server starting up and loading the model. When you
+see output like the following, Triton is ready to accept inference
+requests::
 
   I0828 23:42:45.635957 1 main.cc:417] Starting endpoints, 'inference:0' listening on
-  I0828 23:42:45.649580 1 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
-  I0828 23:42:45.649647 1 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
-  I0828 23:42:45.693758 1 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+  I0828 23:42:45.649580 1 grpc_server.cc:1730] Started GRPCInferenceService at 0.0.0.0:8001
+  I0828 23:42:45.649647 1 http_server.cc:1125] Started HTTPService at 0.0.0.0:8000
+  I0828 23:42:45.693758 1 http_server.cc:1139] Started Metrics Service at 0.0.0.0:8002
 
-For more information, see :ref:`section-running-the-inference-server`.
+For more information, see :ref:`section-running-triton`.
 
 .. _section-quickstart-verify-inference-server-status:
 
-Verify Inference Server Is Running Correctly
---------------------------------------------
+Verify Triton Is Running Correctly
+----------------------------------
 
-Use the server’s *Status* endpoint to verify that the server and the
-models are ready for inference.  From the host system use curl to
-access the HTTP endpoint to request the server status. For example::
+Use Triton’s *ready* endpoint to verify that the server and the models
+are ready for inference. From the host system use curl to access the
+HTTP endpoint that indicates server status. For example::
 
-  $ curl localhost:8000/api/status
-  id: "inference:0"
-  version: "0.6.0"
-  uptime_ns: 23322988571
-  model_status {
-    key: "resnet50_netdef"
-    value {
-      config {
-        name: "resnet50_netdef"
-        platform: "caffe2_netdef"
-      }
-      ...
-      version_status {
-        key: 1
-        value {
-          ready_state: MODEL_READY
-        }
-      }
-    }
-  }
-  ready_state: SERVER_READY
+  $ curl -v localhost:8000/v2/health/ready
+  ...
+  < HTTP/1.1 200 OK
+  < Content-Length: 0
+  < Content-Type: text/plain
 
-The ready_state field should return SERVER_READY to indicate that the
-inference server is online, that models are properly loaded, and that
-the server is ready to receive inference requests.
-
-For more information, see
+The HTTP request returns status 200 if Triton is ready and non-200 if
+it is not ready.  For more information, see
 :ref:`section-checking-inference-server-status`.
 
 .. _section-quickstart-getting-the-examples:
@@ -220,21 +198,18 @@ For more information, see
 Getting The Client Examples
 ---------------------------
 
-Make sure you log into NGC as described in
-:ref:`section-quickstart-prerequisites` before attempting the steps in this
-section. Use docker pull to get the client libraries and examples
-container from NGC::
+Use docker pull to get the client libraries and examples container
+from NGC::
 
   $ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 
 Where <xx.yy> is the version that you want to pull. Run the client
-image so that the client examples can access the inference server::
+image::
 
   $ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 
 It is also possible to build the client examples with or without
-Docker and for some platforms pre-compiled client examples are
-available. For more information, see
+Docker. For more information, see
 :ref:`section-getting-the-client-examples`.
 
 .. _section-quickstart-running-the-image-classification-example:
@@ -242,24 +217,24 @@ available. For more information, see
 Running The Image Classification Example
 ----------------------------------------
 
-From within the tritonserver_client image, run the example
-image-client application to perform image classification using the
-example resnet50_netdef from the example model repository.
+From within the nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
+image, run the example image-client application to perform image
+classification using the example resnet50_netdef.
 
 To send a request for the resnet50_netdef (Caffe2) model from the
-example model repository for an image from the /workspace/images directory::
+example model repository for an image from the /workspace/images
+directory::
 
   $ /workspace/install/bin/image_client -m resnet50_netdef -s INCEPTION /workspace/images/mug.jpg
   Request 0, batch size 1
-  Image '../images/mug.jpg':
-      504 (COFFEE MUG) = 0.723991
+  Image 'images/mug.jpg':
+      0.723992 (504) = COFFEE MUG
 
-The Python version of the application accepts the same command-line
+The Python version of image_client accepts the same command-line
 arguments::
 
   $ python /workspace/install/python/image_client.py -m resnet50_netdef -s INCEPTION /workspace/images/mug.jpg
-  Request 0, batch size 1
-  Image '../images/mug.jpg':
-      504 (COFFEE MUG) = 0.778078556061
+  Request 1, batch size 1
+      0.777365 (504) = COFFEE MUG
 
 For more information, see :ref:`section-image-classification-example`.

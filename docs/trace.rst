@@ -30,11 +30,10 @@
 Server Trace
 ------------
 
-The inference server includes that capability to generate a detailed
-trace for individual inference requests. If you are :ref:`building
-your own inference server <section-building-the-server-with-cmake>`
-you must use the \-DTRTIS_ENABLE_TRACING=ON option when configuring
-cmake.
+Triton includes that capability to generate a detailed trace for
+individual inference requests. If you are :ref:`building your own
+inference server <section-building-the-server-with-cmake>` you must
+use the \-DTRITON_ENABLE_TRACING=ON option when configuring cmake.
 
 Tracing is enable by command-line arguments when running the tritonserver
 executable. For example::
@@ -96,8 +95,8 @@ Trace Summary Tool
 
 An example `trace summary tool
 <https://github.com/NVIDIA/triton-inference-server/blob/master/qa/common/trace_summary.py>`_
-can be used to summarize a set of traces collected from the inference
-server. Basic usage is::
+can be used to summarize a set of traces collected from Triton. Basic
+usage is::
 
   $ trace_summary.py <trace file>
 

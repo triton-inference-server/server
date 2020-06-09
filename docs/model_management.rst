@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -30,89 +30,31 @@
 Model Management
 ================
 
-The inference server operates in one of three model control modes:
-NONE, POLL, or EXPLICIT.
+Triton operates in one of three model control modes: NONE, POLL, or
+EXPLICIT.
 
 Model Control Mode NONE
 -----------------------
 
-The server attempts to load all models in the model repository at
-startup. Models that the server is not able to load will be marked as
-UNAVAILABLE in the server status and will not be available for
-inferencing.
+Triton attempts to load all models in the model repository at
+startup. Models that Triton is not able to load will be marked as
+UNAVAILABLE and will not be available for inferencing.
 
 Changes to the model repository while the server is running will be
-ignored. Model control requests using the :ref:`Model Control API
-<section-api-model-control>` will have no affect and will receive an
+ignored. Model control requests using the :ref:`model control endpoint
+<section-http-and-grpc-api>` will have no affect and will receive an
 error response.
 
 This model control mode is selected by specifing
--\\-model-control-mode=none when starting the inference
-server.
+-\\-model-control-mode=none when starting Triton. This is the default
+model control mode.
 
-Model Control Mode POLL
------------------------
-
-The server attempts to load all models in the model repository at
-startup. Models that the server is not able to load will be marked as
-UNAVAILABLE in the server status and will not be available for
-inferencing.
-
-Changes to the model repository will be detected and the server will
-attempt to load and unload models as necessary based on those
-changes. Changes to the model repository may not be detected
-immediately because the server polls the repository periodically. You
-can control the polling interval with the -\\-repository-poll-secs
-option. The console log or the :ref:`Status API <section-api-status>`
-can be used to determine when model repository changes have taken
-effect.
-
-Model control requests using the :ref:`Model Control API
-<section-api-model-control>` will have no affect and will receive an
-error response.
-
-This model control mode is the default but can be explicitly enabled
-by specifing -\\-model-control-mode=poll and by setting
--\\-repository-poll-secs to a non-zero value when starting the
-inference server.
-
-In POLL mode the inference server responds to the following model
-repository changes:
-
-* Versions may be added and removed from models by adding and removing
-  the corresponding version subdirectory. The inference server will
-  allow in-flight requests to complete even if they are using a
-  removed version of the model. New requests for a removed model
-  version will fail. Depending on the model's :ref:`version policy
-  <section-version-policy>`, changes to the available versions may
-  change which model version is served by default.
-
-* Existing models can be removed from the repository by removing the
-  corresponding model directory.  The inference server will allow
-  in-flight requests to any version of the removed model to
-  complete. New requests for a removed model will fail.
-
-* New models can be added to the repository by adding a new model
-  directory.
-
-* The :ref:`model configuration <section-model-configuration>`
-  (config.pbtxt) can be changed and the server will unload and reload
-  the model to pick up the new model configuration.
-
-* Labels files providing labels for outputs that represent
-  classifications can be added, removed, or modified and the inference
-  server will unload and reload the model to pick up the new
-  labels. If a label file is added or removed the corresponding edit
-  to the :cpp:var:`label_filename
-  <nvidia::inferenceserver::ModelOutput::label_filename>` property of
-  the output it corresponds to in the :ref:`model configuration
-  <section-model-configuration>` must be performed at the same time.
 
 Model Control Mode EXPLICIT
 ---------------------------
 
-At startup, the server loads only those models specified explicitly
-with the -\\-load-model command-line option. If -\\-load-model is not
+At startup, Triton loads only those models specified explicitly with
+the -\\-load-model command-line option. If -\\-load-model is not
 specified then no models are loaded at startup. After startup, all
 model load and unload actions must be initiated explicitly by using
 the :ref:`Model Control API <section-api-model-control>`. The response
@@ -122,8 +64,58 @@ the load or unload action.
 This model control mode is enabled by specifing
 -\\-model-control-mode=explicit.
 
-**The EXPLICIT model control mode is experimental**. The inference
-server will attempt to load and unload models using the APIs provided
-by the framework backends, but it is likely that at least some of the
-backends will have difficulty managing repeated load/unload
-cycles.
+Model Control Mode POLL
+-----------------------
+
+Triton attempts to load all models in the model repository at
+startup. Models that Triton is not able to load will be marked as
+UNAVAILABLE and will not be available for inferencing.
+
+Changes to the model repository will be detected and Triton will
+attempt to load and unload models as necessary based on those
+changes. Changes to the model repository may not be detected
+immediately because Triton polls the repository periodically. You can
+control the polling interval with the -\\-repository-poll-secs
+option. The console log or the :ref:`Status API <section-api-status>`
+can be used to determine when model repository changes have taken
+effect.
+
+Model control requests using the :ref:`model control endpoint
+<section-http-and-grpc-api>` will have no affect and will receive an
+error response.
+
+This model control mode is enabled by specifing
+-\\-model-control-mode=poll and by setting -\\-repository-poll-secs to
+a non-zero value when starting Triton.
+
+In POLL mode Triton responds to the following model repository
+changes:
+
+* Versions may be added and removed from models by adding and removing
+  the corresponding version subdirectory. Triton will allow in-flight
+  requests to complete even if they are using a removed version of the
+  model. New requests for a removed model version will fail. Depending
+  on the model's :ref:`version policy <section-version-policy>`,
+  changes to the available versions may change which model version is
+  served by default.
+
+* Existing models can be removed from the repository by removing the
+  corresponding model directory.  Triton will allow in-flight requests
+  to any version of the removed model to complete. New requests for a
+  removed model will fail.
+
+* New models can be added to the repository by adding a new model
+  directory.
+
+* The :ref:`model configuration <section-model-configuration>`
+  (config.pbtxt) can be changed and Triton will unload and reload the
+  model to pick up the new model configuration.
+
+* Labels files providing labels for outputs that represent
+  classifications can be added, removed, or modified and Triton will
+  unload and reload the model to pick up the new labels. If a label
+  file is added or removed the corresponding edit to the
+  :cpp:var:`label_filename
+  <nvidia::inferenceserver::ModelOutput::label_filename>` property of
+  the output it corresponds to in the :ref:`model configuration
+  <section-model-configuration>` must be performed at the same time.
