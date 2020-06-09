@@ -171,18 +171,18 @@ CSV output of the results::
 
   $ perf_client -m resnet50_netdef --concurrency-range 1:4 -f perf.csv
   $ cat perf.csv
-  Concurrency,Inferences/Second,Client Send,Network+Server Send/Recv,Server Queue,Server Compute,Client Recv,p50 latency,p90 latency,p95 latency,p99 latency
-  1,160.8,68,1291,38,4801,7,6212,6289,6328,7407
-  3,207.8,70,1211,8346,4786,8,14379,14457,14536,15853
-  4,208.4,71,1014,13314,4776,8,19168,19218,19265,19583
-  2,209.2,67,1204,3511,4756,7,9545,9576,9588,9627
+  Concurrency,Inferences/Second,Client Send,Network+Server Send/Recv,Server Queue,Server Compute Input,Server Compute Infer,Server Compute Output,Client Recv,p50 latency,p90 latency,p95 latency,p99 latency
+  1,163.6,69,1230,33,43,4719,5,9,6133,6191,6224,6415
+  2,208.6,180,1306,3299,43,4720,5,28,9482,9617,10746,10832
+  4,209.8,173,1268,12835,40,4705,4,27,19046,19133,19164,19290
+  3,210.2,175,1267,8052,40,4697,4,27,14259,14325,14350,14426
 
 You can import the CSV file into a spreadsheet to help visualize
 the latency vs inferences/second tradeoff as well as see some
 components of the latency. Follow these steps:
 
 - Open `this spreadsheet
-  <https://docs.google.com/spreadsheets/d/1IsdW78x_F-jLLG4lTV0L-rruk0VEBRL7Mnb-80RGLL4>`_
+  <https://docs.google.com/spreadsheets/d/1S8h0bWBBElHUoLd2SOvQPzZzRiQ55xjyqodm_9ireiw>`_
 - Make a copy from the File menu "Make a copy..."
 - Open the copy
 - Select the A1 cell on the "Raw Data" tab
