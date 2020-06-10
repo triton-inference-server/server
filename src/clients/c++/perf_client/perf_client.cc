@@ -1177,7 +1177,7 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       InferenceProfiler::Create(
           verbose, stability_threshold, measurement_window_ms, max_trials,
-          percentile, latency_threshold_ms, parser,
+          percentile, latency_threshold_ms, protocol, parser,
           std::move(triton_client_wrapper), std::move(manager), &profiler),
       "failed to create profiler");
 

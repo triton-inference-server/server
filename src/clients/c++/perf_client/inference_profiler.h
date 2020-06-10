@@ -156,7 +156,7 @@ class InferenceProfiler {
       const bool verbose, const double stability_threshold,
       const uint64_t measurement_window_ms, const size_t max_trials,
       const int64_t percentile, const uint64_t latency_threshold_ms,
-      std::shared_ptr<ModelParser>& parser,
+      const ProtocolType protocol, std::shared_ptr<ModelParser>& parser,
       std::unique_ptr<TritonClientWrapper> profile_client,
       std::unique_ptr<LoadManager> manager,
       std::unique_ptr<InferenceProfiler>* profiler);
@@ -227,7 +227,8 @@ class InferenceProfiler {
       const bool verbose, const double stability_threshold,
       const int32_t measurement_window_ms, const size_t max_trials,
       const bool extra_percentile, const size_t percentile,
-      const uint64_t latency_threshold_ms, std::shared_ptr<ModelParser>& parser,
+      const uint64_t latency_threshold_ms, const ProtocolType protocol,
+      std::shared_ptr<ModelParser>& parser,
       std::unique_ptr<TritonClientWrapper> profile_client,
       std::unique_ptr<LoadManager> manager);
 
