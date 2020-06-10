@@ -51,6 +51,7 @@ SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_grpc_shm_string_client.py
 SIMPLE_SHM_CLIENT_PY=../clients/simple_grpc_shm_client.py
 SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_grpc_cudashm_client.py
 SIMPLE_MODEL_CONTROL_PY=../clients/simple_grpc_model_control.py
+SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=../clients/reuse_infer_objects_client.py
 EXPLICIT_BYTE_CONTENT_CLIENT_PY=../clients/grpc_explicit_byte_content_client.py
 EXPLICIT_INT_CONTENT_CLIENT_PY=../clients/grpc_explicit_int_content_client.py
 EXPLICIT_INT8_CONTENT_CLIENT_PY=../clients/grpc_explicit_int8_content_client.py
@@ -68,6 +69,7 @@ SIMPLE_SHM_CLIENT=../clients/simple_grpc_shm_client
 SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_cudashm_client
 SIMPLE_IMAGE_CLIENT=../clients/image_client
 SIMPLE_ENSEMBLE_IMAGE_CLIENT=../clients/ensemble_image_client
+SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
 
 rm -f *.log
 rm -f *.log.*
@@ -186,6 +188,13 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+# Test while reusing the InferInput and InferRequestedOutput objects
+$SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY -v -i grpc -u localhost:8001 >> ${CLIENT_LOG}.reuse 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.reuse
+    RET=1
+fi
+
 for i in \
    $SIMPLE_INFER_CLIENT \
    $SIMPLE_STRING_INFER_CLIENT \
@@ -240,6 +249,13 @@ done
 $SIMPLE_INFER_CLIENT -v -c >> ${CLIENT_LOG}.c++.custom 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.custom
+    RET=1
+fi
+
+# Test while reusing the InferInput and InferRequestedOutput objects
+$SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v -i grpc -u localhost:8001 >> ${CLIENT_LOG}.c++.reuse 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.reuse
     RET=1
 fi
 

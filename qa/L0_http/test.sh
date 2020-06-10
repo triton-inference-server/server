@@ -50,6 +50,7 @@ SIMPLE_SHM_CLIENT_PY=../clients/simple_http_shm_client.py
 SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_http_cudashm_client.py
 SIMPLE_MODEL_CONTROL_PY=../clients/simple_http_model_control.py
 SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_http_sequence_sync_infer_client.py
+SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=../clients/reuse_infer_objects_client.py
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_health_metadata
 SIMPLE_INFER_CLIENT=../clients/simple_http_infer_client
@@ -59,6 +60,7 @@ SIMPLE_MODEL_CONTROL=../clients/simple_http_model_control
 SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_http_sequence_sync_infer_client
 SIMPLE_SHM_CLIENT=../clients/simple_http_shm_client
 SIMPLE_CUDASHM_CLIENT=../clients/simple_http_cudashm_client
+SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
 
 rm -f *.log
 rm -f *.log.*
@@ -157,6 +159,14 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+# Test while reusing the InferInput and InferRequestedOutput objects
+$SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY -v >> ${CLIENT_LOG}.reuse 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.reuse
+    RET=1
+fi
+
+
 for i in \
    $SIMPLE_INFER_CLIENT \
    $SIMPLE_STRING_INFER_CLIENT \
@@ -183,6 +193,12 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+# Test while reusing the InferInput and InferRequestedOutput objects
+$SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v >> ${CLIENT_LOG}.c++.reuse 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.reuse
+    RET=1
+fi
 
 set -e
 
