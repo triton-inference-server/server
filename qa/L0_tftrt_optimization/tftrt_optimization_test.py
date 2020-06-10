@@ -48,11 +48,11 @@ class TFTRTOptimizationTest(unittest.TestCase):
         inputs.append(httpclient.InferInput('INPUT1', [1, 16], "FP32"))
 
         # Initialize the data
-        inputs[0].set_data_from_numpy(self.input0_, binary_data=False)
-        inputs[1].set_data_from_numpy(self.input1_, binary_data=True)
+        inputs[0].set_data_from_numpy(self.input0_, binary_data=True)
+        inputs[1].set_data_from_numpy(self.input1_, binary_data=False)
 
         outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-        outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+        outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
 
         results = triton_client.infer(model_name,
                                       inputs,

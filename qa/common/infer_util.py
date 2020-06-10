@@ -277,7 +277,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             if len(shm_regions) != 0:
                 if config[1] == "http":
                     output_req.append(httpclient.InferRequestedOutput(
-                        OUTPUT0, binary_data=False))
+                        OUTPUT0, binary_data=config[3]))
                 else:
                     output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
 
@@ -294,7 +294,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     if config[1] == "http":
                         output_req.append(httpclient.InferRequestedOutput(
-                            OUTPUT0, binary_data=False, class_count=num_classes))
+                            OUTPUT0, binary_data=config[3], class_count=num_classes))
                     else:
                         output_req.append(grpcclient.InferRequestedOutput(
                             OUTPUT0, class_count=num_classes))
@@ -303,7 +303,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             if len(shm_regions) != 0:
                 if config[1] == "http":
                     output_req.append(httpclient.InferRequestedOutput(
-                        OUTPUT1, binary_data=False))
+                        OUTPUT1, binary_data=config[3]))
                 else:
                     output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
 
@@ -320,7 +320,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     if config[1] == "http":
                         output_req.append(httpclient.InferRequestedOutput(
-                            OUTPUT1, binary_data=False, class_count=num_classes))
+                            OUTPUT1, binary_data=config[3], class_count=num_classes))
                     else:
                         output_req.append(grpcclient.InferRequestedOutput(
                             OUTPUT1, class_count=num_classes))

@@ -72,13 +72,13 @@ if __name__ == '__main__':
 
     # Initialize the data
     # Enable binary_data after DLIS-1204 is fixed.
-    inputs[0].set_data_from_numpy(input0_data, binary_data=False)
-    inputs[1].set_data_from_numpy(input1_data, binary_data=False)
+    inputs[0].set_data_from_numpy(input0_data, binary_data=True)
+    inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
     outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0',
-                                                   binary_data=False))
+                                                   binary_data=True))
     outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=False))
+                                                   binary_data=True))
 
     # Inference call
     async_request = triton_client.async_infer(model_name=model_name,
