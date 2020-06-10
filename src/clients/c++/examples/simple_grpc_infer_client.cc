@@ -228,9 +228,9 @@ main(int argc, char** argv)
       results_ptr->RawData(
           "OUTPUT1", (const uint8_t**)&output1_data, &output1_byte_size),
       "unable to get result data for 'OUTPUT1'");
-  if (output0_byte_size != 64) {
+  if (output1_byte_size != 64) {
     std::cerr << "error: received incorrect byte size for 'OUTPUT1': "
-              << output0_byte_size << std::endl;
+              << output1_byte_size << std::endl;
     exit(1);
   }
 

@@ -93,6 +93,29 @@ else()
   )
 
   #
+  # reuse_infer_objects_client
+  #
+  set(
+    REUSE_INFER_OBJECTS_CLIENT_SRCS
+    reuse_infer_objects_client.cc
+    ../examples/shm_utils.cc
+  )
+  set(
+    REUSE_INFER_OBJECTS_CLIENT_HDRS
+    ../examples/shm_utils.h
+  )
+  add_executable(reuse_infer_objects_client ${REUSE_INFER_OBJECTS_CLIENT_SRCS} ${REUSE_INFER_OBJECTS_CLIENT_HDRS})
+  target_link_libraries(
+    reuse_infer_objects_client
+    PRIVATE TRITON::grpcclient_static
+    PRIVATE TRITON::httpclient_static
+  )
+  install(
+    TARGETS reuse_infer_objects_client
+    RUNTIME DESTINATION bin
+  )
+
+  #
   # simple_grpc_health_metadata
   #
   add_executable(simple_grpc_health_metadata simple_grpc_health_metadata.cc)
