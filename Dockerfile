@@ -402,7 +402,7 @@ COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include inclu
 
 # Get ONNX version supported
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/ort_onnx_version.txt ort_onnx_version.txt
-RUN export ONNX_VERSION=`cat ort_onnx_version.txt` && rm - fort_onnx_version.txt
+RUN export ONNX_VERSION=`cat ort_onnx_version.txt` && rm -f ort_onnx_version.txt
 
 # Perf test provided by ONNX Runtime, can be used to test run model with ONNX Runtime directly
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/build/Release/onnxruntime_perf_test /opt/onnxruntime/
