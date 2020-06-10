@@ -201,14 +201,14 @@ InferenceProfiler::Create(
     const bool verbose, const double stability_threshold,
     const uint64_t measurement_window_ms, const size_t max_trials,
     const int64_t percentile, const uint64_t latency_threshold_ms_,
-    std::shared_ptr<ModelParser>& parser,
+    const ProtocolType protocol, std::shared_ptr<ModelParser>& parser,
     std::unique_ptr<TritonClientWrapper> profile_client,
     std::unique_ptr<LoadManager> manager,
     std::unique_ptr<InferenceProfiler>* profiler)
 {
   std::unique_ptr<InferenceProfiler> local_profiler(new InferenceProfiler(
       verbose, stability_threshold, measurement_window_ms, max_trials,
-      (percentile != -1), percentile, latency_threshold_ms_, parser,
+      (percentile != -1), percentile, latency_threshold_ms_, protocol, parser,
       std::move(profile_client), std::move(manager)));
 
   *profiler = std::move(local_profiler);
@@ -219,14 +219,15 @@ InferenceProfiler::InferenceProfiler(
     const bool verbose, const double stability_threshold,
     const int32_t measurement_window_ms, const size_t max_trials,
     const bool extra_percentile, const size_t percentile,
-    const uint64_t latency_threshold_ms_, std::shared_ptr<ModelParser>& parser,
+    const uint64_t latency_threshold_ms_, const ProtocolType protocol,
+    std::shared_ptr<ModelParser>& parser,
     std::unique_ptr<TritonClientWrapper> profile_client,
     std::unique_ptr<LoadManager> manager)
     : verbose_(verbose), measurement_window_ms_(measurement_window_ms),
       max_trials_(max_trials), extra_percentile_(extra_percentile),
       percentile_(percentile), latency_threshold_ms_(latency_threshold_ms_),
-      parser_(parser), profile_client_(std::move(profile_client)),
-      manager_(std::move(manager))
+      protocol_(protocol), parser_(parser),
+      profile_client_(std::move(profile_client)), manager_(std::move(manager))
 {
   load_parameters_.stability_threshold = stability_threshold;
   load_parameters_.stability_window = 3;
