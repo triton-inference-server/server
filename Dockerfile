@@ -126,6 +126,10 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
             --update \
             --build
 
+# Record version of ONNX installed for ORT testing,
+# different versions are installed, but the last one is the latest for ORT
+RUN echo "import onnx; print(onnx.__version__)" | python3 > /workspace/ort_onnx_version.txt
+
 ############################################################################
 ## TensorFlow stage: Use TensorFlow container
 ############################################################################
@@ -395,6 +399,13 @@ COPY --chown=1000:1000 --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE 
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib lib
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include include
+
+# Get ONNX version supported
+COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/ort_onnx_version.txt ort_onnx_version.txt
+RUN export ONNX_VERSION=`cat ort_onnx_version.txt` && rm - fort_onnx_version.txt
+
+# Perf test provided by ONNX Runtime, can be used to test run model with ONNX Runtime directly
+COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/build/Release/onnxruntime_perf_test /opt/onnxruntime/
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
