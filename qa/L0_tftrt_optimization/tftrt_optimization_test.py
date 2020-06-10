@@ -49,7 +49,7 @@ class TFTRTOptimizationTest(unittest.TestCase):
 
         # Initialize the data
         inputs[0].set_data_from_numpy(self.input0_, binary_data=True)
-        inputs[1].set_data_from_numpy(self.input1_, binary_data=True)
+        inputs[1].set_data_from_numpy(self.input1_, binary_data=False)
 
         outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
         outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=True))

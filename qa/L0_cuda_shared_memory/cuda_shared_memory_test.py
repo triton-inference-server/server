@@ -168,7 +168,7 @@ class CudaSharedMemoryTest(unittest.TestCase):
             outputs.append(httpclient.InferRequestedOutput('OUTPUT0',
                                                            binary_data=True))
             outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
-                                                           binary_data=True))
+                                                           binary_data=False))
         else:
             triton_client = grpcclient.InferenceServerClient(
                 _url, verbose=True)
