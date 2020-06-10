@@ -117,30 +117,34 @@ extern Logger gLogger_;
 
 #endif  // TRITON_ENABLE_LOGGING
 
-#define LOG_INFO                                         \
-  if (LOG_INFO_IS_ON)                                    \
-  nvidia::inferenceserver::LogMessage(                   \
-      (char*)__FILE__, __LINE__,                         \
-      nvidia::inferenceserver::LogMessage::Level::kINFO) \
+// Macros that use explicitly given filename and line number.
+#define LOG_INFO_FL(FN, LN)                                               \
+  if (LOG_INFO_IS_ON)                                                     \
+  nvidia::inferenceserver::LogMessage(                                    \
+      (char*)(FN), LN, nvidia::inferenceserver::LogMessage::Level::kINFO) \
       .stream()
-#define LOG_WARNING                                         \
-  if (LOG_WARNING_IS_ON)                                    \
-  nvidia::inferenceserver::LogMessage(                      \
-      (char*)__FILE__, __LINE__,                            \
-      nvidia::inferenceserver::LogMessage::Level::kWARNING) \
+#define LOG_WARNING_FL(FN, LN)                                               \
+  if (LOG_WARNING_IS_ON)                                                     \
+  nvidia::inferenceserver::LogMessage(                                       \
+      (char*)(FN), LN, nvidia::inferenceserver::LogMessage::Level::kWARNING) \
       .stream()
-#define LOG_ERROR                                         \
-  if (LOG_ERROR_IS_ON)                                    \
-  nvidia::inferenceserver::LogMessage(                    \
-      (char*)__FILE__, __LINE__,                          \
-      nvidia::inferenceserver::LogMessage::Level::kERROR) \
+#define LOG_ERROR_FL(FN, LN)                                               \
+  if (LOG_ERROR_IS_ON)                                                     \
+  nvidia::inferenceserver::LogMessage(                                     \
+      (char*)(FN), LN, nvidia::inferenceserver::LogMessage::Level::kERROR) \
       .stream()
-#define LOG_VERBOSE(L)                                   \
-  if (LOG_VERBOSE_IS_ON(L))                              \
-  nvidia::inferenceserver::LogMessage(                   \
-      (char*)__FILE__, __LINE__,                         \
-      nvidia::inferenceserver::LogMessage::Level::kINFO) \
+#define LOG_VERBOSE_FL(L, FN, LN)                                         \
+  if (LOG_VERBOSE_IS_ON(L))                                               \
+  nvidia::inferenceserver::LogMessage(                                    \
+      (char*)(FN), LN, nvidia::inferenceserver::LogMessage::Level::kINFO) \
       .stream()
+
+// Macros that use current filename and line number.
+#define LOG_INFO LOG_INFO_FL(__FILE__, __LINE__)
+#define LOG_WARNING LOG_WARNING_FL(__FILE__, __LINE__)
+#define LOG_ERROR LOG_ERROR_FL(__FILE__, __LINE__)
+#define LOG_VERBOSE(L) LOG_VERBOSE_FL(L, __FILE__, __LINE__)
+
 
 #define LOG_STATUS_ERROR(X, MSG)                         \
   do {                                                   \
