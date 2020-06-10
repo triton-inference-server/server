@@ -54,9 +54,7 @@ def sync_send(triton_client, result_list, values, batch_size, sequence_id,
         inputs = []
         inputs.append(tritonhttpclient.InferInput('INPUT', value_data.shape, "INT32"))
         # Initialize the data
-        # FIXME, negative value in binary form can't be handled properly,
-        # which causes the library to raise decode exception.
-        inputs[0].set_data_from_numpy(value_data, binary_data=False)
+        inputs[0].set_data_from_numpy(value_data)
         outputs = []
         outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT'))
         # Issue the synchronous sequence inference.
