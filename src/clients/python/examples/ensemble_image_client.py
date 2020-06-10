@@ -239,7 +239,7 @@ if __name__ == '__main__':
     else:
         outputs.append(
             tritonhttpclient.InferRequestedOutput(output_name,
-                                                  binary_data=False,
+                                                  binary_data=True,
                                                   class_count=FLAGS.classes))
 
     # Send request

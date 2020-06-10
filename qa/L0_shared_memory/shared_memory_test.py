@@ -154,9 +154,9 @@ class SharedMemoryTest(unittest.TestCase):
             inputs.append(
                 httpclient.InferInput("INPUT1", [1, 16], "INT32"))
             outputs.append(httpclient.InferRequestedOutput('OUTPUT0',
-                                                        binary_data=False))
+                                                        binary_data=True))
             outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
-                                                        binary_data=False))
+                                                        binary_data=True))
         else:
             triton_client = grpcclient.InferenceServerClient(
                 _url, verbose=True)
@@ -170,7 +170,7 @@ class SharedMemoryTest(unittest.TestCase):
         inputs[0].set_shared_memory("input0_data", 64)
 
         if type(shm_ip1_handle) == np.array:
-            inputs[1].set_data_from_numpy(input0_data, binary_data=False)
+            inputs[1].set_data_from_numpy(input0_data, binary_data=True)
         elif big_shm_name != "":
             inputs[1].set_shared_memory(big_shm_name, big_shm_size)
         else:

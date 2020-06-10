@@ -141,11 +141,11 @@ if __name__ == '__main__':
 
     outputs = []
     outputs.append(httpclient.InferRequestedOutput('OUTPUT0',
-                                                   binary_data=False))
+                                                   binary_data=True))
     outputs[-1].set_shared_memory("output0_data", output0_byte_size)
 
     outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=False))
+                                                   binary_data=True))
     outputs[-1].set_shared_memory("output1_data", output1_byte_size)
 
     results = triton_client.infer(model_name=model_name,
