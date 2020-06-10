@@ -288,7 +288,7 @@ def requestGenerator(batched_image_data, input_name, output_name, dtype, FLAGS):
         inputs.append(
             tritonhttpclient.InferInput(input_name, batched_image_data.shape,
                                         dtype))
-        inputs[0].set_data_from_numpy(batched_image_data, binary_data=False)
+        inputs[0].set_data_from_numpy(batched_image_data, binary_data=True)
 
     outputs = []
     if FLAGS.protocol.lower() == "grpc":
@@ -298,7 +298,7 @@ def requestGenerator(batched_image_data, input_name, output_name, dtype, FLAGS):
     else:
         outputs.append(
             tritonhttpclient.InferRequestedOutput(output_name,
-                                                  binary_data=False,
+                                                  binary_data=True,
                                                   class_count=FLAGS.classes))
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version

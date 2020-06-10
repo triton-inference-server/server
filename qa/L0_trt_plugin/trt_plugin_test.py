@@ -44,7 +44,7 @@ class PluginModelTest(unittest.TestCase):
         inputs.append(httpclient.InferInput('INPUT0', [batch_size, 16], "FP32"))
 
         input0_data = np.random.randn(batch_size, 16).astype(np.float32)
-        inputs[0].set_data_from_numpy(input0_data, binary_data=False)
+        inputs[0].set_data_from_numpy(input0_data, binary_data=True)
 
         outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
 
