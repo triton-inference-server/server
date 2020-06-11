@@ -976,17 +976,12 @@ InferenceServerGrpcClient::PreRunProcessing(
     const InferOptions& options, const std::vector<InferInput*>& inputs,
     const std::vector<const InferRequestedOutput*>& outputs)
 {
-  infer_request_.Clear();
-
   // Populate the request protobuf
   infer_request_.set_model_name(options.model_name_);
-  if (!options.model_version_.empty()) {
-    infer_request_.set_model_version(options.model_version_);
-  }
-  if (!options.request_id_.empty()) {
-    infer_request_.set_id(options.request_id_);
-  }
+  infer_request_.set_model_version(options.model_version_);
+  infer_request_.set_id(options.request_id_);
 
+  infer_request_.mutable_parameters()->clear();
   if (options.sequence_id_ != 0) {
     (*infer_request_.mutable_parameters())["sequence_id"].set_int64_param(
         options.sequence_id_);
@@ -1006,8 +1001,11 @@ InferenceServerGrpcClient::PreRunProcessing(
         options.timeout_);
   }
 
+  int index = 0;
   for (const auto input : inputs) {
-    auto grpc_input = infer_request_.add_inputs();
+    auto grpc_input = (infer_request_.inputs().size() <= index)
+                          ? infer_request_.add_inputs()
+                          : infer_request_.mutable_inputs()->Mutable(index);
     grpc_input->set_name(input->Name());
     grpc_input->mutable_shape()->Clear();
     for (const auto dim : input->Shape()) {
@@ -1016,6 +1014,7 @@ InferenceServerGrpcClient::PreRunProcessing(
     grpc_input->set_datatype(input->Datatype());
 
     input->PrepareForRequest();
+    grpc_input->mutable_parameters()->clear();
     if (input->IsSharedMemory()) {
       std::string region_name;
       size_t offset;
@@ -1037,6 +1036,7 @@ InferenceServerGrpcClient::PreRunProcessing(
       size_t content_size;
       input->ByteSize(&content_size);
       contents->reserve(content_size);
+      contents->clear();
       while (!end_of_input) {
         const uint8_t* buf;
         size_t buf_size;
@@ -1046,10 +1046,20 @@ InferenceServerGrpcClient::PreRunProcessing(
         }
       }
     }
+    index++;
   }
 
+  if (index < infer_request_.inputs().size()) {
+    infer_request_.mutable_inputs()->DeleteSubrange(
+        index - 1, (infer_request_.inputs().size() - index));
+  }
+
+  index = 0;
   for (const auto routput : outputs) {
-    auto grpc_output = infer_request_.add_outputs();
+    auto grpc_output = (infer_request_.outputs().size() <= index)
+                           ? infer_request_.add_outputs()
+                           : infer_request_.mutable_outputs()->Mutable(index++);
+    grpc_output->Clear();
     grpc_output->set_name(routput->Name());
     size_t class_count = routput->ClassificationCount();
     if (class_count != 0) {
@@ -1070,6 +1080,11 @@ InferenceServerGrpcClient::PreRunProcessing(
             .set_int64_param(offset);
       }
     }
+    index++;
+  }
+  if (index < infer_request_.outputs().size()) {
+    infer_request_.mutable_outputs()->DeleteSubrange(
+        index - 1, (infer_request_.outputs().size() - index));
   }
 
   if (infer_request_.ByteSizeLong() > INT_MAX) {
