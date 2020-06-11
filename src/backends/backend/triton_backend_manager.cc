@@ -128,6 +128,14 @@ TritonBackend::LoadBackendLibrary()
       dlhandle_, "TRITONBACKEND_Finalize", true /* optional */,
       reinterpret_cast<void**>(&backend_fini_fn_)));
 
+  // Model initialize and finalize functions, optional
+  RETURN_IF_ERROR(GetEntrypoint(
+      dlhandle_, "TRITONBACKEND_ModelInitialize", true /* optional */,
+      reinterpret_cast<void**>(&model_init_fn_)));
+  RETURN_IF_ERROR(GetEntrypoint(
+      dlhandle_, "TRITONBACKEND_ModelFinalize", true /* optional */,
+      reinterpret_cast<void**>(&model_fini_fn_)));
+
   return Status::Success;
 }
 

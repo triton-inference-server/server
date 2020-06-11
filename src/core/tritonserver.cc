@@ -41,6 +41,7 @@
 #include "src/core/nvtx.h"
 #include "src/core/response_allocator.h"
 #include "src/core/server.h"
+#include "src/core/server_message.h"
 #include "src/core/status.h"
 
 #define TRITONJSON_STATUSTYPE Status
@@ -115,48 +116,6 @@ TritonServerError::Create(const ni::Status& status)
       return TritonServerError::Create(status__); \
     }                                             \
   } while (false)
-
-//
-// TritonServerMessage
-//
-// Implementation for TRITONSERVER_Message.
-//
-class TritonServerMessage {
- public:
-  TritonServerMessage(const ni::TritonJson::Value& msg);
-  TritonServerMessage(std::string&& msg);
-
-  void Serialize(const char** base, size_t* byte_size) const;
-
- private:
-  ni::TritonJson::WriteBuffer json_buffer_;
-  std::string str_buffer_;
-
-  const char* base_;
-  size_t byte_size_;
-};
-
-TritonServerMessage::TritonServerMessage(const ni::TritonJson::Value& msg)
-{
-  json_buffer_.Clear();
-  msg.Write(&json_buffer_);
-  base_ = json_buffer_.Base();
-  byte_size_ = json_buffer_.Size();
-}
-
-TritonServerMessage::TritonServerMessage(std::string&& msg)
-{
-  str_buffer_ = std::move(msg);
-  base_ = str_buffer_.data();
-  byte_size_ = str_buffer_.size();
-}
-
-void
-TritonServerMessage::Serialize(const char** base, size_t* byte_size) const
-{
-  *base = base_;
-  *byte_size = byte_size_;
-}
 
 //
 // TritonServerMetrics
@@ -536,8 +495,8 @@ TRITONSERVER_ResponseAllocatorDelete(TRITONSERVER_ResponseAllocator* allocator)
 TRITONSERVER_Error*
 TRITONSERVER_MessageDelete(TRITONSERVER_Message* message)
 {
-  TritonServerMessage* lmessage =
-      reinterpret_cast<TritonServerMessage*>(message);
+  ni::TritonServerMessage* lmessage =
+      reinterpret_cast<ni::TritonServerMessage*>(message);
   delete lmessage;
   return nullptr;  // Success
 }
@@ -546,8 +505,8 @@ TRITONSERVER_Error*
 TRITONSERVER_MessageSerializeToJson(
     TRITONSERVER_Message* protobuf, const char** base, size_t* byte_size)
 {
-  TritonServerMessage* lprotobuf =
-      reinterpret_cast<TritonServerMessage*>(protobuf);
+  ni::TritonServerMessage* lprotobuf =
+      reinterpret_cast<ni::TritonServerMessage*>(protobuf);
   lprotobuf->Serialize(base, byte_size);
   return nullptr;  // Success
 }
@@ -1504,7 +1463,7 @@ TRITONSERVER_ServerMetadata(
   RETURN_IF_STATUS_ERROR(metadata.Add("extensions", std::move(extensions)));
 
   *server_metadata = reinterpret_cast<TRITONSERVER_Message*>(
-      new TritonServerMessage(metadata));
+      new ni::TritonServerMessage(metadata));
   return nullptr;  // Success
 }
 
@@ -1603,7 +1562,7 @@ TRITONSERVER_ServerModelMetadata(
   RETURN_IF_STATUS_ERROR(metadata.Add("outputs", std::move(outputs)));
 
   *model_metadata = reinterpret_cast<TRITONSERVER_Message*>(
-      new TritonServerMessage(metadata));
+      new ni::TritonServerMessage(metadata));
   return nullptr;  // success
 }
 
@@ -1740,7 +1699,7 @@ TRITONSERVER_ServerModelStatistics(
   RETURN_IF_STATUS_ERROR(
       metadata.Add("model_stats", std::move(model_stats_json)));
   *model_stats = reinterpret_cast<TRITONSERVER_Message*>(
-      new TritonServerMessage(metadata));
+      new ni::TritonServerMessage(metadata));
 
   return nullptr;  // success
 
@@ -1765,7 +1724,7 @@ TRITONSERVER_ServerModelConfig(
       backend->Config(), &model_config_json, options);
 
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
-      new TritonServerMessage(std::move(model_config_json)));
+      new ni::TritonServerMessage(std::move(model_config_json)));
   return nullptr;  // success
 }
 
@@ -1807,7 +1766,7 @@ TRITONSERVER_ServerModelIndex(
   }
 
   *repository_index = reinterpret_cast<TRITONSERVER_Message*>(
-      new TritonServerMessage(repository_index_json));
+      new ni::TritonServerMessage(repository_index_json));
 
   return nullptr;  // success
 }

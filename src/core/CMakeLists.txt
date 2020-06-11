@@ -188,6 +188,7 @@ set(
   scheduler_utils.h
   sequence_batch_scheduler.h
   server.h
+  server_message.h
   infer_stats.h
   infer_trace.h
   status.h
