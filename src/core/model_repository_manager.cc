@@ -47,6 +47,7 @@
 #include "src/backends/caffe2/netdef_backend_factory.h"
 #endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_CUSTOM
+#include "src/backends/backend/backend_factory.h"
 #include "src/backends/custom/custom_backend_factory.h"
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
@@ -404,6 +405,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
 #endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_CUSTOM
+  std::unique_ptr<TritonBackendFactory> triton_backend_factory_;
   std::unique_ptr<CustomBackendFactory> custom_factory_;
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_TENSORFLOW
@@ -485,6 +487,11 @@ ModelRepositoryManager::BackendLifeCycle::Create(
         backend_map.find(kCustomPlatform)->second;
     RETURN_IF_ERROR(CustomBackendFactory::Create(
         config, &(local_life_cycle->custom_factory_)));
+  }
+  {
+    const std::shared_ptr<BackendConfig> config;
+    RETURN_IF_ERROR(TritonBackendFactory::Create(
+        config, &(local_life_cycle->triton_backend_factory_)));
   }
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
@@ -851,84 +858,102 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
   // Create backend
   Status status;
   std::unique_ptr<InferenceBackend> is;
-  switch (backend_info->platform_) {
+
+  // If 'backend' is specified in the config then use the new triton
+  // backend.
+#ifdef TRITON_ENABLE_CUSTOM
+  if (!model_config.backend().empty()) {
+    status = triton_backend_factory_->CreateBackend(
+        backend_info->repository_path_, model_name, version, model_config,
+        min_compute_capability_, &is);
+  } else
+#endif  // TRITON_ENABLE_CUSTOM
+  {
+    switch (backend_info->platform_) {
 #ifdef TRITON_ENABLE_TENSORFLOW
-    case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
-      status = graphdef_factory_->CreateBackend(
-          version_path, model_config, min_compute_capability_, &is);
-      break;
-    case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
-      status = savedmodel_factory_->CreateBackend(
-          version_path, model_config, min_compute_capability_, &is);
-      break;
+      case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
+        status = graphdef_factory_->CreateBackend(
+            version_path, model_config, min_compute_capability_, &is);
+        break;
+      case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
+        status = savedmodel_factory_->CreateBackend(
+            version_path, model_config, min_compute_capability_, &is);
+        break;
 #endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
-    case Platform::PLATFORM_TENSORRT_PLAN:
-      status = plan_factory_->CreateBackend(
-          version_path, model_config, min_compute_capability_, &is);
-      break;
+      case Platform::PLATFORM_TENSORRT_PLAN:
+        status = plan_factory_->CreateBackend(
+            version_path, model_config, min_compute_capability_, &is);
+        break;
 #endif  // TRITON_ENABLE_TENSORRT
 #ifdef TRITON_ENABLE_CAFFE2
-    case Platform::PLATFORM_CAFFE2_NETDEF:
-      status = netdef_factory_->CreateBackend(
-          version_path, model_config, min_compute_capability_, &is);
-      break;
+      case Platform::PLATFORM_CAFFE2_NETDEF:
+        status = netdef_factory_->CreateBackend(
+            version_path, model_config, min_compute_capability_, &is);
+        break;
 #endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_ONNXRUNTIME
-    case Platform::PLATFORM_ONNXRUNTIME_ONNX:
-      status = onnx_factory_->CreateBackend(
-          version_path, model_config, min_compute_capability_, &is);
-      break;
+      case Platform::PLATFORM_ONNXRUNTIME_ONNX:
+        status = onnx_factory_->CreateBackend(
+            version_path, model_config, min_compute_capability_, &is);
+        break;
 #endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
-    case Platform::PLATFORM_PYTORCH_LIBTORCH:
-      status = libtorch_factory_->CreateBackend(
-          version_path, model_config, min_compute_capability_, &is);
-      break;
+      case Platform::PLATFORM_PYTORCH_LIBTORCH:
+        status = libtorch_factory_->CreateBackend(
+            version_path, model_config, min_compute_capability_, &is);
+        break;
 #endif  // TRITON_ENABLE_PYTORCH
 #ifdef TRITON_ENABLE_CUSTOM
-    case Platform::PLATFORM_CUSTOM:
-      status = custom_factory_->CreateBackend(
-          backend_info->repository_path_, model_name, version, model_config,
-          min_compute_capability_, &is);
-      break;
+      case Platform::PLATFORM_CUSTOM:
+        status = custom_factory_->CreateBackend(
+            backend_info->repository_path_, model_name, version, model_config,
+            min_compute_capability_, &is);
+        break;
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
-    case Platform::PLATFORM_ENSEMBLE: {
-      status = ensemble_factory_->CreateBackend(
-          version_path, model_config, min_compute_capability_, &is);
-      // Complete label provider with label information from involved backends
-      // Must be done here because involved backends may not be able to obtained
-      // from server because this may happen during server initialization.
-      if (status.IsOk()) {
-        std::set<std::string> no_label_outputs;
-        const auto& label_provider = is->GetLabelProvider();
-        for (const auto& output : model_config.output()) {
-          if (label_provider->GetLabel(output.name(), 0).empty()) {
-            no_label_outputs.emplace(output.name());
+      case Platform::PLATFORM_ENSEMBLE: {
+        status = ensemble_factory_->CreateBackend(
+            version_path, model_config, min_compute_capability_, &is);
+        // Complete label provider with label information from involved backends
+        // Must be done here because involved backends may not be able to
+        // obtained from server because this may happen during server
+        // initialization.
+        if (status.IsOk()) {
+          std::set<std::string> no_label_outputs;
+          const auto& label_provider = is->GetLabelProvider();
+          for (const auto& output : model_config.output()) {
+            if (label_provider->GetLabel(output.name(), 0).empty()) {
+              no_label_outputs.emplace(output.name());
+            }
           }
-        }
-        for (const auto& element : model_config.ensemble_scheduling().step()) {
-          for (const auto& pair : element.output_map()) {
-            // Found model that produce one of the missing output
-            if (no_label_outputs.find(pair.second) != no_label_outputs.end()) {
-              std::shared_ptr<InferenceBackend> backend;
-              // Safe to obtain backend because the ensemble can't be loaded
-              // until the involved backends are ready
-              GetInferenceBackend(
-                  element.model_name(), element.model_version(), &backend);
-              label_provider->AddLabels(
-                  pair.second,
-                  backend->GetLabelProvider()->GetLabels(pair.first));
+          for (const auto& element :
+               model_config.ensemble_scheduling().step()) {
+            for (const auto& pair : element.output_map()) {
+              // Found model that produce one of the missing output
+              if (no_label_outputs.find(pair.second) !=
+                  no_label_outputs.end()) {
+                std::shared_ptr<InferenceBackend> backend;
+                // Safe to obtain backend because the ensemble can't be loaded
+                // until the involved backends are ready
+                GetInferenceBackend(
+                    element.model_name(), element.model_version(), &backend);
+                label_provider->AddLabels(
+                    pair.second,
+                    backend->GetLabelProvider()->GetLabels(pair.first));
+              }
             }
           }
         }
+        break;
       }
-      break;
-    }
 #endif  // TRITON_ENABLE_ENSEMBLE
-    default:
-      break;
+      default:
+        status = Status(
+            Status::Code::INVALID_ARG,
+            "unknown platform '" + model_config.platform() + "'");
+        break;
+    }
   }
 
   // Update backend state

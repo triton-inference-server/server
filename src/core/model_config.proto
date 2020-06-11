@@ -1151,6 +1151,12 @@ message ModelConfig
   //@@
   string platform = 2;
 
+  //@@  .. cpp:var:: string backend
+  //@@
+  //@@     The backend used by the model.
+  //@@
+  string backend = 17;
+
   //@@  .. cpp:var:: ModelVersionPolicy version_policy
   //@@
   //@@     Policy indicating which version(s) of the model will be served.
