@@ -50,7 +50,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=20.02
+TRITON_VERSION=20.06
 CUDA_DEVICE=0
 
 REPO_ARCH="xavier"
