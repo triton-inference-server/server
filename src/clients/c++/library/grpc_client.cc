@@ -1003,6 +1003,8 @@ InferenceServerGrpcClient::PreRunProcessing(
 
   int index = 0;
   for (const auto input : inputs) {
+    // Add new InferInputTensor submessages only if required, otherwise
+    // reuse the submessages already available.
     auto grpc_input = (infer_request_.inputs().size() <= index)
                           ? infer_request_.add_inputs()
                           : infer_request_.mutable_inputs()->Mutable(index);
@@ -1049,6 +1051,8 @@ InferenceServerGrpcClient::PreRunProcessing(
     index++;
   }
 
+  // Remove extra InferInputTensor submessages, that are not required for
+  // this request.
   if (index < infer_request_.inputs().size()) {
     infer_request_.mutable_inputs()->DeleteSubrange(
         index - 1, (infer_request_.inputs().size() - index));
@@ -1056,6 +1060,8 @@ InferenceServerGrpcClient::PreRunProcessing(
 
   index = 0;
   for (const auto routput : outputs) {
+    // Add new InferRequestedOutputTensor submessage only if required, otherwise
+    // reuse the submessages already available.
     auto grpc_output = (infer_request_.outputs().size() <= index)
                            ? infer_request_.add_outputs()
                            : infer_request_.mutable_outputs()->Mutable(index++);
@@ -1082,6 +1088,8 @@ InferenceServerGrpcClient::PreRunProcessing(
     }
     index++;
   }
+  // Remove extra InferRequestedOutputTensor submessages, that are not required
+  // for this request.
   if (index < infer_request_.outputs().size()) {
     infer_request_.mutable_outputs()->DeleteSubrange(
         index - 1, (infer_request_.outputs().size() - index));
