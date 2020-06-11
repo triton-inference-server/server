@@ -301,6 +301,14 @@ OnnxBackend::CreateExecutionContext(
     glock.lock();
   }
 
+  // Register a custom ops library that contains custom operations.
+  std::string custom_library_path = Config().custom_library_path();
+  if (!custom_library_path.empty()) {
+    void* library_handle = nullptr;  // leak this, no harm.
+    RETURN_IF_ORT_ERROR(ort_api->RegisterCustomOpsLibrary(
+        session_options, custom_library_path.c_str(), &library_handle));
+  }
+
   RETURN_IF_ERROR(OnnxLoader::LoadSession(
       op_itr->second, session_options, &context->session_));
   RETURN_IF_ORT_ERROR(
