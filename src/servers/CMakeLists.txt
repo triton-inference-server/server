@@ -335,6 +335,8 @@ if(${TRITON_ENABLE_ENSEMBLE})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:ensemble-backend-library>)
 endif() # TRITON_ENABLE_ENSEMBLE
 
+set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:triton-backend-library>)
+
 set(CUDA_OBJS "")
 if(${TRITON_ENABLE_GPU})
   set(CUDA_OBJS $<TARGET_OBJECTS:model-config-cuda-library>)

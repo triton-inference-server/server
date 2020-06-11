@@ -596,68 +596,81 @@ GetNormalizedModelConfig(
     RETURN_IF_ERROR(ReadTextProto(config_path, config));
   }
 
-  // Autofill if requested...
-  if (autofill) {
-    const std::string model_name(BaseName(path));
-    std::unique_ptr<AutoFill> af;
-    RETURN_IF_ERROR(AutoFill::Create(
-        model_name, backend_config_map, std::string(path), *config, &af));
-    RETURN_IF_ERROR(af->Fix(config));
-
-    LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
-  }
-
-  if (config->platform().empty()) {
+  // For now, both 'backend' and 'platform' cannot be listed in the
+  // config. If backend is given then just leave platform empty and
+  // don't perform autofill or attempt to adjust default model
+  // filename.
+  if (!config->platform().empty() && !config->backend().empty()) {
     return Status(
         Status::Code::INVALID_ARG,
-        "must specify platform for model '" + config->name() + "'");
+        "cannot specify both 'backend' and 'platform' for model '" +
+            config->name() + "'");
   }
 
-  // If 'default_model_filename' is not specified set it appropriately
-  // based upon 'platform'.
-  if (config->default_model_filename().empty()) {
+  if (config->backend().empty()) {
+    // Autofill if requested...
+    if (autofill) {
+      const std::string model_name(BaseName(path));
+      std::unique_ptr<AutoFill> af;
+      RETURN_IF_ERROR(AutoFill::Create(
+          model_name, backend_config_map, std::string(path), *config, &af));
+      RETURN_IF_ERROR(af->Fix(config));
+
+      LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
+    }
+
+    if (config->platform().empty()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "must specify platform for model '" + config->name() + "'");
+    }
+
+    // If 'default_model_filename' is not specified set it appropriately
+    // based upon 'platform'.
+    if (config->default_model_filename().empty()) {
 #ifdef TRITON_ENABLE_TENSORFLOW
-    if (config->platform() == kTensorFlowGraphDefPlatform) {
-      config->set_default_model_filename(kTensorFlowGraphDefFilename);
-    } else if (config->platform() == kTensorFlowSavedModelPlatform) {
-      config->set_default_model_filename(kTensorFlowSavedModelFilename);
-    } else
+      if (config->platform() == kTensorFlowGraphDefPlatform) {
+        config->set_default_model_filename(kTensorFlowGraphDefFilename);
+      } else if (config->platform() == kTensorFlowSavedModelPlatform) {
+        config->set_default_model_filename(kTensorFlowSavedModelFilename);
+      } else
 #endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
-        if (config->platform() == kTensorRTPlanPlatform) {
-      config->set_default_model_filename(kTensorRTPlanFilename);
-    } else
+          if (config->platform() == kTensorRTPlanPlatform) {
+        config->set_default_model_filename(kTensorRTPlanFilename);
+      } else
 #endif  // TRITON_ENABLE_TENSORRT
 #ifdef TRITON_ENABLE_CAFFE2
-        if (config->platform() == kCaffe2NetDefPlatform) {
-      config->set_default_model_filename(kCaffe2NetDefFilename);
-    } else
+          if (config->platform() == kCaffe2NetDefPlatform) {
+        config->set_default_model_filename(kCaffe2NetDefFilename);
+      } else
 #endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_ONNXRUNTIME
-        if (config->platform() == kOnnxRuntimeOnnxPlatform) {
-      config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
-    } else
+          if (config->platform() == kOnnxRuntimeOnnxPlatform) {
+        config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
+      } else
 #endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
-        if (config->platform() == kPyTorchLibTorchPlatform) {
-      config->set_default_model_filename(kPyTorchLibTorchFilename);
-    } else
+          if (config->platform() == kPyTorchLibTorchPlatform) {
+        config->set_default_model_filename(kPyTorchLibTorchFilename);
+      } else
 #endif  // TRITON_ENABLE_PYTORCH
 #ifdef TRITON_ENABLE_CUSTOM
-        if (config->platform() == kCustomPlatform) {
-      config->set_default_model_filename(kCustomFilename);
-    } else
+          if (config->platform() == kCustomPlatform) {
+        config->set_default_model_filename(kCustomFilename);
+      } else
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
-        if (config->platform() == kEnsemblePlatform) {
-      // No actual model file is needed to be loaded for ensemble.
-    } else
+          if (config->platform() == kEnsemblePlatform) {
+        // No actual model file is needed to be loaded for ensemble.
+      } else
 #endif  // TRITON_ENABLE_ENSEMBLE
-    {
-      return Status(
-          Status::Code::INTERNAL, "unexpected platform type " +
-                                      config->platform() + " for " +
-                                      config->name());
+      {
+        return Status(
+            Status::Code::INTERNAL, "unexpected platform type " +
+                                        config->platform() + " for " +
+                                        config->name());
+      }
     }
   }
 
@@ -780,10 +793,17 @@ ValidateModelConfig(
         Status::Code::INVALID_ARG, "model configuration must specify 'name'");
   }
 
-  if (config.platform().empty()) {
+  if (!config.platform().empty() && !config.backend().empty()) {
     return Status(
         Status::Code::INVALID_ARG,
-        "must specify 'platform' for " + config.name());
+        "cannot specify both 'backend' and 'platform' for model '" +
+            config.name() + "'");
+  }
+
+  if (config.platform().empty() && config.backend().empty()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "must specify 'platform' or 'backend' for '" + config.name() + "'");
   }
 
   if (config.max_batch_size() < 0) {
@@ -792,17 +812,21 @@ ValidateModelConfig(
         "'max_batch_size' must be non-negative value for " + config.name());
   }
 
-  if (!expected_platform.empty() && (config.platform() != expected_platform)) {
-    return Status(
-        Status::Code::NOT_FOUND, "expected model of type " + expected_platform +
-                                     " for " + config.name());
-  }
-
-  if (GetPlatform(config.platform()) == Platform::PLATFORM_UNKNOWN) {
-    return Status(
-        Status::Code::INVALID_ARG, "unexpected platform type \'" +
-                                       config.platform() + "\' for " +
+  if (!config.platform().empty()) {
+    if (!expected_platform.empty() &&
+        (config.platform() != expected_platform)) {
+      return Status(
+          Status::Code::NOT_FOUND, "expected model of type " +
+                                       expected_platform + " for " +
                                        config.name());
+    }
+
+    if (GetPlatform(config.platform()) == Platform::PLATFORM_UNKNOWN) {
+      return Status(
+          Status::Code::INVALID_ARG, "unexpected platform type \'" +
+                                         config.platform() + "\' for " +
+                                         config.name());
+    }
   }
 
   if (!config.has_version_policy()) {
@@ -976,8 +1000,8 @@ ValidateModelConfig(
     }
   }
 
-  // If ensemble scheduling is specified, validate it.
-  // Otherwise, must validate platform and instance_group
+  // If ensemble scheduling is specified, validate it.  Otherwise,
+  // must validate platform and instance_group
   if (config.has_ensemble_scheduling()) {
 #ifdef TRITON_ENABLE_ENSEMBLE
     RETURN_IF_ERROR(ValidateEnsembleSchedulingConfig(config));

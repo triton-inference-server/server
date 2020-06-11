@@ -1498,8 +1498,13 @@ TRITONSERVER_ServerModelMetadata(
   RETURN_IF_STATUS_ERROR(metadata.Add("versions", std::move(versions)));
 
   const auto& model_config = backend->Config();
-  RETURN_IF_STATUS_ERROR(
-      metadata.AddStringRef("platform", model_config.platform().c_str()));
+  if (!model_config.platform().empty()) {
+    RETURN_IF_STATUS_ERROR(
+        metadata.AddStringRef("platform", model_config.platform().c_str()));
+  } else {
+    RETURN_IF_STATUS_ERROR(
+        metadata.AddStringRef("platform", model_config.backend().c_str()));
+  }
 
   ni::TritonJson::Value inputs(metadata, ni::TritonJson::ValueType::ARRAY);
   for (const auto& io : model_config.input()) {

@@ -194,6 +194,7 @@ endif() # TRITON_ENABLE_METRICS
 
 
 add_subdirectory(../../src/core src/core)
+add_subdirectory(../../src/backends/backend src/backends/backend)
 add_subdirectory(../../src/backends/caffe2 src/backends/caffe2)
 add_subdirectory(../../src/backends/custom src/backends/custom)
 add_subdirectory(../../src/backends/ensemble src/backends/ensemble)
