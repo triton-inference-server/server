@@ -2115,7 +2115,7 @@ InferGRPCToInput(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             std::string(
-                "when shared memory is used, expected 'content' is not set "
+                "unexpected 'content' provided when using shared memory "
                 "for "
                 "input tensor '" +
                 io.name() + "' for model '" + request.model_name() + "'")
