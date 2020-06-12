@@ -112,6 +112,9 @@ class TritonJson {
     {
     }
 
+    // Move constructor.
+    explicit Value(Value&& other) { *this = std::move(other); }
+
     // Move assignment operator.
     Value& operator=(Value&& other)
     {
@@ -541,6 +544,18 @@ class TritonJson {
       return TRITONJSON_STATUSSUCCESS;
     }
 
+    // Get value as a string. The string may contain null or other
+    // special characters.  Error if value is not a string.
+    TRITONJSON_STATUSTYPE AsString(std::string* str) const
+    {
+      if ((value_ == nullptr) || !value_->IsString()) {
+        TRITONJSON_STATUSRETURN(
+            std::string("attempt to access JSON non-string as string"));
+      }
+      str->assign(value_->GetString(), value_->GetStringLength());
+      return TRITONJSON_STATUSSUCCESS;
+    }
+
     // Get value as a boolean. Error if value is not a boolean.
     TRITONJSON_STATUSTYPE AsBool(bool* value) const
     {
@@ -644,6 +659,27 @@ class TritonJson {
       }
       *value = v.GetString();
       *len = v.GetStringLength();
+      return TRITONJSON_STATUSSUCCESS;
+    }
+
+    // Get object member as a string. The string may contain null or
+    // other special characters.  Error if this is not an object or if
+    // the member is not a string.
+    TRITONJSON_STATUSTYPE MemberAsString(
+        const char* name, std::string* str) const
+    {
+      const rapidjson::Value& object = AsValue();
+      if (!object.IsObject() || !object.HasMember(name)) {
+        TRITONJSON_STATUSRETURN(
+            std::string("attempt to access non-existing object member '") +
+            name + "'");
+      }
+      const auto& v = object[name];
+      if (!v.IsString()) {
+        TRITONJSON_STATUSRETURN(
+            std::string("attempt to access JSON non-string as string"));
+      }
+      str->assign(v.GetString(), v.GetStringLength());
       return TRITONJSON_STATUSSUCCESS;
     }
 
@@ -781,6 +817,27 @@ class TritonJson {
       }
       *value = v.GetString();
       *len = v.GetStringLength();
+      return TRITONJSON_STATUSSUCCESS;
+    }
+
+    // Get array index as a string. The string may contain null or
+    // other special characters.  Error if this is not an array or if
+    // the index element is not a string.
+    TRITONJSON_STATUSTYPE IndexAsString(
+        const size_t idx, std::string* str) const
+    {
+      const rapidjson::Value& array = AsValue();
+      if (!array.IsArray() || (idx >= array.GetArray().Size())) {
+        TRITONJSON_STATUSRETURN(
+            std::string("attempt to access non-existing array index '") +
+            std::to_string(idx) + "'");
+      }
+      const auto& v = array[idx];
+      if (!v.IsString()) {
+        TRITONJSON_STATUSRETURN(
+            std::string("attempt to access JSON non-string as string"));
+      }
+      str->assign(v.GetString(), v.GetStringLength());
       return TRITONJSON_STATUSSUCCESS;
     }
 

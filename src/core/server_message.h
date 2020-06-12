@@ -25,51 +25,47 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <memory>
 #include <string>
-#include "src/backends/backend/triton_backend_manager.h"
-#include "src/core/backend.h"
-#include "src/core/infer_request.h"
-#include "src/core/model_config.pb.h"
-#include "src/core/status.h"
+
+#define TRITONJSON_STATUSTYPE Status
+#define TRITONJSON_STATUSRETURN(M) return Status(Status::Code::INTERNAL, (M))
+#define TRITONJSON_STATUSSUCCESS Status::Success
+#include "src/core/json.h"
 
 namespace nvidia { namespace inferenceserver {
 
 //
-// Represents a model.
+// Implementation for TRITONSERVER_Message.
 //
-// Inheriting from InferenceBackend (which is misnamed) required for
-// now to interface with legacy arch.
-//
-class TritonModel : public InferenceBackend {
+class TritonServerMessage {
  public:
-  static Status Create(
-      const std::string& model_repository_path, const std::string& model_name,
-      const int64_t version, const ModelConfig& model_config,
-      const double min_compute_capability, std::unique_ptr<TritonModel>* model);
-  ~TritonModel();
+  TritonServerMessage(const TritonJson::Value& msg)
+  {
+    json_buffer_.Clear();
+    msg.Write(&json_buffer_);
+    base_ = json_buffer_.Base();
+    byte_size_ = json_buffer_.Size();
+  }
 
-  const std::string& ModelPath() const { return model_path_; }
-  const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
-  void* State() { return state_; }
-  void SetState(void* state) { state_ = state; }
+  TritonServerMessage(std::string&& msg)
+  {
+    str_buffer_ = std::move(msg);
+    base_ = str_buffer_.data();
+    byte_size_ = str_buffer_.size();
+  }
+
+  void Serialize(const char** base, size_t* byte_size) const
+  {
+    *base = base_;
+    *byte_size = byte_size_;
+  }
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(TritonModel);
+  TritonJson::WriteBuffer json_buffer_;
+  std::string str_buffer_;
 
-  TritonModel(
-      const std::string& model_path,
-      const std::shared_ptr<TritonBackend>& backend,
-      const double min_compute_capability);
-
-  // Full path to the repo directory holding the model
-  const std::string model_path_;
-
-  // Backend used by this model.
-  std::shared_ptr<TritonBackend> backend_;
-
-  // Opaque state associated with the backend.
-  void* state_;
+  const char* base_;
+  size_t byte_size_;
 };
 
 }}  // namespace nvidia::inferenceserver
