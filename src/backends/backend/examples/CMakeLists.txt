@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,9 +23,28 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-{
-  global:
-    TRITONSERVER_*;
-    TRITONBACKEND_*;
-  local: *;
-};
+
+cmake_minimum_required (VERSION 3.5)
+
+#
+# libtriton_identity.so
+#
+configure_file(libtriton_identity.ldscript libtriton_identity.ldscript COPYONLY)
+
+add_library(
+  triton_identity SHARED
+  identity.cc
+)
+set_target_properties(
+  triton_identity
+  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_identity.ldscript
+)
+set_target_properties(
+  triton_identity
+  PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_identity.ldscript"
+)
+
+install(
+  TARGETS triton_identity
+  LIBRARY DESTINATION backends
+)

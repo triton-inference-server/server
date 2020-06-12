@@ -424,6 +424,52 @@ TRITONSERVER_MemoryTypeString(TRITONSERVER_MemoryType memtype)
 }
 
 //
+// TRITONSERVER_Log
+//
+bool
+TRITONSERVER_LogIsEnabled(TRITONSERVER_LogLevel level)
+{
+  switch (level) {
+    case TRITONSERVER_LOG_INFO:
+      return LOG_INFO_IS_ON;
+    case TRITONSERVER_LOG_WARN:
+      return LOG_WARNING_IS_ON;
+    case TRITONSERVER_LOG_ERROR:
+      return LOG_ERROR_IS_ON;
+    case TRITONSERVER_LOG_VERBOSE:
+      return LOG_VERBOSE_IS_ON(1);
+  }
+
+  return false;
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_LogMessage(
+    TRITONSERVER_LogLevel level, const char* filename, const int line,
+    const char* msg)
+{
+  switch (level) {
+    case TRITONSERVER_LOG_INFO:
+      LOG_INFO_FL(filename, line) << msg;
+      break;
+    case TRITONSERVER_LOG_WARN:
+      LOG_WARNING_FL(filename, line) << msg;
+      break;
+    case TRITONSERVER_LOG_ERROR:
+      LOG_ERROR_FL(filename, line) << msg;
+      break;
+    case TRITONSERVER_LOG_VERBOSE:
+      LOG_VERBOSE_FL(1, filename, line) << msg;
+      break;
+  }
+
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("unknown logging level '" + std::to_string(level) + "'")
+          .c_str());
+}
+
+//
 // TRITONSERVER_Error
 //
 TRITONSERVER_Error*
