@@ -41,6 +41,7 @@ CLIENT_LOG="./client.log"
 ZERO_OUT_TEST=zero_out_test.py
 CUDA_OP_TEST=cuda_op_test.py
 MOD_OP_TEST=mod_op_test.py
+ONNX_OP_TEST=onnx_op_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
@@ -113,6 +114,43 @@ fi
 set +e
 
 python $MOD_OP_TEST -v -m libtorch_modulo >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# ONNX
+mkdir -p onnx_custom_ops/custom_op/1 && \
+    cp custom_op_test.onnx onnx_custom_ops/custom_op/1/model.onnx
+
+rm config.pbtxt && touch config.pbtxt
+echo "name: \"custom_op\"" >> config.pbtxt && \
+echo "platform: \"onnxruntime_onnx\"" >> config.pbtxt && \
+echo "max_batch_size: 0" >> config.pbtxt && \
+echo "custom_library_path: \"./libcustom_op_library.so\"" >> config.pbtxt
+
+SERVER_ARGS="--model-repository=onnx_custom_ops --strict-model-config=false"
+SERVER_LD_PRELOAD=""
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+python $ONNX_OP_TEST -v -m custom_op >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
