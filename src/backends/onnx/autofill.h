@@ -37,7 +37,8 @@ class AutoFillOnnx {
  public:
   static Status Create(
       const std::string& model_name, const std::string& model_path,
-      std::unique_ptr<AutoFill>* autofill);
+      std::unique_ptr<AutoFill>* autofill,
+      const std::string& custom_library_path);
 };
 
 }}  // namespace nvidia::inferenceserver

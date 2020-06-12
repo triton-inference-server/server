@@ -124,6 +124,9 @@ AutoFill::Create(
   const Platform platform = GetPlatform(config.platform());
 #endif
 
+  // If custom library is specified, use it to set the session options for ONNX.
+  const std::string custom_library = config.custom_library_path();
+
   Status status;
 
 #ifdef TRITON_ENABLE_TENSORFLOW
@@ -196,7 +199,8 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afox;
-    status = AutoFillOnnx::Create(model_name, model_path, &afox);
+    status =
+        AutoFillOnnx::Create(model_name, model_path, &afox, custom_library);
     LOG_VERBOSE(1) << "ONNX autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afox);
