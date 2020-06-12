@@ -125,7 +125,7 @@ AutoFill::Create(
 #endif
 
   // If custom library is specified, use it to set the session options for ONNX.
-  const std::string custom_library = config.custom_library_path();
+  const std::string custom_library = config.op_library_filename();
 
   Status status;
 

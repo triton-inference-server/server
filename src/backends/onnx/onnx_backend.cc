@@ -302,11 +302,11 @@ OnnxBackend::CreateExecutionContext(
   }
 
   // Register a custom ops library that contains custom operations.
-  std::string custom_library_path = Config().custom_library_path();
-  if (!custom_library_path.empty()) {
+  std::string op_library_filename = Config().op_library_filename();
+  if (!op_library_filename.empty()) {
     void* library_handle = nullptr;  // leak this, no harm.
     RETURN_IF_ORT_ERROR(ort_api->RegisterCustomOpsLibrary(
-        session_options, custom_library_path.c_str(), &library_handle));
+        session_options, op_library_filename.c_str(), &library_handle));
   }
 
   RETURN_IF_ERROR(OnnxLoader::LoadSession(

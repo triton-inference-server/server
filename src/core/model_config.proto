@@ -1291,12 +1291,12 @@ message ModelConfig
   //@@
   repeated ModelWarmup model_warmup = 16;
 
-  //@@  .. cpp:var:: string custom_library_path
+  //@@  .. cpp:var:: string op_library_filename
   //@@
   //@@     Optional path of the custom library that contains custom
   //@@     operations that are used in this specific model.
   //@@     Necssary only for ONNXRuntime models. Please use LD_PRELOAD for other
   //@@     types of models.
   //@@
-  string custom_library_path = 18;
+  string op_library_filename = 18;
 }
