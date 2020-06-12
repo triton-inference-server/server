@@ -1054,8 +1054,7 @@ InferenceServerGrpcClient::PreRunProcessing(
   // Remove extra InferInputTensor submessages, that are not required for
   // this request.
   if (index < infer_request_.inputs().size()) {
-    infer_request_.mutable_inputs()->DeleteSubrange(
-        index - 1, (infer_request_.inputs().size() - index));
+    infer_request_.mutable_inputs()->RemoveLast();
   }
 
   index = 0;
@@ -1090,9 +1089,8 @@ InferenceServerGrpcClient::PreRunProcessing(
   }
   // Remove extra InferRequestedOutputTensor submessages, that are not required
   // for this request.
-  if (index < infer_request_.outputs().size()) {
-    infer_request_.mutable_outputs()->DeleteSubrange(
-        index - 1, (infer_request_.outputs().size() - index));
+  while (index < infer_request_.outputs().size()) {
+    infer_request_.mutable_outputs()->RemoveLast();
   }
 
   if (infer_request_.ByteSizeLong() > INT_MAX) {
