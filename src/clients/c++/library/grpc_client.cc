@@ -1053,7 +1053,7 @@ InferenceServerGrpcClient::PreRunProcessing(
 
   // Remove extra InferInputTensor submessages, that are not required for
   // this request.
-  if (index < infer_request_.inputs().size()) {
+  while (index < infer_request_.inputs().size()) {
     infer_request_.mutable_inputs()->RemoveLast();
   }
 
@@ -1087,6 +1087,7 @@ InferenceServerGrpcClient::PreRunProcessing(
     }
     index++;
   }
+
   // Remove extra InferRequestedOutputTensor submessages, that are not required
   // for this request.
   while (index < infer_request_.outputs().size()) {
