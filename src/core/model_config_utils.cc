@@ -26,13 +26,20 @@
 
 #include "src/core/model_config_utils.h"
 
+#include <google/protobuf/util/json_util.h>
 #include <deque>
+#include <mutex>
 #include <set>
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
+
+#define TRITONJSON_STATUSTYPE Status
+#define TRITONJSON_STATUSRETURN(M) return Status(Status::Code::INTERNAL, (M))
+#define TRITONJSON_STATUSSUCCESS Status::Success
+#include "src/core/json.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -933,13 +940,6 @@ ValidateModelConfig(
   if (config.has_sequence_batching()) {
     const auto& batcher = config.sequence_batching();
 
-    if (batcher.control_input_size() == 0) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "sequence batching must specify at least one control tensor for " +
-              config.name());
-    }
-
     // Check boolean controls...
     std::string tensor_name;
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
@@ -1285,17 +1285,324 @@ GetProfileIndex(const std::string& profile_name, int* profile_index)
 {
   if (profile_name.empty()) {
     return Status(Status::Code::INVALID_ARG, "profile name must not be empty");
-  } else {
-    try {
-      *profile_index = stoi(profile_name);
+  }
+
+  try {
+    *profile_index = stoi(profile_name);
+  }
+  catch (const std::invalid_argument& ia) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "unable to parse '" + profile_name + "': " + ia.what());
+  }
+
+  return Status::Success;
+}
+
+namespace {
+
+Status
+CollectInt64Fields(
+    google::protobuf::Message* message, const std::string& prefix,
+    std::set<std::string>* int64_fields)
+{
+  const google::protobuf::Descriptor* desc = message->GetDescriptor();
+  const google::protobuf::Reflection* refl = message->GetReflection();
+  for (int i = 0; i < desc->field_count(); ++i) {
+    const google::protobuf::FieldDescriptor* field = desc->field(i);
+    const std::string fullname = prefix + "::" + field->name();
+    switch (field->type()) {
+      case google::protobuf::FieldDescriptor::TYPE_MESSAGE: {
+        if (field->is_repeated()) {
+          int rsize = refl->FieldSize(*message, field);
+          if (rsize == 0) {
+            refl->AddMessage(message, field);
+          }
+
+          rsize = refl->FieldSize(*message, field);
+          for (int r = 0; r < rsize; ++r) {
+            RETURN_IF_ERROR(CollectInt64Fields(
+                refl->MutableRepeatedMessage(message, field, r), fullname,
+                int64_fields));
+          }
+        } else {
+          RETURN_IF_ERROR(CollectInt64Fields(
+              refl->MutableMessage(message, field), fullname, int64_fields));
+        }
+      } break;
+
+      case google::protobuf::FieldDescriptor::TYPE_INT64:
+      case google::protobuf::FieldDescriptor::TYPE_UINT64:
+      case google::protobuf::FieldDescriptor::TYPE_SINT64:
+      case google::protobuf::FieldDescriptor::TYPE_FIXED64:
+      case google::protobuf::FieldDescriptor::TYPE_SFIXED64:
+        int64_fields->insert(fullname);
+        break;
+
+      default:
+        break;
     }
-    catch (const std::invalid_argument& ia) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "unable to parse '" + profile_name + "': " + ia.what());
-    }
+  }
+
+  return Status::Success;
+}
+
+Status
+ValidateModelConfigInt64()
+{
+  // Must initialize a dummy ModelConfig so that all fields are
+  // visited.
+  ModelConfig config;
+
+  std::set<std::string> int64_fields;
+  RETURN_IF_ERROR(CollectInt64Fields(&config, "ModelConfig", &int64_fields));
+
+  LOG_VERBOSE(1) << "ModelConfig 64-bit fields:";
+  for (const auto& f : int64_fields) {
+    LOG_VERBOSE(1) << "\t" << f;
+  }
+
+  // We expect to find exactly the following fields. If we get an
+  // error from this code ModelConfig has added or removed a 64-bit
+  // field and we need to adjust here and in ModelConfigToJson below.
+  std::set<std::string> expected{
+      "ModelConfig::input::dims",
+      "ModelConfig::input::reshape::shape",
+      "ModelConfig::output::dims",
+      "ModelConfig::output::reshape::shape",
+      "ModelConfig::version_policy::specific::versions",
+      "ModelConfig::dynamic_batching::max_queue_delay_microseconds",
+      "ModelConfig::dynamic_batching::default_queue_policy::default_timeout_"
+      "microseconds",
+      "ModelConfig::dynamic_batching::priority_queue_policy::value::default_"
+      "timeout_microseconds",
+      "ModelConfig::sequence_batching::oldest::max_queue_delay_microseconds",
+      "ModelConfig::sequence_batching::max_sequence_idle_microseconds",
+      "ModelConfig::ensemble_scheduling::step::model_version",
+      "ModelConfig::model_warmup::inputs::value::dims"};
+
+  if (int64_fields != expected) {
+    return Status(
+        Status::Code::INTERNAL, "ModelConfig 64-bit field needs update");
+  }
+
+  return Status::Success;
+}
+
+Status
+FixInt(
+    TritonJson::Value& document, TritonJson::Value& io, const std::string& name)
+{
+  TritonJson::Value str_value;
+  if (!io.Find(name.c_str(), &str_value)) {
     return Status::Success;
   }
+
+  std::string str;
+  RETURN_IF_ERROR(str_value.AsString(&str));
+
+  int64_t d;
+  try {
+    d = std::atoll(str.c_str());
+  }
+  catch (...) {
+    return Status(
+        Status::Code::INTERNAL,
+        (std::string("unable to convert '") + str + "' to integer"));
+  }
+
+  str_value.SetInt(d);
+
+  return Status::Success;
+}
+
+Status
+FixIntArray(
+    TritonJson::Value& document, TritonJson::Value& io, const std::string& name)
+{
+  TritonJson::Value fixed_shape_array(document, TritonJson::ValueType::ARRAY);
+
+  if (!io.Find(name.c_str())) {
+    return Status::Success;
+  }
+
+  TritonJson::Value shape_array;
+  RETURN_IF_ERROR(io.MemberAsArray(name.c_str(), &shape_array));
+  for (size_t i = 0; i < shape_array.ArraySize(); ++i) {
+    std::string str;
+    RETURN_IF_ERROR(shape_array.IndexAsString(i, &str));
+
+    int64_t d;
+    try {
+      d = std::atoll(str.c_str());
+    }
+    catch (...) {
+      return Status(
+          Status::Code::INTERNAL,
+          (std::string("unable to convert '") + str + "' to integer"));
+    }
+
+    fixed_shape_array.AppendInt(d);
+  }
+
+  shape_array.Swap(fixed_shape_array);
+
+  return Status::Success;
+}
+
+Status
+FixObjectArray(
+    TritonJson::Value& document, TritonJson::Value& arr,
+    const std::string& name)
+{
+  for (size_t i = 0; i < arr.ArraySize(); ++i) {
+    TritonJson::Value obj;
+    RETURN_IF_ERROR(arr.IndexAsObject(i, &obj));
+    RETURN_IF_ERROR(FixInt(document, obj, name));
+  }
+
+  return Status::Success;
+}
+
+}  // namespace
+
+Status
+ModelConfigToJson(const ModelConfig& config, std::string* json_str)
+{
+  std::string config_json_str;
+  ::google::protobuf::util::JsonPrintOptions options;
+  options.preserve_proto_field_names = true;
+  ::google::protobuf::util::MessageToJsonString(
+      config, &config_json_str, options);
+
+  // We need to verify that every field 64-bit field in the
+  // ModelConfig protobuf is being handled. We hardcode the known
+  // fields and check just once to make sure everything has been
+  // handled. We could have this check in a separately compiled CI
+  // test but it is convenient to keep it here close to the code below
+  // that actually fixes the 64-bit fields.
+  {
+    static std::once_flag fonce;
+    Status status = Status::Success;
+    std::call_once(fonce, [&status] { status = ValidateModelConfigInt64(); });
+    RETURN_IF_ERROR(status);
+  }
+
+  // In the json produced by protobuf, int64 and uint64 values are
+  // represented as strings. Protobuf doesn't provide an option to
+  // disable this (sigh) so we need to fix it up here as we want the
+  // json representation of the config to be reasonable json...
+  TritonJson::Value config_json;
+  config_json.Parse(config_json_str);
+
+  // Fix input::dims, input::reshape::shape, output::dims,
+  // output::reshape::shape
+  for (std::string name : {"input", "output"}) {
+    TritonJson::Value ios;
+    RETURN_IF_ERROR(config_json.MemberAsArray(name.c_str(), &ios));
+    for (size_t i = 0; i < ios.ArraySize(); ++i) {
+      TritonJson::Value io;
+      RETURN_IF_ERROR(ios.IndexAsObject(i, &io));
+      RETURN_IF_ERROR(FixIntArray(config_json, io, "dims"));
+
+      TritonJson::Value reshape;
+      if (io.Find("reshape", &reshape)) {
+        RETURN_IF_ERROR(FixIntArray(config_json, reshape, "shape"));
+      }
+    }
+  }
+
+  // Fix version_policy::specific::versions
+  {
+    TritonJson::Value vp;
+    if (config_json.Find("version_policy", &vp)) {
+      TritonJson::Value specific;
+      if (vp.Find("specific", &specific)) {
+        RETURN_IF_ERROR(FixIntArray(config_json, specific, "versions"));
+      }
+    }
+  }
+
+  // Fix dynamic_batching::max_queue_delay_microseconds,
+  // dynamic_batching::default_queue_policy::default_timeout_microseconds,
+  // dynamic_batching::priority_queue_policy::value::default_timeout_microseconds
+  {
+    TritonJson::Value db;
+    if (config_json.Find("dynamic_batching", &db)) {
+      RETURN_IF_ERROR(FixInt(config_json, db, "max_queue_delay_microseconds"));
+      TritonJson::Value dqp;
+      if (db.Find("default_queue_policy", &dqp)) {
+        RETURN_IF_ERROR(
+            FixInt(config_json, dqp, "default_timeout_microseconds"));
+      }
+      TritonJson::Value pqp;
+      if (db.Find("priority_queue_policy", &pqp)) {
+        // Iterate over each member in 'pqp' and fix...
+        std::vector<std::string> members;
+        RETURN_IF_ERROR(pqp.Members(&members));
+        for (const auto& m : members) {
+          TritonJson::Value el;
+          RETURN_IF_ERROR(pqp.MemberAsObject(m.c_str(), &el));
+          RETURN_IF_ERROR(
+              FixInt(config_json, el, "default_timeout_microseconds"));
+        }
+      }
+    }
+  }
+
+  // Fix sequence_batching::oldest::max_queue_delay_microseconds,
+  // sequence_batching::max_sequence_idle_microseconds
+  {
+    TritonJson::Value sb;
+    if (config_json.Find("sequence_batching", &sb)) {
+      RETURN_IF_ERROR(
+          FixInt(config_json, sb, "max_sequence_idle_microseconds"));
+      TritonJson::Value oldest;
+      if (sb.Find("oldest", &oldest)) {
+        RETURN_IF_ERROR(
+            FixInt(config_json, oldest, "max_queue_delay_microseconds"));
+      }
+    }
+  }
+
+  // Fix ensemble_scheduling::step::model_version.
+  {
+    TritonJson::Value ens;
+    if (config_json.Find("ensemble_scheduling", &ens)) {
+      TritonJson::Value step;
+      if (ens.Find("step", &step)) {
+        RETURN_IF_ERROR(FixObjectArray(config_json, step, "model_version"));
+      }
+    }
+  }
+
+  // Fix model_warmup::inputs::value::dims.
+  {
+    TritonJson::Value warmups;
+    if (config_json.Find("model_warmup", &warmups)) {
+      for (size_t i = 0; i < warmups.ArraySize(); ++i) {
+        TritonJson::Value warmup;
+        RETURN_IF_ERROR(warmups.IndexAsObject(i, &warmup));
+        TritonJson::Value inputs;
+        if (warmup.Find("inputs", &inputs)) {
+          std::vector<std::string> members;
+          RETURN_IF_ERROR(inputs.Members(&members));
+          for (const auto& m : members) {
+            TritonJson::Value input;
+            RETURN_IF_ERROR(inputs.MemberAsObject(m.c_str(), &input));
+            RETURN_IF_ERROR(FixIntArray(config_json, input, "dims"));
+          }
+        }
+      }
+    }
+  }
+
+  // Convert fixed json back the string...
+  TritonJson::WriteBuffer buffer;
+  config_json.Write(&buffer);
+  *json_str = std::move(buffer.MutableContents());
+
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
