@@ -1298,5 +1298,5 @@ message ModelConfig
   //@@     Necssary only for ONNXRuntime models. Please use LD_PRELOAD for other
   //@@     types of models.
   //@@
-  string custom_library_path = 17;
+  string custom_library_path = 18;
 }
