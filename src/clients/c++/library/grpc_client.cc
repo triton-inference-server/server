@@ -1008,6 +1008,12 @@ InferenceServerGrpcClient::PreRunProcessing(
     auto grpc_input = (infer_request_.inputs().size() <= index)
                           ? infer_request_.add_inputs()
                           : infer_request_.mutable_inputs()->Mutable(index);
+
+    if (input->IsSharedMemory()) {
+      // The input contents must be cleared when using shared memory.
+      grpc_input->Clear();
+    }
+
     grpc_input->set_name(input->Name());
     grpc_input->mutable_shape()->Clear();
     for (const auto dim : input->Shape()) {
@@ -1063,7 +1069,7 @@ InferenceServerGrpcClient::PreRunProcessing(
     // reuse the submessages already available.
     auto grpc_output = (infer_request_.outputs().size() <= index)
                            ? infer_request_.add_outputs()
-                           : infer_request_.mutable_outputs()->Mutable(index++);
+                           : infer_request_.mutable_outputs()->Mutable(index);
     grpc_output->Clear();
     grpc_output->set_name(routput->Name());
     size_t class_count = routput->ClassificationCount();
