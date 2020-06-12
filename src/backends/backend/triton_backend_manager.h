@@ -25,17 +25,68 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
+#include "src/backends/backend/tritonbackend.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
+
+//
+// Proxy to a backend shared library.
+//
+class TritonBackend {
+ public:
+  static Status Create(
+      const std::string& name, const std::string& path,
+      std::shared_ptr<TritonBackend>* backend);
+  ~TritonBackend();
+
+  const std::string& Name() const { return name_; }
+  void* State() { return state_; }
+  void SetState(void* state) { state_ = state; }
+
+ private:
+  typedef TRITONSERVER_Error* (*TritonBackendInitFn_t)(
+      TRITONBACKEND_Backend* backend);
+
+  explicit TritonBackend(const std::string& name, const std::string& path)
+      : name_(name), path_(path), state_(nullptr)
+  {
+  }
+
+  Status LoadBackendLibrary();
+  Status UnloadBackendLibrary();
+
+  // The name of the backend.
+  const std::string name_;
+
+  // Full path to the backend shared library.
+  const std::string path_;
+
+  // dlopen / dlsym handles
+  void* dlhandle_;
+  TritonBackendInitFn_t backend_init_fn_;
+  TritonBackendInitFn_t backend_fini_fn_;
+
+  // Opaque state associated with the backend.
+  void* state_;
+};
 
 //
 // Manage communication with Triton backends and their lifecycle.
 //
 class TritonBackendManager {
  public:
+  static Status CreateBackend(
+      const std::string& name, const std::string& path,
+      std::shared_ptr<TritonBackend>* backend);
+
  private:
+  std::mutex mu_;
+  std::unordered_map<std::string, std::weak_ptr<TritonBackend>> backend_map_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -119,6 +119,34 @@ typedef enum TRITONSERVER_memorytype_enum {
 TRITONSERVER_EXPORT const char* TRITONSERVER_MemoryTypeString(
     TRITONSERVER_MemoryType memtype);
 
+/// TRITONSERVER_Logging
+///
+/// Types/levels of logging.
+///
+typedef enum TRITONSERVER_loglevel_enum {
+  TRITONSERVER_LOG_INFO,
+  TRITONSERVER_LOG_WARN,
+  TRITONSERVER_LOG_ERROR,
+  TRITONSERVER_LOG_VERBOSE
+} TRITONSERVER_LogLevel;
+
+/// Is a log level enabled?
+///
+/// \param level The log level.
+/// \return True if the log level is enabled, false if not enabled.
+TRITONSERVER_EXPORT bool TRITONSERVER_LogIsEnabled(TRITONSERVER_LogLevel level);
+
+/// Log a message at a given log level if that level is enabled.
+///
+/// \param level The log level.
+/// \param filename The file name of the location of the log message.
+/// \param line The line number of the log message.
+/// \param msg The log message.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_LogMessage(
+    TRITONSERVER_LogLevel level, const char* filename, const int line,
+    const char* msg);
+
 /// TRITONSERVER_Error
 ///
 /// Errors are reported by a TRITONSERVER_Error object. A NULL

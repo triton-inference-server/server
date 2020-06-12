@@ -79,12 +79,17 @@ TritonModel::Create(
                                        model_path + ", " + global_path);
   }
 
+  // Find the backend
+  std::shared_ptr<TritonBackend> backend;
+  RETURN_IF_ERROR(TritonBackendManager::CreateBackend(
+      model_config.backend(), backend_libpath, &backend));
+
   // Create and intialize the model and model instances.
   std::unique_ptr<TritonModel> local_model(
-      new TritonModel(min_compute_capability));
-  //    RETURN_IF_ERROR(local_backend->Init(path, server_params,
-  //    model_config));
-  //    RETURN_IF_ERROR(local_backend->CreateExecutionContexts(custom_paths));
+      new TritonModel(backend, min_compute_capability));
+  RETURN_IF_ERROR(
+      local_model->Init(version_path, model_config, "" /* platform */));
+  //    RETURN_IF_ERROR(local_model->CreateExecutionContexts(custom_paths));
 
   *model = std::move(local_model);
   return Status::Success;

@@ -25,6 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <memory>
+#include <string>
+#include "src/backends/backend/triton_backend_manager.h"
 #include "src/core/backend.h"
 #include "src/core/infer_request.h"
 #include "src/core/model_config.pb.h"
@@ -48,10 +51,14 @@ class TritonModel : public InferenceBackend {
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModel);
 
-  explicit TritonModel(const double min_compute_capability)
-      : InferenceBackend(min_compute_capability)
+  TritonModel(
+      const std::shared_ptr<TritonBackend>& backend,
+      const double min_compute_capability)
+      : InferenceBackend(min_compute_capability), backend_(backend)
   {
   }
+
+  std::shared_ptr<TritonBackend> backend_;
 };
 
 }}  // namespace nvidia::inferenceserver

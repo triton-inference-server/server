@@ -79,7 +79,7 @@ struct TRITONBACKEND_ModelInstance;
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_InputProperties(
     TRITONBACKEND_Input* input, const char** name,
-    TRITONBACKEND_DataType* datatype, int64_t** shape, uint32_t* dims_count,
+    TRITONSERVER_DataType* datatype, int64_t** shape, uint32_t* dims_count,
     uint32_t* buffer_count);
 
 /// Get a buffer holding (part of) the tensor data for an input. The
@@ -104,7 +104,7 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_InputProperties(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_InputBuffer(
     TRITONBACKEND_Input* input, const uint32_t index, const void** buffer,
-    uint64_t* buffer_byte_size, TRITONBACKEND_MemoryType* memory_type,
+    uint64_t* buffer_byte_size, TRITONSERVER_MemoryType* memory_type,
     int64_t* memory_type_id);
 
 ///
@@ -150,7 +150,7 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestedOutputName(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_OutputBuffer(
     TRITONBACKEND_Output* output, void** buffer,
-    const uint64_t buffer_byte_size, TRITONBACKEND_MemoryType* memory_type,
+    const uint64_t buffer_byte_size, TRITONSERVER_MemoryType* memory_type,
     int64_t* memory_type_id);
 
 ///
@@ -306,7 +306,7 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseDelete(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseOutput(
     TRITONBACKEND_Response* response, TRITONBACKEND_Output** output,
-    const char* name, const TRITONBACKEND_DataType datatype,
+    const char* name, const TRITONSERVER_DataType datatype,
     const int64_t* shape, const uint32_t dims_count);
 
 /// Send a successful response. Calling this function transfers
@@ -333,6 +333,16 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSendError(
 ///
 /// Object representing a backend.
 ///
+
+/// Get the name of the backend. The caller does not own the returned
+/// string and must not modify or delete it. The lifetime of the
+/// returned string extends only as long as 'backend'.
+///
+/// \param backend The backend.
+/// \param name Returns the name of the backend.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendName(
+    TRITONBACKEND_Backend* backend, const char** name);
 
 /// Get the TRITONBACKEND API version supported by Triton. This value
 /// can be compared against the TRITONBACKEND_API_VERSION used to
