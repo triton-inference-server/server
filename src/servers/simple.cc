@@ -24,6 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <rapidjson/document.h>
+#include <rapidjson/error/en.h>
 #include <unistd.h>
 #include <chrono>
 #include <cstring>
@@ -33,8 +35,6 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
 #include "src/core/tritonserver.h"
 #include "src/servers/common.h"
 

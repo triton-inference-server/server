@@ -26,7 +26,16 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 #include "src/backends/backend/tritonbackend.h"
+
+#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
+#define TRITONJSON_STATUSRETURN(M) \
+  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
+#define TRITONJSON_STATUSSUCCESS nullptr
+#include "src/core/json.h"
+
+namespace ni = nvidia::inferenceserver;
 
 //
 // Simple backend that demonstrates the TRITONBACKEND API for a
@@ -43,6 +52,13 @@
 
 namespace {
 
+#define RETURN_ERROR_IF_FALSE(P, C, MSG)              \
+  do {                                                \
+    if (!(P)) {                                       \
+      return TRITONSERVER_ErrorNew(C, (MSG).c_str()); \
+    }                                                 \
+  } while (false)
+
 #define RETURN_IF_ERROR(X)           \
   do {                               \
     TRITONSERVER_Error* err__ = (X); \
@@ -50,6 +66,175 @@ namespace {
       return err__;                  \
     }                                \
   } while (false)
+
+#define LOG_IF_ERROR(X, MSG)                                               \
+  do {                                                                     \
+    TRITONSERVER_Error* err__ = (X);                                       \
+    if (err__ != nullptr) {                                                \
+      TRITONSERVER_LogMessage(                                             \
+          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,                       \
+          (std::string(MSG) + ": " + TRITONSERVER_ErrorCodeString(err__) + \
+           " - " + TRITONSERVER_ErrorMessage(err__))                       \
+              .c_str());                                                   \
+      TRITONSERVER_ErrorDelete(err__);                                     \
+    }                                                                      \
+  } while (false)
+
+TRITONSERVER_Error*
+ParseShape(
+    ni::TritonJson::Value& io, const std::string& name,
+    std::vector<int64_t>* shape)
+{
+  ni::TritonJson::Value shape_array;
+  RETURN_IF_ERROR(io.MemberAsArray(name.c_str(), &shape_array));
+  for (size_t i = 0; i < shape_array.ArraySize(); ++i) {
+    std::string str;
+
+    // The model configuration is specified in protobuf (sigh) and it
+    // has no option to produce json where uint64 and int64 fields are
+    // actually represented as numbers. Instead it always represents
+    // them as strings so have to parse appropriately and convert.
+    RETURN_IF_ERROR(shape_array.IndexAsString(i, &str));
+
+    try {
+      int64_t d = std::atoll(str.c_str());
+      shape->push_back(d);
+    }
+    catch (...) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          (std::string("unable to convert shape dimension '") + str +
+           "' to integer")
+              .c_str());
+    }
+  }
+
+  return nullptr;  // success
+}
+
+std::string
+ShapeStr(const std::vector<int64_t>& shape)
+{
+  bool first = true;
+
+  std::string str("[");
+  for (const auto& dim : shape) {
+    if (!first) {
+      str += ",";
+    }
+    str += std::to_string(dim);
+    first = false;
+  }
+
+  str += "]";
+  return str;
+}
+
+//
+// ModelState
+//
+// State associated with a model that is using this backend. An object
+// of this class is created and associated with each
+// TRITONBACKEND_Model.
+//
+class ModelState {
+ public:
+  static TRITONSERVER_Error* Create(
+      TRITONBACKEND_Model* triton_model, ModelState** state);
+
+  TRITONSERVER_Error* ValidateModelConfig();
+
+ private:
+  ModelState(
+      TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config);
+
+  TRITONBACKEND_Model* triton_model_;
+  ni::TritonJson::Value model_config_;
+};
+
+TRITONSERVER_Error*
+ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
+{
+  TRITONSERVER_Message* config_message;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(triton_model, &config_message));
+
+  // We can get the model configuration as a json string from
+  // config_message, parse it with our favorite json parser to create
+  // DOM that we can access when we need to example the
+  // configuration. We use TritonJson, which is a wrapper that returns
+  // nice errors (currently the underlying implementation is
+  // rapidjson... but others could be added). You can use any json
+  // parser you prefer.
+  const char* buffer;
+  size_t byte_size;
+  RETURN_IF_ERROR(
+      TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
+
+  ni::TritonJson::Value model_config;
+  TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
+  RETURN_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
+  RETURN_IF_ERROR(err);
+
+  *state = new ModelState(triton_model, std::move(model_config));
+  return nullptr;  // success
+}
+
+ModelState::ModelState(
+    TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config)
+    : triton_model_(triton_model), model_config_(std::move(model_config))
+{
+}
+
+TRITONSERVER_Error*
+ModelState::ValidateModelConfig()
+{
+  // We have the json DOM for the model configuration...
+  ni::TritonJson::WriteBuffer buffer;
+  RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
+  TRITONSERVER_LogMessage(
+      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      (std::string("model configuration:\n") + buffer.Contents()).c_str());
+
+  ni::TritonJson::Value inputs, outputs;
+  RETURN_IF_ERROR(model_config_.MemberAsArray("input", &inputs));
+  RETURN_IF_ERROR(model_config_.MemberAsArray("output", &outputs));
+
+  // There must be 1 input and 1 output.
+  RETURN_ERROR_IF_FALSE(
+      inputs.ArraySize() == 1, TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("expected 1 input, got ") +
+          std::to_string(inputs.ArraySize()));
+  RETURN_ERROR_IF_FALSE(
+      outputs.ArraySize() == 1, TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("expected 1 output, got ") +
+          std::to_string(outputs.ArraySize()));
+
+  ni::TritonJson::Value input, output;
+  RETURN_IF_ERROR(inputs.IndexAsObject(0, &input));
+  RETURN_IF_ERROR(outputs.IndexAsObject(0, &output));
+
+  // Input and output must have same datatype
+  std::string input_dtype, output_dtype;
+  RETURN_IF_ERROR(input.MemberAsString("data_type", &input_dtype));
+  RETURN_IF_ERROR(output.MemberAsString("data_type", &output_dtype));
+
+  RETURN_ERROR_IF_FALSE(
+      input_dtype == output_dtype, TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("expected input and output datatype to match, got ") +
+          input_dtype + " and " + output_dtype);
+
+  // Input and output must have same datatype
+  std::vector<int64_t> input_shape, output_shape;
+  RETURN_IF_ERROR(ParseShape(input, "dims", &input_shape));
+  RETURN_IF_ERROR(ParseShape(output, "dims", &output_shape));
+
+  RETURN_ERROR_IF_FALSE(
+      input_shape == output_shape, TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("expected input and output shape to match, got ") +
+          ShapeStr(input_shape) + " and " + ShapeStr(output_shape));
+
+  return nullptr;  // success
+}
 
 }  // namespace
 
@@ -83,14 +268,14 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
           .c_str());
   TRITONSERVER_LogMessage(
       TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      (name + "' TRITONBACKEND API version: " +
+      (std::string("'") + name + "' TRITONBACKEND API version: " +
        std::to_string(TRITONBACKEND_API_VERSION))
           .c_str());
 
   if (api_version < TRITONBACKEND_API_VERSION) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
-        (std::string("Triton backend API version '") +
+        (std::string(" triton backend API version '") +
          std::to_string(api_version) +
          "' is less than backend's API version '" +
          std::to_string(TRITONBACKEND_API_VERSION) + "'")
@@ -123,6 +308,83 @@ TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
           .c_str());
 
   delete state;
+
+  return nullptr;  // success
+}
+
+// Implementing TRITONBACKEND_ModelInitialize is optional. The backend
+// can initialize any state that is intended to be shared across all
+// instances of the model.
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
+{
+  const char* cname;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelName(model, &cname));
+  std::string name(cname);
+
+  uint64_t version;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(model, &version));
+
+  TRITONSERVER_LogMessage(
+      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
+       std::to_string(version) + ")")
+          .c_str());
+
+  // Can get the full path to the filesystem directory containing this
+  // model, in case we wanted to load something from the repo.
+  const char* cdir;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelRepositoryPath(model, &cdir));
+  std::string dir(cdir);
+
+  TRITONSERVER_LogMessage(
+      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      (std::string("Repository path: ") + dir).c_str());
+
+  // The model can access the backend as well... here we can access
+  // the backend global state.
+  TRITONBACKEND_Backend* backend;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(model, &backend));
+
+  void* vbackendstate;
+  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vbackendstate));
+  std::string* backend_state = reinterpret_cast<std::string*>(vbackendstate);
+
+  TRITONSERVER_LogMessage(
+      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      (std::string("backend state is '") + *backend_state + "'").c_str());
+
+  // With each model we create a Model object and associate it with
+  // the TRITONBACKEND_Model.
+  ModelState* model_state;
+  RETURN_IF_ERROR(ModelState::Create(model, &model_state));
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelSetState(model, reinterpret_cast<void*>(model_state)));
+
+  // One of the primary things to do in ModelInitialize is to examine
+  // the model configuration to ensure that it is something that this
+  // backend can support. If not, returning an error from this
+  // function will prevent the model from loading.
+  RETURN_IF_ERROR(model_state->ValidateModelConfig());
+
+  return nullptr;  // success
+}
+
+// Implementing TRITONBACKEND_ModelFinalize is optional unless state
+// is set using TRITONBACKEND_ModelSetState. The backend must free
+// this state and perform any other global cleanup.
+TRITONSERVER_Error*
+TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
+{
+  void* vstate;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
+  ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
+
+  TRITONSERVER_LogMessage(
+      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      "TRITONBACKEND_ModelFinalize: delete model state");
+
+  delete model_state;
 
   return nullptr;  // success
 }

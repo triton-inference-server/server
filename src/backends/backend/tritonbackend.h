@@ -408,6 +408,20 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelVersion(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelRepositoryPath(
     TRITONBACKEND_Model* model, const char** path);
 
+/// Get the model configuration. The caller takes ownership of the
+/// message object and must call TRITONSERVER_MessageDelete to release
+/// the object. The configuration is available via this call even
+/// before the model is loaded and so can be used in
+/// TRITONBACKEND_ModelInitialize. TRITONSERVER_ServerModelConfig
+/// returns equivalent information but is not useable until after the
+/// model loads.
+///
+/// \param model The model.
+/// \param model_config Returns the model configuration as a message.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelConfig(
+    TRITONBACKEND_Model* model, TRITONSERVER_Message** model_config);
+
 /// Get the backend used by the model.
 ///
 /// \param model The model.
@@ -518,7 +532,10 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_Finalize(
 /// Initialize for a model. This function is optional, a backend is
 /// not required to implement it. This function is called once when a
 /// model that uses the backend is loaded to allow the backend to
-/// initialize any state associated with the model.
+/// initialize any state associated with the model. The backend should
+/// also examine the model configuration to determine if the
+/// configuration is suitable for the backend. Any errors reported by
+/// this function will prevent the model from loading.
 ///
 /// \param model The model.
 /// \return a TRITONSERVER_Error indicating success or failure.

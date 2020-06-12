@@ -26,8 +26,12 @@
 
 #include "src/backends/backend/triton_model.h"
 
+#include <google/protobuf/util/json_util.h>
 #include <vector>
+#include "src/backends/backend/tritonbackend.h"
 #include "src/core/filesystem.h"
+#include "src/core/logging.h"
+#include "src/core/server_message.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -86,13 +90,111 @@ TritonModel::Create(
 
   // Create and intialize the model and model instances.
   std::unique_ptr<TritonModel> local_model(
-      new TritonModel(backend, min_compute_capability));
+      new TritonModel(model_path, backend, min_compute_capability));
   RETURN_IF_ERROR(
       local_model->Init(version_path, model_config, "" /* platform */));
-  //    RETURN_IF_ERROR(local_model->CreateExecutionContexts(custom_paths));
+
+  // Model initialization is optional... The TRITONBACKEND_Model
+  // object is this TritonModel object.
+  if (backend->ModelInitFn() != nullptr) {
+    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(
+        reinterpret_cast<TRITONBACKEND_Model*>(local_model.get())));
+  }
+
+  // RETURN_IF_ERROR(local_model->CreateExecutionContexts(custom_paths));
 
   *model = std::move(local_model);
   return Status::Success;
 }
+
+TritonModel::TritonModel(
+    const std::string& model_path,
+    const std::shared_ptr<TritonBackend>& backend,
+    const double min_compute_capability)
+    : InferenceBackend(min_compute_capability), model_path_(model_path),
+      backend_(backend), state_(nullptr)
+{
+}
+
+TritonModel::~TritonModel()
+{
+  // Model finalization is optional... The TRITONBACKEND_Model
+  // object is this TritonModel object.
+  if (backend_->ModelFiniFn() != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        backend_->ModelFiniFn()(reinterpret_cast<TRITONBACKEND_Model*>(this)),
+        "failed finalizing model");
+  }
+}
+
+extern "C" {
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelName(TRITONBACKEND_Model* model, const char** name)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *name = tm->Name().c_str();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelVersion(TRITONBACKEND_Model* model, uint64_t* version)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *version = tm->Version();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelRepositoryPath(TRITONBACKEND_Model* model, const char** path)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *path = tm->ModelPath().c_str();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelConfig(
+    TRITONBACKEND_Model* model, TRITONSERVER_Message** model_config)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+
+  std::string model_config_json;
+  ::google::protobuf::util::JsonPrintOptions options;
+  options.preserve_proto_field_names = true;
+  ::google::protobuf::util::MessageToJsonString(
+      tm->Config(), &model_config_json, options);
+  *model_config = reinterpret_cast<TRITONSERVER_Message*>(
+      new TritonServerMessage(std::move(model_config_json)));
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelBackend(
+    TRITONBACKEND_Model* model, TRITONBACKEND_Backend** backend)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *backend = reinterpret_cast<TRITONBACKEND_Backend*>(tm->Backend().get());
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelState(TRITONBACKEND_Model* model, void** state)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *state = tm->State();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelSetState(TRITONBACKEND_Model* model, void* state)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  tm->SetState(state);
+  return nullptr;  // success
+}
+
+}  // extern C
 
 }}  // namespace nvidia::inferenceserver

@@ -39,6 +39,11 @@ namespace nvidia { namespace inferenceserver {
 //
 class TritonBackend {
  public:
+  typedef TRITONSERVER_Error* (*TritonModelInitFn_t)(
+      TRITONBACKEND_Model* model);
+  typedef TRITONSERVER_Error* (*TritonModelFiniFn_t)(
+      TRITONBACKEND_Model* model);
+
   static Status Create(
       const std::string& name, const std::string& path,
       std::shared_ptr<TritonBackend>* backend);
@@ -48,8 +53,13 @@ class TritonBackend {
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
+  TritonModelInitFn_t ModelInitFn() const { return model_init_fn_; }
+  TritonModelFiniFn_t ModelFiniFn() const { return model_fini_fn_; }
+
  private:
   typedef TRITONSERVER_Error* (*TritonBackendInitFn_t)(
+      TRITONBACKEND_Backend* backend);
+  typedef TRITONSERVER_Error* (*TritonBackendFiniFn_t)(
       TRITONBACKEND_Backend* backend);
 
   explicit TritonBackend(const std::string& name, const std::string& path)
@@ -69,7 +79,9 @@ class TritonBackend {
   // dlopen / dlsym handles
   void* dlhandle_;
   TritonBackendInitFn_t backend_init_fn_;
-  TritonBackendInitFn_t backend_fini_fn_;
+  TritonBackendFiniFn_t backend_fini_fn_;
+  TritonModelInitFn_t model_init_fn_;
+  TritonModelFiniFn_t model_fini_fn_;
 
   // Opaque state associated with the backend.
   void* state_;

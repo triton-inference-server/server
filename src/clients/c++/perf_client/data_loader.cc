@@ -24,13 +24,12 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 #include "src/clients/c++/perf_client/data_loader.h"
-#include <b64/decode.h>
-#include "src/core/model_config.h"
 
+#include <b64/decode.h>
+#include <rapidjson/filereadstream.h>
 #include <fstream>
-#include "rapidjson/filereadstream.h"
+#include "src/core/model_config.h"
 
 DataLoader::DataLoader(const size_t batch_size)
     : batch_size_(batch_size), data_stream_cnt_(0)

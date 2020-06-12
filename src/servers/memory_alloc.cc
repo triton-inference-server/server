@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cuda_runtime_api.h>
+#include <rapidjson/document.h>
+#include <rapidjson/error/en.h>
 #include <unistd.h>
 #include <chrono>
 #include <future>
@@ -32,8 +34,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
 #include "src/core/tritonserver.h"
 #include "src/servers/common.h"
 
