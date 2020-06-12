@@ -292,7 +292,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
 
-    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 100:200:50 \
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 \
     -p1000 -b 1 -a>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
@@ -305,7 +305,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
 
-    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 100:200:50 \
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 \
     --input-data=${INT_JSONDATAFILE} -p1000 -b 1 -a>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
@@ -318,7 +318,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
 
-    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 100:200:10 -p1000 -b 1 \
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:100 -p1000 -b 1 \
     -a --binary-search --request-distribution "poisson" -l 10 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
@@ -502,7 +502,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
 
-    $PERF_CLIENT -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 10:20:5 --sync \
+    $PERF_CLIENT -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --sync \
     --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
