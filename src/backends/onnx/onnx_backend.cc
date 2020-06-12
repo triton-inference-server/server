@@ -301,12 +301,14 @@ OnnxBackend::CreateExecutionContext(
     glock.lock();
   }
 
-  // Register a custom ops library that contains custom operations.
-  std::string op_library_filename = Config().op_library_filename();
-  if (!op_library_filename.empty()) {
-    void* library_handle = nullptr;  // leak this, no harm.
-    RETURN_IF_ORT_ERROR(ort_api->RegisterCustomOpsLibrary(
-        session_options, op_library_filename.c_str(), &library_handle));
+  // Register all op libraries that contains custom operations.
+  if (Config().has_model_operations()) {
+    auto model_ops = Config().model_operations();
+    for (const auto& lib_filename : model_ops.op_library_filename()) {
+      void* library_handle = nullptr;  // leak this, no harm.
+      RETURN_IF_ORT_ERROR(ort_api->RegisterCustomOpsLibrary(
+          session_options, lib_filename.c_str(), &library_handle));
+    }
   }
 
   RETURN_IF_ERROR(OnnxLoader::LoadSession(

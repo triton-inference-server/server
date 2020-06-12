@@ -124,8 +124,8 @@ AutoFill::Create(
   const Platform platform = GetPlatform(config.platform());
 #endif
 
-  // If custom library is specified, use it to set the session options for ONNX.
-  const std::string custom_library = config.op_library_filename();
+  // If model operations is specified, use it to set the session options for ONNX.
+  auto model_ops = config.model_operations();
 
   Status status;
 
@@ -199,8 +199,11 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afox;
-    status =
-        AutoFillOnnx::Create(model_name, model_path, &afox, custom_library);
+    std::vector<std::string> op_libraries;
+    for (const auto& lib_filename : model_ops.op_library_filename()) {
+      op_libraries.push_back(lib_filename);
+    }
+    status = AutoFillOnnx::Create(model_name, model_path, &afox, op_libraries);
     LOG_VERBOSE(1) << "ONNX autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afox);

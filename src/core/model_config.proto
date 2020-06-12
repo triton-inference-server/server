@@ -1136,6 +1136,21 @@ message ModelWarmup
 //@@
 message ModelConfig
 {
+  //@@
+  //@@  .. cpp:var:: message ModelOperations
+  //@@
+  //@@     The metadata of libraries providing custom operations for this model.
+  //@@
+  message ModelOperations
+  {
+    //@@  .. cpp:var:: string op_library_filename
+    //@@
+    //@@     Optional paths of the libraries providing custom operations for
+    //@@     this model. Valid only for ONNX models.
+    //@@
+    repeated string op_library_filename = 1;
+  }
+
   //@@  .. cpp:var:: string name
   //@@
   //@@     The name of the model.
@@ -1291,12 +1306,10 @@ message ModelConfig
   //@@
   repeated ModelWarmup model_warmup = 16;
 
-  //@@  .. cpp:var:: string op_library_filename
+  //@@  .. cpp:var:: ModelOperations model_operations
   //@@
-  //@@     Optional path of the custom library that contains custom
-  //@@     operations that are used in this specific model.
-  //@@     Necssary only for ONNXRuntime models. Please use LD_PRELOAD for other
-  //@@     types of models.
+  //@@     Optional metadata of the libraries providing custom operations for
+  //@@     this model.
   //@@
-  string op_library_filename = 18;
+  ModelOperations model_operations = 18;
 }

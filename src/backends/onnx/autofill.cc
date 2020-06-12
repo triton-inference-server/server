@@ -293,7 +293,8 @@ AutoFillOnnxImpl::SetBatchingSupport()
 Status
 AutoFillOnnx::Create(
     const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFill>* autofill, const std::string& op_library_filename)
+    std::unique_ptr<AutoFill>* autofill,
+    const std::vector<std::string>& op_libraries)
 {
   std::unique_ptr<AutoFillOnnxImpl> local_autofill;
 
@@ -311,10 +312,11 @@ AutoFillOnnx::Create(
 
   RETURN_IF_ORT_ERROR(ort_api->CreateSessionOptions(&session_options));
 
-  if (!op_library_filename.empty()) {
+  // Does nothing if op_libraries is empty
+  for (const auto& lib_filename : op_libraries) {
     void* library_handle = nullptr;  // leak this, no harm.
     RETURN_IF_ORT_ERROR(ort_api->RegisterCustomOpsLibrary(
-        session_options, op_library_filename.c_str(), &library_handle));
+        session_options, lib_filename.c_str(), &library_handle));
   }
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
