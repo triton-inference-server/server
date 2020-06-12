@@ -133,7 +133,7 @@ wait $SERVER_PID
 mkdir -p onnx_custom_ops/custom_op/1 && \
     cp custom_op_test.onnx onnx_custom_ops/custom_op/1/model.onnx
 
-rm config.pbtxt && touch config.pbtxt
+touch config.pbtxt
 echo "name: \"custom_op\"" >> config.pbtxt && \
 echo "platform: \"onnxruntime_onnx\"" >> config.pbtxt && \
 echo "max_batch_size: 0" >> config.pbtxt && \
