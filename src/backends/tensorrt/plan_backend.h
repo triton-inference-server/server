@@ -240,8 +240,7 @@ class PlanBackend : public InferenceBackend {
           std::vector<std::unique_ptr<InferenceRequest>>&& requests)
           : inference_backend_(inference_backend),
             event_set_idx_(event_set_idx), total_batch_size_(0),
-            compute_start_ns_(0), compute_input_end_ns_(0),
-            compute_output_start_ns_(0), requests_(std::move(requests))
+            compute_start_ns_(0), requests_(std::move(requests))
       {
       }
 
@@ -256,8 +255,6 @@ class PlanBackend : public InferenceBackend {
 
       // The timestamps for reporting stats
       uint64_t compute_start_ns_;
-      uint64_t compute_input_end_ns_;
-      uint64_t compute_output_start_ns_;
 
       // All the composing InferenceRequest objects
       std::vector<std::unique_ptr<InferenceRequest>> requests_;

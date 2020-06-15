@@ -1869,7 +1869,6 @@ PlanBackend::Context::Run(
   // available at this point as the execution and output copy are on the same
   // stream.
   cudaStreamWaitEvent(stream_, events_[next_set_].input_ready_, 0);
-  INFER_STATS_SET_TIMESTAMP(payload_->compute_input_end_ns_);
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
@@ -1940,7 +1939,6 @@ PlanBackend::Context::Run(
   }
 
   cudaEventRecord(events_[next_set_].ready_for_output_, stream_);
-  INFER_STATS_SET_TIMESTAMP(payload_->compute_output_start_ns_);
 
   // Collect the names of requested outputs. Do not include outputs
   // for requests that have already responded with an error.
@@ -2096,12 +2094,22 @@ PlanBackend::Context::ProcessResponse(
     }
     auto& event_set = events_[payload->event_set_idx_];
 
+#ifdef TRITON_ENABLE_STATS
+    cudaEventSynchronize(event_set.input_ready_);
+    INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
+#endif  // TRITON_ENABLE_STATS
+
     // The model execution associated with the current context
     // has consumed the inputs. Put the context back into the available queue
     // so that it can begin enqueuing new memcpys into the input buffers
     cudaEventSynchronize(event_set.ready_for_input_);
     context_queue->Put(context_idx);
     NVTX_MARKER("plan_input_available");
+
+#ifdef TRITON_ENABLE_STATS
+    cudaEventSynchronize(event_set.ready_for_output_);
+    INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
+#endif  // TRITON_ENABLE_STATS
 
     // Call Finalize() here to defer CUDA synchronization as much as possible
     payload->responder_->Finalize();
@@ -2117,8 +2125,8 @@ PlanBackend::Context::ProcessResponse(
       auto& request = payload->requests_[i];
       request->ReportStatistics(
           metric_reporter_.get(), (payload->responses_[i] != nullptr),
-          payload->compute_start_ns_, payload->compute_input_end_ns_,
-          payload->compute_output_start_ns_, compute_end_ns);
+          payload->compute_start_ns_, compute_input_end_ns,
+          compute_output_start_ns, compute_end_ns);
 
 #ifdef TRITON_ENABLE_TRACING
       if (request->Trace() != nullptr) {
@@ -2126,11 +2134,9 @@ PlanBackend::Context::ProcessResponse(
         trace->Report(
             TRITONSERVER_TRACE_COMPUTE_START, payload->compute_start_ns_);
         trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_INPUT_END,
-            payload->compute_input_end_ns_);
+            TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
         trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_OUTPUT_START,
-            payload->compute_output_start_ns_);
+            TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
         trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
       }
 #endif  // TRITON_ENABLE_TRACING
@@ -2140,8 +2146,8 @@ PlanBackend::Context::ProcessResponse(
     payload->inference_backend_->MutableStatsAggregator()
         ->UpdateInferBatchStats(
             metric_reporter_.get(), payload->total_batch_size_,
-            payload->compute_start_ns_, payload->compute_input_end_ns_,
-            payload->compute_output_start_ns_, compute_end_ns);
+            payload->compute_start_ns_, compute_input_end_ns,
+            compute_output_start_ns, compute_end_ns);
 #endif  // TRITON_ENABLE_STATS
 
     // Send all the responses that haven't already been sent because of
