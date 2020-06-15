@@ -41,7 +41,7 @@ namespace ni = nvidia::inferenceserver;
 // Simple backend that demonstrates the TRITONBACKEND API for a
 // sequential backend. A sequential backend produces exactly 1
 // response for every request and sends the response before exiting
-// the TRITONBACKEND_ModelInstanceExecute function.
+// the TRITONBACKEND_ModelExecute function.
 //
 // This backend supports any model that has exactly 1 input and
 // exactly 1 output. The input and output can have any name, datatype
@@ -97,7 +97,7 @@ ParseShape(
 }
 
 std::string
-ShapeStr(const std::vector<int64_t>& shape)
+ShapeToString(const std::vector<int64_t>& shape)
 {
   bool first = true;
 
@@ -207,7 +207,7 @@ ModelState::ValidateModelConfig()
       std::string("expected input and output datatype to match, got ") +
           input_dtype + " and " + output_dtype);
 
-  // Input and output must have same datatype
+  // Input and output must have same shape
   std::vector<int64_t> input_shape, output_shape;
   RETURN_IF_ERROR(ParseShape(input, "dims", &input_shape));
   RETURN_IF_ERROR(ParseShape(output, "dims", &output_shape));
@@ -215,7 +215,7 @@ ModelState::ValidateModelConfig()
   RETURN_ERROR_IF_FALSE(
       input_shape == output_shape, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected input and output shape to match, got ") +
-          ShapeStr(input_shape) + " and " + ShapeStr(output_shape));
+          ShapeToString(input_shape) + " and " + ShapeToString(output_shape));
 
   return nullptr;  // success
 }
@@ -226,9 +226,9 @@ ModelState::ValidateModelConfig()
 
 extern "C" {
 
-// Implementing TRITONBACKEND_Initialize is optional. The backend can
-// initialize any global state that is intended to be shared across
-// all models and model instances that use the backend.
+// Implementing TRITONBACKEND_Initialize is optional. The backend
+// should initialize any global state that is intended to be shared
+// across all models and model instances that use the backend.
 TRITONSERVER_Error*
 TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
 {
@@ -297,8 +297,8 @@ TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
 }
 
 // Implementing TRITONBACKEND_ModelInitialize is optional. The backend
-// can initialize any state that is intended to be shared across all
-// instances of the model.
+// should initialize any state that is intended to be shared across
+// all instances of the model.
 TRITONSERVER_Error*
 TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
 {
@@ -316,7 +316,7 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
           .c_str());
 
   // Can get the full path to the filesystem directory containing this
-  // model, in case we wanted to load something from the repo.
+  // model... in case we wanted to load something from the repo.
   const char* cdir;
   RETURN_IF_ERROR(TRITONBACKEND_ModelRepositoryPath(model, &cdir));
   std::string dir(cdir);
@@ -351,12 +351,16 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   // function will prevent the model from loading.
   RETURN_IF_ERROR(model_state->ValidateModelConfig());
 
+  // FIXME here we should look at the instance-group and decide how we
+  // are going to handle multiple instances (or raise and error if
+  // disallowing them).
+
   return nullptr;  // success
 }
 
 // Implementing TRITONBACKEND_ModelFinalize is optional unless state
 // is set using TRITONBACKEND_ModelSetState. The backend must free
-// this state and perform any other global cleanup.
+// this state and perform any other cleanup.
 TRITONSERVER_Error*
 TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
 {
@@ -369,6 +373,21 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
       "TRITONBACKEND_ModelFinalize: delete model state");
 
   delete model_state;
+
+  return nullptr;  // success
+}
+
+// Implementing TRITONBACKEND_ModelExecute is required.
+TRITONSERVER_Error*
+TRITONBACKEND_ModelExecute(
+    TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
+    const uint32_t request_count)
+{
+  TRITONSERVER_LogMessage(
+      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      (std::string("TRITONBACKEND_ModelExecute: ") +
+       std::to_string(request_count) + " requests")
+          .c_str());
 
   return nullptr;  // success
 }

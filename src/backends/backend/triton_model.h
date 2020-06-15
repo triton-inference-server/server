@@ -68,7 +68,7 @@ class TritonModel : public InferenceBackend {
   // Backend used by this model.
   std::shared_ptr<TritonBackend> backend_;
 
-  // Opaque state associated with the backend.
+  // Opaque state associated with this model.
   void* state_;
 };
 
