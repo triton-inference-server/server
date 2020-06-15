@@ -2094,17 +2094,21 @@ PlanBackend::Context::ProcessResponse(
     }
     auto& event_set = events_[payload->event_set_idx_];
 
+#ifdef TRITON_ENABLE_STATS
+    cudaEventSynchronize(event_set.input_ready_);
+    INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
+#endif  // TRITON_ENABLE_STATS
+
     // The model execution associated with the current context
     // has consumed the inputs. Put the context back into the available queue
     // so that it can begin enqueuing new memcpys into the input buffers
     cudaEventSynchronize(event_set.ready_for_input_);
-    INFER_STATS_SET_TIMESTAMP(compute_input_end_ns);
     context_queue->Put(context_idx);
     NVTX_MARKER("plan_input_available");
 
 #ifdef TRITON_ENABLE_STATS
     cudaEventSynchronize(event_set.ready_for_output_);
-    INFER_STATS_SET_TIMESTAMP(compute_output_start_ns);
+    INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
 #endif  // TRITON_ENABLE_STATS
 
     // Call Finalize() here to defer CUDA synchronization as much as possible
