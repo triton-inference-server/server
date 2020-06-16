@@ -124,9 +124,6 @@ AutoFill::Create(
   const Platform platform = GetPlatform(config.platform());
 #endif
 
-  // If model operations is specified, use it to set the session options for ONNX.
-  auto model_ops = config.model_operations();
-
   Status status;
 
 #ifdef TRITON_ENABLE_TENSORFLOW
@@ -199,6 +196,10 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afox;
+
+    // If model operations is specified, use it to set the session options for
+    // ONNX.
+    auto model_ops = config.model_operations();
     std::vector<std::string> op_libraries;
     for (const auto& lib_filename : model_ops.op_library_filename()) {
       op_libraries.push_back(lib_filename);
