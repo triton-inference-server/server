@@ -41,11 +41,13 @@ git clone --single-branch --depth=1 -b r${TRITON_VERSION} \
 git clone --single-branch --depth=1 -b 20.03-devel \
         ssh://git@gitlab-master.nvidia.com:12051/dl/JoC/asr_kaldi.git
 cp -r asr_kaldi/kaldi-asr-client triton-inference-server/src/clients/c++
+cp -r asr_kaldi/model-repo/kaldi_online/config.pbtxt model-repo/kaldi_online/
 
 # Client dependencies
 (apt-get update && \
     apt-get install -y --no-install-recommends \
         libssl-dev \
+        libb64-dev \
         rapidjson-dev)
 
 pip3 install --upgrade wheel setuptools grpcio-tools
@@ -53,14 +55,14 @@ pip3 install --upgrade wheel setuptools grpcio-tools
 # Build client library and kaldi perf client
 (cd triton-inference-server/build && \
     cmake -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
-          -DTRTIS_ENABLE_GRPC_V2=ON && \
+          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install && \
     make -j16 trtis-clients)
 
+rm *.log
 RET=0
 
 # Run server
-/opt/tritonserver/bin/trtserver --model-repo=/workspace/model-repo > server.log 2>&1
+/opt/tritonserver/bin/trtserver --model-repo=/workspace/model-repo > server.log 2>&1 &
 SERVER_PID=$!
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start server\n***"
@@ -72,7 +74,7 @@ KALDI_CLIENT=install/bin/kaldi_asr_parallel_client
 
 # Run client
 RESULTS_DIR="/data/results"
-mkdir $RESULTS_DIR
+mkdir -p $RESULTS_DIR
 
 CONCURRENCY=2000
 
