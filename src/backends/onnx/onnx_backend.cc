@@ -301,6 +301,16 @@ OnnxBackend::CreateExecutionContext(
     glock.lock();
   }
 
+  // Register all op libraries that contains custom operations.
+  if (Config().has_model_operations()) {
+    auto model_ops = Config().model_operations();
+    for (const auto& lib_filename : model_ops.op_library_filename()) {
+      void* library_handle = nullptr;  // leak this, no harm.
+      RETURN_IF_ORT_ERROR(ort_api->RegisterCustomOpsLibrary(
+          session_options, lib_filename.c_str(), &library_handle));
+    }
+  }
+
   RETURN_IF_ERROR(OnnxLoader::LoadSession(
       op_itr->second, session_options, &context->session_));
   RETURN_IF_ORT_ERROR(
