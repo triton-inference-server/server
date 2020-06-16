@@ -102,7 +102,7 @@ Assuming the model repository is available in
 /path/to/model/repository, the following command runs the container
 you pulled from NGC or built locally::
 
-  $ docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tritonserver image name> --model-repository=/models
+  $ docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tritonserver image name> tritonserver --model-repository=/models
 
 Where *<tritonserver image name>* will be something like
 **nvcr.io/nvidia/tritonserver:20.03.1-py3** if you :ref:`pulled the
@@ -134,7 +134,7 @@ On a system without GPUs, Triton should be run without using the
 -\\-gpus flag to docker, but is otherwise identical to what is
 described in :ref:`section-running-triton-with-gpu`::
 
-  $ docker run --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tritonserver image name> --model-repository=/models
+  $ docker run --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tritonserver image name> tritonserver --model-repository=/models
 
 Because the -\\-gpus flag is not used, a GPU is not available and
 Triton will therefore be unable to load any model configuration that
