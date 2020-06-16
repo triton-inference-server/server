@@ -146,3 +146,30 @@ to use the `NGC PyTorch container
 corresponding to the Triton container. For example, if you are using
 the 20.03 version of Triton, use the 20.03 version of the PyTorch
 container.
+
+ONNX
+-------
+
+ONNXRuntime allows users to `add custom operations
+<https://github.com/microsoft/onnxruntime/blob/master/docs/AddingCustomOp.md>`_
+which can then be used in ONNX models. To register your custom operations
+library you need to include it in the model configuration as an additional
+field. For example, if you follow `this example
+<https://github.com/microsoft/onnxruntime/blob/master/onnxruntime/test/shared_lib/test_inference.cc>`_
+in the `microsoft/onnxruntime<https://github.com/microsoft/onnxruntime>`_
+repository and your ONNXRuntime custom operations are compiled into libonnxcustom.so,
+adding the following to the model configuraion of your model makes those 
+operations available to that specific ONNX model::
+
+  $ model_operations { op_library_filename: "/path/to/libonnxcustom.so" }
+
+A limitation of this approach is that the custom operations must be
+managed separately from the model repository itself. And more
+seriously, if there are custom layer name conflicts across multiple
+shared libraries or the handles used to register them in ONNXRuntime there
+is currently no way to handle it.
+
+When building the custom operations shared library it is important to
+use the same version of ONNXRuntime as is being used in Triton. You can
+find the ONNXRuntime version in the `Triton Release Notes
+<https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html>`_.
