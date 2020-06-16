@@ -31,6 +31,8 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+#include <string>
+#include <vector>
 
 // This header can be used both within Triton server and externally
 // (i.e. in source that interacts only via TRITONSERVER API). Status
@@ -175,6 +177,25 @@ class TritonJson {
       }
       rapidjson::PrettyWriter<WriteBuffer> writer(*buffer);
       document_.Accept(writer);
+      return TRITONJSON_STATUSSUCCESS;
+    }
+
+    // Swap a value with another.
+    TRITONJSON_STATUSTYPE Swap(TritonJson::Value& other)
+    {
+      rapidjson::Value& value = AsMutableValue();
+      value.Swap(other.AsMutableValue());
+      return TRITONJSON_STATUSSUCCESS;
+    }
+
+    // FIXME Should have Set* for all types.
+
+    // Set/overwrite a signed integer in a value. This changes the
+    // type of the value to signed int.
+    TRITONJSON_STATUSTYPE SetInt(const int64_t value)
+    {
+      rapidjson::Value& v = AsMutableValue();
+      v.SetInt64(value);
       return TRITONJSON_STATUSSUCCESS;
     }
 
@@ -504,6 +525,21 @@ class TritonJson {
             std::to_string(idx) + "'");
       }
       *value = TritonJson::Value(array[idx], allocator_);
+      return TRITONJSON_STATUSSUCCESS;
+    }
+
+    // Get the names of all members in an object.  Error if value is
+    // not an object.
+    TRITONJSON_STATUSTYPE Members(std::vector<std::string>* names) const
+    {
+      const rapidjson::Value& object = AsValue();
+      if (!object.IsObject()) {
+        TRITONJSON_STATUSRETURN(
+            std::string("attempt to get members for non-object"));
+      }
+      for (const auto& m : object.GetObject()) {
+        names->push_back(m.name.GetString());
+      }
       return TRITONJSON_STATUSSUCCESS;
     }
 

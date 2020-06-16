@@ -31,6 +31,7 @@
 #include "src/backends/backend/tritonbackend.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
+#include "src/core/model_config_utils.h"
 #include "src/core/server_message.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -160,10 +161,12 @@ TRITONBACKEND_ModelConfig(
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
 
   std::string model_config_json;
-  ::google::protobuf::util::JsonPrintOptions options;
-  options.preserve_proto_field_names = true;
-  ::google::protobuf::util::MessageToJsonString(
-      tm->Config(), &model_config_json, options);
+  Status status = ModelConfigToJson(tm->Config(), &model_config_json);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(std::move(model_config_json)));
 
