@@ -27,6 +27,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -37,7 +38,8 @@ class AutoFillOnnx {
  public:
   static Status Create(
       const std::string& model_name, const std::string& model_path,
-      std::unique_ptr<AutoFill>* autofill);
+      std::unique_ptr<AutoFill>* autofill,
+      const std::vector<std::string>& op_libraries);
 };
 
 }}  // namespace nvidia::inferenceserver
