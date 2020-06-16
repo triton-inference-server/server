@@ -140,9 +140,47 @@ this release is `r20.03.1
 Backwards Compatibility
 -----------------------
 
-Version 2 of Triton does not generally maintain backwards
-compatibility with version 1. This section will be updated with
-specifics as part of the first release of version 2.
+Version 2 of Triton is beta quality, so you should expect some changes
+to the server and client protocols and APIs. Version 2 of Triton does
+not generally maintain backwards compatibility with
+version 1. Specifically, you should take the following items into
+account when transitioning from version 1 to version 2:
+
+* The Triton executables and libraries are in /opt/tritonserver. The
+  Triton executable is /opt/tritonserver/bin/tritonserver.
+
+* Some *tritonserver* command-line arguments are removed or have
+  different default behavior in version 2.
+
+  * --api-version, --http-health-port, --grpc-infer-thread-count,
+    --grpc-stream-infer-thread-count,--allow-poll-model-repository
+    and --allow-model-control are removed.
+
+  * The default for --model-control-mode is changed to *none*.
+
+* The HTTP/REST and GRPC protocols, which conceptual similar to
+  version 1, are completely changed in version 2. See the `inference
+  protocols
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/http_grpc_api.html>`_
+  section of the documentation for more information.
+
+* Python and C++ client libraries are re-implemented to match the new
+  HTTP/REST and GRPC protocols. The Python client no longer depends on
+  a C++ shared library and so should be usable on any platform that
+  supports Python. See
+
+* The version 2 cmake build requires these changes:
+
+  * The cmake flag names have changed from having a TRTIS prefix to
+    having a TRITON prefix. For example, TRITON_ENABLE_TENSORRT.
+
+  * The build targets are *server*, *client* and *custom-backend* to
+    build the server, client libraries and example, and custom backend
+    SDK, respectively.
+
+* If the Docker containers the environment variables indicating the
+  Triton version have change to have a TRITON prefix, for example,
+  TRITON_SERVER_VERSION.
 
 Roadmap
 -------
