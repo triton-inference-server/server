@@ -26,7 +26,6 @@
 
 #include "src/core/tritonserver.h"
 
-#include <google/protobuf/util/json_util.h>
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
@@ -503,11 +502,11 @@ TRITONSERVER_MessageDelete(TRITONSERVER_Message* message)
 
 TRITONSERVER_Error*
 TRITONSERVER_MessageSerializeToJson(
-    TRITONSERVER_Message* protobuf, const char** base, size_t* byte_size)
+    TRITONSERVER_Message* message, const char** base, size_t* byte_size)
 {
-  ni::TritonServerMessage* lprotobuf =
-      reinterpret_cast<ni::TritonServerMessage*>(protobuf);
-  lprotobuf->Serialize(base, byte_size);
+  ni::TritonServerMessage* lmessage =
+      reinterpret_cast<ni::TritonServerMessage*>(message);
+  lmessage->Serialize(base, byte_size);
   return nullptr;  // Success
 }
 
@@ -1718,13 +1717,12 @@ TRITONSERVER_ServerModelConfig(
       lserver->GetInferenceBackend(model_name, model_version, &backend));
 
   std::string model_config_json;
-  ::google::protobuf::util::JsonPrintOptions options;
-  options.preserve_proto_field_names = true;
-  ::google::protobuf::util::MessageToJsonString(
-      backend->Config(), &model_config_json, options);
+  RETURN_IF_STATUS_ERROR(
+      ModelConfigToJson(backend->Config(), &model_config_json));
 
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new ni::TritonServerMessage(std::move(model_config_json)));
+
   return nullptr;  // success
 }
 

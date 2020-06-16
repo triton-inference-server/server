@@ -150,4 +150,10 @@ Status ParseLongLongParameter(
 /// value.
 Status GetProfileIndex(const std::string& profile_name, int* profile_index);
 
+/// Convert a model configuration protobuf to the equivalent json.
+/// \param config The protobuf model configuration.
+/// \param json Returns the equivalent JSON.
+/// \return The error status.
+Status ModelConfigToJson(const ModelConfig& config, std::string* json_str);
+
 }}  // namespace nvidia::inferenceserver

@@ -299,10 +299,12 @@ ModelParser::GetEnsembleSchedulerType(
   if (std::string(config["platform"].GetString()).compare("ensemble") == 0) {
     const auto step_itr = config["ensemble_scheduling"].FindMember("step");
     for (const auto& step : step_itr->value.GetArray()) {
-      std::string step_model_version(step["model_version"].GetString());
-      int64_t model_version_int = std::stol(step_model_version);
+      std::string step_model_version;
+      const int64_t model_version_int = step["model_version"].GetInt64();
       if (model_version_int == -1) {
         step_model_version = "";
+      } else {
+        step_model_version = std::to_string(model_version_int);
       }
       (*composing_models_map_)[config["name"].GetString()].emplace(
           std::string(step["model_name"].GetString()), step_model_version);

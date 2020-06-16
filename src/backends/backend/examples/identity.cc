@@ -88,25 +88,9 @@ ParseShape(
   ni::TritonJson::Value shape_array;
   RETURN_IF_ERROR(io.MemberAsArray(name.c_str(), &shape_array));
   for (size_t i = 0; i < shape_array.ArraySize(); ++i) {
-    std::string str;
-
-    // The model configuration is specified in protobuf (sigh) and it
-    // has no option to produce json where uint64 and int64 fields are
-    // actually represented as numbers. Instead it always represents
-    // them as strings so have to parse appropriately and convert.
-    RETURN_IF_ERROR(shape_array.IndexAsString(i, &str));
-
-    try {
-      int64_t d = std::atoll(str.c_str());
-      shape->push_back(d);
-    }
-    catch (...) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          (std::string("unable to convert shape dimension '") + str +
-           "' to integer")
-              .c_str());
-    }
+    int64_t d;
+    RETURN_IF_ERROR(shape_array.IndexAsInt(i, &d));
+    shape->push_back(d);
   }
 
   return nullptr;  // success
