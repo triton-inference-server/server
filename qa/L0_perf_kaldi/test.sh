@@ -25,32 +25,76 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Test with 20.03 for now because model is compatible with that version
-REPO_VERSION="20.03"
+# Test with 20.03 because 20.06 is not yet available, 20.05 is not usable
+TRITON_VERSION="20.05"
 
-git clone ssh://git@gitlab-master.nvidia.com:12051/dl/JoC/asr_kaldi.git && \
-    cd asr_kaldi && \
-    ./scripts/docker/build.sh && \
-    ./scripts/docker/launch_download.sh && \
-    ./scripts/docker/launch_server.sh
+# Build client
+cd /workspace
+
+git clone --single-branch --depth=1 -b r${TRITON_VERSION} \
+    https://github.com/NVIDIA/triton-inference-server.git
+
+(cd triton-inference-server/src/clients/c++ && \
+    echo "add_subdirectory(kaldi-asr-client)" >> "CMakeLists.txt")
+
+# branch name is 20.03-devel but used for 20.05 as well
+git clone --single-branch --depth=1 -b 20.03-devel \
+        ssh://git@gitlab-master.nvidia.com:12051/dl/JoC/asr_kaldi.git
+cp -r asr_kaldi/kaldi-asr-client triton-inference-server/src/clients/c++
+
+# Client dependencies
+(apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libssl-dev \
+        rapidjson-dev)
+
+pip3 install --upgrade wheel setuptools grpcio-tools
+
+# Build client library and kaldi perf client
+(cd triton-inference-server/build && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
+          -DTRTIS_ENABLE_GRPC_V2=ON && \
+    make -j16 trtis-clients)
+
+RET=0
+
+# Run server
+/opt/tritonserver/bin/trtserver --model-repo=/workspace/model-repo > server.log 2>&1
+SERVER_PID=$!
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start server\n***"
+    cat server.log
+    exit 1
+fi
+
+KALDI_CLIENT=install/bin/kaldi_asr_parallel_client
+
+# Run client
+RESULTS_DIR="/data/results"
+mkdir $RESULTS_DIR
 
 CONCURRENCY=2000
 
 # Client only supports GRPC (5 iterations on the dataset)
-./scripts/docker/launch_client.sh -i 5 -c ${CONCURRENCY} >> client_1.log 2>&1
+$KALDI_CLIENT -i 5 -c ${CONCURRENCY} >> client_1.log 2>&1
+if (( $? != 0 )); then
+    RET=1
+fi
 
 # Capture Throughput
 THROUGHPUT=cat client_1.log | grep 'Throughput:' | cut -f 2 | cut -f 1 -d ' '
 
 # '-o' Flag is needed to run online and capture latency
-./scripts/docker/launch_client.sh -i 5 -c ${CONCURRENCY} -o >> client_2.log 2>&1
+$KALDI_CLIENT -i 5 -c ${CONCURRENCY} -o >> client_2.log 2>&1
+if (( $? != 0 )); then
+    RET=1
+fi
 
 # Capture Latency 95 percentile
 LATENCY_95=cat client_2.log | grep -A1 "Latencies:" | sed -n '2 p' | cut -f 5
 
-REPORTER=../common/reporter.py
-
-RET=0
+REPORTER=triton-inference-server/qa/common/reporter.py
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> results.tjson
 echo -e "\"s_benchmark_name\":\"kaldi\"," >> results.tjson
@@ -78,13 +122,9 @@ if [ -f $REPORTER ]; then
 fi
 
 if (( $RET == 0 )); then
-    echo -e "\n***\n*** Data Collection Passed\n***"
+    echo -e "\n***\n*** ASR Kaldi Benchmark Passed\n***"
 else
-    echo -e "\n***\n*** Data Collection FAILED\n***"
+    echo -e "\n***\n*** ASR Kaldi Benchmark FAILED\n***"
 fi
-
-# Cleanup folder and docker images
-rm -rf asr_kaldi && \
-    sudo docker image rm trtis_kaldi_client:latest trtis_kaldi_server:latest
 
 exit $RET
