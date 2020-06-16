@@ -82,8 +82,8 @@ class HttpFrontend(AbstractFrontend):
             res += "\tSend (avg): {}us\n".format(span_map["HTTP_SEND"] /
                                                  (cnt * 1000))
             res += "\tOverhead (avg): {}us\n".format(
-                (span_map["HTTP_INFER"] - span_map["HTTP_RECV"] -
-                 span_map["HTTP_SEND"]) / (cnt * 1000))
+                (span_map["HTTP_INFER"] - span_map["REQUEST"] -
+                 span_map["HTTP_RECV"] - span_map["HTTP_SEND"]) / (cnt * 1000))
             return res
         else:
             return None
@@ -113,8 +113,9 @@ class GrpcFrontend(AbstractFrontend):
             res += "\tSend (avg): {}us\n".format(span_map["GRPC_SEND"] /
                                                  (cnt * 1000))
             res += "\tOverhead (avg): {}us\n".format(
-                (span_map["GRPC_INFER"] - span_map["GRPC_WAITREAD"] -
-                 span_map["GRPC_SEND"]) / (cnt * 1000))
+                (span_map["GRPC_INFER"] - span_map["REQUEST"] -
+                 span_map["GRPC_WAITREAD"] - span_map["GRPC_SEND"]) /
+                (cnt * 1000))
             return res
         else:
             return None
