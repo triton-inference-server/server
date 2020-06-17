@@ -200,8 +200,8 @@ class InferenceResponse {
   // InferenceResponse
   InferenceResponse(
       const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
-      const ResponseAllocator* allocator,
-      void* alloc_userp, TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+      const ResponseAllocator* allocator, void* alloc_userp,
+      TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
       const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
           delegator)
@@ -214,7 +214,7 @@ class InferenceResponse {
   const std::string& Id() const { return id_; }
   const std::string& ModelName() const;
   int64_t ActualModelVersion() const;
-  Status IsDecoupled(bool *is_decoupled) const;
+  Status IsDecoupled(bool* is_decoupled) const;
   const Status& ResponseStatus() const { return status_; }
 
   const std::deque<Output>& Outputs() const { return outputs_; }
