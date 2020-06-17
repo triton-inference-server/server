@@ -26,7 +26,6 @@
 
 #include "src/backends/backend/triton_model.h"
 
-#include <google/protobuf/util/json_util.h>
 #include <vector>
 #include "src/backends/backend/tritonbackend.h"
 #include "src/core/filesystem.h"
@@ -89,20 +88,60 @@ TritonModel::Create(
   RETURN_IF_ERROR(TritonBackendManager::CreateBackend(
       model_config.backend(), backend_libpath, &backend));
 
-  // Create and intialize the model and model instances.
+  // Create and initialize the model.
   std::unique_ptr<TritonModel> local_model(
       new TritonModel(model_path, backend, min_compute_capability));
   RETURN_IF_ERROR(
       local_model->Init(version_path, model_config, "" /* platform */));
 
+  TRITONBACKEND_Model* triton_model =
+      reinterpret_cast<TRITONBACKEND_Model*>(local_model.get());
+  TritonBackend::TritonModelExecFn_t model_exec_fn = backend->ModelExecFn();
+
   // Model initialization is optional... The TRITONBACKEND_Model
   // object is this TritonModel object.
   if (backend->ModelInitFn() != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(
-        reinterpret_cast<TRITONBACKEND_Model*>(local_model.get())));
+    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(triton_model));
   }
 
-  // RETURN_IF_ERROR(local_model->CreateExecutionContexts(custom_paths));
+  // Create a scheduler with 1 thread. The backend is already
+  // initialized so there is no need to have the scheduler thread call
+  // any initialization.
+  RETURN_IF_ERROR(local_model->SetConfiguredScheduler(
+      1 /* runner_cnt */,
+      [](uint32_t runner_idx) -> Status { return Status::Success; },
+      [model_exec_fn, triton_model](
+          uint32_t runner_idx,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
+        // There is only a single thread calling this function so can
+        // use a static vector to avoid needing to malloc each time.
+        static std::vector<TRITONBACKEND_Request*> triton_requests(1024);
+        triton_requests.clear();
+        for (auto& r : requests) {
+          triton_requests.push_back(
+              reinterpret_cast<TRITONBACKEND_Request*>(r.release()));
+        }
+
+        // If there is an error then we retain ownership of 'requests'
+        // and must send error responses.
+        TRITONSERVER_Error* err = model_exec_fn(
+            triton_model, &triton_requests[0], triton_requests.size());
+        if (err != nullptr) {
+          Status status = Status(
+              TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
+              TRITONSERVER_ErrorMessage(err));
+          for (TRITONBACKEND_Request* tr : triton_requests) {
+            std::unique_ptr<InferenceRequest> ur(
+                reinterpret_cast<InferenceRequest*>(tr));
+            InferenceRequest::RespondIfError(
+                ur, status, true /* release_requests */);
+          }
+
+          TRITONSERVER_ErrorDelete(err);
+        }
+
+        return Status::Success;
+      }));
 
   *model = std::move(local_model);
   return Status::Success;
