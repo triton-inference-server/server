@@ -201,7 +201,7 @@ class PlanBackend : public InferenceBackend {
     // Number of CUDA event set for each instance.
     static constexpr int EVENT_SET_COUNT = 2;
 
-    Status InitEventSet();
+    Status InitEventSet(bool busy_wait_events);
     Status DestroyEventSet();
     Status GetRequestShapeValues(
         size_t total_batch_size,
