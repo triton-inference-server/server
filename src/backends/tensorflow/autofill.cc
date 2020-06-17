@@ -302,7 +302,8 @@ AutoFillSavedModel::Create(
         graphdef_backend_config->allow_gpu_memory_growth,
         graphdef_backend_config->per_process_gpu_memory_fraction,
         graphdef_backend_config->allow_soft_placement,
-        graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */);
+        graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */,
+        false /* auto_mixed precision */);
 
     RETURN_IF_ERROR(DestroyFileFolder(local_savedmodel_path));
     if (err == nullptr) {
