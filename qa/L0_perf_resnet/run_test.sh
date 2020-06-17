@@ -67,13 +67,10 @@ fi
 
 set +e
 
-PERF_CLIENT_PROTOCOL_ARGS="-i grpc -u localhost:8001" &&
-    [ $PERF_CLIENT_PROTOCOL != "grpc" ] && PERF_CLIENT_PROTOCOL_ARGS=""
-
 # Run the model once to warm up. Some frameworks do optimization on the first requests.
-$PERF_CLIENT -v ${PERF_CLIENT_PROTOCOL_ARGS} -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
+$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
 
-$PERF_CLIENT -v ${PERF_CLIENT_PROTOCOL_ARGS} -m $MODEL_NAME -p5000 \
+$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                 -f ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
