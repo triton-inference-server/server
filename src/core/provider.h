@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <deque>
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include <event2/buffer.h>
 #endif
@@ -173,8 +174,10 @@ class InferResponseProvider {
     void* release_userp_;
   };
 
-  // Ordered list of outputs as they "added" by AllocateOutputBuffer().
-  std::vector<Output> outputs_;
+  // Ordered list of outputs as they "added" by
+  // AllocateOutputBuffer(). Need to use deque so that pointers in
+  // Output are not invalidated when outputs are appended.
+  std::deque<Output> outputs_;
 
   // label provider used to generate classification results.
   std::shared_ptr<LabelProvider> label_provider_;
