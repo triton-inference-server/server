@@ -1251,18 +1251,6 @@ TRITONSERVER_InferenceResponseId(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_InferenceResponseIsDecoupled(
-    TRITONSERVER_InferenceResponse* inference_response, bool* is_decoupled)
-{
-  ni::InferenceResponse* lresponse =
-      reinterpret_cast<ni::InferenceResponse*>(inference_response);
-
-  *is_decoupled = lresponse->IsDecoupled();
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
 TRITONSERVER_InferenceResponseOutputCount(
     TRITONSERVER_InferenceResponse* inference_response, uint32_t* count)
 {

@@ -171,8 +171,6 @@ class InferenceRequest {
   const std::string& Id() const { return id_; }
   void SetId(const std::string& i) { id_ = i; }
 
-  bool IsDecoupled() const { return is_decoupled_; }
-
   // Flags for the request, union of TRITONSERVER_RequestFlag.
   uint32_t Flags() const { return flags_; }
   void SetFlags(uint32_t f) { flags_ = f; }
@@ -326,8 +324,8 @@ class InferenceRequest {
       void* response_userp)
   {
     response_factory_ = InferenceResponseFactory(
-        backend_shared_, id_, is_decoupled_, allocator, alloc_userp,
-        response_fn, response_userp, response_delegator_);
+        backend_shared_, id_, allocator, alloc_userp, response_fn,
+        response_userp, response_delegator_);
     return Status::Success;
   }
 
@@ -465,9 +463,6 @@ class InferenceRequest {
   int64_t actual_model_version_;
 
   std::string id_;
-
-  // Whether the request is for a model with decoupled request and responses.
-  bool is_decoupled_;
 
   uint32_t flags_;
   uint64_t correlation_id_;

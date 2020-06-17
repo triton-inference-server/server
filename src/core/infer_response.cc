@@ -40,8 +40,8 @@ InferenceResponseFactory::CreateResponse(
     std::unique_ptr<InferenceResponse>* response) const
 {
   response->reset(new InferenceResponse(
-      backend_, id_, is_decoupled_, allocator_, alloc_userp_, response_fn_,
-      response_userp_, response_delegator_));
+      backend_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
+      response_delegator_));
 
   return Status::Success;
 }
@@ -60,6 +60,20 @@ int64_t
 InferenceResponse::ActualModelVersion() const
 {
   return (backend_ == nullptr) ? -1 : backend_->Version();
+}
+
+Status
+InferenceResponse::IsDecoupled(bool* is_decoupled) const
+{
+  if (backend_ == nullptr) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Unable to determine the model transaction policy for the response");
+  }
+
+  *is_decoupled = backend_->IsDecoupled();
+
+  return Status::Success;
 }
 
 Status
@@ -276,11 +290,7 @@ operator<<(std::ostream& out, const InferenceResponse& response)
 {
   out << "[0x" << std::addressof(response) << "] "
       << "response id: " << response.Id() << ", model: " << response.ModelName()
-      << ", actual version: " << response.ActualModelVersion();
-  if (response.IsDecoupled()) {
-    out << ", is_decoupled: " << response.IsDecoupled() << std::endl;
-  }
-  out << std::endl;
+      << ", actual version: " << response.ActualModelVersion() << std::endl;
 
   out << "status:" << response.ResponseStatus().AsString() << std::endl;
 

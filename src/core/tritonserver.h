@@ -834,17 +834,6 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseId(
     TRITONSERVER_InferenceResponse* inference_response,
     const char** request_id);
 
-/// Check whether or not the response is from a model with decoupled
-/// requests and responses.
-///
-/// \param inference_response The response object.
-/// \param is_decoupled Returns the truth value of whether the response
-/// is decoupled or not.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_InferenceResponseIsDecoupled(
-    TRITONSERVER_InferenceResponse* inference_response, bool* is_decoupled);
-
 /// Get the number of outputs available in the response.
 ///
 /// \param inference_response The response object.
