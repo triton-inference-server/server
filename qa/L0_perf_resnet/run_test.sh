@@ -48,7 +48,7 @@ if (( $CONCURRENCY < $REQUIRED_CONCURRENCY )); then
     CONCURRENCY=$REQUIRED_CONCURRENCY
 fi
 
-NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}
+NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}_${PERF_CLIENT_PROTOCOL}
 
 rm -fr models && mkdir -p models && \
     cp -r $MODEL_PATH models/. && \
@@ -73,7 +73,7 @@ PERF_CLIENT_PROTOCOL_ARGS="-i grpc -u localhost:8001" &&
 # Run the model once to warm up. Some frameworks do optimization on the first requests.
 $PERF_CLIENT -v ${PERF_CLIENT_PROTOCOL_ARGS} -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
 
-$PERF_CLIENT -v -${PERF_CLIENT_PROTOCOL_ARGS} -m $MODEL_NAME -p5000 \
+$PERF_CLIENT -v ${PERF_CLIENT_PROTOCOL_ARGS} -m $MODEL_NAME -p5000 \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                 -f ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
