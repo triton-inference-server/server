@@ -487,6 +487,8 @@ InferenceRequest::Normalize()
 {
   const ModelConfig& model_config = backend_raw_->Config();
 
+  is_decoupled_ = model_config.model_transaction_type().decoupled();
+
   // Initialize the requested outputs to be used during inference. If
   // original_requested_outputs_ is empty assume all outputs specified
   // in model config are being requested.
@@ -793,7 +795,11 @@ operator<<(std::ostream& out, const InferenceRequest& request)
       << ", correlation id: " << request.CorrelationId()
       << ", batch size: " << request.BatchSize()
       << ", priority: " << request.Priority()
-      << ", timeout (us): " << request.TimeoutMicroseconds() << std::endl;
+      << ", timeout (us): " << request.TimeoutMicroseconds();
+  if (request.IsDecoupled()) {
+    out << ", is_decoupled: " << request.IsDecoupled();
+  }
+  out << std::endl;
 
   out << "original inputs:" << std::endl;
   for (const auto& itr : request.OriginalInputs()) {

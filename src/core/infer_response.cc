@@ -40,8 +40,8 @@ InferenceResponseFactory::CreateResponse(
     std::unique_ptr<InferenceResponse>* response) const
 {
   response->reset(new InferenceResponse(
-      backend_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
-      response_delegator_));
+      backend_, id_, is_decoupled_, allocator_, alloc_userp_, response_fn_,
+      response_userp_, response_delegator_));
 
   return Status::Success;
 }
@@ -276,7 +276,11 @@ operator<<(std::ostream& out, const InferenceResponse& response)
 {
   out << "[0x" << std::addressof(response) << "] "
       << "response id: " << response.Id() << ", model: " << response.ModelName()
-      << ", actual version: " << response.ActualModelVersion() << std::endl;
+      << ", actual version: " << response.ActualModelVersion();
+  if (response.IsDecoupled()) {
+    out << ", is_decoupled: " << response.IsDecoupled() << std::endl;
+  }
+  out << std::endl;
 
   out << "status:" << response.ResponseStatus().AsString() << std::endl;
 

@@ -48,14 +48,15 @@ class InferenceResponseFactory {
   InferenceResponseFactory() = default;
   InferenceResponseFactory(
       const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
-      const ResponseAllocator* allocator, void* alloc_userp,
-      TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+      const bool is_decoupled, const ResponseAllocator* allocator,
+      void* alloc_userp, TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
       const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
           delegator)
-      : backend_(backend), id_(id), allocator_(allocator),
-        alloc_userp_(alloc_userp), response_fn_(response_fn),
-        response_userp_(response_userp), response_delegator_(delegator)
+      : backend_(backend), id_(id), is_decoupled_(is_decoupled),
+        allocator_(allocator), alloc_userp_(alloc_userp),
+        response_fn_(response_fn), response_userp_(response_userp),
+        response_delegator_(delegator)
   {
   }
 
@@ -82,6 +83,9 @@ class InferenceResponseFactory {
   // The ID of the corresponding request that should be included in
   // every response.
   std::string id_;
+
+  // Whether or not the response generated from the factory are decoupled.
+  bool is_decoupled_;
 
   // The response allocator and user pointer. The 'allocator_' is a
   // raw pointer because it is owned by the client, and the client is
@@ -200,20 +204,22 @@ class InferenceResponse {
   // InferenceResponse
   InferenceResponse(
       const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
-      const ResponseAllocator* allocator, void* alloc_userp,
-      TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+      const bool is_decoupled, const ResponseAllocator* allocator,
+      void* alloc_userp, TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
       const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
           delegator)
-      : backend_(backend), id_(id), allocator_(allocator),
-        alloc_userp_(alloc_userp), response_fn_(response_fn),
-        response_userp_(response_userp), response_delegator_(delegator)
+      : backend_(backend), id_(id), is_decoupled_(is_decoupled),
+        allocator_(allocator), alloc_userp_(alloc_userp),
+        response_fn_(response_fn), response_userp_(response_userp),
+        response_delegator_(delegator)
   {
   }
 
   const std::string& Id() const { return id_; }
   const std::string& ModelName() const;
   int64_t ActualModelVersion() const;
+  bool IsDecoupled() const { return is_decoupled_; };
   const Status& ResponseStatus() const { return status_; }
 
   const std::deque<Output>& Outputs() const { return outputs_; }
@@ -262,6 +268,9 @@ class InferenceResponse {
   // The ID of the corresponding request that should be included in
   // every response.
   std::string id_;
+
+  // Whether the response is decoupled or not.
+  bool is_decoupled_;
 
   // The result tensors. Use a deque so that there is no reallocation
   // with the resulting copies.
