@@ -40,6 +40,8 @@ CAFFE2PLAN=../common/caffe2plan
 
 rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 
+PROTOCOLS="grpc http"
+
 TRT_MODEL_NAME="resnet50_fp16_plan"
 TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
 PYT_MODEL_NAME="resnet50_fp32_libtorch"
@@ -55,7 +57,6 @@ ONNXTRT_MODEL_NAME="resnet50_fp32_onnx_trt"
 # Test minimum latency
 #
 STATIC_BATCH=1
-DYNAMIC_BATCH=1
 INSTANCE_CNT=1
 MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME} ${NETDEF_MODEL_NAME}"
 OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
@@ -89,29 +90,33 @@ $CAFFE2PLAN -h -b ${STATIC_BATCH} \
 
 # Tests with each "non-optimized" model
 for MODEL_NAME in $MODEL_NAMES; do
-    REPO=`pwd`/tensorrt_models && [ "$MODEL_NAME" != "$TRT_MODEL_NAME" ] && \
-        REPO=$REPODIR/perf_model_store
-    FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
-    MODEL_NAME=${MODEL_NAME} \
-              MODEL_FRAMEWORK=${FRAMEWORK} \
-              MODEL_PATH="$REPO/${MODEL_NAME}" \
-              STATIC_BATCH_SIZES=${STATIC_BATCH} \
-              DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-              INSTANCE_COUNTS=${INSTANCE_CNT} \
-              bash -x run_test.sh
+    for PROTOCOL in $PROTOCOLS; do
+        REPO=`pwd`/tensorrt_models && [ "$MODEL_NAME" != "$TRT_MODEL_NAME" ] && \
+            REPO=$REPODIR/perf_model_store
+        FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
+        MODEL_NAME=${MODEL_NAME} \
+                MODEL_FRAMEWORK=${FRAMEWORK} \
+                MODEL_PATH="$REPO/${MODEL_NAME}" \
+                STATIC_BATCH=${STATIC_BATCH} \
+                PERF_CLIENT_PROTOCOL=${PROTOCOL} \
+                INSTANCE_CNT=${INSTANCE_CNT} \
+                bash -x run_test.sh
+    done
 done
 
 # Tests with optimization enabled models
 for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
-    REPO=`pwd`/optimized_model_store
-    FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3,4)
-    MODEL_NAME=${MODEL_NAME} \
-              MODEL_FRAMEWORK=${FRAMEWORK} \
-              MODEL_PATH="$REPO/${MODEL_NAME}" \
-              STATIC_BATCH_SIZES=${STATIC_BATCH} \
-              DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-              INSTANCE_COUNTS=${INSTANCE_CNT} \
-              bash -x run_test.sh
+    for PROTOCOL in $PROTOCOLS; do
+        REPO=`pwd`/optimized_model_store
+        FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3,4)
+        MODEL_NAME=${MODEL_NAME} \
+                MODEL_FRAMEWORK=${FRAMEWORK} \
+                MODEL_PATH="$REPO/${MODEL_NAME}" \
+                STATIC_BATCH=${STATIC_BATCH} \
+                PERF_CLIENT_PROTOCOL=${PROTOCOL} \
+                INSTANCE_CNT=${INSTANCE_CNT} \
+                bash -x run_test.sh
+    done
 done
 
 #
@@ -121,7 +126,6 @@ done
 # if we find a RN50 onnx that supports batching).
 #
 STATIC_BATCH=128
-DYNAMIC_BATCH=1
 INSTANCE_CNT=2
 MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME}"
 OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME}"
@@ -137,26 +141,30 @@ $CAFFE2PLAN -h -b ${STATIC_BATCH} \
             $REPODIR/caffe_models/resnet50.prototxt $REPODIR/caffe_models/resnet50.caffemodel
 
 for MODEL_NAME in $MODEL_NAMES; do
-    REPO=`pwd`/tensorrt_models && [ "$MODEL_NAME" != "$TRT_MODEL_NAME" ] && \
-        REPO=$REPODIR/perf_model_store
-    FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
-    MODEL_NAME=${MODEL_NAME} \
-              MODEL_FRAMEWORK=${FRAMEWORK} \
-              MODEL_PATH="$REPO/${MODEL_NAME}" \
-              STATIC_BATCH_SIZES=${STATIC_BATCH} \
-              DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-              INSTANCE_COUNTS=${INSTANCE_CNT} \
-              bash -x run_test.sh
+    for PROTOCOL in $PROTOCOLS; do
+        REPO=`pwd`/tensorrt_models && [ "$MODEL_NAME" != "$TRT_MODEL_NAME" ] && \
+            REPO=$REPODIR/perf_model_store
+        FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
+        MODEL_NAME=${MODEL_NAME} \
+                MODEL_FRAMEWORK=${FRAMEWORK} \
+                MODEL_PATH="$REPO/${MODEL_NAME}" \
+                STATIC_BATCH=${STATIC_BATCH} \
+                PERF_CLIENT_PROTOCOL=${PROTOCOL} \
+                INSTANCE_CNT=${INSTANCE_CNT} \
+                bash -x run_test.sh
+    done
 done
 
 for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
-    REPO=`pwd`/optimized_model_store
-    FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3,4)
-    MODEL_NAME=${MODEL_NAME} \
-              MODEL_FRAMEWORK=${FRAMEWORK} \
-              MODEL_PATH="$REPO/${MODEL_NAME}" \
-              STATIC_BATCH_SIZES=${STATIC_BATCH} \
-              DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-              INSTANCE_COUNTS=${INSTANCE_CNT} \
-              bash -x run_test.sh
+    for PROTOCOL in $PROTOCOLS; do
+        REPO=`pwd`/optimized_model_store
+        FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3,4)
+        MODEL_NAME=${MODEL_NAME} \
+                MODEL_FRAMEWORK=${FRAMEWORK} \
+                MODEL_PATH="$REPO/${MODEL_NAME}" \
+                STATIC_BATCH=${STATIC_BATCH} \
+                PERF_CLIENT_PROTOCOL=${PROTOCOL} \
+                INSTANCE_CNT=${INSTANCE_CNT} \
+                bash -x run_test.sh
+    done
 done
