@@ -470,10 +470,19 @@ message ModelOptimizationPolicy
     //@@    .. cpp:var:: bool graphs
     //@@
     //@@       Use CUDA graphs API to capture model operations and execute
-    //@@       them more efficiently. Currently only recognized by TensorRT
-    //@@       backend.
+    //@@       them more efficiently. Default value is false.
+    //@@       Currently only recognized by TensorRT backend.
     //@@
     bool graphs = 1;
+
+    //@@    .. cpp:var:: bool busy_wait_events
+    //@@
+    //@@       Use busy-waiting to synchronize CUDA events to achieve minimum
+    //@@       latency from event complete to host thread to be notified, with
+    //@@       the cost of high CPU load. Default value is false.
+    //@@       Currently only recognized by TensorRT backend.
+    //@@
+    bool busy_wait_events = 2;
   }
 
   //@@
