@@ -158,7 +158,7 @@ account when transitioning from version 1 to version 2:
 
   * The default for --model-control-mode is changed to *none*.
 
-* The HTTP/REST and GRPC protocols, which conceptual similar to
+* The HTTP/REST and GRPC protocols, while conceptually similar to
   version 1, are completely changed in version 2. See the `inference
   protocols
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/http_grpc_api.html>`_
@@ -167,7 +167,9 @@ account when transitioning from version 1 to version 2:
 * Python and C++ client libraries are re-implemented to match the new
   HTTP/REST and GRPC protocols. The Python client no longer depends on
   a C++ shared library and so should be usable on any platform that
-  supports Python. See
+  supports Python. See the `client libraries
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/client_library.html>`_
+  section of the documentaion for more information.
 
 * The version 2 cmake build requires these changes:
 
@@ -175,11 +177,11 @@ account when transitioning from version 1 to version 2:
     having a TRITON prefix. For example, TRITON_ENABLE_TENSORRT.
 
   * The build targets are *server*, *client* and *custom-backend* to
-    build the server, client libraries and example, and custom backend
-    SDK, respectively.
+    build the server, client libraries and examples, and custom
+    backend SDK, respectively.
 
-* If the Docker containers the environment variables indicating the
-  Triton version have change to have a TRITON prefix, for example,
+* In the Docker containers the environment variables indicating the
+  Triton version have changed to have a TRITON prefix, for example,
   TRITON_SERVER_VERSION.
 
 Roadmap
