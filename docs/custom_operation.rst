@@ -163,12 +163,6 @@ operations available to that specific ONNX model::
 
   $ model_operations { op_library_filename: "/path/to/libonnxcustom.so" }
 
-A limitation of this approach is that the custom operations must be
-managed separately from the model repository itself. And more
-seriously, if there are custom layer name conflicts across multiple
-shared libraries or the handles used to register them in ONNXRuntime there
-is currently no way to handle it.
-
 When building the custom operations shared library it is important to
 use the same version of ONNXRuntime as is being used in Triton. You can
 find the ONNXRuntime version in the `Triton Release Notes
