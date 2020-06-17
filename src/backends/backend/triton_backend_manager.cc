@@ -47,12 +47,11 @@ GetEntrypoint(
       return Status::Success;
     }
 
-    dlclose(handle);
     std::string errstr(dlsym_error);  // need copy as dlclose overwrites
+    dlclose(handle);
     return Status(
-        Status::Code::NOT_FOUND,
-        "unable to find '" + name +
-            "' entrypoint in backend library: " + errstr);
+        Status::Code::NOT_FOUND, "unable to find required entrypoint '" + name +
+                                     "' in backend library: " + errstr);
   }
 
   if (fn == nullptr) {
@@ -63,7 +62,7 @@ GetEntrypoint(
     dlclose(handle);
     return Status(
         Status::Code::NOT_FOUND,
-        "unable to find '" + name + "' entrypoint in backend library");
+        "unable to find required entrypoint '" + name + "' in backend library");
   }
 
   *befn = fn;
@@ -97,6 +96,12 @@ TritonBackend::Create(
   return Status::Success;
 }
 
+TritonBackend::TritonBackend(const std::string& name, const std::string& path)
+    : name_(name), path_(path), state_(nullptr)
+{
+  ClearHandles();
+}
+
 TritonBackend::~TritonBackend()
 {
   // Backend finalization is optional... The TRITONBACKEND_Backend
@@ -110,31 +115,60 @@ TritonBackend::~TritonBackend()
   LOG_STATUS_ERROR(UnloadBackendLibrary(), "failed unloading backend");
 }
 
+void
+TritonBackend::ClearHandles()
+{
+  dlhandle_ = nullptr;
+  backend_init_fn_ = nullptr;
+  backend_fini_fn_ = nullptr;
+  model_init_fn_ = nullptr;
+  model_fini_fn_ = nullptr;
+  model_exec_fn_ = nullptr;
+}
+
 Status
 TritonBackend::LoadBackendLibrary()
 {
-  dlhandle_ = dlopen(path_.c_str(), RTLD_LAZY);
-  if (dlhandle_ == nullptr) {
+  void* handle = dlopen(path_.c_str(), RTLD_LAZY);
+  if (handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
         "unable to load backend library: " + std::string(dlerror()));
   }
 
+  TritonBackendInitFn_t bifn;
+  TritonBackendFiniFn_t bffn;
+  TritonModelInitFn_t mifn;
+  TritonModelFiniFn_t mffn;
+  TritonModelExecFn_t mefn;
+
   // Backend initialize and finalize functions, optional
   RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_Initialize", true /* optional */,
-      reinterpret_cast<void**>(&backend_init_fn_)));
+      handle, "TRITONBACKEND_Initialize", true /* optional */,
+      reinterpret_cast<void**>(&bifn)));
   RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_Finalize", true /* optional */,
-      reinterpret_cast<void**>(&backend_fini_fn_)));
+      handle, "TRITONBACKEND_Finalize", true /* optional */,
+      reinterpret_cast<void**>(&bffn)));
 
   // Model initialize and finalize functions, optional
   RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_ModelInitialize", true /* optional */,
-      reinterpret_cast<void**>(&model_init_fn_)));
+      handle, "TRITONBACKEND_ModelInitialize", true /* optional */,
+      reinterpret_cast<void**>(&mifn)));
   RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_ModelFinalize", true /* optional */,
-      reinterpret_cast<void**>(&model_fini_fn_)));
+      handle, "TRITONBACKEND_ModelFinalize", true /* optional */,
+      reinterpret_cast<void**>(&mffn)));
+
+  // Model execute function, required
+  RETURN_IF_ERROR(GetEntrypoint(
+      handle, "TRITONBACKEND_ModelExecute", false /* optional */,
+      reinterpret_cast<void**>(&mefn)));
+
+  dlhandle_ = handle;
+  backend_init_fn_ = bifn;
+  backend_fini_fn_ = bffn;
+  model_init_fn_ = mifn;
+  model_fini_fn_ = mffn;
+  model_exec_fn_ = mefn;
 
   return Status::Success;
 }
@@ -147,6 +181,8 @@ TritonBackend::UnloadBackendLibrary()
         Status::Code::INTERNAL,
         "unable to unload backend library: " + std::string(dlerror()));
   }
+
+  ClearHandles();
 
   return Status::Success;
 }

@@ -595,12 +595,18 @@ InferenceRequest::Normalize()
     }
 
     if (!CompareDimsWithWildcard(input_config->dims(), *shape)) {
+      DimsList full_dims;
+      if (model_config.max_batch_size() > 0) {
+        full_dims.Add(WILDCARD_DIM);
+      }
+      for (int i = 0; i < input_config->dims_size(); ++i) {
+        full_dims.Add(input_config->dims(i));
+      }
       return Status(
           Status::Code::INVALID_ARG,
           "unexpected shape for input '" + pr.first + "' for model '" +
-              ModelName() + "'. Expected " +
-              DimsListToString(input_config->dims()) + ", got " +
-              DimsListToString(*shape));
+              ModelName() + "'. Expected " + DimsListToString(full_dims) +
+              ", got " + DimsListToString(input.OriginalShape()));
     }
 
     // If there is a reshape for this input then adjust them to
