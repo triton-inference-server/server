@@ -211,6 +211,7 @@ BaseBackend::CreateExecutionContext(
 
   TRTISTF_TFTRTConfig* tftrt_config_ptr = nullptr;
   TRTISTF_TFTRTConfig tftrt_config;
+  bool auto_mixed_precision = false;
   if (Config().optimization().has_execution_accelerators()) {
     // Set default values. is_dynamic_op is always true for online
     // TF-TRT.
@@ -274,6 +275,7 @@ BaseBackend::CreateExecutionContext(
                     "' is provided for TensorRT Execution Accelerator");
           }
         }
+        tftrt_config_ptr = &tftrt_config;
         LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                        << instance_name;
       } else if (execution_accelerator.name() == kGPUIOExecutionAccelerator) {
@@ -283,6 +285,10 @@ BaseBackend::CreateExecutionContext(
           // In TensorFlow, TF device (vGPU) is used for device utilities
           context->input_device_id_ = vgpu_device;
         }
+      } else if (
+          execution_accelerator.name() ==
+          kAutoMixedPrecisionExecutionAccelerator) {
+        auto_mixed_precision = true;
       } else {
         return Status(
             Status::Code::INVALID_ARG, "unknown Execution Accelerator '" +
@@ -290,14 +296,13 @@ BaseBackend::CreateExecutionContext(
                                            "' is requested");
       }
     }
-    tftrt_config_ptr = &tftrt_config;
   }
 
   RETURN_IF_ERROR(CreateTRTISTFModel(
       backend_config_, vgpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->first, gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
-      &context->output_name_map_, tftrt_config_ptr));
+      &context->output_name_map_, tftrt_config_ptr, auto_mixed_precision));
 
 
   if (context->input_device_id_ != Context::MODEL_DEVICE) {

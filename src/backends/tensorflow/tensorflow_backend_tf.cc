@@ -213,7 +213,7 @@ NewSessionOptions(
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
     const std::map<int, std::vector<float>>& memory_limit_mb,
-    const TRTISTF_TFTRTConfig* tftrt_config,
+    const TRTISTF_TFTRTConfig* tftrt_config, const bool auto_mixed_precision,
     tensorflow::SessionOptions* session_options)
 {
   session_options->config.mutable_gpu_options()->set_allow_growth(
@@ -283,6 +283,13 @@ NewSessionOptions(
         tftrt_config->max_workspace_size_bytes_);
     (*trt_parameter_map)["max_cached_engines"].set_i(
         tftrt_config->max_cached_engines_);
+  }
+
+  if (auto_mixed_precision) {
+    auto opt_config = session_options->config.mutable_graph_options()
+                          ->mutable_rewrite_options();
+    opt_config->set_meta_optimizer_iterations(tensorflow::RewriterConfig::ONE);
+    opt_config->set_auto_mixed_precision(tensorflow::RewriterConfig::ON);
   }
 }
 
@@ -806,13 +813,13 @@ TRTISTF_ModelCreateFromGraphDef(
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
     const std::map<int, std::vector<float>>& memory_limit_mb,
-    const TRTISTF_TFTRTConfig* tftrt_config)
+    const TRTISTF_TFTRTConfig* tftrt_config, const bool auto_mixed_precision)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
       has_graph_level, graph_level, allow_gpu_memory_growth,
       per_process_gpu_memory_fraction, allow_soft_placement, memory_limit_mb,
-      tftrt_config, &session_options);
+      tftrt_config, auto_mixed_precision, &session_options);
 
   tensorflow::Session* session;
   RETURN_IF_TF_ERROR(tensorflow::NewSession(session_options, &session));
@@ -885,13 +892,13 @@ TRTISTF_ModelCreateFromSavedModel(
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
     const std::map<int, std::vector<float>>& memory_limit_mb,
-    const TRTISTF_TFTRTConfig* tftrt_config)
+    const TRTISTF_TFTRTConfig* tftrt_config, const bool auto_mixed_precision)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
       has_graph_level, graph_level, allow_gpu_memory_growth,
       per_process_gpu_memory_fraction, allow_soft_placement, memory_limit_mb,
-      tftrt_config, &session_options);
+      tftrt_config, auto_mixed_precision, &session_options);
 
 
   if (device_id != TRTISTF_MODEL_DEVICE) {
