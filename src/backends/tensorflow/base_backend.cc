@@ -298,6 +298,12 @@ BaseBackend::CreateExecutionContext(
     }
   }
 
+  if (auto_mixed_precision && (tftrt_config_ptr != nullptr)) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "Auto mixed precision can not be set with TFTRT optimization");
+  }
+
   RETURN_IF_ERROR(CreateTRTISTFModel(
       backend_config_, vgpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->first, gdp_itr->second,
