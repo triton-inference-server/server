@@ -474,6 +474,15 @@ message ModelOptimizationPolicy
     //@@       backend.
     //@@
     bool graphs = 1;
+
+    //@@    .. cpp:var:: bool busy_wait_events
+    //@@
+    //@@       Use busy-waiting to synchronize CUDA events to achieve minimum
+    //@@       latency from event complete to host thread to be notified, with
+    //@@       the cost of high CPU load. Currently only recognized by TensorRT
+    //@@       backend.
+    //@@
+    bool busy_wait_events = 2;
   }
 
   //@@

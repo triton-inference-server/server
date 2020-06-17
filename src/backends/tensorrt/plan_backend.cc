@@ -44,12 +44,13 @@ namespace nvidia { namespace inferenceserver {
 namespace {
 
 Status
-CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
+CreateCudaEvent(
+    const std::string& event_name, unsigned int event_flags, cudaEvent_t* event)
 {
   // Not adding 'cudaEventBlockingSync' to reduce gaps between the time of
   // event record and the time of signaling blocking thread.
   // The busy waiting only happens when there is inflight request.
-  auto cuerr = cudaEventCreateWithFlags(event, cudaEventDisableTiming);
+  auto cuerr = cudaEventCreateWithFlags(event, event_flags);
   if (cuerr != cudaSuccess) {
     return Status(
         Status::Code::INTERNAL, "unable to create CUDA event for " +
@@ -468,7 +469,8 @@ PlanBackend::CreateExecutionContext(
       cuda_stream_priority, &context->input_copy_stream_));
 
   // Create CUDA events associated with the execution states
-  RETURN_IF_ERROR(context->InitEventSet());
+  RETURN_IF_ERROR(
+      context->InitEventSet(Config().optimization().cuda().busy_wait_events()));
 
   auto eit = device_engines_.find(gpu_device);
   if (eit->second.second == nullptr) {
@@ -2168,20 +2170,24 @@ PlanBackend::Context::ProcessResponse(
 }
 
 Status
-PlanBackend::Context::InitEventSet()
+PlanBackend::Context::InitEventSet(bool busy_wait_events)
 {
+  unsigned int event_flags =
+      (busy_wait_events ? cudaEventDefault : cudaEventBlockingSync) |
+      cudaEventDisableTiming;
+
   for (size_t idx = 0; idx < EVENT_SET_COUNT; idx++) {
     RETURN_IF_ERROR(CreateCudaEvent(
-        "Set " + std::to_string(idx) + " ready for input",
+        "Set " + std::to_string(idx) + " ready for input", event_flags,
         &events_[idx].ready_for_input_));
     RETURN_IF_ERROR(CreateCudaEvent(
-        "Set " + std::to_string(idx) + " input ready",
+        "Set " + std::to_string(idx) + " input ready", event_flags,
         &events_[idx].input_ready_));
     RETURN_IF_ERROR(CreateCudaEvent(
-        "Set " + std::to_string(idx) + " ready for output",
+        "Set " + std::to_string(idx) + " ready for output", event_flags,
         &events_[idx].ready_for_output_));
     RETURN_IF_ERROR(CreateCudaEvent(
-        "Set " + std::to_string(idx) + " output ready",
+        "Set " + std::to_string(idx) + " output ready", event_flags,
         &events_[idx].output_ready_));
   }
   return Status::Success;
