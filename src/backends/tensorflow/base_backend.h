@@ -110,7 +110,8 @@ class BaseBackend : public InferenceBackend {
       const int gpu_device, const bool has_graph_level, const int graph_level,
       const std::string& model_name, const std::string& model_path,
       TRTISTFModelHandle* trtistf_model, IONameMap* input_name_map,
-      IONameMap* output_name_map, const TRTISTF_TFTRTConfig* tftrt_config) = 0;
+      IONameMap* output_name_map, const TRTISTF_TFTRTConfig* tftrt_config,
+      const bool auto_mixed_precision) = 0;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BaseBackend);

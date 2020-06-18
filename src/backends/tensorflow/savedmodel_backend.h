@@ -43,8 +43,8 @@ class SavedModelBackend : public BaseBackend {
       const bool has_graph_level, const int graph_level,
       const std::string& model_name, const std::string& model_path,
       TRTISTFModelHandle* trtistf_model, IONameMap* input_name_map,
-      IONameMap* output_name_map,
-      const TRTISTF_TFTRTConfig* tftrt_config) override;
+      IONameMap* output_name_map, const TRTISTF_TFTRTConfig* tftrt_config,
+      const bool auto_mixed_precision) override;
 
  private:
   Status ValidateBooleanSequenceControl(
