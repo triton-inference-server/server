@@ -1467,8 +1467,22 @@ FixObjectArray(
 }  // namespace
 
 Status
-ModelConfigToJson(const ModelConfig& config, std::string* json_str)
+ModelConfigToJson(
+    const ModelConfig& config, const uint32_t config_version,
+    std::string* json_str)
 {
+  // Currently only support 'config_version' 1, which is the json
+  // representation of the ModelConfig protobuf with the int64 fields
+  // fixes to be actual numbers instead of the string madness done by
+  // protobuf.
+  if (config_version != 1) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        std::string("model configuration version ") +
+            std::to_string(config_version) +
+            " not supported, supported versions are: 1");
+  }
+
   std::string config_json_str;
   ::google::protobuf::util::JsonPrintOptions options;
   options.preserve_proto_field_names = true;

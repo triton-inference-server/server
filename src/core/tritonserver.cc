@@ -1708,7 +1708,8 @@ TRITONSERVER_ServerModelStatistics(
 TRITONSERVER_Error*
 TRITONSERVER_ServerModelConfig(
     TRITONSERVER_Server* server, const char* model_name,
-    const int64_t model_version, TRITONSERVER_Message** model_config)
+    const int64_t model_version, const uint32_t config_version,
+    TRITONSERVER_Message** model_config)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1718,7 +1719,7 @@ TRITONSERVER_ServerModelConfig(
 
   std::string model_config_json;
   RETURN_IF_STATUS_ERROR(
-      ModelConfigToJson(backend->Config(), &model_config_json));
+      ModelConfigToJson(backend->Config(), config_version, &model_config_json));
 
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new ni::TritonServerMessage(std::move(model_config_json)));

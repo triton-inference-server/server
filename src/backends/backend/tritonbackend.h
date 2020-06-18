@@ -79,8 +79,8 @@ struct TRITONBACKEND_Model;
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_InputProperties(
     TRITONBACKEND_Input* input, const char** name,
-    TRITONSERVER_DataType* datatype, int64_t** shape, uint32_t* dims_count,
-    uint64_t* byte_size, uint32_t* buffer_count);
+    TRITONSERVER_DataType* datatype, const int64_t** shape,
+    uint32_t* dims_count, uint64_t* byte_size, uint32_t* buffer_count);
 
 /// Get a buffer holding (part of) the tensor data for an input. For a
 /// given input the number of buffers composing the input are found
@@ -162,14 +162,6 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestId(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestCorrelationId(
     TRITONBACKEND_Request* request, uint64_t* id);
-
-/// Get the batch size of the request.
-///
-/// \param request The inference request.
-/// \param batch_size Returns the batch size.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestBatchSize(
-    TRITONBACKEND_Request* request, uint32_t* batch_size);
 
 /// Get the number of input tensors specified in the request.
 ///
@@ -414,10 +406,15 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelRepositoryPath(
 /// model loads.
 ///
 /// \param model The model.
+/// \param config_version The model configuration will be returned in
+/// a format matching this version. If the configuration cannot be
+/// represented in the requested version's format then an error will
+/// be returned. Currently only version 1 is supported.
 /// \param model_config Returns the model configuration as a message.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelConfig(
-    TRITONBACKEND_Model* model, TRITONSERVER_Message** model_config);
+    TRITONBACKEND_Model* model, const uint32_t config_version,
+    TRITONSERVER_Message** model_config);
 
 /// Get the backend used by the model.
 ///

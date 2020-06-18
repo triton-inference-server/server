@@ -198,12 +198,14 @@ TRITONBACKEND_ModelRepositoryPath(TRITONBACKEND_Model* model, const char** path)
 
 TRITONSERVER_Error*
 TRITONBACKEND_ModelConfig(
-    TRITONBACKEND_Model* model, TRITONSERVER_Message** model_config)
+    TRITONBACKEND_Model* model, const uint32_t config_version,
+    TRITONSERVER_Message** model_config)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
 
   std::string model_config_json;
-  Status status = ModelConfigToJson(tm->Config(), &model_config_json);
+  Status status =
+      ModelConfigToJson(tm->Config(), config_version, &model_config_json);
   if (!status.IsOk()) {
     return TRITONSERVER_ErrorNew(
         StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
@@ -240,29 +242,6 @@ TRITONBACKEND_ModelSetState(TRITONBACKEND_Model* model, void* state)
   return nullptr;  // success
 }
 
-//
-// TRITONBACKEND_ResponseFactory
-//
-TRITONSERVER_Error*
-TRITONBACKEND_ResponseFactoryNew(
-    TRITONBACKEND_ResponseFactory** factory, TRITONBACKEND_Request* request)
-{
-  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
-  InferenceResponseFactory* response_factory =
-      new InferenceResponseFactory(tr->ResponseFactory());
-  *factory = reinterpret_cast<TRITONBACKEND_ResponseFactory*>(response_factory);
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-TRITONBACKEND_ResponseFactoryDelete(TRITONBACKEND_ResponseFactory* factory)
-{
-  InferenceResponseFactory* tf =
-      reinterpret_cast<InferenceResponseFactory*>(factory);
-  delete tf;
-  return nullptr;  // success
-}
-
 ///
 /// TRITONBACKEND_Request
 ///
@@ -279,15 +258,6 @@ TRITONBACKEND_RequestCorrelationId(TRITONBACKEND_Request* request, uint64_t* id)
 {
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   *id = tr->CorrelationId();
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-TRITONBACKEND_RequestBatchSize(
-    TRITONBACKEND_Request* request, uint32_t* batch_size)
-{
-  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
-  *batch_size = tr->BatchSize();
   return nullptr;  // success
 }
 
@@ -381,6 +351,29 @@ TRITONBACKEND_RequestRelease(TRITONBACKEND_Request* request)
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   std::unique_ptr<InferenceRequest> ur(tr);
   InferenceRequest::Release(std::move(ur));
+  return nullptr;  // success
+}
+
+//
+// TRITONBACKEND_ResponseFactory
+//
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseFactoryNew(
+    TRITONBACKEND_ResponseFactory** factory, TRITONBACKEND_Request* request)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  InferenceResponseFactory* response_factory =
+      new InferenceResponseFactory(tr->ResponseFactory());
+  *factory = reinterpret_cast<TRITONBACKEND_ResponseFactory*>(response_factory);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseFactoryDelete(TRITONBACKEND_ResponseFactory* factory)
+{
+  InferenceResponseFactory* tf =
+      reinterpret_cast<InferenceResponseFactory*>(factory);
+  delete tf;
   return nullptr;  // success
 }
 
@@ -494,8 +487,8 @@ TRITONBACKEND_ResponseSendError(
 TRITONSERVER_Error*
 TRITONBACKEND_InputProperties(
     TRITONBACKEND_Input* input, const char** name,
-    TRITONSERVER_DataType* datatype, int64_t** shape, uint32_t* dims_count,
-    uint64_t* byte_size, uint32_t* buffer_count)
+    TRITONSERVER_DataType* datatype, const int64_t** shape,
+    uint32_t* dims_count, uint64_t* byte_size, uint32_t* buffer_count)
 {
   InferenceRequest::Input* ti =
       reinterpret_cast<InferenceRequest::Input*>(input);
@@ -506,16 +499,35 @@ TRITONBACKEND_InputProperties(
     *datatype = DataTypeToTriton(ti->DType());
   }
   if (shape != nullptr) {
-    *shape = ti->MutableShape()->data();
+    *shape = ti->ShapeWithBatchDim().data();
   }
   if (dims_count != nullptr) {
-    *dims_count = ti->Shape().size();
+    *dims_count = ti->ShapeWithBatchDim().size();
   }
   if (byte_size != nullptr) {
-    *byte_size = GetByteSize(ti->DType(), ti->Shape());
+    *byte_size = GetByteSize(ti->DType(), ti->ShapeWithBatchDim());
   }
   if (buffer_count != nullptr) {
     *buffer_count = ti->DataBufferCount();
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_InputBuffer(
+    TRITONBACKEND_Input* input, const uint32_t index, const void** buffer,
+    uint64_t* buffer_byte_size, TRITONSERVER_MemoryType* memory_type,
+    int64_t* memory_type_id)
+{
+  InferenceRequest::Input* ti =
+      reinterpret_cast<InferenceRequest::Input*>(input);
+  Status status = ti->DataBuffer(
+      index, buffer, buffer_byte_size, memory_type, memory_type_id);
+  if (!status.IsOk()) {
+    *buffer = nullptr;
+    *buffer_byte_size = 0;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
   }
   return nullptr;  // success
 }

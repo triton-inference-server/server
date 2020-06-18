@@ -1500,7 +1500,8 @@ HTTPAPIServer::HandleModelConfig(
       GetModelVersionFromString(model_version_str, &requested_model_version);
   if (err == nullptr) {
     err = TRITONSERVER_ServerModelConfig(
-        server_.get(), model_name.c_str(), requested_model_version, &message);
+        server_.get(), model_name.c_str(), requested_model_version,
+        1 /* config_version */, &message);
     if (err == nullptr) {
       const char* buffer;
       size_t byte_size;
