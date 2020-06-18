@@ -28,6 +28,7 @@
 import argparse
 import numpy as np
 import sys
+import gevent.ssl
 
 import tritonhttpclient
 from tritonclientutils import InferenceServerException
@@ -94,6 +95,12 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8000',
                         help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-s',
+                        '--ssl',
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Enable encrypted link to the server using HTTPS')
     parser.add_argument('-H', dest='http_headers', metavar="HTTP_HEADER",
                         required=False, action='append',
                         help='HTTP headers to add to inference server requests. ' +
@@ -101,7 +108,14 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
+        if FLAGS.ssl:
+            triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose,
+                                                         ssl=True,
+                                                         ssl_context_factory=gevent.ssl._create_unverified_context,
+                                                         insecure=True)
+        else:
+            triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))

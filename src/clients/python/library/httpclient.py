@@ -143,6 +143,21 @@ class InferenceServerClient:
         for handling asynchronous inference requests. Default value
         is None, which means there will be no restriction on the
         number of greenlets created.
+    ssl : bool
+        If True, channels the requests to encrypted https scheme.
+        Default value is False.
+    ssl_options : dict
+        Any options supported by `ssl.wrap_socket` specified as
+        dictionary. The argument is ignored if 'ssl' is specified
+        False. 
+    ssl_context_factory : SSLContext callable
+        It must be a callbable that returns a SSLContext. The default
+        value is None which use `ssl.create_default_context`. The
+        argument is ignored if 'ssl' is specified False.
+    insecure : bool
+        If True, then does not match the host name with the certificate.
+        Default value is False. The argument is ignored if 'ssl' is
+        specified False.
 
     Raises
         ------
@@ -157,13 +172,21 @@ class InferenceServerClient:
                  connection_timeout=60.0,
                  network_timeout=60.0,
                  verbose=False,
-                 max_greenlets=None):
-        self._parsed_url = URL("http://" + url)
+                 max_greenlets=None,
+                 ssl=False,
+                 ssl_options=None,
+                 ssl_context_factory=None,
+                 insecure=False):
+        scheme = "https://" if ssl else "http://"
+        self._parsed_url = URL(scheme + url)
         self._client_stub = HTTPClient.from_url(
             self._parsed_url,
             concurrency=connection_count,
             connection_timeout=connection_timeout,
-            network_timeout=network_timeout)
+            network_timeout=network_timeout,
+            ssl_options=ssl_options,
+            ssl_context_factory=ssl_context_factory,
+            insecure=insecure)
         self._pool = gevent.pool.Pool(max_greenlets)
         self._verbose = verbose
 
