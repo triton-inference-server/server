@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Test with 20.03 because 20.06 is not yet available, 20.05 is not usable
+# Test with 20.05 because kaldi image for 20.06 is not yet available
 TRITON_VERSION="20.05"
 
 # Build client
@@ -37,9 +37,6 @@ git clone --single-branch --depth=1 -b r${TRITON_VERSION} \
 (cd triton-inference-server/src/clients/c++ && \
     echo "add_subdirectory(kaldi-asr-client)" >> "CMakeLists.txt")
 
-# branch name is 20.03-devel but used for 20.05 as well
-git clone --single-branch --depth=1 -b 20.03-devel \
-        ssh://git@gitlab-master.nvidia.com:12051/dl/JoC/asr_kaldi.git
 cp -r asr_kaldi/kaldi-asr-client triton-inference-server/src/clients/c++
 cp -r asr_kaldi/model-repo/kaldi_online/config.pbtxt model-repo/kaldi_online/
 
