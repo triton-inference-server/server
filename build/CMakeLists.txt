@@ -134,6 +134,8 @@ ExternalProject_Add(grpc-repo
 #
 # Build protobuf project from grpc-repo
 #
+# Use -DCMAKE_BUILD_TYPE:STRING=RELEASE to workaround the protobuf build issue
+# described in https://stackoverflow.com/a/60218066/2091555
 ExternalProject_Add(protobuf
   PREFIX protobuf
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/protobuf/cmake"
