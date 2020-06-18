@@ -25,9 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
-DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
-INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
+STATIC_BATCH=${STATIC_BATCH:=1}
+INSTANCE_CNT=${INSTANCE_CNT:=1}
 REQUIRED_CONCURRENCY=${REQUIRED_CONCURRENCY:=0}
 
 PERF_CLIENT=../clients/perf_client
@@ -43,95 +42,74 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-for STATIC_BATCH in $STATIC_BATCH_SIZES; do
-    for DYNAMIC_BATCH in $DYNAMIC_BATCH_SIZES; do
-        for INSTANCE_CNT in $INSTANCE_COUNTS; do
-            if (( ($DYNAMIC_BATCH > 1) && ($STATIC_BATCH >= $DYNAMIC_BATCH) )); then
-                continue
-            fi
+MAX_BATCH=${STATIC_BATCH}
+CONCURRENCY=$(( $INSTANCE_CNT * 2 ))
+if (( $CONCURRENCY < $REQUIRED_CONCURRENCY )); then
+    CONCURRENCY=$REQUIRED_CONCURRENCY
+fi
 
-            MAX_BATCH=${STATIC_BATCH} && \
-                (( $DYNAMIC_BATCH > $STATIC_BATCH )) && \
-                MAX_BATCH=${DYNAMIC_BATCH}
-            CONCURRENCY=$(( $INSTANCE_CNT * $DYNAMIC_BATCH * 2 ))
-            if (( $CONCURRENCY < $REQUIRED_CONCURRENCY )); then
-                CONCURRENCY=$REQUIRED_CONCURRENCY
-            fi
+NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}_${PERF_CLIENT_PROTOCOL}
 
-            if (( $DYNAMIC_BATCH > 1 )); then
-                NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_dbatch${DYNAMIC_BATCH}_instance${INSTANCE_CNT}
-            else
-                NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}
-            fi
+rm -fr models && mkdir -p models && \
+    cp -r $MODEL_PATH models/. && \
+    (cd models/$MODEL_NAME && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
+            echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
-            rm -fr models && mkdir -p models && \
-                cp -r $MODEL_PATH models/. && \
-                (cd models/$MODEL_NAME && \
-                        sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
-                        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
-            if (( $DYNAMIC_BATCH > 1 )); then
-                (cd models/$MODEL_NAME && \
-                        echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
-            fi
+SERVER_LOG="${NAME}.serverlog"
+run_server
+if (( $SERVER_PID == 0 )); then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
 
-            SERVER_LOG="${NAME}.serverlog"
-            run_server
-            if (( $SERVER_PID == 0 )); then
-                echo -e "\n***\n*** Failed to start $SERVER\n***"
-                cat $SERVER_LOG
-                exit 1
-            fi
 
-            set +e
+set +e
 
-            # Run the model once to warm up. Some frameworks do
-            # optimization on the first requests.
-            $PERF_CLIENT -v -i grpc -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
+# Run the model once to warm up. Some frameworks do optimization on the first requests.
+$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
 
-            $PERF_CLIENT -v -i grpc -m $MODEL_NAME -p5000 \
-                         -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
-                         -f ${NAME}.csv >> ${NAME}.log 2>&1
-            if (( $? != 0 )); then
-                RET=1
-            fi
-            curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
-            if (( $? != 0 )); then
-                RET=1
-            fi
+$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
+                -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                -f ${NAME}.csv >> ${NAME}.log 2>&1
+if (( $? != 0 )); then
+    RET=1
+fi
+curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
+if (( $? != 0 )); then
+    RET=1
+fi
 
-            set -e
+set -e
 
-            echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
-            echo -e "\"s_benchmark_name\":\"resnet50\"," >> ${NAME}.tjson
-            echo -e "\"s_protocol\":\"grpc\"," >> ${NAME}.tjson
-            echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >> ${NAME}.tjson
-            echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
-            echo -e "\"l_concurrency\":${CONCURRENCY}," >> ${NAME}.tjson
-            echo -e "\"l_dynamic_batch_size\":${DYNAMIC_BATCH}," >> ${NAME}.tjson
-            echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
-            echo -e "\"l_instance_count\":${INSTANCE_CNT}}]" >> ${NAME}.tjson
+echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
+echo -e "\"s_benchmark_name\":\"resnet50\"," >> ${NAME}.tjson
+echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${NAME}.tjson
+echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >> ${NAME}.tjson
+echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
+echo -e "\"l_concurrency\":${CONCURRENCY}," >> ${NAME}.tjson
+echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
+echo -e "\"l_instance_count\":${INSTANCE_CNT}}]" >> ${NAME}.tjson
 
-            kill $SERVER_PID
-            wait $SERVER_PID
+kill $SERVER_PID
+wait $SERVER_PID
 
-            if [ -f $REPORTER ]; then
-                set +e
+if [ -f $REPORTER ]; then
+    set +e
 
-                URL_FLAG=
-                if [ ! -z ${BENCHMARK_REPORTER_URL} ]; then
-                    URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
-                fi
+    URL_FLAG=
+    if [ ! -z ${BENCHMARK_REPORTER_URL} ]; then
+        URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
+    fi
 
-                $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
-                if (( $? != 0 )); then
-                    RET=1
-                fi
+    $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
+    if (( $? != 0 )); then
+        RET=1
+    fi
 
-                set -e
-            fi
-        done
-    done
-done
+    set -e
+fi
 
 if (( $RET == 0 )); then
     echo -e "\n***\n*** Test Passed\n***"
