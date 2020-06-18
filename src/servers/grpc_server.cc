@@ -190,345 +190,15 @@ operator<<(std::ostream& out, const Steps& step)
 }
 
 //
-// AllocPayload
+// The server has separate handling mechanisms for inference RPCs
+// and non-inference RPCs.
 //
-// Simple structure that carries the userp payload needed for
-// allocation.
-//
-struct AllocPayload {
-  struct ShmInfo {
-    void* base_;
-    size_t byte_size_;
-    TRITONSERVER_MemoryType memory_type_;
-    int64_t memory_type_id_;
-  };
 
-  using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
-  using ClassificationMap = std::unordered_map<std::string, uint32_t>;
-
-  explicit AllocPayload() : response_(nullptr) {}
-  ~AllocPayload()
-  {
-    // Don't delete 'response_'.. it is owned by the HandlerState
-  }
-
-  ModelInferResponse* response_;
-  TensorShmMap shm_map_;
-  ClassificationMap classification_map_;
-
-  // Used to extend the lifetime of the serialized data in case
-  // non-raw contents were provided in the request. Serialized data's
-  // actual lifetime is that of the request whereas AllocPayload's
-  // lifetime is that of a response... but it is convenient to keep it
-  // here.
-  std::list<std::string> serialized_data_;
-};
-
-//
-// HandlerState
-//
-template <
-    typename ServerResponderType, typename RequestType, typename ResponseType>
-class HandlerState {
- public:
-  using HandlerStateType =
-      HandlerState<ServerResponderType, RequestType, ResponseType>;
-
-  // State that is shared across all state objects that make up a GRPC
-  // transaction (e.g. a stream).
-  struct Context {
-    explicit Context(const uint64_t unique_id = 0)
-        : unique_id_(unique_id), step_(Steps::START), finish_ok_(true)
-    {
-      ctx_.reset(new grpc::ServerContext());
-      responder_.reset(new ServerResponderType(ctx_.get()));
-    }
-
-    // Enqueue 'state' so that its response is delivered in the
-    // correct order.
-    void EnqueueForResponse(HandlerStateType* state)
-    {
-      std::lock_guard<std::mutex> lock(mu_);
-      states_.push(state);
-    }
-
-    // Check the state at the front of the queue and write it if
-    // ready. The state at the front of the queue is ready if it is in
-    // the WRITEREADY state and it equals 'required_state' (or
-    // 'required_state' is nullptr). Return nullptr if front of queue
-    // was not ready (and so not written), or return the state if it
-    // was ready and written.
-    HandlerStateType* WriteResponseIfReady(HandlerStateType* required_state)
-    {
-      std::lock_guard<std::mutex> lock(mu_);
-      if (states_.empty()) {
-        return nullptr;
-      }
-
-      HandlerStateType* state = states_.front();
-      if (state->step_ != Steps::WRITEREADY) {
-        return nullptr;
-      }
-
-      if ((required_state != nullptr) && (state != required_state)) {
-        return nullptr;
-      }
-
-#ifdef TRITON_ENABLE_TRACING
-      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-        state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
-      }
-#endif  // TRITON_ENABLE_TRACING
-
-      state->step_ = Steps::WRITTEN;
-      responder_->Write(state->response_, state);
-
-      return state;
-    }
-
-    // If 'state' is at the front of the queue and written, pop it and
-    // return true. Other return false.
-    bool PopCompletedResponse(HandlerStateType* state)
-    {
-      std::lock_guard<std::mutex> lock(mu_);
-      if (states_.empty()) {
-        return false;
-      }
-
-      HandlerStateType* front = states_.front();
-      if ((front == state) && (state->step_ == Steps::WRITTEN)) {
-        states_.pop();
-        return true;
-      }
-
-      return false;
-    }
-
-    // Return true if this context has completed all reads and writes.
-    bool IsRequestsCompleted()
-    {
-      std::lock_guard<std::mutex> lock(mu_);
-      return ((step_ == Steps::WRITEREADY) && states_.empty());
-    }
-
-    // Unique ID for the context. Used only for debugging so will
-    // always be 0 in non-debug builds.
-    const uint64_t unique_id_;
-
-    // Context for the rpc, allowing to tweak aspects of it such as
-    // the use of compression, authentication, as well as to send
-    // metadata back to the client.
-    std::unique_ptr<grpc::ServerContext> ctx_;
-    std::unique_ptr<ServerResponderType> responder_;
-
-    // The states associated with this context that are currently
-    // active. Used by stream handlers to maintain request / response
-    // orders. A state enters this queue when it has successfully read
-    // a request and exits the queue when it is written.
-    std::mutex mu_;
-    std::queue<HandlerStateType*> states_;
-
-    // The step of the entire context.
-    Steps step_;
-
-    // True if this context should finish with OK status, false if
-    // should finish with CANCELLED status.
-    bool finish_ok_;
-  };
-
-  explicit HandlerState(
-      const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
-  {
-    Reset(context, start_step);
-  }
-
-  void Reset(
-      const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
-  {
-    unique_id_ = NEXT_UNIQUE_ID;
-    context_ = context;
-    step_ = start_step;
-    request_.Clear();
-    response_.Clear();
-  }
-
-  void Release() { context_ = nullptr; }
-
-  // Unique ID for the state. Used only for debugging so will
-  // always be 0 in non-debug builds.
-  uint64_t unique_id_;
-
-  std::shared_ptr<Context> context_;
-  Steps step_;
-
-#ifdef TRITON_ENABLE_TRACING
-  TraceManager* trace_manager_;
-  TRITONSERVER_InferenceTrace* trace_;
-  uint64_t trace_id_;
-#endif  // TRITON_ENABLE_TRACING
-
-  RequestType request_;
-  ResponseType response_;
-
-  // For inference requests the allocator payload, unused for other
-  // requests.
-  AllocPayload alloc_payload_;
-};
-
-//
-// Handler
-//
-template <
-    typename ServiceType, typename ServerResponderType, typename RequestType,
-    typename ResponseType>
-class Handler : public GRPCServer::HandlerBase {
- public:
-  Handler(
-      const std::string& name,
-      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      ServiceType* service, grpc::ServerCompletionQueue* cq,
-      size_t max_state_bucket_count);
-  virtual ~Handler();
-
-  // Descriptive name of of the handler.
-  const std::string& Name() const { return name_; }
-
-  // Start handling requests.
-  void Start();
-
-  // Stop handling requests.
-  void Stop();
-
- protected:
-  using State = HandlerState<ServerResponderType, RequestType, ResponseType>;
-  using StateContext = typename State::Context;
-
-  State* StateNew(
-      const std::shared_ptr<StateContext>& context,
-      Steps start_step = Steps::START)
-  {
-    State* state = nullptr;
-
-    if (max_state_bucket_count_ > 0) {
-      std::lock_guard<std::mutex> lock(alloc_mu_);
-
-      if (!state_bucket_.empty()) {
-        state = state_bucket_.back();
-        state->Reset(context, start_step);
-        state_bucket_.pop_back();
-      }
-    }
-
-    if (state == nullptr) {
-      state = new State(context, start_step);
-    }
-
-    return state;
-  }
-
-  void StateRelease(State* state)
-  {
-    if (max_state_bucket_count_ > 0) {
-      std::lock_guard<std::mutex> lock(alloc_mu_);
-
-      if (state_bucket_.size() < max_state_bucket_count_) {
-        state->Release();
-        state_bucket_.push_back(state);
-        return;
-      }
-    }
-
-    delete state;
-  }
-
-  virtual void StartNewRequest() = 0;
-  virtual bool Process(State* state, bool rpc_ok) = 0;
-
-  const std::string name_;
-  std::shared_ptr<TRITONSERVER_Server> tritonserver_;
-
-  ServiceType* service_;
-  grpc::ServerCompletionQueue* cq_;
-  std::unique_ptr<std::thread> thread_;
-
-  // Mutex to serialize State allocation
-  std::mutex alloc_mu_;
-
-  // Keep some number of state objects for reuse to avoid the overhead
-  // of creating a state for every new request.
-  const size_t max_state_bucket_count_;
-  std::vector<State*> state_bucket_;
-};
-
-template <
-    typename ServiceType, typename ServerResponderType, typename RequestType,
-    typename ResponseType>
-Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Handler(
-    const std::string& name,
-    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-    ServiceType* service, grpc::ServerCompletionQueue* cq,
-    size_t max_state_bucket_count)
-    : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
-      max_state_bucket_count_(max_state_bucket_count)
-{
-}
-
-template <
-    typename ServiceType, typename ServerResponderType, typename RequestType,
-    typename ResponseType>
-Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::~Handler()
-{
-  for (State* state : state_bucket_) {
-    delete state;
-  }
-  state_bucket_.clear();
-
-  LOG_VERBOSE(1) << "Destructed " << Name();
-}
-
-template <
-    typename ServiceType, typename ServerResponderType, typename RequestType,
-    typename ResponseType>
-void
-Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Start()
-{
-  // Use a barrier to make sure we don't return until thread has
-  // started.
-  auto barrier = std::make_shared<Barrier>(2);
-
-  thread_.reset(new std::thread([this, barrier] {
-    StartNewRequest();
-    barrier->Wait();
-
-    void* tag;
-    bool ok;
-
-    while (cq_->Next(&tag, &ok)) {
-      State* state = static_cast<State*>(tag);
-      if (!Process(state, ok)) {
-        LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
-        StateRelease(state);
-      }
-    }
-  }));
-
-  barrier->Wait();
-  LOG_VERBOSE(1) << "Thread started for " << Name();
-}
-
-template <
-    typename ServiceType, typename ServerResponderType, typename RequestType,
-    typename ResponseType>
-void
-Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Stop()
-{
-  if (thread_->joinable()) {
-    thread_->join();
-  }
-
-  LOG_VERBOSE(1) << "Thread exited for " << Name();
-}
+//=========================================================================
+//  The following section contains the handling mechanism for non-inference
+//  RPCs. A single thread is created to handle all these requests as they
+//  are deemed to be not performance critical.
+//=========================================================================
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
 class CommonCallData : public GRPCServer::ICallData {
@@ -608,6 +278,8 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Process(bool rpc_ok)
 
 //
 // CommonHandler
+//
+// A common handler for all non-inference requests.
 //
 class CommonHandler : public GRPCServer::HandlerBase {
  public:
@@ -1788,6 +1460,359 @@ CommonHandler::SetUpAllRequests()
       OnExecuteRepositoryModelUnload);
 }
 
+//=========================================================================
+//  The following section contains the handling mechanism for inference
+//  RPCs such as ModelInfer and ModelStreamInfer. This implementation
+//  is tuned more towards performance and reducing the latency.
+//=========================================================================
+
+//
+// AllocPayload
+//
+// Simple structure that carries the userp payload needed for
+// allocation.
+//
+struct AllocPayload {
+  struct ShmInfo {
+    void* base_;
+    size_t byte_size_;
+    TRITONSERVER_MemoryType memory_type_;
+    int64_t memory_type_id_;
+  };
+
+  using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
+  using ClassificationMap = std::unordered_map<std::string, uint32_t>;
+
+  explicit AllocPayload() : response_(nullptr) {}
+  ~AllocPayload()
+  {
+    // Don't delete 'response_'.. it is owned by the InferHandlerState
+  }
+
+  ModelInferResponse* response_;
+  TensorShmMap shm_map_;
+  ClassificationMap classification_map_;
+
+  // Used to extend the lifetime of the serialized data in case
+  // non-raw contents were provided in the request. Serialized data's
+  // actual lifetime is that of the request whereas AllocPayload's
+  // lifetime is that of a response... but it is convenient to keep it
+  // here.
+  std::list<std::string> serialized_data_;
+};
+
+//
+// InferHandlerState
+//
+template <
+    typename ServerResponderType, typename RequestType, typename ResponseType>
+class InferHandlerState {
+ public:
+  using InferHandlerStateType =
+      InferHandlerState<ServerResponderType, RequestType, ResponseType>;
+
+  // State that is shared across all state objects that make up a GRPC
+  // transaction (e.g. a stream).
+  struct Context {
+    explicit Context(const uint64_t unique_id = 0)
+        : unique_id_(unique_id), step_(Steps::START), finish_ok_(true)
+    {
+      ctx_.reset(new grpc::ServerContext());
+      responder_.reset(new ServerResponderType(ctx_.get()));
+    }
+
+    // Enqueue 'state' so that its response is delivered in the
+    // correct order.
+    void EnqueueForResponse(InferHandlerStateType* state)
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      states_.push(state);
+    }
+
+    // Check the state at the front of the queue and write it if
+    // ready. The state at the front of the queue is ready if it is in
+    // the WRITEREADY state and it equals 'required_state' (or
+    // 'required_state' is nullptr). Return nullptr if front of queue
+    // was not ready (and so not written), or return the state if it
+    // was ready and written.
+    InferHandlerStateType* WriteResponseIfReady(
+        InferHandlerStateType* required_state)
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      if (states_.empty()) {
+        return nullptr;
+      }
+
+      InferHandlerStateType* state = states_.front();
+      if (state->step_ != Steps::WRITEREADY) {
+        return nullptr;
+      }
+
+      if ((required_state != nullptr) && (state != required_state)) {
+        return nullptr;
+      }
+
+#ifdef TRITON_ENABLE_TRACING
+      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+        state->trace_manager_->CaptureTimestamp(
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+      }
+#endif  // TRITON_ENABLE_TRACING
+
+      state->step_ = Steps::WRITTEN;
+      responder_->Write(state->response_, state);
+
+      return state;
+    }
+
+    // If 'state' is at the front of the queue and written, pop it and
+    // return true. Other return false.
+    bool PopCompletedResponse(InferHandlerStateType* state)
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      if (states_.empty()) {
+        return false;
+      }
+
+      InferHandlerStateType* front = states_.front();
+      if ((front == state) && (state->step_ == Steps::WRITTEN)) {
+        states_.pop();
+        return true;
+      }
+
+      return false;
+    }
+
+    // Return true if this context has completed all reads and writes.
+    bool IsRequestsCompleted()
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      return ((step_ == Steps::WRITEREADY) && states_.empty());
+    }
+
+    // Unique ID for the context. Used only for debugging so will
+    // always be 0 in non-debug builds.
+    const uint64_t unique_id_;
+
+    // Context for the rpc, allowing to tweak aspects of it such as
+    // the use of compression, authentication, as well as to send
+    // metadata back to the client.
+    std::unique_ptr<grpc::ServerContext> ctx_;
+    std::unique_ptr<ServerResponderType> responder_;
+
+    // The states associated with this context that are currently
+    // active. Used by stream handlers to maintain request / response
+    // orders. A state enters this queue when it has successfully read
+    // a request and exits the queue when it is written.
+    std::mutex mu_;
+    std::queue<InferHandlerStateType*> states_;
+
+    // The step of the entire context.
+    Steps step_;
+
+    // True if this context should finish with OK status, false if
+    // should finish with CANCELLED status.
+    bool finish_ok_;
+  };
+
+  explicit InferHandlerState(
+      const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
+  {
+    Reset(context, start_step);
+  }
+
+  void Reset(
+      const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
+  {
+    unique_id_ = NEXT_UNIQUE_ID;
+    context_ = context;
+    step_ = start_step;
+    request_.Clear();
+    response_.Clear();
+  }
+
+  void Release() { context_ = nullptr; }
+
+  // Unique ID for the state. Used only for debugging so will
+  // always be 0 in non-debug builds.
+  uint64_t unique_id_;
+
+  std::shared_ptr<Context> context_;
+  Steps step_;
+
+#ifdef TRITON_ENABLE_TRACING
+  TraceManager* trace_manager_;
+  TRITONSERVER_InferenceTrace* trace_;
+  uint64_t trace_id_;
+#endif  // TRITON_ENABLE_TRACING
+
+  RequestType request_;
+  ResponseType response_;
+
+  // For inference requests the allocator payload, unused for other
+  // requests.
+  AllocPayload alloc_payload_;
+};
+
+//
+// InferHandler
+//
+template <
+    typename ServiceType, typename ServerResponderType, typename RequestType,
+    typename ResponseType>
+class InferHandler : public GRPCServer::HandlerBase {
+ public:
+  InferHandler(
+      const std::string& name,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
+      ServiceType* service, grpc::ServerCompletionQueue* cq,
+      size_t max_state_bucket_count);
+  virtual ~InferHandler();
+
+  // Descriptive name of of the handler.
+  const std::string& Name() const { return name_; }
+
+  // Start handling requests.
+  void Start();
+
+  // Stop handling requests.
+  void Stop();
+
+ protected:
+  using State =
+      InferHandlerState<ServerResponderType, RequestType, ResponseType>;
+  using StateContext = typename State::Context;
+
+  State* StateNew(
+      const std::shared_ptr<StateContext>& context,
+      Steps start_step = Steps::START)
+  {
+    State* state = nullptr;
+
+    if (max_state_bucket_count_ > 0) {
+      std::lock_guard<std::mutex> lock(alloc_mu_);
+
+      if (!state_bucket_.empty()) {
+        state = state_bucket_.back();
+        state->Reset(context, start_step);
+        state_bucket_.pop_back();
+      }
+    }
+
+    if (state == nullptr) {
+      state = new State(context, start_step);
+    }
+
+    return state;
+  }
+
+  void StateRelease(State* state)
+  {
+    if (max_state_bucket_count_ > 0) {
+      std::lock_guard<std::mutex> lock(alloc_mu_);
+
+      if (state_bucket_.size() < max_state_bucket_count_) {
+        state->Release();
+        state_bucket_.push_back(state);
+        return;
+      }
+    }
+
+    delete state;
+  }
+
+  virtual void StartNewRequest() = 0;
+  virtual bool Process(State* state, bool rpc_ok) = 0;
+
+  const std::string name_;
+  std::shared_ptr<TRITONSERVER_Server> tritonserver_;
+
+  ServiceType* service_;
+  grpc::ServerCompletionQueue* cq_;
+  std::unique_ptr<std::thread> thread_;
+
+  // Mutex to serialize State allocation
+  std::mutex alloc_mu_;
+
+  // Keep some number of state objects for reuse to avoid the overhead
+  // of creating a state for every new request.
+  const size_t max_state_bucket_count_;
+  std::vector<State*> state_bucket_;
+};
+
+template <
+    typename ServiceType, typename ServerResponderType, typename RequestType,
+    typename ResponseType>
+InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
+    InferHandler(
+        const std::string& name,
+        const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
+        ServiceType* service, grpc::ServerCompletionQueue* cq,
+        size_t max_state_bucket_count)
+    : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
+      max_state_bucket_count_(max_state_bucket_count)
+{
+}
+
+template <
+    typename ServiceType, typename ServerResponderType, typename RequestType,
+    typename ResponseType>
+InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
+    ~InferHandler()
+{
+  for (State* state : state_bucket_) {
+    delete state;
+  }
+  state_bucket_.clear();
+
+  LOG_VERBOSE(1) << "Destructed " << Name();
+}
+
+template <
+    typename ServiceType, typename ServerResponderType, typename RequestType,
+    typename ResponseType>
+void
+InferHandler<
+    ServiceType, ServerResponderType, RequestType, ResponseType>::Start()
+{
+  // Use a barrier to make sure we don't return until thread has
+  // started.
+  auto barrier = std::make_shared<Barrier>(2);
+
+  thread_.reset(new std::thread([this, barrier] {
+    StartNewRequest();
+    barrier->Wait();
+
+    void* tag;
+    bool ok;
+
+    while (cq_->Next(&tag, &ok)) {
+      State* state = static_cast<State*>(tag);
+      if (!Process(state, ok)) {
+        LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
+        StateRelease(state);
+      }
+    }
+  }));
+
+  barrier->Wait();
+  LOG_VERBOSE(1) << "Thread started for " << Name();
+}
+
+template <
+    typename ServiceType, typename ServerResponderType, typename RequestType,
+    typename ResponseType>
+void
+InferHandler<
+    ServiceType, ServerResponderType, RequestType, ResponseType>::Stop()
+{
+  if (thread_->joinable()) {
+    thread_->join();
+  }
+
+  LOG_VERBOSE(1) << "Thread exited for " << Name();
+}
+
 //
 // Infer utilities
 //
@@ -2558,7 +2583,7 @@ InferResponseCompleteCommon(
 // ModelInferHandler
 //
 class ModelInferHandler
-    : public Handler<
+    : public InferHandler<
           GRPCInferenceService::AsyncService,
           grpc::ServerAsyncResponseWriter<ModelInferResponse>,
           ModelInferRequest, ModelInferResponse> {
@@ -2570,7 +2595,7 @@ class ModelInferHandler
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, tritonserver, service, cq, max_state_bucket_count),
+      : InferHandler(name, tritonserver, service, cq, max_state_bucket_count),
         trace_manager_(trace_manager), shm_manager_(shm_manager)
   {
     // Create the allocator that will be used to allocate buffers for
@@ -2625,7 +2650,7 @@ ModelInferHandler::StartNewRequest()
 }
 
 bool
-ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
+ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 {
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
                  << state->unique_id_ << " step " << state->step_;
@@ -2794,7 +2819,7 @@ ModelInferHandler::InferResponseComplete(
 // ModelStreamInferHandler
 //
 class ModelStreamInferHandler
-    : public Handler<
+    : public InferHandler<
           GRPCInferenceService::AsyncService,
           grpc::ServerAsyncReaderWriter<
               ModelStreamInferResponse, ModelInferRequest>,
@@ -2807,7 +2832,7 @@ class ModelStreamInferHandler
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, tritonserver, service, cq, max_state_bucket_count),
+      : InferHandler(name, tritonserver, service, cq, max_state_bucket_count),
         trace_manager_(trace_manager), shm_manager_(shm_manager)
   {
     // Create the allocator that will be used to allocate buffers for
@@ -2862,7 +2887,7 @@ ModelStreamInferHandler::StartNewRequest()
 }
 
 bool
-ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
+ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 {
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
