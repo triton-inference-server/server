@@ -60,8 +60,6 @@ rm -fr ./custom_models && mkdir ./custom_models && \
     mkdir -p ./custom_models/custom_zero_1_float32/1 && \
     cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
 
-PERF_CLIENT_PROTOCOL_ARGS="-i grpc -u localhost:8001" &&
-    [ $PERF_CLIENT_PROTOCOL != "grpc" ] && PERF_CLIENT_PROTOCOL_ARGS=""
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
@@ -128,7 +126,7 @@ for BACKEND in $BACKENDS; do
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
                  ${PERF_CLIENT_EXTRA_ARGS} \
-                 ${PERF_CLIENT_PROTOCOL_ARGS} -m ${MODEL_NAME} \
+                 -i ${PERF_CLIENT_PROTOCOL} -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
                  --shape ${INPUT_NAME}:${SHAPE} \
                  -f ${RESULTDIR}/${NAME}.csv >> ${RESULTDIR}/${NAME}.log 2>&1
