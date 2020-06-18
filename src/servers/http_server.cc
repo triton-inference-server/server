@@ -971,7 +971,8 @@ class HTTPAPIServer : public HTTPServerImpl {
   // send the response.
   class InferRequestClass {
    public:
-    explicit InferRequestClass(evhtp_request_t* req);
+    explicit InferRequestClass(
+        TRITONSERVER_Server* server, evhtp_request_t* req);
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
@@ -997,6 +998,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     std::list<std::vector<char>> serialized_data_;
 
    private:
+    TRITONSERVER_Server* server_;
     evhtp_request_t* req_;
     evthr_t* thread_;
   };
@@ -2195,7 +2197,7 @@ HTTPAPIServer::HandleInfer(
   if (err == nullptr) {
     connection_paused = true;
     std::unique_ptr<InferRequestClass> infer_request(
-        new InferRequestClass(req));
+        new InferRequestClass(server_.get(), req));
 #ifdef TRITON_ENABLE_TRACING
     infer_request->trace_manager_ = trace_manager_;
     infer_request->trace_id_ = trace_id;
@@ -2297,8 +2299,9 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   delete infer_request;
 }
 
-HTTPAPIServer::InferRequestClass::InferRequestClass(evhtp_request_t* req)
-    : req_(req)
+HTTPAPIServer::InferRequestClass::InferRequestClass(
+    TRITONSERVER_Server* server, evhtp_request_t* req)
+    : server_(server), req_(req)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
@@ -2391,7 +2394,6 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
     TRITONSERVER_DataType datatype;
     const int64_t* shape;
     uint64_t dim_count;
-    uint32_t batch_size;
     const void* base;
     size_t byte_size;
     TRITONSERVER_MemoryType memory_type;
@@ -2399,8 +2401,8 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
     void* userp;
 
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
-        response, idx, &cname, &datatype, &shape, &dim_count, &batch_size,
-        &base, &byte_size, &memory_type, &memory_type_id, &userp));
+        response, idx, &cname, &datatype, &shape, &dim_count, &base, &byte_size,
+        &memory_type, &memory_type_id, &userp));
 
     TritonJson::Value output_json(response_json, TritonJson::ValueType::OBJECT);
     RETURN_IF_ERR(output_json.AddStringRef("name", cname));
@@ -2409,10 +2411,23 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
     auto info = reinterpret_cast<AllocPayload::OutputInfo*>(userp);
 
     size_t element_count = 1;
+    uint32_t batch_size = 0;
 
     // If returning output as classification then need to set the
     // datatype and shape based on classification requirements.
     if ((info != nullptr) && (info->class_cnt_ > 0)) {
+      // For classification need to determine the batch size, if any,
+      // because need to use that to break up the response for each
+      // batch entry.
+      uint32_t batch_flags;
+      RETURN_IF_ERR(TRITONSERVER_ServerModelBatch(
+          server_, model_name, model_version, &batch_flags,
+          nullptr /* voidp */));
+      if ((dim_count > 0) &&
+          ((batch_flags & TRITONSERVER_BATCH_FIRST_DIM) != 0)) {
+        batch_size = shape[0];
+      }
+
       const char* datatype_str =
           TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES);
       RETURN_IF_ERR(output_json.AddStringRef("datatype", datatype_str));

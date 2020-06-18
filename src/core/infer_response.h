@@ -109,20 +109,20 @@ class InferenceResponse {
    public:
     Output(
         const std::string& name, const DataType datatype,
-        const std::vector<int64_t>& shape, const uint32_t batch_size,
-        const ResponseAllocator* allocator, void* alloc_userp)
+        const std::vector<int64_t>& shape, const ResponseAllocator* allocator,
+        void* alloc_userp)
         : name_(name), datatype_(datatype), shape_(shape),
-          batch_size_(batch_size), allocator_(allocator),
-          alloc_userp_(alloc_userp), allocated_buffer_(nullptr)
+          allocator_(allocator), alloc_userp_(alloc_userp),
+          allocated_buffer_(nullptr)
     {
     }
     Output(
         const std::string& name, const DataType datatype,
-        std::vector<int64_t>&& shape, const uint32_t batch_size,
-        const ResponseAllocator* allocator, void* alloc_userp)
+        std::vector<int64_t>&& shape, const ResponseAllocator* allocator,
+        void* alloc_userp)
         : name_(name), datatype_(datatype), shape_(std::move(shape)),
-          batch_size_(batch_size), allocator_(allocator),
-          alloc_userp_(alloc_userp), allocated_buffer_(nullptr)
+          allocator_(allocator), alloc_userp_(alloc_userp),
+          allocated_buffer_(nullptr)
     {
     }
 
@@ -138,12 +138,7 @@ class InferenceResponse {
     const std::vector<int64_t>& Shape() const { return shape_; }
 
     // Reshape the output tensor if specified in output config.
-    void Reshape(const ModelOutput* output_config);
-
-    // The batch size of the output, as understood by Triton. A
-    // batch-size of 0 indicates that the model doesn't support
-    // batching in a way that Triton understands.
-    uint32_t BatchSize() const { return batch_size_; }
+    void Reshape(const bool has_batch_dim, const ModelOutput* output_config);
 
     // Get information about the buffer allocated for this output
     // tensor's data. If no buffer is allocated 'buffer' will return
@@ -181,7 +176,6 @@ class InferenceResponse {
     std::string name_;
     DataType datatype_;
     std::vector<int64_t> shape_;
-    uint32_t batch_size_;
 
     // The response allocator and user pointer.
     const ResponseAllocator* allocator_;
@@ -223,12 +217,10 @@ class InferenceResponse {
   // return a pointer to the newly added output.
   Status AddOutput(
       const std::string& name, const DataType datatype,
-      const std::vector<int64_t>& shape, const uint32_t batch_size,
-      Output** output = nullptr);
+      const std::vector<int64_t>& shape, Output** output = nullptr);
   Status AddOutput(
       const std::string& name, const DataType datatype,
-      std::vector<int64_t>&& shape, const uint32_t batch_size,
-      Output** output = nullptr);
+      std::vector<int64_t>&& shape, Output** output = nullptr);
 
   // Get the classification label associated with an output. Return
   // 'label' == nullptr if no label.

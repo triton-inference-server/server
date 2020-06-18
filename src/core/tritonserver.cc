@@ -1267,9 +1267,8 @@ TRITONSERVER_Error*
 TRITONSERVER_InferenceResponseOutput(
     TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
     const char** name, TRITONSERVER_DataType* datatype, const int64_t** shape,
-    uint64_t* dim_count, uint32_t* batch_size, const void** base,
-    size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
-    int64_t* memory_type_id, void** userp)
+    uint64_t* dim_count, const void** base, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id, void** userp)
 {
   ni::InferenceResponse* lresponse =
       reinterpret_cast<ni::InferenceResponse*>(inference_response);
@@ -1291,7 +1290,6 @@ TRITONSERVER_InferenceResponseOutput(
   const std::vector<int64_t>& oshape = output.Shape();
   *shape = &oshape[0];
   *dim_count = oshape.size();
-  *batch_size = output.BatchSize();
 
   RETURN_IF_STATUS_ERROR(
       output.DataBuffer(base, byte_size, memory_type, memory_type_id, userp));
@@ -1435,6 +1433,30 @@ TRITONSERVER_ServerModelIsReady(
 
   RETURN_IF_STATUS_ERROR(
       lserver->ModelIsReady(model_name, model_version, ready));
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_ServerModelBatch(
+    TRITONSERVER_Server* server, const char* model_name,
+    const int64_t model_version, uint32_t* flags, void** voidp)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  if (voidp != nullptr) {
+    *voidp = nullptr;
+  }
+
+  std::shared_ptr<ni::InferenceBackend> backend;
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetInferenceBackend(model_name, model_version, &backend));
+
+  if (backend->Config()->max_batch_size() > 0) {
+    *flags = TRITONSERVER_BATCH_FIRST_DIM;
+  } else {
+    *flags = TRITONSERVER_BATCH_UNKNOWN;
+  }
+
   return nullptr;  // Success
 }
 

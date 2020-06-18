@@ -1093,8 +1093,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
       }
       InferenceResponse::Output* response_output = nullptr;
       response->AddOutput(
-          name, DataType::TYPE_STRING, *batchn_shape, request->BatchSize(),
-          &response_output);
+          name, DataType::TYPE_STRING, *batchn_shape, &response_output);
       // Calculate expected byte size in advance using string offsets
       const size_t data_byte_size =
           offsets[element_idx + expected_element_cnt] - offsets[element_idx];

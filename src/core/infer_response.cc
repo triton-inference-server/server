@@ -79,18 +79,19 @@ InferenceResponse::IsDecoupled(bool* is_decoupled) const
 Status
 InferenceResponse::AddOutput(
     const std::string& name, const DataType datatype,
-    const std::vector<int64_t>& shape, const uint32_t batch_size,
-    InferenceResponse::Output** output)
+    const std::vector<int64_t>& shape, InferenceResponse::Output** output)
 {
-  outputs_.emplace_back(
-      name, datatype, shape, batch_size, allocator_, alloc_userp_);
+  outputs_.emplace_back(name, datatype, shape, allocator_, alloc_userp_);
 
   LOG_VERBOSE(1) << "add response output: " << outputs_.back();
 
   if (backend_ != nullptr) {
     const ModelOutput* output_config;
     RETURN_IF_ERROR(backend_->GetOutput(name, &output_config));
-    outputs_.back().Reshape(output_config);
+    if (output_config->has_reshape()) {
+      const bool has_batch_dim = (backend_->Config().max_batch_size() > 0);
+      outputs_.back().Reshape(has_batch_dim, output_config);
+    }
   }
 
   if (output != nullptr) {
@@ -103,18 +104,20 @@ InferenceResponse::AddOutput(
 Status
 InferenceResponse::AddOutput(
     const std::string& name, const DataType datatype,
-    std::vector<int64_t>&& shape, const uint32_t batch_size,
-    InferenceResponse::Output** output)
+    std::vector<int64_t>&& shape, InferenceResponse::Output** output)
 {
   outputs_.emplace_back(
-      name, datatype, std::move(shape), batch_size, allocator_, alloc_userp_);
+      name, datatype, std::move(shape), allocator_, alloc_userp_);
 
   LOG_VERBOSE(1) << "add response output: " << outputs_.back();
 
   if (backend_ != nullptr) {
     const ModelOutput* output_config;
     RETURN_IF_ERROR(backend_->GetOutput(name, &output_config));
-    outputs_.back().Reshape(output_config);
+    if (output_config->has_reshape()) {
+      const bool has_batch_dim = (backend_->Config().max_batch_size() > 0);
+      outputs_.back().Reshape(has_batch_dim, output_config);
+    }
   }
 
   if (output != nullptr) {
@@ -188,29 +191,34 @@ InferenceResponse::Output::~Output()
 }
 
 void
-InferenceResponse::Output::Reshape(const ModelOutput* output_config)
+InferenceResponse::Output::Reshape(
+    const bool has_batch_dim, const ModelOutput* output_config)
 {
-  if (output_config->has_reshape()) {
-    std::deque<int64_t> variable_size_values;
-    int64_t batch_dim_offset = (batch_size_ > 0) ? 1 : 0;
-    const auto& from_shape = output_config->reshape().shape();
-    const auto& to_shape = output_config->dims();
-    for (int64_t idx = 0; idx < from_shape.size(); idx++) {
-      if (from_shape[idx] == -1) {
-        variable_size_values.push_back(shape_[idx + batch_dim_offset]);
-      }
+  std::deque<int64_t> variable_size_values;
+
+  const int64_t batch_dim =
+      (has_batch_dim && (shape_.size() > 0)) ? shape_[0] : -1;
+  const size_t batch_dim_offset = (has_batch_dim) ? 1 : 0;
+
+  const auto& from_shape = output_config->reshape().shape();
+  const auto& to_shape = output_config->dims();
+  for (int64_t idx = 0; idx < from_shape.size(); idx++) {
+    if (from_shape[idx] == -1) {
+      variable_size_values.push_back(shape_[idx + batch_dim_offset]);
     }
-    shape_.clear();
-    if (batch_size_ > 0) {
-      shape_.push_back(batch_size_);
-    }
-    for (const auto& dim : to_shape) {
-      if (dim == -1) {
-        shape_.push_back(variable_size_values.front());
-        variable_size_values.pop_front();
-      } else {
-        shape_.push_back(dim);
-      }
+  }
+
+  shape_.clear();
+  if (batch_dim >= 0) {
+    shape_.push_back(batch_dim);
+  }
+
+  for (const auto& dim : to_shape) {
+    if (dim == -1) {
+      shape_.push_back(variable_size_values.front());
+      variable_size_values.pop_front();
+    } else {
+      shape_.push_back(dim);
     }
   }
 }
