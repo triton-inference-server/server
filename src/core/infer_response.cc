@@ -63,6 +63,20 @@ InferenceResponse::ActualModelVersion() const
 }
 
 Status
+InferenceResponse::IsDecoupled(bool* is_decoupled) const
+{
+  if (backend_ == nullptr) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Unable to determine the model transaction policy for the response");
+  }
+
+  *is_decoupled = backend_->IsDecoupled();
+
+  return Status::Success;
+}
+
+Status
 InferenceResponse::AddOutput(
     const std::string& name, const DataType datatype,
     const std::vector<int64_t>& shape, const uint32_t batch_size,
