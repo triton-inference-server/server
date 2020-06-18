@@ -42,7 +42,6 @@ extern "C" {
 #endif
 
 struct TRITONBACKEND_Input;
-struct TRITONBACKEND_RequestedOutput;
 struct TRITONBACKEND_Output;
 struct TRITONBACKEND_Request;
 struct TRITONBACKEND_ResponseFactory;
@@ -73,15 +72,19 @@ struct TRITONBACKEND_Model;
 /// \param shape If non-nullptr, returns the tensor shape.
 /// \param dim_count If non-nullptr, returns the number of dimensions
 /// in the tensor shape.
+/// \param byte_size If non-nullptr, returns the size of the tensor, in bytes.
 /// \param buffer_count If non-nullptr, returns the number of buffers
-/// holding the contents of the tensor.
+/// holding the contents of the tensor. These buffers are accessed
+/// using TRITONBACKEND_InputBuffer.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_InputProperties(
     TRITONBACKEND_Input* input, const char** name,
     TRITONSERVER_DataType* datatype, int64_t** shape, uint32_t* dims_count,
-    uint32_t* buffer_count);
+    uint64_t* byte_size, uint32_t* buffer_count);
 
-/// Get a buffer holding (part of) the tensor data for an input. The
+/// Get a buffer holding (part of) the tensor data for an input. For a
+/// given input the number of buffers composing the input are found
+/// from 'buffer_count' returned by TRITONBACKEND_InputProperties. The
 /// returned buffer is owned by the input and so should not be
 /// modified or freed by the caller. The lifetime of the buffer
 /// matches that of the input and so the buffer should not be accessed
@@ -105,23 +108,6 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_InputBuffer(
     TRITONBACKEND_Input* input, const uint32_t index, const void** buffer,
     uint64_t* buffer_byte_size, TRITONSERVER_MemoryType* memory_type,
     int64_t* memory_type_id);
-
-///
-/// TRITONBACKEND_RequestedOutput
-///
-/// Object representing a requested output tensor.
-///
-
-/// Get the name of a requested output tensor. The returned string is
-/// owned by the output, not the caller, and so should not be modified
-/// or freed.
-///
-/// \param request The inference request.
-/// \param output The output tensor.
-/// \param name Returns the tensor name.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestedOutputName(
-    TRITONBACKEND_RequestedOutput* output, const char** name);
 
 ///
 /// TRITONBACKEND_Output
@@ -208,7 +194,8 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInput(
     TRITONBACKEND_Request* request, const uint32_t index,
     TRITONBACKEND_Input** input);
 
-/// Get the number of output tensors specified in the request.
+/// Get the number of output tensors requested to be returned in the
+/// request.
 ///
 /// \param request The inference request.
 /// \param count Returns the number of output tensors.
@@ -216,26 +203,26 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInput(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestOutputCount(
     TRITONBACKEND_Request* request, uint32_t* count);
 
-/// Get a requested output tensor. The lifetime of the returned output
-/// tensor object matches that of the request and so the output tensor
-/// object should not be accessed after the request object is
-/// released.
+/// Get the name of a requested output tensor. The caller does not own
+/// the returned string and must not modify or delete it. The lifetime
+/// of the returned string extends only as long as 'request'.
 ///
 /// \param request The inference request.
-/// \param index The index of the output tensor. Must be 0 <= index <
-/// count, where count is the value returned by
+/// \param index The index of the requested output tensor. Must be 0
+/// <= index < count, where count is the value returned by
 /// TRITONBACKEND_RequestOutputCount.
-/// \param output Returns the output tensor corresponding to the index.
+/// \param output_name Returns the name of the requested output tensor
+/// corresponding to the index.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestOutput(
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestOutputName(
     TRITONBACKEND_Request* request, const uint32_t index,
-    TRITONBACKEND_RequestedOutput** output);
+    const char** output_name);
 
 /// Release the request. The request should be released when it is no
 /// longer needed by the backend. After this call returns the
 /// 'request' object is no longer valid and must not be used. Any
-/// tensor names, data types, shapes, etc. returned by
-/// TRITONBACKEND_Request* functions for this request is no longer
+/// tensor names, data types, shapes, input tensors, etc. returned by
+/// TRITONBACKEND_Request* functions for this request are no longer
 /// valid. If a persistent copy of that data is required it must be
 /// created before calling this function.
 ///
@@ -247,12 +234,15 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestRelease(
 ///
 /// TRITONBACKEND_ResponseFactory
 ///
-/// Object representing an inference response factory.
-///
+/// Object representing an inference response factory. Using a
+/// response factory is not required; instead a response can be
+/// generated directly from a TRITONBACKEND_Request object using
+/// TRITONBACKEND_ResponseNew(). A response factory allows a request
+/// to be released before all responses have been sent. Releasing a
+/// request as early as possible releases all input tensor data and
+/// therefore may be desirable in some cases.
 
-/// Create the response factory associated with a request. This
-/// function can be called only once for a given request. Subsequent
-/// calls with result in a TRITONSERVER_ERROR_ALREADY_EXISTS error.
+/// Create the response factory associated with a request.
 ///
 /// \param factory Returns the new response factory.
 /// \param request The inference request.
@@ -273,12 +263,20 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseFactoryDelete(
 /// Object representing an inference response.
 ///
 
+/// Create a response for a request.
+///
+/// \param response Returns the new response.
+/// \param request The request.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseNew(
+    TRITONBACKEND_Response** response, TRITONBACKEND_Request* request);
+
 /// Create a response using a factory.
 ///
 /// \param response Returns the new response.
 /// \param factory The response factory.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseNew(
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseNewFromFactory(
     TRITONBACKEND_Response** response, TRITONBACKEND_ResponseFactory* factory);
 
 /// Destroy a response. It is not necessary to delete a response if
@@ -290,10 +288,10 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseNew(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseDelete(
     TRITONBACKEND_Response* response);
 
-/// Get an output tensor in the response, creating if necessary. The
-/// lifetime of the returned output tensor object matches that of the
-/// response and so the output tensor object should not be accessed
-/// after the response object is deleted.
+/// Create an output tensor in the response. The lifetime of the
+/// returned output tensor object matches that of the response and so
+/// the output tensor object should not be accessed after the response
+/// object is deleted.
 ///
 /// \param response The response.
 /// \param output Returns the new response output.
@@ -500,7 +498,10 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelFinalize(
     TRITONBACKEND_Model* model);
 
 /// Execute a batch of one or more requests. This function is
-/// required.
+/// required. Triton will not perform multiple simultaneous calls to
+/// this function for a given model; however, if a backend is used by
+/// multiple models Triton may simultaneously call the function with a
+/// different thread for each model.
 ///
 /// If an error is returned the ownership of the request objects
 /// remains with Triton and the backend must not retain references to

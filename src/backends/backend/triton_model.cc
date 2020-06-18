@@ -169,6 +169,9 @@ TritonModel::~TritonModel()
 
 extern "C" {
 
+//
+// TRITONBACKEND_Model
+//
 TRITONSERVER_Error*
 TRITONBACKEND_ModelName(TRITONBACKEND_Model* model, const char** name)
 {
@@ -234,6 +237,307 @@ TRITONBACKEND_ModelSetState(TRITONBACKEND_Model* model, void* state)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
   tm->SetState(state);
+  return nullptr;  // success
+}
+
+//
+// TRITONBACKEND_ResponseFactory
+//
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseFactoryNew(
+    TRITONBACKEND_ResponseFactory** factory, TRITONBACKEND_Request* request)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  InferenceResponseFactory* response_factory =
+      new InferenceResponseFactory(tr->ResponseFactory());
+  *factory = reinterpret_cast<TRITONBACKEND_ResponseFactory*>(response_factory);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseFactoryDelete(TRITONBACKEND_ResponseFactory* factory)
+{
+  InferenceResponseFactory* tf =
+      reinterpret_cast<InferenceResponseFactory*>(factory);
+  delete tf;
+  return nullptr;  // success
+}
+
+///
+/// TRITONBACKEND_Request
+///
+TRITONSERVER_Error*
+TRITONBACKEND_RequestId(TRITONBACKEND_Request* request, const char** id)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *id = tr->Id().c_str();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestCorrelationId(TRITONBACKEND_Request* request, uint64_t* id)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *id = tr->CorrelationId();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestBatchSize(
+    TRITONBACKEND_Request* request, uint32_t* batch_size)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *batch_size = tr->BatchSize();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestInputCount(TRITONBACKEND_Request* request, uint32_t* count)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *count = tr->ImmutableInputs().size();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestInput(
+    TRITONBACKEND_Request* request, const uint32_t index,
+    TRITONBACKEND_Input** input)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  const auto& inputs = tr->ImmutableInputs();
+  if (index >= inputs.size()) {
+    *input = nullptr;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("out of bounds index ") + std::to_string(index) +
+         ": request has " + std::to_string(inputs.size()) + " inputs")
+            .c_str());
+  }
+
+  // The request inputs are not allowed to change once the request
+  // makes it to the backend, so it is ok to just iterate through the
+  // map. This linear search is the best we can do given the need for
+  // the inputs to be in the map and given the typical small number of
+  // inputs is better than having every request maintain the inputs as
+  // both map and vector.
+  uint32_t cnt = 0;
+  for (const auto& pr : inputs) {
+    if (cnt++ == index) {
+      InferenceRequest::Input* in = pr.second;
+      *input = reinterpret_cast<TRITONBACKEND_Input*>(in);
+      break;
+    }
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestOutputCount(
+    TRITONBACKEND_Request* request, uint32_t* count)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *count = tr->ImmutableRequestedOutputs().size();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestOutputName(
+    TRITONBACKEND_Request* request, const uint32_t index,
+    const char** output_name)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  const auto& routputs = tr->ImmutableRequestedOutputs();
+  if (index >= routputs.size()) {
+    *output_name = nullptr;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("out of bounds index ") + std::to_string(index) +
+         ": request has " + std::to_string(routputs.size()) +
+         " requested outputs")
+            .c_str());
+  }
+
+  // The requested outputs are not allowed to change once the request
+  // makes it to the backend, so it is ok to just iterate through the
+  // set. This linear search is the best we can do given the requested
+  // outputs being in a set and given the typical small number of
+  // requested outputs it should not be a performance issue.
+  uint32_t cnt = 0;
+  for (const auto& rout : routputs) {
+    if (cnt++ == index) {
+      *output_name = rout.c_str();
+      break;
+    }
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestRelease(TRITONBACKEND_Request* request)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  std::unique_ptr<InferenceRequest> ur(tr);
+  InferenceRequest::Release(std::move(ur));
+  return nullptr;  // success
+}
+
+///
+/// TRITONBACKEND_Response
+///
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseNew(
+    TRITONBACKEND_Response** response, TRITONBACKEND_Request* request)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+
+  std::unique_ptr<InferenceResponse> tresp;
+  Status status = tr->ResponseFactory().CreateResponse(&tresp);
+  if (!status.IsOk()) {
+    *response = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
+  *response = reinterpret_cast<TRITONBACKEND_Response*>(tresp.release());
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseNewFromFactory(
+    TRITONBACKEND_Response** response, TRITONBACKEND_ResponseFactory* factory)
+{
+  InferenceResponseFactory* tf =
+      reinterpret_cast<InferenceResponseFactory*>(factory);
+
+  std::unique_ptr<InferenceResponse> tr;
+  Status status = tf->CreateResponse(&tr);
+  if (!status.IsOk()) {
+    *response = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
+  *response = reinterpret_cast<TRITONBACKEND_Response*>(tr.release());
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseDelete(TRITONBACKEND_Response* response)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+  delete tr;
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseOutput(
+    TRITONBACKEND_Response* response, TRITONBACKEND_Output** output,
+    const char* name, const TRITONSERVER_DataType datatype,
+    const int64_t* shape, const uint32_t dims_count)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+  std::vector<int64_t> lshape(shape, shape + dims_count);
+  InferenceResponse::Output* loutput;
+  Status status = tr->AddOutput(
+      name, TritonToDataType(datatype), std::move(lshape),
+      1 /*batch_size FIXME*/, &loutput);
+  if (!status.IsOk()) {
+    *output = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
+  *output = reinterpret_cast<TRITONBACKEND_Output*>(loutput);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseSend(TRITONBACKEND_Response* response)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+
+  std::unique_ptr<InferenceResponse> utr(tr);
+  Status status = InferenceResponse::Send(std::move(utr));
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseSendError(
+    TRITONBACKEND_Response* response, TRITONSERVER_Error* error)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+
+  std::unique_ptr<InferenceResponse> utr(tr);
+  Status status = InferenceResponse::SendWithStatus(
+      std::move(utr), Status(
+                          TritonCodeToStatusCode(TRITONSERVER_ErrorCode(error)),
+                          TRITONSERVER_ErrorMessage(error)));
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
+  return nullptr;  // success
+}
+
+///
+/// TRITONBACKEND_Input
+///
+TRITONSERVER_Error*
+TRITONBACKEND_InputProperties(
+    TRITONBACKEND_Input* input, const char** name,
+    TRITONSERVER_DataType* datatype, int64_t** shape, uint32_t* dims_count,
+    uint64_t* byte_size, uint32_t* buffer_count)
+{
+  InferenceRequest::Input* ti =
+      reinterpret_cast<InferenceRequest::Input*>(input);
+  if (name != nullptr) {
+    *name = ti->Name().c_str();
+  }
+  if (datatype != nullptr) {
+    *datatype = DataTypeToTriton(ti->DType());
+  }
+  if (shape != nullptr) {
+    *shape = ti->MutableShape()->data();
+  }
+  if (dims_count != nullptr) {
+    *dims_count = ti->Shape().size();
+  }
+  if (byte_size != nullptr) {
+    *byte_size = GetByteSize(ti->DType(), ti->Shape());
+  }
+  if (buffer_count != nullptr) {
+    *buffer_count = ti->DataBufferCount();
+  }
+  return nullptr;  // success
+}
+
+///
+/// TRITONBACKEND_Output
+///
+TRITONSERVER_Error*
+TRITONBACKEND_OutputBuffer(
+    TRITONBACKEND_Output* output, void** buffer,
+    const uint64_t buffer_byte_size, TRITONSERVER_MemoryType* memory_type,
+    int64_t* memory_type_id)
+{
+  InferenceResponse::Output* to =
+      reinterpret_cast<InferenceResponse::Output*>(output);
+  Status status = to->AllocateDataBuffer(
+      buffer, buffer_byte_size, memory_type, memory_type_id);
+  if (!status.IsOk()) {
+    *buffer = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
   return nullptr;  // success
 }
 
