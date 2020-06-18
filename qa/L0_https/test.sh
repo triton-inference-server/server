@@ -97,6 +97,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Stop the proxy server
+service nginx stop
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
