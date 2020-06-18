@@ -533,7 +533,8 @@ message ModelOptimizationPolicy
     //@@       For ONNX Runtime backend, possible value is "tensorrt" as name,
     //@@       and no parameters are required.
     //@@
-    //@@       For TensorFlow backend, possible values are "tensorrt", "gpu_io".
+    //@@       For TensorFlow backend, possible values are "tensorrt",
+    //@@       "auto_mixed_precision", "gpu_io".
     //@@
     //@@       For "tensorrt", the following parameters can be specified:
     //@@         "precision_mode": The precision used for optimization.
@@ -547,6 +548,10 @@ message ModelOptimizationPolicy
     //@@
     //@@         "max_workspace_size_bytes": The maximum GPU memory the model
     //@@         can use temporarily during execution. Default value is 1GB.
+    //@@
+    //@@       For "auto_mixed_precision", no parameters are required. If set,
+    //@@       the model will try to use FP16 for better performance.
+    //@@       This optimization can not be set with "tensorrt".
     //@@
     //@@       For "gpu_io", no parameters are required. If set, the model will
     //@@       be executed using TensorFlow Callable API to set input and output

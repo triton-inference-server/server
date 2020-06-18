@@ -223,7 +223,7 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromGraphDef(
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
     const std::map<int, std::vector<float>>& memory_limit_mb,
-    const TRTISTF_TFTRTConfig* tftrt_config);
+    const TRTISTF_TFTRTConfig* tftrt_config, const bool auto_mixed_precision);
 
 // Create a SavedModel model.
 TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
@@ -233,7 +233,7 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
     const std::map<int, std::vector<float>>& memory_limit_mb,
-    const TRTISTF_TFTRTConfig* tftrt_config);
+    const TRTISTF_TFTRTConfig* tftrt_config, const bool auto_mixed_precision);
 
 // Delete a model.
 TRTISTF_EXPORT void TRTISTF_ModelDelete(TRTISTF_Model* model);
