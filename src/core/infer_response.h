@@ -214,6 +214,7 @@ class InferenceResponse {
   const std::string& Id() const { return id_; }
   const std::string& ModelName() const;
   int64_t ActualModelVersion() const;
+  Status IsDecoupled(bool* is_decoupled) const;
   const Status& ResponseStatus() const { return status_; }
 
   const std::deque<Output>& Outputs() const { return outputs_; }
