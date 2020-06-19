@@ -404,7 +404,7 @@ COPY --chown=1000:1000 --from=tritonserver_tf /opt/tensorflow/tensorflow-source/
 COPY --chown=1000:1000 --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib lib
-COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include include
+COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include/tritonserver/tritonserver.h include/
 
 # Get ONNX version supported
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/ort_onnx_version.txt ort_onnx_version.txt
