@@ -976,7 +976,8 @@ class HTTPAPIServer : public HTTPServerImpl {
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
     static void InferRequestComplete(
-        TRITONSERVER_InferenceRequest* request, void* userp);
+        TRITONSERVER_InferenceRequest* request, const uint32_t flags,
+        void* userp);
     static void InferResponseComplete(
         TRITONSERVER_InferenceResponse* response, void* userp);
     TRITONSERVER_Error* FinalizeResponse(
@@ -2305,16 +2306,17 @@ HTTPAPIServer::InferRequestClass::InferRequestClass(evhtp_request_t* req)
 
 void
 HTTPAPIServer::InferRequestClass::InferRequestComplete(
-    TRITONSERVER_InferenceRequest* request, void* userp)
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   // FIXME need to manage the lifetime of InferRequestClass so that we
   // delete it here.
 
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceRequestDelete(request),
-      "deleting HTTP/REST inference request");
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(request),
+        "deleting HTTP/REST inference request");
+  }
 }
-
 
 void
 HTTPAPIServer::InferRequestClass::InferResponseComplete(

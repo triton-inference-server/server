@@ -669,7 +669,8 @@ TRITONBACKEND_ModelExecute(
   for (uint32_t r = 0; r < request_count; ++r) {
     TRITONBACKEND_Request* request = requests[r];
     LOG_IF_ERROR(
-        TRITONBACKEND_RequestRelease(request), "failed releasing request");
+        TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
+        "failed releasing request");
   }
 
   return nullptr;  // success

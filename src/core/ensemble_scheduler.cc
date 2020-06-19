@@ -92,7 +92,8 @@ class EnsembleContext {
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
   static void RequestComplete(
-      TRITONSERVER_InferenceRequest* request, void* userp);
+      TRITONSERVER_InferenceRequest* request, const uint32_t flags,
+      void* userp);
   static void ResponseComplete(
       TRITONSERVER_InferenceResponse* response, void* userp);
 
@@ -374,15 +375,17 @@ EnsembleContext::ResponseRelease(
 
 void
 EnsembleContext::RequestComplete(
-    TRITONSERVER_InferenceRequest* request, void* userp)
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  // Assuming request is released after all responses are completed so that
-  // this function will be the trigger for next steps
-  auto step_ptr = std::unique_ptr<Step>(reinterpret_cast<Step*>(userp));
-  EnsembleContext::Proceed(step_ptr->ctx_, step_ptr);
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceRequestDelete(request),
-      "deleting ensemble inference request");
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    // Assuming request is released after all responses are completed
+    // so that this function will be the trigger for next steps
+    auto step_ptr = std::unique_ptr<Step>(reinterpret_cast<Step*>(userp));
+    EnsembleContext::Proceed(step_ptr->ctx_, step_ptr);
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(request),
+        "deleting ensemble inference request");
+  }
 }
 
 void
@@ -686,7 +689,8 @@ EnsembleContext::FinishEnsemble()
     }
   }
 
-  InferenceRequest::Release(std::move(request_));
+  InferenceRequest::Release(
+      std::move(request_), TRITONSERVER_REQUEST_RELEASE_ALL);
 
   return ensemble_status_;
 }

@@ -86,12 +86,15 @@ WarmupResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
 }
 
 void
-WarmupRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
+WarmupRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  TRITONSERVER_InferenceRequestDelete(request);
-  if (userp != nullptr) {
-    auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
-    warmup_promise->set_value();
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    TRITONSERVER_InferenceRequestDelete(request);
+    if (userp != nullptr) {
+      auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
+      warmup_promise->set_value();
+    }
   }
 }
 
