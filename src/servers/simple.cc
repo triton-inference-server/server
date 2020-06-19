@@ -245,9 +245,10 @@ ResponseRelease(
 }
 
 void
-InferRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
+InferRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  // We reuse the request so we don't delete it here...
+  // We reuse the request so we don't delete it here.
 }
 
 void

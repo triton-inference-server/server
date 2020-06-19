@@ -745,7 +745,8 @@ LibTorchBackend::Context::Run(
 
   // Release all requests.
   for (auto& request : requests) {
-    InferenceRequest::Release(std::move(request));
+    InferenceRequest::Release(
+        std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);
   }
 }
 

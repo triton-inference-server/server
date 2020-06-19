@@ -48,7 +48,8 @@ namespace nvidia { namespace inferenceserver {
       }                                                                      \
       for (auto& request : (REQUESTS)) {                                     \
         request->ReportStatistics(MR, false /* success */, 0, 0, 0, 0);      \
-        InferenceRequest::Release(std::move(request));                       \
+        InferenceRequest::Release(                                           \
+            std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);           \
       }                                                                      \
       return;                                                                \
     }                                                                        \

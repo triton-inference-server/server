@@ -395,7 +395,9 @@ class InferenceRequest {
   // Release the request. Call the release callback and transfer
   // ownership of the request to the callback. On return 'request' is
   // nullptr.
-  static void Release(std::unique_ptr<InferenceRequest>&& request);
+  static void Release(
+      std::unique_ptr<InferenceRequest>&& request,
+      const uint32_t release_flags);
 
   // Create a copy of 'from' suitable for use as a "null" request as
   // required for the direct sequence batcher. The returned copy will

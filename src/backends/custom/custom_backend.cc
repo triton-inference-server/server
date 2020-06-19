@@ -593,7 +593,8 @@ CustomBackend::Context::Run(
                   LibraryErrorString(custom_payloads[i].error_code)));
     }
 
-    InferenceRequest::Release(std::move(requests[i]));
+    InferenceRequest::Release(
+        std::move(requests[i]), TRITONSERVER_REQUEST_RELEASE_ALL);
   }
 }
 

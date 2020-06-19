@@ -72,9 +72,13 @@ NullResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
 }
 
 void
-NullRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
+NullRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  TRITONSERVER_InferenceRequestDelete(request);
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(request), "deleting null request");
+  }
 }
 
 }  // namespace
@@ -131,7 +135,8 @@ InferenceRequest::RespondIfError(
   // gives ownership to the callback. So can't access 'request' after
   // this point.
   if (release_request) {
-    Release(std::move(request));
+    InferenceRequest::Release(
+        std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);
   }
 }
 
@@ -150,7 +155,8 @@ InferenceRequest::RespondIfError(
 }
 
 void
-InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
+InferenceRequest::Release(
+    std::unique_ptr<InferenceRequest>&& request, const uint32_t release_flags)
 {
   // Invoke the release callbacks added internally before releasing the
   // request to user provided callback.
@@ -169,7 +175,7 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
   void* userp = request->release_userp_;
   request->release_fn_(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
-      userp);
+      release_flags, userp);
 
 #ifdef TRITON_ENABLE_TRACING
   // If tracing then record request end (after the callback completes
