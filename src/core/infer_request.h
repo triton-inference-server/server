@@ -85,11 +85,23 @@ class InferenceRequest {
     const std::vector<int64_t>& Shape() const { return shape_; }
     std::vector<int64_t>* MutableShape() { return &shape_; }
 
+    // FIXME. Should not need these functions. All shapes kept here
+    // should include the batch dimension instead of breaking the same
+    // into batch + shape.
+    const std::vector<int64_t>& ShapeWithBatchDim() const
+    {
+      return shape_with_batch_dim_;
+    }
+    std::vector<int64_t>* MutableShapeWithBatchDim()
+    {
+      return &shape_with_batch_dim_;
+    }
+
     // Whether or not the input is a tensorrt shape tensor
     bool IsShapeTensor() const { return is_shape_tensor_; }
 
     // Set the input to be treated as a shape tensor.
-    Status SetShapeTensor(const bool is_shape_tensor);
+    Status SetIsShapeTensor(const bool is_shape_tensor);
 
     // The data for this input.
     const std::shared_ptr<Memory>& Data() const { return data_; }
@@ -134,6 +146,7 @@ class InferenceRequest {
     DataType datatype_;
     std::vector<int64_t> original_shape_;
     std::vector<int64_t> shape_;
+    std::vector<int64_t> shape_with_batch_dim_;
     bool is_shape_tensor_;
     std::shared_ptr<Memory> data_;
   };

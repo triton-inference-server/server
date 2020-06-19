@@ -731,7 +731,7 @@ CommonHandler::SetUpAllRequests()
       TRITONSERVER_Message* model_config_message = nullptr;
       err = TRITONSERVER_ServerModelConfig(
           tritonserver_.get(), request.name().c_str(), requested_model_version,
-          &model_config_message);
+          1 /* config_version */, &model_config_message);
       if (err == nullptr) {
         const char* buffer;
         size_t byte_size;

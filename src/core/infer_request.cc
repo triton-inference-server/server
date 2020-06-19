@@ -236,6 +236,7 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
 
     // Must normalize shape here...
     *new_input->MutableShape() = new_input->OriginalShape();
+    *new_input->MutableShapeWithBatchDim() = new_input->OriginalShape();
 
     new_input->SetData(data);
   }
@@ -273,6 +274,7 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
 
     // Must normalize shape here...
     *new_input->MutableShape() = new_input->OriginalShape();
+    *new_input->MutableShapeWithBatchDim() = new_input->OriginalShape();
 
     // Note that the input that have max byte size will be responsible for
     // holding the artifical data, while other inputs will hold a reference to
@@ -391,6 +393,7 @@ InferenceRequest::AddOverrideInput(
 {
   std::shared_ptr<Input> i = std::make_shared<Input>(name, datatype, shape);
   *(i->MutableShape()) = i->OriginalShape();
+  *(i->MutableShapeWithBatchDim()) = i->OriginalShape();
 
   RETURN_IF_ERROR(AddOverrideInput(i));
   if (input != nullptr) {
@@ -532,13 +535,13 @@ InferenceRequest::Normalize()
     for (auto& pr : original_inputs_) {
       auto& input = pr.second;
 
-      // Keep shape tensor's shape as it is
+      // For a shape tensor, keep the tensor's shape as it is and mark
+      // that the input is a shape tensor.
       const ModelInput* input_config;
       RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
       if (input_config->is_shape_tensor()) {
         *input.MutableShape() = input.OriginalShape();
-        // Set the input as shape tensor
-        input.SetShapeTensor(true);
+        input.SetIsShapeTensor(true);
         continue;
       }
 
@@ -629,6 +632,18 @@ InferenceRequest::Normalize()
         } else {
           shape->push_back(dim);
         }
+      }
+    }
+
+    // Create shape with batch dimension.
+    // FIXME, should not need this!!
+    if (batch_size_ == 0) {
+      *input.MutableShapeWithBatchDim() = *shape;
+    } else {
+      input.MutableShapeWithBatchDim()->clear();
+      input.MutableShapeWithBatchDim()->push_back(batch_size_);
+      for (int64_t d : *shape) {
+        input.MutableShapeWithBatchDim()->push_back(d);
       }
     }
   }
@@ -731,7 +746,7 @@ InferenceRequest::Input::Input(
 }
 
 Status
-InferenceRequest::Input::SetShapeTensor(const bool is_shape_tensor)
+InferenceRequest::Input::SetIsShapeTensor(const bool is_shape_tensor)
 {
   is_shape_tensor_ = is_shape_tensor;
   return Status::Success;
