@@ -168,7 +168,8 @@ TRITONSERVER_Error*
 ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 {
   TRITONSERVER_Message* config_message;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(triton_model, &config_message));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
+      triton_model, 1 /* config_version */, &config_message));
 
   // We can get the model configuration as a json string from
   // config_message, parse it with our favorite json parser to create
@@ -470,10 +471,6 @@ TRITONBACKEND_ModelExecute(
         responses, r,
         TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
 
-    uint32_t batch_size = 0;
-    GUARDED_RESPOND_IF_ERROR(
-        responses, r, TRITONBACKEND_RequestBatchSize(request, &batch_size));
-
     // Triton ensures that there is only a single input since that is
     // what is specified in the model configuration, so normally there
     // would be no reason to check it but we do here to demonstate the
@@ -502,7 +499,6 @@ TRITONBACKEND_ModelExecute(
         TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
         (std::string("request ") + std::to_string(r) + ": id = \"" +
          request_id + "\", correlation_id = " + std::to_string(correlation_id) +
-         ", batch_size = " + std::to_string(batch_size) +
          ", input_count = " + std::to_string(input_count) +
          ", requested_output_count = " + std::to_string(requested_output_count))
             .c_str());
@@ -540,7 +536,7 @@ TRITONBACKEND_ModelExecute(
 
     const char* input_name;
     TRITONSERVER_DataType input_datatype;
-    int64_t* input_shape;
+    const int64_t* input_shape;
     uint32_t input_dims_count;
     uint64_t input_byte_size;
     uint32_t input_buffer_count;
@@ -605,15 +601,15 @@ TRITONBACKEND_ModelExecute(
       // memory but we have to handle any returned type. If we get
       // back a buffer in GPU memory we just fail the request.
       void* output_buffer;
-      TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
-      int64_t memory_type_id = 0;
+      TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
+      int64_t output_memory_type_id = 0;
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_OutputBuffer(
-              output, &output_buffer, input_byte_size, &memory_type,
-              &memory_type_id));
+              output, &output_buffer, input_byte_size, &output_memory_type,
+              &output_memory_type_id));
       if ((responses[r] == nullptr) ||
-          (memory_type == TRITONSERVER_MEMORY_GPU)) {
+          (output_memory_type == TRITONSERVER_MEMORY_GPU)) {
         TRITONSERVER_LogMessage(
             TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
             (std::string("request ") + std::to_string(r) +
@@ -623,12 +619,43 @@ TRITONBACKEND_ModelExecute(
         continue;
       }
 
-      // Step 3.
-      // FIXME
+      // Step 3. Copy input -> output. We can only handle if the input
+      // buffers are on CPU so fail otherwise.
+      size_t output_buffer_offset = 0;
+      for (uint32_t b = 0; b < input_buffer_count; ++b) {
+        const void* input_buffer = nullptr;
+        uint64_t buffer_byte_size = 0;
+        TRITONSERVER_MemoryType input_memory_type = TRITONSERVER_MEMORY_CPU;
+        int64_t input_memory_type_id = 0;
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r,
+            TRITONBACKEND_InputBuffer(
+                input, b, &input_buffer, &buffer_byte_size, &input_memory_type,
+                &input_memory_type_id));
+        if ((responses[r] == nullptr) ||
+            (input_memory_type == TRITONSERVER_MEMORY_GPU)) {
+          break;
+        }
+
+        memcpy(
+            reinterpret_cast<char*>(output_buffer) + output_buffer_offset,
+            input_buffer, buffer_byte_size);
+        output_buffer_offset += buffer_byte_size;
+      }
+
+      if (responses[r] == nullptr) {
+        TRITONSERVER_LogMessage(
+            TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
+            (std::string("request ") + std::to_string(r) +
+             ": failed to get input buffer in CPU memory, error response "
+             "sent")
+                .c_str());
+        continue;
+      }
     }
 
     // If we get to this point there hasn't been any error and the
-    // response if complete and we can send it. If there is an error
+    // response is complete and we can send it. If there is an error
     // when sending all we can do is log it.
     LOG_IF_ERROR(
         TRITONBACKEND_ResponseSend(responses[r]), "failed sending response");

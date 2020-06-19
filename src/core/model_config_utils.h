@@ -152,8 +152,14 @@ Status GetProfileIndex(const std::string& profile_name, int* profile_index);
 
 /// Convert a model configuration protobuf to the equivalent json.
 /// \param config The protobuf model configuration.
+/// \param config_version The model configuration will be returned in
+/// a format matching this version. If the configuration cannot be
+/// represented in the requested version's format then an error will
+/// be returned.
 /// \param json Returns the equivalent JSON.
 /// \return The error status.
-Status ModelConfigToJson(const ModelConfig& config, std::string* json_str);
+Status ModelConfigToJson(
+    const ModelConfig& config, const uint32_t config_version,
+    std::string* json_str);
 
 }}  // namespace nvidia::inferenceserver

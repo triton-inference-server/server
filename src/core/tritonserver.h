@@ -1268,11 +1268,16 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelStatistics(
 /// \param model_version The version of the model to get configuration
 /// for.  If -1 then the server will choose a version based on the
 /// model's policy.
+/// \param config_version The model configuration will be returned in
+/// a format matching this version. If the configuration cannot be
+/// represented in the requested version's format then an error will
+/// be returned. Currently only version 1 is supported.
 /// \param model_config Returns the model config message.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelConfig(
     TRITONSERVER_Server* server, const char* model_name,
-    const int64_t model_version, TRITONSERVER_Message** model_config);
+    const int64_t model_version, const uint32_t config_version,
+    TRITONSERVER_Message** model_config);
 
 /// Get the index of all unique models in the model repositories as a
 /// TRITONSERVER_Message object. The caller takes ownership of the
