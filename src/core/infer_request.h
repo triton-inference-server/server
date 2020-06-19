@@ -373,20 +373,24 @@ class InferenceRequest {
 
   // Send an error response for this request. If 'status' is Success
   // then no response is sent and the request is not released (even if
-  // 'release_request' is true). If 'release_request' is true then the
-  // release callback is called for this request and ownership is
-  // given to the callback. Thus, if 'release_request' is true
-  // 'request' is returned as nullptr.
+  // 'release_request' is true). Because this is sending an error it
+  // is assumed that this is the last response for the request and so
+  // the FINAL flag is set in the response callback. If
+  // 'release_request' is true then the release callback is called for
+  // this request and ownership is given to the callback. Thus, if
+  // 'release_request' is true 'request' is returned as nullptr.
   static void RespondIfError(
       std::unique_ptr<InferenceRequest>& request, const Status& status,
       const bool release_request = false);
 
   // Send an error response to a set of 'requests'. If 'status' is
   // Success then no responses are sent and the requests are not
-  // released (even if 'release_request' is true). If
-  // 'release_request' is true then the release callback is called for
-  // each request, and the request ownership is given to the
-  // callback. Thus, if 'release_request' is true 'requests' is
+  // released (even if 'release_request' is true). Because this is
+  // sending an error it is assumed that this is the last response for
+  // the requests and so the FINAL flag is set in the response
+  // callbacks. If 'release_request' is true then the release callback
+  // is called for each request, and the request ownership is given to
+  // the callback. Thus, if 'release_request' is true 'requests' is
   // returned with all nullptrs.
   static void RespondIfError(
       std::vector<std::unique_ptr<InferenceRequest>>& requests,

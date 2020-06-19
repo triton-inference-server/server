@@ -722,7 +722,8 @@ OnnxBackend::Context::Run(
   for (auto& response : responses) {
     if (response != nullptr) {
       LOG_STATUS_ERROR(
-          InferenceResponse::Send(std::move(response)),
+          InferenceResponse::Send(
+              std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL),
           "failed to send TensorFlow backend response");
     }
   }
@@ -804,7 +805,8 @@ OnnxBackend::Context::SetInputTensors(
         if (!status.IsOk()) {
           if ((*responses)[ridx] != nullptr) {
             InferenceResponse::SendWithStatus(
-                std::move((*responses)[ridx]), status);
+                std::move((*responses)[ridx]),
+                TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
           }
           expected_byte_sizes.push_back(0);
         } else {
@@ -861,7 +863,8 @@ OnnxBackend::Context::SetInputTensors(
         }
         if (!status.IsOk() && ((*responses)[ridx] != nullptr)) {
           InferenceResponse::SendWithStatus(
-              std::move((*responses)[ridx]), status);
+              std::move((*responses)[ridx]),
+              TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
         }
         buffer_offset += expected_byte_sizes[ridx];
       }
@@ -926,6 +929,7 @@ OnnxBackend::Context::SetStringInputBuffer(
         if (element_cnt >= expected_element_cnt) {
           InferenceResponse::SendWithStatus(
               std::move((*responses)[idx]),
+              TRITONSERVER_RESPONSE_COMPLETE_FINAL,
               Status(
                   Status::Code::INVALID_ARG,
                   "unexpected number of string elements " +
@@ -944,6 +948,7 @@ OnnxBackend::Context::SetStringInputBuffer(
         if (len > remaining_bytes) {
           InferenceResponse::SendWithStatus(
               std::move((*responses)[idx]),
+              TRITONSERVER_RESPONSE_COMPLETE_FINAL,
               Status(
                   Status::Code::INVALID_ARG,
                   "incomplete string data for inference input '" + name +
@@ -1140,7 +1145,8 @@ OnnxBackend::Context::SetStringOutputBuffer(
         }
       }
       if (!status.IsOk()) {
-        InferenceResponse::SendWithStatus(std::move(response), status);
+        InferenceResponse::SendWithStatus(
+            std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
       }
     }
 

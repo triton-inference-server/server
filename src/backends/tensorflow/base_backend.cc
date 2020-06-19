@@ -478,7 +478,8 @@ SetStringInputTensor(
       request_input, buffer_memory_type, buffer_memory_type_id, &content,
       &content_byte_size, &contiguous_buffer, stream, &cuda_copy);
   if (!status.IsOk()) {
-    InferenceResponse::SendWithStatus(std::move(*response), status);
+    InferenceResponse::SendWithStatus(
+        std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
     FillStringTensor(
         tensor, tensor_offset + element_idx, request_element_cnt - element_idx);
     return cuda_copy;
@@ -497,7 +498,7 @@ SetStringInputTensor(
   while (content_byte_size >= sizeof(uint32_t)) {
     if (element_idx >= request_element_cnt) {
       InferenceResponse::SendWithStatus(
-          std::move(*response),
+          std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
           Status(
               Status::Code::INVALID_ARG,
               "unexpected number of string elements " +
@@ -516,7 +517,7 @@ SetStringInputTensor(
 
     if (content_byte_size < len) {
       InferenceResponse::SendWithStatus(
-          std::move(*response),
+          std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
           Status(
               Status::Code::INVALID_ARG,
               "incomplete string data for inference input '" +
@@ -537,7 +538,7 @@ SetStringInputTensor(
 
   if ((*response != nullptr) && (element_idx != request_element_cnt)) {
     InferenceResponse::SendWithStatus(
-        std::move(*response),
+        std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
         Status(
             Status::Code::INTERNAL,
             "expected " + std::to_string(request_element_cnt) +
@@ -581,7 +582,8 @@ SetStringOutputBuffer(
       &buffer, serialized->size(), &actual_memory_type, &actual_memory_type_id);
   if (!status.IsOk()) {
     LOG_STATUS_ERROR(
-        InferenceResponse::SendWithStatus(std::move(*response), status),
+        InferenceResponse::SendWithStatus(
+            std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
         "error sending TensorFlow response");
     return cuda_copy;
   }
@@ -597,7 +599,8 @@ SetStringOutputBuffer(
 
   if (!status.IsOk()) {
     LOG_STATUS_ERROR(
-        InferenceResponse::SendWithStatus(std::move(*response), status),
+        InferenceResponse::SendWithStatus(
+            std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
         "error sending TensorFlow response");
     return cuda_copy;
   }
@@ -778,7 +781,9 @@ BaseBackend::Context::Run(
           const InferenceRequest::Input* request_input;
           Status status = request->ImmutableInput(input_name, &request_input);
           if (!status.IsOk() && (response != nullptr)) {
-            InferenceResponse::SendWithStatus(std::move(response), status);
+            InferenceResponse::SendWithStatus(
+                std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                status);
           }
 
           cuda_copy |= SetStringInputTensor(
@@ -990,7 +995,8 @@ BaseBackend::Context::Run(
   for (auto& response : responses) {
     if (response != nullptr) {
       LOG_STATUS_ERROR(
-          InferenceResponse::Send(std::move(response)),
+          InferenceResponse::Send(
+              std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL),
           "failed to send TensorFlow backend response");
     }
   }

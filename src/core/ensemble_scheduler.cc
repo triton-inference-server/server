@@ -95,7 +95,8 @@ class EnsembleContext {
       TRITONSERVER_InferenceRequest* request, const uint32_t flags,
       void* userp);
   static void ResponseComplete(
-      TRITONSERVER_InferenceResponse* response, void* userp);
+      TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+      void* userp);
 
   using StepList = std::vector<std::unique_ptr<Step>>;
   using VersionMap =
@@ -390,8 +391,12 @@ EnsembleContext::RequestComplete(
 
 void
 EnsembleContext::ResponseComplete(
-    TRITONSERVER_InferenceResponse* response, void* userp)
+    TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
+  if (response == nullptr) {
+    return;
+  }
+
   auto step_ptr = reinterpret_cast<Step*>(userp);
   // FIXME infer_stats is added when constructing the request, this is different
   // from the one in the ensemble backend, purely used for accumulating duration
@@ -680,10 +685,13 @@ EnsembleContext::FinishEnsemble()
   }
 #endif
   if (ensemble_status_.IsOk()) {
-    InferenceResponse::Send(std::move(response));
+    InferenceResponse::Send(
+        std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
   } else {
     if (response != nullptr) {
-      InferenceResponse::SendWithStatus(std::move(response), ensemble_status_);
+      InferenceResponse::SendWithStatus(
+          std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+          ensemble_status_);
     } else {
       InferenceRequest::RespondIfError(request_, ensemble_status_);
     }

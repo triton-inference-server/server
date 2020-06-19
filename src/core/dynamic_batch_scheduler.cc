@@ -600,7 +600,8 @@ DynamicBatchScheduler::FinalizeResponses()
   }
 
   for (auto& response : responses) {
-    InferenceResponse::Send(std::move(response));
+    InferenceResponse::Send(
+        std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
   }
 }
 

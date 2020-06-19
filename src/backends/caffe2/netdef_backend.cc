@@ -614,7 +614,8 @@ NetDefBackend::Context::Run(
   for (auto& response : responses) {
     if (response != nullptr) {
       LOG_STATUS_ERROR(
-          InferenceResponse::Send(std::move(response)),
+          InferenceResponse::Send(
+              std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL),
           "failed to send TensorFlow backend response");
     }
   }

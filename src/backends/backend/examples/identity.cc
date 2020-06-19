@@ -80,18 +80,20 @@ namespace {
     }                                \
   } while (false)
 
-#define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                   \
-  do {                                                                \
-    if ((RESPONSES)[IDX] != nullptr) {                                \
-      TRITONSERVER_Error* err__ = (X);                                \
-      if (err__ != nullptr) {                                         \
-        LOG_IF_ERROR(                                                 \
-            TRITONBACKEND_ResponseSendError((RESPONSES)[IDX], err__), \
-            "failed to send error response");                         \
-        (RESPONSES)[IDX] = nullptr;                                   \
-        TRITONSERVER_ErrorDelete(err__);                              \
-      }                                                               \
-    }                                                                 \
+#define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
+  do {                                                                  \
+    if ((RESPONSES)[IDX] != nullptr) {                                  \
+      TRITONSERVER_Error* err__ = (X);                                  \
+      if (err__ != nullptr) {                                           \
+        LOG_IF_ERROR(                                                   \
+            TRITONBACKEND_ResponseSendError(                            \
+                (RESPONSES)[IDX], TRITONSERVER_RESPONSE_COMPLETE_FINAL, \
+                err__),                                                 \
+            "failed to send error response");                           \
+        (RESPONSES)[IDX] = nullptr;                                     \
+        TRITONSERVER_ErrorDelete(err__);                                \
+      }                                                                 \
+    }                                                                   \
   } while (false)
 
 TRITONSERVER_Error*
@@ -655,10 +657,14 @@ TRITONBACKEND_ModelExecute(
     }
 
     // If we get to this point there hasn't been any error and the
-    // response is complete and we can send it. If there is an error
-    // when sending all we can do is log it.
+    // response is complete and we can send it. This is the last (and
+    // only) response that we are sending for the request so we must
+    // mark it FINAL. If there is an error when sending all we can do
+    // is log it.
     LOG_IF_ERROR(
-        TRITONBACKEND_ResponseSend(responses[r]), "failed sending response");
+        TRITONBACKEND_ResponseSend(
+            responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL),
+        "failed sending response");
   }
 
   // Done with requests. We could have released each request as soon

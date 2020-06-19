@@ -449,12 +449,13 @@ TRITONBACKEND_ResponseOutput(
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_ResponseSend(TRITONBACKEND_Response* response)
+TRITONBACKEND_ResponseSend(
+    TRITONBACKEND_Response* response, const uint32_t send_flags)
 {
   InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
 
   std::unique_ptr<InferenceResponse> utr(tr);
-  Status status = InferenceResponse::Send(std::move(utr));
+  Status status = InferenceResponse::Send(std::move(utr), send_flags);
   if (!status.IsOk()) {
     return TRITONSERVER_ErrorNew(
         StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
@@ -465,15 +466,17 @@ TRITONBACKEND_ResponseSend(TRITONBACKEND_Response* response)
 
 TRITONSERVER_Error*
 TRITONBACKEND_ResponseSendError(
-    TRITONBACKEND_Response* response, TRITONSERVER_Error* error)
+    TRITONBACKEND_Response* response, const uint32_t send_flags,
+    TRITONSERVER_Error* error)
 {
   InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
 
   std::unique_ptr<InferenceResponse> utr(tr);
   Status status = InferenceResponse::SendWithStatus(
-      std::move(utr), Status(
-                          TritonCodeToStatusCode(TRITONSERVER_ErrorCode(error)),
-                          TRITONSERVER_ErrorMessage(error)));
+      std::move(utr), send_flags,
+      Status(
+          TritonCodeToStatusCode(TRITONSERVER_ErrorCode(error)),
+          TRITONSERVER_ErrorMessage(error)));
   if (!status.IsOk()) {
     return TRITONSERVER_ErrorNew(
         StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());

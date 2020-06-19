@@ -64,11 +64,15 @@ ResponseAllocator null_allocator =
     ResponseAllocator(NullResponseAlloc, NullResponseRelease);
 
 void
-NullResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
+NullResponseComplete(
+    TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
+    void* userp)
 {
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseDelete(iresponse),
-      "deleting null response");
+  if (iresponse != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(iresponse),
+        "deleting null response");
+  }
 }
 
 void
@@ -122,13 +126,15 @@ InferenceRequest::RespondIfError(
 
   // Use the response factory to create a response, set the status,
   // and send it. If something goes wrong all we can do is log the
-  // error.
+  // error. Because this is sending an error we assume that this is
+  // the last response for the request and so set the FINAL flag.
   std::unique_ptr<InferenceResponse> response;
   LOG_STATUS_ERROR(
       request->response_factory_.CreateResponse(&response),
       "failed to create error response");
   LOG_STATUS_ERROR(
-      InferenceResponse::SendWithStatus(std::move(response), status),
+      InferenceResponse::SendWithStatus(
+          std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
       "failed to send error response");
 
   // If releasing the request then invoke the release callback which

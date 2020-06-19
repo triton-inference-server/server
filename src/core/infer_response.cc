@@ -141,7 +141,8 @@ InferenceResponse::ClassificationLabel(
 }
 
 Status
-InferenceResponse::Send(std::unique_ptr<InferenceResponse>&& response)
+InferenceResponse::Send(
+    std::unique_ptr<InferenceResponse>&& response, const uint32_t flags)
 {
   if (response->response_delegator_ != nullptr) {
     auto ldelegator = std::move(response->response_delegator_);
@@ -151,13 +152,14 @@ InferenceResponse::Send(std::unique_ptr<InferenceResponse>&& response)
   void* userp = response->response_userp_;
   response->response_fn_(
       reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
-      userp);
+      flags, userp);
   return Status::Success;
 }
 
 Status
 InferenceResponse::SendWithStatus(
-    std::unique_ptr<InferenceResponse>&& response, const Status& status)
+    std::unique_ptr<InferenceResponse>&& response, const uint32_t flags,
+    const Status& status)
 {
   response->status_ = status;
   if (response->response_delegator_ != nullptr) {
@@ -169,7 +171,7 @@ InferenceResponse::SendWithStatus(
   void* userp = response->response_userp_;
   response->response_fn_(
       reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
-      userp);
+      flags, userp);
   return Status::Success;
 }
 
