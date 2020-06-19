@@ -112,16 +112,8 @@ def create_savedmodel_modelfile(
         in0 = tf.strings.to_number(in0, tf.int32)
         in1 = tf.strings.to_number(in1, tf.int32)
 
-    # TF doesn't have GPU add or subtract operation for int8, int16 or
-    # int32 so force those onto CPU.
-    if ((input_dtype == np.int8) or (input_dtype == np.int16) or
-        (input_dtype == np.int32)):
-        with tf.device('/cpu:0'):
-            add = tf.add(in0, in1, "ADD")
-            sub = tf.subtract(in0, in1, "SUB")
-    else:
-        add = tf.add(in0, in1, "ADD")
-        sub = tf.subtract(in0, in1, "SUB")
+    add = tf.add(in0, in1, "ADD")
+    sub = tf.subtract(in0, in1, "SUB")
 
     # Cast or convert result to the output dtype.
     if tf_output0_dtype == tf.string:
