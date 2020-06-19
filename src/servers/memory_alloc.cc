@@ -175,9 +175,12 @@ ResponseRelease(
 }
 
 void
-InferRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
+InferRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  TRITONSERVER_InferenceRequestDelete(request);
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    TRITONSERVER_InferenceRequestDelete(request);
+  }
 }
 
 void

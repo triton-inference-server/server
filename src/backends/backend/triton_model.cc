@@ -346,11 +346,12 @@ TRITONBACKEND_RequestOutputName(
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_RequestRelease(TRITONBACKEND_Request* request)
+TRITONBACKEND_RequestRelease(
+    TRITONBACKEND_Request* request, uint32_t release_flags)
 {
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   std::unique_ptr<InferenceRequest> ur(tr);
-  InferenceRequest::Release(std::move(ur));
+  InferenceRequest::Release(std::move(ur), release_flags);
   return nullptr;  // success
 }
 

@@ -2428,13 +2428,16 @@ SetInferenceRequestMetadata(
 }
 
 void
-InferRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
+InferRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
 
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceRequestDelete(request),
-      "deleting GRPC inference request");
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(request),
+        "deleting GRPC inference request");
+  }
 }
 
 TRITONSERVER_Error*

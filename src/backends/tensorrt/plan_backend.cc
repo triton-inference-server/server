@@ -106,12 +106,15 @@ WarmupResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
 }
 
 void
-WarmupRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
+WarmupRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  TRITONSERVER_InferenceRequestDelete(request);
-  if (userp != nullptr) {
-    auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
-    warmup_promise->set_value();
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    TRITONSERVER_InferenceRequestDelete(request);
+    if (userp != nullptr) {
+      auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
+      warmup_promise->set_value();
+    }
   }
 }
 
@@ -1535,7 +1538,8 @@ PlanBackend::WarmUp(uint32_t runner_idx, WarmupData& sample)
     completion_promise.get_future().get();
   }
   for (auto& request : sample.requests_) {
-    InferenceRequest::Release(std::move(request));
+    InferenceRequest::Release(
+        std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);
   }
 
   // Need to reset the next context to be executed on this runner
@@ -2164,7 +2168,8 @@ PlanBackend::Context::ProcessResponse(
 
     // Release all requests.
     for (auto& request : payload->requests_) {
-      InferenceRequest::Release(std::move(request));
+      InferenceRequest::Release(
+          std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);
     }
   }
 }

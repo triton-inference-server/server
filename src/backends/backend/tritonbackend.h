@@ -219,9 +219,12 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestOutputName(
 /// created before calling this function.
 ///
 /// \param request The inference request.
+/// \param release_flags Flags indicating what type of request release
+/// should be performed. \see TRITONSERVER_RequestReleaseFlag. \see
+/// TRITONSERVER_InferenceRequestReleaseFn_t.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestRelease(
-    TRITONBACKEND_Request* request);
+    TRITONBACKEND_Request* request, uint32_t release_flags);
 
 ///
 /// TRITONBACKEND_ResponseFactory

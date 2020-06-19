@@ -512,12 +512,34 @@ typedef enum tritonserver_requestflag_enum {
   TRITONSERVER_REQUEST_FLAG_SEQUENCE_END = 2
 } TRITONSERVER_RequestFlag;
 
+/// Inference request release flags. The enum values must be
+/// power-of-2 values.
+typedef enum tritonserver_requestreleaseflag_enum {
+  TRITONSERVER_REQUEST_RELEASE_NONE = 0,
+  TRITONSERVER_REQUEST_RELEASE_ALL = 1
+} TRITONSERVER_RequestReleaseFlag;
+
 /// Type for inference request release callback function. The callback
-/// function takes ownership of the TRITONSERVER_InferenceRequest
-/// object. The 'userp' data is the same as what is supplied in the
-/// call to TRITONSERVER_ServerInferAsync.
+/// indicates what type of release is being performed on the request
+/// and for some of these the callback function takes ownership of the
+/// TRITONSERVER_InferenceRequest object. The 'userp' data is the same
+/// as what is supplied in the call to TRITONSERVER_ServerInferAsync.
+///
+/// One or more flags will be specified when the callback is invoked,
+/// and the callback must take the following actions:
+///
+///   - If no flags are set (flags ==
+///     TRITONSERVER_REQUEST_RELEASE_None) the callback should do
+///     nothing.
+///
+///   - TRITONSERVER_REQUEST_RELEASE_ALL: The entire inference request
+///     is being released and ownership is passed to the callback
+///     function. Triton will not longer access the 'request' object
+///     itself nor any input tensor data associated with the
+///     request. The callback should free or otherwise manage the
+///     'request' object and all associated tensor data.
 typedef void (*TRITONSERVER_InferenceRequestReleaseFn_t)(
-    TRITONSERVER_InferenceRequest* request, void* userp);
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp);
 
 /// Type for callback function indicating that an inference response
 /// has completed. The callback function takes ownership of the
