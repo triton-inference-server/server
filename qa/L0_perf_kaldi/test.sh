@@ -28,14 +28,11 @@
 # Test with 20.05 because kaldi image for 20.06 is not yet available
 TRITON_VERSION="20.05"
 
-# Build client
 cd /workspace
-
 git clone --single-branch --depth=1 -b r${TRITON_VERSION} \
     https://github.com/NVIDIA/triton-inference-server.git
 
-(cd triton-inference-server/src/clients/c++ && \
-    echo "add_subdirectory(kaldi-asr-client)" >> "CMakeLists.txt")
+echo "add_subdirectory(kaldi-asr-client)" >> triton-inference-server/src/clients/c++/CMakeLists.txt
 
 cp -r asr_kaldi/kaldi-asr-client triton-inference-server/src/clients/c++
 cp -r asr_kaldi/model-repo/kaldi_online/config.pbtxt model-repo/kaldi_online/
@@ -55,8 +52,8 @@ pip3 install --upgrade wheel setuptools grpcio-tools
           -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install && \
     make -j16 trtis-clients)
 
-rm *.log
 RET=0
+rm -rf *.log
 
 # Run server
 /opt/tritonserver/bin/trtserver --model-repo=/workspace/model-repo > server.log 2>&1 &
@@ -82,7 +79,7 @@ if (( $? != 0 )); then
 fi
 
 # Capture Throughput
-THROUGHPUT=cat client_1.log | grep 'Throughput:' | cut -f 2 | cut -f 1 -d ' '
+THROUGHPUT=`cat client_1.log | grep 'Throughput:' | cut -f 2 | cut -f 1 -d ' '`
 
 # '-o' Flag is needed to run online and capture latency
 $KALDI_CLIENT -i 5 -c ${CONCURRENCY} -o >> client_2.log 2>&1
@@ -91,7 +88,7 @@ if (( $? != 0 )); then
 fi
 
 # Capture Latency 95 percentile
-LATENCY_95=cat client_2.log | grep -A1 "Latencies:" | sed -n '2 p' | cut -f 5
+LATENCY_95=`cat client_2.log | grep -A1 "Latencies:" | sed -n '2 p' | cut -f 5`
 
 REPORTER=triton-inference-server/qa/common/reporter.py
 
