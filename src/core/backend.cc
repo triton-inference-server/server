@@ -75,14 +75,18 @@ ResponseAllocator warmup_allocator =
     ResponseAllocator(WarmupResponseAlloc, WarmupResponseRelease);
 
 void
-WarmupResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
+WarmupResponseComplete(
+    TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
+    void* userp)
 {
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseError(iresponse), "warmup error");
-  // Just delete the response, warmup doesn't check for correctness
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseDelete(iresponse),
-      "deleting warmup response");
+  if (iresponse != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseError(iresponse), "warmup error");
+    // Just delete the response, warmup doesn't check for correctness
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(iresponse),
+        "deleting warmup response");
+  }
 }
 
 void

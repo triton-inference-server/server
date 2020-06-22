@@ -2615,7 +2615,8 @@ class ModelInferHandler
 
  private:
   static void InferResponseComplete(
-      TRITONSERVER_InferenceResponse* response, void* userp);
+      TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+      void* userp);
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
@@ -2783,8 +2784,14 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
 void
 ModelInferHandler::InferResponseComplete(
-    TRITONSERVER_InferenceResponse* iresponse, void* userp)
+    TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
+    void* userp)
 {
+  // FIXME need to correctly handle FINAL flag
+  if (iresponse == nullptr) {
+    return;
+  }
+
   State* state = reinterpret_cast<State*>(userp);
 
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
@@ -2852,7 +2859,8 @@ class ModelStreamInferHandler
 
  private:
   static void StreamInferResponseComplete(
-      TRITONSERVER_InferenceResponse* response, void* userp);
+      TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+      void* userp);
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
@@ -3120,8 +3128,14 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
 void
 ModelStreamInferHandler::StreamInferResponseComplete(
-    TRITONSERVER_InferenceResponse* iresponse, void* userp)
+    TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
+    void* userp)
 {
+  // FIXME need to correctly handle FINAL flag
+  if (iresponse == nullptr) {
+    return;
+  }
+
   State* state = reinterpret_cast<State*>(userp);
 
   LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferComplete, context "

@@ -580,7 +580,9 @@ CustomBackend::Context::Run(
       // GetOutput() on the output
       if (ocontext->response_ != nullptr) {
         LOG_STATUS_ERROR(
-            InferenceResponse::Send(std::move(ocontext->response_)),
+            InferenceResponse::Send(
+                std::move(ocontext->response_),
+                TRITONSERVER_RESPONSE_COMPLETE_FINAL),
             "failed to send custom backend response");
       }
     } else {

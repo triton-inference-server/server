@@ -42,7 +42,8 @@ namespace nvidia { namespace inferenceserver {
       for (auto& response : (RESPONSES)) {                                   \
         if (response != nullptr) {                                           \
           const auto& response_status__ = InferenceResponse::SendWithStatus( \
-              std::move(response), status__);                                \
+              std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,     \
+              status__);                                                     \
           LOG_STATUS_ERROR(response_status__, (LOG_MSG));                    \
         }                                                                    \
       }                                                                      \
@@ -62,7 +63,8 @@ namespace nvidia { namespace inferenceserver {
       for (auto& response : (RESPONSES)) {                                   \
         if (response != nullptr) {                                           \
           const auto& response_status__ = InferenceResponse::SendWithStatus( \
-              std::move(response), status__);                                \
+              std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,     \
+              status__);                                                     \
           LOG_STATUS_ERROR(response_status__, (LOG_MSG));                    \
         }                                                                    \
       }                                                                      \

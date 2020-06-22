@@ -306,19 +306,26 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseOutput(
 /// access or delete the response object after calling this function.
 ///
 /// \param response The response.
+/// \param send_flags Flags associated with the response. \see
+/// TRITONSERVER_ResponseCompleteFlag. \see
+/// TRITONSERVER_InferenceResponseCompleteFn_t.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSend(
-    TRITONBACKEND_Response* response);
+    TRITONBACKEND_Response* response, const uint32_t send_flags);
 
 /// Send an error response. Calling this function transfers ownership
 /// of the response object to Triton. The caller must not access or
 /// delete the response object after calling this function.
 ///
 /// \param response The response.
+/// \param send_flags Flags associated with the response. \see
+/// TRITONSERVER_ResponseCompleteFlag. \see
+/// TRITONSERVER_InferenceResponseCompleteFn_t.
 /// \param error The TRITONSERVER_Error to send.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSendError(
-    TRITONBACKEND_Response* response, TRITONSERVER_Error* error);
+    TRITONBACKEND_Response* response, const uint32_t send_flags,
+    TRITONSERVER_Error* error);
 
 ///
 /// TRITONBACKEND_Backend
