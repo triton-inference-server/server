@@ -57,7 +57,7 @@ if __name__ == '__main__':
    model_name = "param"
 
    # Create the inference context for the model.
-   client = client_util.InferenceServerClient(FLAGS.url, FLAGS.verbose)
+   client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
 
    # Input tensor can be any size int32 vector...
    input_data = np.zeros(shape=1, dtype=np.int32)
