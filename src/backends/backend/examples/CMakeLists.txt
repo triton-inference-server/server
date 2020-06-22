@@ -27,6 +27,14 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
+# Backend utilities
+#
+add_library(
+  backend-utils-library EXCLUDE_FROM_ALL OBJECT
+  backend_utils.cc backend_utils.h
+)
+
+#
 # libtriton_identity.so
 #
 configure_file(libtriton_identity.ldscript libtriton_identity.ldscript COPYONLY)
@@ -34,6 +42,7 @@ configure_file(libtriton_identity.ldscript libtriton_identity.ldscript COPYONLY)
 add_library(
   triton_identity SHARED
   identity.cc
+  $<TARGET_OBJECTS:backend-utils-library>
 )
 set_target_properties(
   triton_identity
