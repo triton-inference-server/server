@@ -186,6 +186,19 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInput(
     TRITONBACKEND_Request* request, const uint32_t index,
     TRITONBACKEND_Input** input);
 
+/// Get a named request input tensor. The lifetime of the returned
+/// input tensor object matches that of the request and so the input
+/// tensor object should not be accessed after the request object is
+/// released.
+///
+/// \param request The inference request.
+/// \param name The name of the input tensor.
+/// \param input Returns the input tensor corresponding to the name.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInputByName(
+    TRITONBACKEND_Request* request, const char* name,
+    TRITONBACKEND_Input** input);
+
 /// Get the number of output tensors requested to be returned in the
 /// request.
 ///
@@ -252,6 +265,16 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseFactoryNew(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseFactoryDelete(
     TRITONBACKEND_ResponseFactory* factory);
 
+/// Send response flags without a corresponding response.
+///
+/// \param factory The response factory.
+/// \param send_flags Flags to send. \see
+/// TRITONSERVER_ResponseCompleteFlag. \see
+/// TRITONSERVER_InferenceResponseCompleteFn_t.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseFactorySendFlags(
+    TRITONBACKEND_ResponseFactory* factory, const uint32_t send_flags);
+
 ///
 /// TRITONBACKEND_Response
 ///
@@ -301,29 +324,18 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseOutput(
     const char* name, const TRITONSERVER_DataType datatype,
     const int64_t* shape, const uint32_t dims_count);
 
-/// Send a successful response. Calling this function transfers
-/// ownership of the response object to Triton. The caller must not
-/// access or delete the response object after calling this function.
+/// Send a response. Calling this function transfers ownership of the
+/// response object to Triton. The caller must not access or delete
+/// the response object after calling this function.
 ///
 /// \param response The response.
 /// \param send_flags Flags associated with the response. \see
 /// TRITONSERVER_ResponseCompleteFlag. \see
 /// TRITONSERVER_InferenceResponseCompleteFn_t.
+/// \param error The TRITONSERVER_Error to send if the response is an
+/// error, or nullptr if the response is successful.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSend(
-    TRITONBACKEND_Response* response, const uint32_t send_flags);
-
-/// Send an error response. Calling this function transfers ownership
-/// of the response object to Triton. The caller must not access or
-/// delete the response object after calling this function.
-///
-/// \param response The response.
-/// \param send_flags Flags associated with the response. \see
-/// TRITONSERVER_ResponseCompleteFlag. \see
-/// TRITONSERVER_InferenceResponseCompleteFn_t.
-/// \param error The TRITONSERVER_Error to send.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSendError(
     TRITONBACKEND_Response* response, const uint32_t send_flags,
     TRITONSERVER_Error* error);
 

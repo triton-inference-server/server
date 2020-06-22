@@ -109,8 +109,10 @@ TritonModel::Create(
   // any initialization.
   RETURN_IF_ERROR(local_model->SetConfiguredScheduler(
       1 /* runner_cnt */,
+      /* Initialization callback */
       [](uint32_t runner_idx) -> Status { return Status::Success; },
-      [model_exec_fn, triton_model](
+      /* Run callback */
+      [model_exec_fn, triton_model, backend](
           uint32_t runner_idx,
           std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
         // There is only a single thread calling this function so can
@@ -121,6 +123,15 @@ TritonModel::Create(
           triton_requests.push_back(
               reinterpret_cast<TRITONBACKEND_Request*>(r.release()));
         }
+
+        // We don't want the backend used by this model to unload
+        // while exec_fn is running (can happen if model is unloaded
+        // during the request and then that request is released in
+        // exec_fn as the last reference to the model. So we hold a
+        // copy of the backend here... This convoluted flow will be
+        // cleaned up once legacy InferenceBackend is replaced with
+        // TritonModel.
+        std::shared_ptr<TritonBackend> backendx = backend;
 
         // If there is an error then we retain ownership of 'requests'
         // and must send error responses.
@@ -288,7 +299,7 @@ TRITONBACKEND_RequestInput(
   // The request inputs are not allowed to change once the request
   // makes it to the backend, so it is ok to just iterate through the
   // map. This linear search is the best we can do given the need for
-  // the inputs to be in the map and given the typical small number of
+  // the inputs to be in a map and given the typical small number of
   // inputs is better than having every request maintain the inputs as
   // both map and vector.
   uint32_t cnt = 0;
@@ -299,6 +310,27 @@ TRITONBACKEND_RequestInput(
       break;
     }
   }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestInputByName(
+    TRITONBACKEND_Request* request, const char* name,
+    TRITONBACKEND_Input** input)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  const auto& inputs = tr->ImmutableInputs();
+  const auto& itr = inputs.find(name);
+  if (itr == inputs.end()) {
+    *input = nullptr;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("unknown request input name ") + name).c_str());
+  }
+
+  InferenceRequest::Input* in = itr->second;
+  *input = reinterpret_cast<TRITONBACKEND_Input*>(in);
 
   return nullptr;  // success
 }
@@ -378,6 +410,20 @@ TRITONBACKEND_ResponseFactoryDelete(TRITONBACKEND_ResponseFactory* factory)
   return nullptr;  // success
 }
 
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseFactorySendFlags(
+    TRITONBACKEND_ResponseFactory* factory, const uint32_t send_flags)
+{
+  InferenceResponseFactory* tf =
+      reinterpret_cast<InferenceResponseFactory*>(factory);
+  Status status = tf->SendFlags(send_flags);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
 ///
 /// TRITONBACKEND_Response
 ///
@@ -449,33 +495,24 @@ TRITONBACKEND_ResponseOutput(
 
 TRITONSERVER_Error*
 TRITONBACKEND_ResponseSend(
-    TRITONBACKEND_Response* response, const uint32_t send_flags)
-{
-  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
-
-  std::unique_ptr<InferenceResponse> utr(tr);
-  Status status = InferenceResponse::Send(std::move(utr), send_flags);
-  if (!status.IsOk()) {
-    return TRITONSERVER_ErrorNew(
-        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
-  }
-  return nullptr;  // success
-}
-
-
-TRITONSERVER_Error*
-TRITONBACKEND_ResponseSendError(
     TRITONBACKEND_Response* response, const uint32_t send_flags,
     TRITONSERVER_Error* error)
 {
   InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
 
+  Status status;
+
   std::unique_ptr<InferenceResponse> utr(tr);
-  Status status = InferenceResponse::SendWithStatus(
-      std::move(utr), send_flags,
-      Status(
-          TritonCodeToStatusCode(TRITONSERVER_ErrorCode(error)),
-          TRITONSERVER_ErrorMessage(error)));
+  if (error == nullptr) {
+    status = InferenceResponse::Send(std::move(utr), send_flags);
+  } else {
+    status = InferenceResponse::SendWithStatus(
+        std::move(utr), send_flags,
+        Status(
+            TritonCodeToStatusCode(TRITONSERVER_ErrorCode(error)),
+            TRITONSERVER_ErrorMessage(error)));
+  }
+
   if (!status.IsOk()) {
     return TRITONSERVER_ErrorNew(
         StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
