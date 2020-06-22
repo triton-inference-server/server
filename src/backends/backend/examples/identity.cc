@@ -24,18 +24,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <iostream>
-#include <string>
-#include <vector>
-#include "src/backends/backend/tritonbackend.h"
-
-#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
-#define TRITONJSON_STATUSRETURN(M) \
-  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
-#define TRITONJSON_STATUSSUCCESS nullptr
-#include "src/core/json.h"
+#include "src/backends/backend/examples/backend_utils.h"
 
 namespace ni = nvidia::inferenceserver;
+namespace nib = nvidia::inferenceserver::backend;
 
 //
 // Simple backend that demonstrates the TRITONBACKEND API for a
@@ -52,34 +44,6 @@ namespace ni = nvidia::inferenceserver;
 
 namespace {
 
-#define LOG_IF_ERROR(X, MSG)                                               \
-  do {                                                                     \
-    TRITONSERVER_Error* err__ = (X);                                       \
-    if (err__ != nullptr) {                                                \
-      TRITONSERVER_LogMessage(                                             \
-          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,                       \
-          (std::string(MSG) + ": " + TRITONSERVER_ErrorCodeString(err__) + \
-           " - " + TRITONSERVER_ErrorMessage(err__))                       \
-              .c_str());                                                   \
-      TRITONSERVER_ErrorDelete(err__);                                     \
-    }                                                                      \
-  } while (false)
-
-#define RETURN_ERROR_IF_FALSE(P, C, MSG)              \
-  do {                                                \
-    if (!(P)) {                                       \
-      return TRITONSERVER_ErrorNew(C, (MSG).c_str()); \
-    }                                                 \
-  } while (false)
-
-#define RETURN_IF_ERROR(X)           \
-  do {                               \
-    TRITONSERVER_Error* err__ = (X); \
-    if (err__ != nullptr) {          \
-      return err__;                  \
-    }                                \
-  } while (false)
-
 #define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
   do {                                                                  \
     if ((RESPONSES)[IDX] != nullptr) {                                  \
@@ -95,47 +59,6 @@ namespace {
       }                                                                 \
     }                                                                   \
   } while (false)
-
-TRITONSERVER_Error*
-ParseShape(
-    ni::TritonJson::Value& io, const std::string& name,
-    std::vector<int64_t>* shape)
-{
-  ni::TritonJson::Value shape_array;
-  RETURN_IF_ERROR(io.MemberAsArray(name.c_str(), &shape_array));
-  for (size_t i = 0; i < shape_array.ArraySize(); ++i) {
-    int64_t d;
-    RETURN_IF_ERROR(shape_array.IndexAsInt(i, &d));
-    shape->push_back(d);
-  }
-
-  return nullptr;  // success
-}
-
-std::string
-ShapeToString(const int64_t* dims, const size_t dims_count)
-{
-  bool first = true;
-
-  std::string str("[");
-  for (size_t i = 0; i < dims_count; ++i) {
-    const int64_t dim = dims[i];
-    if (!first) {
-      str += ",";
-    }
-    str += std::to_string(dim);
-    first = false;
-  }
-
-  str += "]";
-  return str;
-}
-
-std::string
-ShapeToString(const std::vector<int64_t>& shape)
-{
-  return ShapeToString(shape.data(), shape.size());
-}
 
 //
 // ModelState
@@ -241,13 +164,14 @@ ModelState::ValidateModelConfig()
 
   // Input and output must have same shape
   std::vector<int64_t> input_shape, output_shape;
-  RETURN_IF_ERROR(ParseShape(input, "dims", &input_shape));
-  RETURN_IF_ERROR(ParseShape(output, "dims", &output_shape));
+  RETURN_IF_ERROR(nib::ParseShape(input, "dims", &input_shape));
+  RETURN_IF_ERROR(nib::ParseShape(output, "dims", &output_shape));
 
   RETURN_ERROR_IF_FALSE(
       input_shape == output_shape, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected input and output shape to match, got ") +
-          ShapeToString(input_shape) + " and " + ShapeToString(output_shape));
+          nib::ShapeToString(input_shape) + " and " +
+          nib::ShapeToString(output_shape));
 
   return nullptr;  // success
 }
@@ -560,7 +484,7 @@ TRITONBACKEND_ModelExecute(
         TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
         (std::string("\tinput ") + input_name +
          ": datatype = " + TRITONSERVER_DataTypeString(input_datatype) +
-         ", shape = " + ShapeToString(input_shape, input_dims_count) +
+         ", shape = " + nib::ShapeToString(input_shape, input_dims_count) +
          ", byte_size = " + std::to_string(input_byte_size) +
          ", buffer_count = " + std::to_string(input_buffer_count))
             .c_str());
