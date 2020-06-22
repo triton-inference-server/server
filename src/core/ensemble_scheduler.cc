@@ -415,15 +415,14 @@ EnsembleContext::ResponseComplete(
         TRITONSERVER_DataType datatype;
         const int64_t* shape;
         uint64_t dim_count;
-        uint32_t batch_size;
         const void* base;
         size_t byte_size;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
         void* userp;
         err = TRITONSERVER_InferenceResponseOutput(
-            response, idx, &name, &datatype, &shape, &dim_count, &batch_size,
-            &base, &byte_size, &memory_type, &memory_type_id, &userp);
+            response, idx, &name, &datatype, &shape, &dim_count, &base,
+            &byte_size, &memory_type, &memory_type_id, &userp);
         if (err == nullptr) {
           auto it = output_to_tensor.find(name);
           if (it != output_to_tensor.end()) {
@@ -433,7 +432,6 @@ EnsembleContext::ResponseComplete(
 
             tensor_data.first->SetData(
                 std::move(step_ptr->output_map_[it->first]));
-            tensor_data.second = batch_size;
             step_ptr->updated_tensors_.emplace(it->second);
           } else {
             err = TRITONSERVER_ErrorNew(
@@ -610,6 +608,13 @@ EnsembleContext::InitStep(const size_t step_idx, std::unique_ptr<Step>* step)
 
   RETURN_IF_ERROR(irequest->PrepareForInference());
 
+  // Record the batch size of output in advance as
+  // there is no other way to access it later on.
+  for (const auto& pair : istep.output_to_tensor_) {
+    auto& output_data_ = tensor_data_[pair.second];
+    output_data_.second = irequest->BatchSize();
+  }
+
   (*step)->request_ = std::move(irequest);
 
   return Status::Success;
@@ -731,8 +736,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
 
     InferenceResponse::Output* output;
     RETURN_IF_ERROR((*response)->AddOutput(
-        output_pair.first, tensor_data.first->DType(), shape,
-        request_->BatchSize(), &output));
+        output_pair.first, tensor_data.first->DType(), shape, &output));
 
     // Use the memory type of the memory block as preferred memory type
     TRITONSERVER_MemoryType dst_memory_type;
