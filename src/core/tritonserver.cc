@@ -1451,7 +1451,7 @@ TRITONSERVER_ServerModelBatch(
   RETURN_IF_STATUS_ERROR(
       lserver->GetInferenceBackend(model_name, model_version, &backend));
 
-  if (backend->Config()->max_batch_size() > 0) {
+  if (backend->Config().max_batch_size() > 0) {
     *flags = TRITONSERVER_BATCH_FIRST_DIM;
   } else {
     *flags = TRITONSERVER_BATCH_UNKNOWN;
