@@ -137,7 +137,9 @@ class InferenceResponse {
     // The shape of the output tensor.
     const std::vector<int64_t>& Shape() const { return shape_; }
 
-    // Reshape the output tensor if specified in output config.
+    // Reshape the output tensor. This function must only be called
+    // for outputs that have respace specified in the model
+    // configuration.
     void Reshape(const bool has_batch_dim, const ModelOutput* output_config);
 
     // Get information about the buffer allocated for this output
