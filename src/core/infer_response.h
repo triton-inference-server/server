@@ -239,13 +239,15 @@ class InferenceResponse {
   // Send the response with success status. Calling this function
   // releases ownership of the response object and gives it to the
   // callback function.
-  static Status Send(std::unique_ptr<InferenceResponse>&& response);
+  static Status Send(
+      std::unique_ptr<InferenceResponse>&& response, const uint32_t flags);
 
   // Send the response with explicit status. Calling this function
   // releases ownership of the response object and gives it to the
   // callback function.
   static Status SendWithStatus(
-      std::unique_ptr<InferenceResponse>&& response, const Status& status);
+      std::unique_ptr<InferenceResponse>&& response, const uint32_t flags,
+      const Status& status);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(InferenceResponse);

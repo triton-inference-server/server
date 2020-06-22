@@ -95,14 +95,18 @@ ResponseAllocator warmup_allocator =
     ResponseAllocator(WarmupResponseAlloc, WarmupResponseRelease);
 
 void
-WarmupResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
+WarmupResponseComplete(
+    TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
+    void* userp)
 {
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseError(iresponse), "warmup error");
-  // Just delete the response, warmup doesn't check for correctness
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseDelete(iresponse),
-      "deleting warmup response");
+  if (iresponse != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseError(iresponse), "warmup error");
+    // Just delete the response, warmup doesn't check for correctness
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(iresponse),
+        "deleting warmup response");
+  }
 }
 
 void
@@ -1599,7 +1603,8 @@ PlanBackend::Context::SetOutputShapeTensorBuffer(
       &actual_memory_type_id);
   if (!status.IsOk()) {
     LOG_STATUS_ERROR(
-        InferenceResponse::SendWithStatus(std::move(*response), status),
+        InferenceResponse::SendWithStatus(
+            std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
         "error sending TRT response");
     return cuda_copy;
   }
@@ -1622,7 +1627,8 @@ PlanBackend::Context::SetOutputShapeTensorBuffer(
 
   if (!status.IsOk()) {
     LOG_STATUS_ERROR(
-        InferenceResponse::SendWithStatus(std::move(*response), status),
+        InferenceResponse::SendWithStatus(
+            std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
         "error sending TensorFlow response");
     return cuda_copy;
   }
@@ -2161,7 +2167,8 @@ PlanBackend::Context::ProcessResponse(
     for (auto& response : payload->responses_) {
       if (response != nullptr) {
         LOG_STATUS_ERROR(
-            InferenceResponse::Send(std::move(response)),
+            InferenceResponse::Send(
+                std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL),
             "failed to send TRT backend response");
       }
     }

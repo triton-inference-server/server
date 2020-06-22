@@ -519,6 +519,13 @@ typedef enum tritonserver_requestreleaseflag_enum {
   TRITONSERVER_REQUEST_RELEASE_ALL = 1
 } TRITONSERVER_RequestReleaseFlag;
 
+/// Inference response complete flags. The enum values must be
+/// power-of-2 values.
+typedef enum tritonserver_responsecompleteflag_enum {
+  TRITONSERVER_RESPONSE_COMPLETE_NONE = 0,
+  TRITONSERVER_RESPONSE_COMPLETE_FINAL = 1
+} TRITONSERVER_ResponseCompleteFlag;
+
 /// Type for inference request release callback function. The callback
 /// indicates what type of release is being performed on the request
 /// and for some of these the callback function takes ownership of the
@@ -529,8 +536,9 @@ typedef enum tritonserver_requestreleaseflag_enum {
 /// and the callback must take the following actions:
 ///
 ///   - If no flags are set (flags ==
-///     TRITONSERVER_REQUEST_RELEASE_None) the callback should do
-///     nothing.
+///     TRITONSERVER_REQUEST_RELEASE_NONE) the callback should do
+///     nothing. The callback does *not* take ownership of the request
+///     object.
 ///
 ///   - TRITONSERVER_REQUEST_RELEASE_ALL: The entire inference request
 ///     is being released and ownership is passed to the callback
@@ -546,8 +554,21 @@ typedef void (*TRITONSERVER_InferenceRequestReleaseFn_t)(
 /// TRITONSERVER_InferenceResponse object. The 'userp' data is the
 /// same as what is supplied in the call to
 /// TRITONSERVER_ServerInferAsync.
+///
+/// One or more flags may be specified when the callback is invoked:
+///
+///   - TRITONSERVER_RESPONSE_COMPLETE_FINAL: Indicates that no more
+///     responses will be generated for a given request (more
+///     specifically, that no more responses will be generated for the
+///     inference request that set this callback and 'userp'). When
+///     this flag is set 'response' may be a response object or may be
+///     nullptr. If 'response' is not nullptr, then 'response' is the
+///     last response that Triton will produce for the request. If
+///     'response' is nullptr then Triton is indicating that no more
+///     responses will be produced for the request.
 typedef void (*TRITONSERVER_InferenceResponseCompleteFn_t)(
-    TRITONSERVER_InferenceResponse* response, void* userp);
+    TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+    void* userp);
 
 /// Create a new inference request object.
 ///

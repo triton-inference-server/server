@@ -184,13 +184,16 @@ InferRequestComplete(
 }
 
 void
-InferResponseComplete(TRITONSERVER_InferenceResponse* response, void* userp)
+InferResponseComplete(
+    TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
-  // Send 'response' to the future.
-  std::promise<TRITONSERVER_InferenceResponse*>* p =
-      reinterpret_cast<std::promise<TRITONSERVER_InferenceResponse*>*>(userp);
-  p->set_value(response);
-  delete p;
+  if (response != nullptr) {
+    // Send 'response' to the future.
+    std::promise<TRITONSERVER_InferenceResponse*>* p =
+        reinterpret_cast<std::promise<TRITONSERVER_InferenceResponse*>*>(userp);
+    p->set_value(response);
+    delete p;
+  }
 }
 
 uint32_t

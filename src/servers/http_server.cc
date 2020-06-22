@@ -979,7 +979,8 @@ class HTTPAPIServer : public HTTPServerImpl {
         TRITONSERVER_InferenceRequest* request, const uint32_t flags,
         void* userp);
     static void InferResponseComplete(
-        TRITONSERVER_InferenceResponse* response, void* userp);
+        TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+        void* userp);
     TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response);
 
@@ -2320,32 +2321,36 @@ HTTPAPIServer::InferRequestClass::InferRequestComplete(
 
 void
 HTTPAPIServer::InferRequestClass::InferResponseComplete(
-    TRITONSERVER_InferenceResponse* response, void* userp)
+    TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
-  // FIXME can't use InferRequestClass object here since it's lifetime
-  // is different than response. For response we need to know how to
-  // send each output (as json, shm, or binary) and that information
-  // has to be maintained in a way that allows us to clean it up
-  // appropriately if connection closed or last response sent.
-  //
-  // But for now userp is the InferRequestClass object and the end of
-  // its life is in the OK or BAD ReplyCallback.
+  // FIXME need to correctly handle FINAL flag
 
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
+  if (response != nullptr) {
+    // FIXME can't use InferRequestClass object here since it's lifetime
+    // is different than response. For response we need to know how to
+    // send each output (as json, shm, or binary) and that information
+    // has to be maintained in a way that allows us to clean it up
+    // appropriately if connection closed or last response sent.
+    //
+    // But for now userp is the InferRequestClass object and the end of
+    // its life is in the OK or BAD ReplyCallback.
 
-  auto err = infer_request->FinalizeResponse(response);
-  if (err == nullptr) {
-    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
-  } else {
-    EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
-    TRITONSERVER_ErrorDelete(err);
-    evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+    HTTPAPIServer::InferRequestClass* infer_request =
+        reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
+
+    auto err = infer_request->FinalizeResponse(response);
+    if (err == nullptr) {
+      evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
+    } else {
+      EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+      TRITONSERVER_ErrorDelete(err);
+      evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+    }
+
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(response),
+        "deleting inference response");
   }
-
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseDelete(response),
-      "deleting inference response");
 }
 
 TRITONSERVER_Error*
