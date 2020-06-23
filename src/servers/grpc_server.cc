@@ -1616,7 +1616,9 @@ class InferHandlerState {
   };
 
   explicit InferHandlerState(
+      TRITONSERVER_Server* tritonserver,
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
+      : tritonserver_(tritonserver)
   {
     Reset(context, start_step);
   }
@@ -1632,6 +1634,9 @@ class InferHandlerState {
   }
 
   void Release() { context_ = nullptr; }
+
+  // Needed in the response handle for classification outputs.
+  TRITONSERVER_Server* tritonserver_;
 
   // Unique ID for the state. Used only for debugging so will
   // always be 0 in non-debug builds.
@@ -1684,6 +1689,7 @@ class InferHandler : public GRPCServer::HandlerBase {
   using StateContext = typename State::Context;
 
   State* StateNew(
+      TRITONSERVER_Server* tritonserver,
       const std::shared_ptr<StateContext>& context,
       Steps start_step = Steps::START)
   {
@@ -1700,7 +1706,7 @@ class InferHandler : public GRPCServer::HandlerBase {
     }
 
     if (state == nullptr) {
-      state = new State(context, start_step);
+      state = new State(tritonserver, context, start_step);
     }
 
     return state;
@@ -2442,8 +2448,8 @@ InferRequestComplete(
 
 TRITONSERVER_Error*
 InferResponseCompleteCommon(
-    TRITONSERVER_InferenceResponse* iresponse, ModelInferResponse& response,
-    const AllocPayload& alloc_payload)
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* iresponse,
+    ModelInferResponse& response, const AllocPayload& alloc_payload)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(iresponse));
 
@@ -2469,7 +2475,6 @@ InferResponseCompleteCommon(
 
   for (uint32_t output_idx = 0; output_idx < output_count; ++output_idx) {
     const char* cname;
-    uint32_t batch_size;
     TRITONSERVER_DataType datatype;
     const int64_t* shape;
     uint64_t dim_count;
@@ -2480,8 +2485,8 @@ InferResponseCompleteCommon(
     void* userp;
 
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
-        iresponse, output_idx, &cname, &datatype, &shape, &dim_count,
-        &batch_size, &base, &byte_size, &memory_type, &memory_type_id, &userp));
+        iresponse, output_idx, &cname, &datatype, &shape, &dim_count, &base,
+        &byte_size, &memory_type, &memory_type_id, &userp));
 
     const std::string name(cname);
 
@@ -2515,6 +2520,20 @@ InferResponseCompleteCommon(
     } else {
       // Classification
       const uint32_t classification_count = itr->second;
+
+      // For classification need to determine the batch size, if any,
+      // because need to use that to break up the response for each
+      // batch entry.
+      uint32_t batch_size = 0;
+
+      uint32_t batch_flags;
+      RETURN_IF_ERR(TRITONSERVER_ServerModelBatch(
+          server, model_name, model_version, &batch_flags,
+          nullptr /* voidp */));
+      if ((dim_count > 0) &&
+          ((batch_flags & TRITONSERVER_BATCH_FIRST_DIM) != 0)) {
+        batch_size = shape[0];
+      }
 
       // Determine the batch1 byte size of the tensor... needed when
       // the response tensor batch-size > 1 so that we know how to
@@ -2627,7 +2646,7 @@ void
 ModelInferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>();
-  State* state = StateNew(context);
+  State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
   state->trace_manager_ = nullptr;
@@ -2799,8 +2818,8 @@ ModelInferHandler::InferResponseComplete(
 
 
   ModelInferResponse& response = state->response_;
-  TRITONSERVER_Error* err =
-      InferResponseCompleteCommon(iresponse, response, state->alloc_payload_);
+  TRITONSERVER_Error* err = InferResponseCompleteCommon(
+      state->tritonserver_, iresponse, response, state->alloc_payload_);
 
   if (err != nullptr) {
     response.Clear();
@@ -2871,7 +2890,7 @@ void
 ModelStreamInferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>(NEXT_UNIQUE_ID);
-  State* state = StateNew(context);
+  State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
   state->trace_manager_ = nullptr;
@@ -3046,7 +3065,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // Now that the inference request is in flight, create a copy of
     // 'state' and use it to attempt another read from the connection
     // (i.e the next request in the stream).
-    State* next_read_state = StateNew(context, Steps::READ);
+    State* next_read_state =
+        StateNew(tritonserver_.get(), context, Steps::READ);
 
 #ifdef TRITON_ENABLE_TRACING
     // Capture a timestamp for the time when we start waiting for this
@@ -3143,8 +3163,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
                  << " step " << state->step_;
 
   ModelInferResponse& response = *(state->response_.mutable_infer_response());
-  TRITONSERVER_Error* err =
-      InferResponseCompleteCommon(iresponse, response, state->alloc_payload_);
+  TRITONSERVER_Error* err = InferResponseCompleteCommon(
+      state->tritonserver_, iresponse, response, state->alloc_payload_);
 
   if (err != nullptr) {
     grpc::Status status;

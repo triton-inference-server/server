@@ -230,8 +230,7 @@ BackendResponder::ProcessTensor(
     if ((response != nullptr) &&
         (request->ImmutableRequestedOutputs().find(name) !=
          request->ImmutableRequestedOutputs().end())) {
-      response->AddOutput(
-          name, datatype, batchn_shape, request->BatchSize(), &response_output);
+      response->AddOutput(name, datatype, batchn_shape, &response_output);
       need_sync_ |= SetFixedSizeOutputBuffer(
           &response, response_output, tensor_byte_size, tensor_offset, buffer,
           memory_type, memory_type_id, use_pinned_memory_type);

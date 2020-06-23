@@ -436,8 +436,7 @@ TRITONBACKEND_ResponseOutput(
   std::vector<int64_t> lshape(shape, shape + dims_count);
   InferenceResponse::Output* loutput;
   Status status = tr->AddOutput(
-      name, TritonToDataType(datatype), std::move(lshape),
-      1 /*batch_size FIXME*/, &loutput);
+      name, TritonToDataType(datatype), std::move(lshape), &loutput);
   if (!status.IsOk()) {
     *output = nullptr;
     return TRITONSERVER_ErrorNew(

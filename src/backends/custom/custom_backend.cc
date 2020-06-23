@@ -743,8 +743,7 @@ CustomBackend::Context::GetOutput(
     }
 
     InferenceResponse::Output* output;
-    Status status = response->AddOutput(
-        name, dtitr->second, shape, request->BatchSize(), &output);
+    Status status = response->AddOutput(name, dtitr->second, shape, &output);
     if (!status.IsOk()) {
       LOG_VERBOSE(1) << status.AsString();
       return false;
