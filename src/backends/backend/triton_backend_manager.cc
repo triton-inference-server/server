@@ -104,6 +104,8 @@ TritonBackend::TritonBackend(const std::string& name, const std::string& path)
 
 TritonBackend::~TritonBackend()
 {
+  LOG_VERBOSE(1) << "unloading backend '" << name_ << "'";
+
   // Backend finalization is optional... The TRITONBACKEND_Backend
   // object is this TritonBackend object.
   if (backend_fini_fn_ != nullptr) {

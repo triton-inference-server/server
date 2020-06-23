@@ -70,6 +70,9 @@ class InferenceResponseFactory {
   // Create a new response.
   Status CreateResponse(std::unique_ptr<InferenceResponse>* response) const;
 
+  // Send a "null" response with 'flags'.
+  Status SendFlags(const uint32_t flags);
+
  private:
   // The backend associated with this factory. For normal
   // requests/responses this will always be defined and acts to keep

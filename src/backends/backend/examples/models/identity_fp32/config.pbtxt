@@ -24,57 +24,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
-
-#
-# Backend utilities
-#
-add_library(
-  backend-utils-library EXCLUDE_FROM_ALL OBJECT
-  backend_utils.cc backend_utils.h
-)
-
-#
-# libtriton_identity.so
-#
-configure_file(libtriton_identity.ldscript libtriton_identity.ldscript COPYONLY)
-
-add_library(
-  triton_identity SHARED
-  identity.cc
-  $<TARGET_OBJECTS:backend-utils-library>
-)
-set_target_properties(
-  triton_identity
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_identity.ldscript
-)
-set_target_properties(
-  triton_identity
-  PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_identity.ldscript"
-)
-
-#
-# libtriton_identity.so
-#
-configure_file(libtriton_repeat.ldscript libtriton_repeat.ldscript COPYONLY)
-
-add_library(
-  triton_repeat SHARED
-  repeat.cc
-  $<TARGET_OBJECTS:backend-utils-library>
-)
-set_target_properties(
-  triton_repeat
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_repeat.ldscript
-)
-set_target_properties(
-  triton_repeat
-  PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_repeat.ldscript"
-)
-
-install(
-  TARGETS
-    triton_identity
-    triton_repeat
-  LIBRARY DESTINATION backends
-)
+name: "identity_fp32"
+backend: "identity"
+max_batch_size: 1
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]

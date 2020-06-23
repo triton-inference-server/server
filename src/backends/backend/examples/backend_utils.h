@@ -38,17 +38,17 @@
 
 namespace nvidia { namespace inferenceserver { namespace backend {
 
-#define LOG_IF_ERROR(X, MSG)                                               \
-  do {                                                                     \
-    TRITONSERVER_Error* err__ = (X);                                       \
-    if (err__ != nullptr) {                                                \
-      TRITONSERVER_LogMessage(                                             \
-          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,                       \
-          (std::string(MSG) + ": " + TRITONSERVER_ErrorCodeString(err__) + \
-           " - " + TRITONSERVER_ErrorMessage(err__))                       \
-              .c_str());                                                   \
-      TRITONSERVER_ErrorDelete(err__);                                     \
-    }                                                                      \
+#define LOG_IF_ERROR(X, MSG)                                                   \
+  do {                                                                         \
+    TRITONSERVER_Error* lie_err__ = (X);                                       \
+    if (lie_err__ != nullptr) {                                                \
+      TRITONSERVER_LogMessage(                                                 \
+          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,                           \
+          (std::string(MSG) + ": " + TRITONSERVER_ErrorCodeString(lie_err__) + \
+           " - " + TRITONSERVER_ErrorMessage(lie_err__))                       \
+              .c_str());                                                       \
+      TRITONSERVER_ErrorDelete(lie_err__);                                     \
+    }                                                                          \
   } while (false)
 
 #define RETURN_ERROR_IF_FALSE(P, C, MSG)              \
@@ -58,14 +58,23 @@ namespace nvidia { namespace inferenceserver { namespace backend {
     }                                                 \
   } while (false)
 
-#define RETURN_IF_ERROR(X)           \
-  do {                               \
-    TRITONSERVER_Error* err__ = (X); \
-    if (err__ != nullptr) {          \
-      return err__;                  \
-    }                                \
+#define RETURN_IF_ERROR(X)               \
+  do {                                   \
+    TRITONSERVER_Error* rie_err__ = (X); \
+    if (rie_err__ != nullptr) {          \
+      return rie_err__;                  \
+    }                                    \
   } while (false)
 
+/// Convenience deleter for TRITONBACKEND_ResponseFactory.
+struct ResponseFactoryDeleter {
+  void operator()(TRITONBACKEND_ResponseFactory* f)
+  {
+    LOG_IF_ERROR(
+        TRITONBACKEND_ResponseFactoryDelete(f),
+        "failed deleting response factory");
+  }
+};
 
 /// Parse an array in a JSON object into the corresponding shape. The
 /// array must be composed of integers.
@@ -90,5 +99,20 @@ std::string ShapeToString(const int64_t* dims, const size_t dims_count);
 /// \param shape The shape as a vector of dimensions.
 /// \return The string representation.
 std::string ShapeToString(const std::vector<int64_t>& shape);
+
+/// Get an input tensor's contents into a buffer.
+///
+/// \param request The inference request.
+/// \param input_name The name of the input buffer.
+/// \param buffer The buffer where the input tensor content is copied into.
+/// \param buffer_byte_size Acts as both input and output. On input
+/// gives the size of 'buffer', in bytes. The function will fail if
+/// the buffer is not large enough to hold the input tensor
+/// contents. Returns the size of the input tensor data returned in
+/// 'buffer'.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* ReadInputTensor(
+    TRITONBACKEND_Request* request, const std::string& input_name, char* buffer,
+    size_t* buffer_byte_size);
 
 }}}  // namespace nvidia::inferenceserver::backend

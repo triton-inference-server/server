@@ -46,6 +46,14 @@ InferenceResponseFactory::CreateResponse(
   return Status::Success;
 }
 
+Status
+InferenceResponseFactory::SendFlags(const uint32_t flags)
+{
+  void* userp = response_userp_;
+  response_fn_(nullptr /* response */, flags, userp);
+  return Status::Success;
+}
+
 //
 // InferenceResponse
 //
@@ -165,17 +173,7 @@ InferenceResponse::SendWithStatus(
     const Status& status)
 {
   response->status_ = status;
-  if (response->response_delegator_ != nullptr) {
-    auto ldelegator = std::move(response->response_delegator_);
-    ldelegator(std::move(response));
-    return Status::Success;
-  }
-
-  void* userp = response->response_userp_;
-  response->response_fn_(
-      reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
-      flags, userp);
-  return Status::Success;
+  return InferenceResponse::Send(std::move(response), flags);
 }
 
 //
