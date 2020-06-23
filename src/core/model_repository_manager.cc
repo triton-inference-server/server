@@ -277,7 +277,16 @@ struct BackendDeleter {
 
   void operator()(InferenceBackend* backend)
   {
-    delete backend;
+    // The actual model object must be destroyed in a different
+    // thread. This thread could have a callstack that includes the
+    // model/backend itself because this deleter could be triggered by
+    // a request release or response send in the backend. Following
+    // delete will lead to the model destructor which may wait on this
+    // same thread... so deadlock if we don't use a different thread
+    // here.
+    std::thread dthd([backend]() { delete backend; });
+    dthd.detach();
+
     OnDestroyBackend_();
   }
 

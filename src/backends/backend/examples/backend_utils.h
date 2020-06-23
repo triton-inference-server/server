@@ -25,7 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <condition_variable>
+#include <deque>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <vector>
 #include "src/backends/backend/tritonbackend.h"
@@ -75,6 +78,98 @@ struct ResponseFactoryDeleter {
         "failed deleting response factory");
   }
 };
+
+///
+/// InstanceProperties
+///
+/// Configuration information for a model instance.
+///
+struct InstanceProperties {
+  enum class Kind { CPU, GPU };
+
+  InstanceProperties(const size_t i, const Kind k, const int d)
+      : id_(i), kind_(k), device_id_(d)
+  {
+  }
+  std::string AsString() const;
+
+  size_t id_;
+
+  // For CPU device_id_ is always 0. For GPU device_id_ indicates the
+  // GPU device to be used by the instance.
+  Kind kind_;
+  int device_id_;
+};
+
+//
+// BlockingQueue
+//
+// A blocking queue is useful for communicating between multiple
+// threads within a backend. Multiple threads are often used to
+// implement model instances.
+///
+template <typename T>
+class BlockingQueue {
+ public:
+  bool WaitNotEmpty() const
+  {
+    std::unique_lock<std::mutex> lk(mu_);
+    if (queue_.empty()) {
+      cv_.wait(lk, [this] { return !queue_.empty(); });
+    }
+    return true;
+  }
+
+  bool Empty() const
+  {
+    std::lock_guard<std::mutex> lk(mu_);
+    return queue_.empty();
+  }
+
+  T Pop()
+  {
+    std::unique_lock<std::mutex> lk(mu_);
+    if (queue_.empty()) {
+      cv_.wait(lk, [this] { return !queue_.empty(); });
+    }
+    auto res = std::move(queue_.front());
+    queue_.pop_front();
+    return res;
+  }
+
+  void Push(const T& value)
+  {
+    {
+      std::lock_guard<std::mutex> lk(mu_);
+      queue_.emplace_back(value);
+    }
+    cv_.notify_one();
+  }
+
+  void Push(T&& value)
+  {
+    {
+      std::lock_guard<std::mutex> lk(mu_);
+      queue_.emplace_back(std::move(value));
+    }
+    cv_.notify_one();
+  }
+
+ private:
+  mutable std::mutex mu_;
+  mutable std::condition_variable cv_;
+  std::deque<T> queue_;
+};
+
+/// Parse model configuration and extra the model instances that
+/// should be implemented for the specified instance groups.
+///
+/// \param model_config The model configuration.
+/// \param instances Returns the model instance information.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* ParseInstanceGroups(
+    TritonJson::Value& model_config,
+    std::vector<InstanceProperties>* instances);
 
 /// Parse an array in a JSON object into the corresponding shape. The
 /// array must be composed of integers.

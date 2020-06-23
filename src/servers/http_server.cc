@@ -2420,7 +2420,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
       // because need to use that to break up the response for each
       // batch entry.
       uint32_t batch_flags;
-      RETURN_IF_ERR(TRITONSERVER_ServerModelBatch(
+      RETURN_IF_ERR(TRITONSERVER_ServerModelBatchProperties(
           server_, model_name, model_version, &batch_flags,
           nullptr /* voidp */));
       if ((dim_count > 0) &&
