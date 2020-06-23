@@ -924,9 +924,7 @@ BaseBackend::Context::Run(
               (request->ImmutableRequestedOutputs().find(name) !=
                request->ImmutableRequestedOutputs().end())) {
             InferenceResponse::Output* response_output = nullptr;
-            response->AddOutput(
-                name, datatype, batchn_shape, request->BatchSize(),
-                &response_output);
+            response->AddOutput(name, datatype, batchn_shape, &response_output);
             string_buffer.emplace_back(new std::string());
             cuda_copy |= SetStringOutputBuffer(
                 output_tensor, &response, response_output, tensor_element_cnt,

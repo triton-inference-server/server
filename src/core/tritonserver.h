@@ -901,9 +901,6 @@ TRITONSERVER_InferenceResponseOutputCount(
 /// \param shape Returns the shape of the output.
 /// \param dim_count Returns the number of dimensions of the returned
 /// shape.
-/// \param batch_size Returns the batch size of the output as
-/// understood by Triton. If the model does not support batching in a
-/// way that Triton understands the value will be 0.
 /// \param base Returns the tensor data for the output.
 /// \param byte_size Returns the size, in bytes, of the data.
 /// \param memory_type Returns the memory type of the data.
@@ -914,9 +911,9 @@ TRITONSERVER_InferenceResponseOutputCount(
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseOutput(
     TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
     const char** name, TRITONSERVER_DataType* datatype, const int64_t** shape,
-    uint64_t* dim_count, uint32_t* batch_size, const void** base,
-    size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
-    int64_t* memory_type_id, void** userp);
+    uint64_t* dim_count, const void** base, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
+    void** userp);
 
 /// Get a classification label associated with an output for a given
 /// index.  The caller does not own the returned label and must not
@@ -1189,12 +1186,17 @@ TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
 /// An inference server.
 ///
 
-/// Model indes flags. The enum values must be power-of-2 values.
+/// Model batch flags. The enum values must be power-of-2 values.
+typedef enum tritonserver_batchflag_enum {
+  TRITONSERVER_BATCH_UNKNOWN = 0,
+  TRITONSERVER_BATCH_FIRST_DIM = 1
+} TRITONSERVER_ModelBatchFlag;
+
+/// Model index flags. The enum values must be power-of-2 values.
 typedef enum tritonserver_modelindexflag_enum {
   TRITONSERVER_INDEX_FLAG_NONE = 0,
   TRITONSERVER_INDEX_FLAG_READY = 1
 } TRITONSERVER_ModelIndexFlag;
-
 
 /// Create a new server object. The caller takes ownership of the
 /// TRITONSERVER_Server object and must call TRITONSERVER_ServerDelete
@@ -1259,6 +1261,33 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelIsReady(
     TRITONSERVER_Server* server, const char* model_name,
     const int64_t model_version, bool* ready);
 
+/// Get the batch properties of the model. The properties are
+/// communicated by a flags value and an (optional) object returned by
+/// 'voidp'.
+///
+///   - TRITONSERVER_BATCH_UNKNOWN: Triton cannot determine the
+///     batching properties of the model. This means that the model
+///     does not support batching in any way that is useable by
+///     Triton. The returned 'voidp' value is nullptr.
+///
+///   - TRITONSERVER_BATCH_FIRST_DIM: The model supports batching
+///     along the first dimension of every input and output
+///     tensor. Triton schedulers that perform batching can
+///     automatically batch inference requests along this dimension.
+///     The returned 'voidp' value is nullptr.
+///
+/// \param server The inference server object.
+/// \param model_name The name of the model.
+/// \param model_version The version of the model.  If -1 then the
+/// server will choose a version based on the model's policy.
+/// \param flags Returns flags indicating the batch properties of the
+/// model.
+/// \param voidp If non-nullptr, returns a point specific to the 'flags' value.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelBatch(
+    TRITONSERVER_Server* server, const char* model_name,
+    const int64_t model_version, uint32_t* flags, void** voidp);
+
 /// Get the metadata of the server as a TRITONSERVER_Message object.
 /// The caller takes ownership of the message object and must call
 /// TRITONSERVER_MessageDelete to release the object.
@@ -1269,13 +1298,13 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelIsReady(
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerMetadata(
     TRITONSERVER_Server* server, TRITONSERVER_Message** server_metadata);
 
-/// Get the metadata of the model being served as a TRITONSERVER_Message object.
-/// The caller takes ownership of the message object and must call
-/// TRITONSERVER_MessageDelete to release the object.
+/// Get the metadata of a model as a TRITONSERVER_Message
+/// object.  The caller takes ownership of the message object and must
+/// call TRITONSERVER_MessageDelete to release the object.
 ///
 /// \param server The inference server object.
-/// \param model_name The name of the model to get metadata for.
-/// \param model_version The version of the model to get metadata for.
+/// \param model_name The name of the model.
+/// \param model_version The version of the model.
 /// If -1 then the server will choose a version based on the model's
 /// policy.
 /// \param model_metadata Returns the model metadata message.
@@ -1284,33 +1313,30 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelMetadata(
     TRITONSERVER_Server* server, const char* model_name,
     const int64_t model_version, TRITONSERVER_Message** model_metadata);
 
-/// Get the statistics of the model being served as a TRITONSERVER_Message
+/// Get the statistics of a model as a TRITONSERVER_Message
 /// object. The caller takes ownership of the object and must call
 /// TRITONSERVER_MessageDelete to release the object.
 ///
 /// \param server The inference server object.
-/// \param model_name The name of the model to get statistics for.
+/// \param model_name The name of the model.
 /// If empty, then statistics for all available models will be returned,
 /// and the server will choose a version based on those models' policies.
-/// \param model_version The version of the model to get statistics
-/// for.  If -1 then the server will choose a version based on the
-/// model's policy.
+/// \param model_version The version of the model.  If -1 then the
+/// server will choose a version based on the model's policy.
 /// \param model_stats Returns the model statistics message.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelStatistics(
     TRITONSERVER_Server* server, const char* model_name,
     const int64_t model_version, TRITONSERVER_Message** model_stats);
 
-/// Get the configuration of the model being served as a
-/// TRITONSERVER_Message object.  The caller takes ownership of the
-/// message object and must call TRITONSERVER_MessageDelete to release
-/// the object.
+/// Get the configuration of a model as a TRITONSERVER_Message object.
+/// The caller takes ownership of the message object and must call
+/// TRITONSERVER_MessageDelete to release the object.
 ///
 /// \param server The inference server object.
-/// \param model_name The name of the model to get configuration for.
-/// \param model_version The version of the model to get configuration
-/// for.  If -1 then the server will choose a version based on the
-/// model's policy.
+/// \param model_name The name of the model.
+/// \param model_version The version of the model.  If -1 then the
+/// server will choose a version based on the model's policy.
 /// \param config_version The model configuration will be returned in
 /// a format matching this version. If the configuration cannot be
 /// represented in the requested version's format then an error will
