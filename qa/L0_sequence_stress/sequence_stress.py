@@ -325,7 +325,7 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
 
         for c in range(common_cnt + rare_cnt):
             client_metadata_list.append(
-                (grpcclient.InferenceServerClient("localhost:8001", FLAGS.verbose),
+                (grpcclient.InferenceServerClient("localhost:8001", verbose=FLAGS.verbose),
                     correlation_id_base + c))
             last_choices.append(None)
 
@@ -406,7 +406,7 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
     print("Exiting thread {}".format(name))
 
 def check_status(model_name):
-    client = grpcclient.InferenceServerClient("localhost:8001", FLAGS.verbose)
+    client = grpcclient.InferenceServerClient("localhost:8001", verbose=FLAGS.verbose)
     stats = client.get_inference_statistics(model_name)
     print(stats)
 

@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     client_util = httpclient if FLAGS.protocol == "http" else grpcclient
     # Create the inference context for the model.
-    client = client_util.InferenceServerClient(FLAGS.url, FLAGS.verbose)
+    client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
 
     # We use identity string models that takes 1 input tensor of a single string
     # and returns 1 output tensor of a single string. The output tensor is the

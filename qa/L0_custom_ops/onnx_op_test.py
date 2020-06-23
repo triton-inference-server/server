@@ -63,7 +63,7 @@ if __name__ == '__main__':
     dtype = np.float32
 
     # Create the inference context for the model.
-    client = client_util.InferenceServerClient(FLAGS.url, FLAGS.verbose)
+    client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
 
     # Create the data for one input tensor.
     input_data = []

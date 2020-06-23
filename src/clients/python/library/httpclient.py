@@ -127,6 +127,8 @@ class InferenceServerClient:
     ----------
     url : str
         The inference server URL, e.g. 'localhost:8000'.
+    verbose : bool
+        If True generate verbose output. Default value is False.
     connection_count : int
         The number of connections to create for this client.
         Default value is 1.
@@ -136,8 +138,6 @@ class InferenceServerClient:
     network_timeout : float
         The timeout value for the network. Default value is
         60.0 sec
-    verbose : bool
-        If True generate verbose output. Default value is False.
     max_greenlets : int
         Determines the maximum allowed number of worker greenlets
         for handling asynchronous inference requests. Default value
@@ -168,10 +168,10 @@ class InferenceServerClient:
 
     def __init__(self,
                  url,
+                 verbose=False,
                  connection_count=1,
                  connection_timeout=60.0,
                  network_timeout=60.0,
-                 verbose=False,
                  max_greenlets=None,
                  ssl=False,
                  ssl_options=None,

@@ -61,7 +61,7 @@ if __name__ == '__main__':
    model_name = "image_preprocess_nhwc_224x224x3"
 
    # Create the inference context for the model.
-   client = client_util.InferenceServerClient(FLAGS.url, FLAGS.verbose)
+   client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
 
    # Input tensor will be raw content from image file
    image_path = FLAGS.image_filename
