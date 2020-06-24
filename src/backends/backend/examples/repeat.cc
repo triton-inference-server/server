@@ -26,6 +26,7 @@
 
 #include "src/backends/backend/examples/backend_utils.h"
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <thread>
@@ -120,6 +121,7 @@ class ModelState {
  public:
   static TRITONSERVER_Error* Create(
       TRITONBACKEND_Model* triton_model, ModelState** state);
+  ~ModelState();
 
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
@@ -137,6 +139,7 @@ class ModelState {
 
   TRITONBACKEND_Model* triton_model_;
   ni::TritonJson::Value model_config_;
+  std::atomic<size_t> inflight_thread_count_;
 };
 
 TRITONSERVER_Error*
@@ -169,8 +172,17 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 
 ModelState::ModelState(
     TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config)
-    : triton_model_(triton_model), model_config_(std::move(model_config))
+    : triton_model_(triton_model), model_config_(std::move(model_config)),
+      inflight_thread_count_(0)
 {
+}
+
+ModelState::~ModelState()
+{
+  // Wait for all threads to exit...
+  while (inflight_thread_count_ > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
 }
 
 TRITONSERVER_Error*
@@ -273,6 +285,21 @@ ModelState::ValidateModelConfig()
       out_dtype == "TYPE_INT32", TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected OUT datatype to be INT32, got ") + out_dtype);
 
+  // For simplicity this backend doesn't support multiple
+  // instances. So check and give a warning if more than one instance
+  // is requested.
+  std::vector<nib::InstanceProperties> instances;
+  RETURN_IF_ERROR(nib::ParseInstanceGroups(model_config_, &instances));
+  if (instances.size() != 1) {
+    TRITONSERVER_LogMessage(
+        TRITONSERVER_LOG_WARN, __FILE__, __LINE__,
+        (std::string("model configuration specifies ") +
+         std::to_string(instances.size()) +
+         " instances but repeat backend supports only a single CPU instance. "
+         "Additional instances ignored")
+            .c_str());
+  }
+
   return nullptr;  // success
 }
 
@@ -368,10 +395,12 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
   int32_t* in_buffer_ptr = in_buffer.release();
   int32_t* delay_buffer_ptr = delay_buffer.release();
 
-  // Start a detached thread to generate the responses. As long as the
-  // factory is alive, Triton will understand that the model (and thus
-  // this model state) is in use... so this model will not be unloaded
-  // until the thread exits and releases the factory.
+  // Start a detached thread to generate the responses. If a model is
+  // being destroyed (because it is unloaded and there are no
+  // in-flight requests) then that destruction must wait for all
+  // threads to complete. We do this by maintaining an atomic counter
+  // that tracks how many threads are running.
+  inflight_thread_count_++;
   std::thread response_thread([this, factory_ptr, in_buffer_ptr,
                                delay_buffer_ptr, element_count]() {
     RequestThread(factory_ptr, in_buffer_ptr, delay_buffer_ptr, element_count);
@@ -460,6 +489,8 @@ ModelState::RequestThread(
       TRITONBACKEND_ResponseFactorySendFlags(
           factory.get(), TRITONSERVER_RESPONSE_COMPLETE_FINAL),
       "failed sending final response");
+
+  inflight_thread_count_--;
 }
 
 }  // namespace
@@ -499,10 +530,6 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   // backend can support. If not, returning an error from this
   // function will prevent the model from loading.
   RETURN_IF_ERROR(model_state->ValidateModelConfig());
-
-  // FIXME here we should look at the instance-group and decide how we
-  // are going to handle multiple instances (or raise an error if
-  // disallowing them).
 
   return nullptr;  // success
 }
