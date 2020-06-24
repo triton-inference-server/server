@@ -25,8 +25,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG=client.log
-
 # Install the tar file
 rm -fr triton_client
 mkdir triton_client
@@ -64,6 +62,24 @@ for l in $WHLS; do
         RET=1
     fi
 done
+
+# This test is running in a non-NVIDIA docker so we can configure the
+# build without GPUs and make sure it works correctly.
+cd /workspace/builddir && rm -fr client ../install/*
+cmake -DTRITON_ENABLE_GPU=OFF -DTRITON_ENABLE_METRICS_GPU=OFF ../build
+make -j16 client
+
+CUDAFILES=`find /workspace/builddir/client/install -name *cuda* | wc -l`
+if [ "$CUDAFILES" != "0" ]; then
+    echo -e "*** unexpected CUDA files in TRITON_ENABLE_GPU=OFF build\n"
+    RET=1
+fi
+
+SHMFILES=`find /workspace/builddir/client/install -name *shm* | wc -l`
+if [ "$SHMFILES" != "7" ]; then
+    echo -e "*** expected 7 SHM files in TRITON_ENABLE_GPU=OFF build, got $SHMFILES\n"
+    RET=1
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

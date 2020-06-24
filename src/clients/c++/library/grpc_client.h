@@ -29,17 +29,10 @@
 
 #include <queue>
 #include "src/clients/c++/library/common.h"
+#include "src/clients/c++/library/ipc.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/model_config.pb.h"
-
-#ifdef TRITON_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#else
-struct cudaIpcMemHandle_t {
-};
-#endif  // TRITON_ENABLE_GPU
-
 
 namespace nvidia { namespace inferenceserver { namespace client {
 

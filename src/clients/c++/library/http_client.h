@@ -30,13 +30,7 @@
 #include <map>
 #include <memory>
 #include "src/clients/c++/library/common.h"
-
-#ifdef TRITON_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#else
-struct cudaIpcMemHandle_t {
-};
-#endif  // TRITON_ENABLE_GPU
+#include "src/clients/c++/library/ipc.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
