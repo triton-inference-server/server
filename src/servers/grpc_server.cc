@@ -1515,11 +1515,18 @@ class InferHandlerState {
   // transaction (e.g. a stream).
   struct Context {
     explicit Context(const uint64_t unique_id = 0)
-        : unique_id_(unique_id), step_(Steps::START), finish_ok_(true)
+        : unique_id_(unique_id), ongoing_requests_(0), step_(Steps::START),
+          finish_ok_(true)
     {
       ctx_.reset(new grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
     }
+
+    // Increments the ongoing reques counter
+    void IncrementRequestCounter() { ongoing_requests_++; }
+
+    // Decrements the ongoing reques counter
+    void DecrementRequestCounter() { ongoing_requests_--; }
 
     // Enqueue 'state' so that its response is delivered in the
     // correct order.
@@ -1527,6 +1534,28 @@ class InferHandlerState {
     {
       std::lock_guard<std::mutex> lock(mu_);
       states_.push(state);
+    }
+
+    // Write the response to the stream directly.
+    void WriteResponseThrough(InferHandlerStateType* state)
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+
+#ifdef TRITON_ENABLE_TRACING
+      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+        state->trace_manager_->CaptureTimestamp(
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+      }
+#endif  // TRITON_ENABLE_TRACING
+
+      if (state->response_.control_response().final()) {
+        state->step_ = Steps::WRITTEN;
+      } else {
+        state->step_ = Steps::ISSUED;
+      }
+      responder_->Write(state->response_, state);
+      // Clear the response
+      state->response_.mutable_infer_response()->mutable_outputs()->Clear();
     }
 
     // Check the state at the front of the queue and write it if
@@ -1587,7 +1616,9 @@ class InferHandlerState {
     bool IsRequestsCompleted()
     {
       std::lock_guard<std::mutex> lock(mu_);
-      return ((step_ == Steps::WRITEREADY) && states_.empty());
+      return (
+          (step_ == Steps::WRITEREADY) && states_.empty() &&
+          (ongoing_requests_ == 0));
     }
 
     // Unique ID for the context. Used only for debugging so will
@@ -1606,6 +1637,7 @@ class InferHandlerState {
     // a request and exits the queue when it is written.
     std::mutex mu_;
     std::queue<InferHandlerStateType*> states_;
+    std::atomic<uint32_t> ongoing_requests_;
 
     // The step of the entire context.
     Steps step_;
@@ -1629,6 +1661,8 @@ class InferHandlerState {
     unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
     step_ = start_step;
+    cb_counter_ = 0;
+    is_decoupled_ = false;
     request_.Clear();
     response_.Clear();
   }
@@ -1650,6 +1684,9 @@ class InferHandlerState {
   TRITONSERVER_InferenceTrace* trace_;
   uint64_t trace_id_;
 #endif  // TRITON_ENABLE_TRACING
+
+  bool is_decoupled_;
+  uint32_t cb_counter_;
 
   RequestType request_;
   ResponseType response_;
@@ -2710,18 +2747,33 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     if (!shutdown) {
       StartNewRequest();
     }
+
+    int64_t requested_model_version;
+    if (err == nullptr) {
+      err = GetModelVersionFromString(
+          request.model_version(), &requested_model_version);
+    }
+
+    if (err == nullptr) {
+      uint32_t txn_flags;
+      err = TRITONSERVER_ServerModelTransactionPolicy(
+          tritonserver_.get(), request.model_name().c_str(),
+          requested_model_version, &txn_flags);
+      if ((txn_flags & TRITONSERVER_TXN_POLICY_DECOUPLED) != 0) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNSUPPORTED,
+            "ModelInfer RPC doesn't support models with decoupled "
+            "transaction policy");
+      }
+    }
+
     // Create the inference request which contains all the
     // input information needed for an inference.
     TRITONSERVER_InferenceRequest* irequest = nullptr;
     if (err == nullptr) {
-      int64_t requested_model_version;
-      err = GetModelVersionFromString(
-          request.model_version(), &requested_model_version);
-      if (err == nullptr) {
-        err = TRITONSERVER_InferenceRequestNew(
-            &irequest, tritonserver_.get(), request.model_name().c_str(),
-            requested_model_version);
-      }
+      err = TRITONSERVER_InferenceRequestNew(
+          &irequest, tritonserver_.get(), request.model_name().c_str(),
+          requested_model_version);
     }
 
     if (err == nullptr) {
@@ -2807,20 +2859,34 @@ ModelInferHandler::InferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
 {
-  // FIXME need to correctly handle FINAL flag
-  if (iresponse == nullptr) {
-    return;
-  }
-
   State* state = reinterpret_cast<State*>(userp);
+
+  // Increment the callback index
+  state->cb_counter_++;
 
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
 
+  // Defer to the callback with the final response
+  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    return;
+  }
 
   ModelInferResponse& response = state->response_;
-  TRITONSERVER_Error* err = InferResponseCompleteCommon(
-      state->tritonserver_, iresponse, response, state->alloc_payload_);
+
+  TRITONSERVER_Error* err = nullptr;
+  if (iresponse == nullptr || state->cb_counter_ != 1) {
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string(
+            "ModelInfer RPC expects exactly 1 response callback per request, "
+            "got " +
+            std::to_string(state->cb_counter_))
+            .c_str());
+  } else {
+    err = InferResponseCompleteCommon(
+        state->tritonserver_, iresponse, response, state->alloc_payload_);
+  }
 
   if (err != nullptr) {
     response.Clear();
@@ -2976,10 +3042,31 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       return !finished;
     }
 
-    // Request has been successfully read so put it in the context
-    // queue so that it's response is sent in the same order as the
-    // request was received.
-    state->context_->EnqueueForResponse(state);
+    int64_t requested_model_version;
+    err = GetModelVersionFromString(
+        request.model_version(), &requested_model_version);
+
+    // Record the transaction policy of the model into the current state
+    // object.
+    if (err == nullptr) {
+      uint32_t txn_flags;
+      err = TRITONSERVER_ServerModelTransactionPolicy(
+          tritonserver_.get(), request.model_name().c_str(),
+          requested_model_version, &txn_flags);
+      state->is_decoupled_ =
+          ((txn_flags & TRITONSERVER_TXN_POLICY_DECOUPLED) != 0);
+    }
+
+    // Request has been successfully read, increment the context request
+    // counter.
+    state->context_->IncrementRequestCounter();
+
+    // If the request is not for a model with decoupled transaction policy
+    // then put it in the context queue so thats it's response is sent in
+    // the same order as the request was received.
+    if (!state->is_decoupled_) {
+      state->context_->EnqueueForResponse(state);
+    }
 
     // Need to get context here as it is needed below. 'state' can
     // complete inference, write response, and finish (which releases
@@ -2994,14 +3081,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // input information needed for an inference.
     TRITONSERVER_InferenceRequest* irequest = nullptr;
     if (err == nullptr) {
-      int64_t requested_model_version;
-      err = GetModelVersionFromString(
-          request.model_version(), &requested_model_version);
-      if (err == nullptr) {
-        err = TRITONSERVER_InferenceRequestNew(
-            &irequest, tritonserver_.get(), request.model_name().c_str(),
-            requested_model_version);
-      }
+      err = TRITONSERVER_InferenceRequestNew(
+          &irequest, tritonserver_.get(), request.model_name().c_str(),
+          requested_model_version);
     }
 
     if (err == nullptr) {
@@ -3112,19 +3194,26 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->finish_ok_ = false;
     }
 
-    // Log an error if 'state' is not the expected next response. Mark
-    // that the stream did not complete successfully but don't cancel
-    // right away... need to wait for any pending reads, inferences
-    // and writes to complete.
-    if (!state->context_->PopCompletedResponse(state)) {
-      LOG_ERROR << "Unexpected response for " << Name() << ", rpc_ok=" << rpc_ok
-                << ", context " << state->context_->unique_id_ << ", "
-                << state->unique_id_ << " step " << state->step_;
-      state->context_->finish_ok_ = false;
-    }
+    // The response for the request has been written completely. The counter
+    // can be safely decremented.
+    state->context_->DecrementRequestCounter();
 
-    // Write the next response if it is ready...
-    state->context_->WriteResponseIfReady(nullptr);
+    if (!state->is_decoupled_) {
+      // Log an error if 'state' is not the expected next response. Mark
+      // that the stream did not complete successfully but don't cancel
+      // right away... need to wait for any pending reads, inferences
+      // and writes to complete.
+      if (!state->context_->PopCompletedResponse(state)) {
+        LOG_ERROR << "Unexpected response for " << Name()
+                  << ", rpc_ok=" << rpc_ok << ", context "
+                  << state->context_->unique_id_ << ", " << state->unique_id_
+                  << " step " << state->step_;
+        state->context_->finish_ok_ = false;
+      }
+
+      // Write the next response if it is ready...
+      state->context_->WriteResponseIfReady(nullptr);
+    }
 
     // If done reading and no in-flight requests then can finish the
     // entire stream. Otherwise just finish this state.
@@ -3153,25 +3242,29 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
 {
-  // FIXME need to correctly handle FINAL flag
-  if (iresponse == nullptr) {
-    return;
-  }
-
   State* state = reinterpret_cast<State*>(userp);
+  // Increment the callback index
+  state->cb_counter_++;
 
   LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferComplete, context "
                  << state->context_->unique_id_ << ", " << state->unique_id_
-                 << " step " << state->step_;
+                 << " step " << state->step_ << ", callback index "
+                 << state->cb_counter_ << ", flags " << flags;
 
-  ModelInferResponse& response = *(state->response_.mutable_infer_response());
-  TRITONSERVER_Error* err = InferResponseCompleteCommon(
-      state->tritonserver_, iresponse, response, state->alloc_payload_);
+  state->response_.mutable_control_response()->set_final(
+      (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
+
+  TRITONSERVER_Error* err = nullptr;
+  if (iresponse != nullptr) {
+    ModelInferResponse& response = *(state->response_.mutable_infer_response());
+    err = InferResponseCompleteCommon(
+        state->tritonserver_, iresponse, response, state->alloc_payload_);
+  }
 
   if (err != nullptr) {
     grpc::Status status;
     GrpcStatusUtil::Create(&status, err);
-    state->response_.Clear();
+    state->response_.mutable_infer_response()->Clear();
     state->response_.set_error_message(status.error_message());
   }
 
@@ -3181,8 +3274,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       TRITONSERVER_InferenceResponseDelete(iresponse),
       "deleting GRPC inference response");
 
-  state->step_ = Steps::WRITEREADY;
-  state->context_->WriteResponseIfReady(state);
+  if (state->is_decoupled_) {
+    state->context_->WriteResponseThrough(state);
+  } else {
+    state->step_ = Steps::WRITEREADY;
+    state->context_->WriteResponseIfReady(state);
+  }
 }
 
 }  // namespace

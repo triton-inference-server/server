@@ -1241,6 +1241,13 @@ typedef enum tritonserver_modelindexflag_enum {
   TRITONSERVER_INDEX_FLAG_READY = 1
 } TRITONSERVER_ModelIndexFlag;
 
+/// Model transaction policy flags. The enum values must be
+/// power-of-2 values.
+typedef enum tritonserver_txn_policy_flag_enum {
+  TRITONSERVER_TXN_POLICY_ONE_TO_ONE = 0,
+  TRITONSERVER_TXN_POLICY_DECOUPLED = 1
+} TRITONSERVER_ModelTxnPolicyFlag;
+
 /// Create a new server object. The caller takes ownership of the
 /// TRITONSERVER_Server object and must call TRITONSERVER_ServerDelete
 /// to release the object.
@@ -1330,6 +1337,27 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelIsReady(
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelBatchProperties(
     TRITONSERVER_Server* server, const char* model_name,
     const int64_t model_version, uint32_t* flags, void** voidp);
+
+/// Get the transaction policy of the model. The policy is communicated
+/// by a flags value.
+///
+///   - TRITONSERVER_TXN_POLICY_ONE_TO_ONE: The model generates exactly
+///     one request per response.
+///
+///   - TRITONSERVER_TXN_POLICY_DECOUPLED: The model may generate multiple
+///     responses per request.
+///
+/// \param server The inference server object.
+/// \param model_name The name of the model.
+/// \param model_version The version of the model.  If -1 then the
+/// server will choose a version based on the model's policy.
+/// \param txn_flags Returns flags indicating the transaction policy of the
+/// model.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_ServerModelTransactionPolicy(
+    TRITONSERVER_Server* server, const char* model_name,
+    const int64_t model_version, uint32_t* txn_flags);
 
 /// Get the metadata of the server as a TRITONSERVER_Message object.
 /// The caller takes ownership of the message object and must call

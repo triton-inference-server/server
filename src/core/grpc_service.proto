@@ -742,6 +742,23 @@ message ModelInferResponse
 }
 
 //@@
+//@@.. cpp:var:: message ControlResponse
+//@@
+//@@   The control signal for a stream inference response
+//@@
+message ControlResponse
+{
+  //@@
+  //@@  .. cpp:var:: bool final
+  //@@
+  //@@     Whether or not the response is last to be generated for
+  //@@     a particular request. If false, then further responses
+  //@@     must be expected.
+  //@@
+  bool final = 1;
+}
+
+//@@
 //@@.. cpp:var:: message ModelStreamInferResponse
 //@@
 //@@   Response message for ModelStreamInfer.
@@ -762,6 +779,14 @@ message ModelStreamInferResponse
   //@@     Holds the results of the request.
   //@@
   ModelInferResponse infer_response = 2;
+
+  //@@
+  //@@  .. cpp:var:: ControlResponse control_response
+  //@@
+  //@@     Returns the control flags associated with
+  //@@     the response.
+  //@@
+  ControlResponse control_response = 3;
 }
 
 //@@
