@@ -277,7 +277,8 @@ JsonBytesArrayByteSize(TritonJson::Value& tensor_data, size_t* byte_size)
       // 4 bytes to record the string length.
       const char* str;
       size_t len = 0;
-      RETURN_IF_ERR(el.AsString(&str, &len));
+      RETURN_MSG_IF_ERR(
+          el.AsString(&str, &len), "Unable to parse JSON bytes array");
       *byte_size += len + sizeof(uint32_t);
     }
   }
@@ -438,7 +439,9 @@ ReadDataFromJson(
               .c_str());
 
     default:
-      RETURN_IF_ERR(ReadDataFromJsonHelper(base, dtype, tensor_data, &counter));
+      RETURN_MSG_IF_ERR(
+          ReadDataFromJsonHelper(base, dtype, tensor_data, &counter),
+          "Unable to parse 'data'");
       break;
   }
 
@@ -659,7 +662,9 @@ CheckBinaryInputData(
   if (request_input.Find("parameters", &params_json)) {
     TritonJson::Value binary_data_size_json;
     if (params_json.Find("binary_data_size", &binary_data_size_json)) {
-      RETURN_IF_ERR(binary_data_size_json.AsUInt(byte_size));
+      RETURN_MSG_IF_ERR(
+          binary_data_size_json.AsUInt(byte_size),
+          "Unable to parse 'binary_data_size'");
       *is_binary = true;
     }
   }
@@ -676,7 +681,8 @@ CheckBinaryOutputData(TritonJson::Value& request_output, bool* is_binary)
   if (request_output.Find("parameters", &params_json)) {
     TritonJson::Value binary_data_json;
     if (params_json.Find("binary_data", &binary_data_json)) {
-      RETURN_IF_ERR(binary_data_json.AsBool(is_binary));
+      RETURN_MSG_IF_ERR(
+          binary_data_json.AsBool(is_binary), "Unable to parse 'binary_data'");
     }
   }
 
@@ -699,21 +705,27 @@ CheckSharedMemoryData(
       if (params_json.Find("shared_memory_region", &region_json)) {
         *use_shm = true;
         size_t len;
-        RETURN_IF_ERR(region_json.AsString(shm_region, &len));
+        RETURN_MSG_IF_ERR(
+            region_json.AsString(shm_region, &len),
+            "Unable to parse 'shared_memory_region'");
       }
     }
 
     {
       TritonJson::Value offset_json;
       if (params_json.Find("shared_memory_offset", &offset_json)) {
-        RETURN_IF_ERR(offset_json.AsUInt(offset));
+        RETURN_MSG_IF_ERR(
+            offset_json.AsUInt(offset),
+            "Unable to parse 'shared_memory_offset'");
       }
     }
 
     {
       TritonJson::Value size_json;
       if (params_json.Find("shared_memory_byte_size", &size_json)) {
-        RETURN_IF_ERR(size_json.AsUInt(byte_size));
+        RETURN_MSG_IF_ERR(
+            size_json.AsUInt(byte_size),
+            "Unable to parse 'shared_memory_byte_size'");
       }
     }
   }
@@ -731,7 +743,8 @@ CheckClassificationOutput(
   if (request_output.Find("parameters", &params_json)) {
     TritonJson::Value cls_json;
     if (params_json.Find("classification", &cls_json)) {
-      RETURN_IF_ERR(cls_json.AsUInt(num_classes));
+      RETURN_MSG_IF_ERR(
+          cls_json.AsUInt(num_classes), "Unable to set 'classification'");
     }
   }
 
@@ -800,7 +813,8 @@ ValidateOutputParameter(TritonJson::Value& io)
       TritonJson::Value binary_data_json;
       if (params_json.Find("binary_data", &binary_data_json)) {
         bool is_binary;
-        RETURN_IF_ERR(binary_data_json.AsBool(&is_binary));
+        RETURN_MSG_IF_ERR(
+            binary_data_json.AsBool(&is_binary), "Unable to set 'binary_data'");
         if (is_binary) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INVALID_ARG,
@@ -1875,7 +1889,7 @@ HTTPAPIServer::EVBufferToInput(
   if (request_json.Find("id", &id_json)) {
     const char* id;
     size_t id_len;
-    RETURN_IF_ERR(id_json.AsString(&id, &id_len));
+    RETURN_MSG_IF_ERR(id_json.AsString(&id, &id_len), "Unable to parse 'id'");
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(irequest, id));
   }
 
@@ -1885,7 +1899,8 @@ HTTPAPIServer::EVBufferToInput(
     TritonJson::Value seq_json;
     if (params_json.Find("sequence_id", &seq_json)) {
       uint64_t seq_id;
-      RETURN_IF_ERR(seq_json.AsUInt(&seq_id));
+      RETURN_MSG_IF_ERR(
+          seq_json.AsUInt(&seq_id), "Unable to parse 'sequence_id'");
       RETURN_IF_ERR(
           TRITONSERVER_InferenceRequestSetCorrelationId(irequest, seq_id));
     }
@@ -1896,7 +1911,8 @@ HTTPAPIServer::EVBufferToInput(
       TritonJson::Value start_json;
       if (params_json.Find("sequence_start", &start_json)) {
         bool start;
-        RETURN_IF_ERR(start_json.AsBool(&start));
+        RETURN_MSG_IF_ERR(
+            start_json.AsBool(&start), "Unable to parse 'sequence_start'");
         if (start) {
           flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
         }
@@ -1905,7 +1921,8 @@ HTTPAPIServer::EVBufferToInput(
       TritonJson::Value end_json;
       if (params_json.Find("sequence_end", &end_json)) {
         bool end;
-        RETURN_IF_ERR(end_json.AsBool(&end));
+        RETURN_MSG_IF_ERR(
+            end_json.AsBool(&end), "Unable to parse 'sequence_end'");
         if (end) {
           flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
         }
@@ -1918,7 +1935,8 @@ HTTPAPIServer::EVBufferToInput(
       TritonJson::Value priority_json;
       if (params_json.Find("priority", &priority_json)) {
         uint64_t p;
-        RETURN_IF_ERR(priority_json.AsUInt(&p));
+        RETURN_MSG_IF_ERR(
+            priority_json.AsUInt(&p), "Unable to parse 'priority'");
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriority(irequest, p));
       }
     }
@@ -1927,7 +1945,7 @@ HTTPAPIServer::EVBufferToInput(
       TritonJson::Value timeout_json;
       if (params_json.Find("timeout", &timeout_json)) {
         uint64_t t;
-        RETURN_IF_ERR(timeout_json.AsUInt(&t));
+        RETURN_MSG_IF_ERR(timeout_json.AsUInt(&t), "Unable to parse 'timeout'");
         RETURN_IF_ERR(
             TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(irequest, t));
       }
@@ -1937,7 +1955,9 @@ HTTPAPIServer::EVBufferToInput(
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
   TritonJson::Value inputs_json;
-  RETURN_IF_ERR(request_json.MemberAsArray("inputs", &inputs_json));
+  RETURN_MSG_IF_ERR(
+      request_json.MemberAsArray("inputs", &inputs_json),
+      "Unable to parse 'inputs'");
 
   for (size_t i = 0; i < inputs_json.ArraySize(); i++) {
     TritonJson::Value request_input;
@@ -1946,21 +1966,26 @@ HTTPAPIServer::EVBufferToInput(
 
     const char* input_name;
     size_t input_name_len;
-    RETURN_IF_ERR(
-        request_input.MemberAsString("name", &input_name, &input_name_len));
+    RETURN_MSG_IF_ERR(
+        request_input.MemberAsString("name", &input_name, &input_name_len),
+        "Unable to parse 'name'");
 
     const char* datatype;
     size_t datatype_len;
-    RETURN_IF_ERR(
-        request_input.MemberAsString("datatype", &datatype, &datatype_len));
+    RETURN_MSG_IF_ERR(
+        request_input.MemberAsString("datatype", &datatype, &datatype_len),
+        "Unable to parse 'datatype'");
     const TRITONSERVER_DataType dtype = TRITONSERVER_StringToDataType(datatype);
 
     TritonJson::Value shape_json;
-    RETURN_IF_ERR(request_input.MemberAsArray("shape", &shape_json));
+    RETURN_MSG_IF_ERR(
+        request_input.MemberAsArray("shape", &shape_json),
+        "Unable to parse 'shape'");
     std::vector<int64_t> shape_vec;
     for (size_t i = 0; i < shape_json.ArraySize(); i++) {
       uint64_t d = 0;
-      RETURN_IF_ERR(shape_json.IndexAsUInt(i, &d));
+      RETURN_MSG_IF_ERR(
+          shape_json.IndexAsUInt(i, &d), "Unable to parse 'shape'");
       shape_vec.push_back(d);
     }
 
@@ -2044,7 +2069,9 @@ HTTPAPIServer::EVBufferToInput(
           // checking here. Flow in this endpoint needs to be
           // reworked...
           TritonJson::Value tensor_data;
-          RETURN_IF_ERR(request_input.MemberAsArray("data", &tensor_data));
+          RETURN_MSG_IF_ERR(
+              request_input.MemberAsArray("data", &tensor_data),
+              "Unable to parse 'data'");
 
           if (dtype == TRITONSERVER_TYPE_BYTES) {
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
@@ -2093,7 +2120,9 @@ HTTPAPIServer::EVBufferToInput(
   // outputs is optional
   if (request_json.Find("outputs")) {
     TritonJson::Value outputs_json;
-    RETURN_IF_ERR(request_json.MemberAsArray("outputs", &outputs_json));
+    RETURN_MSG_IF_ERR(
+        request_json.MemberAsArray("outputs", &outputs_json),
+        "Unable to parse 'outputs'");
     for (size_t i = 0; i < outputs_json.ArraySize(); i++) {
       TritonJson::Value request_output;
       RETURN_IF_ERR(outputs_json.At(i, &request_output));
@@ -2101,8 +2130,9 @@ HTTPAPIServer::EVBufferToInput(
 
       const char* output_name;
       size_t output_name_len;
-      RETURN_IF_ERR(request_output.MemberAsString(
-          "name", &output_name, &output_name_len));
+      RETURN_MSG_IF_ERR(
+          request_output.MemberAsString("name", &output_name, &output_name_len),
+          "Unable to parse 'name'");
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(
           irequest, output_name));
 
