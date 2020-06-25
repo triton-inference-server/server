@@ -124,6 +124,12 @@ RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3
     cp builddir/custom-backend/install/lib/libimagepreprocess.so \
         qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1/.
 
+RUN mkdir -p qa/L0_backend_identity/models && \
+    cp -r src/backends/backend/examples/models/identity_fp32 qa/L0_backend_identity/models/. && \
+    mkdir -p qa/L0_backend_identity/models/identity_fp32/1 && \
+    cp builddir/server/install/backends/libtriton_identity.so \
+        qa/L0_backend_identity/models/identity_fp32/1/.
+
 RUN mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
     cp builddir/custom-backend/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
