@@ -26,6 +26,8 @@
 
 #include "src/servers/grpc_server.h"
 
+#include <grpc++/alarm.h>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <list>
@@ -1472,8 +1474,16 @@ CommonHandler::SetUpAllRequests()
 // Simple structure that carries the userp payload needed for
 // allocation.
 //
+template <typename ResponseType>
 struct AllocPayload {
   struct ShmInfo {
+    ShmInfo(
+        void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+        int64_t memory_type_id)
+        : base_(base), byte_size_(byte_size), memory_type_(memory_type),
+          memory_type_id_(memory_type_id)
+    {
+    }
     void* base_;
     size_t byte_size_;
     TRITONSERVER_MemoryType memory_type_;
@@ -1483,13 +1493,14 @@ struct AllocPayload {
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
   using ClassificationMap = std::unordered_map<std::string, uint32_t>;
 
-  explicit AllocPayload() : response_(nullptr) {}
+  explicit AllocPayload() : response_list_(nullptr) {}
   ~AllocPayload()
   {
     // Don't delete 'response_'.. it is owned by the InferHandlerState
   }
 
-  ModelInferResponse* response_;
+  std::shared_ptr<std::vector<ResponseType*>> response_list_;
+  uint32_t response_alloc_count_;
   TensorShmMap shm_map_;
   ClassificationMap classification_map_;
 
@@ -1514,9 +1525,10 @@ class InferHandlerState {
   // State that is shared across all state objects that make up a GRPC
   // transaction (e.g. a stream).
   struct Context {
-    explicit Context(const uint64_t unique_id = 0)
-        : unique_id_(unique_id), ongoing_requests_(0), step_(Steps::START),
-          finish_ok_(true)
+    explicit Context(
+        grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
+        : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
+          step_(Steps::START), finish_ok_(true), ongoing_write_(false)
     {
       ctx_.reset(new grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -1537,7 +1549,7 @@ class InferHandlerState {
     }
 
     // Write the response to the stream directly.
-    void WriteResponseThrough(InferHandlerStateType* state)
+    void DecoupledWriteResponse(InferHandlerStateType* state)
     {
       std::lock_guard<std::mutex> lock(mu_);
 
@@ -1547,15 +1559,29 @@ class InferHandlerState {
             state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
       }
 #endif  // TRITON_ENABLE_TRACING
+      state->step_ = Steps::WRITTEN;
+      responder_->Write(*state->GetCurrentResponse(), state);
 
-      if (state->response_.control_response().final()) {
-        state->step_ = Steps::WRITTEN;
-      } else {
-        state->step_ = Steps::ISSUED;
-      }
-      responder_->Write(state->response_, state);
-      // Clear the response
-      state->response_.mutable_infer_response()->mutable_outputs()->Clear();
+      // Clear the outputs in the response
+      state->GetCurrentResponse()
+          ->mutable_infer_response()
+          ->mutable_outputs()
+          ->Clear();
+
+      // Proceed to next response object
+      state->Next();
+    }
+
+    // Adds the state object to the completion queue so
+    // that it can be processed later
+    void PutTaskBackToQueue(InferHandlerStateType* state)
+    {
+      // FIXME: Is there a better way to put task on the
+      // completion queue rather than using alarm object?
+      // The alarm object will add a new task to the back of the
+      // completion queue when it expires or when it’s cancelled.
+      grpc::Alarm alarm;
+      alarm.Set(cq_, gpr_now(gpr_clock_type::GPR_CLOCK_REALTIME), state);
     }
 
     // Check the state at the front of the queue and write it if
@@ -1589,7 +1615,8 @@ class InferHandlerState {
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = Steps::WRITTEN;
-      responder_->Write(state->response_, state);
+      state->context_->ongoing_write_ = true;
+      responder_->Write(*state->GetCurrentResponse(), state);
 
       return state;
     }
@@ -1621,6 +1648,9 @@ class InferHandlerState {
           (ongoing_requests_ == 0));
     }
 
+    // The grpc completion queue associated with the RPC.
+    grpc::ServerCompletionQueue* cq_;
+
     // Unique ID for the context. Used only for debugging so will
     // always be 0 in non-debug builds.
     const uint64_t unique_id_;
@@ -1645,6 +1675,9 @@ class InferHandlerState {
     // True if this context should finish with OK status, false if
     // should finish with CANCELLED status.
     bool finish_ok_;
+
+    // True if there is an ongoing write to the grpc stream
+    std::atomic<bool> ongoing_write_;
   };
 
   explicit InferHandlerState(
@@ -1652,7 +1685,15 @@ class InferHandlerState {
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
       : tritonserver_(tritonserver)
   {
+    response_list_.reset(new std::vector<ResponseType*>());
     Reset(context, start_step);
+  }
+
+  ~InferHandlerState()
+  {
+    for (auto response : *response_list_) {
+      delete response;
+    }
   }
 
   void Reset(
@@ -1661,13 +1702,56 @@ class InferHandlerState {
     unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
     step_ = start_step;
-    cb_counter_ = 0;
+    current_index_ = 0;
+    available_count_ = 0;
     is_decoupled_ = false;
+    complete_ = false;
     request_.Clear();
-    response_.Clear();
+    for (auto response : *response_list_) {
+      response->Clear();
+    }
   }
 
   void Release() { context_ = nullptr; }
+
+  // Get the response object next in line to be written
+  // to the stream.
+  ResponseType* GetCurrentResponse()
+  {
+    if (response_list_->size() <= current_index_) {
+      return nullptr;
+    }
+    return (*response_list_)[current_index_];
+  }
+
+  // Get the response object at the specified index.
+  ResponseType* GetResponseAt(uint32_t index)
+  {
+    if (response_list_->size() <= index) {
+      return nullptr;
+    }
+    return (*response_list_)[index];
+  }
+
+  // Advance the response index to point to the next
+  // response.
+  bool Next()
+  {
+    current_index_++;
+    return true;
+  }
+
+  // Returns whether all the responses from the state
+  // are delivered and successfully written on the
+  // stream.
+  bool IsComplete()
+  {
+    return (complete_ && (current_index_ == available_count_));
+  }
+
+  // Returns whether the state has a pending response
+  // to be written on the stream.
+  bool WriteReady() { return (current_index_ < available_count_); }
 
   // Needed in the response handle for classification outputs.
   TRITONSERVER_Server* tritonserver_;
@@ -1677,6 +1761,8 @@ class InferHandlerState {
   uint64_t unique_id_;
 
   std::shared_ptr<Context> context_;
+  // Mutex to protect the step_
+  std::mutex mu_;
   Steps step_;
 
 #ifdef TRITON_ENABLE_TRACING
@@ -1686,14 +1772,16 @@ class InferHandlerState {
 #endif  // TRITON_ENABLE_TRACING
 
   bool is_decoupled_;
-  uint32_t cb_counter_;
+  uint32_t current_index_;
+  uint32_t available_count_;
+  bool complete_;
 
   RequestType request_;
-  ResponseType response_;
+  std::shared_ptr<std::vector<ResponseType*>> response_list_;
 
   // For inference requests the allocator payload, unused for other
   // requests.
-  AllocPayload alloc_payload_;
+  AllocPayload<ResponseType> alloc_payload_;
 };
 
 //
@@ -1859,18 +1947,15 @@ InferHandler<
 //
 // Infer utilities
 //
+template <typename ShmMapType>
 TRITONSERVER_Error*
-InferResponseAlloc(
+ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
-    int64_t preferred_memory_type_id, void* userp, void** buffer,
-    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
-    int64_t* actual_memory_type_id)
+    int64_t preferred_memory_type_id, ModelInferResponse* response,
+    const ShmMapType& shm_map, void** buffer, void** buffer_userp,
+    TRITONSERVER_MemoryType* actual_memory_type, int64_t* actual_memory_type_id)
 {
-  AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
-  ModelInferResponse* response = payload->response_;
-  const AllocPayload::TensorShmMap& shm_map = payload->shm_map_;
-
   *buffer = nullptr;
   *buffer_userp = nullptr;
   *actual_memory_type = preferred_memory_type;
@@ -1932,6 +2017,31 @@ InferResponseAlloc(
   }
 
   return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+InferResponseAlloc(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
+    int64_t* actual_memory_type_id)
+{
+  AllocPayload<ModelInferResponse>* payload =
+      reinterpret_cast<AllocPayload<ModelInferResponse>*>(userp);
+
+  // ModelInfer RPC expects exactly one response per request. Hence,
+  // will be creating and using just one response object.
+  if (payload->response_list_->size() < 1) {
+    payload->response_list_->push_back(new ModelInferResponse());
+  }
+
+  return ResponseAllocatorHelper<
+      AllocPayload<ModelInferResponse>::TensorShmMap>(
+      allocator, tensor_name, byte_size, preferred_memory_type,
+      preferred_memory_type_id, (*payload->response_list_)[0],
+      payload->shm_map_, buffer, buffer_userp, actual_memory_type,
+      actual_memory_type_id);
 }
 
 TRITONSERVER_Error*
@@ -2071,14 +2181,17 @@ ParseClassificationParams(
   return nullptr;  // success
 }
 
+template <typename ResponseType>
 TRITONSERVER_Error*
 InferAllocatorPayload(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const ModelInferRequest& request, std::list<std::string>&& serialized_data,
-    ModelInferResponse* response, AllocPayload* alloc_payload)
+    std::shared_ptr<std::vector<ResponseType*>> response_list_,
+    AllocPayload<ResponseType>* alloc_payload)
 {
-  alloc_payload->response_ = response;
+  alloc_payload->response_list_ = response_list_;
+  alloc_payload->response_alloc_count_ = 0;
   alloc_payload->shm_map_.clear();
   alloc_payload->classification_map_.clear();
   alloc_payload->serialized_data_ = std::move(serialized_data);
@@ -2116,8 +2229,8 @@ InferAllocatorPayload(
           region_name, offset, &base, &memory_type, &memory_type_id));
 
       alloc_payload->shm_map_.emplace(
-          io.name(),
-          AllocPayload::ShmInfo{base, byte_size, memory_type, memory_type_id});
+          io.name(), typename AllocPayload<ResponseType>::ShmInfo(
+                         base, byte_size, memory_type, memory_type_id));
     } else if (has_classification) {
       alloc_payload->classification_map_.emplace(
           io.name(), classification_count);
@@ -2483,10 +2596,12 @@ InferRequestComplete(
   }
 }
 
+template <typename ResponseType>
 TRITONSERVER_Error*
 InferResponseCompleteCommon(
     TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* iresponse,
-    ModelInferResponse& response, const AllocPayload& alloc_payload)
+    ModelInferResponse& response,
+    const AllocPayload<ResponseType>& alloc_payload)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(iresponse));
 
@@ -2683,7 +2798,7 @@ class ModelInferHandler
 void
 ModelInferHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>();
+  auto context = std::make_shared<State::Context>(cq_);
   State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
@@ -2732,7 +2847,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   }
 
   const ModelInferRequest& request = state->request_;
-  ModelInferResponse& response = state->response_;
+  auto response_list = state->response_list_;
 
   if (state->step_ == Steps::START) {
     TRITONSERVER_Error* err = nullptr;
@@ -2789,9 +2904,9 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           tritonserver_, shm_manager_, request, &serialized_data, irequest);
     }
     if (err == nullptr) {
-      err = InferAllocatorPayload(
+      err = InferAllocatorPayload<ModelInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
-          &response, &state->alloc_payload_);
+          response_list, &state->alloc_payload_);
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
@@ -2827,7 +2942,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       GrpcStatusUtil::Create(&status, err);
       TRITONSERVER_ErrorDelete(err);
 
-      response.Clear();
+      ModelInferResponse error_response;
 
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
@@ -2837,7 +2952,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = COMPLETE;
-      state->context_->responder_->Finish(response, status, state);
+      state->context_->responder_->Finish(error_response, status, state);
     }
   } else if (state->step_ == Steps::COMPLETE) {
 #ifdef TRITON_ENABLE_TRACING
@@ -2862,7 +2977,7 @@ ModelInferHandler::InferResponseComplete(
   State* state = reinterpret_cast<State*>(userp);
 
   // Increment the callback index
-  state->cb_counter_++;
+  state->available_count_++;
 
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
@@ -2872,24 +2987,43 @@ ModelInferHandler::InferResponseComplete(
     return;
   }
 
-  ModelInferResponse& response = state->response_;
+  auto response_list = state->response_list_;
 
   TRITONSERVER_Error* err = nullptr;
-  if (iresponse == nullptr || state->cb_counter_ != 1) {
+  // This callback is expected to be called exactly once for each request.
+  // Will use the single response object in the response list to hold the
+  // information.
+  if (state->response_list_->size() < 1) {
+    LOG_ERROR << "expected allocator to have created a response object";
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "No response object found in the callback");
+  }
+
+  ModelInferResponse* response;
+  bool response_created = false;
+  if (err == nullptr) {
+    response = (*state->response_list_)[0];
+  } else {
+    response_created = true;
+    response = new ModelInferResponse();
+  }
+
+  if (iresponse == nullptr || state->available_count_ != 1) {
     err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
         std::string(
             "ModelInfer RPC expects exactly 1 response callback per request, "
             "got " +
-            std::to_string(state->cb_counter_))
+            std::to_string(state->available_count_))
             .c_str());
   } else {
-    err = InferResponseCompleteCommon(
-        state->tritonserver_, iresponse, response, state->alloc_payload_);
+    err = InferResponseCompleteCommon<ModelInferResponse>(
+        state->tritonserver_, iresponse, *response, state->alloc_payload_);
   }
 
   if (err != nullptr) {
-    response.Clear();
+    response->Clear();
   }
 
   grpc::Status status;
@@ -2908,7 +3042,39 @@ ModelInferHandler::InferResponseComplete(
 #endif  // TRITON_ENABLE_TRACING
 
   state->step_ = COMPLETE;
-  state->context_->responder_->Finish(response, status, state);
+  state->context_->responder_->Finish(*response, status, state);
+  if (response_created) {
+    delete response;
+  }
+}
+
+//
+// Additional Stream Infer utilities
+//
+TRITONSERVER_Error*
+StreamInferResponseAlloc(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
+    int64_t* actual_memory_type_id)
+{
+  AllocPayload<ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<ModelStreamInferResponse>*>(userp);
+
+  uint32_t index = payload->response_alloc_count_++;
+  // Create a response object only when needed
+  if (payload->response_list_->size() < (index + 1)) {
+    payload->response_list_->push_back(new ModelStreamInferResponse());
+  }
+
+  return ResponseAllocatorHelper<
+      AllocPayload<ModelStreamInferResponse>::TensorShmMap>(
+      allocator, tensor_name, byte_size, preferred_memory_type,
+      preferred_memory_type_id,
+      (*payload->response_list_)[index]->mutable_infer_response(),
+      payload->shm_map_, buffer, buffer_userp, actual_memory_type,
+      actual_memory_type_id);
 }
 
 //
@@ -2935,7 +3101,7 @@ class ModelStreamInferHandler
     // the result tensors.
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
-            &allocator_, InferResponseAlloc, InferResponseFree,
+            &allocator_, StreamInferResponseAlloc, InferResponseFree,
             nullptr /* start_fn */),
         "creating response allocator");
   }
@@ -2948,6 +3114,7 @@ class ModelStreamInferHandler
   static void StreamInferResponseComplete(
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);
+  bool Finish(State* state);
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
@@ -2957,7 +3124,7 @@ class ModelStreamInferHandler
 void
 ModelStreamInferHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(NEXT_UNIQUE_ID);
+  auto context = std::make_shared<State::Context>(cq_, NEXT_UNIQUE_ID);
   State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
@@ -2987,6 +3154,8 @@ ModelStreamInferHandler::StartNewRequest()
 bool
 ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 {
+  std::lock_guard<std::mutex> lock(state->mu_);
+
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
@@ -3075,7 +3244,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     std::shared_ptr<StateContext> context = state->context_;
 
     // Issue the inference request into server...
-    ModelStreamInferResponse& response = state->response_;
+    auto response_list_ = state->response_list_;
 
     // Create the inference request which contains all the
     // input information needed for an inference.
@@ -3099,9 +3268,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           tritonserver_, shm_manager_, request, &serialized_data, irequest);
     }
     if (err == nullptr) {
-      err = InferAllocatorPayload(
+      err = InferAllocatorPayload<ModelStreamInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response.mutable_infer_response(), &state->alloc_payload_);
+          response_list_, &state->alloc_payload_);
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
@@ -3129,6 +3298,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // WRITEREADY or WRITTEN. If there was an error then enqueue the
     // error response and show it to be ready for writing.
     if (err != nullptr) {
+      ModelStreamInferResponse* response = state->GetCurrentResponse();
       LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
@@ -3138,9 +3308,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
       TRITONSERVER_ErrorDelete(err);
-      response.set_error_message(status.error_message());
+      response->set_error_message(status.error_message());
 
-      response.mutable_infer_response()->Clear();
+      response->mutable_infer_response()->Clear();
 
       state->step_ = Steps::WRITEREADY;
       state->context_->WriteResponseIfReady(state);
@@ -3174,31 +3344,44 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     next_read_state->context_->responder_->Read(
         &next_read_state->request_, next_read_state);
 
-  } else if (state->step_ == Steps::WRITTEN) {
+  } else if (state->step_ == Steps::COMPLETE) {
+    state->step_ = Steps::FINISH;
+    finished = true;
+  } else if (!state->is_decoupled_) {
+    // We handle the WRITTEN and WRITEREADY states little
+    // differently depending whether the inference request
+    // is for a decoupled model or not. This is because the
+    // grpc contract requires us to call Write() only once
+    // on a task. Hence, for decoupled writes, we call only
+    // one write and then wait for another notification from
+    // the completion queue to execute pending Write()'s, if
+    // any.
+
+    //
+    // Non-Decoupled state transitions
+    //
+    if (state->step_ == Steps::WRITTEN) {
+      state->context_->ongoing_write_ = false;
 #ifdef TRITON_ENABLE_TRACING
-    if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-      state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
-    }
+      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+        state->trace_manager_->CaptureTimestamp(
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
+      }
 #endif  // TRITON_ENABLE_TRACING
 
-    // If the write failed (for example, client closed the stream)
-    // mark that the stream did not complete successfully but don't
-    // cancel right away... need to wait for any pending reads,
-    // inferences and writes to complete.
-    if (!rpc_ok) {
-      LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
-                     << ", context " << state->context_->unique_id_ << ", "
-                     << state->unique_id_ << " step " << state->step_
-                     << ", failed";
-      state->context_->finish_ok_ = false;
-    }
+      // If the write failed (for example, client closed the stream)
+      // mark that the stream did not complete successfully but don't
+      // cancel right away... need to wait for any pending reads,
+      // inferences and writes to complete.
+      if (!rpc_ok) {
+        LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
+                       << ", context " << state->context_->unique_id_ << ", "
+                       << state->unique_id_ << " step " << state->step_
+                       << ", failed";
+        state->context_->finish_ok_ = false;
+      }
 
-    // The response for the request has been written completely. The counter
-    // can be safely decremented.
-    state->context_->DecrementRequestCounter();
 
-    if (!state->is_decoupled_) {
       // Log an error if 'state' is not the expected next response. Mark
       // that the stream did not complete successfully but don't cancel
       // right away... need to wait for any pending reads, inferences
@@ -3213,28 +3396,102 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
       // Write the next response if it is ready...
       state->context_->WriteResponseIfReady(nullptr);
-    }
 
-    // If done reading and no in-flight requests then can finish the
-    // entire stream. Otherwise just finish this state.
-    if (state->context_->IsRequestsCompleted()) {
-      state->context_->step_ = Steps::COMPLETE;
-      state->step_ = Steps::COMPLETE;
-      state->context_->responder_->Finish(
-          state->context_->finish_ok_ ? grpc::Status::OK
-                                      : grpc::Status::CANCELLED,
-          state);
-    } else {
+      // The response for the request has been written completely.
+      // The counter can be safely decremented.
+      state->context_->DecrementRequestCounter();
+      finished = Finish(state);
+
+    } else if (state->step_ == Steps::COMPLETE) {
       state->step_ = Steps::FINISH;
       finished = true;
     }
+  } else {
+    //
+    //  Decoupled state transitions
+    //
+    if (state->step_ == Steps::WRITTEN) {
+      state->context_->ongoing_write_ = false;
+#ifdef TRITON_ENABLE_TRACING
+      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+        state->trace_manager_->CaptureTimestamp(
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
+      }
+#endif  // TRITON_ENABLE_TRACING
 
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-    finished = true;
+      // If the write failed (for example, client closed the stream)
+      // mark that the stream did not complete successfully but don't
+      // cancel right away... need to wait for any pending reads,
+      // inferences and writes to complete.
+      if (!rpc_ok) {
+        LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
+                       << ", context " << state->context_->unique_id_ << ", "
+                       << state->unique_id_ << " step " << state->step_
+                       << ", failed";
+        state->context_->finish_ok_ = false;
+      }
+
+      // Finish the state if all the transactions associated with
+      // the state have completed.
+      if (state->IsComplete()) {
+        state->context_->DecrementRequestCounter();
+        finished = Finish(state);
+      } else {
+        // If there is an available response to be written
+        // to the stream, then transition directly to WRITEREADY
+        // state and enqueue itself to the completion queue to be
+        // taken up later. Otherwise, go to ISSUED state and wait
+        // for the callback to make a response available.
+        if (state->WriteReady()) {
+          state->step_ = Steps::WRITEREADY;
+          state->context_->PutTaskBackToQueue(state);
+        } else {
+          state->step_ = Steps::ISSUED;
+        }
+      }
+    } else if (state->step_ == Steps::WRITEREADY) {
+      // Finish the state if all the transactions associated with
+      // the state have completed.
+      if (state->IsComplete()) {
+        state->context_->DecrementRequestCounter();
+        finished = Finish(state);
+      } else {
+        // GRPC doesn't allow to issue another write till
+        // the notification from previous write has been
+        // delivered. If there is an ongoing write then
+        // defer writing and place the task at the back
+        // of the completion queue to be taken up later.
+        if (!state->context_->ongoing_write_) {
+          state->context_->ongoing_write_ = true;
+          state->context_->DecoupledWriteResponse(state);
+        } else {
+          state->context_->PutTaskBackToQueue(state);
+        }
+      }
+    }
   }
 
   return !finished;
+}
+
+bool
+ModelStreamInferHandler::Finish(InferHandler::State* state)
+{
+  // If done reading and no in-flight requests then can finish the
+  // entire stream. Otherwise just finish this state.
+  if (state->context_->IsRequestsCompleted()) {
+    state->context_->step_ = Steps::COMPLETE;
+    state->step_ = Steps::COMPLETE;
+    state->context_->responder_->Finish(
+        state->context_->finish_ok_ ? grpc::Status::OK
+                                    : grpc::Status::CANCELLED,
+        state);
+  } else {
+    state->step_ = Steps::FINISH;
+    return true;
+  }
+
+  return false;
 }
 
 void
@@ -3243,42 +3500,63 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
+
+  std::lock_guard<std::mutex> lock(state->mu_);
+
   // Increment the callback index
-  state->cb_counter_++;
+  state->available_count_++;
 
   LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferComplete, context "
                  << state->context_->unique_id_ << ", " << state->unique_id_
                  << " step " << state->step_ << ", callback index "
-                 << state->cb_counter_ << ", flags " << flags;
+                 << state->available_count_ << ", flags " << flags;
 
-  state->response_.mutable_control_response()->set_final(
-      (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
+  auto& response_list = state->response_list_;
 
-  TRITONSERVER_Error* err = nullptr;
+  // Add a response object to the list if needed
   if (iresponse != nullptr) {
-    ModelInferResponse& response = *(state->response_.mutable_infer_response());
-    err = InferResponseCompleteCommon(
-        state->tritonserver_, iresponse, response, state->alloc_payload_);
-  }
+    if (response_list->size() < state->available_count_) {
+      LOG_ERROR << "expected the response allocator to have added the response";
+    }
 
-  if (err != nullptr) {
-    grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    state->response_.mutable_infer_response()->Clear();
-    state->response_.set_error_message(status.error_message());
-  }
+    ModelStreamInferResponse* response =
+        state->GetResponseAt(state->available_count_ - 1);
 
-  TRITONSERVER_ErrorDelete(err);
+    TRITONSERVER_Error* err = nullptr;
+    if (iresponse != nullptr) {
+      ModelInferResponse& infer_response =
+          *(response->mutable_infer_response());
+      err = InferResponseCompleteCommon<ModelStreamInferResponse>(
+          state->tritonserver_, iresponse, infer_response,
+          state->alloc_payload_);
+    }
 
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseDelete(iresponse),
-      "deleting GRPC inference response");
+    if (err != nullptr) {
+      grpc::Status status;
+      GrpcStatusUtil::Create(&status, err);
+      response->mutable_infer_response()->Clear();
+      response->set_error_message(status.error_message());
+    }
 
-  if (state->is_decoupled_) {
-    state->context_->WriteResponseThrough(state);
+    TRITONSERVER_ErrorDelete(err);
+
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(iresponse),
+        "deleting GRPC inference response");
   } else {
+    // Should not count if (iresponse==nullptr)
+    state->available_count_--;
+  }
+
+  state->complete_ = ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
+  if (!state->is_decoupled_) {
     state->step_ = Steps::WRITEREADY;
     state->context_->WriteResponseIfReady(state);
+  } else {
+    if (state->step_ == Steps::ISSUED) {
+      state->step_ = Steps::WRITEREADY;
+      state->context_->PutTaskBackToQueue(state);
+    }
   }
 }
 
