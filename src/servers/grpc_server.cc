@@ -1534,10 +1534,10 @@ class InferHandlerState {
       responder_.reset(new ServerResponderType(ctx_.get()));
     }
 
-    // Increments the ongoing reques counter
+    // Increments the ongoing request counter
     void IncrementRequestCounter() { ongoing_requests_++; }
 
-    // Decrements the ongoing reques counter
+    // Decrements the ongoing request counter
     void DecrementRequestCounter() { ongoing_requests_--; }
 
     // Enqueue 'state' so that its response is delivered in the
@@ -2871,10 +2871,10 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
     if (err == nullptr) {
       uint32_t txn_flags;
-      err = TRITONSERVER_ServerModelTransactionPolicy(
+      err = TRITONSERVER_ServerModelTransactionProperties(
           tritonserver_.get(), request.model_name().c_str(),
-          requested_model_version, &txn_flags);
-      if ((txn_flags & TRITONSERVER_TXN_POLICY_DECOUPLED) != 0) {
+          requested_model_version, &txn_flags, nullptr /* voidp */);
+      if ((txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
         err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_UNSUPPORTED,
             "ModelInfer RPC doesn't support models with decoupled "
@@ -2984,6 +2984,7 @@ ModelInferHandler::InferResponseComplete(
 
   // Defer to the callback with the final response
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    LOG_ERROR << "[INTERNAL] ModelInfer received a response without FINAL flag";
     return;
   }
 
@@ -3219,11 +3220,10 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // object.
     if (err == nullptr) {
       uint32_t txn_flags;
-      err = TRITONSERVER_ServerModelTransactionPolicy(
+      err = TRITONSERVER_ServerModelTransactionProperties(
           tritonserver_.get(), request.model_name().c_str(),
-          requested_model_version, &txn_flags);
-      state->is_decoupled_ =
-          ((txn_flags & TRITONSERVER_TXN_POLICY_DECOUPLED) != 0);
+          requested_model_version, &txn_flags, nullptr /* voidp */);
+      state->is_decoupled_ = ((txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0);
     }
 
     // Request has been successfully read, increment the context request
@@ -3510,6 +3510,19 @@ ModelStreamInferHandler::StreamInferResponseComplete(
                  << state->context_->unique_id_ << ", " << state->unique_id_
                  << " step " << state->step_ << ", callback index "
                  << state->available_count_ << ", flags " << flags;
+
+  // Log appropriate errors
+  if (!state->is_decoupled_) {
+    if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0)
+      {
+        LOG_ERROR << "[INTERNAL] ModelStreamInfer received a response without "
+                     "FINAL flag for a model with one-to-one transaction";
+      }
+    if (iresponse == nullptr) {
+      LOG_ERROR << "[INTERNAL] ModelStreamInfer received a null response for a "
+                   "model with one-to-one transaction";
+    }
+  }
 
   auto& response_list = state->response_list_;
 

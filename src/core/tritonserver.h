@@ -1243,10 +1243,10 @@ typedef enum tritonserver_modelindexflag_enum {
 
 /// Model transaction policy flags. The enum values must be
 /// power-of-2 values.
-typedef enum tritonserver_txn_policy_flag_enum {
-  TRITONSERVER_TXN_POLICY_ONE_TO_ONE = 0,
-  TRITONSERVER_TXN_POLICY_DECOUPLED = 1
-} TRITONSERVER_ModelTxnPolicyFlag;
+typedef enum tritonserver_txn_property_flag_enum {
+  TRITONSERVER_TXN_ONE_TO_ONE = 0,
+  TRITONSERVER_TXN_DECOUPLED = 1
+} TRITONSERVER_ModelTxnPropertyFlag;
 
 /// Create a new server object. The caller takes ownership of the
 /// TRITONSERVER_Server object and must call TRITONSERVER_ServerDelete
@@ -1341,11 +1341,11 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelBatchProperties(
 /// Get the transaction policy of the model. The policy is communicated
 /// by a flags value.
 ///
-///   - TRITONSERVER_TXN_POLICY_ONE_TO_ONE: The model generates exactly
-///     one request per response.
+///   - TRITONSERVER_TXN_ONE_TO_ONE: The model generates exactly
+///     one response per request.
 ///
-///   - TRITONSERVER_TXN_POLICY_DECOUPLED: The model may generate multiple
-///     responses per request.
+///   - TRITONSERVER_TXN_DECOUPLED: The model may generate zero
+///     to many responses per request.
 ///
 /// \param server The inference server object.
 /// \param model_name The name of the model.
@@ -1353,11 +1353,12 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelBatchProperties(
 /// server will choose a version based on the model's policy.
 /// \param txn_flags Returns flags indicating the transaction policy of the
 /// model.
+/// \param voidp If non-nullptr, returns a point specific to the 'flags' value.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_ServerModelTransactionPolicy(
+TRITONSERVER_ServerModelTransactionProperties(
     TRITONSERVER_Server* server, const char* model_name,
-    const int64_t model_version, uint32_t* txn_flags);
+    const int64_t model_version, uint32_t* txn_flags, void** voidp);
 
 /// Get the metadata of the server as a TRITONSERVER_Message object.
 /// The caller takes ownership of the message object and must call
