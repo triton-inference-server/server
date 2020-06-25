@@ -42,7 +42,7 @@ if(${TRITON_ENABLE_GRPC})
 
   set(
       REQUEST_HDRS
-      grpc_client.h common.h
+      grpc_client.h common.h ipc.h
   )
 
   add_library(
@@ -167,7 +167,7 @@ if(${TRITON_ENABLE_HTTP})
 
   set(
       REQUEST_HDRS
-      http_client.h common.h cencode.h
+      http_client.h common.h ipc.h cencode.h
   )
 
   add_library(

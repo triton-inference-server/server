@@ -66,18 +66,18 @@ COPY build build
 COPY src/clients src/clients
 COPY src/core src/core
 
-RUN cd build && \
+RUN mkdir builddir && cd builddir && \
     cmake -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
           -DTRITON_ENABLE_GRPC=ON \
-          -DTRITON_ENABLE_HTTP=ON && \
+          -DTRITON_ENABLE_HTTP=ON ../build && \
     make -j16 client
 RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
 
 # For CI testing need to install a test script.
-COPY qa/L0_client_tar/test.sh /tmp/test.sh
+COPY qa/L0_client/test.sh /tmp/test.sh
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg

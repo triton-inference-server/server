@@ -113,12 +113,17 @@ For Ubuntu, the dependencies and how to install them can be found in
 Dockerfile.client. Also note that the dependency name may be different
 depending on the version of the system.
 
-To build on Ubuntu, change to the build/ directory and run the
-following to configure and build::
+To build on Ubuntu, run the following to configure and build::
 
-  $ cd build
-  $ cmake -DCMAKE_BUILD_TYPE=Release
+  $ mkdir builddir && cd builddir
+  $ cmake -DCMAKE_BUILD_TYPE=Release ../build
   $ make -j8 client
+
+If you want to build a version of the client libraries and examples
+that does not include the CUDA shared memory support, use the
+following cmake configuration::
+
+  $ cmake -DTRITON_ENABLE_GPU=OFF -DTRITON_ENABLE_METRICS_GPU=OFF -DCMAKE_BUILD_TYPE=Release ../build
 
 When the build completes the libraries can be found in
 client/install/lib, the corresponding headers in
@@ -154,6 +159,12 @@ are using Microsoft Visual Studio, you should do the following::
   > cd build
   > cmake -G"Visual Studio 16 2019" -DCMAKE_BUILD_TYPE=Release
   > MSBuild.exe client.vcxproj -p:Configuration=Release
+
+If you want to build a version of the client libraries and examples
+that does not include the CUDA shared memory support, use the
+following cmake configuration::
+
+  > cmake -G"Visual Studio 16 2019" -DTRITON_ENABLE_GPU=OFF -DTRITON_ENABLE_METRICS_GPU=OFF -DCMAKE_BUILD_TYPE=Release
 
 When the build completes the libraries can be found in
 client\\install\\lib, the corresponding headers in
