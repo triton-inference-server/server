@@ -284,9 +284,10 @@ struct BackendDeleter {
     // delete will lead to the model destructor which may wait on this
     // same thread... so deadlock if we don't use a different thread
     // here.
-    std::thread dthd([backend]() {
+    std::function<void()> destroy_fn = OnDestroyBackend_;
+    std::thread dthd([backend, destroy_fn]() {
       delete backend;
-      OnDestroyBackend_();
+      destroy_fn();
     });
 
     dthd.detach();
