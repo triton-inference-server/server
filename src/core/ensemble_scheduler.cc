@@ -315,7 +315,7 @@ EnsembleContext::EnsembleContext(
 
   TRITONSERVER_ResponseAllocator* allocator;
   TRITONSERVER_Error* err = TRITONSERVER_ResponseAllocatorNew(
-      &allocator, ResponseAlloc, ResponseRelease);
+      &allocator, ResponseAlloc, ResponseRelease, nullptr /* start_fn */);
   if (err != nullptr) {
     ensemble_status_ = Status(
         TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),

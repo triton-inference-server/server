@@ -278,8 +278,21 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseFactorySendFlags(
 ///
 /// TRITONBACKEND_Response
 ///
-/// Object representing an inference response.
+/// Object representing an inference response. For a given request,
+/// the backend must carefully manage the lifecycle of responses
+/// generated for that request to ensure that the output tensor
+/// buffers are allocated correctly. When a response is created with
+/// TRITONBACKEND_ResponseNew or TRITONBACKEND_ResponseNewFromFactory,
+/// all the outputs and corresponding buffers must be created for that
+/// response using TRITONBACKEND_ResponseOutput and
+/// TRITONBACKEND_OutputBuffer *before* another response is created
+/// for the request.
 ///
+/// After creating a first response and all the outputs and output
+/// buffers for that response, the backend may create another response
+/// before sending the first one. The backend may even delete the
+/// first response with TRITONBACKEND_ResponseDelete and never send
+/// it.
 
 /// Create a response for a request.
 ///

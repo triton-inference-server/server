@@ -57,6 +57,28 @@ InferenceResponseFactory::SendFlags(const uint32_t flags)
 //
 // InferenceResponse
 //
+InferenceResponse::InferenceResponse(
+    const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
+    const ResponseAllocator* allocator, void* alloc_userp,
+    TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+    void* response_userp,
+    const std::function<void(std::unique_ptr<InferenceResponse>&&)>& delegator)
+    : backend_(backend), id_(id), allocator_(allocator),
+      alloc_userp_(alloc_userp), response_fn_(response_fn),
+      response_userp_(response_userp), response_delegator_(delegator)
+{
+  // If the allocator has a start_fn then invoke it.
+  TRITONSERVER_ResponseAllocatorStartFn_t start_fn = allocator_->StartFn();
+  if (start_fn != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        start_fn(
+            reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+                const_cast<ResponseAllocator*>(allocator_)),
+            alloc_userp_),
+        "response allocation start failed");
+  }
+}
+
 const std::string&
 InferenceResponse::ModelName() const
 {
