@@ -124,10 +124,6 @@ RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3
     cp builddir/custom-backend/install/lib/libimagepreprocess.so \
         qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1/.
 
-RUN mkdir -p qa/L0_custom_param/models/param/1 && \
-    cp builddir/custom-backend/install/lib/libparam.so \
-        qa/L0_custom_param/models/param/1/.
-
 RUN mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
     cp builddir/custom-backend/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
