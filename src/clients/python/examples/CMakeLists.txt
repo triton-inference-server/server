@@ -34,12 +34,18 @@ if(${TRITON_ENABLE_HTTP})
       simple_http_string_infer_client.py
       simple_http_async_infer_client.py
       simple_http_sequence_sync_infer_client.py
-      simple_http_cudashm_client.py
       simple_http_shm_client.py
       simple_http_shm_string_client.py
       simple_http_model_control.py
     DESTINATION python
   )
+  if(${TRITON_ENABLE_GPU})
+    install(
+      PROGRAMS
+        simple_http_cudashm_client.py
+      DESTINATION python
+    )
+  endif() # TRITON_ENABLE_GPU
 endif() # TRITON_ENABLE_HTTP
 
 if(${TRITON_ENABLE_GRPC})
@@ -50,7 +56,6 @@ if(${TRITON_ENABLE_GRPC})
       grpc_explicit_int_content_client.py
       grpc_explicit_int8_content_client.py
       grpc_image_client.py
-      simple_grpc_cudashm_client.py
       simple_grpc_health_metadata.py
       simple_grpc_async_infer_client.py
       simple_grpc_infer_client.py
@@ -62,6 +67,13 @@ if(${TRITON_ENABLE_GRPC})
       simple_grpc_model_control.py
     DESTINATION python
   )
+  if(${TRITON_ENABLE_GPU})
+    install(
+      PROGRAMS
+        simple_grpc_cudashm_client.py
+      DESTINATION python
+    )
+  endif() # TRITON_ENABLE_GPU
 endif() # TRITON_ENABLE_GRPC
 
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})

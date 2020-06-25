@@ -354,6 +354,7 @@ else()
   target_link_libraries(
     simple_http_shm_client
     PRIVATE TRITON::httpclient_static
+    PRIVATE rt
   )
   install(
     TARGETS simple_http_shm_client

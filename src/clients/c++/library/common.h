@@ -27,8 +27,6 @@
 
 /// \file
 
-#include "src/core/constants.h"
-
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
@@ -41,6 +39,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "src/core/constants.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
