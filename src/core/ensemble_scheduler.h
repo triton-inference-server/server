@@ -61,6 +61,8 @@ struct EnsembleInfo {
 
   std::string ensemble_name_;
 
+  bool is_decoupled_;
+
   // the ensemble output (re)shape expected by the ensemble
   std::unordered_map<std::string, DimsList> ensemble_output_shape_;
 

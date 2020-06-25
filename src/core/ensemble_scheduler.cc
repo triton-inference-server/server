@@ -46,15 +46,46 @@ class EnsembleContext;
 // Step contains metadata, and status for the
 // internal infer request
 struct Step {
-  Step(size_t step_idx) : infer_status_(nullptr), step_idx_(step_idx) {}
+  Step(size_t step_idx)
+      : response_flags_(0), infer_status_(nullptr), step_idx_(step_idx)
+  {
+  }
 
   std::shared_ptr<EnsembleContext> ctx_;
   std::unique_ptr<InferenceRequest> request_;
   std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>> output_map_;
-  std::set<std::string> updated_tensors_;
+  std::set<std::pair<std::string, size_t>> updated_tensors_;
+  uint32_t response_flags_;
   TRITONSERVER_Error* infer_status_;
 
   size_t step_idx_;
+};
+
+struct TensorData {
+  TensorData() = default;
+  TensorData(size_t outgoing_steps_count)
+      : current_set_idx_(0), outgoing_steps_count_(outgoing_steps_count),
+        batch_size_(0)
+  {
+  }
+
+  size_t AddContent(std::unique_ptr<InferenceRequest::Input>&& content)
+  {
+    content_.emplace(
+        current_set_idx_,
+        std::make_pair(std::move(content), outgoing_steps_count_));
+    return current_set_idx_++;
+  }
+
+  // Content of the tensor. A container is used to handle the decoupled case
+  // where variable number of tensor contents will be produced.
+  // map 'set idx' to pair of <tensor content, remaining outgoing count>
+  std::unordered_map<
+      size_t, std::pair<std::unique_ptr<InferenceRequest::Input>, size_t>>
+      content_;
+  size_t current_set_idx_;
+  size_t outgoing_steps_count_;
+  size_t batch_size_;
 };
 
 // EnsembleContext maintains the state of the ensemble request
@@ -101,10 +132,6 @@ class EnsembleContext {
   using StepList = std::vector<std::unique_ptr<Step>>;
   using VersionMap =
       std::unordered_map<int64_t, std::shared_ptr<InferenceBackend>>;
-  // Storing each tensor's meta data and the raw data as
-  // InferenceRequest::Input, and the batch size of the generated tensor.
-  using TensorData =
-      std::pair<std::unique_ptr<InferenceRequest::Input>, size_t>;
 
   // Helper function to reshape the given tensor according to the
   // config shape and batching info and its actual shape and batching info.
@@ -128,25 +155,29 @@ class EnsembleContext {
   // returns the list of updated tensors in 'updated_tensors'
   Status UpdateEnsembleState(
       const std::unique_ptr<Step>& completed_step,
-      std::set<std::string>* updated_tensors);
+      std::set<std::pair<std::string, size_t>>* updated_tensors);
 
   // Helper function that returns a list of 'steps' that should be run under
   // current ensemble state. 'updated_tensors' is used so that we don't need to
   // iterate all the tensors to determine which step can be run.
   Status GetNextSteps(
-      const std::set<std::string>& updated_tensors, StepList* steps);
+      const std::set<std::pair<std::string, size_t>>& updated_tensors,
+      StepList* steps);
 
   // Helper function that completes the response of the ensemble request
-  Status FinishEnsemble();
+  Status FinishEnsemble(
+      std::unique_ptr<InferenceResponse>&& response = nullptr);
 
   // Helper function that initialize the 'step' given the info at 'step_idx'.
   // The 'step' will have proper request / response provider for the model
-  Status InitStep(const size_t step_idx, std::unique_ptr<Step>* step);
+  Status InitStep(
+      const size_t step_idx, const size_t tensor_idx,
+      std::unique_ptr<Step>* step);
 
   // Helper function that set the output of the ensemble request if it is ready
   // and valid.
-  // Return error if some of the required outputs are not set (deadlock)
   Status CheckAndSetEnsembleOutput(
+      const std::set<std::pair<std::string, size_t>>& updated_tensors,
       std::unique_ptr<InferenceResponse>* response);
 
   MetricModelReporter* metric_reporter_;
@@ -276,7 +307,14 @@ EnsembleContext::EnsembleContext(
   }
 
   for (const auto& pair : *tensor_to_step_) {
-    tensor_data_.emplace(pair.first, TensorData());
+    const auto& requested_outputs = request_->ImmutableRequestedOutputs();
+    // For requested outputs, add 1 to outgoing count as the ensemble itself
+    // isn't counted as step.
+    if (requested_outputs.find(pair.first) != requested_outputs.end()) {
+      tensor_data_.emplace(pair.first, TensorData(pair.second.size() + 1));
+    } else {
+      tensor_data_.emplace(pair.first, TensorData(pair.second.size()));
+    }
   }
 
   if (ensemble_status_.IsOk()) {
@@ -292,18 +330,20 @@ EnsembleContext::EnsembleContext(
         auto& tensor_data = it->second;
         // Shape() represents reshaped value without batch dimension,
         // thus need to fill it if necessary.
+        std::unique_ptr<InferenceRequest::Input> content;
         if (request_->BatchSize() != 0) {
           std::vector<int64_t> shape{request_->BatchSize()};
           shape.insert(
               shape.end(), input->Shape().begin(), input->Shape().end());
-          tensor_data.first.reset(new InferenceRequest::Input(
+          content.reset(new InferenceRequest::Input(
               input->Name(), input->DType(), shape));
         } else {
-          tensor_data.first.reset(new InferenceRequest::Input(
+          content.reset(new InferenceRequest::Input(
               input->Name(), input->DType(), input->Shape()));
         }
-        tensor_data.first->SetData(input->Data());
-        tensor_data.second = request_->BatchSize();
+        content->SetData(input->Data());
+        tensor_data.AddContent(std::move(content));
+        tensor_data.batch_size_ = request_->BatchSize();
       } else {
         ensemble_status_ = Status(
             Status::Code::INVALID_ARG,
@@ -379,10 +419,6 @@ EnsembleContext::RequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
-    // Assuming request is released after all responses are completed
-    // so that this function will be the trigger for next steps
-    auto step_ptr = std::unique_ptr<Step>(reinterpret_cast<Step*>(userp));
-    EnsembleContext::Proceed(step_ptr->ctx_, step_ptr);
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(request),
         "deleting ensemble inference request");
@@ -397,11 +433,9 @@ EnsembleContext::ResponseComplete(
     return;
   }
 
-  auto step_ptr = reinterpret_cast<Step*>(userp);
-  // FIXME infer_stats is added when constructing the request, this is different
-  // from the one in the ensemble backend, purely used for accumulating duration
-  // in requests Output buffers are set in ResponseAlloc(), setting meta data
-  // here.
+  auto step_ptr = std::unique_ptr<Step>(reinterpret_cast<Step*>(userp));
+  step_ptr->response_flags_ = flags;
+
   auto err = TRITONSERVER_InferenceResponseError(response);
   if (err == nullptr) {
     uint32_t count;
@@ -426,13 +460,14 @@ EnsembleContext::ResponseComplete(
         if (err == nullptr) {
           auto it = output_to_tensor.find(name);
           if (it != output_to_tensor.end()) {
-            auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
-            tensor_data.first.reset(new InferenceRequest::Input(
-                it->second, TritonToDataType(datatype), shape, dim_count));
+            std::unique_ptr<InferenceRequest::Input> content(
+                new InferenceRequest::Input(
+                    it->second, TritonToDataType(datatype), shape, dim_count));
+            content->SetData(std::move(step_ptr->output_map_[it->first]));
 
-            tensor_data.first->SetData(
-                std::move(step_ptr->output_map_[it->first]));
-            step_ptr->updated_tensors_.emplace(it->second);
+            auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
+            step_ptr->updated_tensors_.emplace(
+                it->second, tensor_data.AddContent(std::move(content)));
           } else {
             err = TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
@@ -456,6 +491,12 @@ EnsembleContext::ResponseComplete(
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(response),
       "deleting inference response");
+
+  EnsembleContext::Proceed(step_ptr->ctx_, step_ptr);
+  // Expecting more responses
+  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    step_ptr.release();
+  }
 }
 
 void
@@ -484,15 +525,23 @@ EnsembleContext::PrepareSteps(
 
     if (ensemble_status_.IsOk()) {
       StepList res;
-      std::set<std::string> updated_tensors;
+      std::set<std::pair<std::string, size_t>> updated_tensors;
       ensemble_status_ = UpdateEnsembleState(completed_step, &updated_tensors);
       if (ensemble_status_.IsOk()) {
         ensemble_status_ = GetNextSteps(updated_tensors, ready_steps);
       }
-      // Error or no more progress (completed or deadlock)
-      // in either case, FinishEnsemble() won't be called again
-      if ((!ensemble_status_.IsOk()) || (inflight_step_counter_ == 0)) {
-        ensemble_status_ = FinishEnsemble();
+
+      // Check and send ensemble response
+      if ((!ensemble_status_.IsOk()) || (inflight_step_counter_ == 0) ||
+          info_->is_decoupled_) {
+        std::unique_ptr<InferenceResponse> response;
+        if (ensemble_status_.IsOk()) {
+          ensemble_status_ =
+              CheckAndSetEnsembleOutput(updated_tensors, &response);
+        }
+        if ((response != nullptr) || (!ensemble_status_.IsOk())) {
+          ensemble_status_ = FinishEnsemble(std::move(response));
+        }
       }
     }
     return ensemble_status_;
@@ -502,17 +551,20 @@ EnsembleContext::PrepareSteps(
 Status
 EnsembleContext::UpdateEnsembleState(
     const std::unique_ptr<Step>& completed_step,
-    std::set<std::string>* updated_tensors)
+    std::set<std::pair<std::string, size_t>>* updated_tensors)
 {
   updated_tensors->clear();
   if (completed_step == nullptr) {
-    for (const auto& pair : tensor_data_) {
-      if (pair.second.first != nullptr) {
-        updated_tensors->emplace(pair.first);
+    for (const auto& tensor_data : tensor_data_) {
+      if (!tensor_data.second.content_.empty()) {
+        updated_tensors->emplace(tensor_data.first, 0);
       }
     }
   } else {
-    inflight_step_counter_--;
+    if (completed_step->response_flags_ &
+        TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
+      inflight_step_counter_--;
+    }
     RETURN_IF_TRITONSERVER_ERROR(completed_step->infer_status_);
     updated_tensors->swap(completed_step->updated_tensors_);
   }
@@ -521,31 +573,40 @@ EnsembleContext::UpdateEnsembleState(
 
 Status
 EnsembleContext::GetNextSteps(
-    const std::set<std::string>& updated_tensors, StepList* steps)
+    const std::set<std::pair<std::string, size_t>>& updated_tensors,
+    StepList* steps)
 {
   steps->clear();
 
-  std::set<size_t> next_step_idx;
+  std::set<std::pair<size_t, size_t>> next_step_idx;
   // Get steps whose tensors used for input are set
-  for (const auto tensor_name : updated_tensors) {
-    const auto& step_idx = (*tensor_to_step_)[tensor_name];
+  for (const auto tensor_name_idx : updated_tensors) {
+    const auto& step_idx = (*tensor_to_step_)[tensor_name_idx.first];
     for (const auto& idx : step_idx) {
       bool ready = true;
       for (const auto& input_pair : info_->steps_[idx].input_to_tensor_) {
-        if (tensor_data_[input_pair.second].first == nullptr) {
+        auto& tensor_content = tensor_data_[input_pair.second].content_;
+        if (tensor_content.empty()) {
           ready = false;
           break;
+        } else {
+          // Check if the content has tensor data at proper index (updated idx)
+          if (tensor_content.find(tensor_name_idx.second) ==
+              tensor_content.end()) {
+            ready = false;
+            break;
+          }
         }
       }
       if (ready) {
-        next_step_idx.insert(idx);
+        next_step_idx.emplace(idx, tensor_name_idx.second);
       }
     }
   }
 
   for (const auto& idx : next_step_idx) {
     steps->emplace_back();
-    RETURN_IF_ERROR(InitStep(idx, &(steps->back())));
+    RETURN_IF_ERROR(InitStep(idx.first, idx.second, &(steps->back())));
   }
   inflight_step_counter_ += steps->size();
 
@@ -553,7 +614,8 @@ EnsembleContext::GetNextSteps(
 }
 
 Status
-EnsembleContext::InitStep(const size_t step_idx, std::unique_ptr<Step>* step)
+EnsembleContext::InitStep(
+    const size_t step_idx, const size_t tensor_idx, std::unique_ptr<Step>* step)
 {
   const auto& istep = info_->steps_[step_idx];
   auto& version_map = handles_[istep.model_name_];
@@ -571,20 +633,26 @@ EnsembleContext::InitStep(const size_t step_idx, std::unique_ptr<Step>* step)
 
   // Set inputs in request and prepare input map
   for (const auto& pair : istep.input_to_tensor_) {
-    const auto& other = tensor_data_[pair.second];
+    auto& tensor_data = tensor_data_[pair.second];
+    auto& other = tensor_data.content_[tensor_idx];
 
     // If the actual shape and config shape agree with each other without
     // considering batch size, non-batch / batch conversion are not required.
     const ModelInput* input_config;
     backend->GetInput(pair.first, &input_config);
     auto shape = ReshapeTensorDims(
-        input_config->dims(), allow_batching, other.second,
+        input_config->dims(), allow_batching, tensor_data.batch_size_,
         other.first->OriginalShape());
 
     InferenceRequest::Input* input;
     RETURN_IF_ERROR(irequest->AddOriginalInput(
         pair.first, other.first->DType(), shape, &input));
     RETURN_IF_ERROR(input->SetData(other.first->Data()));
+
+    // Prune the tensor content if applicable
+    if ((--other.second) == 0) {
+      tensor_data.content_.erase(tensor_idx);
+    }
   }
 
   // Set requested outputs in request header
@@ -612,7 +680,7 @@ EnsembleContext::InitStep(const size_t step_idx, std::unique_ptr<Step>* step)
   // there is no other way to access it later on.
   for (const auto& pair : istep.output_to_tensor_) {
     auto& output_data_ = tensor_data_[pair.second];
-    output_data_.second = irequest->BatchSize();
+    output_data_.batch_size_ = irequest->BatchSize();
   }
 
   (*step)->request_ = std::move(irequest);
@@ -662,12 +730,13 @@ EnsembleContext::ReshapeTensorDims(
 }
 
 Status
-EnsembleContext::FinishEnsemble()
+EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
 {
-  std::unique_ptr<InferenceResponse> response;
-  if (ensemble_status_.IsOk()) {
-    ensemble_status_ = CheckAndSetEnsembleOutput(&response);
+  // Do nothing if the ensemble is finished
+  if (request_ == nullptr) {
+    return ensemble_status_;
   }
+
   // Add ensemble name to make error message more trackable
   if (!ensemble_status_.IsOk()) {
     ensemble_status_ = Status(
@@ -689,9 +758,16 @@ EnsembleContext::FinishEnsemble()
         infer_stats.compute_output_duration_ns_);
   }
 #endif
+
   if (ensemble_status_.IsOk()) {
-    InferenceResponse::Send(
-        std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
+    if (info_->is_decoupled_ && (inflight_step_counter_ != 0)) {
+      InferenceResponse::Send(
+          std::move(response), TRITONSERVER_RESPONSE_COMPLETE_NONE);
+      return ensemble_status_;
+    } else {
+      InferenceResponse::Send(
+          std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
+    }
   } else {
     if (response != nullptr) {
       InferenceResponse::SendWithStatus(
@@ -710,39 +786,71 @@ EnsembleContext::FinishEnsemble()
 
 Status
 EnsembleContext::CheckAndSetEnsembleOutput(
+    const std::set<std::pair<std::string, size_t>>& updated_tensors,
     std::unique_ptr<InferenceResponse>* response)
 {
+  size_t tensor_idx = 0;
+  // Check if updated tensor is one of the ensemble output and if all outputs
+  // have content of the same index
+  bool ready = false;
+  const auto& requested_outputs = request_->ImmutableRequestedOutputs();
+  for (const auto tensor_name_idx : updated_tensors) {
+    if (requested_outputs.find(tensor_name_idx.first) ==
+        requested_outputs.end()) {
+      continue;
+    }
+
+    ready = true;
+    tensor_idx = tensor_name_idx.second;
+    for (const auto& output : requested_outputs) {
+      auto& tensor_content = tensor_data_[output].content_;
+      if (tensor_content.empty()) {
+        ready = false;
+        break;
+      } else {
+        // Check if the content has tensor data at proper index (updated idx)
+        if (tensor_content.find(tensor_idx) == tensor_content.end()) {
+          ready = false;
+          break;
+        }
+      }
+    }
+  }
+  if (!ready) {
+    if (info_->is_decoupled_ && (inflight_step_counter_ != 0)) {
+      return Status::Success;
+    }
+    return Status(
+        Status::Code::INVALID_ARG,
+        "unexpected deadlock, at least one output is not set while no more "
+        "ensemble steps can be made");
+  }
+
   RETURN_IF_ERROR(request_->ResponseFactory().CreateResponse(response));
 
   bool cuda_async_copy = false;
-  const auto& requested_outputs = request_->ImmutableRequestedOutputs();
+  std::vector<std::unique_ptr<InferenceRequest::Input>> released_tensor_content;
   for (const auto& output_pair : info_->ensemble_output_shape_) {
     if (requested_outputs.find(output_pair.first) == requested_outputs.end()) {
       continue;
     }
     // Check if output is ready
-    const auto& tensor_data = tensor_data_[output_pair.first];
-    if ((tensor_data.first == nullptr) ||
-        (tensor_data.first->Data()) == nullptr) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "unexpected deadlock, output '" + output_pair.first +
-              "' is not set while no more ensemble steps can be made");
-    }
+    auto& tensor_data = tensor_data_[output_pair.first];
+    auto& other = tensor_data.content_[tensor_idx];
 
     auto shape = ReshapeTensorDims(
-        output_pair.second, (request_->BatchSize() != 0), tensor_data.second,
-        tensor_data.first->OriginalShape());
+        output_pair.second, (request_->BatchSize() != 0),
+        tensor_data.batch_size_, other.first->OriginalShape());
 
     InferenceResponse::Output* output;
     RETURN_IF_ERROR((*response)->AddOutput(
-        output_pair.first, tensor_data.first->DType(), shape, &output));
+        output_pair.first, other.first->DType(), shape, &output));
 
     // Use the memory type of the memory block as preferred memory type
     TRITONSERVER_MemoryType dst_memory_type;
     int64_t dst_memory_type_id;
     size_t content_size;
-    tensor_data.first->Data()->BufferAt(
+    other.first->Data()->BufferAt(
         0, &content_size, &dst_memory_type, &dst_memory_type_id);
 
     void* buffer;
@@ -763,7 +871,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
-    const char* content = tensor_data.first->Data()->BufferAt(
+    const char* content = other.first->Data()->BufferAt(
         content_idx, &content_size, &src_memory_type, &src_memory_type_id);
     bool cuda_used = false;
     while (content != nullptr) {
@@ -775,8 +883,15 @@ EnsembleContext::CheckAndSetEnsembleOutput(
 
       content_offset += content_size;
       content_idx++;
-      content = tensor_data.first->Data()->BufferAt(
+      content = other.first->Data()->BufferAt(
           content_idx, &content_size, &src_memory_type, &src_memory_type_id);
+    }
+
+    // Prune the tensor content if applicable, but the release of data buffer
+    // is deferred as there may be ongoing copies.
+    if ((--other.second) == 0) {
+      released_tensor_content.emplace_back(std::move(other.first));
+      tensor_data.content_.erase(tensor_idx);
     }
   }
 
@@ -864,6 +979,9 @@ EnsembleScheduler::EnsembleScheduler(
   info_.reset(new EnsembleInfo());
 
   info_->ensemble_name_ = config.name();
+
+  // This config field is filled internally for ensemble models
+  info_->is_decoupled_ = config.model_transaction_policy().decoupled();
 
   for (const auto& input : config.input()) {
     info_->tensor_to_step_.emplace(input.name(), std::set<size_t>());
