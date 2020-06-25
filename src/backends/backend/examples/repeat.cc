@@ -38,7 +38,9 @@ namespace nib = nvidia::inferenceserver::backend;
 // Backend that demonstrates the TRITONBACKEND API for a decoupled
 // backend where each request can generate 0 to many responses.
 //
-// This backend supports a model that has three inputs and one output:
+// This backend supports a model that has three inputs and one
+// output. The model can support batching but the shapes described
+// here refer to the non-batch portion of the shape.
 //
 //   - Input 'IN' can have any vector shape (e.g. [4] or [-1]) and
 //   - datatype must be INT32.
@@ -52,16 +54,18 @@ namespace nib = nvidia::inferenceserver::backend;
 //
 // For a request, the backend will sent 'n' responses where 'n' is the
 // number of elements in IN. For each response, OUT will equal the
-// i'th element of IN. The backend will wait the DELAY, in
-// milliseconds, before sending the i'th response. After WAIT
-// milliseconds the backend will release the request and return from
-// the TRITONBACKEND_ModelExecute function so that Triton can provide
-// another request to the backend. WAIT can be less than the sum of
-// DELAY so that the request is released before all responses are
-// sent. Thus, even if there is only one instance of the model, the
-// backend can be processing multiple requests at the same time, and
-// the responses for multiple requests can be intermixed, depending on
-// the values of DELAY and WAIT.
+// i'th element of IN. The backend will wait the i'th DELAY, in
+// milliseconds, before sending the i'th response. If IN shape is [0]
+// then no responses will be sent.
+//
+// After WAIT milliseconds the backend will release the request and
+// return from the TRITONBACKEND_ModelExecute function so that Triton
+// can provide another request to the backend. WAIT can be less than
+// the sum of DELAY so that the request is released before all
+// responses are sent. Thus, even if there is only one instance of the
+// model, the backend can be processing multiple requests at the same
+// time, and the responses for multiple requests can be intermixed,
+// depending on the values of DELAY and WAIT.
 //
 // If the model uses a batching scheduler (like the dynamic batcher),
 // the WAIT time used is the maximum wait time of all requests in the
@@ -477,6 +481,14 @@ ModelState::RequestThread(
         (std::string("sent response ") + std::to_string(e + 1) + " of " +
          std::to_string(element_count))
             .c_str());
+  }
+
+  // Add some logging for the case where IN was size 0 and so no
+  // responses were sent.
+  if (element_count == 0) {
+    TRITONSERVER_LogMessage(
+        TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+        "IN size is zero, no responses send ");
   }
 
   // All responses have been sent so we must signal that we are done
