@@ -1713,8 +1713,6 @@ class InferContext:
         err = c_void_p(_crequest_infer_ctx_get_async_run_results(
             self._ctx, request_id))
 
-        self._last_request_id = _raise_if_error(err)
-
         with self._lock:
             requested_outputs = self._requested_outputs_dict[request_id]
             if isinstance(requested_outputs, int):
@@ -1722,6 +1720,8 @@ class InferContext:
                 requested_outputs = self._callback_resources_dict[idx]
                 del self._callback_resources_dict[idx]
             del self._requested_outputs_dict[request_id]
+
+        self._last_request_id = _raise_if_error(err)
 
         return self._get_results(requested_outputs[0], requested_outputs[1], request_id)
 
