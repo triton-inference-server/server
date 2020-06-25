@@ -2527,7 +2527,7 @@ InferResponseCompleteCommon(
       uint32_t batch_size = 0;
 
       uint32_t batch_flags;
-      RETURN_IF_ERR(TRITONSERVER_ServerModelBatch(
+      RETURN_IF_ERR(TRITONSERVER_ServerModelBatchProperties(
           server, model_name, model_version, &batch_flags,
           nullptr /* voidp */));
       if ((dim_count > 0) &&
