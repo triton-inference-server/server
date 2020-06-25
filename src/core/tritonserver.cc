@@ -1437,7 +1437,7 @@ TRITONSERVER_ServerModelIsReady(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_ServerModelBatch(
+TRITONSERVER_ServerModelBatchProperties(
     TRITONSERVER_Server* server, const char* model_name,
     const int64_t model_version, uint32_t* flags, void** voidp)
 {
