@@ -1551,8 +1551,6 @@ class InferHandlerState {
     // Write the response to the stream directly.
     void DecoupledWriteResponse(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
-
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
@@ -3168,8 +3166,6 @@ ModelStreamInferHandler::StartNewRequest()
 bool
 ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 {
-  std::lock_guard<std::mutex> lock(state->mu_);
-
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
@@ -3458,6 +3454,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         state->context_->DecrementRequestCounter();
         finished = Finish(state);
       } else {
+        std::lock_guard<std::mutex> lock(state->mu_);
+
         // If there is an available response to be written
         // to the stream, then transition directly to WRITEREADY
         // state and enqueue itself to the completion queue to be
@@ -3522,8 +3520,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 {
   State* state = reinterpret_cast<State*>(userp);
 
-  std::lock_guard<std::mutex> lock(state->mu_);
-
   // Increment the callback index
   state->available_count_++;
 
@@ -3586,6 +3582,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     state->step_ = Steps::WRITEREADY;
     state->context_->WriteResponseIfReady(state);
   } else {
+    std::lock_guard<std::mutex> lock(state->mu_);
+
     if (state->step_ == Steps::ISSUED) {
       state->step_ = Steps::WRITEREADY;
       state->context_->PutTaskBackToQueue(state);
