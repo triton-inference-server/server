@@ -1186,7 +1186,11 @@ class InferenceServerClient:
         g = self._pool.apply_async(
             wrapped_post, (request_uri, request_body, headers, query_params))
 
+        # Schedule the greenlet to run in this loop iteration
         g.start()
+
+        # Relinquish control to greenlet loop
+        gevent.sleep(0)
 
         if self._verbose:
             verbose_message = "Sent request"
