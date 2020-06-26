@@ -3053,7 +3053,8 @@ ModelInferHandler::InferResponseComplete(
 // Additional Stream Infer utilities
 //
 TRITONSERVER_Error*
-StreamInferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp) {
+StreamInferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
+{
   AllocPayload<ModelStreamInferResponse>* payload =
       reinterpret_cast<AllocPayload<ModelStreamInferResponse>*>(userp);
 
@@ -3310,6 +3311,10 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // WRITEREADY or WRITTEN. If there was an error then enqueue the
     // error response and show it to be ready for writing.
     if (err != nullptr) {
+      // Create a response object only when needed
+      if (state->response_list_->size() < 1) {
+        state->response_list_->push_back(new ModelStreamInferResponse());
+      }
       ModelStreamInferResponse* response = state->GetCurrentResponse();
       LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
@@ -3323,9 +3328,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       response->set_error_message(status.error_message());
 
       response->mutable_infer_response()->Clear();
-
       state->step_ = Steps::WRITEREADY;
-      state->context_->WriteResponseIfReady(state);
+      if (!state->is_decoupled_) {
+        state->context_->WriteResponseIfReady(state);
+      } else {
+        state->complete_ = true;
+        state->context_->PutTaskBackToQueue(state);
+      }
     }
 
     // Now that the inference request is in flight, create a copy of
@@ -3525,11 +3534,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 
   // Log appropriate errors
   if (!state->is_decoupled_) {
-    if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0)
-      {
-        LOG_ERROR << "[INTERNAL] ModelStreamInfer received a response without "
-                     "FINAL flag for a model with one-to-one transaction";
-      }
+    if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+      LOG_ERROR << "[INTERNAL] ModelStreamInfer received a response without "
+                   "FINAL flag for a model with one-to-one transaction";
+    }
     if (iresponse == nullptr) {
       LOG_ERROR << "[INTERNAL] ModelStreamInfer received a null response for a "
                    "model with one-to-one transaction";
