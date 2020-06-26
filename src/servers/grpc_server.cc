@@ -3053,6 +3053,22 @@ ModelInferHandler::InferResponseComplete(
 // Additional Stream Infer utilities
 //
 TRITONSERVER_Error*
+StreamInferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp) {
+  AllocPayload<ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<ModelStreamInferResponse>*>(userp);
+
+  // Move to the next response object
+  payload->response_alloc_count_++;
+
+  // Create a response object only when needed
+  if (payload->response_list_->size() < payload->response_alloc_count_) {
+    payload->response_list_->push_back(new ModelStreamInferResponse());
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 StreamInferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
@@ -3063,11 +3079,7 @@ StreamInferResponseAlloc(
   AllocPayload<ModelStreamInferResponse>* payload =
       reinterpret_cast<AllocPayload<ModelStreamInferResponse>*>(userp);
 
-  uint32_t index = payload->response_alloc_count_++;
-  // Create a response object only when needed
-  if (payload->response_list_->size() < (index + 1)) {
-    payload->response_list_->push_back(new ModelStreamInferResponse());
-  }
+  uint32_t index = payload->response_alloc_count_ - 1;
 
   return ResponseAllocatorHelper<
       AllocPayload<ModelStreamInferResponse>::TensorShmMap>(
@@ -3103,7 +3115,7 @@ class ModelStreamInferHandler
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
             &allocator_, StreamInferResponseAlloc, InferResponseFree,
-            nullptr /* start_fn */),
+            StreamInferResponseStart),
         "creating response allocator");
   }
 
