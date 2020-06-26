@@ -91,8 +91,8 @@ WarmupResponseRelease(
   return nullptr;
 }
 
-ResponseAllocator warmup_allocator =
-    ResponseAllocator(WarmupResponseAlloc, WarmupResponseRelease);
+ResponseAllocator warmup_allocator = ResponseAllocator(
+    WarmupResponseAlloc, WarmupResponseRelease, nullptr /* start_fn */);
 
 void
 WarmupResponseComplete(

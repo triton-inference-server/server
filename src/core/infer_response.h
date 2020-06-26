@@ -203,12 +203,7 @@ class InferenceResponse {
       TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
       const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
-          delegator)
-      : backend_(backend), id_(id), allocator_(allocator),
-        alloc_userp_(alloc_userp), response_fn_(response_fn),
-        response_userp_(response_userp), response_delegator_(delegator)
-  {
-  }
+          delegator);
 
   const std::string& Id() const { return id_; }
   const std::string& ModelName() const;

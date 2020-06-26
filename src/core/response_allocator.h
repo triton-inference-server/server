@@ -36,8 +36,9 @@ class ResponseAllocator {
  public:
   explicit ResponseAllocator(
       TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn)
-      : alloc_fn_(alloc_fn), release_fn_(release_fn)
+      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+      TRITONSERVER_ResponseAllocatorStartFn_t start_fn)
+      : alloc_fn_(alloc_fn), release_fn_(release_fn), start_fn_(start_fn)
   {
   }
 
@@ -46,10 +47,12 @@ class ResponseAllocator {
   {
     return release_fn_;
   }
+  TRITONSERVER_ResponseAllocatorStartFn_t StartFn() const { return start_fn_; }
 
  private:
   TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
   TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn_;
+  TRITONSERVER_ResponseAllocatorStartFn_t start_fn_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -275,18 +275,61 @@ typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorReleaseFn_t)(
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id);
 
+/// Type for function that is called to indicate that subsequent
+/// allocation requests will refer to a new response.
+///
+/// \param allocator The allocator that is provided in the call to
+/// TRITONSERVER_ServerInferAsync.
+/// \param userp The user data pointer that is provided in the call to
+/// TRITONSERVER_ServerInferAsync.
+/// \return a TRITONSERVER_Error object if a failure occurs.
+typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorStartFn_t)(
+    TRITONSERVER_ResponseAllocator* allocator, void* userp);
+
 /// Create a new response allocator object.
+///
+/// The response allocator object is used by Triton to allocate
+/// buffers to hold the output tensors in inference responses. Most
+/// models generate a single response for each inference request
+/// (TRITONSERVER_TXN_ONE_TO_ONE). For these models the order of
+/// callbacks will be:
+///
+///   TRITONSERVER_ServerInferAsync called
+///    - start_fn : optional (and typically not required)
+///    - alloc_fn : called once for each output tensor in response
+///   TRITONSERVER_InferenceResponseDelete called
+///    - release_fn: called once for each output tensor in response
+///
+/// For models that generate multiple responses for each inference
+/// request (TRITONSERVER_TXN_DECOUPLED), the start_fn callback can be
+/// used to determine sets of alloc_fn callbacks that belong to the
+/// same response:
+///
+///   TRITONSERVER_ServerInferAsync called
+///    - start_fn
+///    - alloc_fn : called once for each output tensor in response
+///    - start_fn
+///    - alloc_fn : called once for each output tensor in response
+///      ...
+///   For each response, TRITONSERVER_InferenceResponseDelete called
+///    - release_fn: called once for each output tensor in the response
 ///
 /// \param allocator Returns the new response allocator object.
 /// \param alloc_fn The function to call to allocate buffers for result
 /// tensors.
 /// \param release_fn The function to call when the server no longer
 /// holds a reference to an allocated buffer.
+/// \param start_fn The function to call to indicate that the
+/// subsequent 'alloc_fn' calls are for a new response. This callback
+/// is optional (use nullptr to indicate that it should not be
+/// invoked).
+
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ResponseAllocatorNew(
     TRITONSERVER_ResponseAllocator** allocator,
     TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn);
+    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+    TRITONSERVER_ResponseAllocatorStartFn_t start_fn);
 
 /// Delete a response allocator.
 ///
