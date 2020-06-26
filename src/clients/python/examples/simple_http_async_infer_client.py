@@ -49,9 +49,14 @@ if __name__ == '__main__':
                         help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
+
+    request_count=2
     try:
+        # Need to specify large enough concurrency to issue all the
+        # inference requests to the server in parallel.
         triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose)
+                                                         verbose=FLAGS.verbose,
+                                                         concurrency=request_count)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -71,7 +76,6 @@ if __name__ == '__main__':
     input1_data = np.ones(shape=(1, 16), dtype=np.int32)
 
     # Initialize the data
-    # Enable binary_data after DLIS-1204 is fixed.
     inputs[0].set_data_from_numpy(input0_data, binary_data=True)
     inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
@@ -79,28 +83,31 @@ if __name__ == '__main__':
                                                    binary_data=True))
     outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
                                                    binary_data=True))
+    async_requests = []
 
-    # Inference call
-    async_request = triton_client.async_infer(model_name=model_name,
-                              inputs=inputs,
-                              outputs=outputs)
+    for i in range(request_count):
+        # Asynchronous inference call.
+        async_requests.append(triton_client.async_infer(model_name=model_name,
+                                                inputs=inputs,
+                                                outputs=outputs))
 
-    # Get the result from the initiated asynchronous inference request.
-    # Note the call will block till the server responds.
-    result = async_request.get_result()
+    for async_request in async_requests:
+        # Get the result from the initiated asynchronous inference request.
+        # Note the call will block till the server responds.
+        result = async_request.get_result()
 
-    print(result.get_response())
-    # Validate the results by comparing with precomputed values.
-    output0_data = result.as_numpy('OUTPUT0')
-    output1_data = result.as_numpy('OUTPUT1')
-    for i in range(16):
-        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
-              " = " + str(output0_data[0][i]))
-        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
-              " = " + str(output1_data[0][i]))
-        if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
-            print("async infer error: incorrect sum")
-            sys.exit(1)
-        if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
-            print("async infer error: incorrect difference")
-            sys.exit(1)
+        print(result.get_response())
+        # Validate the results by comparing with precomputed values.
+        output0_data = result.as_numpy('OUTPUT0')
+        output1_data = result.as_numpy('OUTPUT1')
+        for i in range(16):
+            print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
+                  " = " + str(output0_data[0][i]))
+            print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
+                  " = " + str(output1_data[0][i]))
+            if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
+                print("async infer error: incorrect sum")
+                sys.exit(1)
+            if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
+                print("async infer error: incorrect difference")
+                sys.exit(1)

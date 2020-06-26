@@ -386,9 +386,13 @@ if __name__ == '__main__':
             triton_client = tritongrpcclient.InferenceServerClient(
                 url=FLAGS.url, verbose=FLAGS.verbose)
         else:
-            # Create HTTP client for communicating with the server
+            # Specify large enough concurrency to handle the
+            # the number of requests.
+            concurrency = 20 if FLAGS.async_set else 1
             triton_client = tritonhttpclient.InferenceServerClient(
-                url=FLAGS.url, verbose=FLAGS.verbose)
+                                            url=FLAGS.url,
+                                            verbose=FLAGS.verbose,
+                                            concurrency=concurrency)
     except Exception as e:
         print("client creation failed: " + str(e))
         sys.exit(1)
