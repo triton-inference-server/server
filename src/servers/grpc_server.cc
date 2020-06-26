@@ -2624,7 +2624,8 @@ class ModelInferHandler
     // the result tensors.
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
-            &allocator_, InferResponseAlloc, InferResponseFree),
+            &allocator_, InferResponseAlloc, InferResponseFree,
+            nullptr /* start_fn */),
         "creating inference response allocator");
   }
 
@@ -2868,7 +2869,8 @@ class ModelStreamInferHandler
     // the result tensors.
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
-            &allocator_, InferResponseAlloc, InferResponseFree),
+            &allocator_, InferResponseAlloc, InferResponseFree,
+            nullptr /* start_fn */),
         "creating response allocator");
   }
 

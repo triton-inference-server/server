@@ -472,10 +472,11 @@ TRITONSERVER_Error*
 TRITONSERVER_ResponseAllocatorNew(
     TRITONSERVER_ResponseAllocator** allocator,
     TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn)
+    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+    TRITONSERVER_ResponseAllocatorStartFn_t start_fn)
 {
   *allocator = reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
-      new ni::ResponseAllocator(alloc_fn, release_fn));
+      new ni::ResponseAllocator(alloc_fn, release_fn, start_fn));
   return nullptr;  // Success
 }
 

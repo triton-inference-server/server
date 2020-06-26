@@ -164,16 +164,6 @@ extern Logger gLogger_;
     }                                                                   \
   } while (false)
 
-#define LOG_TRITONSERVER_ERROR(X, MSG)                                  \
-  do {                                                                  \
-    TRITONSERVER_Error* err__ = (X);                                    \
-    if (err__ != nullptr) {                                             \
-      LOG_ERROR << (MSG) << ": " << TRITONSERVER_ErrorCodeString(err__) \
-                << " - " << TRITONSERVER_ErrorMessage(err__);           \
-      TRITONSERVER_ErrorDelete(err__);                                  \
-    }                                                                   \
-  } while (false)
-
 #define LOG_FLUSH nvidia::inferenceserver::gLogger_.Flush()
 
 }}  // namespace nvidia::inferenceserver

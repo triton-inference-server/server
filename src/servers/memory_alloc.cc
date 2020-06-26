@@ -618,7 +618,7 @@ main(int argc, char** argv)
   TRITONSERVER_ResponseAllocator* allocator = nullptr;
   FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorNew(
-          &allocator, ResponseAlloc, ResponseRelease),
+          &allocator, ResponseAlloc, ResponseRelease, nullptr /* start_fn */),
       "creating response allocator");
 
   TRITONSERVER_InferenceRequest* irequest = nullptr;

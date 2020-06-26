@@ -924,7 +924,8 @@ class HTTPAPIServer : public HTTPServerImpl {
 
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
-            &allocator_, InferResponseAlloc, InferResponseFree),
+            &allocator_, InferResponseAlloc, InferResponseFree,
+            nullptr /* start_fn */),
         "creating response allocator");
   }
 

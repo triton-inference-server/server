@@ -60,8 +60,8 @@ NullResponseRelease(
       "unexpected release for null request, no output should be requestd.");
 }
 
-ResponseAllocator null_allocator =
-    ResponseAllocator(NullResponseAlloc, NullResponseRelease);
+ResponseAllocator null_allocator = ResponseAllocator(
+    NullResponseAlloc, NullResponseRelease, nullptr /* start_fn */);
 
 void
 NullResponseComplete(
