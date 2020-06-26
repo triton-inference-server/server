@@ -48,3 +48,5 @@ output [
     dims: [ 4, 16 ]
   }
 ]
+model_transaction_policy {
+}
