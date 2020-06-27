@@ -3008,14 +3008,16 @@ ModelInferHandler::InferResponseComplete(
     response = new ModelInferResponse();
   }
 
-  if (iresponse == nullptr || state->available_count_ != 1) {
+  if (state->available_count_ != 1) {
     err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNSUPPORTED,
+        TRITONSERVER_ERROR_INTERNAL,
         std::string(
-            "ModelInfer RPC expects exactly 1 response callback per request, "
-            "got " +
+            "expected a single response, got " +
             std::to_string(state->available_count_))
             .c_str());
+  } else if (iresponse == nullptr) {
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
   } else {
     err = InferResponseCompleteCommon<ModelInferResponse>(
         state->tritonserver_, iresponse, *response, state->alloc_payload_);
