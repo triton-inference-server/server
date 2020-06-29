@@ -129,7 +129,7 @@ class InferenceServerClient:
         The inference server URL, e.g. 'localhost:8000'.
     verbose : bool
         If True generate verbose output. Default value is False.
-    connection_count : int
+    concurrency : int
         The number of connections to create for this client.
         Default value is 1.
     connection_timeout : float
@@ -169,7 +169,7 @@ class InferenceServerClient:
     def __init__(self,
                  url,
                  verbose=False,
-                 connection_count=1,
+                 concurrency=1,
                  connection_timeout=60.0,
                  network_timeout=60.0,
                  max_greenlets=None,
@@ -181,7 +181,7 @@ class InferenceServerClient:
         self._parsed_url = URL(scheme + url)
         self._client_stub = HTTPClient.from_url(
             self._parsed_url,
-            concurrency=connection_count,
+            concurrency=concurrency,
             connection_timeout=connection_timeout,
             network_timeout=network_timeout,
             ssl_options=ssl_options,
@@ -1092,7 +1092,13 @@ class InferenceServerClient:
                     headers=None,
                     query_params=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
-        the outputs specified by 'outputs'.
+        the outputs specified by 'outputs'. Even though this call is
+        non-blocking, however, the actual number of concurrent requests to
+        the server will be limited by the 'concurrency' parameter specified
+        while creating this client. In other words, if the inflight
+        async_infer exceeds the specified 'concurrency', the delivery of
+        the exceeding request(s) to server will be blocked till the slot is
+        made available by retrieving the results of previously issued requests.
 
         Parameters
         ----------
@@ -1186,7 +1192,13 @@ class InferenceServerClient:
         g = self._pool.apply_async(
             wrapped_post, (request_uri, request_body, headers, query_params))
 
+        # Schedule the greenlet to run in this loop iteration
         g.start()
+
+        # Relinquish control to greenlet loop. Using non-zero
+        # value to ensure the control is transferred to the
+        # event loop.
+        gevent.sleep(0.01)
 
         if self._verbose:
             verbose_message = "Sent request"

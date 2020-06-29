@@ -91,7 +91,11 @@ if __name__ == '__main__':
       triton_client = tritongrpcclient.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
       inputs = [tritongrpcclient.InferInput('in', input_data.shape, "INT32")]
     else:
-      triton_client = tritonhttpclient.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
+      # Need to specify the correct concurrency for all the requests
+      # to be delivered to the server.
+      triton_client = tritonhttpclient.InferenceServerClient(FLAGS.url,
+                                                  verbose=FLAGS.verbose,
+                                                  concurrency=FLAGS.count)
       inputs = [tritonhttpclient.InferInput('in', input_data.shape, "INT32")]
 
     inputs[0].set_data_from_numpy(input_data)
