@@ -27,6 +27,9 @@
 name: "repeat_int32"
 backend: "repeat"
 max_batch_size: 1
+model_transaction_policy {
+  decoupled: True
+}
 input [
   {
     name: "IN"

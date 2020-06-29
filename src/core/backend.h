@@ -138,8 +138,6 @@ class InferenceBackend {
 
   uint32_t MaxPriorityLevel() const { return max_priority_level_; }
 
-  bool IsDecoupled() const { return is_decoupled_; }
-
  protected:
   struct WarmupData {
     WarmupData(const std::string& sample_name) : sample_name_(sample_name) {}
@@ -218,9 +216,6 @@ class InferenceBackend {
 
   // The largest priority value for the backend.
   uint32_t max_priority_level_;
-
-  // Whether or not the model being represented is decoupled.
-  bool is_decoupled_;
 };
 
 }}  // namespace nvidia::inferenceserver

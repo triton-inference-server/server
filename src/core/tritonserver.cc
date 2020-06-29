@@ -1462,6 +1462,30 @@ TRITONSERVER_ServerModelBatchProperties(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_ServerModelTransactionProperties(
+    TRITONSERVER_Server* server, const char* model_name,
+    const int64_t model_version, uint32_t* txn_flags, void** voidp)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  if (voidp != nullptr) {
+    *voidp = nullptr;
+  }
+
+  std::shared_ptr<ni::InferenceBackend> backend;
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetInferenceBackend(model_name, model_version, &backend));
+
+  if (backend->Config().model_transaction_policy().decoupled()) {
+    *txn_flags = TRITONSERVER_TXN_DECOUPLED;
+  } else {
+    *txn_flags = TRITONSERVER_TXN_ONE_TO_ONE;
+  }
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_ServerMetadata(
     TRITONSERVER_Server* server, TRITONSERVER_Message** server_metadata)
 {
