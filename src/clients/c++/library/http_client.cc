@@ -992,6 +992,7 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
     TritonJson::Value raw_handle_json(
         request_json, TritonJson::ValueType::OBJECT);
     {
+      // Must free encoded_handle after use to prevent memory leak
       char* encoded_handle = nullptr;
       int encoded_size;
       Base64Encode(
@@ -1002,7 +1003,7 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
       }
 
       raw_handle_json.AddString("b64", encoded_handle, encoded_size);
-      delete encoded_handle;
+      free(encoded_handle);
     }
     request_json.Add("raw_handle", std::move(raw_handle_json));
     request_json.AddUInt("device_id", device_id);
