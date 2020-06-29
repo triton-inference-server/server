@@ -152,7 +152,8 @@ typedef struct custom_payload_struct {
 /// this function returns a contiguous block of the input tensor
 /// value. The entire tensor value may be in multiple non-contiguous
 /// blocks and so this function must be called multiple times until
-/// 'content' returns nullptr.
+/// 'content' returns nullptr. This callback function is not thread
+/// safe.
 ///
 /// \param input_context The input context provided in call to
 /// CustomExecute.
@@ -172,7 +173,8 @@ typedef bool (*CustomGetNextInputFn_t)(
 ///
 /// This callback function is provided in the call to ComputeExecute
 /// and is used to report the shape of an output and to get the
-/// buffers to store the output tensor values.
+/// buffers to store the output tensor values. This callback funtion
+/// is not thread safe.
 ///
 /// \param output_context The output context provided in call to
 /// CustomExecute.
@@ -207,7 +209,8 @@ typedef int (*CustomExecuteFn_t)(
     void*, uint32_t, CustomPayload*, CustomGetNextInputFn_t,
     CustomGetOutputFn_t);
 
-/// See CustomGetNextInputFn_t
+/// See CustomGetNextInputFn_t. This callback funtion is not thread
+/// safe.
 ///
 /// \param memory_type Acts as both input and output. On input
 /// gives the buffer memory type preferred by the function caller.
@@ -220,7 +223,7 @@ typedef bool (*CustomGetNextInputV2Fn_t)(
     uint64_t* content_byte_size, CustomMemoryType* memory_type,
     int64_t* memory_type_id);
 
-/// See CustomGetOutputFn_t
+/// See CustomGetOutputFn_t. This callback funtion is not thread safe.
 ///
 /// \param memory_type Acts as both input and output. On input
 /// gives the buffer memory type preferred by the function caller.
