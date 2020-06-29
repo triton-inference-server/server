@@ -543,9 +543,7 @@ EnsembleContext::PrepareSteps(
           ensemble_status_ =
               CheckAndSetEnsembleOutput(updated_tensors, &response);
         }
-        if ((response != nullptr) || (!ensemble_status_.IsOk())) {
-          ensemble_status_ = FinishEnsemble(std::move(response));
-        }
+        ensemble_status_ = FinishEnsemble(std::move(response));
       }
     }
     return ensemble_status_;
@@ -774,9 +772,11 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
 #endif
 
   if (ensemble_status_.IsOk()) {
-    if (info_->is_decoupled_ && (inflight_step_counter_ != 0)) {
+    if (info_->is_decoupled_ && (response != nullptr)) {
       InferenceResponse::Send(
           std::move(response), TRITONSERVER_RESPONSE_COMPLETE_NONE);
+    }
+    if (inflight_step_counter_ != 0) {
       return ensemble_status_;
     } else {
       InferenceResponse::Send(
@@ -831,7 +831,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     }
   }
   if (!ready) {
-    if (info_->is_decoupled_ && (inflight_step_counter_ != 0)) {
+    if (info_->is_decoupled_) {
       return Status::Success;
     }
     return Status(
