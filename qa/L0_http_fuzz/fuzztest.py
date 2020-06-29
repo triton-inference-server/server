@@ -58,7 +58,7 @@ class FuzzTest(unittest.TestCase):
         url_list = ["/v2", "/v2/models/simple", "/v2/models/simple/infer",
                     "/v2/models/simple/versions/v1", "/v2/models/simple/versions/v1",
                     "/v2/models/simple/config", "/v2/models/simple/stats",
-                    "/v2/health/ready", "/v2/health/live",
+                    "/v2/models/simple/ready", "/v2/health/ready", "/v2/health/live",
                     "/v2/repository/index", "/v2/repository/models/simple/unload",
                     "/v2/repository/models/simple/load", 
                     "/v2/systemsharedmemory/status", "/v2/systemsharedmemory/register",
