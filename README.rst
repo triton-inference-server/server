@@ -173,26 +173,17 @@ Documentation
 -------------
 
 The User Guide, Developer Guide, and API Reference `documentation for
-the current release
-<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/index.html>`_
-provide guidance on installing, building, and running Triton Inference
-Server.
-
-You can also view the `documentation for the master branch
-<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/index.html>`_
-and for `earlier releases
-<https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
-
-An `FAQ
-<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/faq.html>`_
-provides answers for frequently asked questions.
+Triton V1
+<https://docs.nvidia.com/deeplearning/triton-inference-server/master-v1-user-guide/docs/index.html>`_
+provides guidance on installing, building, and running Triton
+Inference Server.
 
 READMEs for deployment examples can be found in subdirectories of
 deploy/, for example, `deploy/single_server/README.rst
 <https://github.com/NVIDIA/triton-inference-server/tree/master/deploy/single_server/README.rst>`_.
 
 The `Release Notes
-<https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_
+<https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html>`_
 and `Support Matrix
 <https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html>`_
 indicate the required versions of the NVIDIA Driver and CUDA, and also
