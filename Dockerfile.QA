@@ -279,7 +279,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade wheel numpy pillow future grpcio requests gsutil awscli six
+RUN pip3 install --upgrade wheel setuptools && \
+    pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six
 
 # need protoc-gen-go to generate go specific gRPC modules
 RUN go get github.com/golang/protobuf/protoc-gen-go && \
