@@ -42,8 +42,9 @@ namespace {
 struct TensorNode {
   TensorNode(
       const std::string& model_name, const bool batching, const DataType& type,
-      const DimsList& dims)
-      : model_name_(model_name), type_(type), dims_(dims), ready_(false)
+      const DimsList& dims, const bool is_decoupled)
+      : model_name_(model_name), type_(type), dims_(dims),
+        is_decoupled_(is_decoupled), decouple_label_(0), visited_(false)
   {
     // Expand dims to full shape, which includes batch dimension if exist
     if (batching) {
@@ -56,7 +57,9 @@ struct TensorNode {
   DataType type_;
   DimsList dims_;
   DimsList full_dims_;
-  bool ready_;
+  bool is_decoupled_;
+  size_t decouple_label_;
+  bool visited_;
   std::vector<TensorNode*> prev_nodes_;
   std::vector<TensorNode*> next_nodes_;
 };
@@ -122,13 +125,14 @@ ValidateTensorMapping(
               " in model " + step.model_name());
     }
   }
+  bool is_decoupled = model_config.model_transaction_policy().decoupled();
   for (const auto& model_input : model_config.input()) {
     size_t mapped_cnt = 0;
     for (const auto& input_map : step.input_map()) {
       if (model_input.name() == input_map.first) {
         TensorNode model_tensor(
             step.model_name(), batching, model_input.data_type(),
-            model_input.dims());
+            model_input.dims(), is_decoupled);
         auto it = ensemble_tensors->find(input_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -178,7 +182,7 @@ ValidateTensorMapping(
       if (model_output.name() == output_map.first) {
         TensorNode model_tensor(
             step.model_name(), batching, model_output.data_type(),
-            model_output.dims());
+            model_output.dims(), is_decoupled);
         auto it = ensemble_tensors->find(output_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -243,13 +247,17 @@ ValidateEnsembleConfig(
   for (const auto& input : ensemble_config.input()) {
     const auto& dims =
         input.has_reshape() ? input.reshape().shape() : input.dims();
-    TensorNode input_node(ensemble_name, batching, input.data_type(), dims);
+    TensorNode input_node(
+        ensemble_name, batching, input.data_type(), dims,
+        false /* is_decoupled */);
     ensemble_tensors.emplace(std::make_pair(input.name(), input_node));
   }
   for (const auto& output : ensemble_config.output()) {
     const auto& dims =
         output.has_reshape() ? output.reshape().shape() : output.dims();
-    TensorNode output_node(ensemble_name, batching, output.data_type(), dims);
+    TensorNode output_node(
+        ensemble_name, batching, output.data_type(), dims,
+        false /* is_decoupled */);
     ensemble_tensors.emplace(std::make_pair(output.name(), output_node));
   }
 
@@ -315,6 +323,51 @@ ValidateEnsembleConfig(
     RETURN_IF_ERROR(ValidateTensorMapping(
         ensemble_name, step, model_config, &ensemble_tensors));
   }
+
+  // Visit nodes and validate decoupled workflow if any
+  // check data flow
+  size_t decouple_label = 0;
+  std::deque<TensorNode*> current_iterators;
+  for (const auto& input : ensemble_config.input()) {
+    auto it = ensemble_tensors.find(input.name());
+    it->second.visited_ = true;
+    current_iterators.push_back(&(it->second));
+  }
+  while (!current_iterators.empty()) {
+    auto& current_node = current_iterators.front();
+    for (auto& next_node : current_node->next_nodes_) {
+      if (next_node->visited_) {
+        continue;
+      }
+      bool next_node_ready = true;
+      for (auto& prev_node : next_node->prev_nodes_) {
+        if (!prev_node->visited_) {
+          next_node_ready = false;
+          break;
+        }
+      }
+      if (next_node_ready) {
+        size_t prev_decouple_label = next_node->prev_nodes_[0]->decouple_label_;
+        for (auto& prev_node : next_node->prev_nodes_) {
+          if (prev_node->decouple_label_ != prev_decouple_label) {
+            return Status(
+                Status::Code::INVALID_ARG,
+                "in ensemble " + ensemble_name + ", step of model '" +
+                    next_node->model_name_ +
+                    "' receives inputs originated from different decoupled "
+                    "models");
+          }
+        }
+        next_node->decouple_label_ =
+            next_node->is_decoupled_ ? ++decouple_label : prev_decouple_label;
+        next_node->visited_ = true;
+        current_iterators.push_back(next_node);
+      }
+    }
+    current_iterators.pop_front();
+  }
+  ensemble->model_config_.mutable_model_transaction_policy()->set_decoupled(
+      decouple_label != 0);
 
   return Status::Success;
 }
