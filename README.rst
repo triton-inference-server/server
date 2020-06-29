@@ -142,9 +142,9 @@ Backwards Compatibility
 
 Version 2 of Triton is beta quality, so you should expect some changes
 to the server and client protocols and APIs. Version 2 of Triton does
-not generally maintain backwards compatibility with
-version 1. Specifically, you should take the following items into
-account when transitioning from version 1 to version 2:
+not generally maintain backwards compatibility with version 1.
+Specifically, you should take the following items into account when
+transitioning from version 1 to version 2:
 
 * The Triton executables and libraries are in /opt/tritonserver. The
   Triton executable is /opt/tritonserver/bin/tritonserver.
@@ -242,6 +242,9 @@ You can also view the `documentation for the master branch
 <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/index.html>`_
 and for `earlier releases
 <https://docs.nvidia.com/deeplearning/triton-inference-server/archives/index.html>`_.
+
+NVIDIA publishes a number of `deep learning examples that use Triton
+<https://github.com/NVIDIA/DeepLearningExamples>`_.
 
 An `FAQ
 <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/faq.html>`_
