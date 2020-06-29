@@ -167,8 +167,6 @@ InferenceBackend::SetModelConfig(
     max_priority_level_ = 0;
   }
 
-  is_decoupled_ = config.model_transaction_policy().decoupled();
-
   return Status::Success;
 }
 
