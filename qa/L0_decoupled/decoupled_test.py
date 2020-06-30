@@ -134,7 +134,7 @@ class DecoupledTest(unittest.TestCase):
                     expected_data += 1
 
     def test_one_to_none(self):
-        # Tests cases where each request generates no response.
+        # Test cases where each request generates no response.
         # Note the name of the test one_to_none implies the
         # mapping between requests and responses.
 
@@ -144,7 +144,7 @@ class DecoupledTest(unittest.TestCase):
         self._decoupled_infer(request_count=10, repeat_count=0)
 
     def test_one_to_one(self):
-        # Tests cases where each request generates single response.
+        # Test cases where each request generates single response.
         # Note the name of the test one_to_one implies the
         # mapping between requests and responses.
 
@@ -161,7 +161,7 @@ class DecoupledTest(unittest.TestCase):
         self._decoupled_infer(request_count=10, wait_time=2000)
 
     def test_one_to_many(self):
-        # Tests cases where each request generates multiple response.
+        # Test cases where each request generates multiple response.
         # Note the name of the test one_to_many implies the
         # mapping between requests and responses.
 
@@ -190,7 +190,7 @@ class DecoupledTest(unittest.TestCase):
                               wait_time=10000)
 
     def test_one_to_multi_many(self):
-        # Tests cases where each request generates multiple response but the
+        # Test cases where each request generates multiple response but the
         # responses are delayed so as to stress the control path handling the
         # queued responses.
 
@@ -266,14 +266,14 @@ class DecoupledTest(unittest.TestCase):
                                       inputs=this_inputs,
                                       outputs=this_outputs)
             self.assertTrue(
-                False, "async_infer is expected to fail for decoupled models")
+                False, "expected to fail for decoupled models")
         except InferenceServerException as ex:
             self.assertTrue(
                 "doesn't support models with decoupled transaction policy"
                 in ex.message())
 
     def test_no_streaming(self):
-        # Tests cases with no streaming inference. Server should give
+        # Test cases with no streaming inference. Server should give
         # appropriate error in such cases.
 
         self._no_streaming_helper("grpc")
