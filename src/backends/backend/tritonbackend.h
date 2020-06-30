@@ -451,6 +451,15 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelConfig(
     TRITONBACKEND_Model* model, const uint32_t config_version,
     TRITONSERVER_Message** model_config);
 
+/// Get the TRITONSERVER_Server object that this model is being served
+/// by.
+///
+/// \param model The model.
+/// \param server Returns the server.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelServer(
+    TRITONBACKEND_Model* model, TRITONSERVER_Server** server);
+
 /// Get the backend used by the model.
 ///
 /// \param model The model.

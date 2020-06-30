@@ -35,6 +35,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+class InferenceServer;
+
 //
 // Represents a model.
 //
@@ -44,12 +46,14 @@ namespace nvidia { namespace inferenceserver {
 class TritonModel : public InferenceBackend {
  public:
   static Status Create(
-      const std::string& model_repository_path, const std::string& model_name,
-      const int64_t version, const ModelConfig& model_config,
-      const double min_compute_capability, std::unique_ptr<TritonModel>* model);
+      InferenceServer* server, const std::string& model_repository_path,
+      const std::string& model_name, const int64_t version,
+      const ModelConfig& model_config, const double min_compute_capability,
+      std::unique_ptr<TritonModel>* model);
   ~TritonModel();
 
   const std::string& ModelPath() const { return model_path_; }
+  InferenceServer* Server() { return server_; }
   const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
@@ -58,9 +62,14 @@ class TritonModel : public InferenceBackend {
   DISALLOW_COPY_AND_ASSIGN(TritonModel);
 
   TritonModel(
-      const std::string& model_path,
+      InferenceServer* server, const std::string& model_path,
       const std::shared_ptr<TritonBackend>& backend,
       const double min_compute_capability);
+
+  // The server object that owns this model. The model holds this as a
+  // raw pointer because the lifetime of the server is guaranteed to
+  // be longer than the lifetime of a model owned by the server.
+  InferenceServer* server_;
 
   // Full path to the repo directory holding the model
   const std::string model_path_;

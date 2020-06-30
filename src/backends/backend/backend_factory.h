@@ -39,6 +39,7 @@ class TritonBackendFactory {
   };
 
   static Status Create(
+      InferenceServer* server,
       const std::shared_ptr<BackendConfig>& backend_config,
       std::unique_ptr<TritonBackendFactory>* factory)
   {
@@ -46,7 +47,7 @@ class TritonBackendFactory {
 
     auto triton_backend_config =
         std::static_pointer_cast<Config>(backend_config);
-    factory->reset(new TritonBackendFactory(triton_backend_config));
+    factory->reset(new TritonBackendFactory(server, triton_backend_config));
     return Status::Success;
   }
 
@@ -58,7 +59,7 @@ class TritonBackendFactory {
   {
     std::unique_ptr<TritonModel> model;
     RETURN_IF_ERROR(TritonModel::Create(
-        model_repository_path, model_name, version, model_config,
+        server_, model_repository_path, model_name, version, model_config,
         min_compute_capability, &model));
     backend->reset(model.release());
     return Status::Success;
@@ -69,11 +70,13 @@ class TritonBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonBackendFactory);
 
-  TritonBackendFactory(const std::shared_ptr<Config>& backend_config)
-      : backend_config_(backend_config)
+  TritonBackendFactory(
+      InferenceServer* server, const std::shared_ptr<Config>& backend_config)
+      : server_(server), backend_config_(backend_config)
   {
   }
 
+  InferenceServer* server_;
   const std::shared_ptr<Config> backend_config_;
 };
 

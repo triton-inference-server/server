@@ -503,7 +503,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
   {
     const std::shared_ptr<BackendConfig> config;
     RETURN_IF_ERROR(TritonBackendFactory::Create(
-        config, &(local_life_cycle->triton_backend_factory_)));
+        server, config, &(local_life_cycle->triton_backend_factory_)));
   }
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
