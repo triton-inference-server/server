@@ -55,6 +55,8 @@ RUN cd builddir && \
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
+    mkdir qa/L0_decoupled/models && \
+    cp -r /workspace/src/backends/backend/examples/models/repeat_int32 qa/L0_decoupled/models/ && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_go_client/models && \
@@ -206,6 +208,10 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_shm && \
     mkdir -p qa/L0_perf_nomodel_cudashm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm
+
+RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
+    cp builddir/server/install/backends/libtriton_repeat.so \
+        qa/L0_decoupled/models/repeat_int32/1/.
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.

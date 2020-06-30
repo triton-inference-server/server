@@ -1683,6 +1683,12 @@ class InferHandlerState {
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
       : tritonserver_(tritonserver)
   {
+    // For debugging and testing,
+    const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
+    delay_response_ms_ = 0;
+    if (dstr != nullptr) {
+      delay_response_ms_ = atoi(dstr);
+    }
     response_list_.reset(new std::vector<ResponseType*>());
     Reset(context, start_step);
   }
@@ -1776,6 +1782,9 @@ class InferHandlerState {
 
   RequestType request_;
   std::shared_ptr<std::vector<ResponseType*>> response_list_;
+
+  // For testing and debugging
+  int delay_response_ms_;
 
   // For inference requests the allocator payload, unused for other
   // requests.
@@ -3471,6 +3480,16 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         }
       }
     } else if (state->step_ == Steps::WRITEREADY) {
+      if (state->delay_response_ms_ != 0) {
+        // Will delay the write of the response by the specified time.
+        // This can be used to test the flow where there are other
+        // responses available to be written.
+        LOG_INFO << "Delaying the write of the response by "
+                 << state->delay_response_ms_ << " ms...";
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(state->delay_response_ms_));
+      }
+
       // Finish the state if all the transactions associated with
       // the state have completed.
       if (state->IsComplete()) {
