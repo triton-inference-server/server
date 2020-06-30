@@ -32,10 +32,10 @@ import os
 
 
 class FuzzTest(unittest.TestCase):
-    def _run_fuzz(self, url):
+    def _run_fuzz(self, url, logger):
         session = Session(target=Target(
             connection=TCPSocketConnection("127.0.0.1", 8000)),
-            keep_web_open=False)
+            fuzz_loggers=logger, keep_web_open=False)
 
         s_initialize(name="Request"+url)
         with s_block("Request-Line"):
@@ -46,9 +46,6 @@ class FuzzTest(unittest.TestCase):
             s_delim(" ", name="space-2")
             s_string("HTTP/1.1", name="HTTP-Version")
             s_static("\r\n", name="Request-Line-CRLF")
-            s_string("Host:", name="Host-Line")
-            s_delim(" ", name="space-3")
-            s_static("\r\n", name="Host-Line-CRLF")
         s_static("\r\n", "Request-CRLF")
 
         session.connect(s_get("Request"+url))
@@ -56,9 +53,9 @@ class FuzzTest(unittest.TestCase):
 
     def test_failures_from_db(self):
         url_list = ["/v2", "/v2/models/simple", "/v2/models/simple/infer",
-                    "/v2/models/simple/versions/v1", "/v2/models/simple/versions/v1",
-                    "/v2/models/simple/config", "/v2/models/simple/stats",
-                    "/v2/models/simple/ready", "/v2/health/ready", "/v2/health/live",
+                    "/v2/models/simple/versions/v1", "/v2/models/simple/config", 
+                    "/v2/models/simple/stats", "/v2/models/simple/ready", 
+                    "/v2/health/ready", "/v2/health/live",
                     "/v2/repository/index", "/v2/repository/models/simple/unload",
                     "/v2/repository/models/simple/load", 
                     "/v2/systemsharedmemory/status", "/v2/systemsharedmemory/register",
@@ -66,8 +63,11 @@ class FuzzTest(unittest.TestCase):
                     "/v2/cudasharedmemory/status", "/v2/cudasharedmemory/register",
                     "/v2/cudasharedmemory/unregister", "/v2/cudasharedmemory/region/xx/status"]
 
+        csv_log = open('fuzz_results.csv', 'w')
+        logger = [FuzzLoggerCsv(file_handle=csv_log)]
+
         for url in url_list:
-            self._run_fuzz(url)
+            self._run_fuzz(url, logger)
 
             # Get latest db file
             files = glob.glob('boofuzz-results/*')
