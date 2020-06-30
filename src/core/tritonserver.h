@@ -550,7 +550,6 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceTraceModelVersion(
 
 /// Inference request flags. The enum values must be power-of-2 values.
 typedef enum tritonserver_requestflag_enum {
-  TRITONSERVER_REQUEST_FLAG_NONE = 0,
   TRITONSERVER_REQUEST_FLAG_SEQUENCE_START = 1,
   TRITONSERVER_REQUEST_FLAG_SEQUENCE_END = 2
 } TRITONSERVER_RequestFlag;
@@ -558,14 +557,12 @@ typedef enum tritonserver_requestflag_enum {
 /// Inference request release flags. The enum values must be
 /// power-of-2 values.
 typedef enum tritonserver_requestreleaseflag_enum {
-  TRITONSERVER_REQUEST_RELEASE_NONE = 0,
   TRITONSERVER_REQUEST_RELEASE_ALL = 1
 } TRITONSERVER_RequestReleaseFlag;
 
 /// Inference response complete flags. The enum values must be
 /// power-of-2 values.
 typedef enum tritonserver_responsecompleteflag_enum {
-  TRITONSERVER_RESPONSE_COMPLETE_NONE = 0,
   TRITONSERVER_RESPONSE_COMPLETE_FINAL = 1
 } TRITONSERVER_ResponseCompleteFlag;
 
@@ -578,17 +575,18 @@ typedef enum tritonserver_responsecompleteflag_enum {
 /// One or more flags will be specified when the callback is invoked,
 /// and the callback must take the following actions:
 ///
-///   - If no flags are set (flags ==
-///     TRITONSERVER_REQUEST_RELEASE_NONE) the callback should do
-///     nothing. The callback does *not* take ownership of the request
-///     object.
-///
 ///   - TRITONSERVER_REQUEST_RELEASE_ALL: The entire inference request
 ///     is being released and ownership is passed to the callback
 ///     function. Triton will not longer access the 'request' object
 ///     itself nor any input tensor data associated with the
 ///     request. The callback should free or otherwise manage the
 ///     'request' object and all associated tensor data.
+///
+/// Note that currently TRITONSERVER_REQUEST_RELEASE_ALL should always
+/// be set when the callback is invoked but in the future that may
+/// change, so the callback should explicitly check for the flag
+/// before taking ownership of the request object.
+///
 typedef void (*TRITONSERVER_InferenceRequestReleaseFn_t)(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp);
 
@@ -1231,8 +1229,8 @@ TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
 
 /// Model batch flags. The enum values must be power-of-2 values.
 typedef enum tritonserver_batchflag_enum {
-  TRITONSERVER_BATCH_UNKNOWN = 0,
-  TRITONSERVER_BATCH_FIRST_DIM = 1
+  TRITONSERVER_BATCH_UNKNOWN = 1,
+  TRITONSERVER_BATCH_FIRST_DIM = 2
 } TRITONSERVER_ModelBatchFlag;
 
 /// Model index flags. The enum values must be power-of-2 values.

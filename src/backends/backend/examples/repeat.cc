@@ -472,8 +472,7 @@ ModelState::RequestThread(
     // Send the response.
     LOG_IF_ERROR(
         TRITONBACKEND_ResponseSend(
-            response, TRITONSERVER_RESPONSE_COMPLETE_NONE,
-            nullptr /* success */),
+            response, 0 /* flags */, nullptr /* success */),
         "failed sending response");
 
     TRITONSERVER_LogMessage(

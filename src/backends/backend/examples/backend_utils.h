@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <time.h>
 #include <condition_variable>
 #include <deque>
 #include <iostream>
@@ -68,6 +69,22 @@ namespace nvidia { namespace inferenceserver { namespace backend {
       return rie_err__;                  \
     }                                    \
   } while (false)
+
+#ifdef TRITON_ENABLE_STATS
+#define TIMESPEC_TO_NANOS(TS) ((TS).tv_sec * 1000000000 + (TS).tv_nsec)
+#define SET_TIMESTAMP(TS_NS)             \
+  {                                      \
+    struct timespec ts;                  \
+    clock_gettime(CLOCK_MONOTONIC, &ts); \
+    TS_NS = TIMESPEC_TO_NANOS(ts);       \
+  }
+#define DECL_TIMESTAMP(TS_NS) \
+  uint64_t TS_NS;             \
+  SET_TIMESTAMP(TS_NS);
+#else
+#define DECL_TIMESTAMP(TS_NS)
+#define SET_TIMESTAMP(TS_NS)
+#endif  // TRITON_ENABLE_STATS
 
 /// Convenience deleter for TRITONBACKEND_ResponseFactory.
 struct ResponseFactoryDeleter {
