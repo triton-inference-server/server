@@ -48,7 +48,7 @@ the most recent version of CUDA, Docker, and nvidia-docker.
 After performing the above setup, you can pull the Triton container
 using the following command::
 
-  docker pull nvcr.io/nvidia/tritonserver:20.03.1-py3
+  docker pull nvcr.io/nvidia/tritonserver:20.06-py3
 
-Replace *20.03.1* with the version of inference server that you want to
+Replace *20.06* with the version of inference server that you want to
 pull.
