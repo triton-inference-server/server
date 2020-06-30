@@ -58,6 +58,9 @@ class TritonModel : public InferenceBackend {
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
+  Status MetricReporter(
+      const int device, MetricModelReporter** metric_reporter);
+
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModel);
 
@@ -76,6 +79,11 @@ class TritonModel : public InferenceBackend {
 
   // Backend used by this model.
   std::shared_ptr<TritonBackend> backend_;
+
+#ifdef TRITON_ENABLE_METRICS
+  // The metric model reporters required for instances of this model.
+  std::unordered_map<int, std::unique_ptr<MetricModelReporter>> reporters_;
+#endif  // TRITON_ENABLE_METRICS
 
   // Opaque state associated with this model.
   void* state_;

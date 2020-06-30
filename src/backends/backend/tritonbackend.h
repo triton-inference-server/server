@@ -52,9 +52,8 @@ struct TRITONBACKEND_Model;
 // Version of this TRITONBACKEND API.
 #define TRITONBACKEND_API_VERSION 1
 
-/// GPU device number that indicates that no GPU is available for a
-/// backend. Typically a backend will then execute using only CPU.
-#define TRITONBACKEND_NO_GPU_DEVICE -1
+/// Device number that indicates "no device".
+#define TRITONBACKEND_NO_DEVICE -1
 
 ///
 /// TRITONBACKEND_Input
@@ -224,12 +223,14 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestOutputName(
     const char** output_name);
 
 /// Release the request. The request should be released when it is no
-/// longer needed by the backend. After this call returns the
-/// 'request' object is no longer valid and must not be used. Any
-/// tensor names, data types, shapes, input tensors, etc. returned by
-/// TRITONBACKEND_Request* functions for this request are no longer
-/// valid. If a persistent copy of that data is required it must be
-/// created before calling this function.
+/// longer needed by the backend. If this call returns with an error
+/// (i.e. non-nullptr) then the request was not released and ownership
+/// remains with the backend. If this call returns with success, the
+/// 'request' object is no longer owned by the backend and must not be
+/// used. Any tensor names, data types, shapes, input tensors,
+/// etc. returned by TRITONBACKEND_Request* functions for this request
+/// are no longer valid. If a persistent copy of that data is required
+/// it must be created before calling this function.
 ///
 /// \param request The inference request.
 /// \param release_flags Flags indicating what type of request release
@@ -485,6 +486,89 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelState(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelSetState(
     TRITONBACKEND_Model* model, void* state);
+
+/// Record statistics for an inference request.
+///
+/// Set 'success' true to indicate that the inference request
+/// completed successfully. In this case all timestamps should be
+/// non-zero values reported in nanoseconds and should be collected
+/// using clock_gettime(CLOCK_MONOTONIC, &ts) or the equivalent. Set
+/// 'success' to false to indicate that the inference request failed
+/// to complete successfully. In this case all timestamps values are
+/// ignored.
+///
+/// For consistency of measurement across different backends, the
+/// timestamps should be collected at the following points during
+/// TRITONBACKEND_ModelExecute.
+///
+///   TRITONBACKEND_ModelExecute()
+///     CAPTURE TIMESPACE (exec_start_ns)
+///     < process input tensors to prepare them for inference
+///       execution, including copying the tensors to/from GPU if
+///       necessary>
+///     CAPTURE TIMESPACE (compute_start_ns)
+///     < perform inference computations to produce outputs >
+///     CAPTURE TIMESPACE (compute_end_ns)
+///     < allocate output buffers and extract output tensors, including
+///       copying the tensors to/from GPU if necessary>
+///     CAPTURE TIMESPACE (exec_end_ns)
+///     return
+///
+/// Note that these statistics are associated with a valid
+/// TRITONBACKEND_Request object and so must be reported before the
+/// request is released. For backends that release the request before
+/// all response(s) are sent, these statistics cannot capture
+/// information about the time required to produce the response.
+///
+/// \param model The model.
+/// \param request The inference request that statistics are being
+/// reported for.
+/// \param success True if the inference request completed
+/// successfully, false if it failed to complete.
+/// \param device The device to associate with the statistics, or
+/// TRITONBACKEND_NO_DEVICE if no device should be associated.
+/// \param exec_start_ns Timestamp for the start of model execution.
+/// \param compute_start_ns Timestamp for the start of execution
+/// computations.
+/// \param compute_end_ns Timestamp for the end of execution
+/// computations.
+/// \param exec_end_ns Timestamp for the end of model execution.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelReportStatistics(
+    TRITONBACKEND_Model* model, TRITONBACKEND_Request* request,
+    const bool success, const int device, const uint64_t exec_start_ns,
+    const uint64_t compute_start_ns, const uint64_t compute_end_ns,
+    const uint64_t exec_end_ns);
+
+/// Record statistics for the execution of an entire batch of
+/// inference requests.
+///
+/// All timestamps should be non-zero values reported in nanoseconds
+/// and should be collected using clock_gettime(CLOCK_MONOTONIC, &ts)
+/// or the equivalent. See TRITONBACKEND_ModelReportStatistics for
+/// more information about the timestamps.
+///
+/// 'batch_size' is the sum of the batch sizes for the individual
+/// requests that were delivered together in the call to
+/// TRITONBACKEND_ModelExecute. For example, if three requests are
+/// passed to TRITONBACKEND_ModelExecute and those requests have batch
+/// size 1, 2, and 3; then 'batch_size' should be set to 6.
+///
+/// \param model The model.
+/// \param batch_size Combined batch size of all the individual
+/// requests executed in the batch.
+/// \param exec_start_ns Timestamp for the start of model execution.
+/// \param compute_start_ns Timestamp for the start of execution
+/// computations.
+/// \param compute_end_ns Timestamp for the end of execution
+/// computations.
+/// \param exec_end_ns Timestamp for the end of model execution.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error*
+TRITONBACKEND_ModelReportBatchStatistics(
+    TRITONBACKEND_Model* model, const uint64_t batch_size,
+    const uint64_t exec_start_ns, const uint64_t compute_start_ns,
+    const uint64_t compute_end_ns, const uint64_t exec_end_ns);
 
 ///
 /// The following functions can be implemented by a backend. Functions

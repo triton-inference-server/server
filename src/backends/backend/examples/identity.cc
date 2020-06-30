@@ -106,8 +106,15 @@ class ModelState {
   static TRITONSERVER_Error* Create(
       TRITONBACKEND_Model* triton_model, ModelState** state);
 
-  // Get the name of the model.
+  // Get the handle to the TRITONBACKEND model.
+  TRITONBACKEND_Model* TritonModel() { return triton_model_; }
+
+  // Get the name and version of the model.
   const std::string& ModelName() const { return model_name_; }
+  uint64_t ModelVersion() const { return model_version_; }
+
+  // Does this model support batching in the first dimension.
+  TRITONSERVER_Error* SupportsFirstDimBatching(bool* supports);
 
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
@@ -127,11 +134,14 @@ class ModelState {
 
  private:
   ModelState(
-      const char* model_name, TRITONBACKEND_Model* triton_model,
+      TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
+      const char* model_name, const uint64_t model_version,
       ni::TritonJson::Value&& model_config);
 
-  const std::string model_name_;
+  TRITONSERVER_Server* triton_server_;
   TRITONBACKEND_Model* triton_model_;
+  const std::string model_name_;
+  const uint64_t model_version_;
   ni::TritonJson::Value model_config_;
 
   std::vector<std::unique_ptr<ModelInstance>> instances_;
@@ -201,8 +211,24 @@ ModelInstance::ExecuteThread()
        ": starting execute thread for instance " + props_.AsString())
           .c_str());
 
-  // Process requests until recieve a nullptr... then exit.
+  bool supports_batching = false;
+  LOG_IF_ERROR(
+      model_state_->SupportsFirstDimBatching(&supports_batching),
+      "failed to determine batching support");
+
+  // Process requests until receive a nullptr... then exit.
   do {
+    // The way we collect these batch timestamps is not entirely
+    // accurate. Normally, in a performant backend you would execute
+    // all the requests at the same time, and so there would be a
+    // single compute-start / compute-end time-range. But here we
+    // execute each request separately so there is no single range.
+    uint64_t min_exec_start_ns = std::numeric_limits<uint64_t>::max();
+    uint64_t max_exec_end_ns = 0;
+    uint64_t min_compute_start_ns = std::numeric_limits<uint64_t>::max();
+    uint64_t max_compute_end_ns = 0;
+    uint64_t total_batch_size = 0;
+
     // Show that this instance is ready to execute...
     model_state_->SetInstanceReady(props_.id_);
 
@@ -232,6 +258,9 @@ ModelInstance::ExecuteThread()
     // general a backend should try to operate on the entire batch of
     // requests at the same time for improved performance.
     for (uint32_t r = 0; r < request_count; ++r) {
+      DECL_TIMESTAMP(exec_start_ns);
+      min_exec_start_ns = std::min(min_exec_start_ns, exec_start_ns);
+
       TRITONBACKEND_Request* request = requests[r];
 
       const char* request_id = "";
@@ -340,6 +369,20 @@ ModelInstance::ExecuteThread()
           TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
           (std::string("\trequested_output ") + requested_output_name).c_str());
 
+      // For statistics we need to collect the total batch size of all
+      // the requests. If the model doesn't support batching then each
+      // request is necessarily batch-size 1. If the model does
+      // support batching then the first dimension of the shape is the
+      // batch size.
+      if (supports_batching && (input_dims_count > 0)) {
+        total_batch_size += input_shape[0];
+      } else {
+        total_batch_size++;
+      }
+
+      uint64_t compute_start_ns = 0;
+      uint64_t compute_end_ns = 0;
+
       // We only need to produce an output if it was requested.
       if (requested_output_count > 0) {
         // This backend simply copies the input tensor to the output
@@ -398,6 +441,9 @@ ModelInstance::ExecuteThread()
           continue;
         }
 
+        SET_TIMESTAMP(compute_start_ns);
+        min_compute_start_ns = std::min(min_compute_start_ns, compute_start_ns);
+
         // Step 3. Copy input -> output. We can only handle if the input
         // buffers are on CPU so fail otherwise.
         size_t output_buffer_offset = 0;
@@ -426,6 +472,9 @@ ModelInstance::ExecuteThread()
           output_buffer_offset += buffer_byte_size;
         }
 
+        SET_TIMESTAMP(compute_end_ns);
+        max_compute_end_ns = std::max(max_compute_end_ns, compute_end_ns);
+
         if (responses[r] == nullptr) {
           TRITONSERVER_LogMessage(
               TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
@@ -437,25 +486,74 @@ ModelInstance::ExecuteThread()
         }
       }
 
-      // If we get to this point there hasn't been any error and the
-      // response is complete and we can send it. This is the last (and
-      // only) response that we are sending for the request so we must
-      // mark it FINAL. If there is an error when sending all we can do
-      // is log it.
+      // If we get to this point then there hasn't been any error and
+      // the response is complete and we can send it. This is the last
+      // (and only) response that we are sending for the request so we
+      // must mark it FINAL. If there is an error when sending all we
+      // can do is log it.
       LOG_IF_ERROR(
           TRITONBACKEND_ResponseSend(
               responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
               nullptr /* success */),
           "failed sending response");
+
+      DECL_TIMESTAMP(exec_end_ns);
+      max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
+
+      // If there are no compute timestamps the the request didn't ask
+      // for any outputs. Just set the compute start/end to equal
+      // exec_end.
+      if (compute_start_ns == 0) {
+        compute_start_ns = compute_end_ns = exec_end_ns;
+      }
+
+      // Report statistics for the successful request. For instance
+      // using the CPU we don't associate any device with the
+      // statistics, otherwise we associate the instance's device.
+      LOG_IF_ERROR(
+          TRITONBACKEND_ModelReportStatistics(
+              model_state_->TritonModel(), request, true /* success */,
+              (props_.kind_ == nib::InstanceProperties::Kind::CPU)
+                  ? TRITONBACKEND_NO_DEVICE
+                  : props_.device_id_,
+              exec_start_ns, compute_start_ns, compute_end_ns, exec_end_ns),
+          "failed reporting request statistics");
     }
 
-    // Done with requests. We could have released each request as soon
-    // as we sent the corresponding response. But for clarity we just
-    // release them all here. Note that is something goes wrong when
-    // releasing a request all we can do is log it... there is no
-    // response left to use to report an error.
+    // Done with requests...
+
+    // There are two types of statistics that we can report... the
+    // statistics for the entire batch of requests that we just
+    // executed and statistics for each individual request. Statistics
+    // for each individual request were reported above inside the loop
+    // as each request was processed (or for failed requests we report
+    // that failure below). Here we report statistics for the entire
+    // batch of requests.
+    LOG_IF_ERROR(
+        TRITONBACKEND_ModelReportBatchStatistics(
+            model_state_->TritonModel(), total_batch_size, min_exec_start_ns,
+            min_compute_start_ns, max_compute_end_ns, max_exec_end_ns),
+        "failed reporting batch request statistics");
+
+    // We could have released each request as soon as we sent the
+    // corresponding response. But for clarity we just release them
+    // all here. Note that is something goes wrong when releasing a
+    // request all we can do is log it... there is no response left to
+    // use to report an error.
     for (uint32_t r = 0; r < request_count; ++r) {
       TRITONBACKEND_Request* request = requests[r];
+
+      // Before releasing, record failed requests as those where
+      // responses[r] is nullptr. The timestamps are ignored in this
+      // case.
+      if (responses[r] == nullptr) {
+        LOG_IF_ERROR(
+            TRITONBACKEND_ModelReportStatistics(
+                model_state_->TritonModel(), request, false /* success */,
+                TRITONBACKEND_NO_DEVICE, 0, 0, 0, 0),
+            "failed reporting request statistics");
+      }
+
       LOG_IF_ERROR(
           TRITONBACKEND_RequestRelease(
               request, TRITONSERVER_REQUEST_RELEASE_ALL),
@@ -500,16 +598,40 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   const char* model_name;
   RETURN_IF_ERROR(TRITONBACKEND_ModelName(triton_model, &model_name));
 
-  *state = new ModelState(model_name, triton_model, std::move(model_config));
+  uint64_t model_version;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model, &model_version));
+
+  TRITONSERVER_Server* triton_server;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelServer(triton_model, &triton_server));
+
+  *state = new ModelState(
+      triton_server, triton_model, model_name, model_version,
+      std::move(model_config));
   return nullptr;  // success
 }
 
 ModelState::ModelState(
-    const char* model_name, TRITONBACKEND_Model* triton_model,
+    TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
+    const char* model_name, const uint64_t model_version,
     ni::TritonJson::Value&& model_config)
-    : model_name_(model_name), triton_model_(triton_model),
+    : triton_server_(triton_server), triton_model_(triton_model),
+      model_name_(model_name), model_version_(model_version),
       model_config_(std::move(model_config))
 {
+}
+
+TRITONSERVER_Error*
+ModelState::SupportsFirstDimBatching(bool* supports)
+{
+  // We can't determine this during model initialization because
+  // TRITONSERVER_ServerModelBatchProperties can't be called until the
+  // model is loaded...
+  uint32_t flags = 0;
+  RETURN_IF_ERROR(TRITONSERVER_ServerModelBatchProperties(
+      triton_server_, model_name_.c_str(), model_version_, &flags,
+      nullptr /* voidp */));
+  *supports = ((flags & TRITONSERVER_BATCH_FIRST_DIM) != 0);
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error*

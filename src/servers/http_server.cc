@@ -1913,7 +1913,7 @@ HTTPAPIServer::EVBufferToInput(
           TRITONSERVER_InferenceRequestSetCorrelationId(irequest, seq_id));
     }
 
-    uint32_t flags = TRITONSERVER_REQUEST_FLAG_NONE;
+    uint32_t flags = 0;
 
     {
       TritonJson::Value start_json;

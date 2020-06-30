@@ -2505,7 +2505,7 @@ SetInferenceRequestMetadata(
     }
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
         inference_request, infer_param.int64_param()));
-    uint32_t flags = TRITONSERVER_REQUEST_FLAG_NONE;
+    uint32_t flags = 0;
     const auto& sequence_start_it = request.parameters().find("sequence_start");
     if (sequence_start_it != request.parameters().end()) {
       const auto& infer_param = sequence_start_it->second;
