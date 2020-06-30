@@ -32,9 +32,9 @@ NVIDIA Triton Inference Server
 
     **LATEST RELEASE: You are currently on the master-v1 branch which
     tracks under-development progress towards the next V1 release. The
-    latest release of the Triton Inference Server is 1.13.0 and
-    is available on branch** `r20.03.1
-    <https://github.com/NVIDIA/triton-inference-server/tree/r20.03.1>`_.
+    latest release of the Triton Inference Server is 1.14.0 and
+    is available on branch** `r20.06-v1
+    <https://github.com/NVIDIA/triton-inference-server/tree/r20.06-v1>`_.
 
     **Triton V1 and V2: For the 20.06 release, a legacy V1 version of
     Triton will be released from this branch. The V1 version of Triton
@@ -123,11 +123,11 @@ features:
 
 .. overview-end-marker-do-not-remove
 
-The current release of the Triton Inference Server is 1.13.0 and
+The current release of the Triton Inference Server is 1.14.0 and
 corresponds to the 20.02 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
-this release is `r20.03.1
-<https://github.com/NVIDIA/triton-inference-server/tree/r20.03.1>`_.
+this release is `r20.06-v1
+<https://github.com/NVIDIA/triton-inference-server/tree/r20.06-v1>`_.
 
 Backwards Compatibility
 -----------------------

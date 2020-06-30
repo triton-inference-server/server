@@ -58,7 +58,7 @@ following prerequisite steps:
   sure to select the r<xx.yy> release branch that corresponds to the
   version of the server you want to use::
 
-  $ git checkout r20.03.1
+  $ git checkout r20.06-v1
 
 * Create a model repository containing one or more models that you
   want the inference server to serve. An example model repository is
@@ -112,7 +112,7 @@ GitHub repo and checkout the release version of the branch that you
 want to build (or the master branch if you want to build the
 under-development version)::
 
-  $ git checkout r20.03.1
+  $ git checkout r20.06-v1
 
 Then use docker to build::
 
