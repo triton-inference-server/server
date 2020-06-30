@@ -32,14 +32,16 @@
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_message.h"
+#include "src/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
 Status
 TritonModel::Create(
-    const std::string& model_repository_path, const std::string& model_name,
-    const int64_t version, const ModelConfig& model_config,
-    const double min_compute_capability, std::unique_ptr<TritonModel>* model)
+    InferenceServer* server, const std::string& model_repository_path,
+    const std::string& model_name, const int64_t version,
+    const ModelConfig& model_config, const double min_compute_capability,
+    std::unique_ptr<TritonModel>* model)
 {
   model->reset();
 
@@ -90,7 +92,7 @@ TritonModel::Create(
 
   // Create and initialize the model.
   std::unique_ptr<TritonModel> local_model(
-      new TritonModel(model_path, backend, min_compute_capability));
+      new TritonModel(server, model_path, backend, min_compute_capability));
   RETURN_IF_ERROR(
       local_model->Init(version_path, model_config, "" /* platform */));
 
@@ -159,11 +161,11 @@ TritonModel::Create(
 }
 
 TritonModel::TritonModel(
-    const std::string& model_path,
+    InferenceServer* server, const std::string& model_path,
     const std::shared_ptr<TritonBackend>& backend,
     const double min_compute_capability)
-    : InferenceBackend(min_compute_capability), model_path_(model_path),
-      backend_(backend), state_(nullptr)
+    : InferenceBackend(min_compute_capability), server_(server),
+      model_path_(model_path), backend_(backend), state_(nullptr)
 {
 }
 
@@ -225,6 +227,15 @@ TRITONBACKEND_ModelConfig(
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(std::move(model_config_json)));
 
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelServer(
+    TRITONBACKEND_Model* model, TRITONSERVER_Server** server)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *server = reinterpret_cast<TRITONSERVER_Server*>(tm->Server());
   return nullptr;  // success
 }
 
