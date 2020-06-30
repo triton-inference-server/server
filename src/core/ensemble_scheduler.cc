@@ -773,8 +773,7 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
 
   if (ensemble_status_.IsOk()) {
     if (info_->is_decoupled_ && (response != nullptr)) {
-      InferenceResponse::Send(
-          std::move(response), TRITONSERVER_RESPONSE_COMPLETE_NONE);
+      InferenceResponse::Send(std::move(response), 0 /* flags */);
     }
     if (inflight_step_counter_ != 0) {
       return ensemble_status_;
