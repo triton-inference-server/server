@@ -90,7 +90,7 @@ if __name__ == '__main__':
       model_name = "identity_uint32"
       request_parallelism = 4
       shape = [2, 2]
-      with client_util.InferenceServerClient(FLAGS.url, connection_count=request_parallelism,
+      with client_util.InferenceServerClient(FLAGS.url, concurrency=request_parallelism,
                                              verbose=FLAGS.verbose) as client:
          input_datas = []
          requests = []
