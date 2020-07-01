@@ -1310,7 +1310,7 @@ CommonHandler::SetUpAllRequests()
                                       grpc::Status* status) {
     TRITONSERVER_Error* err = nullptr;
     if (request.repository_name().empty()) {
-      uint32_t flags = TRITONSERVER_INDEX_FLAG_NONE;
+      uint32_t flags = 0;
       if (request.ready()) {
         flags |= TRITONSERVER_INDEX_FLAG_READY;
       }

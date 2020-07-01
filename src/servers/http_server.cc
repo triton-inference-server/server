@@ -1354,7 +1354,7 @@ HTTPAPIServer::HandleRepositoryIndex(
       evhtp_header_new("Content-Type", "application/json", 1, 1));
 
   if (err == nullptr) {
-    uint32_t flags = TRITONSERVER_INDEX_FLAG_NONE;
+    uint32_t flags = 0;
     if (ready) {
       flags |= TRITONSERVER_INDEX_FLAG_READY;
     }
