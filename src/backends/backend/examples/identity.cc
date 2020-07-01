@@ -258,7 +258,8 @@ ModelInstance::ExecuteThread()
     // general a backend should try to operate on the entire batch of
     // requests at the same time for improved performance.
     for (uint32_t r = 0; r < request_count; ++r) {
-      DECL_TIMESTAMP(exec_start_ns);
+      uint64_t exec_start_ns = 0;
+      SET_TIMESTAMP(exec_start_ns);
       min_exec_start_ns = std::min(min_exec_start_ns, exec_start_ns);
 
       TRITONBACKEND_Request* request = requests[r];
@@ -497,7 +498,8 @@ ModelInstance::ExecuteThread()
               nullptr /* success */),
           "failed sending response");
 
-      DECL_TIMESTAMP(exec_end_ns);
+      uint64_t exec_end_ns = 0;
+      SET_TIMESTAMP(exec_end_ns);
       max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
 
       // If there are no compute timestamps the the request didn't ask

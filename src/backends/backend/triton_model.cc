@@ -297,6 +297,7 @@ TRITONBACKEND_ModelReportStatistics(
     const uint64_t compute_start_ns, const uint64_t compute_end_ns,
     const uint64_t exec_end_ns)
 {
+#ifdef TRITON_ENABLE_STATS
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
 
@@ -310,6 +311,8 @@ TRITONBACKEND_ModelReportStatistics(
   tr->ReportStatistics(
       metric_reporter, success, exec_start_ns, compute_start_ns, compute_end_ns,
       exec_end_ns);
+#endif  // TRITON_ENABLE_STATS
+
   return nullptr;  // success
 }
 
@@ -319,6 +322,7 @@ TRITONBACKEND_ModelReportBatchStatistics(
     const uint64_t exec_start_ns, const uint64_t compute_start_ns,
     const uint64_t compute_end_ns, const uint64_t exec_end_ns)
 {
+#ifdef TRITON_ENABLE_STATS
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
 
   // If we fail to get the metric reporter then log and error but
@@ -331,6 +335,8 @@ TRITONBACKEND_ModelReportBatchStatistics(
   tm->MutableStatsAggregator()->UpdateInferBatchStats(
       metric_reporter, batch_size, exec_start_ns, compute_start_ns,
       compute_end_ns, exec_end_ns);
+#endif  // TRITON_ENABLE_STATS
+
   return nullptr;  // success
 }
 
