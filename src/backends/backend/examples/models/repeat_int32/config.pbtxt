@@ -52,5 +52,10 @@ output [
     name: "OUT"
     data_type: TYPE_INT32
     dims: [ 1 ]
+  },
+  {
+    name: "IDX"
+    data_type: TYPE_UINT32
+    dims: [ 1 ]
   }
 ]
