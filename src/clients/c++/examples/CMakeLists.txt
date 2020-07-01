@@ -228,6 +228,19 @@ else()
     RUNTIME DESTINATION bin
   )
 
+  #
+  # simple_grpc_custom_repeat
+  #
+  add_executable(simple_grpc_custom_repeat simple_grpc_custom_repeat.cc)
+  target_link_libraries(
+    simple_grpc_custom_repeat
+    PRIVATE TRITON::grpcclient_static
+  )
+  install(
+    TARGETS simple_grpc_custom_repeat
+    RUNTIME DESTINATION bin
+  )
+
   if(${TRITON_ENABLE_GPU})
     #
     # simple_grpc_cudashm_client
