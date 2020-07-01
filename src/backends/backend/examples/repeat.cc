@@ -38,11 +38,11 @@ namespace nib = nvidia::inferenceserver::backend;
 // Backend that demonstrates the TRITONBACKEND API for a decoupled
 // backend where each request can generate 0 to many responses.
 //
-// This backend supports a model that has three inputs and one
-// output. The backend does not support batching.
+// This backend supports a model that has three inputs and two
+// outputs. The backend does not support batching.
 //
 //   - Input 'IN' can have any vector shape (e.g. [4] or [-1]) and
-//   - datatype must be INT32.
+//     datatype must be INT32.
 //
 //   - Input 'DELAY' must have same shape as IN and datatype must be
 //     UINT32.
@@ -50,13 +50,19 @@ namespace nib = nvidia::inferenceserver::backend;
 //   - Input 'WAIT' must have shape [1] and datatype UINT32.
 //
 //   - For each response, output 'OUT' must have shape [1] and
-//   - datatype INT32.
+//     datatype INT32.
+//
+//   - For each response, output 'IDX' must have shape [1] and
+//     datatype UINT32.
 //
 // For a request, the backend will sent 'n' responses where 'n' is the
 // number of elements in IN. For the i'th response, OUT will equal the
-// i'th element of IN. The backend will wait the i'th DELAY, in
-// milliseconds, before sending the i'th response. If IN shape is [0]
-// then no responses will be sent.
+// i'th element of IN and IDX will equal the zero-based count of this
+// response for the request. For example, the first response for a
+// request will have IDX 0, the second will have IDX 1, etc.  The
+// backend will wait the i'th DELAY, in milliseconds, before sending
+// the i'th response. If IN shape is [0] then no responses will be
+// sent.
 //
 // After WAIT milliseconds the backend will release the request and
 // return from the TRITONBACKEND_ModelExecute function so that Triton
@@ -135,7 +141,7 @@ class ModelState {
       TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config);
   void RequestThread(
       TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
-      const int32_t* delay_buffer_ptr, const size_t element_count);
+      const int32_t* delay_buffer_ptr, const uint32_t element_count);
 
   TRITONBACKEND_Model* triton_model_;
   ni::TritonJson::Value model_config_;
@@ -208,28 +214,32 @@ ModelState::ValidateModelConfig()
   RETURN_IF_ERROR(model_config_.MemberAsArray("input", &inputs));
   RETURN_IF_ERROR(model_config_.MemberAsArray("output", &outputs));
 
-  // There must be 3 inputs and 1 output.
+  // There must be 3 inputs and 2 outputs.
   RETURN_ERROR_IF_FALSE(
       inputs.ArraySize() == 3, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected 3 inputs, got ") +
           std::to_string(inputs.ArraySize()));
   RETURN_ERROR_IF_FALSE(
-      outputs.ArraySize() == 1, TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("expected 1 output, got ") +
+      outputs.ArraySize() == 2, TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("expected 2 outputs, got ") +
           std::to_string(outputs.ArraySize()));
 
-  ni::TritonJson::Value in, delay, wait, out;
+  // Here we rely on the model configuation listing the inputs and
+  // outputs in a specific order, which we shouldn't really require...
+  ni::TritonJson::Value in, delay, wait, out, idx;
   RETURN_IF_ERROR(inputs.IndexAsObject(0, &in));
   RETURN_IF_ERROR(inputs.IndexAsObject(1, &delay));
   RETURN_IF_ERROR(inputs.IndexAsObject(2, &wait));
   RETURN_IF_ERROR(outputs.IndexAsObject(0, &out));
+  RETURN_IF_ERROR(outputs.IndexAsObject(1, &idx));
 
   // Check tensor names
-  std::string in_name, delay_name, wait_name, out_name;
+  std::string in_name, delay_name, wait_name, out_name, idx_name;
   RETURN_IF_ERROR(in.MemberAsString("name", &in_name));
   RETURN_IF_ERROR(delay.MemberAsString("name", &delay_name));
   RETURN_IF_ERROR(wait.MemberAsString("name", &wait_name));
   RETURN_IF_ERROR(out.MemberAsString("name", &out_name));
+  RETURN_IF_ERROR(idx.MemberAsString("name", &idx_name));
 
   RETURN_ERROR_IF_FALSE(
       in_name == "IN", TRITONSERVER_ERROR_INVALID_ARG,
@@ -246,13 +256,18 @@ ModelState::ValidateModelConfig()
       out_name == "OUT", TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected first output tensor name to be OUT, got ") +
           out_name);
+  RETURN_ERROR_IF_FALSE(
+      idx_name == "IDX", TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("expected second output tensor name to be IDX, got ") +
+          idx_name);
 
   // Check shapes
-  std::vector<int64_t> in_shape, delay_shape, wait_shape, out_shape;
+  std::vector<int64_t> in_shape, delay_shape, wait_shape, out_shape, idx_shape;
   RETURN_IF_ERROR(nib::ParseShape(in, "dims", &in_shape));
   RETURN_IF_ERROR(nib::ParseShape(delay, "dims", &delay_shape));
   RETURN_IF_ERROR(nib::ParseShape(wait, "dims", &wait_shape));
   RETURN_IF_ERROR(nib::ParseShape(out, "dims", &out_shape));
+  RETURN_IF_ERROR(nib::ParseShape(idx, "dims", &idx_shape));
 
   RETURN_ERROR_IF_FALSE(
       in_shape.size() == 1, TRITONSERVER_ERROR_INVALID_ARG,
@@ -273,13 +288,19 @@ ModelState::ValidateModelConfig()
       TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected OUT shape to be [1], got ") +
           nib::ShapeToString(out_shape));
+  RETURN_ERROR_IF_FALSE(
+      (idx_shape.size() == 1) && (idx_shape[0] == 1),
+      TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("expected IDX shape to be [1], got ") +
+          nib::ShapeToString(idx_shape));
 
   // Check datatypes
-  std::string in_dtype, delay_dtype, wait_dtype, out_dtype;
+  std::string in_dtype, delay_dtype, wait_dtype, out_dtype, idx_dtype;
   RETURN_IF_ERROR(in.MemberAsString("data_type", &in_dtype));
   RETURN_IF_ERROR(delay.MemberAsString("data_type", &delay_dtype));
   RETURN_IF_ERROR(wait.MemberAsString("data_type", &wait_dtype));
   RETURN_IF_ERROR(out.MemberAsString("data_type", &out_dtype));
+  RETURN_IF_ERROR(idx.MemberAsString("data_type", &idx_dtype));
 
   RETURN_ERROR_IF_FALSE(
       in_dtype == "TYPE_INT32", TRITONSERVER_ERROR_INVALID_ARG,
@@ -293,6 +314,9 @@ ModelState::ValidateModelConfig()
   RETURN_ERROR_IF_FALSE(
       out_dtype == "TYPE_INT32", TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected OUT datatype to be INT32, got ") + out_dtype);
+  RETURN_ERROR_IF_FALSE(
+      idx_dtype == "TYPE_UINT32", TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("expected IDX datatype to be UINT32, got ") + idx_dtype);
 
   // For simplicity this backend doesn't support multiple
   // instances. So check and give a warning if more than one instance
@@ -373,7 +397,7 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
                 .c_str()));
   }
 
-  const size_t element_count = in_byte_size / sizeof(int32_t);
+  const uint32_t element_count = in_byte_size / sizeof(int32_t);
 
   // A performant solution would use the input tensors in place as
   // much as possible but here we make a copy into a local array to
@@ -421,7 +445,7 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
 void
 ModelState::RequestThread(
     TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
-    const int32_t* delay_buffer_ptr, const size_t element_count)
+    const int32_t* delay_buffer_ptr, const uint32_t element_count)
 {
   std::unique_ptr<TRITONBACKEND_ResponseFactory, nib::ResponseFactoryDeleter>
       factory(factory_ptr);
@@ -430,7 +454,7 @@ ModelState::RequestThread(
 
   // IN and DELAY are INT32 vectors... wait, copy IN->OUT, and send a
   // response.
-  for (size_t e = 0; e < element_count; ++e) {
+  for (uint32_t e = 0; e < element_count; ++e) {
     TRITONSERVER_LogMessage(
         TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
         (std::string("waiting ") + std::to_string(delay_buffer.get()[e]) +
@@ -441,38 +465,67 @@ ModelState::RequestThread(
     std::this_thread::sleep_for(
         std::chrono::milliseconds(delay_buffer.get()[e]));
 
-    // Create the response with a single OUT output.
+    // Create the response with OUT and IDX outputs.
     TRITONBACKEND_Response* response;
     RESPOND_FACTORY_AND_RETURN_IF_ERROR(
         factory.get(),
         TRITONBACKEND_ResponseNewFromFactory(&response, factory.get()));
 
-    const int64_t output_shape = 1;
-    TRITONBACKEND_Output* output;
+    const int64_t out_shape = 1;
+    TRITONBACKEND_Output* out;
     RESPOND_FACTORY_AND_RETURN_IF_ERROR(
         factory.get(), TRITONBACKEND_ResponseOutput(
-                           response, &output, "OUT", TRITONSERVER_TYPE_INT32,
-                           &output_shape, 1 /* dims_count */));
+                           response, &out, "OUT", TRITONSERVER_TYPE_INT32,
+                           &out_shape, 1 /* dims_count */));
 
-    // Get the output buffer. We request a buffer in CPU memory but we
-    // have to handle any returned type. If we get back a buffer in
-    // GPU memory we just fail the request.
-    void* output_buffer;
-    TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
-    int64_t output_memory_type_id = 0;
+    const int64_t idx_shape = 1;
+    TRITONBACKEND_Output* idx;
+    RESPOND_FACTORY_AND_RETURN_IF_ERROR(
+        factory.get(), TRITONBACKEND_ResponseOutput(
+                           response, &idx, "IDX", TRITONSERVER_TYPE_UINT32,
+                           &idx_shape, 1 /* dims_count */));
+
+    // Get the OUT output buffer. We request a buffer in CPU memory
+    // but we have to handle any returned type. If we get back a
+    // buffer in GPU memory we just fail the request.
+    void* out_buffer;
+    TRITONSERVER_MemoryType out_memory_type = TRITONSERVER_MEMORY_CPU;
+    int64_t out_memory_type_id = 0;
     RESPOND_FACTORY_AND_RETURN_IF_ERROR(
         factory.get(), TRITONBACKEND_OutputBuffer(
-                           output, &output_buffer, sizeof(int32_t),
-                           &output_memory_type, &output_memory_type_id));
-    if (output_memory_type == TRITONSERVER_MEMORY_GPU) {
+                           out, &out_buffer, sizeof(int32_t), &out_memory_type,
+                           &out_memory_type_id));
+    if (out_memory_type == TRITONSERVER_MEMORY_GPU) {
       RESPOND_FACTORY_AND_RETURN_IF_ERROR(
-          factory.get(), TRITONSERVER_ErrorNew(
-                             TRITONSERVER_ERROR_INTERNAL,
-                             "failed to create output buffer in CPU memory"));
+          factory.get(),
+          TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              "failed to create OUT output buffer in CPU memory"));
+    }
+
+    // Get the IDX output buffer. We request a buffer in CPU memory
+    // but we have to handle any returned type. If we get back a
+    // buffer in GPU memory we just fail the request.
+    void* idx_buffer;
+    TRITONSERVER_MemoryType idx_memory_type = TRITONSERVER_MEMORY_CPU;
+    int64_t idx_memory_type_id = 0;
+    RESPOND_FACTORY_AND_RETURN_IF_ERROR(
+        factory.get(), TRITONBACKEND_OutputBuffer(
+                           idx, &idx_buffer, sizeof(uint32_t), &idx_memory_type,
+                           &idx_memory_type_id));
+    if (idx_memory_type == TRITONSERVER_MEMORY_GPU) {
+      RESPOND_FACTORY_AND_RETURN_IF_ERROR(
+          factory.get(),
+          TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              "failed to create IDX output buffer in CPU memory"));
     }
 
     // Copy IN -> OUT
-    *(reinterpret_cast<int32_t*>(output_buffer)) = in_buffer.get()[e];
+    *(reinterpret_cast<int32_t*>(out_buffer)) = in_buffer.get()[e];
+
+    // Set response IDX
+    *(reinterpret_cast<uint32_t*>(idx_buffer)) = e;
 
     // Send the response.
     LOG_IF_ERROR(
