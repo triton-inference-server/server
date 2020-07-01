@@ -39,8 +39,7 @@ namespace nib = nvidia::inferenceserver::backend;
 // backend where each request can generate 0 to many responses.
 //
 // This backend supports a model that has three inputs and one
-// output. The model can support batching but the shapes described
-// here refer to the non-batch portion of the shape.
+// output. The backend does not support batching.
 //
 //   - Input 'IN' can have any vector shape (e.g. [4] or [-1]) and
 //   - datatype must be INT32.
@@ -50,10 +49,11 @@ namespace nib = nvidia::inferenceserver::backend;
 //
 //   - Input 'WAIT' must have shape [1] and datatype UINT32.
 //
-//   - Output 'OUT' must have shape [1] and datatype INT32.
+//   - For each response, output 'OUT' must have shape [1] and
+//   - datatype INT32.
 //
 // For a request, the backend will sent 'n' responses where 'n' is the
-// number of elements in IN. For each response, OUT will equal the
+// number of elements in IN. For the i'th response, OUT will equal the
 // i'th element of IN. The backend will wait the i'th DELAY, in
 // milliseconds, before sending the i'th response. If IN shape is [0]
 // then no responses will be sent.
@@ -66,10 +66,6 @@ namespace nib = nvidia::inferenceserver::backend;
 // model, the backend can be processing multiple requests at the same
 // time, and the responses for multiple requests can be intermixed,
 // depending on the values of DELAY and WAIT.
-//
-// If the model uses a batching scheduler (like the dynamic batcher),
-// the WAIT time used is the maximum wait time of all requests in the
-// batch.
 
 namespace {
 
@@ -198,6 +194,15 @@ ModelState::ValidateModelConfig()
   TRITONSERVER_LogMessage(
       TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
       (std::string("model configuration:\n") + buffer.Contents()).c_str());
+
+  // max_batch_size must be 0 because this backend does not support
+  // batching
+  int64_t max_batch_size;
+  RETURN_IF_ERROR(model_config_.MemberAsInt("max_batch_size", &max_batch_size));
+  RETURN_ERROR_IF_FALSE(
+      max_batch_size == 0, TRITONSERVER_ERROR_INVALID_ARG,
+      std::string(
+          "repeat backend only supports models with max_batch_size == 0"));
 
   ni::TritonJson::Value inputs, outputs;
   RETURN_IF_ERROR(model_config_.MemberAsArray("input", &inputs));
@@ -488,7 +493,7 @@ ModelState::RequestThread(
   if (element_count == 0) {
     TRITONSERVER_LogMessage(
         TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-        "IN size is zero, no responses send ");
+        "IN size is zero, no responses sent");
   }
 
   // All responses have been sent so we must signal that we are done
@@ -590,7 +595,12 @@ TRITONBACKEND_ModelExecute(
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelState(model, reinterpret_cast<void**>(&state)));
 
-  // Then multiple requests we use the max wait value...
+  // This backend does not support models that support batching, so
+  // 'request_count' should always be 1.
+  RETURN_ERROR_IF_FALSE(
+      request_count <= 1, TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("repeat backend does not support batched request execution"));
+
   uint32_t wait_milliseconds = 0;
 
   // At this point we accept ownership of 'requests', which means that
@@ -599,16 +609,10 @@ TRITONBACKEND_ModelExecute(
   // particular request then we send an error response just for the
   // specific request.
 
-  // For simplicity we process each request in a separate thread. If a
-  // model has multiple instances and uses the dynamic batcher to
-  // create large batches, then this could result in 1000's of
-  // threads. A more performant implementation would likely need to
-  // use a different technique than one-thread-per-request.
+  // For simplicity we process each request in a separate thread.
   for (uint32_t r = 0; r < request_count; ++r) {
     TRITONBACKEND_Request* request = requests[r];
-    uint32_t wait = 0;
-    state->ProcessRequest(request, &wait);
-    wait_milliseconds = std::max(wait_milliseconds, wait);
+    state->ProcessRequest(request, &wait_milliseconds);
   }
 
   // Wait, release, return...
