@@ -1228,7 +1228,8 @@ main(int argc, char** argv)
   }
   if (parser->IsDecoupled()) {
     std::cout << "  Detected decoupled model, using the first response for "
-                 "measuring latency" << std::endl;
+                 "measuring latency"
+              << std::endl;
   }
   if (percentile == -1) {
     std::cout << "  Stabilizing using average latency" << std::endl;

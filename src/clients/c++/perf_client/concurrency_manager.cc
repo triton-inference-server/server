@@ -267,8 +267,9 @@ ConcurrencyManager::Infer(
         return;
       }
       if (streaming_) {
-        thread_stat->status_ =
-            ctxs.back()->infer_client_->StartStream(callback_func);
+        // Decoupled models should not collect client side statistics
+        thread_stat->status_ = ctxs.back()->infer_client_->StartStream(
+            callback_func, (!parser_->IsDecoupled()));
         if (!thread_stat->status_.IsOk()) {
           return;
         }
