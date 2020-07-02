@@ -308,7 +308,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// response at the stream.
   /// \param enable_stats Indicates whether client library should record the
   /// the client-side statistics for inference requests on stream or not.
-  /// The library currently doesn't support statistics for decoupled
+  /// The library does not support client side statistics for decoupled
   /// streaming. Set this option false when there is no 1:1 mapping between
   /// request and response on the stream.
   /// \param headers Optional map specifying additional HTTP headers to
