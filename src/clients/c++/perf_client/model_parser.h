@@ -60,7 +60,7 @@ class ModelParser {
       : inputs_(std::make_shared<ModelTensorMap>()),
         outputs_(std::make_shared<ModelTensorMap>()),
         composing_models_map_(std::make_shared<ComposingModelMap>()),
-        scheduler_type_(NONE), max_batch_size_(0)
+        scheduler_type_(NONE), max_batch_size_(0), is_decoupled_(false)
   {
   }
 
@@ -110,6 +110,10 @@ class ModelParser {
   /// \return The maximum supported batch size.
   size_t MaxBatchSize() const { return max_batch_size_; }
 
+  /// Returns whether or not the model is decoupled
+  /// \return the truth value of whether the model is decoupled
+  bool IsDecoupled() const { return is_decoupled_; }
+
   /// Get the details about the model inputs.
   /// \return The map with tensor_name and the tensor details
   /// stored as key-value pair.
@@ -149,4 +153,5 @@ class ModelParser {
   std::string model_version_;
   ModelSchedulerType scheduler_type_;
   size_t max_batch_size_;
+  bool is_decoupled_;
 };

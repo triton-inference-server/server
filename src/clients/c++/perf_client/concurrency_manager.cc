@@ -198,6 +198,8 @@ ConcurrencyManager::Infer(
           ctxs[ctx_id]->infer_client_->ClientInferStat(
               &(thread_stat->contexts_stat_[ctx_id]));
           async_req_map.erase(request_id);
+        } else {
+          return;
         }
       }
     }

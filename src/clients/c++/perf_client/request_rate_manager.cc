@@ -224,6 +224,8 @@ RequestRateManager::Infer(
               it->second.delayed_));
           ctx->infer_client_->ClientInferStat(
               &(thread_stat->contexts_stat_[0]));
+        } else {
+          return;
         }
       }
     }

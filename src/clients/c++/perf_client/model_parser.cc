@@ -55,6 +55,8 @@ ModelParser::Init(
 
   max_batch_size_ = config.max_batch_size();
 
+  is_decoupled_ = config.model_transaction_policy().decoupled();
+
   // Get the information about inputs from metadata
   for (const auto& input : metadata.inputs()) {
     auto it = inputs_->emplace(input.name(), ModelTensor()).first;
@@ -192,6 +194,10 @@ ModelParser::Init(
     max_batch_size_ = bs_itr->value.GetInt();
   }
 
+  const auto txn_itr = config.FindMember("model_transaction_policy");
+  if (txn_itr != config.MemberEnd()) {
+    is_decoupled_ = txn_itr->value["decoupled"].GetBool();
+  }
 
   // Get the information about inputs from metadata
   const auto inputs_itr = metadata.FindMember("inputs");
