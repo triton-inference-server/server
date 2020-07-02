@@ -88,18 +88,17 @@ if __name__ == '__main__':
     input_data = np.arange(start=data_offset,
                            stop=data_offset + repeat_count,
                            dtype=np.int32)
-    input_data = np.expand_dims(input_data, axis=0)
-    delay_data = (np.ones([1, repeat_count], dtype=np.uint32)) * delay_time
-    wait_data = np.array([[wait_time]], dtype=np.uint32)
+    delay_data = (np.ones([repeat_count], dtype=np.uint32)) * delay_time
+    wait_data = np.array([wait_time], dtype=np.uint32)
 
     # Initialize the data.
     inputs = []
-    inputs.append(tritongrpcclient.InferInput('IN', [1, repeat_count], "INT32"))
+    inputs.append(tritongrpcclient.InferInput('IN', [repeat_count], "INT32"))
     inputs[-1].set_data_from_numpy(input_data)
     inputs.append(
-        tritongrpcclient.InferInput('DELAY', [1, repeat_count], "UINT32"))
+        tritongrpcclient.InferInput('DELAY', [repeat_count], "UINT32"))
     inputs[-1].set_data_from_numpy(delay_data)
-    inputs.append(tritongrpcclient.InferInput('WAIT', [1, 1], "UINT32"))
+    inputs.append(tritongrpcclient.InferInput('WAIT', [1], "UINT32"))
     inputs[-1].set_data_from_numpy(wait_data)
 
     outputs = []

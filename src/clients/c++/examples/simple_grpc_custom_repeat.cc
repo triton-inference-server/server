@@ -181,7 +181,7 @@ main(int argc, char** argv)
 
   // Initialize the inputs with the data.
   nic::InferInput* in;
-  std::vector<int64_t> shape{1, repeat_count};
+  std::vector<int64_t> shape{repeat_count};
   FAIL_IF_ERR(
       nic::InferInput::Create(&in, "IN", shape, "INT32"),
       "unable to create 'IN'");
@@ -206,7 +206,7 @@ main(int argc, char** argv)
       "unable to set data for 'DELAY'");
 
   nic::InferInput* wait;
-  shape[1] = 1;
+  shape[0] = 1;
   FAIL_IF_ERR(
       nic::InferInput::Create(&wait, "WAIT", shape, "UINT32"),
       "unable to create 'WAIT'");
