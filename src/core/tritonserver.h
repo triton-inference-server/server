@@ -1235,15 +1235,14 @@ typedef enum tritonserver_batchflag_enum {
 
 /// Model index flags. The enum values must be power-of-2 values.
 typedef enum tritonserver_modelindexflag_enum {
-  TRITONSERVER_INDEX_FLAG_NONE = 0,
   TRITONSERVER_INDEX_FLAG_READY = 1
 } TRITONSERVER_ModelIndexFlag;
 
 /// Model transaction policy flags. The enum values must be
 /// power-of-2 values.
 typedef enum tritonserver_txn_property_flag_enum {
-  TRITONSERVER_TXN_ONE_TO_ONE = 0,
-  TRITONSERVER_TXN_DECOUPLED = 1
+  TRITONSERVER_TXN_ONE_TO_ONE = 1,
+  TRITONSERVER_TXN_DECOUPLED = 2
 } TRITONSERVER_ModelTxnPropertyFlag;
 
 /// Create a new server object. The caller takes ownership of the
@@ -1330,14 +1329,15 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelIsReady(
 /// server will choose a version based on the model's policy.
 /// \param flags Returns flags indicating the batch properties of the
 /// model.
-/// \param voidp If non-nullptr, returns a point specific to the 'flags' value.
+/// \param voidp If non-nullptr, returns a point specific to the
+/// 'flags' value.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelBatchProperties(
     TRITONSERVER_Server* server, const char* model_name,
     const int64_t model_version, uint32_t* flags, void** voidp);
 
-/// Get the transaction policy of the model. The policy is communicated
-/// by a flags value.
+/// Get the transaction policy of the model. The policy is
+/// communicated by a flags value.
 ///
 ///   - TRITONSERVER_TXN_ONE_TO_ONE: The model generates exactly
 ///     one response per request.
@@ -1422,6 +1422,10 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelConfig(
 /// TRITONSERVER_Message object. The caller takes ownership of the
 /// message object and must call TRITONSERVER_MessageDelete to release
 /// the object.
+///
+/// If TRITONSERVER_INDEX_FLAG_READY is set in 'flags' only the models
+/// that are loaded into the server and ready for inferencing are
+/// returned.
 ///
 /// \param server The inference server object.
 /// \param flags TRITONSERVER_ModelIndexFlag flags that control how to
