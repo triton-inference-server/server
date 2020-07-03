@@ -42,9 +42,9 @@ namespace {
 struct TensorNode {
   TensorNode(
       const std::string& model_name, const bool batching, const DataType& type,
-      const DimsList& dims, const bool is_decoupled)
-      : model_name_(model_name), type_(type), dims_(dims),
-        is_decoupled_(is_decoupled), decouple_label_(0), visited_(false)
+      const DimsList& dims)
+      : model_name_(model_name), type_(type), dims_(dims), is_decoupled_(false),
+        decouple_label_(0), visited_(false)
   {
     // Expand dims to full shape, which includes batch dimension if exist
     if (batching) {
@@ -125,14 +125,13 @@ ValidateTensorMapping(
               " in model " + step.model_name());
     }
   }
-  bool is_decoupled = model_config.model_transaction_policy().decoupled();
   for (const auto& model_input : model_config.input()) {
     size_t mapped_cnt = 0;
     for (const auto& input_map : step.input_map()) {
       if (model_input.name() == input_map.first) {
         TensorNode model_tensor(
             step.model_name(), batching, model_input.data_type(),
-            model_input.dims(), is_decoupled);
+            model_input.dims());
         auto it = ensemble_tensors->find(input_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -182,7 +181,7 @@ ValidateTensorMapping(
       if (model_output.name() == output_map.first) {
         TensorNode model_tensor(
             step.model_name(), batching, model_output.data_type(),
-            model_output.dims(), is_decoupled);
+            model_output.dims());
         auto it = ensemble_tensors->find(output_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -206,8 +205,10 @@ ValidateTensorMapping(
   }
 
   // link ensemble tensors
+  bool is_decoupled = model_config.model_transaction_policy().decoupled();
   for (const auto& output_map : step.output_map()) {
     auto& node = ensemble_tensors->find(output_map.second)->second;
+    node.is_decoupled_ = is_decoupled;
     for (const auto& input_map : step.input_map()) {
       auto& prev_node = ensemble_tensors->find(input_map.second)->second;
       node.prev_nodes_.push_back(&prev_node);
@@ -247,17 +248,13 @@ ValidateEnsembleConfig(
   for (const auto& input : ensemble_config.input()) {
     const auto& dims =
         input.has_reshape() ? input.reshape().shape() : input.dims();
-    TensorNode input_node(
-        ensemble_name, batching, input.data_type(), dims,
-        false /* is_decoupled */);
+    TensorNode input_node(ensemble_name, batching, input.data_type(), dims);
     ensemble_tensors.emplace(std::make_pair(input.name(), input_node));
   }
   for (const auto& output : ensemble_config.output()) {
     const auto& dims =
         output.has_reshape() ? output.reshape().shape() : output.dims();
-    TensorNode output_node(
-        ensemble_name, batching, output.data_type(), dims,
-        false /* is_decoupled */);
+    TensorNode output_node(ensemble_name, batching, output.data_type(), dims);
     ensemble_tensors.emplace(std::make_pair(output.name(), output_node));
   }
 
