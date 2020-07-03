@@ -63,6 +63,33 @@ class DecoupledTest(unittest.TestCase):
 
         self.outputs_ = []
         self.outputs_.append(grpcclient.InferRequestedOutput('OUT'))
+        self.outputs_.append(grpcclient.InferRequestedOutput('IDX'))
+
+    def _stream_infer(self, request_count, repeat_count, user_data, result_dict):
+        with grpcclient.InferenceServerClient(url="localhost:8001",
+                                              verbose=True) as triton_client:
+            # Establish stream
+            triton_client.start_stream(callback=partial(callback, user_data))
+            # Send specified many requests in parallel
+            for i in range(request_count):
+                triton_client.async_stream_infer(model_name=self.model_name_,
+                                                 inputs=self.inputs_,
+                                                 request_id=str(i),
+                                                 outputs=self.outputs_)
+
+            # Retrieve results...
+            recv_count = 0
+            while recv_count < (repeat_count * request_count):
+                data_item = user_data._completed_requests.get()
+                if type(data_item) == InferenceServerException:
+                    raise data_item
+                else:
+                    this_id = data_item.get_response().id
+                    if this_id not in result_dict.keys():
+                        result_dict[this_id] = []
+                    result_dict[this_id].append(data_item)
+
+                recv_count += 1
 
     def _decoupled_infer(self,
                          request_count,
@@ -89,29 +116,11 @@ class DecoupledTest(unittest.TestCase):
         user_data = UserData()
         result_dict = {}
 
-        with grpcclient.InferenceServerClient(url="localhost:8001",
-                                              verbose=True) as triton_client:
-            # Establish stream
-            triton_client.start_stream(callback=partial(callback, user_data))
-            # Send specified many requests in parallel
-            for i in range(request_count):
-                triton_client.async_stream_infer(model_name=self.model_name_,
-                                                 inputs=self.inputs_,
-                                                 request_id=str(i),
-                                                 outputs=self.outputs_)
+        try: 
+            self._stream_infer(request_count, repeat_count, user_data, result_dict)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-            # Retrieve results...
-            recv_count = 0
-            while recv_count < (repeat_count * request_count):
-                data_item = user_data._completed_requests.get()
-                if type(data_item) == InferenceServerException:
-                    raise data_item
-                else:
-                    this_id = data_item.get_response().id
-                    if this_id not in result_dict.keys():
-                        result_dict[this_id] = []
-                    result_dict[this_id].append(data_item.as_numpy('OUT'))
-                recv_count += 1
 
         # Validate the results..
         for i in range(request_count):
@@ -129,8 +138,12 @@ class DecoupledTest(unittest.TestCase):
                 expected_data = data_offset
                 result_list = result_dict[this_id]
                 for j in range(len(result_list)):
-                    self.assertEqual(len(result_list[j]), 1)
-                    self.assertEqual(result_list[j][0], expected_data)
+                    this_data = result_list[j].as_numpy('OUT')
+                    self.assertEqual(len(this_data), 1)
+                    self.assertEqual(this_data[0], expected_data)
+                    this_idx = result_list[j].as_numpy('IDX')
+                    self.assertEqual(len(this_idx), 1)
+                    self.assertEqual(this_idx[0], j)
                     expected_data += 1
 
     def test_one_to_none(self):
@@ -286,6 +299,42 @@ class DecoupledTest(unittest.TestCase):
         self._no_streaming_helper("grpc")
         self._no_streaming_helper("http")
 
+    def test_wrong_shape(self):
+        # Sends mismatching shapes for IN and DELAY. Server should return
+        # appropriate error message. The shape of IN is [repeat_count],
+        # where as shape of DELAY is [repeat_count + 1].
+
+        data_offset = 100
+        repeat_count = 1
+        delay_time = 1000
+        wait_time = 2000
+
+        input_data = np.arange(start=data_offset,
+                               stop=data_offset + repeat_count,
+                               dtype=np.int32)
+        delay_data = (np.ones([repeat_count + 1], dtype=np.uint32)) * delay_time
+        wait_data = np.array([wait_time], dtype=np.uint32)
+
+        # Initialize data for IN
+        self.inputs_[0].set_shape([repeat_count])
+        self.inputs_[0].set_data_from_numpy(input_data)
+
+        # Initialize data for DELAY
+        self.inputs_[1].set_shape([repeat_count + 1])
+        self.inputs_[1].set_data_from_numpy(delay_data)
+
+        # Initialize data for WAIT
+        self.inputs_[2].set_data_from_numpy(wait_data)
+
+        user_data = UserData()
+        result_dict = {}
+
+        try: 
+            self._stream_infer(1, repeat_count, user_data, result_dict)    
+            self.assertTrue(False, "expected an error from server")
+        except InferenceServerException as ex:
+            self.assertTrue(
+                "expected IN and DELAY shape to match, got [1] and [2]" in str(ex))
 
 if __name__ == '__main__':
     unittest.main()
