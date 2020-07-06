@@ -53,6 +53,7 @@ def callback(user_data, result, error):
 
 class DecoupledTest(unittest.TestCase):
     def setUp(self):
+        self.repeat_like_models = ["repeat_int32", "simple_repeat", "sequence_repeat"]
         self.model_name_ = "repeat_int32"
 
         self.inputs_ = []
@@ -137,27 +138,31 @@ class DecoupledTest(unittest.TestCase):
         # Note the name of the test one_to_none implies the
         # mapping between requests and responses.
 
-        # Single request case
-        self._decoupled_infer(request_count=1, repeat_count=0)
-        # Multiple request case
-        self._decoupled_infer(request_count=5, repeat_count=0)
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+            # Single request case
+            self._decoupled_infer(request_count=1, repeat_count=0)
+            # Multiple request case
+            self._decoupled_infer(request_count=5, repeat_count=0)
 
     def test_one_to_one(self):
         # Test cases where each request generates single response.
         # Note the name of the test one_to_one implies the
         # mapping between requests and responses.
 
-        # Single request case
-        # Release request before the response is delivered
-        self._decoupled_infer(request_count=1, wait_time=500)
-        # Release request after the response is delivered
-        self._decoupled_infer(request_count=1, wait_time=2000)
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+            # Single request case
+            # Release request before the response is delivered
+            self._decoupled_infer(request_count=1, wait_time=500)
+            # Release request after the response is delivered
+            self._decoupled_infer(request_count=1, wait_time=2000)
 
-        # Multiple request case
-        # Release request before the response is delivered
-        self._decoupled_infer(request_count=5, wait_time=500)
-        # Release request after the response is delivered
-        self._decoupled_infer(request_count=5, wait_time=2000)
+            # Multiple request case
+            # Release request before the response is delivered
+            self._decoupled_infer(request_count=5, wait_time=500)
+            # Release request after the response is delivered
+            self._decoupled_infer(request_count=5, wait_time=2000)
 
     def test_one_to_many(self):
         # Test cases where each request generates multiple response.
@@ -166,27 +171,29 @@ class DecoupledTest(unittest.TestCase):
 
         self.assertFalse("TRITONSERVER_DELAY_GRPC_RESPONSE" in os.environ)
 
-        # Single request case
-        # Release request before the first response is delivered
-        self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
-        # Release request when the responses are getting delivered
-        self._decoupled_infer(request_count=1, repeat_count=5, wait_time=2000)
-        # Release request after all the responses are delivered
-        self._decoupled_infer(request_count=1,
-                              repeat_count=5,
-                              wait_time=10000)
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+            # Single request case
+            # Release request before the first response is delivered
+            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
+            # Release request when the responses are getting delivered
+            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=2000)
+            # Release request after all the responses are delivered
+            self._decoupled_infer(request_count=1,
+                                repeat_count=5,
+                                wait_time=10000)
 
-        # Multiple request case
-        # Release request before the first response is delivered
-        self._decoupled_infer(request_count=5, repeat_count=5, wait_time=500)
-        # Release request when the responses are getting delivered
-        self._decoupled_infer(request_count=5,
-                              repeat_count=5,
-                              wait_time=2000)
-        # Release request after all the responses are delivered
-        self._decoupled_infer(request_count=5,
-                              repeat_count=5,
-                              wait_time=10000)
+            # Multiple request case
+            # Release request before the first response is delivered
+            self._decoupled_infer(request_count=5, repeat_count=5, wait_time=500)
+            # Release request when the responses are getting delivered
+            self._decoupled_infer(request_count=5,
+                                repeat_count=5,
+                                wait_time=2000)
+            # Release request after all the responses are delivered
+            self._decoupled_infer(request_count=5,
+                                repeat_count=5,
+                                wait_time=10000)
 
     def test_one_to_multi_many(self):
         # Test cases where each request generates multiple response but the
@@ -195,27 +202,29 @@ class DecoupledTest(unittest.TestCase):
 
         self.assertTrue("TRITONSERVER_DELAY_GRPC_RESPONSE" in os.environ)
 
-        # Single request case
-        # Release request before the first response is delivered
-        self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
-        # Release request when the responses are getting delivered
-        self._decoupled_infer(request_count=1, repeat_count=5, wait_time=8000)
-        # Release request after all the responses are delivered
-        self._decoupled_infer(request_count=1,
-                              repeat_count=5,
-                              wait_time=20000)
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+            # Single request case
+            # Release request before the first response is delivered
+            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
+            # Release request when the responses are getting delivered
+            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=8000)
+            # Release request after all the responses are delivered
+            self._decoupled_infer(request_count=1,
+                                repeat_count=5,
+                                wait_time=20000)
 
-        # Multiple request case
-        # Release request before the first response is delivered
-        self._decoupled_infer(request_count=5, repeat_count=5, wait_time=500)
-        # Release request when the responses are getting delivered
-        self._decoupled_infer(request_count=5,
-                              repeat_count=5,
-                              wait_time=3000)
-        # Release request after all the responses are delivered
-        self._decoupled_infer(request_count=5,
-                              repeat_count=5,
-                              wait_time=10000)
+            # Multiple request case
+            # Release request before the first response is delivered
+            self._decoupled_infer(request_count=5, repeat_count=5, wait_time=500)
+            # Release request when the responses are getting delivered
+            self._decoupled_infer(request_count=5,
+                                repeat_count=5,
+                                wait_time=3000)
+            # Release request after all the responses are delivered
+            self._decoupled_infer(request_count=5,
+                                repeat_count=5,
+                                wait_time=10000)
 
     def _no_streaming_helper(self, protocol):
         data_offset = 100

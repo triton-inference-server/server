@@ -378,6 +378,9 @@ EnsembleContext::ResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* allocated_memory_type,
     int64_t* allocated_memory_type_id)
 {
+  // [TODO] FIXME: the current workflow implies an assumption on the decoupled
+  // models response workflow: response 1 alloc -> response 1 complete ->
+  // response 2 alloc -> response 2 complete, which may not be true.
   auto tensor_data_map = reinterpret_cast<
       std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>>*>(
       userp);
@@ -433,72 +436,71 @@ void
 EnsembleContext::ResponseComplete(
     TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
-  if (response == nullptr) {
-    return;
-  }
-
   auto step_ptr = std::unique_ptr<Step>(reinterpret_cast<Step*>(userp));
   step_ptr->response_flags_ = flags;
 
-  auto err = TRITONSERVER_InferenceResponseError(response);
-  if (err == nullptr) {
-    uint32_t count;
-    err = TRITONSERVER_InferenceResponseOutputCount(response, &count);
+  if (response != nullptr) {
+    auto err = TRITONSERVER_InferenceResponseError(response);
     if (err == nullptr) {
-      std::lock_guard<std::mutex> lock(step_ptr->ctx_->mutex_);
-      auto& output_to_tensor =
-          step_ptr->ctx_->info_->steps_[step_ptr->step_idx_].output_to_tensor_;
-      for (uint32_t idx = 0; idx < count; idx++) {
-        const char* name;
-        TRITONSERVER_DataType datatype;
-        const int64_t* shape;
-        uint64_t dim_count;
-        const void* base;
-        size_t byte_size;
-        TRITONSERVER_MemoryType memory_type;
-        int64_t memory_type_id;
-        void* userp;
-        err = TRITONSERVER_InferenceResponseOutput(
-            response, idx, &name, &datatype, &shape, &dim_count, &base,
-            &byte_size, &memory_type, &memory_type_id, &userp);
-        if (err == nullptr) {
-          auto it = output_to_tensor.find(name);
-          if (it != output_to_tensor.end()) {
-            std::unique_ptr<InferenceRequest::Input> tensor(
-                new InferenceRequest::Input(
-                    it->second, TritonToDataType(datatype), shape, dim_count));
-            tensor->SetData(std::move(step_ptr->output_map_[it->first]));
+      uint32_t count;
+      err = TRITONSERVER_InferenceResponseOutputCount(response, &count);
+      if (err == nullptr) {
+        std::lock_guard<std::mutex> lock(step_ptr->ctx_->mutex_);
+        auto& output_to_tensor =
+            step_ptr->ctx_->info_->steps_[step_ptr->step_idx_]
+                .output_to_tensor_;
+        for (uint32_t idx = 0; idx < count; idx++) {
+          const char* name;
+          TRITONSERVER_DataType datatype;
+          const int64_t* shape;
+          uint64_t dim_count;
+          const void* base;
+          size_t byte_size;
+          TRITONSERVER_MemoryType memory_type;
+          int64_t memory_type_id;
+          void* userp;
+          err = TRITONSERVER_InferenceResponseOutput(
+              response, idx, &name, &datatype, &shape, &dim_count, &base,
+              &byte_size, &memory_type, &memory_type_id, &userp);
+          if (err == nullptr) {
+            auto it = output_to_tensor.find(name);
+            if (it != output_to_tensor.end()) {
+              std::unique_ptr<InferenceRequest::Input> tensor(
+                  new InferenceRequest::Input(
+                      it->second, TritonToDataType(datatype), shape,
+                      dim_count));
+              tensor->SetData(std::move(step_ptr->output_map_[it->first]));
 
-            auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
-            step_ptr->updated_tensors_.emplace(
-                it->second, tensor_data.AddTensor(std::move(tensor)));
-          } else {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL,
-                std::string(
-                    "internal response header specified output '" +
-                    std::string(name) +
-                    "' that does not map to any ensemble tensors")
-                    .c_str());
+              auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
+              step_ptr->updated_tensors_.emplace(
+                  it->second, tensor_data.AddTensor(std::move(tensor)));
+            } else {
+              LOG_VERBOSE(1)
+                  << "in ensemble, an internal response header specified "
+                     "output '"
+                  << name << "' that does not map to any ensemble tensors";
+            }
           }
-        }
-        if (err != nullptr) {
-          break;
+          if (err != nullptr) {
+            break;
+          }
         }
       }
     }
-  }
 
-  if (err != nullptr) {
-    step_ptr->infer_status_ = err;
+    if (err != nullptr) {
+      step_ptr->infer_status_ = err;
+    }
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(response),
+        "deleting inference response");
   }
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseDelete(response),
-      "deleting inference response");
 
   EnsembleContext::Proceed(step_ptr->ctx_, step_ptr);
   // Expecting more responses
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    // output map will be reused
+    step_ptr->output_map_.clear();
     step_ptr.release();
   }
 }
@@ -772,11 +774,15 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
 #endif
 
   if (ensemble_status_.IsOk()) {
-    if (info_->is_decoupled_ && (response != nullptr)) {
-      InferenceResponse::Send(std::move(response), 0 /* flags */);
-    }
-    if (inflight_step_counter_ != 0) {
-      return ensemble_status_;
+    if (info_->is_decoupled_) {
+      if (response != nullptr) {
+        InferenceResponse::Send(std::move(response), 0 /* flags */);
+      }
+      if (inflight_step_counter_ != 0) {
+        return ensemble_status_;
+      }
+      request_->ResponseFactory().SendFlags(
+          TRITONSERVER_RESPONSE_COMPLETE_FINAL);
     } else {
       InferenceResponse::Send(
           std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);

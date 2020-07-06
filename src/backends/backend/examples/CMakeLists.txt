@@ -54,7 +54,7 @@ set_target_properties(
 )
 
 #
-# libtriton_identity.so
+# libtriton_repeat.so
 #
 configure_file(libtriton_repeat.ldscript libtriton_repeat.ldscript COPYONLY)
 
@@ -72,9 +72,29 @@ set_target_properties(
   PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_repeat.ldscript"
 )
 
+#
+# libtriton_square.so
+#
+configure_file(libtriton_square.ldscript libtriton_square.ldscript COPYONLY)
+
+add_library(
+  triton_square SHARED
+  square.cc
+  $<TARGET_OBJECTS:backend-utils-library>
+)
+set_target_properties(
+  triton_square
+  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_square.ldscript
+)
+set_target_properties(
+  triton_square
+  PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_square.ldscript"
+)
+
 install(
   TARGETS
     triton_identity
     triton_repeat
+    triton_square
   LIBRARY DESTINATION backends
 )

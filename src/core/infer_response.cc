@@ -47,7 +47,7 @@ InferenceResponseFactory::CreateResponse(
 }
 
 Status
-InferenceResponseFactory::SendFlags(const uint32_t flags)
+InferenceResponseFactory::SendFlags(const uint32_t flags) const
 {
   void* userp = response_userp_;
   response_fn_(nullptr /* response */, flags, userp);
