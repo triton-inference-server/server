@@ -329,12 +329,10 @@ class DecoupledTest(unittest.TestCase):
         user_data = UserData()
         result_dict = {}
 
-        try: 
-            self._stream_infer(1, repeat_count, user_data, result_dict)    
-            self.assertTrue(False, "expected an error from server")
-        except InferenceServerException as ex:
-            self.assertTrue(
-                "expected IN and DELAY shape to match, got [1] and [2]" in str(ex))
+        with self.assertRaises(InferenceServerException) as cm:
+            self._stream_infer(1, repeat_count, user_data, result_dict)
+
+        self.assertIn("expected IN and DELAY shape to match, got [1] and [2]", str(cm.exception))
 
 if __name__ == '__main__':
     unittest.main()
