@@ -2207,7 +2207,7 @@ HTTPAPIServer::HandleInfer(
     err = TRITONSERVER_ServerModelTransactionProperties(
         server_.get(), model_name.c_str(), requested_model_version, &txn_flags,
         nullptr /* voidp */);
-    if ((txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
+    if ((err ==nullptr) && (txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
           "HTTP end point doesn't support models with decoupled "

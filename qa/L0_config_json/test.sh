@@ -165,14 +165,21 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-matches=`grep -o "\"dynamic_batching\":{\"max_queue_delay_microseconds\":42" $TRIAL.out | wc -l`
+matches=`grep -o "\"dynamic_batching\":{" $TRIAL.out | wc -l`
+if [ $matches -ne 1 ]; then
+    cat $TRIAL.out
+    echo -e "\n***\n*** Expected 1 dynamic_batching, got $matches\n***"
+    RET=1
+fi
+
+matches=`grep -o "\"max_queue_delay_microseconds\":42" $TRIAL.out | wc -l`
 if [ $matches -ne 1 ]; then
     cat $TRIAL.out
     echo -e "\n***\n*** Expected 1 dynamic_batching:max_queue_delay_microseconds, got $matches\n***"
     RET=1
 fi
 
-matches=`grep -o "\"default_timeout_microseconds\":123}" $TRIAL.out | wc -l`
+matches=`grep -o "\"default_timeout_microseconds\":123" $TRIAL.out | wc -l`
 if [ $matches -ne 3 ]; then
     cat $TRIAL.out
     echo -e "\n***\n*** Expected 3 dynamic_batching:*_queue_policy:default_timeout_microseconds, got $matches\n***"
@@ -207,14 +214,28 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-matches=`grep -o "\"sequence_batching\":{\"max_sequence_idle_microseconds\":42" $TRIAL.out | wc -l`
+matches=`grep -o "\"sequence_batching\":{" $TRIAL.out | wc -l`
+if [ $matches -ne 1 ]; then
+    cat $TRIAL.out
+    echo -e "\n***\n*** Expected 1 sequence_batching, got $matches\n***"
+    RET=1
+fi
+
+matches=`grep -o "\"max_sequence_idle_microseconds\":42" $TRIAL.out | wc -l`
 if [ $matches -ne 1 ]; then
     cat $TRIAL.out
     echo -e "\n***\n*** Expected 1 sequence_batching:max_sequence_idle_microseconds, got $matches\n***"
     RET=1
 fi
 
-matches=`grep -o "\"oldest\":{\"max_queue_delay_microseconds\":987}" $TRIAL.out | wc -l`
+matches=`grep -o "\"oldest\":{" $TRIAL.out | wc -l`
+if [ $matches -ne 1 ]; then
+    cat $TRIAL.out
+    echo -e "\n***\n*** Expected 1 sequence_batching:oldest, got $matches\n***"
+    RET=1
+fi
+
+matches=`grep -o "\"max_queue_delay_microseconds\":987" $TRIAL.out | wc -l`
 if [ $matches -ne 1 ]; then
     cat $TRIAL.out
     echo -e "\n***\n*** Expected 1 sequence_batching:oldest:max_queue_delay_microseconds, got $matches\n***"

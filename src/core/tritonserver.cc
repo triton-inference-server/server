@@ -1472,6 +1472,8 @@ TRITONSERVER_ServerModelTransactionProperties(
     *voidp = nullptr;
   }
 
+  *txn_flags = 0;
+
   std::shared_ptr<ni::InferenceBackend> backend;
   RETURN_IF_STATUS_ERROR(
       lserver->GetInferenceBackend(model_name, model_version, &backend));
