@@ -2881,7 +2881,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       err = TRITONSERVER_ServerModelTransactionProperties(
           tritonserver_.get(), request.model_name().c_str(),
           requested_model_version, &txn_flags, nullptr /* voidp */);
-      if ((err ==nullptr) && (txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
+      if ((err == nullptr) && (txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
         err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_UNSUPPORTED,
             "ModelInfer RPC doesn't support models with decoupled "
@@ -3243,8 +3243,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       err = TRITONSERVER_ServerModelTransactionProperties(
           tritonserver_.get(), request.model_name().c_str(),
           requested_model_version, &txn_flags, nullptr /* voidp */);
-      if (err ==nullptr) {
-      state->is_decoupled_ = ((txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0);
+      if (err == nullptr) {
+        state->is_decoupled_ = ((txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0);
       }
     }
 
