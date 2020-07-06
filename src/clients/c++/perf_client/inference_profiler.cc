@@ -108,7 +108,7 @@ nic::Error
 ReportClientSideStats(
     const ClientSideStats& stats, const int64_t percentile,
     const ProtocolType protocol, const bool verbose,
-    const bool on_sequence_model)
+    const bool on_sequence_model, const bool display_lib_stats)
 {
   const uint64_t avg_latency_us = stats.avg_latency_ns / 1000;
   const uint64_t std_us = stats.std_us;
@@ -120,35 +120,39 @@ ReportClientSideStats(
       avg_request_time_us - avg_send_time_us - avg_receive_time_us;
 
   std::string client_library_detail = "    ";
-  if (protocol == ProtocolType::GRPC) {
-    client_library_detail +=
-        "Avg gRPC time: " + std::to_string(avg_request_time_us) + " usec (";
-    if (!verbose) {
+  if (display_lib_stats) {
+    if (protocol == ProtocolType::GRPC) {
       client_library_detail +=
-          "(un)marshal request/response " +
-          std::to_string(avg_send_time_us + avg_receive_time_us) +
-          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
-          " usec)";
+          "Avg gRPC time: " + std::to_string(avg_request_time_us) + " usec (";
+      if (!verbose) {
+        client_library_detail +=
+            "(un)marshal request/response " +
+            std::to_string(avg_send_time_us + avg_receive_time_us) +
+            " usec + response wait " +
+            std::to_string(avg_response_wait_time_us) + " usec)";
+      } else {
+        client_library_detail += "marshal " + std::to_string(avg_send_time_us) +
+                                 " usec + response wait " +
+                                 std::to_string(avg_response_wait_time_us) +
+                                 " usec + unmarshal " +
+                                 std::to_string(avg_receive_time_us) + " usec)";
+      }
     } else {
       client_library_detail +=
-          "marshal " + std::to_string(avg_send_time_us) +
-          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
-          " usec + unmarshal " + std::to_string(avg_receive_time_us) + " usec)";
-    }
-  } else {
-    client_library_detail +=
-        "Avg HTTP time: " + std::to_string(avg_request_time_us) + " usec (";
-    if (!verbose) {
-      client_library_detail +=
-          "send/recv " +
-          std::to_string(avg_send_time_us + avg_receive_time_us) +
-          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
-          " usec)";
-    } else {
-      client_library_detail +=
-          "send " + std::to_string(avg_send_time_us) +
-          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
-          " usec + receive " + std::to_string(avg_receive_time_us) + " usec)";
+          "Avg HTTP time: " + std::to_string(avg_request_time_us) + " usec (";
+      if (!verbose) {
+        client_library_detail +=
+            "send/recv " +
+            std::to_string(avg_send_time_us + avg_receive_time_us) +
+            " usec + response wait " +
+            std::to_string(avg_response_wait_time_us) + " usec)";
+      } else {
+        client_library_detail += "send " + std::to_string(avg_send_time_us) +
+                                 " usec + response wait " +
+                                 std::to_string(avg_response_wait_time_us) +
+                                 " usec + receive " +
+                                 std::to_string(avg_receive_time_us) + " usec)";
+      }
     }
   }
 
@@ -181,12 +185,12 @@ ReportClientSideStats(
 nic::Error
 Report(
     const PerfStatus& summary, const int64_t percentile,
-    const ProtocolType protocol, const bool verbose)
+    const ProtocolType protocol, const bool verbose, const bool display_lib_stats)
 {
   std::cout << "  Client: " << std::endl;
   ReportClientSideStats(
       summary.client_stats, percentile, protocol, verbose,
-      summary.on_sequence_model);
+      summary.on_sequence_model, display_lib_stats);
 
   std::cout << "  Server: " << std::endl;
   ReportServerSideStats(summary.server_stats, 1);
@@ -251,7 +255,7 @@ InferenceProfiler::Profile(
 
   err = ProfileHelper(false /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
-    err = Report(status_summary, percentile_, protocol_, verbose_);
+    err = Report(status_summary, percentile_, protocol_, verbose_, (!parser_->IsDecoupled()));
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -296,7 +300,7 @@ InferenceProfiler::Profile(
 
   err = ProfileHelper(false /*clean_starts*/, status_summary, &is_stable);
   if (err.IsOk()) {
-    err = Report(status_summary, percentile_, protocol_, verbose_);
+    err = Report(status_summary, percentile_, protocol_, verbose_, (!parser_->IsDecoupled()));
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -338,7 +342,7 @@ InferenceProfiler::Profile(
 
   err = ProfileHelper(true /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
-    err = Report(status_summary, percentile_, protocol_, verbose_);
+    err = Report(status_summary, percentile_, protocol_, verbose_, (!parser_->IsDecoupled()));
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -706,20 +710,22 @@ InferenceProfiler::SummarizeClientStat(
   summary.client_stats.infer_per_sec =
       (valid_request_count * summary.batch_size) / client_duration_sec;
 
-  size_t completed_count =
-      end_stat.completed_request_count - start_stat.completed_request_count;
-  uint64_t request_time_ns = end_stat.cumulative_total_request_time_ns -
-                             start_stat.cumulative_total_request_time_ns;
-  uint64_t send_time_ns =
-      end_stat.cumulative_send_time_ns - start_stat.cumulative_send_time_ns;
-  uint64_t receive_time_ns = end_stat.cumulative_receive_time_ns -
-                             start_stat.cumulative_receive_time_ns;
-  if (completed_count != 0) {
-    summary.client_stats.avg_request_time_ns =
-        request_time_ns / completed_count;
-    summary.client_stats.avg_send_time_ns = send_time_ns / completed_count;
-    summary.client_stats.avg_receive_time_ns =
-        receive_time_ns / completed_count;
+  if (!parser_->IsDecoupled()) {
+    size_t completed_count =
+        end_stat.completed_request_count - start_stat.completed_request_count;
+    uint64_t request_time_ns = end_stat.cumulative_total_request_time_ns -
+                               start_stat.cumulative_total_request_time_ns;
+    uint64_t send_time_ns =
+        end_stat.cumulative_send_time_ns - start_stat.cumulative_send_time_ns;
+    uint64_t receive_time_ns = end_stat.cumulative_receive_time_ns -
+                               start_stat.cumulative_receive_time_ns;
+    if (completed_count != 0) {
+      summary.client_stats.avg_request_time_ns =
+          request_time_ns / completed_count;
+      summary.client_stats.avg_send_time_ns = send_time_ns / completed_count;
+      summary.client_stats.avg_receive_time_ns =
+          receive_time_ns / completed_count;
+    }
   }
 
   return nic::Error::Success;
