@@ -99,7 +99,8 @@ class TritonClientWrapper {
       const std::vector<const nic::InferRequestedOutput*>& outputs);
 
   /// Established a stream to the server.
-  nic::Error StartStream(nic::InferenceServerClient::OnCompleteFn callback);
+  nic::Error StartStream(
+      nic::InferenceServerClient::OnCompleteFn callback, bool enable_stats);
 
   /// Issues an asynchronous inference request to the underlying stream.
   nic::Error AsyncStreamInfer(
