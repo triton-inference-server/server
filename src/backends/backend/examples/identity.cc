@@ -220,11 +220,11 @@ ModelInstance::ExecuteThread()
     // accurate. Normally, in a performant backend you would execute
     // all the requests at the same time, and so there would be a
     // single compute-start / compute-end time-range. But here we
-    // execute each request separately so there is no single range.
+    // execute each request separately so there is no single range. As
+    // a result we just show the entire execute time as being the
+    // compute time as well.
     uint64_t min_exec_start_ns = std::numeric_limits<uint64_t>::max();
     uint64_t max_exec_end_ns = 0;
-    uint64_t min_compute_start_ns = std::numeric_limits<uint64_t>::max();
-    uint64_t max_compute_end_ns = 0;
     uint64_t total_batch_size = 0;
 
     // Show that this instance is ready to execute...
@@ -241,8 +241,8 @@ ModelInstance::ExecuteThread()
     // can't be called until the model is loaded...
     if (!supports_batching_initialized) {
       LOG_IF_ERROR(
-        model_state_->SupportsFirstDimBatching(&supports_batching),
-        "failed to determine batching support");
+          model_state_->SupportsFirstDimBatching(&supports_batching),
+          "failed to determine batching support");
       supports_batching_initialized = true;
     }
 
@@ -389,9 +389,6 @@ ModelInstance::ExecuteThread()
         total_batch_size++;
       }
 
-      uint64_t compute_start_ns = 0;
-      uint64_t compute_end_ns = 0;
-
       // We only need to produce an output if it was requested.
       if (requested_output_count > 0) {
         // This backend simply copies the input tensor to the output
@@ -450,9 +447,6 @@ ModelInstance::ExecuteThread()
           continue;
         }
 
-        SET_TIMESTAMP(compute_start_ns);
-        min_compute_start_ns = std::min(min_compute_start_ns, compute_start_ns);
-
         // Step 3. Copy input -> output. We can only handle if the input
         // buffers are on CPU so fail otherwise.
         size_t output_buffer_offset = 0;
@@ -481,9 +475,6 @@ ModelInstance::ExecuteThread()
           output_buffer_offset += buffer_byte_size;
         }
 
-        SET_TIMESTAMP(compute_end_ns);
-        max_compute_end_ns = std::max(max_compute_end_ns, compute_end_ns);
-
         if (responses[r] == nullptr) {
           TRITONSERVER_LogMessage(
               TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
@@ -510,14 +501,7 @@ ModelInstance::ExecuteThread()
       SET_TIMESTAMP(exec_end_ns);
       max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
 
-      // If there are no compute timestamps the the request didn't ask
-      // for any outputs. Just set the compute start/end to equal
-      // exec_end.
-      if (compute_start_ns == 0) {
-        compute_start_ns = compute_end_ns = exec_end_ns;
-      }
-
-      // Report statistics for the successful request. For instance
+      // Report statistics for the successful request. For an instance
       // using the CPU we don't associate any device with the
       // statistics, otherwise we associate the instance's device.
       LOG_IF_ERROR(
@@ -526,7 +510,7 @@ ModelInstance::ExecuteThread()
               (props_.kind_ == nib::InstanceProperties::Kind::CPU)
                   ? TRITONBACKEND_NO_DEVICE
                   : props_.device_id_,
-              exec_start_ns, compute_start_ns, compute_end_ns, exec_end_ns),
+              exec_start_ns, exec_start_ns, exec_end_ns, exec_end_ns),
           "failed reporting request statistics");
     }
 
@@ -542,7 +526,7 @@ ModelInstance::ExecuteThread()
     LOG_IF_ERROR(
         TRITONBACKEND_ModelReportBatchStatistics(
             model_state_->TritonModel(), total_batch_size, min_exec_start_ns,
-            min_compute_start_ns, max_compute_end_ns, max_exec_end_ns),
+            min_exec_start_ns, max_exec_end_ns, max_exec_end_ns),
         "failed reporting batch request statistics");
 
     // We could have released each request as soon as we sent the
