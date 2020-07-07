@@ -59,7 +59,7 @@ change directory to the root of the repo and checkout the release
 version of the branch that you want to build (or the master branch if
 you want to build the under-development version)::
 
-  $ git checkout r20.06-v1
+  $ git checkout r20.07-v1
 
 Then use docker to build::
 
@@ -106,7 +106,7 @@ CMake, change directory to the root of the repo and checkout the
 release version of the branch that you want to build (or the master
 branch if you want to build the under-development version)::
 
-  $ git checkout r20.06-v1
+  $ git checkout r20.07-v1
 
 Next you must build or install each framework backend you want to
 enable in the inference server, configure the inference server to
