@@ -62,9 +62,6 @@ RUN cd pytorch && \
 ############################################################################
 FROM ${BASE_IMAGE} AS tritonserver_onnx
 
-# Currently the prebuilt Onnx Runtime library is built on CUDA 9, thus it
-# needs to be built from source
-
 # Onnx Runtime release version
 ARG ONNX_RUNTIME_VERSION=1.3.0
 
@@ -87,6 +84,10 @@ COPY build/onnxruntime /tmp/trtis/build/onnxruntime
 # Patch for cudnn.
 RUN patch -i /tmp/trtis/build/onnxruntime/cudnn.patch \
     /workspace/onnxruntime/onnxruntime/core/providers/cuda/rnn/cudnn_rnn_base.h
+
+# Patch to remove compute_30 support.
+RUN patch -i /tmp/trtis/build/onnxruntime/compute30.patch \
+    /workspace/onnxruntime/cmake/CMakeLists.txt
 
 # Patch build to use the CUDA Runtime version of CUB.
 RUN sed -i 's/${PROJECT_SOURCE_DIR}\/external\/cub//' \
