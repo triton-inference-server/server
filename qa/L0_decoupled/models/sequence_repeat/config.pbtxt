@@ -48,6 +48,10 @@ ensemble_scheduling {
         key: "OUT"
         value: "repeat_out"
       }
+      output_map {
+        key: "IDX"
+        value: "IDX"
+      }
     },
     {
       model_name: "identity_int32"
@@ -84,6 +88,11 @@ output [
   {
     name: "OUT"
     data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "IDX"
+    data_type: TYPE_UINT32
     dims: [ 1 ]
   }
 ]
