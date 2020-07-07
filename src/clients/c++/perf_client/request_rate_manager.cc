@@ -222,8 +222,8 @@ RequestRateManager::Infer(
           thread_stat->request_timestamps_.emplace_back(std::make_tuple(
               it->second.start_time_, end_time_async, it->second.sequence_end_,
               it->second.delayed_));
-            ctx->infer_client_->ClientInferStat(
-                &(thread_stat->contexts_stat_[0]));
+          ctx->infer_client_->ClientInferStat(
+              &(thread_stat->contexts_stat_[0]));
         } else {
           return;
         }
