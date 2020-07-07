@@ -33,6 +33,7 @@ import numpy as np
 import queue
 import unittest
 import os
+import time
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
@@ -53,7 +54,9 @@ def callback(user_data, result, error):
 
 class DecoupledTest(unittest.TestCase):
     def setUp(self):
-        self.repeat_like_models = ["repeat_int32", "simple_repeat", "sequence_repeat"]
+        self.repeat_like_models = [
+            "repeat_int32", "simple_repeat", "sequence_repeat"
+        ]
         self.model_name_ = "repeat_int32"
 
         self.inputs_ = []
@@ -65,17 +68,23 @@ class DecoupledTest(unittest.TestCase):
         self.outputs_.append(grpcclient.InferRequestedOutput('OUT'))
         self.outputs_.append(grpcclient.InferRequestedOutput('IDX'))
 
-    def _stream_infer(self, request_count, repeat_count, user_data, result_dict):
+    def _stream_infer(self, request_count, request_delay, repeat_count,
+                      delay_data, delay_factor, user_data, result_dict):
         with grpcclient.InferenceServerClient(url="localhost:8001",
                                               verbose=True) as triton_client:
             # Establish stream
             triton_client.start_stream(callback=partial(callback, user_data))
             # Send specified many requests in parallel
             for i in range(request_count):
+                time.sleep((request_delay / 1000))
+                self.inputs_[1].set_data_from_numpy(delay_data)
                 triton_client.async_stream_infer(model_name=self.model_name_,
                                                  inputs=self.inputs_,
                                                  request_id=str(i),
                                                  outputs=self.outputs_)
+                # Update delay input in accordance with the scaling factor
+                delay_data = delay_data * delay_factor
+                delay_data = delay_data.astype(np.uint32)
 
             # Retrieve results...
             recv_count = 0
@@ -87,16 +96,19 @@ class DecoupledTest(unittest.TestCase):
                     this_id = data_item.get_response().id
                     if this_id not in result_dict.keys():
                         result_dict[this_id] = []
-                    result_dict[this_id].append(data_item)
+                    result_dict[this_id].append((recv_count, data_item))
 
                 recv_count += 1
 
     def _decoupled_infer(self,
                          request_count,
+                         request_delay=0,
                          repeat_count=1,
                          data_offset=100,
                          delay_time=1000,
-                         wait_time=500):
+                         delay_factor=1,
+                         wait_time=500,
+                         order_sequence=None):
         # Initialize data for IN
         input_data = np.arange(start=data_offset,
                                stop=data_offset + repeat_count,
@@ -107,7 +119,6 @@ class DecoupledTest(unittest.TestCase):
         # Initialize data for DELAY
         delay_data = (np.ones([repeat_count], dtype=np.uint32)) * delay_time
         self.inputs_[1].set_shape([repeat_count])
-        self.inputs_[1].set_data_from_numpy(delay_data)
 
         # Initialize data for WAIT
         wait_data = np.array([wait_time], dtype=np.uint32)
@@ -116,32 +127,38 @@ class DecoupledTest(unittest.TestCase):
         user_data = UserData()
         result_dict = {}
 
-        try: 
-            self._stream_infer(request_count, repeat_count, user_data, result_dict)
+        try:
+            self._stream_infer(request_count, request_delay, repeat_count,
+                               delay_data, delay_factor, user_data,
+                               result_dict)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
-
 
         # Validate the results..
         for i in range(request_count):
             this_id = str(i)
             if repeat_count != 0 and this_id not in result_dict.keys():
                 self.assertTrue(
-                    False, "response for request id {} not received".format(this_id))
+                    False,
+                    "response for request id {} not received".format(this_id))
             elif repeat_count == 0 and this_id in result_dict.keys():
                 self.assertTrue(
                     False,
-                    "received unexpected response for request id {}".format(this_id))
+                    "received unexpected response for request id {}".format(
+                        this_id))
             if repeat_count != 0:
                 self.assertEqual(len(result_dict[this_id]), repeat_count)
 
                 expected_data = data_offset
                 result_list = result_dict[this_id]
                 for j in range(len(result_list)):
-                    this_data = result_list[j].as_numpy('OUT')
+                    if order_sequence is not None:
+                        self.assertEqual(result_list[j][0],
+                                         order_sequence[i][j])
+                    this_data = result_list[j][1].as_numpy('OUT')
                     self.assertEqual(len(this_data), 1)
                     self.assertEqual(this_data[0], expected_data)
-                    this_idx = result_list[j].as_numpy('IDX')
+                    this_idx = result_list[j][1].as_numpy('IDX')
                     self.assertEqual(len(this_idx), 1)
                     self.assertEqual(this_idx[0], j)
                     expected_data += 1
@@ -188,25 +205,31 @@ class DecoupledTest(unittest.TestCase):
             self.model_name_ = model
             # Single request case
             # Release request before the first response is delivered
-            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
+            self._decoupled_infer(request_count=1,
+                                  repeat_count=5,
+                                  wait_time=500)
             # Release request when the responses are getting delivered
-            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=2000)
+            self._decoupled_infer(request_count=1,
+                                  repeat_count=5,
+                                  wait_time=2000)
             # Release request after all the responses are delivered
             self._decoupled_infer(request_count=1,
-                                repeat_count=5,
-                                wait_time=10000)
+                                  repeat_count=5,
+                                  wait_time=10000)
 
             # Multiple request case
             # Release request before the first response is delivered
-            self._decoupled_infer(request_count=5, repeat_count=5, wait_time=500)
+            self._decoupled_infer(request_count=5,
+                                  repeat_count=5,
+                                  wait_time=500)
             # Release request when the responses are getting delivered
             self._decoupled_infer(request_count=5,
-                                repeat_count=5,
-                                wait_time=2000)
+                                  repeat_count=5,
+                                  wait_time=2000)
             # Release request after all the responses are delivered
             self._decoupled_infer(request_count=5,
-                                repeat_count=5,
-                                wait_time=10000)
+                                  repeat_count=5,
+                                  wait_time=10000)
 
     def test_one_to_multi_many(self):
         # Test cases where each request generates multiple response but the
@@ -219,25 +242,81 @@ class DecoupledTest(unittest.TestCase):
             self.model_name_ = model
             # Single request case
             # Release request before the first response is delivered
-            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
+            self._decoupled_infer(request_count=1,
+                                  repeat_count=5,
+                                  wait_time=500)
             # Release request when the responses are getting delivered
-            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=8000)
+            self._decoupled_infer(request_count=1,
+                                  repeat_count=5,
+                                  wait_time=8000)
             # Release request after all the responses are delivered
             self._decoupled_infer(request_count=1,
-                                repeat_count=5,
-                                wait_time=20000)
+                                  repeat_count=5,
+                                  wait_time=20000)
 
             # Multiple request case
             # Release request before the first response is delivered
-            self._decoupled_infer(request_count=5, repeat_count=5, wait_time=500)
+            self._decoupled_infer(request_count=5,
+                                  repeat_count=5,
+                                  wait_time=500)
             # Release request when the responses are getting delivered
             self._decoupled_infer(request_count=5,
-                                repeat_count=5,
-                                wait_time=3000)
+                                  repeat_count=5,
+                                  wait_time=3000)
             # Release request after all the responses are delivered
             self._decoupled_infer(request_count=5,
-                                repeat_count=5,
-                                wait_time=10000)
+                                  repeat_count=5,
+                                  wait_time=10000)
+
+    def test_response_order(self):
+        # Test the expected response order for different cases
+
+        self.assertFalse("TRITONSERVER_DELAY_GRPC_RESPONSE" in os.environ)
+
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+
+            # Case 1: Interleaved responses
+            self._decoupled_infer(request_count=2,
+                                  request_delay=500,
+                                  repeat_count=4,
+                                  order_sequence=[[0, 2, 4, 6], [1, 3, 5, 7]])
+
+            # Case 2: All responses of second request delivered before any
+            # response from the first
+            self._decoupled_infer(request_count=2,
+                                  request_delay=500,
+                                  repeat_count=4,
+                                  delay_time=2000,
+                                  delay_factor=0.1,
+                                  order_sequence=[[4, 5, 6, 7], [0, 1, 2, 3]])
+
+            # Case 3: Similar to Case 2, but the second request is generated
+            # after the first response from first request is received
+            self._decoupled_infer(request_count=2,
+                                  request_delay=2500,
+                                  repeat_count=4,
+                                  delay_time=2000,
+                                  delay_factor=0.1,
+                                  order_sequence=[[0, 5, 6, 7], [1, 2, 3, 4]])
+
+            # Case 4: All the responses of second requests are dleivered after
+            # all the responses from first requests are received
+            self._decoupled_infer(request_count=2,
+                                  request_delay=100,
+                                  repeat_count=4,
+                                  delay_time=500,
+                                  delay_factor=10,
+                                  order_sequence=[[0, 1, 2, 3], [4, 5, 6, 7]])
+
+            # Case 5: Similar to Case 4, but the second request is generated
+            # after the first response from the first request is received
+            self._decoupled_infer(request_count=2,
+                                  request_delay=750,
+                                  repeat_count=4,
+                                  delay_time=500,
+                                  delay_factor=10,
+                                  order_sequence=[[0, 1, 2, 3], [4, 5, 6, 7]])
 
     def _no_streaming_helper(self, protocol):
         data_offset = 100
@@ -281,16 +360,14 @@ class DecoupledTest(unittest.TestCase):
         else:
             triton_client = httpclient.InferenceServerClient(
                 url="localhost:8000", verbose=True)
-        try:
+
+        with self.assertRaises(InferenceServerException) as cm:
             triton_client.infer(model_name=self.model_name_,
-                                      inputs=this_inputs,
-                                      outputs=this_outputs)
-            self.assertTrue(
-                False, "expected to fail for decoupled models")
-        except InferenceServerException as ex:
-            self.assertTrue(
-                "doesn't support models with decoupled transaction policy"
-                in ex.message())
+                                inputs=this_inputs,
+                                outputs=this_outputs)
+
+        self.assertIn("doesn't support models with decoupled transaction policy",
+                      str(cm.exception))
 
     def test_no_streaming(self):
         # Test cases with no streaming inference. Server should give
@@ -312,7 +389,8 @@ class DecoupledTest(unittest.TestCase):
         input_data = np.arange(start=data_offset,
                                stop=data_offset + repeat_count,
                                dtype=np.int32)
-        delay_data = (np.ones([repeat_count + 1], dtype=np.uint32)) * delay_time
+        delay_data = (np.ones([repeat_count + 1],
+                              dtype=np.uint32)) * delay_time
         wait_data = np.array([wait_time], dtype=np.uint32)
 
         # Initialize data for IN
@@ -330,9 +408,11 @@ class DecoupledTest(unittest.TestCase):
         result_dict = {}
 
         with self.assertRaises(InferenceServerException) as cm:
-            self._stream_infer(1, repeat_count, user_data, result_dict)
+            self._stream_infer(1, 0, repeat_count, delay_data, 1, user_data, result_dict)
 
-        self.assertIn("expected IN and DELAY shape to match, got [1] and [2]", str(cm.exception))
+        self.assertIn("expected IN and DELAY shape to match, got [1] and [2]",
+                      str(cm.exception))
+
 
 if __name__ == '__main__':
     unittest.main()
