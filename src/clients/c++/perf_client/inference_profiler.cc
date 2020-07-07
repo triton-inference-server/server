@@ -185,7 +185,8 @@ ReportClientSideStats(
 nic::Error
 Report(
     const PerfStatus& summary, const int64_t percentile,
-    const ProtocolType protocol, const bool verbose, const bool display_lib_stats)
+    const ProtocolType protocol, const bool verbose,
+    const bool display_lib_stats)
 {
   std::cout << "  Client: " << std::endl;
   ReportClientSideStats(
@@ -255,7 +256,9 @@ InferenceProfiler::Profile(
 
   err = ProfileHelper(false /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
-    err = Report(status_summary, percentile_, protocol_, verbose_, (!parser_->IsDecoupled()));
+    err = Report(
+        status_summary, percentile_, protocol_, verbose_,
+        (!parser_->IsDecoupled()));
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -300,7 +303,9 @@ InferenceProfiler::Profile(
 
   err = ProfileHelper(false /*clean_starts*/, status_summary, &is_stable);
   if (err.IsOk()) {
-    err = Report(status_summary, percentile_, protocol_, verbose_, (!parser_->IsDecoupled()));
+    err = Report(
+        status_summary, percentile_, protocol_, verbose_,
+        (!parser_->IsDecoupled()));
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -342,7 +347,9 @@ InferenceProfiler::Profile(
 
   err = ProfileHelper(true /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
-    err = Report(status_summary, percentile_, protocol_, verbose_, (!parser_->IsDecoupled()));
+    err = Report(
+        status_summary, percentile_, protocol_, verbose_,
+        (!parser_->IsDecoupled()));
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
