@@ -211,10 +211,8 @@ ModelInstance::ExecuteThread()
        ": starting execute thread for instance " + props_.AsString())
           .c_str());
 
+  bool supports_batching_initialized = false;
   bool supports_batching = false;
-  LOG_IF_ERROR(
-      model_state_->SupportsFirstDimBatching(&supports_batching),
-      "failed to determine batching support");
 
   // Process requests until receive a nullptr... then exit.
   do {
@@ -236,6 +234,16 @@ ModelInstance::ExecuteThread()
     std::unique_ptr<ExecRequests> exec_requests = exec_queue_.Pop();
     if (exec_requests == nullptr) {
       break;
+    }
+
+    // We can't determine 'supports_batching' during model
+    // initialization because TRITONSERVER_ServerModelBatchProperties
+    // can't be called until the model is loaded...
+    if (!supports_batching_initialized) {
+      LOG_IF_ERROR(
+        model_state_->SupportsFirstDimBatching(&supports_batching),
+        "failed to determine batching support");
+      supports_batching_initialized = true;
     }
 
     TRITONBACKEND_Request** requests = exec_requests->requests_;
