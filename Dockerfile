@@ -246,9 +246,6 @@ RUN cd /opt/tritonserver/lib/pytorch && \
         patchelf --set-rpath '$ORIGIN' $i; \
     done
 
-# Need to include pytorch in LD_LIBRARY_PATH since Torchvision load custom ops
-ENV LD_LIBRARY_PATH /opt/tritonserver/lib/pytorch/:$LD_LIBRARY_PATH
-
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461

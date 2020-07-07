@@ -311,5 +311,9 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     pip3 install --upgrade qa/pkgs/triton*.whl
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
+
+# Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom ops
+ENV LD_LIBRARY_PATH /opt/tritonserver/lib/pytorch/:$LD_LIBRARY_PATH
+
 ENV GOPATH /root/go
 ENV PATH $PATH:$GOPATH/bin
