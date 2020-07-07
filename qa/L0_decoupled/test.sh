@@ -61,7 +61,8 @@ for i in \
             test_one_to_none \
             test_one_to_one \
             test_one_to_many \
-            test_no_streaming; do
+            test_no_streaming \
+            test_wrong_shape ; do
 
     echo "Test: $i" >>$CLIENT_LOG
     set +e

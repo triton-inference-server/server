@@ -3339,6 +3339,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       if (!state->is_decoupled_) {
         state->context_->WriteResponseIfReady(state);
       } else {
+        state->available_count_ = 1 + state->current_index_;
         state->complete_ = true;
         state->context_->PutTaskBackToQueue(state);
       }
