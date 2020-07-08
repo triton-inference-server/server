@@ -150,7 +150,8 @@ class DynamicBatchScheduler : public Scheduler {
   const bool preserve_ordering_;
 
   // Per completion-id queues to store the ready requests
-  std::deque<std::unique_ptr<InferenceResponse>> completion_queue_;
+  std::deque<std::pair<std::unique_ptr<InferenceResponse>, uint32_t>>
+      completion_queue_;
   // Lock to protect the completion_queues_
   std::mutex completion_queue_mtx_;
 };
