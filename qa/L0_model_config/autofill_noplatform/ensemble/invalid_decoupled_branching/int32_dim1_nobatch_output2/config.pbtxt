@@ -1,0 +1,32 @@
+name: "int32_dim1_nobatch_output2"
+max_batch_size: 0
+platform: "custom"
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_CPU
+  }
+]

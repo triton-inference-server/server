@@ -114,6 +114,9 @@ for modelpath in \
        autofill_noplatform/ensemble/invalid_batch_size/invalid_batch_size/1 \
        autofill_noplatform/ensemble/invalid_batch_size/fp32_dim1_batch2/1 \
        autofill_noplatform/ensemble/invalid_batch_size/fp32_dim1_batch4/1 \
+       autofill_noplatform/ensemble/invalid_decoupled_branching/invalid_decoupled_branching/1 \
+       autofill_noplatform/ensemble/invalid_decoupled_branching/int32_dim1_nobatch_output2/1 \
+       autofill_noplatform/ensemble/invalid_decoupled_branching_2/invalid_decoupled_branching_2/1 \
        autofill_noplatform/ensemble/inconsistent_shape/inconsistent_shape/1 \
        autofill_noplatform/ensemble/inconsistent_shape/fp32_dim1_batch4/1 \
        autofill_noplatform/ensemble/inconsistent_shape/fp32_dim3_batch4/1 \
@@ -152,6 +155,15 @@ for modelpath in \
    mkdir -p $modelpath
    cp ./libidentity.so $modelpath/libcustom.so
 done
+
+for modelpath in \
+        autofill_noplatform/ensemble/invalid_decoupled_branching/repeat_int32/1 \
+        autofill_noplatform/ensemble/invalid_decoupled_branching_2/repeat_int32/1; do
+    mkdir -p $modelpath
+    cp ./libtriton_repeat.so $modelpath/libtriton_repeat.so
+done
+    
+    
 
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1
