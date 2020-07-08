@@ -30,11 +30,9 @@
 Kubernetes Deploy: Triton Inference Server Cluster
 ==================================================
 
-    **NOTE: Some versions of Google Kubernetes Engine (GKE) contain a
-    regression in the handling of LD_LIBRARY_PATH that prevents the
-    inference server container from running correctly. See
-    https://issuetracker.google.com/issues/141255952. Use a GKE 1.13
-    or earlier version or a GKE 1.14.6 or later version to avoid this
+    **NOTE: The prometheuos operator used in these instructions is not
+    yet updated to work with 1.16.x versions of Google Kubernetes
+    Engine (GKE). You must use a GKE 1.15.x version to avoid this
     issue.**
 
 A helm chart for installing a single cluster of NVIDIA Triton
@@ -98,8 +96,8 @@ GCS Permissions
 
 Make sure the bucket permissions are set so that the inference server
 can access the model repository. If the bucket is public then no
-additional changes are needed and you can proceed to "Running The
-Inference Server" section.
+additional changes are needed and you can proceed to "Deploy
+Prometheus and Grafana" section.
 
 If bucket premissions need to be set with the
 GOOGLE_APPLICATION_CREDENTIALS environment variable then perform the
@@ -214,10 +212,10 @@ to find the external IP for the inference server. In this case it is
 
 The inference server exposes an HTTP endpoint on port 8000, and GRPC
 endpoint on port 8001 and a Prometheus metrics endpoint on
-port 8002. You can use curl to get the status of the inference server
+port 8002. You can use curl to get the meta-data of the inference server
 from the HTTP endpoint::
 
-  $ curl 34.83.9.133:8000/api/status
+  $ curl 34.83.9.133:8000/v2
 
 Follow the `instructions
 <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/client.html#getting-the-client-examples>`_
