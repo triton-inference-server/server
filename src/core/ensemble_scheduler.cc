@@ -59,21 +59,15 @@ struct Step {
   // Different output map to avoid address conflict from different memory types
   std::unordered_map<uintptr_t, std::shared_ptr<AllocatedMemory>>
       cpu_output_map_;
-  std::unordered_map<uintptr_t, std::shared_ptr<AllocatedMemory>>
+  std::unordered_map<
+      int64_t, std::unordered_map<uintptr_t, std::shared_ptr<AllocatedMemory>>>
       gpu_output_map_;
   std::set<std::pair<std::string, IterationCount>> updated_tensors_;
   uint32_t response_flags_;
   TRITONSERVER_Error* infer_status_;
 
   size_t step_idx_;
-
-  static std::shared_ptr<AllocatedMemory> zero_allocation_;
 };
-
-std::shared_ptr<AllocatedMemory> Step::zero_allocation_ =
-    std::make_shared<AllocatedMemory>(
-        0 /* byte_size */, TRITONSERVER_MEMORY_CPU /* memory_type */,
-        0 /* memory_type_id */);
 
 struct TensorData {
   TensorData() = default;
@@ -404,7 +398,7 @@ EnsembleContext::ResponseAlloc(
       auto step = reinterpret_cast<Step*>(userp);
       std::lock_guard<std::mutex> lk(step->output_mtx_);
       if (*allocated_memory_type == TRITONSERVER_MEMORY_GPU) {
-        step->gpu_output_map_.emplace(
+        step->gpu_output_map_[*allocated_memory_type_id].emplace(
             reinterpret_cast<uintptr_t>(*buffer), std::move(allocated_buffer));
       } else {
         step->cpu_output_map_.emplace(
@@ -486,16 +480,18 @@ EnsembleContext::ResponseComplete(
               if (byte_size != 0) {
                 std::lock_guard<std::mutex> output_lk(step_ptr->output_mtx_);
                 if (memory_type == TRITONSERVER_MEMORY_GPU) {
-                  tensor->SetData(std::move(
-                      step_ptr->gpu_output_map_[reinterpret_cast<uintptr_t>(
-                          base)]));
+                  auto& gpu_output_map =
+                      step_ptr->gpu_output_map_[memory_type_id];
+                  auto it =
+                      gpu_output_map.find(reinterpret_cast<uintptr_t>(base));
+                  tensor->SetData(std::move(it->second));
+                  gpu_output_map.erase(it);
                 } else {
-                  tensor->SetData(std::move(
-                      step_ptr->cpu_output_map_[reinterpret_cast<uintptr_t>(
-                          base)]));
+                  auto it = step_ptr->cpu_output_map_.find(
+                      reinterpret_cast<uintptr_t>(base));
+                  tensor->SetData(std::move(it->second));
+                  step_ptr->cpu_output_map_.erase(it);
                 }
-              } else {
-                tensor->SetData(Step::zero_allocation_);
               }
 
               auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
