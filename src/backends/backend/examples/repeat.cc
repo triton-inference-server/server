@@ -653,7 +653,8 @@ TRITONBACKEND_ModelExecute(
       request_count <= 1, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("repeat backend does not support batched request execution"));
 
-  DECL_TIMESTAMP(exec_start_ns);
+  uint64_t exec_start_ns = 0;
+  SET_TIMESTAMP(exec_start_ns);
   uint32_t wait_milliseconds = 0;
 
   // At this point we accept ownership of 'requests', which means that
@@ -677,7 +678,8 @@ TRITONBACKEND_ModelExecute(
 
   std::this_thread::sleep_for(std::chrono::milliseconds(wait_milliseconds));
 
-  DECL_TIMESTAMP(exec_end_ns);
+  uint64_t exec_end_ns = 0;
+  SET_TIMESTAMP(exec_end_ns);
 
   for (uint32_t r = 0; r < request_count; ++r) {
     TRITONBACKEND_Request* request = requests[r];
