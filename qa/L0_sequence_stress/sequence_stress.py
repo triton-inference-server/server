@@ -109,7 +109,7 @@ def check_sequence_async(client_metadata, trial, model_name, input_dtype, steps,
         inputs = [grpcclient.InferInput("INPUT", tensor_shape,
                             np_to_triton_dtype(input_dtype)),]
         inputs[0].set_data_from_numpy(in0)
-        
+
         triton_client.async_stream_infer(model_name, inputs,
                             sequence_id=sequence_id,
                             sequence_start=seq_start, sequence_end=seq_end)
@@ -125,7 +125,7 @@ def check_sequence_async(client_metadata, trial, model_name, input_dtype, steps,
         (results, error) = user_data._completed_requests.get()
         if error is not None:
             raise error
-        
+
         (_, value, expected, _) = steps[processed_count]
         processed_count += 1
         if timeout_ms != None:
@@ -308,6 +308,8 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
     print("Starting thread {} with seed {}".format(name, seed))
     rng = np.random.RandomState(seed)
 
+    client_metadata_list = []
+
     try:
         # Must use streaming GRPC context to ensure each sequences'
         # requests are received in order. Create 2 common-use contexts
@@ -320,7 +322,6 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
         # results not expected. See below for details.
         common_cnt = 2
         rare_cnt = 8
-        client_metadata_list = []
         last_choices = []
 
         for c in range(common_cnt + rare_cnt):
@@ -403,6 +404,14 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
             _thread_exceptions.append(traceback.format_exc())
         finally:
             _thread_exceptions_mutex.release()
+
+    # We need to explicitly close each client so that streams get
+    # cleaned up and closed correctly, otherwise the application
+    # can hang when exiting.
+    for c, i in client_metadata_list:
+      print("thread {} closing client {}".format(name, i))
+      c.close()
+
     print("Exiting thread {}".format(name))
 
 def check_status(model_name):
@@ -474,4 +483,5 @@ if __name__ == '__main__':
     finally:
         _thread_exceptions_mutex.release()
 
+    print("Exiting stress test")
     sys.exit(0)
