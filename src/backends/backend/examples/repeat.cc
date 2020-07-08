@@ -139,7 +139,7 @@ class ModelState {
  private:
   ModelState(
       TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config);
-  void RequestThread(
+  void ResponseThread(
       TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
       const int32_t* delay_buffer_ptr, const uint32_t element_count);
 
@@ -419,7 +419,7 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
           &delay_byte_size));
 
   // 'request' may be released before all the responses are sent, so
-  // create a response factory that will live until the RequestThread
+  // create a response factory that will live until the ResponseThread
   // exits.
   TRITONBACKEND_ResponseFactory* factory_ptr;
   RESPOND_AND_RETURN_IF_ERROR(
@@ -436,14 +436,14 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
   inflight_thread_count_++;
   std::thread response_thread([this, factory_ptr, in_buffer_ptr,
                                delay_buffer_ptr, element_count]() {
-    RequestThread(factory_ptr, in_buffer_ptr, delay_buffer_ptr, element_count);
+    ResponseThread(factory_ptr, in_buffer_ptr, delay_buffer_ptr, element_count);
   });
 
   response_thread.detach();
 }
 
 void
-ModelState::RequestThread(
+ModelState::ResponseThread(
     TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
     const int32_t* delay_buffer_ptr, const uint32_t element_count)
 {
@@ -653,6 +653,7 @@ TRITONBACKEND_ModelExecute(
       request_count <= 1, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("repeat backend does not support batched request execution"));
 
+  DECL_TIMESTAMP(exec_start_ns);
   uint32_t wait_milliseconds = 0;
 
   // At this point we accept ownership of 'requests', which means that
@@ -676,12 +677,34 @@ TRITONBACKEND_ModelExecute(
 
   std::this_thread::sleep_for(std::chrono::milliseconds(wait_milliseconds));
 
+  DECL_TIMESTAMP(exec_end_ns);
+
   for (uint32_t r = 0; r < request_count; ++r) {
     TRITONBACKEND_Request* request = requests[r];
+    // Report statistics for the request. Note that there could
+    // still be responses that have not yet been sent but those
+    // cannot be captured in the statistics as they reflect only the
+    // request object. We use the execution start/end time for
+    // compute also so that the entire execution time is associated
+    // with the inference computation.
+    LOG_IF_ERROR(
+        TRITONBACKEND_ModelReportStatistics(
+            model, request, true /* success */, TRITONBACKEND_NO_DEVICE,
+            exec_start_ns, exec_start_ns, exec_end_ns, exec_end_ns),
+        "failed reporting request statistics");
+
     LOG_IF_ERROR(
         TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
         "failed releasing request");
   }
+
+  // Report the entire batch statistics. This backend does not support
+  // batching so the total batch size is always 1.
+  LOG_IF_ERROR(
+      TRITONBACKEND_ModelReportBatchStatistics(
+          model, 1 /*total_batch_size*/, exec_start_ns, exec_start_ns,
+          exec_end_ns, exec_end_ns),
+      "failed reporting batch request statistics");
 
   TRITONSERVER_LogMessage(
       TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
