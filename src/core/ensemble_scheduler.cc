@@ -55,13 +55,25 @@ struct Step {
 
   std::shared_ptr<EnsembleContext> ctx_;
   std::unique_ptr<InferenceRequest> request_;
-  std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>> output_map_;
+  std::mutex output_mtx_;
+  // Different output map to avoid address conflict from different memory types
+  std::unordered_map<uintptr_t, std::shared_ptr<AllocatedMemory>>
+      cpu_output_map_;
+  std::unordered_map<uintptr_t, std::shared_ptr<AllocatedMemory>>
+      gpu_output_map_;
   std::set<std::pair<std::string, IterationCount>> updated_tensors_;
   uint32_t response_flags_;
   TRITONSERVER_Error* infer_status_;
 
   size_t step_idx_;
+
+  static std::shared_ptr<AllocatedMemory> zero_allocation_;
 };
+
+std::shared_ptr<AllocatedMemory> Step::zero_allocation_ =
+    std::make_shared<AllocatedMemory>(
+        0 /* byte_size */, TRITONSERVER_MEMORY_CPU /* memory_type */,
+        0 /* memory_type_id */);
 
 struct TensorData {
   TensorData() = default;
@@ -378,13 +390,6 @@ EnsembleContext::ResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* allocated_memory_type,
     int64_t* allocated_memory_type_id)
 {
-  // [TODO] FIXME: the current workflow implies an assumption on the decoupled
-  // models response workflow: response 1 alloc -> response 1 complete ->
-  // response 2 alloc -> response 2 complete, which may not be true.
-  auto tensor_data_map = reinterpret_cast<
-      std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>>*>(
-      userp);
-
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
@@ -396,8 +401,16 @@ EnsembleContext::ResponseAlloc(
   if ((mutable_buffer != nullptr) || (byte_size == 0)) {
     if (byte_size != 0) {
       *buffer = static_cast<void*>(mutable_buffer);
+      auto step = reinterpret_cast<Step*>(userp);
+      std::lock_guard<std::mutex> lk(step->output_mtx_);
+      if (*allocated_memory_type == TRITONSERVER_MEMORY_GPU) {
+        step->gpu_output_map_.emplace(
+            reinterpret_cast<uintptr_t>(*buffer), std::move(allocated_buffer));
+      } else {
+        step->cpu_output_map_.emplace(
+            reinterpret_cast<uintptr_t>(*buffer), std::move(allocated_buffer));
+      }
     }
-    tensor_data_map->emplace(tensor_name, std::move(allocated_buffer));
     LOG_VERBOSE(1) << "Internal response allocation: " << tensor_name
                    << ", size " << byte_size << ", addr " << *buffer
                    << ", memory type " << *allocated_memory_type << ", type id "
@@ -469,7 +482,21 @@ EnsembleContext::ResponseComplete(
                   new InferenceRequest::Input(
                       it->second, TritonToDataType(datatype), shape,
                       dim_count));
-              tensor->SetData(std::move(step_ptr->output_map_[it->first]));
+
+              if (byte_size != 0) {
+                std::lock_guard<std::mutex> output_lk(step_ptr->output_mtx_);
+                if (memory_type == TRITONSERVER_MEMORY_GPU) {
+                  tensor->SetData(std::move(
+                      step_ptr->gpu_output_map_[reinterpret_cast<uintptr_t>(
+                          base)]));
+                } else {
+                  tensor->SetData(std::move(
+                      step_ptr->cpu_output_map_[reinterpret_cast<uintptr_t>(
+                          base)]));
+                }
+              } else {
+                tensor->SetData(Step::zero_allocation_);
+              }
 
               auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
               step_ptr->updated_tensors_.emplace(
@@ -499,8 +526,6 @@ EnsembleContext::ResponseComplete(
   EnsembleContext::Proceed(step_ptr->ctx_, step_ptr);
   // Expecting more responses
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
-    // output map will be reused
-    step_ptr->output_map_.clear();
     step_ptr.release();
   }
 }
@@ -684,8 +709,8 @@ EnsembleContext::InitStep(
   irequest->SetSecondaryStatsAggregator(&context_stats_aggregator_);
 #endif
   irequest->SetResponseCallback(
-      reinterpret_cast<ResponseAllocator*>(allocator_.get()),
-      &(*step)->output_map_, ResponseComplete, step->get());
+      reinterpret_cast<ResponseAllocator*>(allocator_.get()), step->get(),
+      ResponseComplete, step->get());
   irequest->SetReleaseCallback(RequestComplete, step->get());
 
   RETURN_IF_ERROR(irequest->PrepareForInference());
