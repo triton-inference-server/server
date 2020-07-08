@@ -844,6 +844,7 @@ class InferenceServerClient:
               sequence_end=False,
               priority=0,
               timeout=None,
+              client_timeout=None,
               headers=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -893,6 +894,11 @@ class InferenceServerClient:
             model-specific action such as terminating the request. If not
             provided, the server will handle the request using default setting
             for the model.
+        client_timeout : int
+            The maximum end-to-end time, in seconds, the request is allowed
+            to take. The client will abort request when the specified time
+            elapses. The default value is None which means client will
+            wait for the response from the server.
         headers : dict
             Optional dictionary specifying additional HTTP headers to include
             in the request.
@@ -931,7 +937,8 @@ class InferenceServerClient:
 
         try:
             response = self._client_stub.ModelInfer(request=request,
-                                                    metadata=metadata)
+                                                    metadata=metadata,
+                                                    timeout=client_timeout)
             if self._verbose:
                 print(response)
             result = InferResult(response)
@@ -951,6 +958,7 @@ class InferenceServerClient:
                     sequence_end=False,
                     priority=0,
                     timeout=None,
+                    client_timeout=None,
                     headers=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -1007,6 +1015,11 @@ class InferenceServerClient:
             model-specific action such as terminating the request. If not
             provided, the server will handle the request using default setting
             for the model.
+        client_timeout : int
+            The maximum end-to-end time, in seconds, the request is allowed
+            to take. The client will abort request when the specified time
+            elapses. The default value is None which means client will
+            wait for the response from the server.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -1051,7 +1064,7 @@ class InferenceServerClient:
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
-                request=request, metadata=metadata)
+                request=request, metadata=metadata, timeout=client_timeout)
             self._call_future.add_done_callback(wrapped_callback)
             if self._verbose:
                 verbose_message = "Sent request"

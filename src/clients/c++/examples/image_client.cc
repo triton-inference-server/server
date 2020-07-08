@@ -1019,7 +1019,8 @@ main(int argc, char** argv)
 
   if (streaming) {
     err = triton_client.grpc_client_->StartStream(
-        callback_func, true /* enable_stats */, http_headers);
+        callback_func, true /* enable_stats */, 0 /* stream_timeout */,
+        http_headers);
     if (!err.IsOk()) {
       std::cerr << "failed to establish the stream: " << err << std::endl;
     }

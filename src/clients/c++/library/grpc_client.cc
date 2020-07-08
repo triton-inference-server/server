@@ -31,6 +31,7 @@
 #include "src/clients/c++/library/grpc_client.h"
 
 #include <grpcpp/grpcpp.h>
+#include <chrono>
 #include <cstdint>
 #include <future>
 #include <iostream>
@@ -44,9 +45,12 @@ namespace {
 // Use map to keep track of GRPC channels. <key, value> : <url, Channel*>
 // If context is created on url that has established Channel, then reuse it.
 std::map<std::string, std::shared_ptr<grpc::Channel>> grpc_channel_map_;
+std::mutex grpc_channel_map_mtx_;
 std::shared_ptr<grpc::Channel>
 GetChannel(const std::string& url)
 {
+  std::lock_guard<std::mutex> lock(grpc_channel_map_mtx_);
+
   const auto& channel_itr = grpc_channel_map_.find(url);
   if (channel_itr != grpc_channel_map_.end()) {
     return channel_itr->second;
@@ -795,6 +799,13 @@ InferenceServerGrpcClient::Infer(
   for (const auto& it : headers) {
     context.AddMetadata(it.first, it.second);
   }
+
+  if (options.client_timeout_ != 0) {
+    auto deadline = std::chrono::system_clock::now() +
+                    std::chrono::microseconds(options.client_timeout_);
+    context.set_deadline(deadline);
+  }
+
   err = PreRunProcessing(options, inputs, outputs);
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   if (!err.IsOk()) {
@@ -851,6 +862,13 @@ InferenceServerGrpcClient::AsyncInfer(
   for (const auto& it : headers) {
     async_request->grpc_context_.AddMetadata(it.first, it.second);
   }
+
+  if (options.client_timeout_ != 0) {
+    auto deadline = std::chrono::system_clock::now() +
+                    std::chrono::microseconds(options.client_timeout_);
+    async_request->grpc_context_.set_deadline(deadline);
+  }
+
   Error err = PreRunProcessing(options, inputs, outputs);
   if (!err.IsOk()) {
     delete async_request;
@@ -883,7 +901,8 @@ InferenceServerGrpcClient::AsyncInfer(
 
 Error
 InferenceServerGrpcClient::StartStream(
-    OnCompleteFn callback, bool enable_stats, const Headers& headers)
+    OnCompleteFn callback, bool enable_stats, uint32_t stream_timeout,
+    const Headers& headers)
 {
   if (stream_worker_.joinable()) {
     return Error(
@@ -902,6 +921,12 @@ InferenceServerGrpcClient::StartStream(
 
   for (const auto& it : headers) {
     grpc_context_.AddMetadata(it.first, it.second);
+  }
+
+  if (stream_timeout != 0) {
+    auto deadline = std::chrono::system_clock::now() +
+                    std::chrono::microseconds(stream_timeout);
+    grpc_context_.set_deadline(deadline);
   }
 
   grpc_stream_ = stub_->ModelStreamInfer(&grpc_context_);
@@ -996,9 +1021,9 @@ InferenceServerGrpcClient::PreRunProcessing(
         options.priority_);
   }
 
-  if (options.timeout_ != 0) {
+  if (options.server_timeout_ != 0) {
     (*infer_request_.mutable_parameters())["timeout"].set_int64_param(
-        options.timeout_);
+        options.server_timeout_);
   }
 
   int index = 0;

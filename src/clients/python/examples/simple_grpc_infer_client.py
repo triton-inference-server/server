@@ -51,6 +51,12 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
+    parser.add_argument('-t',
+                        '--client-timeout',
+                        type=int,
+                        required=False,
+                        default=None,
+                        help='Client timeout in seconds. Default is None.')
 
     FLAGS = parser.parse_args()
     try:
@@ -85,6 +91,7 @@ if __name__ == '__main__':
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
                                   outputs=outputs,
+                                  client_timeout=FLAGS.client_timeout,
                                   headers={'test': '1'})
 
     statistics = triton_client.get_inference_statistics(model_name=model_name)

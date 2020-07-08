@@ -78,6 +78,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
   std::cerr << "\t-v" << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
+  std::cerr << "\t-t <client timeout in microseconds>" << std::endl;
   std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << std::endl;
   std::cerr
@@ -96,10 +97,11 @@ main(int argc, char** argv)
   bool use_custom_model = false;
   std::string url("localhost:8000");
   nic::Headers http_headers;
+  uint32_t client_timeout = 0;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vcu:H:")) != -1) {
+  while ((opt = getopt(argc, argv, "vcu:t:H:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -109,6 +111,9 @@ main(int argc, char** argv)
         break;
       case 'u':
         url = optarg;
+        break;
+      case 't':
+        client_timeout = std::stoi(optarg);
         break;
       case 'H': {
         std::string arg = optarg;
@@ -192,6 +197,7 @@ main(int argc, char** argv)
   // The inference settings. Will be using default for now.
   nic::InferOptions options(model_name);
   options.model_version_ = model_version;
+  options.client_timeout_ = client_timeout;
 
   std::vector<nic::InferInput*> inputs = {input0_ptr.get(), input1_ptr.get()};
   std::vector<const nic::InferRequestedOutput*> outputs = {output0_ptr.get(),
