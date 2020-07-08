@@ -785,10 +785,22 @@ throughput and latency improvements.
 Model Warmup
 ------------
 
-For some framework backends, model initialization may be delayed until
-the first inference is requested, TF-TRT optimization for example,
-which introduces unexpected latency seen by the client. The model
-configuration :cpp:var:`ModelWarmup
+When a model is loaded by Triton the corresponding model framework
+initializes for that model.  For some frameworks, some or all of this
+initialization is deferred until the model receives its first
+inference request (or first few inference requests). As a result, the
+first (few) inference requests can be significantly slower due to
+deferred initialization.
+
+To avoid these initial, slow inference requests, Triton provides a
+configuration option that enables a model to be "warmed up" so that it
+is completely initialized before the first inference request is
+received. When the :cpp:var:`ModelWarmup
+<nvidia::inferenceserver::ModelWarmup>` option is used, Triton will
+not show the model as being ready for inference until model warmup has
+completed.
+
+The model configuration :cpp:var:`ModelWarmup
 <nvidia::inferenceserver::ModelWarmup>` is used to specify warmup
 settings for a model. The settings define a series of inference
 requests that Triton will create to warm-up each model instance. A
