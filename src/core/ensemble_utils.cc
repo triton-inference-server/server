@@ -53,6 +53,13 @@ struct TensorNode {
     full_dims_.MergeFrom(dims_);
   }
 
+  // Constructor for symbolic nodes
+  TensorNode(const std::string& model_name)
+      : model_name_(model_name), is_decoupled_(false), decouple_label_(0),
+        visited_(false)
+  {
+  }
+
   std::string model_name_;
   DataType type_;
   DimsList dims_;
@@ -62,6 +69,9 @@ struct TensorNode {
   bool visited_;
   std::vector<TensorNode*> prev_nodes_;
   std::vector<TensorNode*> next_nodes_;
+  // A symbolic node to keep track of the decouple label of nodes that
+  // are outputs of the same step.
+  std::shared_ptr<TensorNode> sibling_node_;
 };
 
 /// Validate if the data type and the shape of two TensorNode object are
@@ -175,6 +185,7 @@ ValidateTensorMapping(
               " in model " + step.model_name());
     }
   }
+  std::shared_ptr<TensorNode> sibling_node(new TensorNode(step.model_name()));
   for (const auto& output_map : step.output_map()) {
     size_t mapped_cnt = 0;
     for (const auto& model_output : model_config.output()) {
@@ -189,9 +200,11 @@ ValidateTensorMapping(
               "in ensemble " + ensemble + ", ensemble tensor " +
                   output_map.second + ": "));
         } else {
-          ensemble_tensors->emplace(
-              std::make_pair(output_map.second, model_tensor));
+          it = ensemble_tensors
+                   ->emplace(std::make_pair(output_map.second, model_tensor))
+                   .first;
         }
+        it->second.sibling_node_ = sibling_node;
         mapped_cnt++;
       }
     }
@@ -251,11 +264,17 @@ ValidateEnsembleConfig(
     TensorNode input_node(ensemble_name, batching, input.data_type(), dims);
     ensemble_tensors.emplace(std::make_pair(input.name(), input_node));
   }
+
+  TensorNode sink_node(ensemble_name);
   for (const auto& output : ensemble_config.output()) {
     const auto& dims =
         output.has_reshape() ? output.reshape().shape() : output.dims();
     TensorNode output_node(ensemble_name, batching, output.data_type(), dims);
-    ensemble_tensors.emplace(std::make_pair(output.name(), output_node));
+    auto it =
+        ensemble_tensors.emplace(std::make_pair(output.name(), output_node))
+            .first;
+    sink_node.prev_nodes_.emplace_back(&(it->second));
+    it->second.next_nodes_.emplace_back(&sink_node);
   }
 
   for (const auto& step : ensemble_config.ensemble_scheduling().step()) {
@@ -355,8 +374,22 @@ ValidateEnsembleConfig(
                     "models");
           }
         }
-        next_node->decouple_label_ =
-            next_node->is_decoupled_ ? ++decouple_label : prev_decouple_label;
+        if (next_node->sibling_node_ != nullptr) {
+          if (next_node->sibling_node_->visited_) {
+            next_node->decouple_label_ =
+                next_node->sibling_node_->decouple_label_;
+          } else {
+            next_node->decouple_label_ = next_node->is_decoupled_
+                                             ? ++decouple_label
+                                             : prev_decouple_label;
+            next_node->sibling_node_->decouple_label_ =
+                next_node->decouple_label_;
+            next_node->sibling_node_->visited_ = true;
+          }
+        } else {
+          next_node->decouple_label_ =
+              next_node->is_decoupled_ ? ++decouple_label : prev_decouple_label;
+        }
         next_node->visited_ = true;
         current_iterators.push_back(next_node);
       }
