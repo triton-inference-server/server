@@ -234,6 +234,46 @@ for ENV_VAR in "env" "env_dummy" "config"; do
     done
 done
 
+# Test with polling enabled
+SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --model-control-mode=poll"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# copy contents of /models into S3 bucket and wait for them to be loaded.
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+sleep 60
+
+set +e
+
+# python unittest seems to swallow ImportError and still return 0
+# exit code. So need to explicitly check CLIENT_LOG to make sure
+# we see some running tests
+python $INFER_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed To Run\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Clean up bucket
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 aws s3 rb "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
