@@ -208,6 +208,9 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     mkdir -p qa/L0_perf_nomodel_cudashm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm
 
+RUN cp builddir/server/install/backends/libtriton_repeat.so \
+        qa/L0_model_config/.
+
 RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
     cp builddir/server/install/backends/libtriton_repeat.so \
         qa/L0_decoupled/models/repeat_int32/1/.
