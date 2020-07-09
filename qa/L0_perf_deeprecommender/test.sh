@@ -65,26 +65,31 @@ $TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
-# Create the TFTRT plan from TF
-rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
-    (cd tftrt_models/deeprecommender_graphdef_trt && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        echo "optimization { execution_accelerators {" >> config.pbtxt
-        echo "gpu_execution_accelerator : [ {" >> config.pbtxt
-        echo "name : \"tensorrt\" " >> config.pbtxt
-        echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt)
+OPTIMIZED_MODEL_NAMES="deeprecommender_graphdef_trt deeprecommender_onnx_trt"
+
+# Create optimized models (TF-TRT and ONNX-TRT)
+rm -fr optimized_model_store && mkdir optimized_model_store
+for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
+    BASE_MODEL=$(echo ${MODEL_NAME} | cut -d '_' -f 1,2)
+    cp -r $REPODIR/perf_model_store/${BASE_MODEL} optimized_model_store/${MODEL_NAME}
+    CONFIG_PATH="optimized_model_store/${MODEL_NAME}/config.pbtxt"
+    sed -i "s/^name: \"${BASE_MODEL}\"/name: \"${MODEL_NAME}\"/" ${CONFIG_PATH}
+    echo "optimization { execution_accelerators {" >> ${CONFIG_PATH}
+    echo "gpu_execution_accelerator : [ {" >> ${CONFIG_PATH}
+    echo "name : \"tensorrt\" " >> ${CONFIG_PATH}
+    echo "} ]" >> ${CONFIG_PATH}
+    echo "}}" >> ${CONFIG_PATH}
+done
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt; do
+for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
     if [ "$FRAMEWORK" == "graphdef" ]; then
         REPO=`pwd`/tfmodels
     elif [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
     else
-        REPO=`pwd`/tftrt_models
+        REPO=`pwd`/optimized_model_store
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
@@ -119,26 +124,15 @@ $TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
-# Create the TFTRT plan from TF
-rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
-    (cd tftrt_models/deeprecommender_graphdef_trt && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        echo "optimization { execution_accelerators {" >> config.pbtxt
-        echo "gpu_execution_accelerator : [ {" >> config.pbtxt
-        echo "name : \"tensorrt\" " >> config.pbtxt
-        echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt)
-
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt; do
+for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
     if [ "$FRAMEWORK" == "graphdef" ]; then
         REPO=`pwd`/tfmodels
     elif [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
     else
-        REPO=`pwd`/tftrt_models
+        REPO=`pwd`/optimized_model_store
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
@@ -173,26 +167,15 @@ $TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --batch=${DYNAMIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
-# Create the TFTRT plan from TF
-rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
-    (cd tftrt_models/deeprecommender_graphdef_trt && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        echo "optimization { execution_accelerators {" >> config.pbtxt
-        echo "gpu_execution_accelerator : [ {" >> config.pbtxt
-        echo "name : \"tensorrt\" " >> config.pbtxt
-        echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt)
-
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt; do
+for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
     if [ "$FRAMEWORK" == "graphdef" ]; then
         REPO=`pwd`/tfmodels
     elif [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
     else
-        REPO=`pwd`/tftrt_models
+        REPO=`pwd`/optimized_model_store
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
