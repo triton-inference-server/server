@@ -48,9 +48,9 @@ STATIC_BATCH=1
 DYNAMIC_BATCH=1
 INSTANCE_CNT=1
 
-# Copy TF Model
-rm -fr tfmodels && mkdir -p tfmodels && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
+# Copy TF, ONNX and PyTorch Models
+rm -fr models && mkdir -p models && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_* models/.
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
@@ -60,7 +60,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
+$TRTEXEC --uff=models/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
@@ -82,14 +82,14 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
 done
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt; do
+for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
-    if [ "$FRAMEWORK" == "graphdef" ]; then
-        REPO=`pwd`/tfmodels
-    elif [ "$FRAMEWORK" == "plan" ]; then
+    if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
-    else
+    elif [[ "$FRAMEWORK" == *"_trt" ]]; then
         REPO=`pwd`/optimized_model_store
+    else
+        REPO=`pwd`/models
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
@@ -107,10 +107,6 @@ STATIC_BATCH=1024
 DYNAMIC_BATCH=1
 INSTANCE_CNT=2
 
-# Copy TF Model
-rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
-
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
@@ -119,20 +115,20 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
+$TRTEXEC --uff=models/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt; do
+for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
-    if [ "$FRAMEWORK" == "graphdef" ]; then
-        REPO=`pwd`/tfmodels
-    elif [ "$FRAMEWORK" == "plan" ]; then
+    if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
-    else
+    elif [[ "$FRAMEWORK" == *"_trt" ]]; then
         REPO=`pwd`/optimized_model_store
+    else
+        REPO=`pwd`/models
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
@@ -150,10 +146,6 @@ STATIC_BATCH=1
 DYNAMIC_BATCH=64
 INSTANCE_CNT=2
 
-# Copy TF Model
-rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
-
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
@@ -162,20 +154,20 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
+$TRTEXEC --uff=models/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${DYNAMIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt; do
+for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
-    if [ "$FRAMEWORK" == "graphdef" ]; then
-        REPO=`pwd`/tfmodels
-    elif [ "$FRAMEWORK" == "plan" ]; then
+    if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
-    else
+    elif [[ "$FRAMEWORK" == *"_trt" ]]; then
         REPO=`pwd`/optimized_model_store
+    else
+        REPO=`pwd`/models
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
