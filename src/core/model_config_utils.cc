@@ -603,17 +603,6 @@ GetNormalizedModelConfig(
     RETURN_IF_ERROR(ReadTextProto(config_path, config));
   }
 
-  // For now, both 'backend' and 'platform' cannot be listed in the
-  // config. If backend is given then just leave platform empty and
-  // don't perform autofill or attempt to adjust default model
-  // filename.
-  if (!config->platform().empty() && !config->backend().empty()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "cannot specify both 'backend' and 'platform' for model '" +
-            config->name() + "'");
-  }
-
   if (config->backend().empty()) {
     // Autofill if requested...
     if (autofill) {
@@ -798,13 +787,6 @@ ValidateModelConfig(
   if (config.name().empty()) {
     return Status(
         Status::Code::INVALID_ARG, "model configuration must specify 'name'");
-  }
-
-  if (!config.platform().empty() && !config.backend().empty()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "cannot specify both 'backend' and 'platform' for model '" +
-            config.name() + "'");
   }
 
   if (config.platform().empty() && config.backend().empty()) {
