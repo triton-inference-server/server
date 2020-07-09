@@ -355,7 +355,8 @@ class InferenceRequest {
   // The response will be passed to 'delegator' and 'delegator' must call the
   // InferenceResponse::Send() to send the response.
   Status SetResponseDelegator(
-      std::function<void(std::unique_ptr<InferenceResponse>&&)>&& delegator)
+      std::function<void(
+          std::unique_ptr<InferenceResponse>&&, const uint32_t)>&& delegator)
   {
     response_delegator_ = std::move(delegator);
     return response_factory_.SetResponseDelegator(response_delegator_);
@@ -507,7 +508,8 @@ class InferenceRequest {
   std::vector<std::function<void()>> release_callbacks_;
 
   // Delegator to be invoked on sending responses.
-  std::function<void(std::unique_ptr<InferenceResponse>&&)> response_delegator_;
+  std::function<void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>
+      response_delegator_;
 
   // The response factory associated with this request.
   InferenceResponseFactory response_factory_;
