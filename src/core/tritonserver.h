@@ -314,6 +314,17 @@ typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorStartFn_t)(
 ///   For each response, TRITONSERVER_InferenceResponseDelete called
 ///    - release_fn: called once for each output tensor in the response
 ///
+/// In all cases the start_fn, alloc_fn and release_fn callback
+/// functions must be thread-safe. Typically making these functions
+/// thread-safe does not require explicit locking. The recommended way
+/// to implement these functions is to have each inference request
+/// initiated by TRITONSERVER_ServerInferAsync provide a 'user_p'
+/// object that is unique to that request. The callback functions then
+/// operate only on state contained in 'user_p'. Locking is required
+/// only when the callback function needs to access state that is
+/// shared across inference requests (for example, a common allocation
+/// pool).
+///
 /// \param allocator Returns the new response allocator object.
 /// \param alloc_fn The function to call to allocate buffers for result
 /// tensors.
