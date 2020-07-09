@@ -326,12 +326,15 @@ DynamicBatchScheduler::SchedulerThread(
             for (auto& request : requests) {
               completion_queue_.emplace_back();
               auto queue_slot = &completion_queue_.back();
+              queue_slot->second = 0;
               request->SetResponseDelegator(
-                  [this,
-                   queue_slot](std::unique_ptr<InferenceResponse>&& response) {
+                  [this, queue_slot](
+                      std::unique_ptr<InferenceResponse>&& response,
+                      const uint32_t flags) {
                     {
                       std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      (*queue_slot) = std::move(response);
+                      queue_slot->first = std::move(response);
+                      queue_slot->second = flags;
                     }
                     FinalizeResponses();
                   });
@@ -371,12 +374,15 @@ DynamicBatchScheduler::SchedulerThread(
             for (auto& request : requests) {
               completion_queue_.emplace_back();
               auto queue_slot = &completion_queue_.back();
+              queue_slot->second = 0;
               request->SetResponseDelegator(
-                  [this,
-                   queue_slot](std::unique_ptr<InferenceResponse>&& response) {
+                  [this, queue_slot](
+                      std::unique_ptr<InferenceResponse>&& response,
+                      const uint32_t flags) {
                     {
                       std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      (*queue_slot) = std::move(response);
+                      queue_slot->first = std::move(response);
+                      queue_slot->second = flags;
                     }
                     FinalizeResponses();
                   });
@@ -586,22 +592,31 @@ DynamicBatchScheduler::FinalizeResponses()
   static std::mutex finalize_mtx;
   std::lock_guard<std::mutex> lock(finalize_mtx);
   // Finalize the completed payloads in-order as far as possible
-  std::deque<std::unique_ptr<InferenceResponse>> responses;
+  std::deque<std::pair<std::unique_ptr<InferenceResponse>, const uint32_t>>
+      responses;
   {
     std::lock_guard<std::mutex> queue_lock(completion_queue_mtx_);
     while (true) {
       // No response left or ready
-      if (completion_queue_.empty() || (completion_queue_.front() == nullptr)) {
+      if (completion_queue_.empty()) {
         break;
       }
-      responses.emplace_back(std::move(completion_queue_.front()));
-      completion_queue_.pop_front();
+      auto& queue_item = completion_queue_.front();
+      bool response_complete =
+          ((queue_item.second & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
+      if ((queue_item.first == nullptr) && (!response_complete)) {
+        break;
+      }
+
+      responses.emplace_back(std::move(queue_item.first), queue_item.second);
+      if (response_complete) {
+        completion_queue_.pop_front();
+      }
     }
   }
 
   for (auto& response : responses) {
-    InferenceResponse::Send(
-        std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
+    InferenceResponse::Send(std::move(response.first), response.second);
   }
 }
 
