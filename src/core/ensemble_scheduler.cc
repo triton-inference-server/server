@@ -47,18 +47,22 @@ using IterationCount = size_t;
 // to manage the lifecycle of the ensemble request
 class RequestTracker {
  public:
-  explicit RequestTracker(std::unique_ptr<InferenceRequest>&& request,
-  uint64_t compute_start_ns, MetricModelReporter* metric_reporter,
-    InferenceStatsAggregator* stats_aggregator)
-    : inflight_request_counter_(1), request_(std::move(request)),
-      compute_start_ns_(compute_start_ns), metric_reporter_(metric_reporter),
-      stats_aggregator_(stats_aggregator), status_(Status::Success)
+  explicit RequestTracker(
+      std::unique_ptr<InferenceRequest>&& request, uint64_t compute_start_ns,
+      MetricModelReporter* metric_reporter,
+      InferenceStatsAggregator* stats_aggregator)
+      : inflight_request_counter_(1), request_(std::move(request)),
+        compute_start_ns_(compute_start_ns), metric_reporter_(metric_reporter),
+        stats_aggregator_(stats_aggregator), status_(Status::Success)
   {
   }
 
   std::unique_ptr<InferenceRequest>& Request() { return request_; }
 
-  InferenceStatsAggregator& ContextStatsAggregator() { return context_stats_aggregator_; }
+  InferenceStatsAggregator& ContextStatsAggregator()
+  {
+    return context_stats_aggregator_;
+  }
 
   void IncrementCounter()
   {
@@ -66,7 +70,7 @@ class RequestTracker {
     inflight_request_counter_++;
   }
 
-  void DecrementCounter()
+  bool DecrementCounter()
   {
     std::lock_guard<std::mutex> lk(mtx_);
     inflight_request_counter_--;
@@ -89,12 +93,15 @@ class RequestTracker {
       InferenceRequest::Release(
           std::move(request_), TRITONSERVER_REQUEST_RELEASE_ALL);
     }
+    return (inflight_request_counter_ == 0);
   }
 
-  void SetStatus(const Status& status) {
+  void SetStatus(const Status& status)
+  {
     std::lock_guard<std::mutex> lk(mtx_);
     status_ = status;
   }
+
  private:
   std::mutex mtx_;
   uint32_t inflight_request_counter_;
@@ -306,8 +313,8 @@ EnsembleContext::EnsembleContext(
 {
   uint64_t compute_start_ns = 0;
   INFER_STATS_SET_TIMESTAMP(compute_start_ns);
-  request_tracker_ = new RequestTracker(std::move(request), compute_start_ns,
-  metric_reporter, stats_aggregator);
+  request_tracker_ = new RequestTracker(
+      std::move(request), compute_start_ns, metric_reporter, stats_aggregator);
 
   auto& lrequest = request_tracker_->Request();
 
@@ -495,7 +502,9 @@ EnsembleContext::RequestComplete(
 {
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
     auto request_tracker = reinterpret_cast<RequestTracker*>(userp);
-    request_tracker->DecrementCounter();
+    if (request_tracker->DecrementCounter()) {
+      delete request_tracker;
+    }
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(request),
         "deleting ensemble inference request");
@@ -765,7 +774,8 @@ EnsembleContext::InitStep(
   irequest->SetFlags(flags_);
   irequest->SetPriority(priority_);
 #ifdef TRITON_ENABLE_STATS
-  irequest->SetSecondaryStatsAggregator(&request_tracker_->ContextStatsAggregator());
+  irequest->SetSecondaryStatsAggregator(
+      &request_tracker_->ContextStatsAggregator());
 #endif
   irequest->SetResponseCallback(
       reinterpret_cast<ResponseAllocator*>(allocator_.get()), step->get(),
@@ -862,14 +872,17 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
           std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
           ensemble_status_);
     } else {
-      InferenceRequest::RespondIfError(request_tracker_->Request(), ensemble_status_);
+      InferenceRequest::RespondIfError(
+          request_tracker_->Request(), ensemble_status_);
     }
   }
 
   // Reach here when the ensemble execution comes to the end, 'ensemble_status_'
   // at this point is representative.
   request_tracker_->SetStatus(ensemble_status_);
-  request_tracker_->DecrementCounter();
+  if (request_tracker_->DecrementCounter()) {
+    delete request_tracker_;
+  }
   request_tracker_ = nullptr;
   return ensemble_status_;
 }
