@@ -141,6 +141,7 @@ set(
   ensemble_scheduler.cc
   ensemble_utils.cc
   filesystem.cc
+  infer_parameter.cc
   infer_request.cc
   infer_response.cc
   label_provider.cc
@@ -171,6 +172,7 @@ set(
   ensemble_scheduler.h
   ensemble_utils.h
   filesystem.h
+  infer_parameter.h
   infer_request.h
   infer_response.h
   label_provider.h
