@@ -1469,6 +1469,145 @@ CommonHandler::SetUpAllRequests()
 //=========================================================================
 
 //
+// ResponseQueue
+//
+// A simple queue holding the responses to be written. Uses a
+// vector of persistent message objects to prevent allocating
+// memory for each response to be written.
+//
+template <typename ResponseType>
+class ResponseQueue {
+ public:
+  explicit ResponseQueue() { Reset(); }
+
+  ~ResponseQueue()
+  {
+    for (auto response : responses_) {
+      delete response;
+    }
+  }
+
+  // Resets the queue
+  void Reset()
+  {
+    alloc_count_ = 0;
+    ready_count_ = 0;
+    current_index_ = 0;
+    for (auto response : responses_) {
+      response->Clear();
+    }
+  }
+
+  // Gets the response for the non-decoupled models.
+  // Note that there will be a single response in
+  // non-decoupled cases.
+  ResponseType* GetNonDecoupledResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    alloc_count_ = 1;
+    if (responses_.size() < 1) {
+      responses_.push_back(new ResponseType());
+    }
+    return responses_[0];
+  }
+
+  // Allocates a response on the head of the queue
+  void AllocateResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    alloc_count_++;
+    if (responses_.size() < alloc_count_) {
+      responses_.push_back(new ResponseType());
+    }
+  }
+
+  // Gets the last allocated response
+  ResponseType* GetLastAllocatedResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (responses_.size() < alloc_count_) {
+      LOG_ERROR
+          << "[INTERNAL] Attempting to access the response not yet allocated";
+      return nullptr;
+    }
+    return responses_[alloc_count_ - 1];
+  }
+
+  // Marks the next non-ready response complete
+  bool MarkNextResponseComplete()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (alloc_count_ <= ready_count_) {
+      LOG_ERROR
+          << "[INTERNAL] Attempting to mark an unallocated response complete";
+      return false;
+    }
+    ready_count_++;
+
+    return true;
+  }
+
+  // Gets the current response from the tail of
+  // the queue.
+  ResponseType* GetCurrentResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (current_index_ >= ready_count_) {
+      LOG_ERROR << "[INTERNAL] Attempting to access current response when it "
+                   "is not ready";
+      return nullptr;
+    }
+    return responses_[current_index_];
+  }
+
+  // Gets the response at the specified index
+  ResponseType* GetResponseAt(const uint32_t index)
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (index >= alloc_count_) {
+      LOG_ERROR << "[INTERNAL] Attempting to access response which is not yet "
+                   "allocated";
+      return nullptr;
+    }
+    return responses_[index];
+  }
+
+  // Pops the response from the tail of the queue
+  void PopResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    current_index_++;
+  }
+
+  // Returns whether the queue is empty
+  bool IsEmpty()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    return ((alloc_count_ == ready_count_) && (alloc_count_ == current_index_));
+  }
+
+  // Returns whether the queue has responses
+  // ready to be written.
+  bool HasReadyResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    return (ready_count_ > current_index_);
+  }
+
+ private:
+  std::vector<ResponseType*> responses_;
+  std::mutex mtx_;
+
+  // There are three indices to track the responses in the queue
+  // Tracks the allocated response
+  uint32_t alloc_count_;
+  // Tracks the response that is ready to be written
+  uint32_t ready_count_;
+  // Tracks the response next in the queue to be written
+  uint32_t current_index_;
+};
+
+//
 // AllocPayload
 //
 // Simple structure that carries the userp payload needed for
@@ -1493,13 +1632,13 @@ struct AllocPayload {
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
   using ClassificationMap = std::unordered_map<std::string, uint32_t>;
 
-  explicit AllocPayload() : response_list_(nullptr) {}
+  explicit AllocPayload() : response_queue_(nullptr) {}
   ~AllocPayload()
   {
     // Don't delete 'response_'.. it is owned by the InferHandlerState
   }
 
-  std::shared_ptr<std::vector<ResponseType*>> response_list_;
+  std::shared_ptr<ResponseQueue<ResponseType>> response_queue_;
   uint32_t response_alloc_count_;
   TensorShmMap shm_map_;
   ClassificationMap classification_map_;
@@ -1558,28 +1697,27 @@ class InferHandlerState {
       }
 #endif  // TRITON_ENABLE_TRACING
       state->step_ = Steps::WRITTEN;
-      responder_->Write(*state->GetCurrentResponse(), state);
+      ResponseType* response = state->response_queue_->GetCurrentResponse();
+      responder_->Write(*response, state);
 
-      // Clear the outputs in the response
-      state->GetCurrentResponse()
-          ->mutable_infer_response()
-          ->mutable_outputs()
-          ->Clear();
+      // Clear the response after writing
+      response->mutable_infer_response()->Clear();
 
-      // Proceed to next response object
-      state->Next();
+      // Pop the response from queue
+      state->response_queue_->PopResponse();
     }
 
     // Adds the state object to the completion queue so
     // that it can be processed later
     void PutTaskBackToQueue(InferHandlerStateType* state)
     {
+      std::lock_guard<std::mutex> lock(mu_);
       // FIXME: Is there a better way to put task on the
       // completion queue rather than using alarm object?
       // The alarm object will add a new task to the back of the
       // completion queue when it expires or when it’s cancelled.
-      grpc::Alarm alarm;
-      alarm.Set(cq_, gpr_now(gpr_clock_type::GPR_CLOCK_REALTIME), state);
+      state->alarm_.Set(
+          cq_, gpr_now(gpr_clock_type::GPR_CLOCK_REALTIME), state);
     }
 
     // Check the state at the front of the queue and write it if
@@ -1614,7 +1752,8 @@ class InferHandlerState {
 
       state->step_ = Steps::WRITTEN;
       state->context_->ongoing_write_ = true;
-      responder_->Write(*state->GetCurrentResponse(), state);
+      // Non decoupled writes use only one response
+      responder_->Write(*state->response_queue_->GetResponseAt(0), state);
 
       return state;
     }
@@ -1689,15 +1828,8 @@ class InferHandlerState {
     if (dstr != nullptr) {
       delay_response_ms_ = atoi(dstr);
     }
-    response_list_.reset(new std::vector<ResponseType*>());
+    response_queue_.reset(new ResponseQueue<ResponseType>());
     Reset(context, start_step);
-  }
-
-  ~InferHandlerState()
-  {
-    for (auto response : *response_list_) {
-      delete response;
-    }
   }
 
   void Reset(
@@ -1706,56 +1838,20 @@ class InferHandlerState {
     unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
     step_ = start_step;
-    current_index_ = 0;
-    available_count_ = 0;
+    cb_count_ = 0;
     is_decoupled_ = false;
     complete_ = false;
     request_.Clear();
-    for (auto response : *response_list_) {
-      response->Clear();
-    }
+    response_queue_->Reset();
   }
 
   void Release() { context_ = nullptr; }
 
-  // Get the response object next in line to be written
-  // to the stream.
-  ResponseType* GetCurrentResponse()
-  {
-    if (response_list_->size() <= current_index_) {
-      return nullptr;
-    }
-    return (*response_list_)[current_index_];
-  }
-
-  // Get the response object at the specified index.
-  ResponseType* GetResponseAt(uint32_t index)
-  {
-    if (response_list_->size() <= index) {
-      return nullptr;
-    }
-    return (*response_list_)[index];
-  }
-
-  // Advance the response index to point to the next
-  // response.
-  bool Next()
-  {
-    current_index_++;
-    return true;
-  }
 
   // Returns whether all the responses from the state
   // are delivered and successfully written on the
   // stream.
-  bool IsComplete()
-  {
-    return (complete_ && (current_index_ == available_count_));
-  }
-
-  // Returns whether the state has a pending response
-  // to be written on the stream.
-  bool WriteReady() { return (current_index_ < available_count_); }
+  bool IsComplete() { return (complete_ && response_queue_->IsEmpty()); }
 
   // Needed in the response handle for classification outputs.
   TRITONSERVER_Server* tritonserver_;
@@ -1765,9 +1861,8 @@ class InferHandlerState {
   uint64_t unique_id_;
 
   std::shared_ptr<Context> context_;
-  // Mutex to protect the step_
-  std::mutex mu_;
   Steps step_;
+  std::mutex step_mtx_;
 
 #ifdef TRITON_ENABLE_TRACING
   TraceManager* trace_manager_;
@@ -1776,12 +1871,13 @@ class InferHandlerState {
 #endif  // TRITON_ENABLE_TRACING
 
   bool is_decoupled_;
-  uint32_t current_index_;
-  uint32_t available_count_;
+  std::atomic<uint32_t> cb_count_;
   bool complete_;
 
   RequestType request_;
-  std::shared_ptr<std::vector<ResponseType*>> response_list_;
+  std::shared_ptr<ResponseQueue<ResponseType>> response_queue_;
+
+  grpc::Alarm alarm_;
 
   // For testing and debugging
   int delay_response_ms_;
@@ -2039,16 +2135,13 @@ InferResponseAlloc(
 
   // ModelInfer RPC expects exactly one response per request. Hence,
   // will be creating and using just one response object.
-  if (payload->response_list_->size() < 1) {
-    payload->response_list_->push_back(new ModelInferResponse());
-  }
-
+  ModelInferResponse* response =
+      payload->response_queue_->GetNonDecoupledResponse();
   return ResponseAllocatorHelper<
       AllocPayload<ModelInferResponse>::TensorShmMap>(
       allocator, tensor_name, byte_size, preferred_memory_type,
-      preferred_memory_type_id, (*payload->response_list_)[0],
-      payload->shm_map_, buffer, buffer_userp, actual_memory_type,
-      actual_memory_type_id);
+      preferred_memory_type_id, response, payload->shm_map_, buffer,
+      buffer_userp, actual_memory_type, actual_memory_type_id);
 }
 
 TRITONSERVER_Error*
@@ -2194,11 +2287,10 @@ InferAllocatorPayload(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const ModelInferRequest& request, std::list<std::string>&& serialized_data,
-    std::shared_ptr<std::vector<ResponseType*>> response_list_,
+    std::shared_ptr<ResponseQueue<ResponseType>> response_queue,
     AllocPayload<ResponseType>* alloc_payload)
 {
-  alloc_payload->response_list_ = response_list_;
-  alloc_payload->response_alloc_count_ = 0;
+  alloc_payload->response_queue_ = response_queue;
   alloc_payload->shm_map_.clear();
   alloc_payload->classification_map_.clear();
   alloc_payload->serialized_data_ = std::move(serialized_data);
@@ -2854,7 +2946,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   }
 
   const ModelInferRequest& request = state->request_;
-  auto response_list = state->response_list_;
+  auto response_queue = state->response_queue_;
 
   if (state->step_ == Steps::START) {
     TRITONSERVER_Error* err = nullptr;
@@ -2913,7 +3005,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     if (err == nullptr) {
       err = InferAllocatorPayload<ModelInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response_list, &state->alloc_payload_);
+          response_queue, &state->alloc_payload_);
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
@@ -2984,7 +3076,7 @@ ModelInferHandler::InferResponseComplete(
   State* state = reinterpret_cast<State*>(userp);
 
   // Increment the callback index
-  state->available_count_++;
+  state->cb_count_++;
 
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
@@ -2995,35 +3087,27 @@ ModelInferHandler::InferResponseComplete(
     return;
   }
 
-  auto response_list = state->response_list_;
-
   TRITONSERVER_Error* err = nullptr;
   // This callback is expected to be called exactly once for each request.
   // Will use the single response object in the response list to hold the
   // information.
-  if (state->response_list_->size() < 1) {
+  ModelInferResponse* response = state->response_queue_->GetResponseAt(0);
+  bool response_created = false;
+  if (response == nullptr) {
     LOG_ERROR << "expected allocator to have created a response object";
     err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         "No response object found in the callback");
-  }
-
-  ModelInferResponse* response;
-  bool response_created = false;
-  if (err == nullptr) {
-    response = (*state->response_list_)[0];
-  } else {
     response_created = true;
     response = new ModelInferResponse();
   }
 
-  if (state->available_count_ != 1) {
+  if (state->cb_count_ != 1) {
     err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string(
-            "expected a single response, got " +
-            std::to_string(state->available_count_))
-            .c_str());
+        TRITONSERVER_ERROR_INTERNAL, std::string(
+                                         "expected a single response, got " +
+                                         std::to_string(state->cb_count_))
+                                         .c_str());
   } else if (iresponse == nullptr) {
     err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
@@ -3068,12 +3152,7 @@ StreamInferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
       reinterpret_cast<AllocPayload<ModelStreamInferResponse>*>(userp);
 
   // Move to the next response object
-  payload->response_alloc_count_++;
-
-  // Create a response object only when needed
-  if (payload->response_list_->size() < payload->response_alloc_count_) {
-    payload->response_list_->push_back(new ModelStreamInferResponse());
-  }
+  payload->response_queue_->AllocateResponse();
 
   return nullptr;  // success
 }
@@ -3089,13 +3168,18 @@ StreamInferResponseAlloc(
   AllocPayload<ModelStreamInferResponse>* payload =
       reinterpret_cast<AllocPayload<ModelStreamInferResponse>*>(userp);
 
-  uint32_t index = payload->response_alloc_count_ - 1;
+  auto response = payload->response_queue_->GetLastAllocatedResponse();
+
+  if (response == nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Unable to access the last allocated response");
+  }
 
   return ResponseAllocatorHelper<
       AllocPayload<ModelStreamInferResponse>::TensorShmMap>(
       allocator, tensor_name, byte_size, preferred_memory_type,
-      preferred_memory_type_id,
-      (*payload->response_list_)[index]->mutable_infer_response(),
+      preferred_memory_type_id, response->mutable_infer_response(),
       payload->shm_map_, buffer, buffer_userp, actual_memory_type,
       actual_memory_type_id);
 }
@@ -3266,7 +3350,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     std::shared_ptr<StateContext> context = state->context_;
 
     // Issue the inference request into server...
-    auto response_list_ = state->response_list_;
+    auto response_queue_ = state->response_queue_;
 
     // Create the inference request which contains all the
     // input information needed for an inference.
@@ -3292,7 +3376,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     if (err == nullptr) {
       err = InferAllocatorPayload<ModelStreamInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response_list_, &state->alloc_payload_);
+          response_queue_, &state->alloc_payload_);
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
@@ -3320,11 +3404,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // WRITEREADY or WRITTEN. If there was an error then enqueue the
     // error response and show it to be ready for writing.
     if (err != nullptr) {
-      // Create a response object only when needed
-      if (state->response_list_->size() < 1) {
-        state->response_list_->push_back(new ModelStreamInferResponse());
+      ModelStreamInferResponse* response;
+      if (state->is_decoupled_) {
+        state->response_queue_->AllocateResponse();
+        response = state->response_queue_->GetLastAllocatedResponse();
+      } else {
+        response = state->response_queue_->GetNonDecoupledResponse();
       }
-      ModelStreamInferResponse* response = state->GetCurrentResponse();
       LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
@@ -3341,7 +3427,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       if (!state->is_decoupled_) {
         state->context_->WriteResponseIfReady(state);
       } else {
-        state->available_count_ = 1 + state->current_index_;
+        state->response_queue_->MarkNextResponseComplete();
         state->complete_ = true;
         state->context_->PutTaskBackToQueue(state);
       }
@@ -3468,14 +3554,14 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         state->context_->DecrementRequestCounter();
         finished = Finish(state);
       } else {
-        std::lock_guard<std::mutex> lock(state->mu_);
+        std::lock_guard<std::mutex> lock(state->step_mtx_);
 
         // If there is an available response to be written
         // to the stream, then transition directly to WRITEREADY
         // state and enqueue itself to the completion queue to be
         // taken up later. Otherwise, go to ISSUED state and wait
         // for the callback to make a response available.
-        if (state->WriteReady()) {
+        if (state->response_queue_->HasReadyResponse()) {
           state->step_ = Steps::WRITEREADY;
           state->context_->PutTaskBackToQueue(state);
         } else {
@@ -3545,12 +3631,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   State* state = reinterpret_cast<State*>(userp);
 
   // Increment the callback index
-  state->available_count_++;
+  uint32_t response_index = state->cb_count_++;
 
   LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferComplete, context "
                  << state->context_->unique_id_ << ", " << state->unique_id_
                  << " step " << state->step_ << ", callback index "
-                 << state->available_count_ << ", flags " << flags;
+                 << state->cb_count_ << ", flags " << flags;
 
   // Log appropriate errors
   if (!state->is_decoupled_) {
@@ -3564,16 +3650,13 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
   }
 
-  auto& response_list = state->response_list_;
+  auto& response_queue = state->response_queue_;
 
-  // Add a response object to the list if needed
   if (iresponse != nullptr) {
-    if (response_list->size() < state->available_count_) {
+    auto response = response_queue->GetResponseAt(response_index);
+    if (response == nullptr) {
       LOG_ERROR << "expected the response allocator to have added the response";
     }
-
-    ModelStreamInferResponse* response =
-        state->GetResponseAt(state->available_count_ - 1);
 
     TRITONSERVER_Error* err = nullptr;
     if (iresponse != nullptr) {
@@ -3596,9 +3679,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceResponseDelete(iresponse),
         "deleting GRPC inference response");
-  } else {
-    // Should not count if (iresponse==nullptr)
-    state->available_count_--;
   }
 
   state->complete_ = ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
@@ -3606,8 +3686,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     state->step_ = Steps::WRITEREADY;
     state->context_->WriteResponseIfReady(state);
   } else {
-    std::lock_guard<std::mutex> lock(state->mu_);
-
+    std::lock_guard<std::mutex> lock(state->step_mtx_);
+    if (iresponse != nullptr) {
+      state->response_queue_->MarkNextResponseComplete();
+    }
     if (state->step_ == Steps::ISSUED) {
       state->step_ = Steps::WRITEREADY;
       state->context_->PutTaskBackToQueue(state);
