@@ -43,6 +43,76 @@ class EnsembleContext;
 
 using IterationCount = size_t;
 
+// Request tracker is passed as 'userp' in RequestRelease function and used
+// to manage the lifecycle of the ensemble request
+class RequestTracker {
+ public:
+  explicit RequestTracker(
+      std::unique_ptr<InferenceRequest>&& request, uint64_t compute_start_ns,
+      MetricModelReporter* metric_reporter,
+      InferenceStatsAggregator* stats_aggregator)
+      : inflight_request_counter_(1), request_(std::move(request)),
+        compute_start_ns_(compute_start_ns), metric_reporter_(metric_reporter),
+        stats_aggregator_(stats_aggregator), status_(Status::Success)
+  {
+  }
+
+  std::unique_ptr<InferenceRequest>& Request() { return request_; }
+
+  InferenceStatsAggregator& ContextStatsAggregator()
+  {
+    return context_stats_aggregator_;
+  }
+
+  void IncrementCounter()
+  {
+    std::lock_guard<std::mutex> lk(mtx_);
+    inflight_request_counter_++;
+  }
+
+  bool DecrementCounter()
+  {
+    std::lock_guard<std::mutex> lk(mtx_);
+    inflight_request_counter_--;
+    if (inflight_request_counter_ == 0) {
+#ifdef TRITON_ENABLE_STATS
+      const auto& infer_stats = context_stats_aggregator_.ImmutableInferStats();
+      request_->ReportStatisticsWithDuration(
+          metric_reporter_, status_.IsOk(), compute_start_ns_,
+          infer_stats.compute_input_duration_ns_,
+          infer_stats.compute_infer_duration_ns_,
+          infer_stats.compute_output_duration_ns_);
+      if (status_.IsOk()) {
+        stats_aggregator_->UpdateInferBatchStatsWithDuration(
+            metric_reporter_, std::max(1U, request_->BatchSize()),
+            infer_stats.compute_input_duration_ns_,
+            infer_stats.compute_infer_duration_ns_,
+            infer_stats.compute_output_duration_ns_);
+      }
+#endif
+      InferenceRequest::Release(
+          std::move(request_), TRITONSERVER_REQUEST_RELEASE_ALL);
+    }
+    return (inflight_request_counter_ == 0);
+  }
+
+  void SetStatus(const Status& status)
+  {
+    std::lock_guard<std::mutex> lk(mtx_);
+    status_ = status;
+  }
+
+ private:
+  std::mutex mtx_;
+  uint32_t inflight_request_counter_;
+  std::unique_ptr<InferenceRequest> request_;
+  uint64_t compute_start_ns_;
+  MetricModelReporter* metric_reporter_;
+  InferenceStatsAggregator* stats_aggregator_;
+  InferenceStatsAggregator context_stats_aggregator_;
+  Status status_;
+};
+
 // Step is used as 'userp' and keeps ensemble context alive
 // until no more internal requests are inflight.
 // Step contains metadata, and status for the
@@ -190,11 +260,6 @@ class EnsembleContext {
       const std::set<std::pair<std::string, IterationCount>>& updated_tensors,
       std::unique_ptr<InferenceResponse>* response);
 
-  MetricModelReporter* metric_reporter_;
-  InferenceStatsAggregator* stats_aggregator_;
-  InferenceStatsAggregator context_stats_aggregator_;
-  uint64_t compute_start_ns_;
-
   InferenceServer* is_;
 
   EnsembleInfo* info_;
@@ -228,7 +293,7 @@ class EnsembleContext {
 
   // Objects related to the ensemble infer request
   Status ensemble_status_;
-  std::unique_ptr<InferenceRequest> request_;
+  RequestTracker* request_tracker_;
 
   // The allocator that will be used to allocate buffers for the
   // inference result tensors.
@@ -243,12 +308,15 @@ EnsembleContext::EnsembleContext(
     InferenceStatsAggregator* stats_aggregator, InferenceServer* is,
     EnsembleInfo* info, std::unique_ptr<InferenceRequest>& request,
     cudaStream_t stream)
-    : metric_reporter_(metric_reporter), stats_aggregator_(stats_aggregator),
-      is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
-      request_(std::move(request)),
+    : is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
       allocator_(nullptr, TRITONSERVER_ResponseAllocatorDelete)
 {
-  INFER_STATS_SET_TIMESTAMP(compute_start_ns_);
+  uint64_t compute_start_ns = 0;
+  INFER_STATS_SET_TIMESTAMP(compute_start_ns);
+  request_tracker_ = new RequestTracker(
+      std::move(request), compute_start_ns, metric_reporter, stats_aggregator);
+
+  auto& lrequest = request_tracker_->Request();
 
   // Obtain backend handles of all models in ensemble request such that
   // they have the same lifetime as the ensemble request to avoid unloading
@@ -277,7 +345,7 @@ EnsembleContext::EnsembleContext(
   for (const auto& ensemble_output : info_->ensemble_output_shape_) {
     ignored_tensor.insert(ensemble_output.first);
   }
-  for (const auto& requested_output : request_->ImmutableRequestedOutputs()) {
+  for (const auto& requested_output : lrequest->ImmutableRequestedOutputs()) {
     ignored_tensor.erase(requested_output);
   }
   if (ignored_tensor.empty()) {
@@ -317,7 +385,7 @@ EnsembleContext::EnsembleContext(
   }
 
   for (const auto& pair : *tensor_to_step_) {
-    const auto& requested_outputs = request_->ImmutableRequestedOutputs();
+    const auto& requested_outputs = lrequest->ImmutableRequestedOutputs();
     // For requested outputs, add 1 to outgoing count as the ensemble itself
     // isn't counted as step.
     if (requested_outputs.find(pair.first) != requested_outputs.end()) {
@@ -328,12 +396,12 @@ EnsembleContext::EnsembleContext(
   }
 
   if (ensemble_status_.IsOk()) {
-    request_id_ = request_->Id();
-    correlation_id_ = request_->CorrelationId();
-    flags_ = request_->Flags();
-    priority_ = request_->Priority();
+    request_id_ = lrequest->Id();
+    correlation_id_ = lrequest->CorrelationId();
+    flags_ = lrequest->Flags();
+    priority_ = lrequest->Priority();
 
-    for (const auto& pr : request_->ImmutableInputs()) {
+    for (const auto& pr : lrequest->ImmutableInputs()) {
       const InferenceRequest::Input* input = pr.second;
       auto it = tensor_data_.find(input->Name());
       if (it != tensor_data_.end()) {
@@ -341,8 +409,8 @@ EnsembleContext::EnsembleContext(
         // Shape() represents reshaped value without batch dimension,
         // thus need to fill it if necessary.
         std::unique_ptr<InferenceRequest::Input> tensor;
-        if (request_->BatchSize() != 0) {
-          std::vector<int64_t> shape{request_->BatchSize()};
+        if (lrequest->BatchSize() != 0) {
+          std::vector<int64_t> shape{lrequest->BatchSize()};
           shape.insert(
               shape.end(), input->Shape().begin(), input->Shape().end());
           tensor.reset(new InferenceRequest::Input(
@@ -353,7 +421,7 @@ EnsembleContext::EnsembleContext(
         }
         tensor->SetData(input->Data());
         tensor_data.AddTensor(std::move(tensor));
-        tensor_data.batch_size_ = request_->BatchSize();
+        tensor_data.batch_size_ = lrequest->BatchSize();
       } else {
         ensemble_status_ = Status(
             Status::Code::INVALID_ARG,
@@ -433,6 +501,10 @@ EnsembleContext::RequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    auto request_tracker = reinterpret_cast<RequestTracker*>(userp);
+    if (request_tracker->DecrementCounter()) {
+      delete request_tracker;
+    }
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(request),
         "deleting ensemble inference request");
@@ -702,12 +774,13 @@ EnsembleContext::InitStep(
   irequest->SetFlags(flags_);
   irequest->SetPriority(priority_);
 #ifdef TRITON_ENABLE_STATS
-  irequest->SetSecondaryStatsAggregator(&context_stats_aggregator_);
+  irequest->SetSecondaryStatsAggregator(
+      &request_tracker_->ContextStatsAggregator());
 #endif
   irequest->SetResponseCallback(
       reinterpret_cast<ResponseAllocator*>(allocator_.get()), step->get(),
       ResponseComplete, step->get());
-  irequest->SetReleaseCallback(RequestComplete, step->get());
+  irequest->SetReleaseCallback(RequestComplete, request_tracker_);
 
   RETURN_IF_ERROR(irequest->PrepareForInference());
 
@@ -768,7 +841,7 @@ Status
 EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
 {
   // Do nothing if the ensemble is finished
-  if (request_ == nullptr) {
+  if (request_tracker_ == nullptr) {
     return ensemble_status_;
   }
 
@@ -778,21 +851,6 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
         ensemble_status_.StatusCode(), "in ensemble '" + info_->ensemble_name_ +
                                            "', " + ensemble_status_.Message());
   }
-#ifdef TRITON_ENABLE_STATS
-  const auto& infer_stats = context_stats_aggregator_.ImmutableInferStats();
-  request_->ReportStatisticsWithDuration(
-      metric_reporter_, ensemble_status_.IsOk(), compute_start_ns_,
-      infer_stats.compute_input_duration_ns_,
-      infer_stats.compute_infer_duration_ns_,
-      infer_stats.compute_output_duration_ns_);
-  if (ensemble_status_.IsOk()) {
-    stats_aggregator_->UpdateInferBatchStatsWithDuration(
-        metric_reporter_, std::max(1U, request_->BatchSize()),
-        infer_stats.compute_input_duration_ns_,
-        infer_stats.compute_infer_duration_ns_,
-        infer_stats.compute_output_duration_ns_);
-  }
-#endif
 
   if (ensemble_status_.IsOk()) {
     if (info_->is_decoupled_) {
@@ -802,7 +860,7 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
       if (inflight_step_counter_ != 0) {
         return ensemble_status_;
       }
-      request_->ResponseFactory().SendFlags(
+      request_tracker_->Request()->ResponseFactory().SendFlags(
           TRITONSERVER_RESPONSE_COMPLETE_FINAL);
     } else {
       InferenceResponse::Send(
@@ -814,13 +872,18 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
           std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
           ensemble_status_);
     } else {
-      InferenceRequest::RespondIfError(request_, ensemble_status_);
+      InferenceRequest::RespondIfError(
+          request_tracker_->Request(), ensemble_status_);
     }
   }
 
-  InferenceRequest::Release(
-      std::move(request_), TRITONSERVER_REQUEST_RELEASE_ALL);
-
+  // Reach here when the ensemble execution comes to the end, 'ensemble_status_'
+  // at this point is representative.
+  request_tracker_->SetStatus(ensemble_status_);
+  if (request_tracker_->DecrementCounter()) {
+    delete request_tracker_;
+  }
+  request_tracker_ = nullptr;
   return ensemble_status_;
 }
 
@@ -833,7 +896,8 @@ EnsembleContext::CheckAndSetEnsembleOutput(
   // Check if updated tensor is one of the ensemble output and if all outputs
   // have tensor of the same iteration count
   bool ready = false;
-  const auto& requested_outputs = request_->ImmutableRequestedOutputs();
+  auto& lrequest = request_tracker_->Request();
+  const auto& requested_outputs = lrequest->ImmutableRequestedOutputs();
   for (const auto updated_tensor : updated_tensors) {
     if (requested_outputs.find(updated_tensor.first) ==
         requested_outputs.end()) {
@@ -866,7 +930,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
         "ensemble steps can be made");
   }
 
-  RETURN_IF_ERROR(request_->ResponseFactory().CreateResponse(response));
+  RETURN_IF_ERROR(lrequest->ResponseFactory().CreateResponse(response));
 
   bool cuda_async_copy = false;
   std::map<TensorData*, size_t*> releasing_tensors;
@@ -879,7 +943,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     auto& tensor = tensor_data.tensor_[iteration_count];
 
     auto shape = ReshapeTensorDims(
-        output_pair.second, (request_->BatchSize() != 0),
+        output_pair.second, (lrequest->BatchSize() != 0),
         tensor_data.batch_size_, tensor.first->OriginalShape());
 
     InferenceResponse::Output* output;
@@ -962,8 +1026,12 @@ EnsembleContext::ScheduleSteps(
       // Need to check the ensemble_status_ to ensure the FinishEnsemble()
       // is called only once.
       if (context->ensemble_status_.IsOk()) {
+        context->request_tracker_->IncrementCounter();
         context->ensemble_status_ = context->is_->InferAsync(step->request_);
         if (!context->ensemble_status_.IsOk()) {
+          // The request is not sent to server properly, shouldn't expect its
+          // release function get called.
+          context->request_tracker_->DecrementCounter();
           context->ensemble_status_ = context->FinishEnsemble();
           break;
         }
