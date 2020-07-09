@@ -51,8 +51,8 @@ class InferenceResponseFactory {
       const ResponseAllocator* allocator, void* alloc_userp,
       TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
-      const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
-          delegator)
+      const std::function<void(
+          std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
       : backend_(backend), id_(id), allocator_(allocator),
         alloc_userp_(alloc_userp), response_fn_(response_fn),
         response_userp_(response_userp), response_delegator_(delegator)
@@ -60,8 +60,8 @@ class InferenceResponseFactory {
   }
 
   Status SetResponseDelegator(
-      const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
-          delegator)
+      const std::function<void(
+          std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
   {
     response_delegator_ = delegator;
     return Status::Success;
@@ -99,7 +99,8 @@ class InferenceResponseFactory {
   void* response_userp_;
 
   // Delegator to be invoked on sending responses.
-  std::function<void(std::unique_ptr<InferenceResponse>&&)> response_delegator_;
+  std::function<void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>
+      response_delegator_;
 };
 
 //
@@ -202,8 +203,8 @@ class InferenceResponse {
       const ResponseAllocator* allocator, void* alloc_userp,
       TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
-      const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
-          delegator);
+      const std::function<void(
+          std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator);
 
   const std::string& Id() const { return id_; }
   const std::string& ModelName() const;
@@ -273,7 +274,8 @@ class InferenceResponse {
   void* response_userp_;
 
   // Delegator to be invoked on sending responses.
-  std::function<void(std::unique_ptr<InferenceResponse>&&)> response_delegator_;
+  std::function<void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>
+      response_delegator_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceResponse& response);
