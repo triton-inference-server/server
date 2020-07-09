@@ -579,8 +579,8 @@ message ModelInferRequest
     //@@    .. cpp:var:: InferTensorContents contents
     //@@
     //@@       The tensor contents using a data-type format. This field
-    //@@       must not be specified if "raw" tensor contents are being
-    //@@       used for the inference request.
+    //@@       must not be specified if tensor contents are being specified
+    //@@       in ModelInferRequest.raw_input_contents.
     //@@
     InferTensorContents contents = 5;
   }
@@ -718,8 +718,8 @@ message ModelInferResponse
     //@@    .. cpp:var:: InferTensorContents contents
     //@@
     //@@       The tensor contents using a data-type format. This field
-    //@@       must not be specified if "raw" tensor contents are being
-    //@@       used for the inference response.
+    //@@       must not be specified if tensor contents are being specified
+    //@@       in ModelInferResponse.raw_output_contents.
     //@@
     InferTensorContents contents = 5;
   }
