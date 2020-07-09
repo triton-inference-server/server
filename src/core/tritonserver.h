@@ -221,15 +221,16 @@ TRITONSERVER_EXPORT const char* TRITONSERVER_ErrorMessage(
 /// output tensor.
 ///
 /// \param allocator The allocator that is provided in the call to
-/// TRITONSERVER_ServerInferAsync.
+/// TRITONSERVER_InferenceRequestSetResponseCallback.
 /// \param tensor_name The name of the output tensor to allocate for.
 /// \param byte_size The size of the buffer to allocate.
 /// \param memory_type The type of memory that the caller prefers for
 /// the buffer allocation.
 /// \param memory_type_id The ID of the memory that the caller prefers
 /// for the buffer allocation.
-/// \param userp The user data pointer that is provided in the call to
-/// TRITONSERVER_ServerInferAsync.
+/// \param userp The user data pointer that is provided as
+/// 'response_allocator_userp' in the call to
+/// TRITONSERVER_InferenceRequestSetResponseCallback.
 /// \param buffer Returns a pointer to the allocated memory.
 /// \param buffer_userp Returns a user-specified value to associate
 /// with the buffer, or nullptr if no user-specified value should be
@@ -260,7 +261,7 @@ typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorAllocFn_t)(
 /// buffer is deleted by TRITONSERVER_InferenceResponseDelete.
 ///
 /// \param allocator The allocator that is provided in the call to
-/// TRITONSERVER_ServerInferAsync.
+/// TRITONSERVER_InferenceRequestSetResponseCallback.
 /// \param buffer Pointer to the buffer to be freed.
 /// \param buffer_userp The user-specified value associated
 /// with the buffer in TRITONSERVER_ResponseAllocatorAllocFn_t.
@@ -279,9 +280,10 @@ typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorReleaseFn_t)(
 /// allocation requests will refer to a new response.
 ///
 /// \param allocator The allocator that is provided in the call to
-/// TRITONSERVER_ServerInferAsync.
-/// \param userp The user data pointer that is provided in the call to
-/// TRITONSERVER_ServerInferAsync.
+/// TRITONSERVER_InferenceRequestSetResponseCallback.
+/// \param userp The user data pointer that is provided as
+/// 'response_allocator_userp' in the call to
+/// TRITONSERVER_InferenceRequestSetResponseCallback.
 /// \return a TRITONSERVER_Error object if a failure occurs.
 typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorStartFn_t)(
     TRITONSERVER_ResponseAllocator* allocator, void* userp);
@@ -313,6 +315,17 @@ typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorStartFn_t)(
 ///      ...
 ///   For each response, TRITONSERVER_InferenceResponseDelete called
 ///    - release_fn: called once for each output tensor in the response
+///
+/// In all cases the start_fn, alloc_fn and release_fn callback
+/// functions must be thread-safe. Typically making these functions
+/// thread-safe does not require explicit locking. The recommended way
+/// to implement these functions is to have each inference request
+/// provide a 'response_allocator_userp' object that is unique to that
+/// request with TRITONSERVER_InferenceRequestSetResponseCallback. The
+/// callback functions then operate only on this unique state. Locking
+/// is required only when the callback function needs to access state
+/// that is shared across inference requests (for example, a common
+/// allocation pool).
 ///
 /// \param allocator Returns the new response allocator object.
 /// \param alloc_fn The function to call to allocate buffers for result
@@ -569,8 +582,9 @@ typedef enum tritonserver_responsecompleteflag_enum {
 /// Type for inference request release callback function. The callback
 /// indicates what type of release is being performed on the request
 /// and for some of these the callback function takes ownership of the
-/// TRITONSERVER_InferenceRequest object. The 'userp' data is the same
-/// as what is supplied in the call to TRITONSERVER_ServerInferAsync.
+/// TRITONSERVER_InferenceRequest object. The 'userp' data is the data
+/// provided as 'request_release_userp' in the call to
+/// TRITONSERVER_InferenceRequestSetReleaseCallback.
 ///
 /// One or more flags will be specified when the callback is invoked,
 /// and the callback must take the following actions:
@@ -593,8 +607,8 @@ typedef void (*TRITONSERVER_InferenceRequestReleaseFn_t)(
 /// Type for callback function indicating that an inference response
 /// has completed. The callback function takes ownership of the
 /// TRITONSERVER_InferenceResponse object. The 'userp' data is the
-/// same as what is supplied in the call to
-/// TRITONSERVER_ServerInferAsync.
+/// data provided as 'response_userp' in the call to
+/// TRITONSERVER_InferenceRequestSetResponseCallback.
 ///
 /// One or more flags may be specified when the callback is invoked:
 ///
@@ -852,7 +866,7 @@ TRITONSERVER_InferenceRequestSetReleaseCallback(
 /// \param response_allocator The TRITONSERVER_ResponseAllocator to use
 /// to allocate buffers to hold inference results.
 /// \param response_allocator_userp User-provided pointer that is
-/// delivered to the response allocator's allocation function.
+/// delivered to the response allocator's start and allocation functions.
 /// \param response_fn The function called to deliver an inference
 /// response for this request.
 /// \param response_userp User-provided pointer that is delivered to
@@ -1482,7 +1496,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerMetrics(
 /// release_fn callback.
 ///
 /// Responses produced for this request are returned using the
-/// allocator and callback register with the request by
+/// allocator and callback registered with the request by
 /// TRITONSERVER_InferenceRequestSetResponseCallback.
 ///
 /// \param server The inference server object.
