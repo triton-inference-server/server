@@ -287,13 +287,21 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseFactorySendFlags(
 /// all the outputs and corresponding buffers must be created for that
 /// response using TRITONBACKEND_ResponseOutput and
 /// TRITONBACKEND_OutputBuffer *before* another response is created
-/// for the request.
+/// for the request. For a given response, outputs can be created in
+/// any order but they must be created sequentially/sychronously (for
+/// example, the backend cannot use multiple threads to simultaneously
+/// add multiple outputs to a response).
 ///
-/// After creating a first response and all the outputs and output
-/// buffers for that response, the backend may create another response
-/// before sending the first one. The backend may even delete the
-/// first response with TRITONBACKEND_ResponseDelete and never send
-/// it.
+/// The above requirement applies only to responses being generated
+/// for a given request. The backend may generate responses in
+/// parallel on multiple threads as long as those responses are for
+/// different requests.
+///
+/// This order of response creation must be strictly followed. But,
+/// once response(s) are created they do not need to be sent
+/// immediately, nor do they need to be sent in the order they were
+/// created. The backend may even delete a created response instead of
+/// sending it by using TRITONBACKEND_ResponseDelete.
 
 /// Create a response for a request.
 ///
