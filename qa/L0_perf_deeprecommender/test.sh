@@ -48,10 +48,6 @@ STATIC_BATCH=1
 DYNAMIC_BATCH=1
 INSTANCE_CNT=1
 
-# Copy TF, ONNX and PyTorch Models
-rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_* models/.
-
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
@@ -60,7 +56,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
-$TRTEXEC --uff=models/deeprecommender_graphdef/deeprecommender_graphdef.uff \
+$TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
@@ -89,7 +85,7 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
     elif [[ "$FRAMEWORK" == *"_trt" ]]; then
         REPO=`pwd`/optimized_model_store
     else
-        REPO=`pwd`/models
+        REPO=$REPODIR/perf_model_store
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
@@ -115,7 +111,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
-$TRTEXEC --uff=models/deeprecommender_graphdef/deeprecommender_graphdef.uff \
+$TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
@@ -128,7 +124,7 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
     elif [[ "$FRAMEWORK" == *"_trt" ]]; then
         REPO=`pwd`/optimized_model_store
     else
-        REPO=`pwd`/models
+        REPO=$REPODIR/perf_model_store
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
@@ -154,7 +150,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
-$TRTEXEC --uff=models/deeprecommender_graphdef/deeprecommender_graphdef.uff \
+$TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${DYNAMIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
@@ -167,7 +163,7 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
     elif [[ "$FRAMEWORK" == *"_trt" ]]; then
         REPO=`pwd`/optimized_model_store
     else
-        REPO=`pwd`/models
+        REPO=$REPODIR/perf_model_store
     fi
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
