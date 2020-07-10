@@ -136,6 +136,10 @@ seriously, if there are custom layer name conflicts across multiple
 shared libraries or the handles used to register them in PyTorch there
 is currently no way to handle it.
 
+Starting with the 20.07 release of Triton the `TorchVision operations<https://github.com/pytorch/vision>`_ 
+will be included with the PyTorch backend and hence they do not have 
+to be explicitly added as custom operations.
+
 When building the custom operations shared library it is important to
 use the same version of PyTorch as is being used in Triton. You can
 find the PyTorch version in the `Triton Release Notes

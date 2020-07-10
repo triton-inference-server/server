@@ -48,6 +48,10 @@ add_library(
   ${LIBTORCH_SRCS} ${LIBTORCH_HDRS}
 )
 set_target_properties(libtorch-backend-library PROPERTIES CXX_STANDARD 14)
+
+# Need to turn unused-but-set-variable off due to Torchvision
+set_target_properties(libtorch-backend-library PROPERTIES COMPILE_FLAGS -Wno-unused-but-set-variable)
+
 add_dependencies(libtorch-backend-library proto-library)
 target_include_directories(libtorch-backend-library PRIVATE ${TRITON_PYTORCH_INCLUDE_PATHS})
 

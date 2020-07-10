@@ -244,8 +244,8 @@ paths can be specified by separating them with a semicolon, for
 example, -DTRITON_EXTRA_LIB_PATHS="/path/a;/path/b".
 
 For the PyTorch backend you must also provide the path to the PyTorch
-headers using the -DTRITON_PYTORCH_INCLUDE_PATHS option. Multiple paths
-can be specified by separating them with a semicolon.
+and Torchvision headers using the -DTRITON_PYTORCH_INCLUDE_PATHS option.
+Multiple paths can be specified by separating them with a semicolon.
 
 Configure Triton Build
 ......................
