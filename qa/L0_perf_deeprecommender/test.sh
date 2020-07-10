@@ -38,6 +38,7 @@ fi
 REPODIR=/data/inferenceserver/${REPO_VERSION}
 TRTEXEC=/usr/src/tensorrt/bin/trtexec
 MODEL="deeprecommender"
+PROTOCOLS="grpc http"
 
 rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 
@@ -45,7 +46,6 @@ rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 # Test minimum latency
 #
 STATIC_BATCH=1
-DYNAMIC_BATCH=1
 INSTANCE_CNT=1
 
 # Create the TensorRT plan from TF
@@ -87,20 +87,22 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
     else
         REPO=$REPODIR/perf_model_store
     fi
-    MODEL_NAME=${MODEL_NAME} \
-            MODEL_FRAMEWORK=${FRAMEWORK} \
-            MODEL_PATH="$REPO/${MODEL_NAME}" \
-            STATIC_BATCH_SIZES=${STATIC_BATCH} \
-            DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-            INSTANCE_COUNTS=${INSTANCE_CNT} \
-            bash -x run_test.sh
+    for PROTOCOL in $PROTOCOLS; do
+        MODEL_NAME=${MODEL_NAME} \
+                MODEL_FRAMEWORK=${FRAMEWORK} \
+                MODEL_PATH="$REPO/${MODEL_NAME}" \
+                STATIC_BATCH_SIZES=${STATIC_BATCH} \
+                DYNAMIC_BATCH_SIZES=1 \
+                PERF_CLIENT_PROTOCOL=${PROTOCOL} \
+                INSTANCE_COUNTS=${INSTANCE_CNT} \
+                bash -x run_test.sh
+    done
 done
 
 #
 # Test large static batch = 1024 w/ 2 instances
 #
 STATIC_BATCH=1024
-DYNAMIC_BATCH=1
 INSTANCE_CNT=2
 
 # Create the TensorRT plan from TF
@@ -126,50 +128,14 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
     else
         REPO=$REPODIR/perf_model_store
     fi
-    MODEL_NAME=${MODEL_NAME} \
-            MODEL_FRAMEWORK=${FRAMEWORK} \
-            MODEL_PATH="$REPO/${MODEL_NAME}" \
-            STATIC_BATCH_SIZES=${STATIC_BATCH} \
-            DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-            INSTANCE_COUNTS=${INSTANCE_CNT} \
-            bash -x run_test.sh
-done
-
-#
-# Test dynamic batcher 64 w/ 2 instances
-#
-STATIC_BATCH=1
-DYNAMIC_BATCH=64
-INSTANCE_CNT=2
-
-# Create the TensorRT plan from TF
-rm -fr tensorrt_models && mkdir tensorrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
-    (cd tensorrt_models/deeprecommender_plan && \
-        sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
-        sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
-        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
-
-$TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
-         --uffInput=Placeholder,1,1,17736\
-         --batch=${DYNAMIC_BATCH} --output=fc5/Relu --verbose \
-         --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
-
-# Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
-    MODEL_NAME=${MODEL}_${FRAMEWORK}
-    if [ "$FRAMEWORK" == "plan" ]; then
-        REPO=`pwd`/tensorrt_models
-    elif [[ "$FRAMEWORK" == *"_trt" ]]; then
-        REPO=`pwd`/optimized_model_store
-    else
-        REPO=$REPODIR/perf_model_store
-    fi
-    MODEL_NAME=${MODEL_NAME} \
-            MODEL_FRAMEWORK=${FRAMEWORK} \
-            MODEL_PATH="$REPO/${MODEL_NAME}" \
-            STATIC_BATCH_SIZES=${STATIC_BATCH} \
-            DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-            INSTANCE_COUNTS=${INSTANCE_CNT} \
-            bash -x run_test.sh
+    for PROTOCOL in $PROTOCOLS; do
+        MODEL_NAME=${MODEL_NAME} \
+                MODEL_FRAMEWORK=${FRAMEWORK} \
+                MODEL_PATH="$REPO/${MODEL_NAME}" \
+                STATIC_BATCH_SIZES=${STATIC_BATCH} \
+                DYNAMIC_BATCH_SIZES=1 \
+                PERF_CLIENT_PROTOCOL=${PROTOCOL} \
+                INSTANCE_COUNTS=${INSTANCE_CNT} \
+                bash -x run_test.sh
+    done
 done
