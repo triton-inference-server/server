@@ -35,19 +35,13 @@ namespace nvidia { namespace inferenceserver {
 // mechanisms. Will be unnecessary once we transition to new arch.
 class TritonBackendFactory {
  public:
-  struct Config : public BackendConfig {
-  };
-
   static Status Create(
       InferenceServer* server,
-      const std::shared_ptr<BackendConfig>& backend_config,
+      const BackendCmdlineConfigMap& cmdline_config_map,
       std::unique_ptr<TritonBackendFactory>* factory)
   {
     LOG_VERBOSE(1) << "Create TritonBackendFactory";
-
-    auto triton_backend_config =
-        std::static_pointer_cast<Config>(backend_config);
-    factory->reset(new TritonBackendFactory(server, triton_backend_config));
+    factory->reset(new TritonBackendFactory(server, cmdline_config_map));
     return Status::Success;
   }
 
@@ -59,8 +53,8 @@ class TritonBackendFactory {
   {
     std::unique_ptr<TritonModel> model;
     RETURN_IF_ERROR(TritonModel::Create(
-        server_, model_repository_path, model_name, version, model_config,
-        min_compute_capability, &model));
+        server_, model_repository_path, cmdline_config_map_, model_name,
+        version, model_config, min_compute_capability, &model));
     backend->reset(model.release());
     return Status::Success;
   }
@@ -71,13 +65,14 @@ class TritonBackendFactory {
   DISALLOW_COPY_AND_ASSIGN(TritonBackendFactory);
 
   TritonBackendFactory(
-      InferenceServer* server, const std::shared_ptr<Config>& backend_config)
-      : server_(server), backend_config_(backend_config)
+      InferenceServer* server,
+      const BackendCmdlineConfigMap& cmdline_config_map)
+      : server_(server), cmdline_config_map_(cmdline_config_map)
   {
   }
 
   InferenceServer* server_;
-  const std::shared_ptr<Config> backend_config_;
+  const BackendCmdlineConfigMap cmdline_config_map_;
 };
 
 }}  // namespace nvidia::inferenceserver

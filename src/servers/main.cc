@@ -31,10 +31,12 @@
 #include <cctype>
 #include <condition_variable>
 #include <csignal>
+#include <iomanip>
 #include <iostream>
 #include <list>
 #include <mutex>
 #include <set>
+#include <sstream>
 
 #ifdef TRITON_ENABLE_ASAN
 #include <sanitizer/lsan_interface.h>
@@ -154,102 +156,109 @@ enum OptionId {
   OPTION_CUDA_MEMORY_POOL_BYTE_SIZE,
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
-  OPTION_TF_ALLOW_SOFT_PLACEMENT,
-  OPTION_TF_GPU_MEMORY_FRACTION,
-  OPTION_TF_ADD_VGPU,
+  OPTION_BACKEND_CONFIG
 };
 
 struct Option {
-  Option(OptionId id, std::string flag, std::string desc, bool has_arg = true)
-      : id_(id), flag_(flag), desc_(desc), has_arg_(has_arg)
+  static constexpr const char* ArgNone = "";
+  static constexpr const char* ArgBool = "boolean";
+  static constexpr const char* ArgFloat = "float";
+  static constexpr const char* ArgInt = "integer";
+  static constexpr const char* ArgStr = "string";
+
+  Option(OptionId id, std::string flag, std::string arg_desc, std::string desc)
+      : id_(id), flag_(flag), arg_desc_(arg_desc), desc_(desc)
   {
   }
 
   struct option GetLongOption() const
   {
     struct option lo {
-      flag_.c_str(), (has_arg_) ? required_argument : no_argument, nullptr, id_
+      flag_.c_str(), (!arg_desc_.empty()) ? required_argument : no_argument,
+          nullptr, id_
     };
     return lo;
   }
 
   const OptionId id_;
   const std::string flag_;
+  const std::string arg_desc_;
   const std::string desc_;
-  const bool has_arg_;
 };
 
 std::vector<Option> options_
 {
-  {OPTION_HELP, "help", "Print usage", false},
+  {OPTION_HELP, "help", Option::ArgNone, "Print usage"},
 #ifdef TRITON_ENABLE_LOGGING
-      {OPTION_LOG_VERBOSE, "log-verbose",
+      {OPTION_LOG_VERBOSE, "log-verbose", Option::ArgInt,
        "Set verbose logging level. Zero (0) disables verbose logging and "
        "values >= 1 enable verbose logging."},
-      {OPTION_LOG_INFO, "log-info", "Enable/disable info-level logging."},
-      {OPTION_LOG_WARNING, "log-warning",
+      {OPTION_LOG_INFO, "log-info", Option::ArgBool,
+       "Enable/disable info-level logging."},
+      {OPTION_LOG_WARNING, "log-warning", Option::ArgBool,
        "Enable/disable warning-level logging."},
-      {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging."},
+      {OPTION_LOG_ERROR, "log-error", Option::ArgBool,
+       "Enable/disable error-level logging."},
 #endif  // TRITON_ENABLE_LOGGING
-      {OPTION_ID, "id", "Identifier for this server."},
-      {OPTION_MODEL_REPOSITORY, "model-store",
+      {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."},
+      {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
        "Equivalent to --model-repository."},
-      {OPTION_MODEL_REPOSITORY, "model-repository",
+      {OPTION_MODEL_REPOSITORY, "model-repository", Option::ArgStr,
        "Path to model repository directory. It may be specified multiple times "
        "to add multiple model repositories. Note that if a model is not unique "
        "across all model repositories at any time, the model will not be "
        "available."},
-      {OPTION_EXIT_ON_ERROR, "exit-on-error",
+      {OPTION_EXIT_ON_ERROR, "exit-on-error", Option::ArgBool,
        "Exit the inference server if an error occurs during initialization."},
-      {OPTION_STRICT_MODEL_CONFIG, "strict-model-config",
+      {OPTION_STRICT_MODEL_CONFIG, "strict-model-config", Option::ArgBool,
        "If true model configuration files must be provided and all required "
        "configuration settings must be specified. If false the model "
        "configuration may be absent or only partially specified and the "
        "server will attempt to derive the missing required configuration."},
-      {OPTION_STRICT_READINESS, "strict-readiness",
+      {OPTION_STRICT_READINESS, "strict-readiness", Option::ArgBool,
        "If true /v2/health/ready endpoint indicates ready if the server "
        "is responsive and all models are available. If false "
        "/v2/health/ready endpoint indicates ready if server is responsive "
        "even if some/all models are unavailable."},
 #if defined(TRITON_ENABLE_HTTP)
-      {OPTION_ALLOW_HTTP, "allow-http",
+      {OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
        "Allow the server to listen for HTTP requests."},
-      {OPTION_HTTP_PORT, "http-port",
+      {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
        "The port for the server to listen on for HTTP requests."},
-      {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
+      {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
        "Number of threads handling HTTP requests."},
 #endif  // TRITON_ENABLE_HTTP
 #if defined(TRITON_ENABLE_GRPC)
-      {OPTION_ALLOW_GRPC, "allow-grpc",
+      {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
        "Allow the server to listen for GRPC requests."},
-      {OPTION_GRPC_PORT, "grpc-port",
+      {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
        "The port for the server to listen on for GRPC requests."},
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
-       "grpc-infer-allocation-pool-size",
+       "grpc-infer-allocation-pool-size", Option::ArgInt,
        "The maximum number of inference request/response objects that remain "
        "allocated for reuse. As long as the number of in-flight requests "
        "doesn't exceed this value there will be no allocation/deallocation of "
        "request/response objects."},
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
-      {OPTION_ALLOW_METRICS, "allow-metrics",
+      {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
        "Allow the server to provide prometheus metrics."},
-      {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics",
+      {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics", Option::ArgBool,
        "Allow the server to provide GPU metrics. Ignored unless "
        "--allow-metrics is true."},
-      {OPTION_METRICS_PORT, "metrics-port",
+      {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
        "The port reporting prometheus metrics."},
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
-      {OPTION_TRACE_FILEPATH, "trace-file",
+      {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
        "Set the file where trace output will be saved."},
-      {OPTION_TRACE_LEVEL, "trace-level",
+      {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
        "Set the trace level. OFF to disable tracing, MIN for minimal tracing, "
        "MAX for maximal tracing. Default is OFF."},
-      {OPTION_TRACE_RATE, "trace-rate",
+      {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "Set the trace sampling rate. Default is 1000."},
 #endif  // TRITON_ENABLE_TRACING
-      {OPTION_MODEL_CONTROL_MODE, "model-control-mode",
+      {OPTION_MODEL_CONTROL_MODE, "model-control-mode", Option::ArgStr,
        "Specify the mode for model management. Options are \"none\", \"poll\" "
        "and \"explicit\". The default is \"none\". "
        "For \"none\", the server will load all models in the model "
@@ -260,21 +269,23 @@ std::vector<Option> options_
        "For \"explicit\", model load and unload is initiated by using the "
        "model control APIs, and only models specified with --load-model will "
        "be loaded at startup."},
-      {OPTION_POLL_REPO_SECS, "repository-poll-secs",
+      {OPTION_POLL_REPO_SECS, "repository-poll-secs", Option::ArgInt,
        "Interval in seconds between each poll of the model repository to check "
        "for changes. Valid only when --model-control-mode=poll is "
        "specified."},
-      {OPTION_STARTUP_MODEL, "load-model",
+      {OPTION_STARTUP_MODEL, "load-model", Option::ArgStr,
        "Name of the model to be loaded on server startup. It may be specified "
        "multiple times to add multiple models. Note that this option will only "
        "take affect if --model-control-mode=explicit is true."},
       {OPTION_PINNED_MEMORY_POOL_BYTE_SIZE, "pinned-memory-pool-byte-size",
+       Option::ArgInt,
        "The total byte size that can be allocated as pinned system memory. "
        "If GPU support is enabled, the server will allocate pinned system "
        "memory to accelerate data transfer between host and devices until it "
        "exceeds the specified byte size. This option will not affect the "
        "allocation conducted by the backend frameworks. Default is 256 MB."},
       {OPTION_CUDA_MEMORY_POOL_BYTE_SIZE, "cuda-memory-pool-byte-size",
+       "<integer>:<integer>",
        "The total byte size that can be allocated as CUDA memory for the GPU "
        "device. If GPU support is enabled, the server will allocate CUDA "
        "memory to minimize data transfer between host and devices until it "
@@ -285,29 +296,18 @@ std::vector<Option> options_
        "times, but only once per GPU device. Subsequent uses will overwrite "
        "previous uses for the same GPU device. Default is 64 MB."},
       {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
-       "min-supported-compute-capability",
+       "min-supported-compute-capability", Option::ArgFloat,
        "The minimum supported CUDA compute capability. GPUs that don't support "
        "this compute capability will not be used by the server."},
-      {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
+      {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs", Option::ArgInt,
        "Timeout (in seconds) when exiting to wait for in-flight inferences to "
        "finish. After the timeout expires the server exits even if inferences "
        "are still in flight."},
-      {OPTION_TF_ALLOW_SOFT_PLACEMENT, "tf-allow-soft-placement",
-       "Instruct TensorFlow to use CPU implementation of an operation when "
-       "a GPU implementation is not available."},
-      {OPTION_TF_GPU_MEMORY_FRACTION, "tf-gpu-memory-fraction",
-       "Reserve a portion of GPU memory for TensorFlow models. Default "
-       "value 0.0 indicates that TensorFlow should dynamically allocate "
-       "memory as needed. Value of 1.0 indicates that TensorFlow should "
-       "allocate all of GPU memory."},
   {
-    OPTION_TF_ADD_VGPU, "tf-add-vgpu",
-        "Add a tensorflow virtual GPU instances on a physical GPU. Input "
-        "should be 2 integers and 1 float separated by semicolons in the "
-        "format <physical GPU>;<number of virtual GPUs>;<memory limit per VGPU "
-        "in megabytes>. This option can be used multiple times, but only once "
-        "per physical GPU device. Subsequent uses will overwrite previous uses "
-        "with the same physical device. By default, no VGPUs are enabled."
+    OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
+        "Specify a backend-specific configuration setting. The format of this "
+        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
+        "<backend_name> is the name of the backend, such as 'tensorrt'."
   }
 };
 
@@ -562,14 +562,76 @@ StopTracing(nvidia::inferenceserver::TraceManager** trace_manager)
 }
 
 std::string
-Usage()
+FormatUsageMessage(std::string str, int offset)
 {
-  std::string usage("Usage:\n");
-  for (const auto& o : options_) {
-    usage += "--" + o.flag_ + "\t" + o.desc_ + "\n";
+  int width = 60;
+  int current_pos = offset;
+  while (current_pos + width < int(str.length())) {
+    int n = str.rfind(' ', current_pos + width);
+    if (n != int(std::string::npos)) {
+      str.replace(n, 1, "\n\t");
+      current_pos += (width + 9);
+    }
   }
 
-  return usage;
+  return str;
+}
+
+std::string
+Usage()
+{
+  std::stringstream ss;
+
+  ss << "Usage: tritonserver [options]" << std::endl;
+  for (const auto& o : options_) {
+    if (!o.arg_desc_.empty()) {
+      ss << "  --" << o.flag_ << " <" << o.arg_desc_ << ">" << std::endl
+         << "\t" << FormatUsageMessage(o.desc_, 0) << std::endl;
+    } else {
+      ss << "  --" << o.flag_ << std::endl
+         << "\t" << FormatUsageMessage(o.desc_, 0) << std::endl;
+    }
+  }
+
+  // FIXME, once backends are more separated from core Triton the
+  // documentation for these flags should be moved to the backend
+  // documentation.
+  ss << std::endl;
+  ss << "For --backend-config for the 'tensorflow' backend the following flags "
+        "are accepted."
+     << std::endl;
+  ss << "  --backend-config=tensorflow,allow-soft-placement=<boolean>"
+     << std::endl;
+  ss << "\t"
+     << FormatUsageMessage(
+            "Instruct TensorFlow to use CPU implementation of an operation "
+            "when a GPU implementation is not available.",
+            0)
+     << std::endl;
+  ss << "  --backend-config=tensorflow,gpu-memory-fraction=<float>"
+     << std::endl;
+  ss << "\t"
+     << FormatUsageMessage(
+            "Reserve a portion of GPU memory for TensorFlow models. Default "
+            "value 0.0 indicates that TensorFlow should dynamically allocate "
+            "memory as needed. Value of 1.0 indicates that TensorFlow should "
+            "allocate all of GPU memory.",
+            0)
+     << std::endl;
+  ss << "  --backend-config=tensorflow,add-vgpu=<arg>" << std::endl;
+  ss << "\t"
+     << FormatUsageMessage(
+            "Add a tensorflow virtual GPU instances on a physical GPU. Input "
+            "should be 2 integers and 1 float separated by semicolons in the "
+            "format <physical GPU>;<number of virtual GPUs>;<memory limit per "
+            "VGPU in megabytes>. This option can be used multiple times, but "
+            "only once per physical GPU device. Subsequent uses will overwrite "
+            "previous uses with the same physical device. By default, no VGPUs "
+            "are enabled.",
+            0)
+     << std::endl;
+
+  return ss.str();
 }
 
 bool
@@ -579,10 +641,10 @@ ParseBoolOption(std::string arg)
     return std::tolower(c);
   });
 
-  if ((arg == "true") || (arg == "1")) {
+  if ((arg == "true") || (arg == "on") || (arg == "1")) {
     return true;
   }
-  if ((arg == "false") || (arg == "0")) {
+  if ((arg == "false") || (arg == "off") || (arg == "0")) {
     return false;
   }
 
@@ -603,11 +665,13 @@ ParseLongLongOption(const std::string arg)
   return std::stoll(arg);
 }
 
+#if 0
 float
 ParseFloatOption(const std::string arg)
 {
   return std::stof(arg);
 }
+#endif
 
 double
 ParseDoubleOption(const std::string arg)
@@ -660,67 +724,34 @@ ParseTraceLevelOption(std::string arg)
 }
 #endif  // TRITON_ENABLE_TRACING
 
-struct VgpuOption {
-  int gpu_device_;
-  int num_vgpus_;
-  uint64_t mem_limit_mbytes_;
-};
-
-VgpuOption
-ParseVGPUOption(const std::string arg)
+std::tuple<std::string, std::string, std::string>
+ParseBackendConfigOption(const std::string arg)
 {
-  int delim_gpu = arg.find(";");
-  int delim_num_vgpus = arg.find(";", delim_gpu + 1);
+  // Format is "<backend_name>,<setting>=<value>"
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
 
   // Check for 2 semicolons
-  if ((delim_gpu < 0) || (delim_num_vgpus < 0)) {
-    std::cerr << "Cannot add virtual devices due to incorrect number of inputs."
-                 "--tf-add-vgpu argument requires format <physical "
-                 "GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
-                 "megabytes>. "
-              << "Found: " << arg << std::endl;
-    std::cerr << Usage() << std::endl;
+  if ((delim_name < 0) || (delim_setting < 0)) {
+    std::cerr << "--backend-config option format is '<backend "
+                 "name>,<setting>=<value>'. Got "
+              << arg << std::endl;
     exit(1);
   }
 
-  std::string gpu_string = arg.substr(0, delim_gpu);
-  std::string vgpu_string =
-      arg.substr(delim_gpu + 1, delim_num_vgpus - delim_gpu - 1);
-  std::string mem_limit_string = arg.substr(delim_num_vgpus + 1);
+  std::string name_string = arg.substr(0, delim_name);
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
 
-  // Ensure that options are non-empty otherwise calling stoi/stof will throw an
-  // exception
-  if (gpu_string.empty() || vgpu_string.empty() || mem_limit_string.empty()) {
-    std::cerr << "Cannot add virtual devices due to empty inputs."
-                 "--tf-add-vgpu argument requires format <physical "
-                 "GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
-                 "megabytes>. "
-              << "Found: " << arg << std::endl;
-    std::cerr << Usage() << std::endl;
+  if (name_string.empty() || setting_string.empty() || value_string.empty()) {
+    std::cerr << "--backend-config option format is '<backend "
+                 "name>,<setting>=<value>'. Got "
+              << arg << std::endl;
     exit(1);
   }
 
-  int gpu_device = std::stoi(gpu_string);
-  int num_vgpus_on_device = std::stoi(vgpu_string);
-  uint64_t mem_limit = std::stoi(mem_limit_string);
-
-  if (gpu_device < 0) {
-    std::cerr << "Cannot add virtual devices. Physical GPU device index must "
-                 "be >= 0. "
-              << "Found: " << gpu_string << std::endl;
-    std::cerr << Usage() << std::endl;
-    exit(1);
-  }
-
-  if (num_vgpus_on_device <= 0) {
-    std::cerr
-        << "Cannot add virtual devices. Number of virtual GPUs must be > 0. "
-        << "Found: " << vgpu_string << std::endl;
-    std::cerr << Usage() << std::endl;
-    exit(1);
-  }
-
-  return {gpu_device, num_vgpus_on_device, mem_limit};
+  return {name_string, setting_string, value_string};
 }
 
 std::pair<int, uint64_t>
@@ -756,13 +787,12 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   bool exit_on_error = true;
   bool strict_model_config = true;
   bool strict_readiness = true;
-  bool tf_allow_soft_placement = true;
-  float tf_gpu_memory_fraction = 0.0;
-  std::list<VgpuOption> tf_vgpus;
   std::list<std::pair<int, uint64_t>> cuda_pools;
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
+  std::vector<std::tuple<std::string, std::string, std::string>>
+      backend_config_settings;
 
 #ifdef TRITON_ENABLE_GPU
   double min_supported_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
@@ -929,15 +959,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_EXIT_TIMEOUT_SECS:
         exit_timeout_secs = ParseIntOption(optarg);
         break;
-
-      case OPTION_TF_ALLOW_SOFT_PLACEMENT:
-        tf_allow_soft_placement = ParseBoolOption(optarg);
-        break;
-      case OPTION_TF_GPU_MEMORY_FRACTION:
-        tf_gpu_memory_fraction = ParseFloatOption(optarg);
-        break;
-      case OPTION_TF_ADD_VGPU:
-        tf_vgpus.push_back(ParseVGPUOption(optarg));
+      case OPTION_BACKEND_CONFIG:
+        backend_config_settings.push_back(ParseBackendConfigOption(optarg));
         break;
     }
   }
@@ -1062,24 +1085,17 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       "setting GPU metrics enable");
 #endif  // TRITON_ENABLE_METRICS
 
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsSetTensorFlowSoftPlacement(
-          loptions, tf_allow_soft_placement),
-      "setting tensorflow soft placement");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
-          loptions, tf_gpu_memory_fraction),
-      "setting tensorflow GPU memory fraction");
-  for (const auto& tf_vgpu : tf_vgpus) {
+  for (const auto& bcs : backend_config_settings) {
     FAIL_IF_ERR(
-        TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
-            loptions, tf_vgpu.gpu_device_, tf_vgpu.num_vgpus_,
-            tf_vgpu.mem_limit_mbytes_),
-        "adding tensorflow VGPU instances");
+        TRITONSERVER_ServerOptionsSetBackendConfig(
+            loptions, std::get<0>(bcs).c_str(), std::get<1>(bcs).c_str(),
+            std::get<2>(bcs).c_str()),
+        "setting backend configurtion");
   }
 
   return true;
 }
+
 }  // namespace
 
 int

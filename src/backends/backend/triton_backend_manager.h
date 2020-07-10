@@ -30,6 +30,8 @@
 #include <string>
 #include <unordered_map>
 #include "src/backends/backend/tritonbackend.h"
+#include "src/core/model_config.h"
+#include "src/core/server_message.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -49,10 +51,13 @@ class TritonBackend {
 
   static Status Create(
       const std::string& name, const std::string& path,
+      const BackendCmdlineConfig& backend_cmdline_config,
       std::shared_ptr<TritonBackend>* backend);
   ~TritonBackend();
 
   const std::string& Name() const { return name_; }
+  const TritonServerMessage& BackendConfig() const { return backend_config_; }
+
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
@@ -66,7 +71,10 @@ class TritonBackend {
   typedef TRITONSERVER_Error* (*TritonBackendFiniFn_t)(
       TRITONBACKEND_Backend* backend);
 
-  TritonBackend(const std::string& name, const std::string& path);
+  TritonBackend(
+      const std::string& name, const std::string& path,
+      const TritonServerMessage& backend_config);
+
   void ClearHandles();
   Status LoadBackendLibrary();
   Status UnloadBackendLibrary();
@@ -76,6 +84,9 @@ class TritonBackend {
 
   // Full path to the backend shared library.
   const std::string path_;
+
+  // Backend configuration as JSON
+  TritonServerMessage backend_config_;
 
   // dlopen / dlsym handles
   void* dlhandle_;
@@ -96,6 +107,7 @@ class TritonBackendManager {
  public:
   static Status CreateBackend(
       const std::string& name, const std::string& path,
+      const BackendCmdlineConfig& backend_cmdline_config,
       std::shared_ptr<TritonBackend>* backend);
 
  private:

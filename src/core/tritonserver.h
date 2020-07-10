@@ -1263,41 +1263,18 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerOptionsSetMetrics(
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerOptionsSetGpuMetrics(
     TRITONSERVER_ServerOptions* options, bool gpu_metrics);
 
-/// Enable or disable TensorFlow soft-placement of operators.
+/// Set a configuration setting for a named backend in a server
+/// options.
 ///
 /// \param options The server options object.
-/// \param soft_placement True to enable, false to disable.
+/// \param backend_name The name of the backend.
+/// \param setting The name of the setting.
+/// \param value The setting value.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsSetTensorFlowSoftPlacement(
-    TRITONSERVER_ServerOptions* options, bool soft_placement);
-
-/// Set the fraction of GPU memory dedicated to TensorFlow models on
-/// each GPU visible to the inference server. Zero (0) indicates that
-/// no memory will be dedicated to TensorFlow and that it will instead
-/// allocate memory as needed.
-///
-/// \param options The server options object.
-/// \param fraction The fraction of the GPU memory dedicated to
-/// TensorFlow.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
-    TRITONSERVER_ServerOptions* options, float fraction);
-
-/// Add Tensorflow virtual GPU instances to a physical GPU.
-///
-/// \param options The server options object.
-/// \param gpu_device The physical GPU device id.
-/// \param num_vgpus The number of virtual GPUs to create on the
-/// physical GPU.
-/// \param per_vgpu_memory_mbytes The amount of GPU memory, in
-/// megabytes, to dedicate to each virtual GPU instance.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
-    TRITONSERVER_ServerOptions* options, int gpu_device, int num_vgpus,
-    uint64_t per_vgpu_memory_mbytes);
+TRITONSERVER_ServerOptionsSetBackendConfig(
+    TRITONSERVER_ServerOptions* options, const char* backend_name,
+    const char* setting, const char* value);
 
 /// TRITONSERVER_Server
 ///

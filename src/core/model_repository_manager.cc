@@ -313,7 +313,8 @@ class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
       InferenceServer* server, const double min_compute_capability,
-      const BackendConfigMap& backend_map,
+      const BackendConfigMap& backend_config_map,
+      const BackendCmdlineConfigMap& backend_cmdline_config_map,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
   ~BackendLifeCycle() = default;
@@ -441,7 +442,8 @@ class ModelRepositoryManager::BackendLifeCycle {
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
     InferenceServer* server, const double min_compute_capability,
-    const BackendConfigMap& backend_map,
+    const BackendConfigMap& backend_config_map,
+    const BackendCmdlineConfigMap& backend_cmdline_config_map,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
@@ -450,13 +452,13 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #ifdef TRITON_ENABLE_TENSORFLOW
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kTensorFlowGraphDefPlatform)->second;
+        backend_config_map.find(kTensorFlowGraphDefPlatform)->second;
     RETURN_IF_ERROR(GraphDefBackendFactory::Create(
         config, &(local_life_cycle->graphdef_factory_)));
   }
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kTensorFlowSavedModelPlatform)->second;
+        backend_config_map.find(kTensorFlowSavedModelPlatform)->second;
     RETURN_IF_ERROR(SavedModelBackendFactory::Create(
         config, &(local_life_cycle->savedmodel_factory_)));
   }
@@ -464,7 +466,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #ifdef TRITON_ENABLE_CAFFE2
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kCaffe2NetDefPlatform)->second;
+        backend_config_map.find(kCaffe2NetDefPlatform)->second;
     RETURN_IF_ERROR(NetDefBackendFactory::Create(
         config, &(local_life_cycle->netdef_factory_)));
   }
@@ -472,7 +474,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #ifdef TRITON_ENABLE_TENSORRT
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kTensorRTPlanPlatform)->second;
+        backend_config_map.find(kTensorRTPlanPlatform)->second;
     RETURN_IF_ERROR(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
@@ -480,7 +482,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #ifdef TRITON_ENABLE_ONNXRUNTIME
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kOnnxRuntimeOnnxPlatform)->second;
+        backend_config_map.find(kOnnxRuntimeOnnxPlatform)->second;
     RETURN_IF_ERROR(
         OnnxBackendFactory::Create(config, &(local_life_cycle->onnx_factory_)));
   }
@@ -488,7 +490,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #ifdef TRITON_ENABLE_PYTORCH
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kPyTorchLibTorchPlatform)->second;
+        backend_config_map.find(kPyTorchLibTorchPlatform)->second;
     RETURN_IF_ERROR(LibTorchBackendFactory::Create(
         config, &(local_life_cycle->libtorch_factory_)));
   }
@@ -496,20 +498,20 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #ifdef TRITON_ENABLE_CUSTOM
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kCustomPlatform)->second;
+        backend_config_map.find(kCustomPlatform)->second;
     RETURN_IF_ERROR(CustomBackendFactory::Create(
         config, &(local_life_cycle->custom_factory_)));
   }
   {
-    const std::shared_ptr<BackendConfig> config;
     RETURN_IF_ERROR(TritonBackendFactory::Create(
-        server, config, &(local_life_cycle->triton_backend_factory_)));
+        server, backend_cmdline_config_map,
+        &(local_life_cycle->triton_backend_factory_)));
   }
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kEnsemblePlatform)->second;
+        backend_config_map.find(kEnsemblePlatform)->second;
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
         server, config, &(local_life_cycle->ensemble_factory_)));
   }
@@ -1037,6 +1039,7 @@ ModelRepositoryManager::Create(
     InferenceServer* server, const std::string& server_version,
     const std::set<std::string>& repository_paths,
     const std::set<std::string>& startup_models, const bool strict_model_config,
+    const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
     const bool polling_enabled, const bool model_control_enabled,
@@ -1068,7 +1071,8 @@ ModelRepositoryManager::Create(
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
-      server, min_compute_capability, backend_config_map, &life_cycle));
+      server, min_compute_capability, backend_config_map,
+      backend_cmdline_config_map, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
