@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,20 +29,26 @@
 import argparse
 import os
 import subprocess
+import yapf
 
 FLAGS = None
 FORMAT_EXTS = ('proto', 'cc', 'cu', 'h')
-SKIP_PATHS = ('tools',)
+SKIP_PATHS = ('tools', )
+
 
 def visit(path):
     if FLAGS.verbose:
         print("visiting " + path)
 
     valid_ext = False
+    python_file = False
     for ext in FORMAT_EXTS:
         if path.endswith('.' + ext):
             valid_ext = True
             break
+    if path.endswith('.py'):
+        valid_ext = True
+        python_file = True
     if not valid_ext:
         if FLAGS.verbose:
             print("skipping due to extension: " + path)
@@ -53,26 +59,42 @@ def visit(path):
             if FLAGS.verbose:
                 print("skipping due to path prefix: " + path)
             return True
+    if python_file:
+        yapf.yapflib.yapf_api.FormatFile(path, in_place=True)
+        return True
+    else:
+        args = ['clang-format-6.0', '--style=file', '-i']
+        if FLAGS.verbose:
+            args.append('-verbose')
+        args.append(path)
 
-    args = ['clang-format-6.0', '--style=file', '-i']
-    if FLAGS.verbose:
-        args.append('-verbose')
-    args.append(path)
-
-    ret = subprocess.call(args)
-    if ret != 0:
-        print("format failed for " + path)
-        return False
+        ret = subprocess.call(args)
+        if ret != 0:
+            print("format failed for " + path)
+            return False
 
     return True
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
+    parser.add_argument('-v',
+                        '--verbose',
+                        action="store_true",
+                        required=False,
+                        default=False,
                         help='Enable verbose output')
-    parser.add_argument('paths', type=str, nargs='*', default=None,
+    parser.add_argument('paths',
+                        type=str,
+                        nargs='*',
+                        default=None,
                         help='Directories or files to format')
     FLAGS = parser.parse_args()
+
+    # Check the version of yapf. Needs a consistent version
+    # of yapf to prevent unneccessary changes in the code.
+    if (yapf.__version__ != '0.30.0'):
+        print("Needs yapf 0.30.0, but got yapf {}".format(yapf.__version__))
 
     if (FLAGS.paths is None) or (len(FLAGS.paths) == 0):
         parser.print_help()
