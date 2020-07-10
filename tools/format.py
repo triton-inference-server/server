@@ -60,7 +60,7 @@ def visit(path):
                 print("skipping due to path prefix: " + path)
             return True
     if python_file:
-        yapf.yapflib.yapf_api.FormatFile(path, in_place=True)
+        yapf.yapflib.yapf_api.FormatFile(path, in_place=True, style_config='google')
         return True
     else:
         args = ['clang-format-6.0', '--style=file', '-i']
