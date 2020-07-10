@@ -119,6 +119,25 @@ typedef enum TRITONSERVER_memorytype_enum {
 TRITONSERVER_EXPORT const char* TRITONSERVER_MemoryTypeString(
     TRITONSERVER_MemoryType memtype);
 
+/// TRITONSERVER_ParameterType
+///
+/// Types of parameters recognized by TRITONSERVER.
+///
+typedef enum TRITONSERVER_parametertype_enum {
+  TRITONSERVER_PARAMETER_STRING,
+  TRITONSERVER_PARAMETER_INT,
+  TRITONSERVER_PARAMETER_BOOL
+} TRITONSERVER_ParameterType;
+
+/// Get the string representation of a parmeter type. The returned
+/// string is not owned by the caller and so should not be modified or
+/// freed.
+///
+/// \param paramtype The parameter type.
+/// \return The string representation of the parameter type.
+TRITONSERVER_EXPORT const char* TRITONSERVER_ParameterTypeString(
+    TRITONSERVER_ParameterType paramtype);
+
 /// TRITONSERVER_Logging
 ///
 /// Types/levels of logging.
@@ -932,6 +951,49 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseId(
     TRITONSERVER_InferenceResponse* inference_response,
     const char** request_id);
 
+/// Get the number of parameters available in the response.
+///
+/// \param inference_response The response object.
+/// \param count Returns the number of parameters.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseParameterCount(
+    TRITONSERVER_InferenceResponse* inference_response, uint32_t* count);
+
+/// Get all information about a parameter. The caller does not own any
+/// of the returned values and must not modify or delete them. The
+/// lifetime of all returned values extends until 'inference_response'
+/// is deleted.
+///
+/// The 'vvalue' returns a void* pointer that must be cast
+/// appropriately based on 'type'. For example:
+///
+///   void* vvalue;
+///   TRITONSERVER_ParameterType type;
+///   TRITONSERVER_InferenceResponseParameter(response, index, &name, &type,
+///   &vvalue); switch (type) {
+///     case TRITONSERVER_PARAMETER_BOOL:
+///       bool value = *(reinterpret_cast<bool*>(vvalue));
+///       ...
+///     case TRITONSERVER_PARAMETER_INT:
+///       int64_t value = *(reinterpret_cast<int64_t*>(vvalue));
+///       ...
+///     case TRITONSERVER_PARAMETER_STRING:
+///       const char* value = *(reinterpret_cast<const char*>(vvalue));
+///       ...
+///
+/// \param inference_response The response object.
+/// \param index The index of the parameter, must be 0 <= index <
+/// count, where 'count' is the value returned by
+/// TRITONSERVER_InferenceResponseParameterCount.
+/// \param name Returns the name of the parameter.
+/// \param type Returns the type of the parameter.
+/// \param vvalue Returns a pointer to the parameter value.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseParameter(
+    TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
+    const char** name, TRITONSERVER_ParameterType* type, const void** vvalue);
+
 /// Get the number of outputs available in the response.
 ///
 /// \param inference_response The response object.
@@ -943,8 +1005,8 @@ TRITONSERVER_InferenceResponseOutputCount(
 
 /// Get all information about an output tensor.  The tensor data is
 /// returned as the base pointer to the data and the size, in bytes,
-/// of the data. The caller does not own any of the returned value and
-/// must not modify or delete them. The lifetime of all returned
+/// of the data. The caller does not own any of the returned values
+/// and must not modify or delete them. The lifetime of all returned
 /// values extends until 'inference_response' is deleted.
 ///
 /// \param inference_response The response object.
@@ -972,7 +1034,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseOutput(
 
 /// Get a classification label associated with an output for a given
 /// index.  The caller does not own the returned label and must not
-/// modify or delete ot. The lifetime of all returned label extends
+/// modify or delete it. The lifetime of all returned label extends
 /// until 'inference_response' is deleted.
 ///
 /// \param inference_response The response object.

@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 #include "src/core/constants.h"
+#include "src/core/infer_parameter.h"
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
 #include "src/core/status.h"
@@ -211,6 +212,18 @@ class InferenceResponse {
   int64_t ActualModelVersion() const;
   const Status& ResponseStatus() const { return status_; }
 
+  // The response parameters.
+  const std::deque<InferenceParameter>& Parameters() const
+  {
+    return parameters_;
+  }
+
+  // Add an parameter to the response.
+  Status AddParameter(const char* name, const char* value);
+  Status AddParameter(const char* name, const int64_t value);
+  Status AddParameter(const char* name, const bool value);
+
+  // The response outputs.
   const std::deque<Output>& Outputs() const { return outputs_; }
 
   // Add an output to the response. If 'output' is non-null
@@ -258,12 +271,15 @@ class InferenceResponse {
   // every response.
   std::string id_;
 
-  // The result tensors. Use a deque so that there is no reallocation
-  // with the resulting copies.
-  std::deque<Output> outputs_;
-
   // Error status for the response.
   Status status_;
+
+  // The parameters of the response. Use a deque so that there is no
+  // reallocation.
+  std::deque<InferenceParameter> parameters_;
+
+  // The result tensors. Use a deque so that there is no reallocation.
+  std::deque<Output> outputs_;
 
   // The response allocator and user pointer.
   const ResponseAllocator* allocator_;

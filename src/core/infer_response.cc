@@ -94,6 +94,27 @@ InferenceResponse::ActualModelVersion() const
 }
 
 Status
+InferenceResponse::AddParameter(const char* name, const char* value)
+{
+  parameters_.emplace_back(name, value);
+  return Status::Success;
+}
+
+Status
+InferenceResponse::AddParameter(const char* name, const int64_t value)
+{
+  parameters_.emplace_back(name, value);
+  return Status::Success;
+}
+
+Status
+InferenceResponse::AddParameter(const char* name, const bool value)
+{
+  parameters_.emplace_back(name, value);
+  return Status::Success;
+}
+
+Status
 InferenceResponse::AddOutput(
     const std::string& name, const DataType datatype,
     const std::vector<int64_t>& shape, InferenceResponse::Output** output)
