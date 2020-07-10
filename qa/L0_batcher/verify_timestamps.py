@@ -185,8 +185,8 @@ def summarize(protocol, traces):
                 model_span_map[key]["http infer"] / (cnt * 1000)))
             print("\tReceive (avg): {}us".format(
                 model_span_map[key]["http recv"] / (cnt * 1000)))
-            print("\tSend (avg): {}us".format(
-                model_span_map[key]["http send"] / (cnt * 1000)))
+            print("\tSend (avg): {}us".format(model_span_map[key]["http send"] /
+                                              (cnt * 1000)))
             print("\tOverhead (avg): {}us".format(
                 (model_span_map[key]["http infer"] -
                  model_span_map[key]["request handler"] -
@@ -197,8 +197,8 @@ def summarize(protocol, traces):
                 model_span_map[key]["grpc infer"] / (cnt * 1000)))
             print("\tWait/Read (avg): {}us".format(
                 model_span_map[key]["grpc wait/read"] / (cnt * 1000)))
-            print("\tSend (avg): {}us".format(
-                model_span_map[key]["grpc send"] / (cnt * 1000)))
+            print("\tSend (avg): {}us".format(model_span_map[key]["grpc send"] /
+                                              (cnt * 1000)))
             print("\tOverhead (avg): {}us".format(
                 (model_span_map[key]["grpc infer"] -
                  model_span_map[key]["request handler"] -
@@ -218,7 +218,7 @@ def summarize(protocol, traces):
             print("\t\tCompute (avg): {}us".format(
                 model_span_map[key]["compute"] / (cnt * 1000)))
         if ("compute input" in model_span_map[key]
-            ) and "compute output" in model_span_map[key]:
+           ) and "compute output" in model_span_map[key]:
             print("\t\t\tInput (avg): {}us".format(
                 model_span_map[key]["compute input"] / (cnt * 1000)))
             print("\t\t\tInfer (avg): {}us".format(

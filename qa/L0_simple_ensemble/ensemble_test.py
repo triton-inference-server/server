@@ -38,9 +38,10 @@ import tritonhttpclient
 
 
 class EnsembleTest(unittest.TestCase):
+
     def _get_infer_count_per_version(self, model_name):
-        triton_client = tritonhttpclient.InferenceServerClient(
-            "localhost:8000", verbose=True)
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True)
         stats = triton_client.get_inference_statistics(model_name)
         self.assertEqual(len(stats["model_stats"]), 2)
         infer_count = [0, 0]
@@ -81,7 +82,7 @@ class EnsembleTest(unittest.TestCase):
                            np.int32,
                            np.int32,
                            np.int32,
-                           outputs=("OUTPUT0", ))
+                           outputs=("OUTPUT0",))
 
         infer_count = self._get_infer_count_per_version("simple")
         # Only 'simple' version 2 should have non-zero infer count

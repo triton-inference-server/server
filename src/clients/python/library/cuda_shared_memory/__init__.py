@@ -36,6 +36,7 @@ import struct
 
 
 class _utf8(object):
+
     @classmethod
     def from_param(cls, value):
         if value is None:
@@ -68,8 +69,7 @@ _ccudashm_shared_memory_region_set.argtypes = [
 _cshm_get_shared_memory_handle_info = _ccudashm.GetCudaSharedMemoryHandleInfo
 _cshm_get_shared_memory_handle_info.restype = c_int
 _cshm_get_shared_memory_handle_info.argtypes = [
-    c_void_p,
-    POINTER(c_char_p),
+    c_void_p, POINTER(c_char_p),
     POINTER(c_uint64),
     POINTER(c_uint64)
 ]
@@ -172,7 +172,7 @@ def set_shared_memory_region(cuda_shm_handle, input_values):
     if not isinstance(input_values, (list, tuple)):
         _raise_error("input_values must be specified as a numpy array")
     for input_value in input_values:
-        if not isinstance(input_value, (np.ndarray, )):
+        if not isinstance(input_value, (np.ndarray,)):
             _raise_error(
                 "input_values must be specified as a list/tuple of numpy arrays"
             )
@@ -287,6 +287,7 @@ class CudaSharedMemoryException(Exception):
         Pointer to an Error that should be used to initialize the exception.
 
     """
+
     def __init__(self, err):
         self.err_code_map = {
             -1: "unable to set device successfully",

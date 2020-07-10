@@ -91,13 +91,12 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Use custom model')
-    parser.add_argument(
-        '-u',
-        '--url',
-        type=str,
-        required=False,
-        default='localhost:8000',
-        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument('-s',
                         '--ssl',
                         action="store_true",
@@ -139,8 +138,7 @@ if __name__ == '__main__':
 
     if FLAGS.http_headers is not None:
         headers_dict = {
-            l.split(':')[0]: l.split(':')[1]
-            for l in FLAGS.http_headers
+            l.split(':')[0]: l.split(':')[1] for l in FLAGS.http_headers
         }
     else:
         headers_dict = None

@@ -39,6 +39,7 @@ try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
     class bdist_wheel(_bdist_wheel):
+
         def finalize_options(self):
             _bdist_wheel.finalize_options(self)
             self.root_is_pure = False
@@ -54,8 +55,7 @@ setup(
     version=VERSION,
     author='NVIDIA Inc.',
     author_email='tanmayv@nvidia.com',
-    description=
-    'Python utils library for NVIDIA Triton Inference Server client',
+    description='Python utils library for NVIDIA Triton Inference Server client',
     license='BSD',
     url='http://nvidia.com',
     keywords='triton tensorrt inference server utils client',

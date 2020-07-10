@@ -47,6 +47,7 @@ def add_span(span_map, timestamps, span_name, ts_start, ts_end):
 
 
 class AbstractFrontend():
+
     @property
     def filter_timestamp(self):
         return None
@@ -59,6 +60,7 @@ class AbstractFrontend():
 
 
 class HttpFrontend(AbstractFrontend):
+
     @property
     def filter_timestamp(self):
         return "HTTP_RECV_START"
@@ -90,6 +92,7 @@ class HttpFrontend(AbstractFrontend):
 
 
 class GrpcFrontend(AbstractFrontend):
+
     @property
     def filter_timestamp(self):
         return "GRPC_WAITREAD_START"
@@ -240,14 +243,14 @@ def summarize(frontend, traces):
         if ("QUEUE"
                 in model_span_map[key]) and "COMPUTE" in model_span_map[key]:
             print("\t\tOverhead (avg): {}us".format(
-                (model_span_map[key]["REQUEST"] - model_span_map[key]["QUEUE"]
-                 - model_span_map[key]["COMPUTE"]) / (cnt * 1000)))
+                (model_span_map[key]["REQUEST"] - model_span_map[key]["QUEUE"] -
+                 model_span_map[key]["COMPUTE"]) / (cnt * 1000)))
             print("\t\tQueue (avg): {}us".format(model_span_map[key]["QUEUE"] /
                                                  (cnt * 1000)))
             print("\t\tCompute (avg): {}us".format(
                 model_span_map[key]["COMPUTE"] / (cnt * 1000)))
         if ("COMPUTE_INPUT" in model_span_map[key]
-            ) and "COMPUTE_OUTPUT" in model_span_map[key]:
+           ) and "COMPUTE_OUTPUT" in model_span_map[key]:
             print("\t\t\tInput (avg): {}us".format(
                 model_span_map[key]["COMPUTE_INPUT"] / (cnt * 1000)))
             print("\t\t\tInfer (avg): {}us".format(

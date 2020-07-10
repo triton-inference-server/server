@@ -41,15 +41,16 @@ from tritonclientutils import InferenceServerException
 
 
 class TrtDynamicShapeTest(unittest.TestCase):
+
     def setUp(self):
         self.dtype_ = np.float32
         self.model_name_ = 'plan'
 
     def test_load_specific_optimization_profile(self):
         # Only OP 5 should be available, which only allow batch size 8
-        tensor_shape = (1, )
+        tensor_shape = (1,)
         try:
-            iu.infer_exact(self, self.model_name_, (1, ) + tensor_shape, 1,
+            iu.infer_exact(self, self.model_name_, (1,) + tensor_shape, 1,
                            self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(
@@ -57,25 +58,25 @@ class TrtDynamicShapeTest(unittest.TestCase):
                 in ex.message())
 
         try:
-            iu.infer_exact(self, self.model_name_, (8, ) + tensor_shape, 8,
+            iu.infer_exact(self, self.model_name_, (8,) + tensor_shape, 8,
                            self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_load_default_optimization_profile(self):
         # Only default OP (OP 0) has max tensor shape 33
-        tensor_shape = (33, )
+        tensor_shape = (33,)
 
         try:
-            iu.infer_exact(self, self.model_name_, (8, ) + tensor_shape, 8,
+            iu.infer_exact(self, self.model_name_, (8,) + tensor_shape, 8,
                            self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        over_tensor_shape = (34, )
+        over_tensor_shape = (34,)
         try:
-            iu.infer_exact(self, self.model_name_, (8, ) + over_tensor_shape,
-                           8, self.dtype_, self.dtype_, self.dtype_)
+            iu.infer_exact(self, self.model_name_, (8,) + over_tensor_shape, 8,
+                           self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(
                 "model expected the shape of dimension 1 to be between 1 and 33 but received 34"
@@ -84,11 +85,10 @@ class TrtDynamicShapeTest(unittest.TestCase):
     def test_select_optimization_profile(self):
         # Different profile has different optimized input shape
         batch_size = 4
-        tensor_shape = (16, )
+        tensor_shape = (16,)
         try:
-            iu.infer_exact(self, self.model_name_,
-                           (batch_size, ) + tensor_shape, batch_size,
-                           self.dtype_, self.dtype_, self.dtype_)
+            iu.infer_exact(self, self.model_name_, (batch_size,) + tensor_shape,
+                           batch_size, self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 

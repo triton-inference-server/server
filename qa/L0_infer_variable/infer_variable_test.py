@@ -37,11 +37,12 @@ np_dtype_string = np.dtype(object)
 
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
+                                                  0)))
 
 
 class InferVariableTest(unittest.TestCase):
+
     def _full_exact(self,
                     input_dtype,
                     output0_dtype,
@@ -52,6 +53,7 @@ class InferVariableTest(unittest.TestCase):
                     output0_raw=True,
                     output1_raw=True,
                     swap=False):
+
         def _infer_exact_helper(tester,
                                 pf,
                                 tensor_shape,
@@ -95,7 +97,7 @@ class InferVariableTest(unittest.TestCase):
                 # model that supports batching
                 iu.infer_exact(
                     tester,
-                    pf, (bs, ) + tensor_shape,
+                    pf, (bs,) + tensor_shape,
                     bs,
                     input_dtype,
                     output0_dtype,
@@ -138,8 +140,7 @@ class InferVariableTest(unittest.TestCase):
                                         swap=swap)
 
         if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
-                                     input_shape, output0_shape,
-                                     output1_shape):
+                                     input_shape, output0_shape, output1_shape):
             for prefix in ensemble_prefix:
                 if input_dtype == np.int8:
                     _infer_exact_helper(self,
@@ -195,9 +196,9 @@ class InferVariableTest(unittest.TestCase):
                                 output1_raw=output1_raw,
                                 swap=False)
 
-        if tu.validate_for_onnx_model(input_dtype, output0_dtype,
-                                      output1_dtype, input_shape,
-                                      output0_shape, output1_shape):
+        if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                      input_shape, output0_shape,
+                                      output1_shape):
             # No basic ensemble models are created against custom models [TODO]
             _infer_exact_helper(self,
                                 'onnx',
@@ -226,24 +227,21 @@ class InferVariableTest(unittest.TestCase):
                                 swap=swap)
 
     def test_raw_fff(self):
-        self._full_exact(np.float32, np.float32, np.float32, (16, ), (16, ),
-                         (16, ))
+        self._full_exact(np.float32, np.float32, np.float32, (16,), (16,),
+                         (16,))
 
     def test_raw_fii(self):
-        self._full_exact(np.float32, np.int32, np.int32, (2, 8), (2, 8),
-                         (2, 8))
+        self._full_exact(np.float32, np.int32, np.int32, (2, 8), (2, 8), (2, 8))
 
     def test_raw_fll(self):
-        self._full_exact(np.float32, np.int64, np.int64, (8, 4), (8, 4),
-                         (8, 4))
+        self._full_exact(np.float32, np.int64, np.int64, (8, 4), (8, 4), (8, 4))
 
     def test_raw_fil(self):
         self._full_exact(np.float32, np.int32, np.int64, (2, 8, 2), (2, 8, 2),
                          (2, 8, 2))
 
     def test_raw_ffi(self):
-        self._full_exact(np.float32, np.float32, np.int32, (16, ), (16, ),
-                         (16, ))
+        self._full_exact(np.float32, np.float32, np.int32, (16,), (16,), (16,))
 
     def test_raw_iii(self):
         self._full_exact(np.int32, np.int32, np.int32, (2, 8), (2, 8), (2, 8))
@@ -254,7 +252,7 @@ class InferVariableTest(unittest.TestCase):
 
     def test_raw_ooo(self):
         self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
-                         (16, ), (16, ), (16, ))
+                         (16,), (16,), (16,))
 
     def test_raw_oii(self):
         self._full_exact(np_dtype_string, np.int32, np.int32, (2, 8), (2, 8),
@@ -271,7 +269,7 @@ class InferVariableTest(unittest.TestCase):
     def test_class_fff(self):
         self._full_exact(np.float32,
                          np.float32,
-                         np.float32, (16, ), (16, ), (16, ),
+                         np.float32, (16,), (16,), (16,),
                          output0_raw=False,
                          output1_raw=False)
 
@@ -299,7 +297,7 @@ class InferVariableTest(unittest.TestCase):
     def test_class_ffi(self):
         self._full_exact(np.float32,
                          np.float32,
-                         np.int32, (16, ), (16, ), (16, ),
+                         np.int32, (16,), (16,), (16,),
                          output0_raw=False,
                          output1_raw=False)
 
@@ -320,7 +318,7 @@ class InferVariableTest(unittest.TestCase):
     def test_mix_ffi(self):
         self._full_exact(np.float32,
                          np.float32,
-                         np.int32, (16, ), (16, ), (16, ),
+                         np.int32, (16,), (16,), (16,),
                          output0_raw=True,
                          output1_raw=False)
 

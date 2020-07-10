@@ -179,8 +179,8 @@ def np_to_torch_dtype(np_dtype):
     return None
 
 
-def create_tf_modelfile(create_savedmodel, models_dir, model_version,
-                        max_batch, dtype, input_shapes, output_shapes):
+def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
+                        dtype, input_shapes, output_shapes):
 
     assert len(input_shapes) == len(output_shapes)
     if not tu.validate_for_tf_model(dtype, dtype, dtype, input_shapes[0],
@@ -224,11 +224,9 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version,
             dtype)
     else:
         model_name = tu.get_zero_model_name(
-            "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt,
-            dtype)
+            "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype)
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -280,8 +278,7 @@ def create_tf_modelconfig(create_savedmodel, models_dir, model_version,
             dtype)
     else:
         model_name = tu.get_zero_model_name(
-            "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt,
-            dtype)
+            "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype)
 
     config_dir = models_dir + "/" + model_name
     config = '''
@@ -289,8 +286,9 @@ name: "{}"
 platform: "{}"
 max_batch_size: {}
 '''.format(
-        model_name, "tensorflow_savedmodel"
-        if create_savedmodel else "tensorflow_graphdef", max_batch)
+        model_name,
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
+        max_batch)
 
     for io_num in range(io_cnt):
         config += '''
@@ -314,9 +312,9 @@ output [
             io_num, np_to_model_dtype(dtype),
             tu.shape_to_dims_str(input_shapes[io_num]),
             "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(input_model_shapes[io_num])) if
-            input_shapes[io_num] != input_model_shapes[io_num] else "", io_num,
-            np_to_model_dtype(dtype),
+                tu.shape_to_dims_str(input_model_shapes[io_num]))
+            if input_shapes[io_num] != input_model_shapes[io_num] else "",
+            io_num, np_to_model_dtype(dtype),
             tu.shape_to_dims_str(output_shapes[io_num]),
             "reshape: {{ shape: [ {} ] }}".format(
                 tu.shape_to_dims_str(output_model_shapes[io_num]))
@@ -365,8 +363,7 @@ def create_netdef_modelfile(models_dir, model_version, max_batch, dtype,
         input_blobs = ["INPUT{}".format(i) for i in range(io_cnt)], \
         output_blobs = ["OUTPUT{}".format(i) for i in range(io_cnt)])
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -423,9 +420,9 @@ output [
             io_num, np_to_model_dtype(dtype),
             tu.shape_to_dims_str(input_shapes[io_num]),
             "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(input_model_shapes[io_num])) if
-            input_shapes[io_num] != input_model_shapes[io_num] else "", io_num,
-            np_to_model_dtype(dtype),
+                tu.shape_to_dims_str(input_model_shapes[io_num]))
+            if input_shapes[io_num] != input_model_shapes[io_num] else "",
+            io_num, np_to_model_dtype(dtype),
             tu.shape_to_dims_str(output_shapes[io_num]),
             "reshape: {{ shape: [ {} ] }}".format(
                 tu.shape_to_dims_str(output_model_shapes[io_num]))
@@ -477,8 +474,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype,
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -536,9 +532,9 @@ output [
             io_num, np_to_model_dtype(dtype),
             tu.shape_to_dims_str(input_shapes[io_num]),
             "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(input_model_shapes[io_num])) if
-            input_shapes[io_num] != input_model_shapes[io_num] else "", io_num,
-            np_to_model_dtype(dtype),
+                tu.shape_to_dims_str(input_model_shapes[io_num]))
+            if input_shapes[io_num] != input_model_shapes[io_num] else "",
+            io_num, np_to_model_dtype(dtype),
             tu.shape_to_dims_str(output_shapes[io_num]),
             "reshape: {{ shape: [ {} ] }}".format(
                 tu.shape_to_dims_str(output_model_shapes[io_num]))
@@ -570,6 +566,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
     if io_cnt == 1:
 
         class ReshapeNet(nn.Module):
+
             def __init__(self, *args):
                 super(ReshapeNet, self).__init__()
                 self.shape = args[0][0]
@@ -585,6 +582,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
     elif io_cnt == 2:
 
         class ReshapeNet(nn.Module):
+
             def __init__(self, *args):
                 super(ReshapeNet, self).__init__()
                 self.shape = args[0][0]
@@ -603,6 +601,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
     elif io_cnt == 3:
 
         class ReshapeNet(nn.Module):
+
             def __init__(self, *args):
                 super(ReshapeNet, self).__init__()
                 self.shape = args[0][0]
@@ -618,6 +617,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
     elif io_cnt == 4:
 
         class ReshapeNet(nn.Module):
+
             def __init__(self, *args):
                 super(ReshapeNet, self).__init__()
                 self.shape = args[0][0]
@@ -639,8 +639,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
     traced = torch.jit.trace(reshapeModel,
                              tuple(example_inputs[i] for i in range(io_cnt)))
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -651,8 +650,8 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
 
 
 def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
-                                input_shapes, input_model_shapes,
-                                output_shapes, output_model_shapes):
+                                input_shapes, input_model_shapes, output_shapes,
+                                output_model_shapes):
 
     assert len(input_shapes) == len(input_model_shapes)
     assert len(output_shapes) == len(output_model_shapes)
@@ -694,9 +693,9 @@ output [
             io_num, np_to_model_dtype(dtype),
             tu.shape_to_dims_str(input_shapes[io_num]),
             "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(input_model_shapes[io_num])) if
-            input_shapes[io_num] != input_model_shapes[io_num] else "", io_num,
-            np_to_model_dtype(dtype),
+                tu.shape_to_dims_str(input_model_shapes[io_num]))
+            if input_shapes[io_num] != input_model_shapes[io_num] else "",
+            io_num, np_to_model_dtype(dtype),
             tu.shape_to_dims_str(output_shapes[io_num]),
             "reshape: {{ shape: [ {} ] }}".format(
                 tu.shape_to_dims_str(output_model_shapes[io_num]))
@@ -720,14 +719,14 @@ def create_ensemble_modelfile(models_dir, model_version, max_batch, dtype,
                                           input_shapes[0]):
         return
 
-    emu.create_identity_ensemble_modelfile("reshape", models_dir,
-                                           model_version, max_batch, dtype,
-                                           input_shapes, output_shapes)
+    emu.create_identity_ensemble_modelfile("reshape", models_dir, model_version,
+                                           max_batch, dtype, input_shapes,
+                                           output_shapes)
 
 
 def create_ensemble_modelconfig(models_dir, model_version, max_batch, dtype,
-                                input_shapes, input_model_shapes,
-                                output_shapes, output_model_shapes):
+                                input_shapes, input_model_shapes, output_shapes,
+                                output_model_shapes):
 
     assert len(input_shapes) == len(input_model_shapes)
     assert len(output_shapes) == len(output_model_shapes)
@@ -773,8 +772,7 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype,
     # Create the model
     model_name = tu.get_zero_model_name(
         "onnx_nobatch" if max_batch == 0 else "onnx", io_cnt, dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     batch_dim = [] if max_batch == 0 else [None]
 
@@ -918,8 +916,8 @@ def create_models(models_dir,
 
     if FLAGS.onnx:
         create_onnx_modelconfig(models_dir, model_version, 8, dtype,
-                                input_shapes, input_model_shapes,
-                                output_shapes, output_model_shapes)
+                                input_shapes, input_model_shapes, output_shapes,
+                                output_model_shapes)
         create_onnx_modelfile(models_dir, model_version, 8, dtype,
                               input_model_shapes, output_model_shapes)
         if no_batch:
@@ -968,8 +966,8 @@ def create_trt_models(models_dir,
 
     if FLAGS.tensorrt:
         create_plan_modelconfig(models_dir, model_version, 8, dtype,
-                                input_shapes, input_model_shapes,
-                                output_shapes, output_model_shapes)
+                                input_shapes, input_model_shapes, output_shapes,
+                                output_model_shapes)
         create_plan_modelfile(models_dir, model_version, 8, dtype,
                               input_model_shapes, output_model_shapes)
         if no_batch:
@@ -1071,16 +1069,14 @@ if __name__ == '__main__':
 
     # TensorRT and LibTorch must be handled separately since it doesn't support
     # zero-sized tensors.
-    create_models(FLAGS.models_dir,
-                  np.float32, ([1], ), ([], ),
-                  no_batch=False)
+    create_models(FLAGS.models_dir, np.float32, ([1],), ([],), no_batch=False)
     create_models(FLAGS.models_dir,
                   np.float32, ([1], [8]), ([], [4, 1, 2]),
                   no_batch=False)
     create_models(FLAGS.models_dir, np.float32, ([4, 4], [2], [2, 2, 3]),
                   ([16], [1, 2], [3, 2, 2]))
     create_libtorch_models(FLAGS.models_dir,
-                           np.float32, ([1], ), ([1, 1, 1], ),
+                           np.float32, ([1],), ([1, 1, 1],),
                            no_batch=False)
     create_libtorch_models(FLAGS.models_dir,
                            np.float32, ([1], [8]), ([1, 1, 1], [4, 1, 2]),
@@ -1106,11 +1102,11 @@ if __name__ == '__main__':
     create_trt_models(FLAGS.models_dir,
                       np.float32, ([4, 4], [2], [2, 2, 3], [1]),
                       ([2, 2, 4], [1, 2, 1], [3, 2, 2], [1, 1, 1]),
-                      output_shapes=([2, 2, 4], [1, 2, 1], [3, 2,
-                                                            2], [1, 1, 1]),
-                      output_model_shapes=([2, 2, 4], [1, 2,
-                                                       1], [3, 2,
-                                                            2], [1, 1, 1]))
+                      output_shapes=([2, 2, 4], [1, 2, 1], [3, 2, 2], [1, 1,
+                                                                       1]),
+                      output_model_shapes=([2, 2, 4], [1, 2, 1], [3, 2,
+                                                                  2], [1, 1,
+                                                                       1]))
 
     # Tests with models that accept variable-shape input/output tensors and reshape
     # TensorRT is ignored as it only allows fixed-shape tensors
@@ -1118,10 +1114,9 @@ if __name__ == '__main__':
     # based on input used for tracing), need to find equivalent operation that
     # is not shape dependent.
     if FLAGS.variable:
-        create_models(FLAGS.models_dir, np.int32, ([2, 4, -1, 6], ),
-                      ([8, -1, 1, 6], ))
-        create_models(FLAGS.models_dir, np.int32,
-                      ([1, -1, 1], [-1], [2, 2, 3]),
+        create_models(FLAGS.models_dir, np.int32, ([2, 4, -1, 6],),
+                      ([8, -1, 1, 6],))
+        create_models(FLAGS.models_dir, np.int32, ([1, -1, 1], [-1], [2, 2, 3]),
                       ([-1], [1, -1, 1], [3, 2, 2]))
         create_models(FLAGS.models_dir,
                       np.int32, ([-1, 1], [2]), ([1, -1], [1, 2]),
@@ -1130,4 +1125,4 @@ if __name__ == '__main__':
 
     # TRT plan that reshapes neither input nor output. Needed for
     # L0_perflab_nomodel.
-    create_trt_models(FLAGS.models_dir, np.float32, ([1], ), ([1], ))
+    create_trt_models(FLAGS.models_dir, np.float32, ([1],), ([1],))

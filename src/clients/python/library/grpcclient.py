@@ -91,6 +91,7 @@ class InferenceServerClient:
         If unable to create a client.
 
     """
+
     def __init__(self, url, verbose=False):
         # FixMe: Are any of the channel options worth exposing?
         # https://grpc.io/grpc/core/group__grpc__arg__keys.html
@@ -381,8 +382,8 @@ class InferenceServerClient:
         try:
             if type(model_version) != str:
                 raise_error("model version must be a string")
-            request = grpc_service_pb2.ModelConfigRequest(
-                name=model_name, version=model_version)
+            request = grpc_service_pb2.ModelConfigRequest(name=model_name,
+                                                          version=model_version)
             if self._verbose:
                 print("get_model_config, metadata {}\n{}".format(
                     metadata, request))
@@ -497,8 +498,7 @@ class InferenceServerClient:
             request = grpc_service_pb2.RepositoryModelUnloadRequest(
                 model_name=model_name)
             if self._verbose:
-                print("unload_model, metadata {}\n{}".format(
-                    metadata, request))
+                print("unload_model, metadata {}\n{}".format(metadata, request))
             self._client_stub.RepositoryModelUnload(request=request,
                                                     metadata=metadata)
             if self._verbose:
@@ -602,9 +602,8 @@ class InferenceServerClient:
             request = grpc_service_pb2.SystemSharedMemoryStatusRequest(
                 name=region_name)
             if self._verbose:
-                print(
-                    "get_system_shared_memory_status, metadata {}\n{}".format(
-                        metadata, request))
+                print("get_system_shared_memory_status, metadata {}\n{}".format(
+                    metadata, request))
             response = self._client_stub.SystemSharedMemoryStatus(
                 request=request, metadata=metadata)
             if self._verbose:
@@ -695,9 +694,8 @@ class InferenceServerClient:
             request = grpc_service_pb2.SystemSharedMemoryUnregisterRequest(
                 name=name)
             if self._verbose:
-                print(
-                    "unregister_system_shared_memory, metadata {}\n{}".format(
-                        metadata, request))
+                print("unregister_system_shared_memory, metadata {}\n{}".format(
+                    metadata, request))
             self._client_stub.SystemSharedMemoryUnregister(request=request,
                                                            metadata=metadata)
             if self._verbose:
@@ -809,8 +807,8 @@ class InferenceServerClient:
             self._client_stub.CudaSharedMemoryRegister(request=request,
                                                        metadata=metadata)
             if self._verbose:
-                print("Registered cuda shared memory with name '{}'".format(
-                    name))
+                print(
+                    "Registered cuda shared memory with name '{}'".format(name))
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -848,8 +846,9 @@ class InferenceServerClient:
                                                          metadata=metadata)
             if self._verbose:
                 if name is not "":
-                    print("Unregistered cuda shared memory with name '{}'".
-                          format(name))
+                    print(
+                        "Unregistered cuda shared memory with name '{}'".format(
+                            name))
                 else:
                     print("Unregistered all cuda shared memory regions")
         except grpc.RpcError as rpc_error:
@@ -1038,6 +1037,7 @@ class InferenceServerClient:
         InferenceServerException
             If server fails to issue inference.
         """
+
         def wrapped_callback(call_future):
             error = result = None
             try:
@@ -1110,10 +1110,9 @@ class InferenceServerClient:
 
         """
         if self._stream is not None:
-            raise_error(
-                "cannot start another stream with one already running. "
-                "'InferenceServerClient' supports only a single active "
-                "stream at a given time.")
+            raise_error("cannot start another stream with one already running. "
+                        "'InferenceServerClient' supports only a single active "
+                        "stream at a given time.")
 
         if headers is not None:
             metadata = headers.items()
@@ -1244,6 +1243,7 @@ class InferInput:
         The datatype of the associated input.
 
     """
+
     def __init__(self, name, shape, datatype):
         self._input = grpc_service_pb2.ModelInferRequest().InferInputTensor()
         self._input.name = name
@@ -1306,7 +1306,7 @@ class InferInput:
         InferenceServerException
             If failed to set data for the tensor.
         """
-        if not isinstance(input_tensor, (np.ndarray, )):
+        if not isinstance(input_tensor, (np.ndarray,)):
             raise_error("input_tensor must be a numpy array")
         dtype = np_to_triton_dtype(input_tensor.dtype)
         if self._input.datatype != dtype:
@@ -1381,6 +1381,7 @@ class InferRequestedOutput:
         value is 0 which means the classification results are not
         requested.
     """
+
     def __init__(self, name, class_count=0):
         self._output = grpc_service_pb2.ModelInferRequest(
         ).InferRequestedOutputTensor()
@@ -1425,8 +1426,7 @@ class InferRequestedOutput:
         self._output.parameters[
             'shared_memory_byte_size'].int64_param = byte_size
         if offset != 0:
-            self._output.parameters[
-                'shared_memory_offset'].int64_param = offset
+            self._output.parameters['shared_memory_offset'].int64_param = offset
 
     def unset_shared_memory(self):
         """Clears the shared memory option set by the last call to
@@ -1459,6 +1459,7 @@ class InferResult:
     result : protobuf message
         The ModelInferResponse returned by the server
     """
+
     def __init__(self, result):
         self._result = result
 
@@ -1528,8 +1529,7 @@ class InferResult:
             if output.name == name:
                 if as_json:
                     return json.loads(
-                        MessageToJson(output,
-                                      preserving_proto_field_name=True))
+                        MessageToJson(output, preserving_proto_field_name=True))
                 else:
                     return output
 
@@ -1572,6 +1572,7 @@ class _InferStream:
         ownership of these objects will be given to the user. The
         'error' would be None for a successful inference.
     """
+
     def __init__(self, callback, verbose):
         self._callback = callback
         self._verbose = verbose
@@ -1609,7 +1610,7 @@ class _InferStream:
                 'Attempted to initialize already initialized InferStream')
         # Create a new thread to handle the gRPC response stream
         self._handler = threading.Thread(target=self._process_response,
-                                         args=(response_iterator, ))
+                                         args=(response_iterator,))
         self._handler.start()
         if self._verbose:
             print("stream started...")
@@ -1658,8 +1659,7 @@ class _InferStream:
                     print(response)
                 result = error = None
                 if response.error_message != "":
-                    error = InferenceServerException(
-                        msg=response.error_message)
+                    error = InferenceServerException(msg=response.error_message)
                 else:
                     result = InferResult(response.infer_response)
                 self._callback(result=result, error=error)
@@ -1677,6 +1677,7 @@ class _RequestIterator:
         The InferStream that holds the context to an active stream.
 
     """
+
     def __init__(self, stream):
         self._stream = stream
 

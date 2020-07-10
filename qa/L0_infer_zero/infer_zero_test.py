@@ -39,11 +39,12 @@ np_dtype_string = np.dtype(object)
 
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
+                                                  0)))
 
 
 class InferZeroTest(unittest.TestCase):
+
     def _full_zero(self, dtype, shapes):
         # 'shapes' is list of shapes, one for each input.
 
@@ -117,8 +118,8 @@ class InferZeroTest(unittest.TestCase):
                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if tu.validate_for_onnx_model(dtype, dtype, dtype, shapes[0],
-                                      shapes[0], shapes[0]):
+        if tu.validate_for_onnx_model(dtype, dtype, dtype, shapes[0], shapes[0],
+                                      shapes[0]):
             # model that supports batching
             for bs in (1, 8):
                 batch_shapes = [[
@@ -174,12 +175,12 @@ class InferZeroTest(unittest.TestCase):
     def test_ff1_sanity(self):
         self._full_zero(np.float32, ([
             1,
-        ], ))
+        ],))
 
     def test_ff1(self):
         self._full_zero(np.float32, ([
             0,
-        ], ))
+        ],))
 
     def test_ff3_sanity(self):
         self._full_zero(np.float32, ([
@@ -236,16 +237,16 @@ class InferZeroTest(unittest.TestCase):
         ]))
 
     def test_hh1_sanity(self):
-        self._full_zero(np.float16, ([2, 2], ))
+        self._full_zero(np.float16, ([2, 2],))
 
     def test_hh1_0(self):
-        self._full_zero(np.float16, ([1, 0], ))
+        self._full_zero(np.float16, ([1, 0],))
 
     def test_hh1_1(self):
-        self._full_zero(np.float16, ([0, 1], ))
+        self._full_zero(np.float16, ([0, 1],))
 
     def test_hh1_2(self):
-        self._full_zero(np.float16, ([0, 0], ))
+        self._full_zero(np.float16, ([0, 0],))
 
     def test_hh3_sanity(self):
         self._full_zero(np.float16, ([2, 2], [2, 2], [1, 1]))
@@ -268,12 +269,12 @@ class InferZeroTest(unittest.TestCase):
     def test_oo1_sanity(self):
         self._full_zero(np_dtype_string, ([
             2,
-        ], ))
+        ],))
 
     def test_oo1(self):
         self._full_zero(np_dtype_string, ([
             0,
-        ], ))
+        ],))
 
     def test_oo3_sanity(self):
         self._full_zero(np_dtype_string, ([2, 2], [2, 2], [1, 1]))
@@ -296,12 +297,12 @@ class InferZeroTest(unittest.TestCase):
     def test_bb1_sanity(self):
         self._full_zero(np.bool, ([
             10,
-        ], ))
+        ],))
 
     def test_bb1_0(self):
         self._full_zero(np.bool, ([
             0,
-        ], ))
+        ],))
 
 
 if __name__ == '__main__':

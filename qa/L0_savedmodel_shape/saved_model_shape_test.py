@@ -39,8 +39,10 @@ np_dtype_string = np.dtype(object)
 
 
 class SavedModelShapeTest(unittest.TestCase):
+
     def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
                     output0_raw, output1_raw, swap):
+
         def _infer_exact_helper(tester,
                                 pf,
                                 tensor_shape,
@@ -68,7 +70,7 @@ class SavedModelShapeTest(unittest.TestCase):
                                    use_grpc, skip_request_id_check,
                                    use_streaming, correlation_id)
                 # model that supports batching
-                iu.infer_exact(tester, "savedmodel", (bs, ) + tensor_shape, bs,
+                iu.infer_exact(tester, "savedmodel", (bs,) + tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw, model_version, swap,
                                outputs, use_http, use_grpc,
@@ -78,10 +80,10 @@ class SavedModelShapeTest(unittest.TestCase):
         input_size = 16
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
-                                    (input_size, ), (input_size, ),
-                                    (input_size, )):
+                                    (input_size,), (input_size,),
+                                    (input_size,)):
             _infer_exact_helper(self,
-                                "savedmodel", (input_size, ),
+                                "savedmodel", (input_size,),
                                 8,
                                 input_dtype,
                                 output0_dtype,

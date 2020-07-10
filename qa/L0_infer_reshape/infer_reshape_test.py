@@ -39,11 +39,12 @@ np_dtype_string = np.dtype(object)
 
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
+                                                  0)))
 
 
 class InferReshapeTest(unittest.TestCase):
+
     def _full_reshape(self,
                       dtype,
                       input_shapes,
@@ -308,7 +309,7 @@ class InferReshapeTest(unittest.TestCase):
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     def test_ff1(self):
-        self._full_reshape(np.float32, input_shapes=([1], ), no_batch=False)
+        self._full_reshape(np.float32, input_shapes=([1],), no_batch=False)
 
     def test_ff2(self):
         self._full_reshape(np.float32, input_shapes=([1], [8]), no_batch=False)
@@ -327,7 +328,7 @@ class InferReshapeTest(unittest.TestCase):
                                                                 2], [1, 1, 1]))
 
     def test_ii1(self):
-        self._full_reshape(np.int32, input_shapes=([2, 4, 5, 6], ))
+        self._full_reshape(np.int32, input_shapes=([2, 4, 5, 6],))
 
     def test_ii2(self):
         self._full_reshape(np.int32,

@@ -37,14 +37,15 @@ from tritonclientutils import np_to_triton_dtype, InferenceServerException
 
 
 class LargePayLoadTest(unittest.TestCase):
+
     def setUp(self):
         self.data_type_ = np.float32
         # n GB divided by element size as tensor shape
         tensor_shape = (math.trunc(6 * (1024 * 1024 * 1024) /
-                                   np.dtype(self.data_type_).itemsize), )
+                                   np.dtype(self.data_type_).itemsize),)
         self.in0_ = np.random.random(tensor_shape).astype(self.data_type_)
 
-        small_tensor_shape = (1, )
+        small_tensor_shape = (1,)
         self.sin0_ = np.random.random(small_tensor_shape).astype(
             self.data_type_)
 

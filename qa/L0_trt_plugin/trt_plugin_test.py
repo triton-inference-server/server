@@ -37,14 +37,14 @@ from tritonclientutils import InferenceServerException
 
 
 class PluginModelTest(unittest.TestCase):
+
     def _full_exact(self, batch_size, model_name, plugin_name):
         triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                          verbose=True)
 
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT0', [batch_size, 16],
-                                            "FP32"))
+        inputs.append(httpclient.InferInput('INPUT0', [batch_size, 16], "FP32"))
 
         input0_data = np.random.randn(batch_size, 16).astype(np.float32)
         inputs[0].set_data_from_numpy(input0_data, binary_data=True)

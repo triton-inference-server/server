@@ -45,13 +45,12 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument(
-        '-u',
-        '--url',
-        type=str,
-        required=False,
-        default='localhost:8000',
-        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument(
         '-i',
         '--protocol',
@@ -68,9 +67,8 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
-        print(
-            "unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
-                FLAGS.protocol))
+        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
+            FLAGS.protocol))
         exit(1)
 
     client_util = httpclient if FLAGS.protocol == "http" else grpcclient
@@ -81,8 +79,7 @@ if __name__ == '__main__':
     elements = 8
 
     # Create the inference context for the model.
-    client = client_util.InferenceServerClient(FLAGS.url,
-                                               verbose=FLAGS.verbose)
+    client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
 
     # Create the data for one input tensor.
     input_data = np.arange(start=42, stop=42 + elements, dtype=np.int32)

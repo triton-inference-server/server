@@ -46,14 +46,14 @@ class UnknownRankTest(unittest.TestCase):
 
     def test_success(self):
         model_name = "unknown_rank_success"
-        tensor_shape = (1, )
+        tensor_shape = (1,)
         try:
             self.infer_unknown(model_name, tensor_shape)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_wrong_output(self):
-        tensor_shape = (1, )
+        tensor_shape = (1,)
         model_name = "unknown_rank_wrong_output"
         try:
             self.infer_unknown(model_name, tensor_shape)

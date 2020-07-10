@@ -54,13 +54,14 @@ if _no_batching:
 
 _ragged_batch_supported_trials = list()
 if "custom" in _trials:
-    _ragged_batch_supported_trials = ("custom", )
+    _ragged_batch_supported_trials = ("custom",)
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
 
 
 class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
+
     def get_datatype(self, trial):
         return np.int32
 
@@ -75,8 +76,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         # qa/common/gen_qa_dyna_sequence_models.py for more
         # information.
         if ((("nobatch" not in trial) and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial) or
-            ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial):
+            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
+            ("onnx" in trial)) or ("libtorch" in trial):
             expected_result = value
             if flag_str is not None:
                 if "start" in flag_str:
@@ -153,9 +154,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         (4000, None),
                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                         (
-                            ("start,end", 42, None, None), ),
-                        self.get_expected_result(42 + corrid, corrid, 42,
-                                                 trial, "start,end"),
+                            ("start,end", 42, None, None),),
+                        self.get_expected_result(42 + corrid, corrid, 42, trial,
+                                                 "start,end"),
                         protocol,
                         sequence_name="{}_{}".format(self._testMethodName,
                                                      protocol))
@@ -172,16 +173,13 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
             precreated_shm0_handles = self.precreate_register_regions(
-                (1, 3), dtype, 0, tensor_shape=(tensor_shapes[0], ))
+                (1, 3), dtype, 0, tensor_shape=(tensor_shapes[0],))
             precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13), dtype, 1, tensor_shape=(tensor_shapes[1], ))
+                (11, 12, 13), dtype, 1, tensor_shape=(tensor_shapes[1],))
             precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 113), dtype, 2, tensor_shape=(tensor_shapes[2], ))
+                (111, 112, 113), dtype, 2, tensor_shape=(tensor_shapes[2],))
             precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113),
-                dtype,
-                3,
-                tensor_shape=(tensor_shapes[3], ))
+                (1111, 1112, 1113), dtype, 3, tensor_shape=(tensor_shapes[3],))
             try:
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
@@ -209,8 +207,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[0]),
-                            'tensor_shape': (tensor_shapes[0], )
+                                "{}_{}".format(self._testMethodName,
+                                               corrids[0]),
+                            'tensor_shape': (tensor_shapes[0],)
                         }))
                 threads.append(
                     threading.Thread(
@@ -230,8 +229,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm1_handles),
                         kwargs={
                             'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[1]),
-                            'tensor_shape': (tensor_shapes[1], )
+                                "{}_{}".format(self._testMethodName,
+                                               corrids[1]),
+                            'tensor_shape': (tensor_shapes[1],)
                         }))
                 threads.append(
                     threading.Thread(
@@ -246,13 +246,14 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (("start", 111, None), (None, 112, None),
                              ("end", 113, None)),
                             self.get_expected_result(
-                                336 * tensor_shapes[2] + corrids[2],
-                                corrids[2], 113, trial, "end"),
+                                336 * tensor_shapes[2] + corrids[2], corrids[2],
+                                113, trial, "end"),
                             precreated_shm2_handles),
                         kwargs={
                             'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[2]),
-                            'tensor_shape': (tensor_shapes[2], )
+                                "{}_{}".format(self._testMethodName,
+                                               corrids[2]),
+                            'tensor_shape': (tensor_shapes[2],)
                         }))
                 threads.append(
                     threading.Thread(
@@ -272,8 +273,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm3_handles),
                         kwargs={
                             'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[3]),
-                            'tensor_shape': (tensor_shapes[3], )
+                                "{}_{}".format(self._testMethodName,
+                                               corrids[3]),
+                            'tensor_shape': (tensor_shapes[3],)
                         }))
 
                 for t in threads:
@@ -329,8 +331,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
+                                                                      dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions(
                 (11, 12, 13), dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
@@ -361,9 +363,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), (None, 2, None), ("end", 3,
                                                                    None)),
-                            self.get_expected_result(6 + corrids[0],
-                                                     corrids[0], 3, trial,
-                                                     "end"),
+                            self.get_expected_result(6 + corrids[0], corrids[0],
+                                                     3, trial, "end"),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -468,18 +469,18 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
+                                                                      dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions((11, 13),
                                                                       dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
                 (111, 113), dtype, 2)
             precreated_shm3_handles = self.precreate_register_regions(
                 (1111, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions(
-                (11111, ), dtype, 4)
-            precreated_shm5_handles = self.precreate_register_regions(
-                (22222, ), dtype, 5)
+            precreated_shm4_handles = self.precreate_register_regions((11111,),
+                                                                      dtype, 4)
+            precreated_shm5_handles = self.precreate_register_regions((22222,),
+                                                                      dtype, 5)
             try:
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
@@ -502,9 +503,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), (None, 2, None), ("end", 3,
                                                                    None)),
-                            self.get_expected_result(6 + corrids[0],
-                                                     corrids[0], 3, trial,
-                                                     "end"),
+                            self.get_expected_result(6 + corrids[0], corrids[0],
+                                                     3, trial, "end"),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -575,7 +575,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (
-                                ("start,end", 11111, None), ),
+                                ("start,end", 11111, None),),
                             self.get_expected_result(11111 + corrids[4],
                                                      corrids[4], 11111, trial,
                                                      "start,end"),
@@ -594,7 +594,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (
-                                ("start,end", 22222, None), ),
+                                ("start,end", 22222, None),),
                             self.get_expected_result(22222 + corrids[5],
                                                      corrids[5], 22222, trial,
                                                      "start,end"),
@@ -633,16 +633,16 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
+                                                                      dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions((11, 13),
                                                                       dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
                 (111, 113), dtype, 2)
             precreated_shm3_handles = self.precreate_register_regions(
                 (1111, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions(
-                (11111, ), dtype, 4)
+            precreated_shm4_handles = self.precreate_register_regions((11111,),
+                                                                      dtype, 4)
             precreated_shm5_handles = self.precreate_register_regions(
                 (22222, 22223, 22224), dtype, 5)
             try:
@@ -667,9 +667,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), (None, 2, None), ("end", 3,
                                                                    None)),
-                            self.get_expected_result(6 + corrids[0],
-                                                     corrids[0], 3, trial,
-                                                     "end"),
+                            self.get_expected_result(6 + corrids[0], corrids[0],
+                                                     3, trial, "end"),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -740,7 +739,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (
-                                ("start,end", 11111, None), ),
+                                ("start,end", 11111, None),),
                             self.get_expected_result(11111 + corrids[4],
                                                      corrids[4], 11111, trial,
                                                      "start,end"),
@@ -839,9 +838,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None),
                              (None, 3, _max_sequence_idle_ms + 1000)),
-                            self.get_expected_result(4 + corrids[0],
-                                                     corrids[0], 3, trial,
-                                                     None),
+                            self.get_expected_result(4 + corrids[0], corrids[0],
+                                                     3, trial, None),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -898,8 +896,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             corrids[3],
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
-                            (("start", 1111,
-                              None), (None, 1112, _max_sequence_idle_ms / 2),
+                            (("start", 1111, None), (None, 1112,
+                                                     _max_sequence_idle_ms / 2),
                              (None, 1112, _max_sequence_idle_ms / 2),
                              ("end", 1113, _max_sequence_idle_ms / 2)),
                             self.get_expected_result(4448 + corrids[3],
@@ -942,8 +940,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             except Exception as ex:
                 self.assertTrue(ex.message().startswith(
                     str("inference request for sequence 1001 to " +
-                        "model '{}' must specify the START flag on the first "
-                        + "request of the sequence").format(model_name)))
+                        "model '{}' must specify the START flag on the first " +
+                        "request of the sequence").format(model_name)))
             finally:
                 if _test_system_shared_memory or _test_cuda_shared_memory:
                     self.cleanup_shm_regions(precreated_shm0_handles)

@@ -43,6 +43,7 @@ from tritonclientutils import InferenceServerException
 
 
 class LifeCycleTest(unittest.TestCase):
+
     def _infer_success_models(self,
                               model_base_names,
                               versions,
@@ -98,8 +99,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertFalse(triton_client.is_server_live())
             self.assertFalse(triton_client.is_server_ready())
             md = triton_client.get_server_metadata()
-            self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
-                             md['version'])
+            self.assertEqual(os.environ["TRITON_SERVER_VERSION"], md['version'])
             self.assertEqual("triton", md['name'])
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -222,10 +222,10 @@ class LifeCycleTest(unittest.TestCase):
         tensor_shape = (1, 16)
 
         # Server was started but with a model that fails to be polled
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 model_name = tu.get_model_name('graphdef', np.float32,
                                                np.float32, np.float32)
@@ -266,10 +266,10 @@ class LifeCycleTest(unittest.TestCase):
         # --strict-readiness=true so server is live but not ready
 
         # Server was started but with models that fail to load
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 self.assertTrue(triton_client.is_server_live())
                 self.assertFalse(triton_client.is_server_ready())
@@ -312,10 +312,10 @@ class LifeCycleTest(unittest.TestCase):
         tensor_shape = (1, 16)
 
         # Server was started but with a model that fails to load
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 self.assertTrue(triton_client.is_server_live())
                 self.assertFalse(triton_client.is_server_ready())
@@ -377,10 +377,10 @@ class LifeCycleTest(unittest.TestCase):
         tensor_shape = (1, 16)
 
         # Server was started but only version 1 is loaded
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
@@ -413,10 +413,10 @@ class LifeCycleTest(unittest.TestCase):
 
         # Make sure savedmodel model is not in the status (because
         # initially it is not in the model repository)
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
@@ -488,12 +488,10 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertEqual(stats.model_stats[idx].name, savedmodel_name)
                 if stats.model_stats[idx].version == "1":
                     self.assertEqual(
-                        stats.model_stats[idx].inference_stats.success.count,
-                        0)
+                        stats.model_stats[idx].inference_stats.success.count, 0)
                 else:
                     self.assertNotEqual(
-                        stats.model_stats[idx].inference_stats.success.count,
-                        0)
+                        stats.model_stats[idx].inference_stats.success.count, 0)
 
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -572,10 +570,10 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual(len(stats.model_stats), 2)
             self.assertEqual(stats.model_stats[0].name, savedmodel_name)
             self.assertEqual(stats.model_stats[1].name, savedmodel_name)
-            self.assertEqual(
-                stats.model_stats[0].inference_stats.success.count, 0)
-            self.assertEqual(
-                stats.model_stats[1].inference_stats.success.count, 0)
+            self.assertEqual(stats.model_stats[0].inference_stats.success.count,
+                             0)
+            self.assertEqual(stats.model_stats[1].inference_stats.success.count,
+                             0)
 
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -595,10 +593,8 @@ class LifeCycleTest(unittest.TestCase):
                     triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertTrue(
                     triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertFalse(triton_client.is_model_ready(
-                    netdef_name, "1"))
-                self.assertFalse(triton_client.is_model_ready(
-                    netdef_name, "3"))
+                self.assertFalse(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(netdef_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -628,10 +624,10 @@ class LifeCycleTest(unittest.TestCase):
 
         # Make sure savedmodel model is not in the status (because
         # initially it is not in the model repository)
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
@@ -730,12 +726,12 @@ class LifeCycleTest(unittest.TestCase):
                                       "localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "1"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "2"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -779,12 +775,10 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertEqual(stats.model_stats[idx].name, graphdef_name)
                 if stats.model_stats[idx].version == "1":
                     self.assertNotEqual(
-                        stats.model_stats[idx].inference_stats.success.count,
-                        0)
+                        stats.model_stats[idx].inference_stats.success.count, 0)
                 else:
                     self.assertEqual(
-                        stats.model_stats[idx].inference_stats.success.count,
-                        0)
+                        stats.model_stats[idx].inference_stats.success.count, 0)
 
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -802,10 +796,10 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(
                     triton_client.is_model_ready(graphdef_name, "1"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "2"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -840,12 +834,12 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(
                     triton_client.is_model_ready(graphdef_name, "1"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "2"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "3"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "7"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "7"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -867,12 +861,12 @@ class LifeCycleTest(unittest.TestCase):
                                       "localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "1"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "2"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "3"))
                 self.assertFalse(
                     triton_client.is_model_ready(graphdef_name, "7"))
         except Exception as ex:
@@ -890,12 +884,12 @@ class LifeCycleTest(unittest.TestCase):
                                       "localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "1"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "2"))
-                self.assertTrue(
-                    triton_client.is_model_ready(graphdef_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(
+                    graphdef_name, "3"))
                 self.assertFalse(
                     triton_client.is_model_ready(graphdef_name, "7"))
         except Exception as ex:
@@ -1018,8 +1012,7 @@ class LifeCycleTest(unittest.TestCase):
                                swap=False,
                                model_version=1)
                 self.assertTrue(
-                    False,
-                    "expected error for unavailable model " + model_name)
+                    False, "expected error for unavailable model " + model_name)
             except Exception as ex:
                 self.assertTrue(
                     ex.message().startswith("Request for unknown model"))
@@ -1143,7 +1136,7 @@ class LifeCycleTest(unittest.TestCase):
         # successfully. Initially savedmodel only has version 1.
         self._infer_success_models([
             "savedmodel",
-        ], (1, ), model_shape)
+        ], (1,), model_shape)
         self._infer_success_models(["graphdef", 'netdef'], (1, 3), model_shape)
 
         # Add the savedmodel to the second model repository, should cause
@@ -1172,8 +1165,8 @@ class LifeCycleTest(unittest.TestCase):
         # have versions 1 and 3.
         shutil.rmtree("models/" + savedmodel_name)
         time.sleep(5)  # wait for model to unload
-        self._infer_success_models(["savedmodel", "graphdef", 'netdef'],
-                                   (1, 3), model_shape)
+        self._infer_success_models(["savedmodel", "graphdef", 'netdef'], (1, 3),
+                                   model_shape)
 
     def test_multiple_model_repository_control(self):
         # similar to test_multiple_model_repository_polling, but the
@@ -1216,7 +1209,7 @@ class LifeCycleTest(unittest.TestCase):
         # successfully. Initially savedmodel only has version 1.
         self._infer_success_models([
             "savedmodel",
-        ], (1, ), model_shape)
+        ], (1,), model_shape)
         self._infer_success_models(["graphdef", 'netdef'], (1, 3), model_shape)
 
         # Add the savedmodel to the second model repository. Because
@@ -1225,7 +1218,7 @@ class LifeCycleTest(unittest.TestCase):
         shutil.copytree(savedmodel_name, "models_0/" + savedmodel_name)
         self._infer_success_models([
             "savedmodel",
-        ], (1, ), model_shape)
+        ], (1,), model_shape)
         self._infer_success_models(["graphdef", 'netdef'], (1, 3), model_shape)
 
         # Reload savedmodel which will cause it to unload because it
@@ -1267,8 +1260,8 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(ex.message().startswith(
                 "failed to load '{}'".format(savedmodel_name)))
 
-        self._infer_success_models(["savedmodel", "graphdef", 'netdef'],
-                                   (1, 3), model_shape)
+        self._infer_success_models(["savedmodel", "graphdef", 'netdef'], (1, 3),
+                                   model_shape)
 
     def test_model_control(self):
         model_shape = (1, 16)
@@ -1295,10 +1288,10 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Load non-existent model
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 triton_client.load_model("unknown_model")
                 self.assertTrue(False, "expected unknown model failure")
@@ -1326,7 +1319,7 @@ class LifeCycleTest(unittest.TestCase):
         # Delete model configuration for savedmodel, which will cause
         # the autofiller to use the latest version policy so that only
         # version 3 will be available if the models are re-loaded
-        for model_name in (savedmodel_name, ):
+        for model_name in (savedmodel_name,):
             os.remove("models/" + model_name + "/config.pbtxt")
 
         self._infer_success_models([
@@ -1349,14 +1342,14 @@ class LifeCycleTest(unittest.TestCase):
 
         self._infer_success_models([
             "savedmodel",
-        ], (3, ), model_shape)
+        ], (3,), model_shape)
         self._infer_success_models([
             "simple_savedmodel",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
 
-        for model_name in (savedmodel_name, ):
+        for model_name in (savedmodel_name,):
             try:
                 for triton_client in (httpclient.InferenceServerClient(
                         "localhost:8000", verbose=True),
@@ -1370,10 +1363,10 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Unload non-existing model, nothing should happen
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 triton_client.unload_model("unknown_model")
             except Exception as ex:
@@ -1416,7 +1409,7 @@ class LifeCycleTest(unittest.TestCase):
 
         self._infer_success_models([
             "savedmodel",
-        ], (3, ), model_shape)
+        ], (3,), model_shape)
 
         try:
             for triton_client in (httpclient.InferenceServerClient(
@@ -1444,7 +1437,7 @@ class LifeCycleTest(unittest.TestCase):
         graphdef_ensemble_name = ensemble_prefix + graphdef_name
 
         # Make sure unloaded models are not in the status
-        for base in ("netdef", ):
+        for base in ("netdef",):
             model_name = tu.get_model_name(base, np.float32, np.float32,
                                            np.float32)
             try:
@@ -1475,10 +1468,10 @@ class LifeCycleTest(unittest.TestCase):
         ], (1, 3), model_shape)
 
         # Load non-existing model
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 triton_client.load_model("unknown_model")
                 self.assertTrue(False, "expected unknown model failure")
@@ -1528,7 +1521,7 @@ class LifeCycleTest(unittest.TestCase):
 
         self._infer_success_models([
             "savedmodel",
-        ], (3, ), model_shape)
+        ], (3,), model_shape)
         self._infer_success_models([
             "simple_savedmodel",
         ], (1, 3),
@@ -1548,10 +1541,10 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Unload non-existing model, nothing should happen
-        for triton_client in (httpclient.InferenceServerClient(
-                "localhost:8000", verbose=True),
-                              grpcclient.InferenceServerClient(
-                                  "localhost:8001", verbose=True)):
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
             try:
                 triton_client.unload_model("unknown_model")
             except Exception as ex:
@@ -1594,7 +1587,7 @@ class LifeCycleTest(unittest.TestCase):
 
         self._infer_success_models([
             "savedmodel",
-        ], (3, ), model_shape)
+        ], (3,), model_shape)
         self._infer_success_models([
             "graphdef",
         ], (1, 3), model_shape)
@@ -1612,11 +1605,9 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(
-                    triton_client.is_model_ready(savedmodel_ensemble_name,
-                                                 "1"))
+                    triton_client.is_model_ready(savedmodel_ensemble_name, "1"))
                 self.assertFalse(
-                    triton_client.is_model_ready(savedmodel_ensemble_name,
-                                                 "3"))
+                    triton_client.is_model_ready(savedmodel_ensemble_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 

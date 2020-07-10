@@ -39,8 +39,10 @@ np_dtype_string = np.dtype(object)
 
 
 class InferTest(unittest.TestCase):
+
     def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
                     output0_raw, output1_raw, swap):
+
         def _infer_exact_helper(tester,
                                 pf,
                                 tensor_shape,
@@ -59,7 +61,7 @@ class InferTest(unittest.TestCase):
                                 use_streaming=True,
                                 correlation_id=0):
             for bs in (1, batch_size):
-                iu.infer_exact(tester, pf, (bs, ) + tensor_shape, bs,
+                iu.infer_exact(tester, pf, (bs,) + tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw, model_version, swap,
                                outputs, use_http, use_grpc,
@@ -69,11 +71,11 @@ class InferTest(unittest.TestCase):
         input_size = 16
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
-                                    (input_size, ), (input_size, ),
-                                    (input_size, )):
+                                    (input_size,), (input_size,),
+                                    (input_size,)):
             for pf in ["graphdef", "savedmodel"]:
                 _infer_exact_helper(self,
-                                    pf, (input_size, ),
+                                    pf, (input_size,),
                                     8,
                                     input_dtype,
                                     output0_dtype,
@@ -83,10 +85,10 @@ class InferTest(unittest.TestCase):
                                     swap=swap)
 
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
-                                    (input_size, ), (input_size, ),
-                                    (input_size, )):
+                                    (input_size,), (input_size,),
+                                    (input_size,)):
             _infer_exact_helper(self,
-                                'netdef', (input_size, ),
+                                'netdef', (input_size,),
                                 8,
                                 input_dtype,
                                 output0_dtype,
@@ -110,7 +112,7 @@ class InferTest(unittest.TestCase):
                                     swap=swap)
             else:
                 _infer_exact_helper(self,
-                                    'plan', (input_size, ),
+                                    'plan', (input_size,),
                                     8,
                                     input_dtype,
                                     output0_dtype,
@@ -119,11 +121,11 @@ class InferTest(unittest.TestCase):
                                     output1_raw=output1_raw,
                                     swap=swap)
 
-        if tu.validate_for_onnx_model(input_dtype, output0_dtype,
-                                      output1_dtype, (input_size, ),
-                                      (input_size, ), (input_size, )):
+        if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                      (input_size,), (input_size,),
+                                      (input_size,)):
             _infer_exact_helper(self,
-                                'onnx', (input_size, ),
+                                'onnx', (input_size,),
                                 8,
                                 input_dtype,
                                 output0_dtype,
@@ -133,10 +135,10 @@ class InferTest(unittest.TestCase):
                                 swap=swap)
 
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype,
-                                          output1_dtype, (input_size, ),
-                                          (input_size, ), (input_size, )):
+                                          output1_dtype, (input_size,),
+                                          (input_size,), (input_size,)):
             _infer_exact_helper(self,
-                                'libtorch', (input_size, ),
+                                'libtorch', (input_size,),
                                 8,
                                 input_dtype,
                                 output0_dtype,

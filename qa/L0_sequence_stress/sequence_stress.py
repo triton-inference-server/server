@@ -57,6 +57,7 @@ _thread_exceptions_mutex = threading.Lock()
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -84,8 +85,8 @@ def check_sequence_async(client_metadata,
     (flag_str, value, expected_result, delay_ms)
 
     """
-    if (("savedmodel" in trial) or ("graphdef" in trial) or ("netdef" in trial)
-            or ("custom" in trial) or ("plan" in trial)):
+    if (("savedmodel" in trial) or ("graphdef" in trial) or
+        ("netdef" in trial) or ("custom" in trial) or ("plan" in trial)):
         tensor_shape = (
             1,
             1,
@@ -200,7 +201,7 @@ def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
         expected_result += val
 
         # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, expected_result, delay_ms), )
+        steps.append((flags, val, expected_result, delay_ms),)
 
     check_sequence_async(client_metadata,
                          trial,
@@ -243,7 +244,7 @@ def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
             expected_result += val
 
             # (flag_str, value, expected_result, delay_ms)
-            steps.append((flags, val, expected_result, delay_ms), )
+            steps.append((flags, val, expected_result, delay_ms),)
 
     check_sequence_async(client_metadata,
                          trial,
@@ -286,7 +287,7 @@ def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
             expected_result += val
 
             # (flag_str, value, expected_result, delay_ms)
-            steps.append((flags, val, expected_result, delay_ms), )
+            steps.append((flags, val, expected_result, delay_ms),)
 
     check_sequence_async(client_metadata,
                          trial,
@@ -314,7 +315,7 @@ def sequence_no_start(client_metadata, rng, trial, model_name, dtype,
         delay_ms = None
 
         # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, None, delay_ms), )
+        steps.append((flags, val, None, delay_ms),)
 
     try:
         check_sequence_async(client_metadata,
@@ -353,7 +354,7 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
         expected_result += val
 
         # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, expected_result, delay_ms), )
+        steps.append((flags, val, expected_result, delay_ms),)
 
     check_sequence_async(client_metadata,
                          trial,
@@ -451,9 +452,8 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
                 # just assume that the no-start is a continuation of
                 # the no-end sequence instead of being a sequence
                 # missing start flag.
-                if ((last_choice != "no-end")
-                        and (last_choice != "valid-no-end")
-                        and (choice < 0.01)):
+                if ((last_choice != "no-end") and
+                    (last_choice != "valid-no-end") and (choice < 0.01)):
                     sequence_no_start(client_metadata,
                                       rng,
                                       trial,

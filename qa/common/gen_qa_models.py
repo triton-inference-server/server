@@ -240,8 +240,7 @@ def create_graphdef_modelfile(models_dir,
     model_name = tu.get_model_name(
         "graphdef_nobatch" if max_batch == 0 else "graphdef", input_dtype,
         output0_dtype, output1_dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -394,8 +393,7 @@ def create_savedmodel_modelfile(models_dir,
     model_name = tu.get_model_name(
         "savedmodel_nobatch" if max_batch == 0 else "savedmodel", input_dtype,
         output0_dtype, output1_dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -536,8 +534,7 @@ def create_netdef_modelfile(models_dir,
     predict_net, _ = c2model_helper.ExtractPredictorNet(model.Proto(), \
         input_blobs = ["INPUT0", "INPUT1"], output_blobs = ["OUTPUT0", "OUTPUT1"])
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -550,10 +547,10 @@ def create_netdef_modelfile(models_dir,
         f.write(model.InitProto().SerializeToString())
 
 
-def create_netdef_modelconfig(models_dir, max_batch, model_version,
-                              input_shape, output0_shape, output1_shape,
-                              input_dtype, output0_dtype, output1_dtype,
-                              output0_label_cnt, version_policy):
+def create_netdef_modelconfig(models_dir, max_batch, model_version, input_shape,
+                              output0_shape, output1_shape, input_dtype,
+                              output0_dtype, output1_dtype, output0_label_cnt,
+                              version_policy):
 
     if not tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
@@ -709,14 +706,12 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
     engine = builder.build_engine(network, config)
 
     # Use a different model name for different kinds of models
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", input_dtype,
-        output0_dtype, output1_dtype)
+    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+                                   input_dtype, output0_dtype, output1_dtype)
     if min_dim != 1 or max_dim != 32:
         model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -827,14 +822,12 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
     engine = builder.build_engine(network, config)
 
     # Use a different model name for different kinds of models
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", input_dtype,
-        output0_dtype, output1_dtype)
+    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+                                   input_dtype, output0_dtype, output1_dtype)
     if min_dim != 1 or max_dim != 32:
         model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -903,11 +896,9 @@ def create_plan_fixed_rf_modelfile(models_dir, max_batch, model_version,
     builder.max_batch_size = max(1, max_batch)
     engine = builder.build_engine(network, config)
 
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", input_dtype,
-        output0_dtype, output1_dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+                                   input_dtype, output0_dtype, output1_dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -952,11 +943,9 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
     engine = builder.build_engine(network, config)
     del network
 
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", input_dtype,
-        output0_dtype, output1_dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+                                   input_dtype, output0_dtype, output1_dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -984,14 +973,13 @@ def create_plan_modelfile(models_dir,
                           max_dim=32):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
-                                     input_shape, output0_shape,
-                                     output1_shape):
+                                     input_shape, output0_shape, output1_shape):
         return
 
     if input_dtype != np.float32 or output0_dtype != np.float32 or output1_dtype != np.float32:
-        if (not tu.shape_is_fixed(input_shape)
-                or not tu.shape_is_fixed(output0_shape)
-                or not tu.shape_is_fixed(output1_shape)):
+        if (not tu.shape_is_fixed(input_shape) or
+                not tu.shape_is_fixed(output0_shape) or
+                not tu.shape_is_fixed(output1_shape)):
             create_plan_dynamic_rf_modelfile(models_dir, max_batch,
                                              model_version, input_shape,
                                              output0_shape, output1_shape,
@@ -999,16 +987,15 @@ def create_plan_modelfile(models_dir,
                                              output1_dtype, swap, min_dim,
                                              max_dim)
         else:
-            create_plan_fixed_rf_modelfile(models_dir, max_batch,
-                                           model_version, input_shape,
-                                           output0_shape, output1_shape,
-                                           input_dtype, output0_dtype,
-                                           output1_dtype, swap)
+            create_plan_fixed_rf_modelfile(models_dir, max_batch, model_version,
+                                           input_shape, output0_shape,
+                                           output1_shape, input_dtype,
+                                           output0_dtype, output1_dtype, swap)
 
     else:
-        if (not tu.shape_is_fixed(input_shape)
-                or not tu.shape_is_fixed(output0_shape)
-                or not tu.shape_is_fixed(output1_shape)):
+        if (not tu.shape_is_fixed(input_shape) or
+                not tu.shape_is_fixed(output0_shape) or
+                not tu.shape_is_fixed(output1_shape)):
             create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
                                           input_shape, output0_shape,
                                           output1_shape, input_dtype,
@@ -1036,8 +1023,7 @@ def create_plan_modelconfig(models_dir,
                             max_dim=32):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
-                                     input_shape, output0_shape,
-                                     output1_shape):
+                                     input_shape, output0_shape, output1_shape):
         return
 
     # Unpack version policy
@@ -1053,9 +1039,8 @@ def create_plan_modelconfig(models_dir,
             version_policy_str = "{ all { }}"
 
     # Use a different model name for different kinds of models
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", input_dtype,
-        output0_dtype, output1_dtype)
+    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+                                   input_dtype, output0_dtype, output1_dtype)
     if min_dim != 1 or max_dim != 32:
         model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
@@ -1170,9 +1155,9 @@ def create_onnx_modelfile(models_dir,
                           output1_dtype,
                           swap=False):
 
-    if not tu.validate_for_onnx_model(input_dtype, output0_dtype,
-                                      output1_dtype, input_shape,
-                                      output0_shape, output1_shape):
+    if not tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                      input_shape, output0_shape,
+                                      output1_shape):
         return
 
     onnx_input_dtype = np_to_onnx_dtype(input_dtype)
@@ -1184,11 +1169,9 @@ def create_onnx_modelfile(models_dir,
     onnx_output1_shape, idx = tu.shape_to_onnx_shape(input_shape, idx)
 
     # Create the model
-    model_name = tu.get_model_name(
-        "onnx_nobatch" if max_batch == 0 else "onnx", input_dtype,
-        output0_dtype, output1_dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
+                                   input_dtype, output0_dtype, output1_dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     batch_dim = [] if max_batch == 0 else [None]
 
@@ -1207,9 +1190,9 @@ def create_onnx_modelfile(models_dir,
 
     # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
     # Also casting String data type to int32
-    if ((onnx_input_dtype == onnx.TensorProto.INT8)
-            or (onnx_input_dtype == onnx.TensorProto.INT16)
-            or (onnx_input_dtype == onnx.TensorProto.STRING)):
+    if ((onnx_input_dtype == onnx.TensorProto.INT8) or
+        (onnx_input_dtype == onnx.TensorProto.INT16) or
+        (onnx_input_dtype == onnx.TensorProto.STRING)):
         internal_in0 = onnx.helper.make_node("Cast", ["INPUT0"], ["_INPUT0"],
                                              to=onnx.TensorProto.INT32)
         internal_in1 = onnx.helper.make_node("Cast", ["INPUT1"], ["_INPUT1"],
@@ -1259,15 +1242,14 @@ def create_onnx_modelconfig(models_dir, max_batch, model_version, input_shape,
                             output0_dtype, output1_dtype, output0_label_cnt,
                             version_policy):
 
-    if not tu.validate_for_onnx_model(input_dtype, output0_dtype,
-                                      output1_dtype, input_shape,
-                                      output0_shape, output1_shape):
+    if not tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                      input_shape, output0_shape,
+                                      output1_shape):
         return
 
     # Use a different model name for the non-batching variant
-    model_name = tu.get_model_name(
-        "onnx_nobatch" if max_batch == 0 else "onnx", input_dtype,
-        output0_dtype, output1_dtype)
+    model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
+                                   input_dtype, output0_dtype, output1_dtype)
     config_dir = models_dir + "/" + model_name
 
     # [TODO] move create_general_modelconfig() out of emu as it is general
@@ -1327,6 +1309,7 @@ def create_libtorch_modelfile(models_dir,
     if not swap:
 
         class AddSubNet(nn.Module):
+
             def __init__(self, *args):
                 self.torch_output0_dtype = args[0][0]
                 self.torch_output1_dtype = args[0][1]
@@ -1342,6 +1325,7 @@ def create_libtorch_modelfile(models_dir,
     else:
 
         class SubAddNet(nn.Module):
+
             def __init__(self, *args):
                 self.torch_output0_dtype = args[0][0]
                 self.torch_output1_dtype = args[0][1]
@@ -1355,8 +1339,7 @@ def create_libtorch_modelfile(models_dir,
         example_input = torch.zeros(input_shape, dtype=torch_input_dtype)
         traced = torch.jit.trace(subAddModel, (example_input, example_input))
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -1477,18 +1460,16 @@ def create_models(models_dir,
 
     if FLAGS.savedmodel:
         # max-batch 8
-        create_savedmodel_modelconfig(models_dir, 8, model_version,
-                                      input_shape, output0_shape,
-                                      output1_shape, input_dtype,
+        create_savedmodel_modelconfig(models_dir, 8, model_version, input_shape,
+                                      output0_shape, output1_shape, input_dtype,
                                       output0_dtype, output1_dtype,
                                       output0_label_cnt, version_policy)
         create_savedmodel_modelfile(models_dir, 8, model_version, input_shape,
                                     output0_shape, output1_shape, input_dtype,
                                     output0_dtype, output1_dtype)
         # max-batch 0
-        create_savedmodel_modelconfig(models_dir, 0, model_version,
-                                      input_shape, output0_shape,
-                                      output1_shape, input_dtype,
+        create_savedmodel_modelconfig(models_dir, 0, model_version, input_shape,
+                                      output0_shape, output1_shape, input_dtype,
                                       output0_dtype, output1_dtype,
                                       output0_label_cnt, version_policy)
         create_savedmodel_modelfile(models_dir, 0, model_version, input_shape,
@@ -1521,8 +1502,8 @@ def create_models(models_dir,
         create_plan_modelconfig(models_dir, 8, model_version,
                                 input_shape + suffix, output0_shape + suffix,
                                 output1_shape + suffix, input_dtype,
-                                output0_dtype, output1_dtype,
-                                output0_label_cnt, version_policy)
+                                output0_dtype, output1_dtype, output0_label_cnt,
+                                version_policy)
         create_plan_modelfile(models_dir, 8, model_version,
                               input_shape + suffix, output0_shape + suffix,
                               output1_shape + suffix, input_dtype,
@@ -1531,8 +1512,8 @@ def create_models(models_dir,
         create_plan_modelconfig(models_dir, 0, model_version,
                                 input_shape + suffix, output0_shape + suffix,
                                 output1_shape + suffix, input_dtype,
-                                output0_dtype, output1_dtype,
-                                output0_label_cnt, version_policy)
+                                output0_dtype, output1_dtype, output0_label_cnt,
+                                version_policy)
         create_plan_modelfile(models_dir, 0, model_version,
                               input_shape + suffix, output0_shape + suffix,
                               output1_shape + suffix, input_dtype,
@@ -1569,16 +1550,16 @@ def create_models(models_dir,
         # max-batch 8
         create_onnx_modelconfig(models_dir, 8, model_version, input_shape,
                                 output0_shape, output1_shape, input_dtype,
-                                output0_dtype, output1_dtype,
-                                output0_label_cnt, version_policy)
+                                output0_dtype, output1_dtype, output0_label_cnt,
+                                version_policy)
         create_onnx_modelfile(models_dir, 8, model_version, input_shape,
                               output0_shape, output1_shape, input_dtype,
                               output0_dtype, output1_dtype)
         # max-batch 0
         create_onnx_modelconfig(models_dir, 0, model_version, input_shape,
                                 output0_shape, output1_shape, input_dtype,
-                                output0_dtype, output1_dtype,
-                                output0_label_cnt, version_policy)
+                                output0_dtype, output1_dtype, output0_label_cnt,
+                                version_policy)
         create_onnx_modelfile(models_dir, 0, model_version, input_shape,
                               output0_shape, output1_shape, input_dtype,
                               output0_dtype, output1_dtype)
@@ -1625,8 +1606,8 @@ def create_models(models_dir,
                                             config_output1_shape, input_dtype,
                                             output0_dtype, output1_dtype,
                                             output0_label_cnt, version_policy)
-            emu.create_ensemble_modelfile(pair[0], models_dir, 8,
-                                          model_version, config_input_shape,
+            emu.create_ensemble_modelfile(pair[0], models_dir, 8, model_version,
+                                          config_input_shape,
                                           config_output0_shape,
                                           config_output1_shape, input_dtype,
                                           output0_dtype, output1_dtype)
@@ -1637,8 +1618,8 @@ def create_models(models_dir,
                                             config_output1_shape, input_dtype,
                                             output0_dtype, output1_dtype,
                                             output0_label_cnt, version_policy)
-            emu.create_ensemble_modelfile(pair[0], models_dir, 0,
-                                          model_version, config_input_shape,
+            emu.create_ensemble_modelfile(pair[0], models_dir, 0, model_version,
+                                          config_input_shape,
                                           config_output0_shape,
                                           config_output1_shape, input_dtype,
                                           output0_dtype, output1_dtype)
@@ -1651,7 +1632,7 @@ def create_fixed_models(models_dir,
                         version_policy=None):
     input_size = 16
     create_models(models_dir, input_dtype, output0_dtype, output1_dtype,
-                  (input_size, ), (input_size, ), (input_size, ), input_size,
+                  (input_size,), (input_size,), (input_size,), input_size,
                   version_policy)
 
 
@@ -1764,28 +1745,28 @@ if __name__ == '__main__':
             for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
                 create_graphdef_modelfile(FLAGS.models_dir,
                                           8,
-                                          2, (16, ), (16, ), (16, ),
+                                          2, (16,), (16,), (16,),
                                           vt,
                                           vt,
                                           vt,
                                           swap=True)
                 create_graphdef_modelfile(FLAGS.models_dir,
                                           8,
-                                          3, (16, ), (16, ), (16, ),
+                                          3, (16,), (16,), (16,),
                                           vt,
                                           vt,
                                           vt,
                                           swap=True)
                 create_graphdef_modelfile(FLAGS.models_dir,
                                           0,
-                                          2, (16, ), (16, ), (16, ),
+                                          2, (16,), (16,), (16,),
                                           vt,
                                           vt,
                                           vt,
                                           swap=True)
                 create_graphdef_modelfile(FLAGS.models_dir,
                                           0,
-                                          3, (16, ), (16, ), (16, ),
+                                          3, (16,), (16,), (16,),
                                           vt,
                                           vt,
                                           vt,
@@ -1795,28 +1776,28 @@ if __name__ == '__main__':
             for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
                 create_savedmodel_modelfile(FLAGS.models_dir,
                                             8,
-                                            2, (16, ), (16, ), (16, ),
+                                            2, (16,), (16,), (16,),
                                             vt,
                                             vt,
                                             vt,
                                             swap=True)
                 create_savedmodel_modelfile(FLAGS.models_dir,
                                             8,
-                                            3, (16, ), (16, ), (16, ),
+                                            3, (16,), (16,), (16,),
                                             vt,
                                             vt,
                                             vt,
                                             swap=True)
                 create_savedmodel_modelfile(FLAGS.models_dir,
                                             0,
-                                            2, (16, ), (16, ), (16, ),
+                                            2, (16,), (16,), (16,),
                                             vt,
                                             vt,
                                             vt,
                                             swap=True)
                 create_savedmodel_modelfile(FLAGS.models_dir,
                                             0,
-                                            3, (16, ), (16, ), (16, ),
+                                            3, (16,), (16,), (16,),
                                             vt,
                                             vt,
                                             vt,
@@ -1826,28 +1807,28 @@ if __name__ == '__main__':
             for vt in [np.float32, np.int32]:
                 create_netdef_modelfile(FLAGS.models_dir,
                                         8,
-                                        2, (16, ), (16, ), (16, ),
+                                        2, (16,), (16,), (16,),
                                         vt,
                                         vt,
                                         vt,
                                         swap=True)
                 create_netdef_modelfile(FLAGS.models_dir,
                                         8,
-                                        3, (16, ), (16, ), (16, ),
+                                        3, (16,), (16,), (16,),
                                         vt,
                                         vt,
                                         vt,
                                         swap=True)
                 create_netdef_modelfile(FLAGS.models_dir,
                                         0,
-                                        2, (16, ), (16, ), (16, ),
+                                        2, (16,), (16,), (16,),
                                         vt,
                                         vt,
                                         vt,
                                         swap=True)
                 create_netdef_modelfile(FLAGS.models_dir,
                                         0,
-                                        3, (16, ), (16, ), (16, ),
+                                        3, (16,), (16,), (16,),
                                         vt,
                                         vt,
                                         vt,
@@ -1857,28 +1838,28 @@ if __name__ == '__main__':
             for vt in [np.float32, np.float16, np.int32]:
                 create_plan_modelfile(FLAGS.models_dir,
                                       8,
-                                      2, (16, ), (16, ), (16, ),
+                                      2, (16,), (16,), (16,),
                                       vt,
                                       vt,
                                       vt,
                                       swap=True)
                 create_plan_modelfile(FLAGS.models_dir,
                                       8,
-                                      3, (16, ), (16, ), (16, ),
+                                      3, (16,), (16,), (16,),
                                       vt,
                                       vt,
                                       vt,
                                       swap=True)
                 create_plan_modelfile(FLAGS.models_dir,
                                       0,
-                                      2, (16, ), (16, ), (16, ),
+                                      2, (16,), (16,), (16,),
                                       vt,
                                       vt,
                                       vt,
                                       swap=True)
                 create_plan_modelfile(FLAGS.models_dir,
                                       0,
-                                      3, (16, ), (16, ), (16, ),
+                                      3, (16,), (16,), (16,),
                                       vt,
                                       vt,
                                       vt,
@@ -1919,28 +1900,28 @@ if __name__ == '__main__':
             for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
                 create_onnx_modelfile(FLAGS.models_dir,
                                       8,
-                                      2, (16, ), (16, ), (16, ),
+                                      2, (16,), (16,), (16,),
                                       vt,
                                       vt,
                                       vt,
                                       swap=True)
                 create_onnx_modelfile(FLAGS.models_dir,
                                       8,
-                                      3, (16, ), (16, ), (16, ),
+                                      3, (16,), (16,), (16,),
                                       vt,
                                       vt,
                                       vt,
                                       swap=True)
                 create_onnx_modelfile(FLAGS.models_dir,
                                       0,
-                                      2, (16, ), (16, ), (16, ),
+                                      2, (16,), (16,), (16,),
                                       vt,
                                       vt,
                                       vt,
                                       swap=True)
                 create_onnx_modelfile(FLAGS.models_dir,
                                       0,
-                                      3, (16, ), (16, ), (16, ),
+                                      3, (16,), (16,), (16,),
                                       vt,
                                       vt,
                                       vt,
@@ -1949,28 +1930,28 @@ if __name__ == '__main__':
             for vt in [np.float32, np.int32, np.int16, np.int8]:
                 create_libtorch_modelfile(FLAGS.models_dir,
                                           8,
-                                          2, (16, ), (16, ), (16, ),
+                                          2, (16,), (16,), (16,),
                                           vt,
                                           vt,
                                           vt,
                                           swap=True)
                 create_libtorch_modelfile(FLAGS.models_dir,
                                           8,
-                                          3, (16, ), (16, ), (16, ),
+                                          3, (16,), (16,), (16,),
                                           vt,
                                           vt,
                                           vt,
                                           swap=True)
                 create_libtorch_modelfile(FLAGS.models_dir,
                                           0,
-                                          2, (16, ), (16, ), (16, ),
+                                          2, (16,), (16,), (16,),
                                           vt,
                                           vt,
                                           vt,
                                           swap=True)
                 create_libtorch_modelfile(FLAGS.models_dir,
                                           0,
-                                          3, (16, ), (16, ), (16, ),
+                                          3, (16,), (16,), (16,),
                                           vt,
                                           vt,
                                           vt,
@@ -1978,11 +1959,9 @@ if __name__ == '__main__':
 
         if FLAGS.ensemble:
             for pair in emu.platform_types_and_validation():
-                for vt in [
-                        np.float16, np.float32, np.int8, np.int16, np.int32
-                ]:
-                    shape = (16, 1, 1) if (pair[0] == "plan"
-                                           and vt == np.int8) else (16, )
+                for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
+                    shape = (16, 1, 1) if (pair[0] == "plan" and
+                                           vt == np.int8) else (16,)
                     if not pair[1](vt, vt, vt, shape, shape, shape):
                         continue
                     emu.create_ensemble_modelfile(pair[0],
@@ -2033,22 +2012,22 @@ if __name__ == '__main__':
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:
         create_models(FLAGS.models_dir, np.float32, np.float32, np.float32,
-                      (-1, ), (-1, ), (-1, ), 16)
+                      (-1,), (-1,), (-1,), 16)
         create_models(FLAGS.models_dir, np.float32, np.int32, np.int32,
                       (-1, -1), (-1, -1), (-1, -1), 16)
-        create_models(FLAGS.models_dir, np.float32, np.int64, np.int64,
-                      (8, -1), (8, -1), (8, -1), 32)
+        create_models(FLAGS.models_dir, np.float32, np.int64, np.int64, (8, -1),
+                      (8, -1), (8, -1), 32)
         create_models(FLAGS.models_dir, np.float32, np.int32, np.int64,
                       (-1, 8, -1), (-1, 8, -1), (-1, 8, -1), 32)
-        create_models(FLAGS.models_dir, np.float32, np.float32, np.int32,
-                      (-1, ), (-1, ), (-1, ), 16)
+        create_models(FLAGS.models_dir, np.float32, np.float32, np.int32, (-1,),
+                      (-1,), (-1,), 16)
         create_models(FLAGS.models_dir, np.int32, np.int32, np.int32, (-1, -1),
                       (-1, -1), (-1, -1), 16)
         create_models(FLAGS.models_dir, np.int32, np.int32, np.float32,
                       (-1, 8, -1), (-1, 8, -1), (-1, 8, -1), 32)
 
         create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string,
-                      np_dtype_string, (-1, ), (-1, ), (-1, ), 16)
+                      np_dtype_string, (-1,), (-1,), (-1,), 16)
         create_models(FLAGS.models_dir, np_dtype_string, np.int32, np.int32,
                       (-1, -1), (-1, -1), (-1, -1), 16)
         create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string,
@@ -2070,6 +2049,6 @@ if __name__ == '__main__':
         for model_dtype in model_dtypes:
             # Use variable size to handle all shape. Note: piping variable size output
             # to fixed size model is not safe but doable
-            for model_shape in [(-1, ), (-1, -1), (-1, -1, -1)]:
+            for model_shape in [(-1,), (-1, -1), (-1, -1, -1)]:
                 emu.create_nop_modelconfig(FLAGS.models_dir, model_shape,
                                            model_dtype)

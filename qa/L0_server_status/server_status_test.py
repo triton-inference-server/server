@@ -41,6 +41,7 @@ from tritonclientutils import *
 
 
 class ServerMetadataTest(unittest.TestCase):
+
     def test_basic(self):
         try:
             for pair in [("localhost:8000", "http"),
@@ -130,8 +131,7 @@ class ServerMetadataTest(unittest.TestCase):
 
                 model_metadata = triton_client.get_model_metadata(
                     model_name, model_version="99")
-                self.assertTrue(False,
-                                "expected unknown model version failure")
+                self.assertTrue(False, "expected unknown model version failure")
         except InferenceServerException as ex:
             self.assertTrue(ex.message().startswith(
                 "Request for unknown model: 'graphdef_int32_int8_int8' version 99 is not found"
@@ -363,8 +363,7 @@ class ServerMetadataTest(unittest.TestCase):
                             len(infer_stats['model_stats']), 1,
                             "expected 1 infer stats for version 1"
                             " of model " + model_name)
-                        stats = infer_stats['model_stats'][0][
-                            'inference_stats']
+                        stats = infer_stats['model_stats'][0]['inference_stats']
                         self.assertTrue(stats['success']['count'], 3)
                     else:
                         self.assertEqual(
@@ -376,8 +375,7 @@ class ServerMetadataTest(unittest.TestCase):
                     infer_stats = triton_client.get_inference_statistics(
                         model_name, model_version='3')
                     if pair[1] == "http":
-                        stats = infer_stats['model_stats'][0][
-                            'inference_stats']
+                        stats = infer_stats['model_stats'][0]['inference_stats']
                         self.assertEqual(
                             stats['success']['count'], 0,
                             "unexpected infer stats for version 3"
@@ -398,6 +396,7 @@ class ModelMetadataTest(unittest.TestCase):
     These tests must be run after the ServerMetadataTest. See test.sh
     file for correct test running.
     '''
+
     def test_model_versions_deleted(self):
         # Originally There were 3 versions of *_int32_int32_int32 and
         # version 3 was executed once. Version 2 and 3 models were
@@ -466,7 +465,7 @@ class ModelMetadataTest(unittest.TestCase):
         # Originally There was version 1 of *_float16_float32_float32.
         # Version 7 was added so now expect just version 7 to be ready
         # and provide infer stats.
-        for platform in ('graphdef', ):
+        for platform in ('graphdef',):
             model_name = platform + "_float16_float32_float32"
 
             try:
@@ -605,8 +604,8 @@ class ModelMetadataTest(unittest.TestCase):
 
                     if version != "1":
                         self.assertTrue(
-                            False, "expected version 1 for infer stat, got " +
-                            version)
+                            False,
+                            "expected version 1 for infer stat, got " + version)
                     else:
                         if pair[1] == "http":
                             self.assertEqual(

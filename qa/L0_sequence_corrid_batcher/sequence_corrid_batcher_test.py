@@ -58,6 +58,7 @@ _max_sequence_idle_ms = 5000
 
 
 class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
+
     def get_datatype(self, trial):
         return np.int32
 
@@ -72,8 +73,8 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
         # qa/common/gen_qa_dyna_sequence_models.py for more
         # information.
         if ((("nobatch" not in trial) and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial) or
-            ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial):
+            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
+            ("onnx" in trial)) or ("libtorch" in trial):
             expected_result = value
             if flag_str is not None:
                 if "start" in flag_str:
@@ -126,9 +127,8 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), ("end", 3, None)),
-                            self.get_expected_result(4 + corrids[0],
-                                                     corrids[0], 3, trial,
-                                                     "end"),
+                            self.get_expected_result(4 + corrids[0], corrids[0],
+                                                     3, trial, "end"),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)

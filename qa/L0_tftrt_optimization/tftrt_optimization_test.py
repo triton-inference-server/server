@@ -34,6 +34,7 @@ from tritonclientutils import InferenceServerException
 
 
 class TFTRTOptimizationTest(unittest.TestCase):
+
     def setUp(self):
         self.input0_ = np.arange(start=0, stop=16,
                                  dtype=np.float32).reshape(1, 16)

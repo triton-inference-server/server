@@ -34,8 +34,7 @@ FLAGS = None
 
 def create_zeroout_modelfile(create_savedmodel, models_dir, model_version):
     # Load the zero-out custom operator
-    _zero_out_module = tf.load_op_library(os.path.join(
-        FLAGS.zero_out_lib_path))
+    _zero_out_module = tf.load_op_library(os.path.join(FLAGS.zero_out_lib_path))
     zero_out = _zero_out_module.zero_out
 
     # Create the model that uses custom operator.
@@ -46,8 +45,7 @@ def create_zeroout_modelfile(create_savedmodel, models_dir, model_version):
     zout = zero_out(zin, name="zeroed")
 
     model_name = "savedmodel_zeroout" if create_savedmodel else "graphdef_zeroout"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -100,8 +98,8 @@ output [
   }}
 ]
 '''.format(
-        model_name, "tensorflow_savedmodel"
-        if create_savedmodel else "tensorflow_graphdef")
+        model_name,
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
 
     try:
         os.makedirs(config_dir)
@@ -125,8 +123,7 @@ def create_cudaop_modelfile(create_savedmodel, models_dir, model_version):
     zout = add_one(zin, name="out")
 
     model_name = "savedmodel_cudaop" if create_savedmodel else "graphdef_cudaop"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -179,8 +176,8 @@ output [
   }}
 ]
 '''.format(
-        model_name, "tensorflow_savedmodel"
-        if create_savedmodel else "tensorflow_graphdef")
+        model_name,
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
 
     try:
         os.makedirs(config_dir)
@@ -204,8 +201,7 @@ def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
     zout = busy_loop(zin, name="out")
 
     model_name = "savedmodel_busyop" if create_savedmodel else "graphdef_busyop"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -258,8 +254,8 @@ output [
   }}
 ]
 '''.format(
-        model_name, "tensorflow_savedmodel"
-        if create_savedmodel else "tensorflow_graphdef")
+        model_name,
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
 
     try:
         os.makedirs(config_dir)
@@ -291,6 +287,7 @@ def create_moduloop_modelfile(models_dir, model_version):
     )
 
     class ModuloCustomNet(nn.Module):
+
         def __init__(self):
             super(ModuloCustomNet, self).__init__()
 
@@ -303,8 +300,7 @@ def create_moduloop_modelfile(models_dir, model_version):
     traced = torch.jit.trace(moduloCustomModel,
                              (example_input0, example_input1))
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)

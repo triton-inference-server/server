@@ -36,6 +36,7 @@ import struct
 
 
 class _utf8(object):
+
     @classmethod
     def from_param(cls, value):
         if value is None:
@@ -250,6 +251,7 @@ class SharedMemoryException(Exception):
         Pointer to an Error that should be used to initialize the exception.
 
     """
+
     def __init__(self, err):
         self.err_code_map = {
             -2: "unable to get shared memory descriptor",

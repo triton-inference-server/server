@@ -89,14 +89,14 @@ def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
     """Return True if input and output dtypes are supported by a Caffe2 model."""
 
     # Some operations used by test don't support fp16.
-    if ((input_dtype == np.float16) or (output0_dtype == np.float16)
-            or (output1_dtype == np.float16)):
+    if ((input_dtype == np.float16) or (output0_dtype == np.float16) or
+        (output1_dtype == np.float16)):
         return False
 
     # Some operations don't support any int type except int32.
-    if ((input_dtype == np.int8) or (output0_dtype == np.int8)
-            or (output1_dtype == np.int8) or (input_dtype == np.int16)
-            or (output0_dtype == np.int16) or (output1_dtype == np.int16)):
+    if ((input_dtype == np.int8) or (output0_dtype == np.int8) or
+        (output1_dtype == np.int8) or (input_dtype == np.int16) or
+        (output0_dtype == np.int16) or (output1_dtype == np.int16)):
         return False
 
     # If the input type is string the output type must be string or
@@ -108,8 +108,8 @@ def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
         return False
 
     # Don't support string inputs or outputs.
-    if ((input_dtype == np.object) or (output0_dtype == np.object)
-            or (output1_dtype == np.object)):
+    if ((input_dtype == np.object) or (output0_dtype == np.object) or
+        (output1_dtype == np.object)):
         return False
 
     return True
@@ -149,8 +149,8 @@ def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
         return False
 
     # Input and output shapes must be fixed-size.
-    if (not shape_is_fixed(input_shape) or not shape_is_fixed(output0_shape)
-            or not shape_is_fixed(output1_shape)):
+    if (not shape_is_fixed(input_shape) or not shape_is_fixed(output0_shape) or
+            not shape_is_fixed(output1_shape)):
         return False
 
     return True

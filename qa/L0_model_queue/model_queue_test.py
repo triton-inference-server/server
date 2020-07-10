@@ -43,6 +43,7 @@ _deferred_exceptions = []
 
 
 class ModelQueueTest(unittest.TestCase):
+
     def setUp(self):
         global _deferred_exceptions
         _deferred_exceptions = []
@@ -109,7 +110,7 @@ class ModelQueueTest(unittest.TestCase):
         # model execution. Then sends 10 requests to overload the model queue,
         # expecting 2 of the requests are returned with error code immediately.
         dtype = np.float32
-        shapes = ([16], )
+        shapes = ([16],)
 
         for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
             preceding_thread = threading.Thread(
@@ -154,7 +155,7 @@ class ModelQueueTest(unittest.TestCase):
         # first request must wait for 'max_queue_delay_microseconds' until it
         # can be executed.
         dtype = np.float32
-        shapes = ([16], )
+        shapes = ([16],)
         for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
             try:
                 threads = []
@@ -188,7 +189,7 @@ class ModelQueueTest(unittest.TestCase):
         # Expect the first request is timed-out and rejected, which makes the
         # second and third request be batched together and executed.
         dtype = np.float32
-        shapes = ([16], )
+        shapes = ([16],)
         for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
             threads = []
             threads.append(
@@ -235,7 +236,7 @@ class ModelQueueTest(unittest.TestCase):
         # 'default_timeout_microseconds'.
 
         dtype = np.float32
-        shapes = ([16], )
+        shapes = ([16],)
         for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
             threads = []
             threads.append(
@@ -355,7 +356,7 @@ class ModelQueueTest(unittest.TestCase):
         # place in the front of the queue and form a preferred batch with the
         # first request.
         dtype = np.float32
-        shapes = ([16], )
+        shapes = ([16],)
         for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
             threads = []
             threads.append(
@@ -409,7 +410,7 @@ class ModelQueueTest(unittest.TestCase):
         #     batch size 6, default timeout (will be 3rd batch)
 
         dtype = np.float32
-        shapes = ([16], )
+        shapes = ([16],)
         for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
             threads = []
             # The expected ranges may not be rounded to accommodate

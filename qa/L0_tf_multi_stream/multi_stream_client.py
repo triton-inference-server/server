@@ -66,13 +66,12 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument(
-        '-u',
-        '--url',
-        type=str,
-        required=False,
-        default='localhost:8000',
-        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument(
         '-m',
         '--model',
@@ -93,8 +92,7 @@ if __name__ == '__main__':
         type=int,
         required=False,
         default=12000000,
-        help='Number of cycles to perform the busyloop op. Default is 12000000'
-    )
+        help='Number of cycles to perform the busyloop op. Default is 12000000')
     parser.add_argument(
         '-i',
         '--protocol',

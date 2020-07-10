@@ -147,8 +147,7 @@ def create_savedmodel_modelfile(models_dir,
     model_name = tu.get_model_name(
         "savedmodel_nobatch" if max_batch == 0 else "savedmodel", input_dtype,
         output0_dtype, output1_dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -269,18 +268,16 @@ def create_models(models_dir,
 
     if FLAGS.savedmodel:
         # max-batch 8
-        create_savedmodel_modelconfig(models_dir, 8, model_version,
-                                      input_shape, output0_shape,
-                                      output1_shape, input_dtype,
+        create_savedmodel_modelconfig(models_dir, 8, model_version, input_shape,
+                                      output0_shape, output1_shape, input_dtype,
                                       output0_dtype, output1_dtype,
                                       output0_label_cnt, version_policy)
         create_savedmodel_modelfile(models_dir, 8, model_version, input_shape,
                                     output0_shape, output1_shape, input_dtype,
                                     output0_dtype, output1_dtype)
         # max-batch 0
-        create_savedmodel_modelconfig(models_dir, 0, model_version,
-                                      input_shape, output0_shape,
-                                      output1_shape, input_dtype,
+        create_savedmodel_modelconfig(models_dir, 0, model_version, input_shape,
+                                      output0_shape, output1_shape, input_dtype,
                                       output0_dtype, output1_dtype,
                                       output0_label_cnt, version_policy)
         create_savedmodel_modelfile(models_dir, 0, model_version, input_shape,
@@ -296,7 +293,7 @@ def create_fixed_models(models_dir,
     input_size = 16
 
     create_models(models_dir, input_dtype, output0_dtype, output1_dtype,
-                  (input_size, ), (input_size, ), (input_size, ), input_size,
+                  (input_size,), (input_size,), (input_size,), input_size,
                   version_policy)
 
 
@@ -376,28 +373,28 @@ if __name__ == '__main__':
             for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
                 create_savedmodel_modelfile(FLAGS.models_dir,
                                             8,
-                                            2, (16, ), (16, ), (16, ),
+                                            2, (16,), (16,), (16,),
                                             vt,
                                             vt,
                                             vt,
                                             swap=True)
                 create_savedmodel_modelfile(FLAGS.models_dir,
                                             8,
-                                            3, (16, ), (16, ), (16, ),
+                                            3, (16,), (16,), (16,),
                                             vt,
                                             vt,
                                             vt,
                                             swap=True)
                 create_savedmodel_modelfile(FLAGS.models_dir,
                                             0,
-                                            2, (16, ), (16, ), (16, ),
+                                            2, (16,), (16,), (16,),
                                             vt,
                                             vt,
                                             vt,
                                             swap=True)
                 create_savedmodel_modelfile(FLAGS.models_dir,
                                             0,
-                                            3, (16, ), (16, ), (16, ),
+                                            3, (16,), (16,), (16,),
                                             vt,
                                             vt,
                                             vt,

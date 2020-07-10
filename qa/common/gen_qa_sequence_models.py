@@ -178,8 +178,8 @@ def np_to_torch_dtype(np_dtype):
     return None
 
 
-def create_tf_modelfile(create_savedmodel, models_dir, model_version,
-                        max_batch, dtype, shape):
+def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
+                        dtype, shape):
 
     if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -249,8 +249,7 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version,
         model_name = tu.get_sequence_model_name(
             "graphdef_nobatch" if max_batch == 0 else "graphdef", dtype)
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -260,12 +259,9 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version,
     if create_savedmodel:
         with tf.Session() as sess:
             sess.run(tf.initializers.global_variables())
-            input0_tensor = tf.get_default_graph().get_tensor_by_name(
-                "INPUT:0")
-            start0_tensor = tf.get_default_graph().get_tensor_by_name(
-                "START:0")
-            ready0_tensor = tf.get_default_graph().get_tensor_by_name(
-                "READY:0")
+            input0_tensor = tf.get_default_graph().get_tensor_by_name("INPUT:0")
+            start0_tensor = tf.get_default_graph().get_tensor_by_name("START:0")
+            ready0_tensor = tf.get_default_graph().get_tensor_by_name("READY:0")
             output0_tensor = tf.get_default_graph().get_tensor_by_name(
                 "OUTPUT:0")
             tf.saved_model.simple_save(sess,
@@ -347,9 +343,9 @@ instance_group [
   }}
 ]
 '''.format(
-        model_name, "tensorflow_savedmodel"
-        if create_savedmodel else "tensorflow_graphdef", max_batch,
-        "fp32" if dtype == np.float32 else "int32",
+        model_name,
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
+        max_batch, "fp32" if dtype == np.float32 else "int32",
         "fp32" if dtype == np.float32 else "int32", np_to_model_dtype(dtype),
         tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
 
@@ -362,8 +358,7 @@ instance_group [
         cfile.write(config)
 
 
-def create_netdef_modelfile(models_dir, model_version, max_batch, dtype,
-                            shape):
+def create_netdef_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -383,8 +378,7 @@ def create_netdef_modelfile(models_dir, model_version, max_batch, dtype,
     predict_net, _ = c2model_helper.ExtractPredictorNet(model.Proto(), \
         input_blobs = ["INPUT", "START","READY"], output_blobs = ["OUTPUT"])
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -556,10 +550,10 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch,
     profile = builder.create_optimization_profile()
     profile.set_shape_input("SHAPE_INPUT", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
-    profile.set_shape("START", min_prefix + unit_shape,
-                      opt_prefix + unit_shape, opt_prefix + unit_shape)
-    profile.set_shape("READY", min_prefix + unit_shape,
-                      opt_prefix + unit_shape, opt_prefix + unit_shape)
+    profile.set_shape("START", min_prefix + unit_shape, opt_prefix + unit_shape,
+                      opt_prefix + unit_shape)
+    profile.set_shape("READY", min_prefix + unit_shape, opt_prefix + unit_shape,
+                      opt_prefix + unit_shape)
 
     config = builder.create_builder_config()
     config.flags = flags
@@ -570,8 +564,7 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch,
 
     model_name = tu.get_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -612,8 +605,7 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
 
     model_name = tu.get_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -675,8 +667,7 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
 
     model_name = tu.get_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -753,8 +744,7 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
 
     model_name = tu.get_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -855,8 +845,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
 
     model_name = tu.get_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -880,8 +869,8 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
             create_plan_dynamic_rf_modelfile(models_dir, model_version,
                                              max_batch, dtype, shape)
         else:
-            create_plan_fixed_rf_modelfile(models_dir, model_version,
-                                           max_batch, dtype, shape)
+            create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch,
+                                           dtype, shape)
     else:
         if (not tu.shape_is_fixed(shape)):
             create_plan_dynamic_modelfile(models_dir, model_version, max_batch,
@@ -891,8 +880,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
                                         dtype, shape)
 
 
-def create_plan_modelconfig(models_dir, model_version, max_batch, dtype,
-                            shape):
+def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
 
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -1041,14 +1029,12 @@ instance_group [
 
 def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape,
-                                      shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
         "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
@@ -1067,11 +1053,9 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     onnx_input = onnx.helper.make_tensor_value_info(
         "INPUT", onnx_dtype, batch_dim + onnx_input_shape)
-    onnx_start = onnx.helper.make_tensor_value_info("START",
-                                                    onnx_control_dtype,
+    onnx_start = onnx.helper.make_tensor_value_info("START", onnx_control_dtype,
                                                     batch_dim + [1])
-    onnx_ready = onnx.helper.make_tensor_value_info("READY",
-                                                    onnx_control_dtype,
+    onnx_ready = onnx.helper.make_tensor_value_info("READY", onnx_control_dtype,
                                                     batch_dim + [1])
     onnx_output = onnx.helper.make_tensor_value_info(
         "OUTPUT", onnx_dtype, batch_dim + onnx_output_shape)
@@ -1080,9 +1064,9 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
     # Also casting String data type to int32
-    if ((onnx_dtype == onnx.TensorProto.INT8)
-            or (onnx_dtype == onnx.TensorProto.INT16)
-            or (onnx_dtype == onnx.TensorProto.STRING)):
+    if ((onnx_dtype == onnx.TensorProto.INT8) or
+        (onnx_dtype == onnx.TensorProto.INT16) or
+        (onnx_dtype == onnx.TensorProto.STRING)):
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
                                                to=onnx.TensorProto.INT32)
 
@@ -1118,11 +1102,9 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype,
-                            shape):
+def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape,
-                                      shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -1196,6 +1178,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
     shape = [abs(ips) for ips in shape]
 
     class SequenceNet(nn.Module):
+
         def __init__(self):
             super(SequenceNet, self).__init__()
 
@@ -1208,8 +1191,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
     traced = torch.jit.trace(sequenceModel,
                              (example_input, example_input, example_input))
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -1307,8 +1289,7 @@ def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
 
     if FLAGS.graphdef:
-        create_tf_modelconfig(False, models_dir, model_version, 8, dtype,
-                              shape)
+        create_tf_modelconfig(False, models_dir, model_version, 8, dtype, shape)
         create_tf_modelfile(False, models_dir, model_version, 8, dtype, shape)
         if no_batch:
             create_tf_modelconfig(False, models_dir, model_version, 0, dtype,
@@ -1487,6 +1468,6 @@ if __name__ == '__main__':
         if FLAGS.ensemble:
             # Create nop models used in ensemble
             for model_dtype in ["TYPE_INT32", "TYPE_FP32"]:
-                for model_shape in [(-1, )]:
+                for model_shape in [(-1,)]:
                     emu.create_nop_modelconfig(FLAGS.models_dir, model_shape,
                                                model_dtype)

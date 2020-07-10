@@ -41,6 +41,7 @@ _trials = ("graphdef", "libtorch", "netdef", "onnx", "plan", "savedmodel")
 
 
 class OutputNameValidationTest(unittest.TestCase):
+
     def requestGenerator(self, model_name, output_name):
         request = grpc_service_pb2.ModelInferRequest()
         request.model_name = model_name

@@ -60,8 +60,8 @@ if __name__ == '__main__':
         nonmatch = list()
         expected_files = [
             f for f in os.listdir(FLAGS.expected_dir)
-            if (os.path.isfile(os.path.join(FLAGS.expected_dir, f)) and (
-                f.startswith("expected")))
+            if (os.path.isfile(os.path.join(FLAGS.expected_dir, f)) and
+                (f.startswith("expected")))
         ]
         for efile in expected_files:
             with open(os.path.join(FLAGS.expected_dir, efile)) as f:
@@ -69,8 +69,8 @@ if __name__ == '__main__':
 
             if pair[1] == "http":
                 config_json = json.loads(
-                    json_format.MessageToJson(
-                        config, preserving_proto_field_name=True))
+                    json_format.MessageToJson(config,
+                                              preserving_proto_field_name=True))
                 if config_json == model_config:
                     sys.exit(0)
             else:

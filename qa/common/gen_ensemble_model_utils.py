@@ -78,6 +78,7 @@ class AddSubEnsembleSchedule:
     Helper class to generate ensemble schedule that behaves the same as
     addsub model given an ensemble type
     """
+
     def __init__(self, ensemble_type):
         if ensemble_type == "fan":
             self._get_schedule = AddSubEnsembleSchedule._get_fan_ensemble_schedule
@@ -95,9 +96,8 @@ class AddSubEnsembleSchedule:
 
     @classmethod
     def _get_simple_ensemble_schedule(cls, base_model_name, input_shape,
-                                      output0_shape, output1_shape,
-                                      input_dtype, output0_dtype,
-                                      output1_dtype):
+                                      output0_shape, output1_shape, input_dtype,
+                                      output0_dtype, output1_dtype):
         # libtorch model uses other naming convention
         index_delimiter = "__" if "libtorch" in base_model_name else ""
         # ensemble input -> addsub -> ensemble output
@@ -294,6 +294,7 @@ class IdentityEnsembleSchedule:
     Helper class to generate ensemble schedule that behaves the same as
     identity model given an ensemble type
     """
+
     def __init__(self, ensemble_type, ensemble_test_type="zero"):
         self._test_type = ensemble_test_type
         if ensemble_type == "fan":
@@ -407,9 +408,9 @@ ensemble_scheduling {{
         return schedule
 
     @classmethod
-    def _get_fan_ensemble_schedule(cls, dtype, input_shapes,
-                                   input_model_shapes, output_shapes,
-                                   output_model_shapes, test_type):
+    def _get_fan_ensemble_schedule(cls, dtype, input_shapes, input_model_shapes,
+                                   output_shapes, output_model_shapes,
+                                   test_type):
         # Note that the simple and sequence test already test "fan" in some
         # degree, because there is no direct match from nop input/output
         # like what is in addsub-like ensemble.
@@ -498,6 +499,7 @@ class SequenceEnsembleSchedule:
     Helper class to generate ensemble schedule that behaves the same as
     sequence model given an ensemble type
     """
+
     def __init__(self, ensemble_type):
         if ensemble_type == "fan":
             self._get_schedule = SequenceEnsembleSchedule._get_fan_ensemble_schedule
@@ -510,8 +512,7 @@ class SequenceEnsembleSchedule:
         return self._get_schedule(base_model_name, shape, model_dtype)
 
     @classmethod
-    def _get_simple_ensemble_schedule(cls, base_model_name, shape,
-                                      model_dtype):
+    def _get_simple_ensemble_schedule(cls, base_model_name, shape, model_dtype):
         # libtorch model uses other naming convention
         index_suffix = "__0" if "libtorch" in base_model_name else ""
         # ensemble input -> sequence -> ensemble output

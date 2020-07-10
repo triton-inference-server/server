@@ -44,13 +44,12 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument(
-        '-u',
-        '--url',
-        type=str,
-        required=False,
-        default='localhost:8000',
-        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
 
@@ -127,11 +126,9 @@ if __name__ == '__main__':
     shm.set_shared_memory_region(shm_ip1_handle, [input1_data_serialized])
 
     # Register Input0 and Input1 shared memory with Triton Server
-    triton_client.register_system_shared_memory("input0_data",
-                                                "/input0_simple",
+    triton_client.register_system_shared_memory("input0_data", "/input0_simple",
                                                 input0_byte_size)
-    triton_client.register_system_shared_memory("input1_data",
-                                                "/input1_simple",
+    triton_client.register_system_shared_memory("input1_data", "/input1_simple",
                                                 input1_byte_size)
 
     # Set the parameters to use data from shared memory
@@ -143,12 +140,10 @@ if __name__ == '__main__':
     inputs[-1].set_shared_memory("input1_data", input1_byte_size)
 
     outputs = []
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT0',
-                                                   binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
     outputs[-1].set_shared_memory("output0_data", output0_byte_size)
 
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
     outputs[-1].set_shared_memory("output1_data", output1_byte_size)
 
     results = triton_client.infer(model_name=model_name,

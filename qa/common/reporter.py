@@ -80,10 +80,10 @@ def annotate_csv(data, csv_file):
         for header, result in zip(header_row, concurrency_row):
             if header == 'Inferences/Second':
                 data['d_infer_per_sec'] = float(result)
-            elif ((header == 'Client Send')
-                  or (header == 'Network+Server Send/Recv')
-                  or (header == 'Server Queue') or (header == 'Server Compute')
-                  or (header == 'Client Recv')):
+            elif ((header == 'Client Send') or
+                  (header == 'Network+Server Send/Recv') or
+                  (header == 'Server Queue') or (header == 'Server Compute') or
+                  (header == 'Client Recv')):
                 avg_latency_us += float(result)
             elif header == 'p50 latency':
                 data['d_latency_p50_ms'] = float(result) / 1000.0

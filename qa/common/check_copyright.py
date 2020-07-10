@@ -117,9 +117,9 @@ def visit(path):
                 # start of the file
                 if first_line:
                     first_line = False
-                    if (fline.startswith("#!") or fline.startswith("..")
-                            or fline.startswith("<!--")
-                            or fline.startswith("{{/*")):
+                    if (fline.startswith("#!") or fline.startswith("..") or
+                            fline.startswith("<!--") or
+                            fline.startswith("{{/*")):
                         continue
                 # Skip empty lines...
                 if len(fline.strip()) != 0:
@@ -171,8 +171,8 @@ def visit(path):
                 return False
 
         if start_year > FLAGS.year:
-            print("copyright start year greater than current year for " +
-                  path + ": " + line)
+            print("copyright start year greater than current year for " + path +
+                  ": " + line)
             return False
         if end_year > FLAGS.year:
             print("copyright end year greater than current year for " + path +

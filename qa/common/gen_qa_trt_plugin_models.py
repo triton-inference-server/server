@@ -107,24 +107,23 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
                           output0_dtype):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output0_dtype,
-                                     input_shape, output0_shape,
-                                     output0_shape):
+                                     input_shape, output0_shape, output0_shape):
         return
 
     trt_input_dtype = np_to_trt_dtype(input_dtype)
     trt_output0_dtype = np_to_trt_dtype(output0_dtype)
 
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", input_dtype,
-        output0_dtype, output0_dtype) + '_' + plugin_name
+    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+                                   input_dtype, output0_dtype,
+                                   output0_dtype) + '_' + plugin_name
 
     with trt.Builder(
             TRT_LOGGER) as builder, builder.create_network() as network:
         input_layer = network.add_input(name="INPUT0",
                                         dtype=trt_input_dtype,
                                         shape=input_shape)
-        plugin_layer = network.add_plugin_v2(
-            inputs=[input_layer], plugin=get_trt_plugin(plugin_name))
+        plugin_layer = network.add_plugin_v2(inputs=[input_layer],
+                                             plugin=get_trt_plugin(plugin_name))
         plugin_layer.get_output(0).name = "OUTPUT0"
         network.mark_output(plugin_layer.get_output(0))
 
@@ -152,16 +151,15 @@ def create_plan_modelconfig(models_dir, max_batch, model_version, plugin_name,
                             output0_dtype):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output0_dtype,
-                                     input_shape, output0_shape,
-                                     output0_shape):
+                                     input_shape, output0_shape, output0_shape):
         return
 
     version_policy_str = "{ latest { num_versions: 1 }}"
 
     # Use a different model name for the non-batching variant
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", input_dtype,
-        output0_dtype, output0_dtype) + '_' + plugin_name
+    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+                                   input_dtype, output0_dtype,
+                                   output0_dtype) + '_' + plugin_name
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -200,16 +198,16 @@ def create_plugin_models(models_dir):
     model_version = 1
 
     # default LReLU_TRT plugin
-    create_plan_modelconfig(models_dir, 8, model_version, "LReLU_TRT", (16, ),
-                            (16, ), np.float32, np.float32)
-    create_plan_modelfile(models_dir, 8, model_version, "LReLU_TRT", (16, ),
-                          (16, ), np.float32, np.float32)
+    create_plan_modelconfig(models_dir, 8, model_version, "LReLU_TRT", (16,),
+                            (16,), np.float32, np.float32)
+    create_plan_modelfile(models_dir, 8, model_version, "LReLU_TRT", (16,),
+                          (16,), np.float32, np.float32)
 
     # custom CustomClipPlugin
     create_plan_modelconfig(models_dir, 8, model_version, "CustomClipPlugin",
-                            (16, ), (16, ), np.float32, np.float32)
+                            (16,), (16,), np.float32, np.float32)
     create_plan_modelfile(models_dir, 8, model_version, "CustomClipPlugin",
-                          (16, ), (16, ), np.float32, np.float32)
+                          (16,), (16,), np.float32, np.float32)
 
 
 if __name__ == '__main__':

@@ -35,6 +35,7 @@ from tritonclientutils import *
 
 
 class CudaSharedMemoryTest(unittest.TestCase):
+
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid cuda shared memory region
         try:
@@ -48,11 +49,9 @@ class CudaSharedMemoryTest(unittest.TestCase):
     def test_valid_create_set_register(self):
         # Create a valid cuda shared memory region, fill data in it and register
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
         cshm.set_shared_memory_region(shm_op0_handle,
                                       [np.array([1, 2], dtype=np.float32)])
@@ -68,11 +67,9 @@ class CudaSharedMemoryTest(unittest.TestCase):
     def test_unregister_before_register(self):
         # Create a valid cuda shared memory region and unregister before register
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
         triton_client.unregister_cuda_shared_memory("dummy_data")
         shm_status = triton_client.get_cuda_shared_memory_status()
@@ -85,11 +82,9 @@ class CudaSharedMemoryTest(unittest.TestCase):
     def test_unregister_after_register(self):
         # Create a valid cuda shared memory region and unregister after register
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
         triton_client.register_cuda_shared_memory(
             "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8)
@@ -104,11 +99,9 @@ class CudaSharedMemoryTest(unittest.TestCase):
     def test_reregister_after_register(self):
         # Create a valid cuda shared memory region and unregister after register
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
         triton_client.register_cuda_shared_memory(
             "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8)
@@ -129,21 +122,17 @@ class CudaSharedMemoryTest(unittest.TestCase):
     def _configure_sever(self):
         shm_ip0_handle = cshm.create_shared_memory_region("input0_data", 64, 0)
         shm_ip1_handle = cshm.create_shared_memory_region("input1_data", 64, 0)
-        shm_op0_handle = cshm.create_shared_memory_region(
-            "output0_data", 64, 0)
-        shm_op1_handle = cshm.create_shared_memory_region(
-            "output1_data", 64, 0)
+        shm_op0_handle = cshm.create_shared_memory_region("output0_data", 64, 0)
+        shm_op1_handle = cshm.create_shared_memory_region("output1_data", 64, 0)
 
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
         input1_data = np.ones(shape=16, dtype=np.int32)
         cshm.set_shared_memory_region(shm_ip0_handle, [input0_data])
         cshm.set_shared_memory_region(shm_ip1_handle, [input1_data])
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         triton_client.register_cuda_shared_memory(
             "input0_data", cshm.get_raw_handle(shm_ip0_handle), 0, 64)
         triton_client.register_cuda_shared_memory(
@@ -171,8 +160,7 @@ class CudaSharedMemoryTest(unittest.TestCase):
         inputs = []
         outputs = []
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
             inputs.append(httpclient.InferInput("INPUT0", [1, 16], "INT32"))
             inputs.append(httpclient.InferInput("INPUT1", [1, 16], "INT32"))
             outputs.append(
@@ -180,8 +168,7 @@ class CudaSharedMemoryTest(unittest.TestCase):
             outputs.append(
                 httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
             inputs.append(grpcclient.InferInput("INPUT0", [1, 16], "INT32"))
             inputs.append(grpcclient.InferInput("INPUT1", [1, 16], "INT32"))
             outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
@@ -210,8 +197,7 @@ class CudaSharedMemoryTest(unittest.TestCase):
                 output_shape = output.shape
             output_dtype = triton_to_np_dtype(output_datatype)
             output_data = cshm.get_contents_as_numpy(shm_op0_handle,
-                                                     output_dtype,
-                                                     output_shape)
+                                                     output_dtype, output_shape)
             self.assertTrue(
                 (output_data[0] == (input0_data + input1_data)).all())
         except Exception as ex:
@@ -226,11 +212,9 @@ class CudaSharedMemoryTest(unittest.TestCase):
         if len(error_msg) > 0:
             raise Exception(str(error_msg))
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         triton_client.unregister_cuda_shared_memory("output0_data")
         shm_status = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
@@ -244,11 +228,9 @@ class CudaSharedMemoryTest(unittest.TestCase):
         error_msg = []
         shm_handles = self._configure_sever()
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         self._basic_inference(shm_handles[0], shm_handles[1], shm_handles[2],
                               shm_handles[3], error_msg)
         if len(error_msg) > 0:
@@ -268,14 +250,11 @@ class CudaSharedMemoryTest(unittest.TestCase):
         # Shared memory input region larger than needed - Throws error
         error_msg = []
         shm_handles = self._configure_sever()
-        shm_ip2_handle = cshm.create_shared_memory_region(
-            "input2_data", 128, 0)
+        shm_ip2_handle = cshm.create_shared_memory_region("input2_data", 128, 0)
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         triton_client.register_cuda_shared_memory(
             "input2_data", cshm.get_raw_handle(shm_ip2_handle), 0, 128)
         self._basic_inference(shm_handles[0], shm_ip2_handle, shm_handles[2],
@@ -302,11 +281,9 @@ class CudaSharedMemoryTest(unittest.TestCase):
         # Unregister all shared memory blocks
         shm_handles = self._configure_sever()
         if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url,
-                                                             verbose=True)
+            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         status_before = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
             self.assertTrue(len(status_before) == 4)

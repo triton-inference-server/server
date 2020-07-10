@@ -37,8 +37,8 @@ from tritonclientutils import *
 
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
+                                                  0)))
 CPU_ONLY = (os.environ.get('TRITON_SERVER_CPU_ONLY') is not None)
 BACKENDS = os.environ.get(
     'BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
@@ -48,8 +48,10 @@ np_dtype_string = np.dtype(object)
 
 
 class InferTest(unittest.TestCase):
+
     def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
                     output0_raw, output1_raw, swap):
+
         def _infer_exact_helper(tester,
                                 pf,
                                 tensor_shape,
@@ -95,7 +97,7 @@ class InferTest(unittest.TestCase):
                 # model that supports batching
                 iu.infer_exact(
                     tester,
-                    pf, (bs, ) + tensor_shape,
+                    pf, (bs,) + tensor_shape,
                     bs,
                     input_dtype,
                     output0_dtype,
@@ -122,19 +124,18 @@ class InferTest(unittest.TestCase):
             for prefix in all_ensemble_prefix:
                 if tu.validate_for_ensemble_model(prefix, input_dtype,
                                                   output0_dtype, output1_dtype,
-                                                  (input_size, ),
-                                                  (input_size, ),
-                                                  (input_size, )):
+                                                  (input_size,), (input_size,),
+                                                  (input_size,)):
                     ensemble_prefix.append(prefix)
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
-                                    (input_size, ), (input_size, ),
-                                    (input_size, )):
+                                    (input_size,), (input_size,),
+                                    (input_size,)):
             for prefix in ensemble_prefix:
                 for pf in ["graphdef", "savedmodel"]:
                     if pf in BACKENDS:
                         _infer_exact_helper(self,
-                                            prefix + pf, (input_size, ),
+                                            prefix + pf, (input_size,),
                                             8,
                                             input_dtype,
                                             output0_dtype,
@@ -144,12 +145,12 @@ class InferTest(unittest.TestCase):
                                             swap=swap)
 
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
-                                    (input_size, ), (input_size, ),
-                                    (input_size, )):
+                                    (input_size,), (input_size,),
+                                    (input_size,)):
             for prefix in ensemble_prefix:
                 if 'netdef' in BACKENDS:
                     _infer_exact_helper(self,
-                                        prefix + 'netdef', (input_size, ),
+                                        prefix + 'netdef', (input_size,),
                                         8,
                                         input_dtype,
                                         output0_dtype,
@@ -165,8 +166,7 @@ class InferTest(unittest.TestCase):
                 if 'plan' in BACKENDS:
                     if input_dtype == np.int8:
                         _infer_exact_helper(self,
-                                            prefix + 'plan',
-                                            (input_size, 1, 1),
+                                            prefix + 'plan', (input_size, 1, 1),
                                             8,
                                             input_dtype,
                                             output0_dtype,
@@ -176,7 +176,7 @@ class InferTest(unittest.TestCase):
                                             swap=swap)
                     else:
                         _infer_exact_helper(self,
-                                            prefix + 'plan', (input_size, ),
+                                            prefix + 'plan', (input_size,),
                                             8,
                                             input_dtype,
                                             output0_dtype,
@@ -188,12 +188,12 @@ class InferTest(unittest.TestCase):
         # the custom model is src/custom/addsub... it does not swap
         # the inputs so always set to False
         if tu.validate_for_custom_model(input_dtype, output0_dtype,
-                                        output1_dtype, (input_size, ),
-                                        (input_size, ), (input_size, )):
+                                        output1_dtype, (input_size,),
+                                        (input_size,), (input_size,)):
             # No basic ensemble models are created against custom models
             if 'custom' in BACKENDS:
                 _infer_exact_helper(self,
-                                    'custom', (input_size, ),
+                                    'custom', (input_size,),
                                     8,
                                     input_dtype,
                                     output0_dtype,
@@ -202,13 +202,13 @@ class InferTest(unittest.TestCase):
                                     output1_raw=output1_raw,
                                     swap=False)
 
-        if tu.validate_for_onnx_model(input_dtype, output0_dtype,
-                                      output1_dtype, (input_size, ),
-                                      (input_size, ), (input_size, )):
+        if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                      (input_size,), (input_size,),
+                                      (input_size,)):
             for prefix in ensemble_prefix:
                 if 'onnx' in BACKENDS:
                     _infer_exact_helper(self,
-                                        prefix + 'onnx', (input_size, ),
+                                        prefix + 'onnx', (input_size,),
                                         8,
                                         input_dtype,
                                         output0_dtype,
@@ -218,12 +218,12 @@ class InferTest(unittest.TestCase):
                                         swap=swap)
 
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype,
-                                          output1_dtype, (input_size, ),
-                                          (input_size, ), (input_size, )):
+                                          output1_dtype, (input_size,),
+                                          (input_size,), (input_size,)):
             for prefix in ensemble_prefix:
                 if 'libtorch' in BACKENDS:
                     _infer_exact_helper(self,
-                                        prefix + 'libtorch', (input_size, ),
+                                        prefix + 'libtorch', (input_size,),
                                         8,
                                         input_dtype,
                                         output0_dtype,

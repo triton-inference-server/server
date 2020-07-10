@@ -53,10 +53,10 @@ _deferred_exceptions = []
 
 
 class InferShapeTensorTest(unittest.TestCase):
+
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
-        self.triton_client_ = grpcclient.InferenceServerClient(
-            "localhost:8001")
+        self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
         global _deferred_exceptions
         _deferred_exceptions = []
 
@@ -309,6 +309,7 @@ class InferShapeTensorTest(unittest.TestCase):
 
 
 class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
+
     def get_expected_result(self, expected_result, value, flag_str=None):
         # Adjust the expected_result for models
         expected_result = value
@@ -359,9 +360,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                                                                      3, None)),
                         self.get_expected_result(6, 3, "end"),
                         precreated_shm0_handles),
-                    kwargs={
-                        'sequence_name': "{}".format(self._testMethodName)
-                    }))
+                    kwargs={'sequence_name': "{}".format(self._testMethodName)
+                           }))
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -375,9 +375,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                          ("end", 8, 13, None)),
                         self.get_expected_result(36, 13, "end"),
                         precreated_shm1_handles),
-                    kwargs={
-                        'sequence_name': "{}".format(self._testMethodName)
-                    }))
+                    kwargs={'sequence_name': "{}".format(self._testMethodName)
+                           }))
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -391,9 +390,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                          ("end", 8, 113, None)),
                         self.get_expected_result(336, 113, "end"),
                         precreated_shm2_handles),
-                    kwargs={
-                        'sequence_name': "{}".format(self._testMethodName)
-                    }))
+                    kwargs={'sequence_name': "{}".format(self._testMethodName)
+                           }))
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -407,9 +405,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                          ("end", 8, 1113, None)),
                         self.get_expected_result(3336, 1113, "end"),
                         precreated_shm3_handles),
-                    kwargs={
-                        'sequence_name': "{}".format(self._testMethodName)
-                    }))
+                    kwargs={'sequence_name': "{}".format(self._testMethodName)
+                           }))
 
             for t in threads:
                 t.start()
@@ -472,9 +469,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                                                                      3, None)),
                         self.get_expected_result(6, 3, "end"),
                         precreated_shm0_handles),
-                    kwargs={
-                        'sequence_name': "{}".format(self._testMethodName)
-                    }))
+                    kwargs={'sequence_name': "{}".format(self._testMethodName)
+                           }))
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -488,9 +484,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                          ("end", 32, 13, None)),
                         self.get_expected_result(36, 13, "end"),
                         precreated_shm1_handles),
-                    kwargs={
-                        'sequence_name': "{}".format(self._testMethodName)
-                    }))
+                    kwargs={'sequence_name': "{}".format(self._testMethodName)
+                           }))
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -504,9 +499,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                          ("end", 16, 113, None)),
                         self.get_expected_result(336, 113, "end"),
                         precreated_shm2_handles),
-                    kwargs={
-                        'sequence_name': "{}".format(self._testMethodName)
-                    }))
+                    kwargs={'sequence_name': "{}".format(self._testMethodName)
+                           }))
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -520,9 +514,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                          ("end", 1, 1113, None)),
                         self.get_expected_result(3336, 1113, "end"),
                         precreated_shm3_handles),
-                    kwargs={
-                        'sequence_name': "{}".format(self._testMethodName)
-                    }))
+                    kwargs={'sequence_name': "{}".format(self._testMethodName)
+                           }))
 
             for t in threads:
                 t.start()
@@ -543,6 +536,7 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
 
 
 class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
+
     def get_expected_result(self,
                             expected_result,
                             corrid,
@@ -587,16 +581,16 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[0],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 1, 1, None), (None, 12, 2, None),
-                         ("end", 2, 3, None)),
+                        (("start", 1, 1, None), (None, 12, 2, None), ("end", 2,
+                                                                      3, None)),
                         self.get_expected_result(4 + corrids[0], corrids[0], 3,
                                                  "end"),
                         precreated_shm0_handles),
                     kwargs={
                         'sequence_name':
-                        "{}_{}".format(self._testMethodName, corrids[0]),
+                            "{}_{}".format(self._testMethodName, corrids[0]),
                         'using_dynamic_batcher':
-                        True
+                            True
                     }))
             threads.append(
                 threading.Thread(
@@ -614,9 +608,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm1_handles),
                     kwargs={
                         'sequence_name':
-                        "{}_{}".format(self._testMethodName, corrids[1]),
+                            "{}_{}".format(self._testMethodName, corrids[1]),
                         'using_dynamic_batcher':
-                        True
+                            True
                     }))
             threads.append(
                 threading.Thread(
@@ -634,9 +628,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm2_handles),
                     kwargs={
                         'sequence_name':
-                        "{}_{}".format(self._testMethodName, corrids[2]),
+                            "{}_{}".format(self._testMethodName, corrids[2]),
                         'using_dynamic_batcher':
-                        True
+                            True
                     }))
             threads.append(
                 threading.Thread(
@@ -654,9 +648,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm3_handles),
                     kwargs={
                         'sequence_name':
-                        "{}_{}".format(self._testMethodName, corrids[3]),
+                            "{}_{}".format(self._testMethodName, corrids[3]),
                         'using_dynamic_batcher':
-                        True
+                            True
                     }))
 
             for t in threads:
@@ -715,9 +709,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm0_handles),
                     kwargs={
                         'sequence_name':
-                        "{}_{}".format(self._testMethodName, corrids[0]),
+                            "{}_{}".format(self._testMethodName, corrids[0]),
                         'using_dynamic_batcher':
-                        True
+                            True
                     }))
             threads.append(
                 threading.Thread(
@@ -735,9 +729,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm1_handles),
                     kwargs={
                         'sequence_name':
-                        "{}_{}".format(self._testMethodName, corrids[1]),
+                            "{}_{}".format(self._testMethodName, corrids[1]),
                         'using_dynamic_batcher':
-                        True
+                            True
                     }))
             threads.append(
                 threading.Thread(
@@ -755,9 +749,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm2_handles),
                     kwargs={
                         'sequence_name':
-                        "{}_{}".format(self._testMethodName, corrids[2]),
+                            "{}_{}".format(self._testMethodName, corrids[2]),
                         'using_dynamic_batcher':
-                        True
+                            True
                     }))
             threads.append(
                 threading.Thread(
@@ -775,9 +769,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm3_handles),
                     kwargs={
                         'sequence_name':
-                        "{}_{}".format(self._testMethodName, corrids[3]),
+                            "{}_{}".format(self._testMethodName, corrids[3]),
                         'using_dynamic_batcher':
-                        True
+                            True
                     }))
 
             for t in threads:

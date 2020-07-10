@@ -47,13 +47,12 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='Name of model')
-    parser.add_argument(
-        '-u',
-        '--url',
-        type=str,
-        required=False,
-        default='localhost:8000',
-        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument(
         '-i',
         '--protocol',
@@ -66,15 +65,13 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
 
     if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
-        print(
-            "unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
-                FLAGS.protocol))
+        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
+            FLAGS.protocol))
         exit(1)
 
     client_util = httpclient if FLAGS.protocol == "http" else grpcclient
     # Create the inference context for the model.
-    client = client_util.InferenceServerClient(FLAGS.url,
-                                               verbose=FLAGS.verbose)
+    client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
 
     # We use identity string models that takes 1 input tensor of a single string
     # and returns 1 output tensor of a single string. The output tensor is the

@@ -41,8 +41,8 @@ import sequence_util as su
 
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
+                                                  0)))
 BACKENDS = os.environ.get('BACKENDS',
                           "graphdef savedmodel netdef onnx plan custom")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
@@ -54,12 +54,12 @@ _trials = ()
 if NO_BATCHING:
     for backend in BACKENDS.split(' '):
         if (backend != "libtorch") and (backend != 'custom'):
-            _trials += (backend + "_nobatch", )
+            _trials += (backend + "_nobatch",)
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
     for backend in BACKENDS.split(' '):
         if (backend != "libtorch") and (backend != 'custom') and (backend !=
                                                                   'plan'):
-            _trials += (backend, )
+            _trials += (backend,)
 else:
     _trials = BACKENDS.split(' ')
 
@@ -78,7 +78,7 @@ if ENSEMBLES:
 
 _ragged_batch_supported_trials = list()
 if "custom" in _trials:
-    _ragged_batch_supported_trials = ("custom", )
+    _ragged_batch_supported_trials = ("custom",)
 
 # Not all models can be tested for ragged handling because the models
 # don't deal well with non-size-1 shapes
@@ -105,6 +105,7 @@ def is_ensemble(model_name):
 
 
 class SequenceBatcherTest(su.SequenceBatcherTestUtil):
+
     def get_datatype(self, trial):
         # Get the datatype to use based on what models are available (see test.sh)
         if ("plan" in trial) or ("savedmodel" in trial):
@@ -113,18 +114,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return np.dtype(object)
         return np.int32
 
-    def get_expected_result(self,
-                            expected_result,
-                            value,
-                            trial,
-                            flag_str=None):
+    def get_expected_result(self, expected_result, value, trial, flag_str=None):
         # Adjust the expected_result for models that
         # couldn't implement the full accumulator. See
         # qa/common/gen_qa_sequence_models.py for more
         # information.
         if ((not NO_BATCHING and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial) or
-            ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial):
+            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
+            ("onnx" in trial)) or ("libtorch" in trial):
             expected_result = value
             if (flag_str is not None) and ("start" in flag_str):
                 expected_result += 1
@@ -195,7 +192,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         (4000, None),
                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                         (
-                            ("start,end", 42, None, None), ),
+                            ("start,end", 42, None, None),),
                         self.get_expected_result(42, 42, trial, "start,end"),
                         protocol,
                         sequence_name="{}_{}".format(self._testMethodName,
@@ -255,8 +252,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                     "inference request to model '{}' must specify "
                                     +
                                     "batch-size 1 due to requirements of sequence "
-                                    + "batcher").format(
-                                        model_name, base_model_name)))
+                                    + "batcher").format(model_name,
+                                                        base_model_name)))
                             return
                     self.assertTrue(ex.message().startswith(
                         str("inference request to model '{}' must specify " +
@@ -675,8 +672,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
+                                                                      dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions(
                 (11, 12, 13), dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
@@ -777,10 +774,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     # Requests do not get batched for the ensemble model
                     self.check_status(model_name, {1: 12}, 12, 12)
                 else:
-                    self.check_status(
-                        model_name,
-                        {(4 / MODEL_INSTANCES):
-                         (3 * MODEL_INSTANCES)}, 3 * MODEL_INSTANCES, 12)
+                    self.check_status(model_name, {
+                        (4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES)
+                    }, 3 * MODEL_INSTANCES, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -806,13 +802,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
             precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0, tensor_shape=(2, ))
+                (1, 2, 3), dtype, 0, tensor_shape=(2,))
             precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13), dtype, 1, tensor_shape=(2, ))
+                (11, 12, 13), dtype, 1, tensor_shape=(2,))
             precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 113), dtype, 2, tensor_shape=(1, ))
+                (111, 112, 113), dtype, 2, tensor_shape=(1,))
             precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3, tensor_shape=(3, ))
+                (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -845,7 +841,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (2, )
+                            'tensor_shape': (2,)
                         }))
                 threads.append(
                     threading.Thread(
@@ -863,7 +859,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm1_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (2, )
+                            'tensor_shape': (2,)
                         }))
                 threads.append(
                     threading.Thread(
@@ -881,7 +877,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm2_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (1, )
+                            'tensor_shape': (1,)
                         }))
                 threads.append(
                     threading.Thread(
@@ -900,7 +896,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm3_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (3, )
+                            'tensor_shape': (3,)
                         }))
 
                 threads[0].start()
@@ -941,13 +937,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
             precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0, tensor_shape=(2, ))
+                (1, 2, 3), dtype, 0, tensor_shape=(2,))
             precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13), dtype, 1, tensor_shape=(2, ))
+                (11, 12, 13), dtype, 1, tensor_shape=(2,))
             precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 113), dtype, 2, tensor_shape=(1, ))
+                (111, 112, 113), dtype, 2, tensor_shape=(1,))
             precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3, tensor_shape=(3, ))
+                (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -980,7 +976,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (2, )
+                            'tensor_shape': (2,)
                         }))
                 threads.append(
                     threading.Thread(
@@ -998,7 +994,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm1_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (2, )
+                            'tensor_shape': (2,)
                         }))
                 threads.append(
                     threading.Thread(
@@ -1016,7 +1012,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm2_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (1, )
+                            'tensor_shape': (1,)
                         }))
                 threads.append(
                     threading.Thread(
@@ -1035,7 +1031,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             precreated_shm3_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (3, )
+                            'tensor_shape': (3,)
                         }))
 
                 for t in threads:
@@ -1066,8 +1062,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
+                                                                      dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions(
                 (11, 12, 13), dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
@@ -1220,18 +1216,18 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
+                                                                      dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions((11, 13),
                                                                       dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
                 (111, 113), dtype, 2)
             precreated_shm3_handles = self.precreate_register_regions(
                 (1111, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions(
-                (11111, ), dtype, 4)
-            precreated_shm5_handles = self.precreate_register_regions(
-                (22222, ), dtype, 5)
+            precreated_shm4_handles = self.precreate_register_regions((11111,),
+                                                                      dtype, 4)
+            precreated_shm5_handles = self.precreate_register_regions((22222,),
+                                                                      dtype, 5)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -1325,7 +1321,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (
-                                ("start,end", 11111, None), ),
+                                ("start,end", 11111, None),),
                             self.get_expected_result(11111, 11111, trial,
                                                      "start,end"),
                             precreated_shm4_handles),
@@ -1343,7 +1339,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (
-                                ("start,end", 22222, None), ),
+                                ("start,end", 22222, None),),
                             self.get_expected_result(22222, 22222, trial,
                                                      "start,end"),
                             precreated_shm5_handles),
@@ -1394,16 +1390,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
+                                                                      dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions((11, 13),
                                                                       dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
                 (111, 113), dtype, 2)
             precreated_shm3_handles = self.precreate_register_regions(
                 (1111, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions(
-                (11111, ), dtype, 4)
+            precreated_shm4_handles = self.precreate_register_regions((11111,),
+                                                                      dtype, 4)
             precreated_shm5_handles = self.precreate_register_regions(
                 (22222, 22223, 22224), dtype, 5)
             try:
@@ -1499,7 +1495,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (
-                                ("start,end", 11111, None), ),
+                                ("start,end", 11111, None),),
                             self.get_expected_result(11111, 11111, trial,
                                                      "start,end"),
                             precreated_shm4_handles),
@@ -1570,8 +1566,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
+                                                                      dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions(
                 (11, 12, 13), dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
@@ -1978,8 +1974,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             1004,
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
-                            (("start", 1111,
-                              None), (None, 1112, _max_sequence_idle_ms / 2),
+                            (("start", 1111, None), (None, 1112,
+                                                     _max_sequence_idle_ms / 2),
                              (None, 1112, _max_sequence_idle_ms / 2),
                              ("end", 1113, _max_sequence_idle_ms / 2)),
                             self.get_expected_result(4448, 1113, trial, None),
@@ -2029,8 +2025,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         return
                 self.assertTrue(ex.message().startswith(
                     str("inference request for sequence 1001 to " +
-                        "model '{}' must specify the START flag on the first "
-                        + "request of the sequence").format(model_name)))
+                        "model '{}' must specify the START flag on the first " +
+                        "request of the sequence").format(model_name)))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)

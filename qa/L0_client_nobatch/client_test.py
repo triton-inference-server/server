@@ -38,13 +38,14 @@ import test_util as tu
 
 
 class ClientNoBatchTest(unittest.TestCase):
+
     def test_nobatch_request_for_batching_model(self):
         input_size = 16
 
         # graphdef_int32_int8_int8 has a batching version with max batch size of 8.
         # The server should return an error if the batch size is not included in the
         # input shapes.
-        tensor_shape = (input_size, )
+        tensor_shape = (input_size,)
         for protocol in ["http", "grpc"]:
             model_name = tu.get_model_name("graphdef", np.int32, np.int8,
                                            np.int8)
@@ -68,10 +69,8 @@ class ClientNoBatchTest(unittest.TestCase):
                 inputs.append(
                     tritonhttpclient.InferInput('INPUT1', tensor_shape,
                                                 "INT32"))
-                outputs.append(
-                    tritonhttpclient.InferRequestedOutput('OUTPUT0'))
-                outputs.append(
-                    tritonhttpclient.InferRequestedOutput('OUTPUT1'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1'))
             else:
                 triton_client = tritongrpcclient.InferenceServerClient(
                     url='localhost:8001', verbose=True)
@@ -81,10 +80,8 @@ class ClientNoBatchTest(unittest.TestCase):
                 inputs.append(
                     tritongrpcclient.InferInput('INPUT1', tensor_shape,
                                                 "INT32"))
-                outputs.append(
-                    tritongrpcclient.InferRequestedOutput('OUTPUT0'))
-                outputs.append(
-                    tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+                outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
+                outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
 
             # Initialize the data
             inputs[0].set_data_from_numpy(in0)
@@ -96,8 +93,7 @@ class ClientNoBatchTest(unittest.TestCase):
                                               outputs=outputs)
                 self.assertTrue(
                     False,
-                    "expected failure with no batch request for batching model"
-                )
+                    "expected failure with no batch request for batching model")
             except InferenceServerException as ex:
                 pass
 
@@ -131,10 +127,8 @@ class ClientNoBatchTest(unittest.TestCase):
                 inputs.append(
                     tritonhttpclient.InferInput('INPUT1', tensor_shape,
                                                 "INT32"))
-                outputs.append(
-                    tritonhttpclient.InferRequestedOutput('OUTPUT0'))
-                outputs.append(
-                    tritonhttpclient.InferRequestedOutput('OUTPUT1'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1'))
             else:
                 triton_client = tritongrpcclient.InferenceServerClient(
                     url='localhost:8001', verbose=True)
@@ -144,10 +138,8 @@ class ClientNoBatchTest(unittest.TestCase):
                 inputs.append(
                     tritongrpcclient.InferInput('INPUT1', tensor_shape,
                                                 "INT32"))
-                outputs.append(
-                    tritongrpcclient.InferRequestedOutput('OUTPUT0'))
-                outputs.append(
-                    tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+                outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
+                outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
 
             # Initialize the data
             inputs[0].set_data_from_numpy(in0)
@@ -170,7 +162,7 @@ class ClientNoBatchTest(unittest.TestCase):
         # graphdef_int32_int8_int8 has a batching version with max batch size of 8.
         # The server should return an error if the batch size is not included in the
         # input shapes.
-        tensor_shape = (input_size, )
+        tensor_shape = (input_size,)
         for protocol in ["http", "grpc"]:
             model_name = tu.get_model_name("graphdef_nobatch", np.int32,
                                            np.int8, np.int8)
@@ -194,10 +186,8 @@ class ClientNoBatchTest(unittest.TestCase):
                 inputs.append(
                     tritonhttpclient.InferInput('INPUT1', tensor_shape,
                                                 "INT32"))
-                outputs.append(
-                    tritonhttpclient.InferRequestedOutput('OUTPUT0'))
-                outputs.append(
-                    tritonhttpclient.InferRequestedOutput('OUTPUT1'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1'))
             else:
                 triton_client = tritongrpcclient.InferenceServerClient(
                     url='localhost:8001', verbose=True)
@@ -207,10 +197,8 @@ class ClientNoBatchTest(unittest.TestCase):
                 inputs.append(
                     tritongrpcclient.InferInput('INPUT1', tensor_shape,
                                                 "INT32"))
-                outputs.append(
-                    tritongrpcclient.InferRequestedOutput('OUTPUT0'))
-                outputs.append(
-                    tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+                outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
+                outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
 
             # Initialize the data
             inputs[0].set_data_from_numpy(in0)
@@ -248,10 +236,8 @@ class ClientNoBatchTest(unittest.TestCase):
                 inputs.append(
                     tritonhttpclient.InferInput('INPUT1', tensor_shape,
                                                 "INT32"))
-                outputs.append(
-                    tritonhttpclient.InferRequestedOutput('OUTPUT0'))
-                outputs.append(
-                    tritonhttpclient.InferRequestedOutput('OUTPUT1'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1'))
             else:
                 triton_client = tritongrpcclient.InferenceServerClient(
                     url='localhost:8001', verbose=True)
@@ -261,10 +247,8 @@ class ClientNoBatchTest(unittest.TestCase):
                 inputs.append(
                     tritongrpcclient.InferInput('INPUT1', tensor_shape,
                                                 "INT32"))
-                outputs.append(
-                    tritongrpcclient.InferRequestedOutput('OUTPUT0'))
-                outputs.append(
-                    tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+                outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
+                outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
 
             # Initialize the data
             inputs[0].set_data_from_numpy(in0)

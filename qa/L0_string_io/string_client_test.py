@@ -34,6 +34,7 @@ import unittest
 
 
 class ClientStringTest(unittest.TestCase):
+
     def test_tf_unicode_bytes(self):
         # We use a simple model that takes an input tensor of 8 byte strings
         # and returns an output tensors of 8 strings. The output tensor
@@ -42,8 +43,8 @@ class ClientStringTest(unittest.TestCase):
         model_version = ""
 
         # Create the inference server client for the model.
-        triton_client = tritonhttpclient.InferenceServerClient(
-            "localhost:8000", verbose=True)
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True)
 
         # Create the data for the input tensor. Initialize the tensor to 8
         # byte strings. (dtype of np.bytes_)
@@ -80,8 +81,7 @@ class ClientStringTest(unittest.TestCase):
         # both output tensors.
         inputs = []
         outputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT0', in0.shape,
-                                                  "BYTES"))
+        inputs.append(tritonhttpclient.InferInput('INPUT0', in0.shape, "BYTES"))
         inputs[0].set_data_from_numpy(in0)
 
         outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))

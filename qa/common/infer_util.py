@@ -76,6 +76,7 @@ def serialize_byte_tensor_list(tensor_values):
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -111,8 +112,8 @@ def infer_exact(tester,
                 use_cuda_shared_memory=False,
                 priority=0,
                 timeout_us=0):
-    tester.assertTrue(use_http or use_http_json_tensors or use_grpc
-                      or use_streaming)
+    tester.assertTrue(use_http or use_http_json_tensors or use_grpc or
+                      use_streaming)
     configs = []
     if use_http:
         configs.append(("localhost:8000", "http", False, True))
@@ -169,16 +170,14 @@ def infer_exact(tester,
 
     if output0_dtype == np.object:
         output0_array = np.array([
-            unicode(str(x), encoding='utf-8')
-            for x in (output0_array.flatten())
+            unicode(str(x), encoding='utf-8') for x in (output0_array.flatten())
         ],
                                  dtype=object).reshape(output0_array.shape)
     else:
         output0_array = output0_array.astype(output0_dtype)
     if output1_dtype == np.object:
         output1_array = np.array([
-            unicode(str(x), encoding='utf-8')
-            for x in (output1_array.flatten())
+            unicode(str(x), encoding='utf-8') for x in (output1_array.flatten())
         ],
                                  dtype=object).reshape(output1_array.shape)
     else:
@@ -302,11 +301,11 @@ def infer_exact(tester,
         if batch_size == 1:
             expected0_sort_idx = [
                 np.flip(np.argsort(x.flatten()), 0)
-                for x in output0_array.reshape((1, ) + tensor_shape)
+                for x in output0_array.reshape((1,) + tensor_shape)
             ]
             expected1_sort_idx = [
                 np.flip(np.argsort(x.flatten()), 0)
-                for x in output1_array.reshape((1, ) + tensor_shape)
+                for x in output1_array.reshape((1,) + tensor_shape)
             ]
         else:
             expected0_sort_idx = [
@@ -445,8 +444,8 @@ def infer_exact(tester,
             else:
                 result_name = result.name
 
-            if ((result_name == OUTPUT0 and output0_raw)
-                    or (result_name == OUTPUT1 and output1_raw)):
+            if ((result_name == OUTPUT0 and output0_raw) or
+                (result_name == OUTPUT1 and output1_raw)):
                 if use_system_shared_memory or use_cuda_shared_memory:
                     if result_name == OUTPUT0:
                         shm_handle = shm_handles[2]
@@ -511,8 +510,8 @@ def infer_exact(tester,
                         if type(class_label) == str:
                             ctuple = class_label.split(':')
                         else:
-                            ctuple = "".join(chr(x)
-                                             for x in class_label).split(':')
+                            ctuple = "".join(
+                                chr(x) for x in class_label).split(':')
                         cval = float(ctuple[0])
                         cidx = int(ctuple[1])
                         if result_name == OUTPUT0:
@@ -620,9 +619,11 @@ def infer_shape_tensor(tester,
                                                  '/' + input_name + shm_suffix,
                                                  input_byte_size),
                  input_byte_size))
-            output_shm_handle_list.append((shm.create_shared_memory_region(
-                output_name + shm_suffix, '/' + output_name + shm_suffix,
-                output_byte_size), output_byte_size))
+            output_shm_handle_list.append(
+                (shm.create_shared_memory_region(output_name + shm_suffix,
+                                                 '/' + output_name + shm_suffix,
+                                                 output_byte_size),
+                 output_byte_size))
             shm.set_shared_memory_region(input_shm_handle_list[-1][0], [
                 in0,
             ])
@@ -651,8 +652,7 @@ def infer_shape_tensor(tester,
             inputs.append(
                 client_utils.InferInput(input_name, input_list[io_num].shape,
                                         "INT32"))
-            outputs.append(
-                client_utils.InferRequestedOutput(dummy_output_name))
+            outputs.append(client_utils.InferRequestedOutput(dummy_output_name))
             outputs.append(client_utils.InferRequestedOutput(output_name))
 
             # -2: dummy; -1: input
@@ -772,8 +772,8 @@ def infer_zero(tester,
                use_cuda_shared_memory=False,
                priority=0,
                timeout_us=0):
-    tester.assertTrue(use_http or use_grpc or use_http_json_tensors
-                      or use_streaming)
+    tester.assertTrue(use_http or use_grpc or use_http_json_tensors or
+                      use_streaming)
     configs = []
     if use_http:
         configs.append(("localhost:8000", "http", False, True))
@@ -977,8 +977,9 @@ def infer_zero(tester,
                     output_shape = output.shape
                 output_dtype = triton_to_np_dtype(output_datatype)
             if use_system_shared_memory:
-                output_data = shm.get_contents_as_numpy(
-                    shm_handle, output_dtype, output_shape)
+                output_data = shm.get_contents_as_numpy(shm_handle,
+                                                        output_dtype,
+                                                        output_shape)
             elif use_cuda_shared_memory:
                 output_data = cudashm.get_contents_as_numpy(
                     shm_handle, output_dtype, output_shape)

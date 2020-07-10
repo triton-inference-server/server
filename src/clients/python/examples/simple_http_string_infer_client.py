@@ -37,8 +37,8 @@ def TestIdentityInference(np_array, binary_data):
     inputs = []
     outputs = []
 
-    inputs.append(
-        tritonhttpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
+    inputs.append(tritonhttpclient.InferInput('INPUT0', np_array.shape,
+                                              "BYTES"))
     inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
 
     outputs.append(
@@ -74,13 +74,12 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument(
-        '-u',
-        '--url',
-        type=str,
-        required=False,
-        default='localhost:8000',
-        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
     try:

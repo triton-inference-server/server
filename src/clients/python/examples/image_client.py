@@ -45,6 +45,7 @@ else:
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -109,8 +110,8 @@ def parse_model_grpc(model_metadata, model_config):
             format(expected_input_dims, model_metadata.name,
                    len(input_metadata.shape)))
 
-    if ((input_config.format != mc.ModelInput.FORMAT_NCHW)
-            and (input_config.format != mc.ModelInput.FORMAT_NHWC)):
+    if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
+        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
         raise Exception("unexpected input format " +
                         mc.ModelInput.Format.Name(input_config.format) +
                         ", expecting " +
@@ -187,8 +188,8 @@ def parse_model_http(model_metadata, model_config):
             format(expected_input_dims, model_metadata['name'],
                    len(input_metadata['shape'])))
 
-    if ((input_config['format'] != "FORMAT_NCHW")
-            and (input_config['format'] != "FORMAT_NHWC")):
+    if ((input_config['format'] != "FORMAT_NCHW") and
+        (input_config['format'] != "FORMAT_NHWC")):
         raise Exception("unexpected input format " + input_config['format'] +
                         ", expecting FORMAT_NCHW or FORMAT_NHWC")
 
@@ -229,7 +230,7 @@ def preprocess(img, format, dtype, c, h, w, scaling, protocol):
         scaled = (typed / 128) - 1
     elif scaling == 'VGG':
         if c == 1:
-            scaled = typed - np.asarray((128, ), dtype=npdtype)
+            scaled = typed - np.asarray((128,), dtype=npdtype)
         else:
             scaled = typed - np.asarray((123, 117, 104), dtype=npdtype)
     else:
@@ -275,8 +276,7 @@ def postprocess(results, output_name, batch_size, batching):
             print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
 
-def requestGenerator(batched_image_data, input_name, output_name, dtype,
-                     FLAGS):
+def requestGenerator(batched_image_data, input_name, output_name, dtype, FLAGS):
 
     # Set the input data
     inputs = []
@@ -344,13 +344,12 @@ if __name__ == '__main__':
                         required=False,
                         default=1,
                         help='Batch size. Default is 1.')
-    parser.add_argument(
-        '-c',
-        '--classes',
-        type=int,
-        required=False,
-        default=1,
-        help='Number of class results to report. Default is 1.')
+    parser.add_argument('-c',
+                        '--classes',
+                        type=int,
+                        required=False,
+                        default=1,
+                        help='Number of class results to report. Default is 1.')
     parser.add_argument(
         '-s',
         '--scaling',
@@ -359,13 +358,12 @@ if __name__ == '__main__':
         required=False,
         default='NONE',
         help='Type of scaling to apply to image pixels. Default is NONE.')
-    parser.add_argument(
-        '-u',
-        '--url',
-        type=str,
-        required=False,
-        default='localhost:8000',
-        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument('-i',
                         '--protocol',
                         type=str,
@@ -548,7 +546,6 @@ if __name__ == '__main__':
         else:
             this_id = response.get_response()["id"]
         print("Request {}, batch size {}".format(this_id, FLAGS.batch_size))
-        postprocess(response, output_name, FLAGS.batch_size,
-                    max_batch_size > 0)
+        postprocess(response, output_name, FLAGS.batch_size, max_batch_size > 0)
 
     print("PASS")

@@ -38,6 +38,7 @@ FLAGS = None
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -177,8 +178,8 @@ if __name__ == '__main__':
         print("[" + str(i) + "] " + str(result0_list[i][0][0]) + " : " +
               str(result1_list[i][0][0]))
 
-        if ((seq0_expected != result0_list[i][0][0])
-                or (seq1_expected != result1_list[i][0][0])):
+        if ((seq0_expected != result0_list[i][0][0]) or
+            (seq1_expected != result1_list[i][0][0])):
             print("[ expected ] " + str(seq0_expected) + " : " +
                   str(seq1_expected))
             sys.exit(1)

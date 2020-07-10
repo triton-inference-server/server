@@ -41,6 +41,7 @@ from tritonclientutils import InferenceServerException
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -53,6 +54,7 @@ def callback(user_data, result, error):
 
 
 class DecoupledTest(unittest.TestCase):
+
     def setUp(self):
         self.repeat_like_models = [
             "repeat_int32", "simple_repeat", "sequence_repeat"
@@ -129,8 +131,7 @@ class DecoupledTest(unittest.TestCase):
 
         try:
             self._stream_infer(request_count, request_delay, repeat_count,
-                               delay_data, delay_factor, user_data,
-                               result_dict)
+                               delay_data, delay_factor, user_data, result_dict)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -390,8 +391,7 @@ class DecoupledTest(unittest.TestCase):
         input_data = np.arange(start=data_offset,
                                stop=data_offset + repeat_count,
                                dtype=np.int32)
-        delay_data = (np.ones([repeat_count + 1],
-                              dtype=np.uint32)) * delay_time
+        delay_data = (np.ones([repeat_count + 1], dtype=np.uint32)) * delay_time
         wait_data = np.array([wait_time], dtype=np.uint32)
 
         # Initialize data for IN

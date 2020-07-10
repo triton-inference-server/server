@@ -135,22 +135,22 @@ breathe_default_project = "BreatheTritonServer"
 exhale_args = {
     # These arguments are required
     "containmentFolder":
-    "./cpp_api",
+        "./cpp_api",
     "rootFileName":
-    "cpp_api_root.rst",
+        "cpp_api_root.rst",
     "rootFileTitle":
-    "C++ API",
+        "C++ API",
     "doxygenStripFromPath":
-    "..",
+        "..",
     # Suggested optional arguments
     "createTreeView":
-    True,
+        True,
     # TIP: if using the sphinx-bootstrap-theme, you need
     # "treeViewIsBootstrap": True,
     "exhaleExecutesDoxygen":
-    True,
+        True,
     "exhaleDoxygenStdin":
-    textwrap.dedent('''
+        textwrap.dedent('''
         JAVADOC_AUTOBRIEF = YES
     INPUT = ../src/core/tritonserver.h ../src/clients/c++/library/common.h ../src/clients/c++/library/grpc_client.h ../src/clients/c++/library/http_client.h ../src/backends/custom/custom.h ../src/custom/sdk/custom_instance.h
     ''')
@@ -176,10 +176,13 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 #
 html_theme_options = {
     'canonical_url':
-    'https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html',
-    'collapse_navigation': False,
-    'display_version': True,
-    'logo_only': False,
+        'https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html',
+    'collapse_navigation':
+        False,
+    'display_version':
+        True,
+    'logo_only':
+        False,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -251,8 +254,8 @@ texinfo_documents = [
 
 # -- Extension configuration -------------------------------------------------
 extlinks = {
-    'issue':
-    ('https://github.com/NVIDIA/triton-inference-server/issues/%s', 'issue '),
+    'issue': ('https://github.com/NVIDIA/triton-inference-server/issues/%s',
+              'issue '),
     'fileref': ('https://github.com/NVIDIA/triton-inference-server/tree/' +
                 (git_sha if git_sha != u'0000000' else "master") + '/%s', ''),
 }

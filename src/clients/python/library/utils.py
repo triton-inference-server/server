@@ -56,6 +56,7 @@ class InferenceServerException(Exception):
         The additional details on the error
 
     """
+
     def __init__(self, msg, status=None, debug_details=None):
         self._msg = msg
         self._status = status

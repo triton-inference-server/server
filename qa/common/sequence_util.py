@@ -58,6 +58,7 @@ _deferred_exceptions = None
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -69,10 +70,10 @@ def completion_callback(user_data, result, error):
 
 
 class SequenceBatcherTestUtil(unittest.TestCase):
+
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
-        self.triton_client_ = grpcclient.InferenceServerClient(
-            "localhost:8001")
+        self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
         self.clear_deferred_exceptions()
 
     def clear_deferred_exceptions(self):
@@ -104,7 +105,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                                    dtype,
                                    i,
                                    batch_size=1,
-                                   tensor_shape=(1, )):
+                                   tensor_shape=(1,)):
         if _test_system_shared_memory or _test_cuda_shared_memory:
             shm_region_handles = []
             for j, value in enumerate(value_list):
@@ -121,9 +122,8 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 for b in range(batch_size):
                     if dtype == np.object:
                         in0 = np.full(tensor_shape, value, dtype=np.int32)
-                        in0n = np.array(
-                            [str(x) for x in in0.reshape(in0.size)],
-                            dtype=object)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                        dtype=object)
                         in0 = in0n.reshape(tensor_shape)
                         output_byte_size += 64 * in0.size
                     else:
@@ -175,7 +175,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                                                 dtype,
                                                 i,
                                                 batch_size=1,
-                                                tensor_shape=(1, )):
+                                                tensor_shape=(1,)):
         self.assertFalse(_test_cuda_shared_memory,
                          "Shape tensors does not support CUDA shared memory")
         if _test_system_shared_memory:
@@ -187,9 +187,8 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 for b in range(batch_size):
                     if dtype == np.object:
                         in0 = np.full(tensor_shape, value, dtype=np.int32)
-                        in0n = np.array(
-                            [str(x) for x in in0.reshape(in0.size)],
-                            dtype=object)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                        dtype=object)
                         in0 = in0n.reshape(tensor_shape)
                     else:
                         in0 = np.full(tensor_shape, value, dtype=dtype)
@@ -244,8 +243,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 shm_region_handles.append(
                     (ip_name, input_byte_size, shm_ip_handle))
                 shm_region_handles.append(
-                    (shape_ip_name, shape_input_byte_size,
-                     shm_shape_ip_handle))
+                    (shape_ip_name, shape_input_byte_size, shm_shape_ip_handle))
                 shm_region_handles.append(
                     (shape_op_name, shape_output_byte_size,
                      shm_shape_op_handle))
@@ -259,8 +257,12 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             return []
 
     # Returns (name, byte size, shm_handle)
-    def precreate_register_dynaseq_shape_tensor_regions(
-        self, value_list, dtype, i, batch_size=1, tensor_shape=(1, )):
+    def precreate_register_dynaseq_shape_tensor_regions(self,
+                                                        value_list,
+                                                        dtype,
+                                                        i,
+                                                        batch_size=1,
+                                                        tensor_shape=(1,)):
         self.assertFalse(_test_cuda_shared_memory,
                          "Shape tensors does not support CUDA shared memory")
         if _test_system_shared_memory:
@@ -272,9 +274,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
                 for b in range(batch_size):
                     if dtype == np.object:
-                        dummy_in0 = np.full(tensor_shape,
-                                            value,
-                                            dtype=np.int32)
+                        dummy_in0 = np.full(tensor_shape, value, dtype=np.int32)
                         dummy_in0n = np.array(
                             [str(x) for x in dummy_in0.reshape(in0.size)],
                             dtype=object)
@@ -343,11 +343,9 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 shm_region_handles.append(
                     (ip_name, input_byte_size, shm_ip_handle))
                 shm_region_handles.append(
-                    (shape_ip_name, shape_input_byte_size,
-                     shm_shape_ip_handle))
+                    (shape_ip_name, shape_input_byte_size, shm_shape_ip_handle))
                 shm_region_handles.append(
-                    (dummy_ip_name, dummy_input_byte_size,
-                     shm_dummy_ip_handle))
+                    (dummy_ip_name, dummy_input_byte_size, shm_dummy_ip_handle))
                 shm_region_handles.append(
                     (shape_op_name, shape_output_byte_size,
                      shm_shape_op_handle))
@@ -381,17 +379,17 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                        protocol,
                        batch_size=1,
                        sequence_name="<unknown>",
-                       tensor_shape=(1, )):
+                       tensor_shape=(1,)):
         """Perform sequence of inferences. The 'values' holds a list of
         tuples, one for each inference with format:
 
         (flag_str, value, (ls_ms, gt_ms), (pre_delay_ms, post_delay_ms)
 
         """
-        if (("savedmodel" not in trial) and ("graphdef" not in trial)
-                and ("netdef" not in trial) and ("custom" not in trial)
-                and ("onnx" not in trial) and ("libtorch" not in trial)
-                and ("plan" not in trial)):
+        if (("savedmodel" not in trial) and ("graphdef" not in trial) and
+            ("netdef" not in trial) and ("custom" not in trial) and
+            ("onnx" not in trial) and ("libtorch" not in trial) and
+            ("plan" not in trial)):
             self.assertFalse(True, "unknown trial type: " + trial)
 
         # Can only send the request exactly once since it is a
@@ -411,7 +409,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         self.assertEqual(len(configs), 1)
 
         full_shape = tensor_shape if "nobatch" in trial else (
-            batch_size, ) + tensor_shape
+            batch_size,) + tensor_shape
 
         # create and register shared memory output region in advance,
         # knowing that this function will not be called concurrently.
@@ -463,14 +461,12 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     outputs = []
                     inputs.append(
                         client_utils.InferInput(
-                            INPUT, full_shape,
-                            np_to_triton_dtype(input_dtype)))
+                            INPUT, full_shape, np_to_triton_dtype(input_dtype)))
                     outputs.append(client_utils.InferRequestedOutput(OUTPUT))
                     if input_dtype == np.object:
                         in0 = np.full(full_shape, value, dtype=np.int32)
-                        in0n = np.array(
-                            [str(x) for x in in0.reshape(in0.size)],
-                            dtype=object)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                        dtype=object)
                         in0 = in0n.reshape(full_shape)
                     else:
                         in0 = np.full(full_shape, value, dtype=input_dtype)
@@ -556,11 +552,10 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         lt_ms = thresholds[0]
                         gt_ms = thresholds[1]
                         if lt_ms is not None:
-                            self.assertTrue(
-                                (end_ms - start_ms) < lt_ms,
-                                "expected less than " + str(lt_ms) +
-                                "ms response time, got " +
-                                str(end_ms - start_ms) + " ms")
+                            self.assertTrue((end_ms - start_ms) < lt_ms,
+                                            "expected less than " + str(lt_ms) +
+                                            "ms response time, got " +
+                                            str(end_ms - start_ms) + " ms")
                         if gt_ms is not None:
                             self.assertTrue(
                                 (end_ms - start_ms) > gt_ms,
@@ -614,17 +609,17 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                              shm_region_handles,
                              batch_size=1,
                              sequence_name="<unknown>",
-                             tensor_shape=(1, )):
+                             tensor_shape=(1,)):
         """Perform sequence of inferences using stream async run.
         The 'values' holds a list of tuples, one for each inference with format:
 
         (flag_str, value, pre_delay_ms)
 
         """
-        if (("savedmodel" not in trial) and ("graphdef" not in trial)
-                and ("netdef" not in trial) and ("custom" not in trial)
-                and ("onnx" not in trial) and ("libtorch" not in trial)
-                and ("plan" not in trial)):
+        if (("savedmodel" not in trial) and ("graphdef" not in trial) and
+            ("netdef" not in trial) and ("custom" not in trial) and
+            ("onnx" not in trial) and ("libtorch" not in trial) and
+            ("plan" not in trial)):
             self.assertFalse(True, "unknown trial type: " + trial)
 
         self.assertFalse(
@@ -632,7 +627,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             "Cannot set both System and CUDA shared memory flags to 1")
 
         full_shape = tensor_shape if "nobatch" in trial else (
-            batch_size, ) + tensor_shape
+            batch_size,) + tensor_shape
 
         client_utils = grpcclient
         triton_client = client_utils.InferenceServerClient("localhost:8001",
@@ -661,13 +656,11 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                                             np_to_triton_dtype(input_dtype)))
                 outputs.append(client_utils.InferRequestedOutput(OUTPUT))
 
-                if not (_test_system_shared_memory
-                        or _test_cuda_shared_memory):
+                if not (_test_system_shared_memory or _test_cuda_shared_memory):
                     if input_dtype == np.object:
                         in0 = np.full(full_shape, value, dtype=np.int32)
-                        in0n = np.array(
-                            [str(x) for x in in0.reshape(in0.size)],
-                            dtype=object)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                        dtype=object)
                         in0 = in0n.reshape(full_shape)
                     else:
                         in0 = np.full(full_shape, value, dtype=input_dtype)
@@ -763,7 +756,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         """
         tensor_shape = (1, 1)
         # shape tensor is 1-D tensor that doesn't contain batch size as first value
-        shape_tensor_shape = (1, )
+        shape_tensor_shape = (1,)
         self.assertFalse(_test_cuda_shared_memory,
                          "Shape tensors does not support CUDA shared memory")
 

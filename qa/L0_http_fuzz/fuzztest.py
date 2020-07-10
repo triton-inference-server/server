@@ -32,6 +32,7 @@ import os
 
 
 class FuzzTest(unittest.TestCase):
+
     def _run_fuzz(self, url, logger):
         session = Session(
             target=Target(connection=TCPSocketConnection("127.0.0.1", 8000)),
