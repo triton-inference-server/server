@@ -39,9 +39,12 @@ import numpy as np
 import test_util as tu
 import sequence_util as su
 
-TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
-BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel netdef onnx plan custom")
+TEST_SYSTEM_SHARED_MEMORY = bool(
+    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(
+    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+BACKENDS = os.environ.get('BACKENDS',
+                          "graphdef savedmodel netdef onnx plan custom")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 NO_BATCHING = (int(os.environ['NO_BATCHING']) == 1)
@@ -51,11 +54,12 @@ _trials = ()
 if NO_BATCHING:
     for backend in BACKENDS.split(' '):
         if (backend != "libtorch") and (backend != 'custom'):
-            _trials += (backend + "_nobatch",)
+            _trials += (backend + "_nobatch", )
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
     for backend in BACKENDS.split(' '):
-        if (backend != "libtorch") and (backend != 'custom') and (backend != 'plan'):
-            _trials += (backend,)
+        if (backend != "libtorch") and (backend != 'custom') and (backend !=
+                                                                  'plan'):
+            _trials += (backend, )
 else:
     _trials = BACKENDS.split(' ')
 
@@ -74,7 +78,7 @@ if ENSEMBLES:
 
 _ragged_batch_supported_trials = list()
 if "custom" in _trials:
-    _ragged_batch_supported_trials = ("custom",)
+    _ragged_batch_supported_trials = ("custom", )
 
 # Not all models can be tested for ragged handling because the models
 # don't deal well with non-size-1 shapes
@@ -90,6 +94,7 @@ if os.environ['BATCHER_TYPE'] == "VARIABLE":
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
 
+
 # Checks whether the provided model name belongs to an ensemble
 # model.
 def is_ensemble(model_name):
@@ -97,6 +102,7 @@ def is_ensemble(model_name):
         if model_name.startswith(prefix):
             return True
     return False
+
 
 class SequenceBatcherTest(su.SequenceBatcherTestUtil):
     def get_datatype(self, trial):
@@ -107,14 +113,18 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return np.dtype(object)
         return np.int32
 
-    def get_expected_result(self, expected_result, value, trial, flag_str=None):
+    def get_expected_result(self,
+                            expected_result,
+                            value,
+                            trial,
+                            flag_str=None):
         # Adjust the expected_result for models that
         # couldn't implement the full accumulator. See
         # qa/common/gen_qa_sequence_models.py for more
         # information.
         if ((not NO_BATCHING and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
-            ("onnx" in trial))  or ("libtorch" in trial):
+            ("graphdef" in trial) or ("netdef" in trial) or
+            ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial):
             expected_result = value
             if (flag_str is not None) and ("start" in flag_str):
                 expected_result += 1
@@ -132,27 +142,31 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, dtype, 5,
-                                        (4000, None),
-                                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                                        (("start", 1, None, None),
-                                         (None, 2, None, None),
-                                         (None, 3, None, None),
-                                         (None, 4, None, None),
-                                         (None, 5, None, None),
-                                         (None, 6, None, None),
-                                         (None, 7, None, None),
-                                         (None, 8, None, None),
-                                         ("end", 9, None, None)),
-                                        self.get_expected_result(45, 9, trial, "end"),
-                                        protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        5,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", 1, None, None), (None, 2, None, None),
+                         (None, 3, None, None), (None, 4, None, None),
+                         (None, 5, None, None), (None, 6, None, None),
+                         (None, 7, None, None), (None, 8, None, None),
+                         ("end", 9, None, None)),
+                        self.get_expected_result(45, 9, trial, "end"),
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, {1: 9 * (idx + 1)}, 9 * (idx + 1), 9 * (idx + 1))
+                    self.check_status(model_name, {1: 9 * (idx + 1)},
+                                      9 * (idx + 1), 9 * (idx + 1))
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -168,19 +182,28 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, dtype, 99,
-                                        (4000, None),
-                                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                                        (("start,end", 42, None, None),),
-                                        self.get_expected_result(42, 42, trial, "start,end"),
-                                        protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        99,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (
+                            ("start,end", 42, None, None), ),
+                        self.get_expected_result(42, 42, trial, "start,end"),
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, {1: idx + 1}, (idx + 1), (idx + 1))
+                    self.check_status(model_name, {1: idx + 1}, (idx + 1),
+                                      (idx + 1))
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -202,18 +225,24 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, dtype, 27,
-                                        (4000, None),
-                                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                                        (("start", 1, None, None),
-                                         ("end", 9, None, None)),
-                                        self.get_expected_result(10, 9, trial, "end"),
-                                        protocol, batch_size=2,
-                                        sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        27,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", 1, None, None), ("end", 9, None, None)),
+                        self.get_expected_result(10, 9, trial, "end"),
+                        protocol,
+                        batch_size=2,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -221,18 +250,18 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
                             base_model_name = model_name[(len(prefix)):]
-                            self.assertTrue(
-                                ex.message().startswith(
-                                    str("in ensemble '{}', " +
-                                        "inference request to model '{}' must specify " +
-                                        "batch-size 1 due to requirements of sequence " +
-                                        "batcher").format(model_name, base_model_name)))
+                            self.assertTrue(ex.message().startswith(
+                                str("in ensemble '{}', " +
+                                    "inference request to model '{}' must specify "
+                                    +
+                                    "batch-size 1 due to requirements of sequence "
+                                    + "batcher").format(
+                                        model_name, base_model_name)))
                             return
-                    self.assertTrue(
-                        ex.message().startswith(
-                            str("inference request to model '{}' must specify " +
-                                "batch-size 1 due to requirements of sequence " +
-                                "batcher").format(model_name)))
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request to model '{}' must specify " +
+                            "batch-size 1 due to requirements of sequence " +
+                            "batcher").format(model_name)))
 
     def test_no_correlation_id(self):
         # Send sequence without correlation ID and check for error.
@@ -245,17 +274,23 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, dtype, 0, # correlation_id = 0
-                                        (4000, None),
-                                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                                        (("start", 1, None, None),
-                                         ("end", 9, None, None)),
-                                        self.get_expected_result(10, 9, trial, "end"),
-                                        protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        0,  # correlation_id = 0
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", 1, None, None), ("end", 9, None, None)),
+                        self.get_expected_result(10, 9, trial, "end"),
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -263,16 +298,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
                             base_model_name = model_name[(len(prefix)):]
-                            self.assertTrue(
-                                ex.message().startswith(
-                                    str("in ensemble '{}', " +
-                                        "inference request to model '{}' must specify a " +
-                                        "non-zero correlation ID").format(model_name, base_model_name)))
+                            self.assertTrue(ex.message().startswith(
+                                str("in ensemble '{}', " +
+                                    "inference request to model '{}' must specify a "
+                                    + "non-zero correlation ID").format(
+                                        model_name, base_model_name)))
                             return
-                    self.assertTrue(
-                        ex.message().startswith(
-                            str("inference request to model '{}' must specify a " +
-                                "non-zero correlation ID").format(model_name)))
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request to model '{}' must specify a " +
+                            "non-zero correlation ID").format(model_name)))
 
     def test_no_sequence_start(self):
         # Send sequence without start flag for never before seen
@@ -286,18 +320,24 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, dtype, 37469245,
-                                        (4000, None),
-                                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                                        ((None, 1, None, None),
-                                         (None, 2, None, None),
-                                         ("end", 3, None, None)),
-                                        self.get_expected_result(6, 3, trial, "end"),
-                                        protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        37469245,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        ((None, 1, None, None), (None, 2, None, None),
+                         ("end", 3, None, None)),
+                        self.get_expected_result(6, 3, trial, "end"),
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -306,18 +346,18 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
                             base_model_name = model_name[(len(prefix)):]
-                            self.assertTrue(
-                                ex.message().startswith(
-                                    str("in ensemble '{}', " +
-                                        "inference request for sequence 37469245 to " +
-                                        "model '{}' must specify the START flag on the first " +
-                                        "request of the sequence").format(model_name, base_model_name)))
+                            self.assertTrue(ex.message().startswith(
+                                str("in ensemble '{}', " +
+                                    "inference request for sequence 37469245 to "
+                                    +
+                                    "model '{}' must specify the START flag on the first "
+                                    + "request of the sequence").format(
+                                        model_name, base_model_name)))
                             return
-                    self.assertTrue(
-                        ex.message().startswith(
-                            str("inference request for sequence 37469245 to " +
-                                "model '{}' must specify the START flag on the first " +
-                                "request of the sequence").format(model_name)))
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request for sequence 37469245 to " +
+                            "model '{}' must specify the START flag on the first "
+                            + "request of the sequence").format(model_name)))
 
     def test_no_sequence_start2(self):
         # Send sequence without start flag after sending a valid
@@ -332,39 +372,46 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, dtype, 3,
-                                        (4000, None),
-                                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                                        (("start", 1, None, None),
-                                         (None, 2, None, None),
-                                         ("end", 3, None, None),
-                                         (None, 55, None, None)),
-                                        self.get_expected_result(6, 3, trial, None),
-                                        protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        3,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", 1, None, None), (None, 2, None, None),
+                         ("end", 3, None, None), (None, 55, None, None)),
+                        self.get_expected_result(6, 3, trial, None),
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
 
-                    self.check_status(model_name, {1: 3 * (idx + 1)}, 3 * (idx + 1), 3 * (idx + 1))
+                    self.check_status(model_name, {1: 3 * (idx + 1)},
+                                      3 * (idx + 1), 3 * (idx + 1))
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
                 except Exception as ex:
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
                             base_model_name = model_name[(len(prefix)):]
-                            self.assertTrue(
-                                ex.message().startswith(
-                                    str("in ensemble '{}', " +
-                                        "inference request for sequence 3 to model '{}' must " +
-                                        "specify the START flag on the first request of " +
-                                        "the sequence").format(model_name, base_model_name)))
+                            self.assertTrue(ex.message().startswith(
+                                str("in ensemble '{}', " +
+                                    "inference request for sequence 3 to model '{}' must "
+                                    +
+                                    "specify the START flag on the first request of "
+                                    + "the sequence").format(
+                                        model_name, base_model_name)))
                             return
-                    self.assertTrue(
-                        ex.message().startswith(
-                            str("inference request for sequence 3 to model '{}' must " +
-                                "specify the START flag on the first request of " +
-                                "the sequence").format(model_name)))
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request for sequence 3 to model '{}' must "
+                            +
+                            "specify the START flag on the first request of " +
+                            "the sequence").format(model_name)))
 
     def test_no_sequence_end(self):
         # Send sequence without end flag. Use same correlation ID to
@@ -379,22 +426,28 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, dtype, 4566,
-                                        (4000, None),
-                                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                                        (("start", 1, None, None),
-                                         (None, 2, None, None),
-                                         ("start", 42, None, None),
-                                         ("end", 9, None, None)),
-                                        self.get_expected_result(51, 9, trial, "end"),
-                                        protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        4566,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", 1, None, None), (None, 2, None, None),
+                         ("start", 42, None, None), ("end", 9, None, None)),
+                        self.get_expected_result(51, 9, trial, "end"),
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, {1: 4 * (idx + 1)}, 4 * (idx + 1), 4 * (idx + 1))
+                    self.check_status(model_name, {1: 4 * (idx + 1)},
+                                      4 * (idx + 1), 4 * (idx + 1))
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -406,8 +459,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3,4), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((0,9,5,13), dtype, 1)
+            precreated_shm0_handles = self.precreate_register_regions(
+                (1, 2, 3, 4), dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions(
+                (0, 9, 5, 13), dtype, 1)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 self.check_setup(model_name)
@@ -415,35 +470,48 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 8)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 8)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 987,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 2, None),
-                           (None, 3, None),
-                           ("end", 4, None)),
-                          self.get_expected_result(10, 4, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 988,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 0, None),
-                           (None, 9, None),
-                           (None, 5, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(27, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            987,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 2, None),
+                             (None, 3, None), ("end", 4, None)),
+                            self.get_expected_result(10, 4, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            988,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 0, None), (None, 9, None),
+                             (None, 5, None), ("end", 13, None)),
+                            self.get_expected_result(27, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 for t in threads:
                     t.start()
@@ -452,12 +520,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:8}, 8, 8)
+                    self.check_status(model_name, {1: 8}, 8, 8)
                 else:
                     stats_batch_size = 2 if MODEL_INSTANCES == 1 else 1
                     exec_cnt = 4 if MODEL_INSTANCES == 1 else 8
-                    self.check_status(model_name, {stats_batch_size: 4 * min(2, MODEL_INSTANCES)},
-                                  exec_cnt, 8)
+                    self.check_status(
+                        model_name,
+                        {stats_batch_size: 4 * min(2, MODEL_INSTANCES)},
+                        exec_cnt, 8)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -473,10 +543,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,12,13,14), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113,1114), dtype, 3)
+            precreated_shm0_handles = self.precreate_register_regions((1, 3),
+                                                                      dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 13, 14), dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1113, 1114), dtype, 3)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -485,55 +559,80 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           ("end", 3, None)),
-                          self.get_expected_result(4, 3, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           (None, 12, None),
-                           (None, 13, None),
-                           ("end", 14, None)),
-                          self.get_expected_result(50, 14, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(224, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           (None, 1113, None),
-                           ("end", 1114, None)),
-                          self.get_expected_result(4450, 1114, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), ("end", 3, None)),
+                            self.get_expected_result(4, 3, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), (None, 12, None),
+                             (None, 13, None), ("end", 14, None)),
+                            self.get_expected_result(50, 14, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), ("end", 113, None)),
+                            self.get_expected_result(224, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             (None, 1113, None), ("end", 1114, None)),
+                            self.get_expected_result(4450, 1114, trial, "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 threads[1].start()
                 threads[3].start()
@@ -545,7 +644,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:12}, 12, 12)
+                    self.check_status(model_name, {1: 12}, 12, 12)
                 else:
                     # Batch size is 4 for the first two inferences and
                     # then 2 for the second two inferences. This is
@@ -554,11 +653,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     # shorter sequences are complete there are only slots
                     # 0 and 1 to execute.
                     if MODEL_INSTANCES == 1:
-                        self.check_status(model_name, {2:2, 4:2}, 4, 12)
+                        self.check_status(model_name, {2: 2, 4: 2}, 4, 12)
                     elif MODEL_INSTANCES == 2:
-                        self.check_status(model_name, {2:4, 1:4}, 8, 12)
+                        self.check_status(model_name, {2: 4, 1: 4}, 8, 12)
                     elif MODEL_INSTANCES == 4:
-                        self.check_status(model_name, {1:12}, 12, 12)
+                        self.check_status(model_name, {1: 12}, 12, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -576,10 +675,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
+            precreated_shm0_handles = self.precreate_register_regions(
+                (1, 2, 3), dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 13), dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 112, 113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1113), dtype, 3)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -588,55 +691,82 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 2, None),
-                           ("end", 3, None)),
-                          self.get_expected_result(6, 3, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           (None, 12, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(36, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           (None, 112, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(336, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           ("end", 1113, None)),
-                          self.get_expected_result(3336, 1113, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                   None)),
+                            self.get_expected_result(6, 3, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), (None, 12, None), ("end", 13,
+                                                                     None)),
+                            self.get_expected_result(36, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), (None, 112, None),
+                             ("end", 113, None)),
+                            self.get_expected_result(336, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             ("end", 1113, None)),
+                            self.get_expected_result(3336, 1113, trial, "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 for t in threads:
                     t.start()
@@ -645,10 +775,12 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:12}, 12, 12)
+                    self.check_status(model_name, {1: 12}, 12, 12)
                 else:
-                    self.check_status(model_name, {(4 / MODEL_INSTANCES):(3 * MODEL_INSTANCES)},
-                                  3 * MODEL_INSTANCES, 12)
+                    self.check_status(
+                        model_name,
+                        {(4 / MODEL_INSTANCES):
+                         (3 * MODEL_INSTANCES)}, 3 * MODEL_INSTANCES, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -673,14 +805,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _ragged_batch_not_supported_trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0,
-                                                                      tensor_shape=(2,))
-            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1,
-                                                                      tensor_shape=(2,))
-            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2,
-                                                                      tensor_shape=(1,))
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3,
-                                                                      tensor_shape=(3,))
+            precreated_shm0_handles = self.precreate_register_regions(
+                (1, 2, 3), dtype, 0, tensor_shape=(2, ))
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 13), dtype, 1, tensor_shape=(2, ))
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 112, 113), dtype, 2, tensor_shape=(1, ))
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1113), dtype, 3, tensor_shape=(3, ))
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -689,59 +821,87 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 2, None),
-                           ("end", 3, None)),
-                          self.get_expected_result(6*2, 3, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
-                            'tensor_shape' : (2,) }))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           (None, 12, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(36*2, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
-                            'tensor_shape' : (2,) }))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           (None, 112, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(336, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
-                            'tensor_shape' : (1,) }))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           ("end", 1113, None)),
-                          self.get_expected_result(3336*3, 1113, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
-                            'tensor_shape' : (3,) }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                   None)),
+                            self.get_expected_result(6 * 2, 3, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName),
+                            'tensor_shape': (2, )
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), (None, 12, None), ("end", 13,
+                                                                     None)),
+                            self.get_expected_result(36 * 2, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName),
+                            'tensor_shape': (2, )
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), (None, 112, None),
+                             ("end", 113, None)),
+                            self.get_expected_result(336, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName),
+                            'tensor_shape': (1, )
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             ("end", 1113, None)),
+                            self.get_expected_result(3336 * 3, 1113, trial,
+                                                     "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName),
+                            'tensor_shape': (3, )
+                        }))
 
                 threads[0].start()
                 threads[1].start()
@@ -753,9 +913,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:12}, 12, 12)
+                    self.check_status(model_name, {1: 12}, 12, 12)
                 else:
-                    self.check_status(model_name, {4:9}, 9, 12)
+                    self.check_status(model_name, {4: 9}, 9, 12)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -780,14 +940,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _ragged_batch_supported_trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0,
-                                                                      tensor_shape=(2,))
-            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1,
-                                                                      tensor_shape=(2,))
-            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2,
-                                                                      tensor_shape=(1,))
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3,
-                                                                      tensor_shape=(3,))
+            precreated_shm0_handles = self.precreate_register_regions(
+                (1, 2, 3), dtype, 0, tensor_shape=(2, ))
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 13), dtype, 1, tensor_shape=(2, ))
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 112, 113), dtype, 2, tensor_shape=(1, ))
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1113), dtype, 3, tensor_shape=(3, ))
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -796,59 +956,87 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 2, None),
-                           ("end", 3, None)),
-                          self.get_expected_result(6*2, 3, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
-                            'tensor_shape' : (2,) }))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           (None, 12, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(36*2, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
-                            'tensor_shape' : (2,) }))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           (None, 112, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(336, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
-                            'tensor_shape' : (1,) }))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           ("end", 1113, None)),
-                          self.get_expected_result(3336*3, 1113, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
-                            'tensor_shape' : (3,) }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                   None)),
+                            self.get_expected_result(6 * 2, 3, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName),
+                            'tensor_shape': (2, )
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), (None, 12, None), ("end", 13,
+                                                                     None)),
+                            self.get_expected_result(36 * 2, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName),
+                            'tensor_shape': (2, )
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), (None, 112, None),
+                             ("end", 113, None)),
+                            self.get_expected_result(336, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName),
+                            'tensor_shape': (1, )
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             ("end", 1113, None)),
+                            self.get_expected_result(3336 * 3, 1113, trial,
+                                                     "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName),
+                            'tensor_shape': (3, )
+                        }))
 
                 for t in threads:
                     t.start()
@@ -857,7 +1045,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:12}, 12, 12)
+                    self.check_status(model_name, {1: 12}, 12, 12)
                 else:
                     self.check_status(model_name, {4: 3}, 3, 12)
             except Exception as ex:
@@ -878,11 +1066,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions((11111,11112,11113), dtype, 4)
+            precreated_shm0_handles = self.precreate_register_regions(
+                (1, 2, 3), dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 13), dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 112, 113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1113), dtype, 3)
+            precreated_shm4_handles = self.precreate_register_regions(
+                (11111, 11112, 11113), dtype, 4)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -891,66 +1084,100 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 2, None),
-                           ("end", 3, None)),
-                          self.get_expected_result(6, 3, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           (None, 12, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(36, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           (None, 112, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(336, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           ("end", 1113, None)),
-                          self.get_expected_result(3336, 1113, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1005,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11111, None),
-                           (None, 11112, None),
-                           ("end", 11113, None)),
-                          self.get_expected_result(33336, 11113, trial, "end"),
-                          precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                   None)),
+                            self.get_expected_result(6, 3, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), (None, 12, None), ("end", 13,
+                                                                     None)),
+                            self.get_expected_result(36, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), (None, 112, None),
+                             ("end", 113, None)),
+                            self.get_expected_result(336, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             ("end", 1113, None)),
+                            self.get_expected_result(3336, 1113, trial, "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1005,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11111, None), (None, 11112, None),
+                             ("end", 11113, None)),
+                            self.get_expected_result(33336, 11113, trial,
+                                                     "end"),
+                            precreated_shm4_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 for t in threads:
                     t.start()
@@ -959,14 +1186,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:15}, 15, 15)
+                    self.check_status(model_name, {1: 15}, 15, 15)
                 else:
                     if MODEL_INSTANCES == 1:
-                        self.check_status(model_name, {4:3,1:3}, 6, 15)
+                        self.check_status(model_name, {4: 3, 1: 3}, 6, 15)
                     elif MODEL_INSTANCES == 2:
-                        self.check_status(model_name, {2:6,1:3}, 9, 15)
+                        self.check_status(model_name, {2: 6, 1: 3}, 9, 15)
                     else:
-                        self.check_status(model_name, {1:15}, 15, 15)
+                        self.check_status(model_name, {1: 15}, 15, 15)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -993,12 +1220,18 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions((11111,), dtype, 4)
-            precreated_shm5_handles = self.precreate_register_regions((22222,), dtype, 5)
+            precreated_shm0_handles = self.precreate_register_regions(
+                (1, 2, 3), dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions((11, 13),
+                                                                      dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1113), dtype, 3)
+            precreated_shm4_handles = self.precreate_register_regions(
+                (11111, ), dtype, 4)
+            precreated_shm5_handles = self.precreate_register_regions(
+                (22222, ), dtype, 5)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -1007,71 +1240,116 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 2, None),
-                           ("end", 3, None)),
-                          self.get_expected_result(6, 3, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(24, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(224, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           ("end", 1113, None)),
-                          self.get_expected_result(3336, 1113, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1005,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start,end", 11111, None),),
-                          self.get_expected_result(11111, 11111, trial, "start,end"),
-                          precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1006,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start,end", 22222, None),),
-                          self.get_expected_result(22222, 22222, trial, "start,end"),
-                          precreated_shm5_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                   None)),
+                            self.get_expected_result(6, 3, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), ("end", 13, None)),
+                            self.get_expected_result(24, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), ("end", 113, None)),
+                            self.get_expected_result(224, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             ("end", 1113, None)),
+                            self.get_expected_result(3336, 1113, trial, "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1005,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start,end", 11111, None), ),
+                            self.get_expected_result(11111, 11111, trial,
+                                                     "start,end"),
+                            precreated_shm4_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1006,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start,end", 22222, None), ),
+                            self.get_expected_result(22222, 22222, trial,
+                                                     "start,end"),
+                            precreated_shm5_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 threads[0].start()
                 threads[1].start()
@@ -1116,12 +1394,18 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions((11111,), dtype, 4)
-            precreated_shm5_handles = self.precreate_register_regions((22222,22223,22224), dtype, 5)
+            precreated_shm0_handles = self.precreate_register_regions(
+                (1, 2, 3), dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions((11, 13),
+                                                                      dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1113), dtype, 3)
+            precreated_shm4_handles = self.precreate_register_regions(
+                (11111, ), dtype, 4)
+            precreated_shm5_handles = self.precreate_register_regions(
+                (22222, 22223, 22224), dtype, 5)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -1130,73 +1414,119 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 3)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 3)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 2, None),
-                           ("end", 3, None)),
-                          self.get_expected_result(6, 3, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(24, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(224, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           ("end", 1113, None)),
-                          self.get_expected_result(3336, 1113, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1005,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start,end", 11111, None),),
-                          self.get_expected_result(11111, 11111, trial, "start,end"),
-                          precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1006,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 22222, None),
-                           (None, 22223, None),
-                           ("end", 22224, 2000),),
-                          self.get_expected_result(66669, 22224, trial, "end"),
-                          precreated_shm5_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                   None)),
+                            self.get_expected_result(6, 3, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), ("end", 13, None)),
+                            self.get_expected_result(24, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), ("end", 113, None)),
+                            self.get_expected_result(224, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             ("end", 1113, None)),
+                            self.get_expected_result(3336, 1113, trial, "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1005,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start,end", 11111, None), ),
+                            self.get_expected_result(11111, 11111, trial,
+                                                     "start,end"),
+                            precreated_shm4_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1006,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start", 22222, None),
+                                (None, 22223, None),
+                                ("end", 22224, 2000),
+                            ),
+                            self.get_expected_result(66669, 22224, trial,
+                                                     "end"),
+                            precreated_shm5_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 threads[0].start()
                 time.sleep(2)
@@ -1214,12 +1544,12 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:14}, 14, 14)
+                    self.check_status(model_name, {1: 14}, 14, 14)
                 else:
                     # Expecting 3 batch-size 4 inferences and then the
                     # 1006 sequence will follow 1003 (a different
                     # implementation could also follow 1002...)
-                    self.check_status(model_name, {4:3, 3:2}, 5, 14)
+                    self.check_status(model_name, {4: 3, 3: 2}, 5, 14)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1240,11 +1570,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions((11111,11113), dtype, 4)
+            precreated_shm0_handles = self.precreate_register_regions(
+                (1, 2, 3), dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 13), dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 112, 113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1113), dtype, 3)
+            precreated_shm4_handles = self.precreate_register_regions(
+                (11111, 11113), dtype, 4)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -1253,65 +1588,99 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 2, None),
-                           ("end", 3, None)),
-                          self.get_expected_result(6, 3, trial, "end"),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           (None, 12, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(36, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           (None, 112, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(336, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           ("end", 1113, None)),
-                          self.get_expected_result(3336, 1113, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11111, None),
-                           ("end", 11113, None)),
-                          self.get_expected_result(22224, 11113, trial, "end"),
-                          precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                   None)),
+                            self.get_expected_result(6, 3, trial, "end"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), (None, 12, None), ("end", 13,
+                                                                     None)),
+                            self.get_expected_result(36, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), (None, 112, None),
+                             ("end", 113, None)),
+                            self.get_expected_result(336, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             ("end", 1113, None)),
+                            self.get_expected_result(3336, 1113, trial, "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11111, None), ("end", 11113, None)),
+                            self.get_expected_result(22224, 11113, trial,
+                                                     "end"),
+                            precreated_shm4_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 threads[0].start()
                 threads[1].start()
@@ -1324,13 +1693,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:14}, 14, 14)
+                    self.check_status(model_name, {1: 14}, 14, 14)
                 else:
                     if MODEL_INSTANCES != 4:
-                        batch_exec = {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES), 1: 2}
+                        batch_exec = {
+                            (4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES),
+                            1: 2
+                        }
                     else:
                         batch_exec = {1: (3 * MODEL_INSTANCES) + 2}
-                    self.check_status(model_name, batch_exec, (3 * MODEL_INSTANCES) + 2, 14)
+                    self.check_status(model_name, batch_exec,
+                                      (3 * MODEL_INSTANCES) + 2, 14)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -1340,7 +1713,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.cleanup_shm_regions(precreated_shm2_handles)
                     self.cleanup_shm_regions(precreated_shm3_handles)
                     self.cleanup_shm_regions(precreated_shm4_handles)
-
 
     def test_backlog_same_correlation_id_no_end(self):
         # Test model instances together are configured with
@@ -1361,11 +1733,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,12,12,13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,112,112,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1112,1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions((11111,11113), dtype, 4)
+            precreated_shm0_handles = self.precreate_register_regions((1, 3),
+                                                                      dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 12, 13), dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 112, 112, 113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1112, 1113), dtype, 3)
+            precreated_shm4_handles = self.precreate_register_regions(
+                (11111, 11113), dtype, 4)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -1374,67 +1751,98 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 16)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 16)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 3, None)),
-                          self.get_expected_result(4, 3, trial, None),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           (None, 12, None),
-                           (None, 12, None),
-                           ("end", 13, None)),
-                          self.get_expected_result(48, 13, trial, "end"),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           (None, 112, None),
-                           (None, 112, None),
-                           ("end", 113, None)),
-                          self.get_expected_result(448, 113, trial, "end"),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, None),
-                           (None, 1112, None),
-                           ("end", 1113, None)),
-                          self.get_expected_result(4448, 1113, trial, "end"),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11111, None),
-                           ("end", 11113, None)),
-                          self.get_expected_result(22224, 11113, trial, "end"),
-                          precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None), (None, 3, None)),
+                            self.get_expected_result(4, 3, trial, None),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), (None, 12, None),
+                             (None, 12, None), ("end", 13, None)),
+                            self.get_expected_result(48, 13, trial, "end"),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), (None, 112, None),
+                             (None, 112, None), ("end", 113, None)),
+                            self.get_expected_result(448, 113, trial, "end"),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111, None), (None, 1112, None),
+                             (None, 1112, None), ("end", 1113, None)),
+                            self.get_expected_result(4448, 1113, trial, "end"),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11111, None), ("end", 11113, None)),
+                            self.get_expected_result(22224, 11113, trial,
+                                                     "end"),
+                            precreated_shm4_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 threads[0].start()
                 threads[1].start()
@@ -1447,7 +1855,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.check_deferred_exception()
                 if is_ensemble(model_name):
                     # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1:16}, 16, 16)
+                    self.check_status(model_name, {1: 16}, 16, 16)
                 else:
                     self.check_status(model_name, {4: 4}, 4, 16)
             except Exception as ex:
@@ -1479,11 +1887,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,12,12,13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,112,112,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1112,1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions((11111,11113), dtype, 4)
+            precreated_shm0_handles = self.precreate_register_regions((1, 3),
+                                                                      dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 12, 13), dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions(
+                (111, 112, 112, 113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions(
+                (1111, 1112, 1112, 1113), dtype, 3)
+            precreated_shm4_handles = self.precreate_register_regions(
+                (11111, 11113), dtype, 4)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -1492,67 +1905,105 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for all sequences.
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1001,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1, None),
-                           (None, 3, _max_sequence_idle_ms + 1000)),
-                          self.get_expected_result(4, 3, trial, None),
-                          precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1002,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11, None),
-                           (None, 12, _max_sequence_idle_ms / 2),
-                           (None, 12, _max_sequence_idle_ms / 2),
-                           ("end", 13, _max_sequence_idle_ms / 2)),
-                          self.get_expected_result(48, 13, trial, None),
-                          precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1003,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 111, None),
-                           (None, 112, _max_sequence_idle_ms / 2),
-                           (None, 112, _max_sequence_idle_ms / 2),
-                           ("end", 113, _max_sequence_idle_ms / 2)),
-                          self.get_expected_result(448, 113, trial, None),
-                          precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1004,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 1111, None),
-                           (None, 1112, _max_sequence_idle_ms / 2),
-                           (None, 1112, _max_sequence_idle_ms / 2),
-                           ("end", 1113, _max_sequence_idle_ms / 2)),
-                          self.get_expected_result(4448, 1113, trial, None),
-                          precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
-                threads.append(threading.Thread(
-                    target=self.check_sequence_async,
-                    args=(trial, model_name, dtype, 1005,
-                          (None, None),
-                          # (flag_str, value, pre_delay_ms)
-                          (("start", 11111, None),
-                           ("end", 11113, None)),
-                          self.get_expected_result(22224, 11113, trial, "end"),
-                          precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1, None),
+                             (None, 3, _max_sequence_idle_ms + 1000)),
+                            self.get_expected_result(4, 3, trial, None),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11, None), (None, 12,
+                                                   _max_sequence_idle_ms / 2),
+                             (None, 12, _max_sequence_idle_ms / 2),
+                             ("end", 13, _max_sequence_idle_ms / 2)),
+                            self.get_expected_result(48, 13, trial, None),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1003,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 111, None), (None, 112,
+                                                    _max_sequence_idle_ms / 2),
+                             (None, 112, _max_sequence_idle_ms / 2),
+                             ("end", 113, _max_sequence_idle_ms / 2)),
+                            self.get_expected_result(448, 113, trial, None),
+                            precreated_shm2_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1004,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 1111,
+                              None), (None, 1112, _max_sequence_idle_ms / 2),
+                             (None, 1112, _max_sequence_idle_ms / 2),
+                             ("end", 1113, _max_sequence_idle_ms / 2)),
+                            self.get_expected_result(4448, 1113, trial, None),
+                            precreated_shm3_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1005,
+                            (None, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (("start", 11111, None), ("end", 11113, None)),
+                            self.get_expected_result(22224, 11113, trial,
+                                                     "end"),
+                            precreated_shm4_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
 
                 threads[0].start()
                 threads[1].start()
@@ -1569,18 +2020,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for prefix in ENSEMBLE_PREFIXES:
                     if model_name.startswith(prefix):
                         base_model_name = model_name[(len(prefix)):]
-                        self.assertTrue(
-                            ex.message().startswith(
-                                str("in ensemble '{}', " +
-                                    "inference request for sequence 1001 to " +
-                                    "model '{}' must specify the START flag on the first " +
-                                    "request of the sequence").format(model_name, base_model_name)))
+                        self.assertTrue(ex.message().startswith(
+                            str("in ensemble '{}', " +
+                                "inference request for sequence 1001 to " +
+                                "model '{}' must specify the START flag on the first "
+                                + "request of the sequence").format(
+                                    model_name, base_model_name)))
                         return
-                self.assertTrue(
-                    ex.message().startswith(
-                        str("inference request for sequence 1001 to " +
-                            "model '{}' must specify the START flag on the first " +
-                            "request of the sequence").format(model_name)))
+                self.assertTrue(ex.message().startswith(
+                    str("inference request for sequence 1001 to " +
+                        "model '{}' must specify the START flag on the first "
+                        + "request of the sequence").format(model_name)))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
@@ -1588,6 +2038,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.cleanup_shm_regions(precreated_shm2_handles)
                     self.cleanup_shm_regions(precreated_shm3_handles)
                     self.cleanup_shm_regions(precreated_shm4_handles)
+
 
 if __name__ == '__main__':
     unittest.main()

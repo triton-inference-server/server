@@ -40,6 +40,7 @@ from tritonclientutils import InferenceServerException
 
 FLAGS = None
 
+
 def parse_model_grpc(model_metadata, model_config):
     """
     Check the configuration of a model to make sure it meets the
@@ -116,18 +117,20 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument('-c',
-                        '--classes',
-                        type=int,
-                        required=False,
-                        default=1,
-                        help='Number of class results to report. Default is 1.')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8000',
-                        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument(
+        '-c',
+        '--classes',
+        type=int,
+        required=False,
+        default=1,
+        help='Number of class results to report. Default is 1.')
+    parser.add_argument(
+        '-u',
+        '--url',
+        type=str,
+        required=False,
+        default='localhost:8000',
+        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument('-i',
                         '--protocol',
                         type=str,
@@ -162,7 +165,8 @@ if __name__ == '__main__':
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
     try:
-        model_metadata = triton_client.get_model_metadata(model_name=model_name)
+        model_metadata = triton_client.get_model_metadata(
+            model_name=model_name)
     except InferenceServerException as e:
         print("failed to retrieve the metadata: " + str(e))
         sys.exit(1)

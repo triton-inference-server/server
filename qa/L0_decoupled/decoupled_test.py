@@ -366,8 +366,9 @@ class DecoupledTest(unittest.TestCase):
                                 inputs=this_inputs,
                                 outputs=this_outputs)
 
-        self.assertIn("doesn't support models with decoupled transaction policy",
-                      str(cm.exception))
+        self.assertIn(
+            "doesn't support models with decoupled transaction policy",
+            str(cm.exception))
 
     def test_no_streaming(self):
         # Test cases with no streaming inference. Server should give
@@ -408,7 +409,8 @@ class DecoupledTest(unittest.TestCase):
         result_dict = {}
 
         with self.assertRaises(InferenceServerException) as cm:
-            self._stream_infer(1, 0, repeat_count, delay_data, 1, user_data, result_dict)
+            self._stream_infer(1, 0, repeat_count, delay_data, 1, user_data,
+                               result_dict)
 
         self.assertIn("expected IN and DELAY shape to match, got [1] and [2]",
                       str(cm.exception))

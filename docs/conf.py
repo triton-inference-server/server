@@ -64,7 +64,9 @@ git_sha = os.getenv("GIT_SHA")
 
 if not git_sha:
     try:
-        git_sha = subprocess.check_output(["git", "log", "--pretty=format:'%h'", "-n1"]).decode('ascii').replace("'","").strip()
+        git_sha = subprocess.check_output(
+            ["git", "log", "--pretty=format:'%h'",
+             "-n1"]).decode('ascii').replace("'", "").strip()
     except:
         git_sha = u'0000000'
 
@@ -93,13 +95,8 @@ Version select: <select onChange="window.location.href = this.value" onFocus="th
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.ifconfig',
-    'sphinx.ext.extlinks',
-    'nbsphinx',
-    'breathe',
+    'sphinx.ext.autodoc', 'sphinx.ext.mathjax', 'sphinx.ext.napoleon',
+    'sphinx.ext.ifconfig', 'sphinx.ext.extlinks', 'nbsphinx', 'breathe',
     'exhale'
 ]
 
@@ -131,24 +128,29 @@ exclude_patterns = [u'build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
 pygments_style = 'sphinx'
 
 # Setup the breathe extension
-breathe_projects = {
-    "BreatheTritonServer": "./doxyoutput/xml"
-}
+breathe_projects = {"BreatheTritonServer": "./doxyoutput/xml"}
 breathe_default_project = "BreatheTritonServer"
 
 # Setup the exhale extension
 exhale_args = {
     # These arguments are required
-    "containmentFolder":     "./cpp_api",
-    "rootFileName":          "cpp_api_root.rst",
-    "rootFileTitle":         "C++ API",
-    "doxygenStripFromPath":  "..",
+    "containmentFolder":
+    "./cpp_api",
+    "rootFileName":
+    "cpp_api_root.rst",
+    "rootFileTitle":
+    "C++ API",
+    "doxygenStripFromPath":
+    "..",
     # Suggested optional arguments
-    "createTreeView":        True,
+    "createTreeView":
+    True,
     # TIP: if using the sphinx-bootstrap-theme, you need
     # "treeViewIsBootstrap": True,
-    "exhaleExecutesDoxygen": True,
-    "exhaleDoxygenStdin": textwrap.dedent('''
+    "exhaleExecutesDoxygen":
+    True,
+    "exhaleDoxygenStdin":
+    textwrap.dedent('''
         JAVADOC_AUTOBRIEF = YES
     INPUT = ../src/core/tritonserver.h ../src/clients/c++/library/common.h ../src/clients/c++/library/grpc_client.h ../src/clients/c++/library/http_client.h ../src/backends/custom/custom.h ../src/custom/sdk/custom_instance.h
     ''')
@@ -159,7 +161,6 @@ exhale_args = {
 
 # Tell sphinx what the pygments highlight language should be.
 highlight_language = 'text'
-
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -174,7 +175,8 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # documentation.
 #
 html_theme_options = {
-    'canonical_url': 'https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html',
+    'canonical_url':
+    'https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html',
     'collapse_navigation': False,
     'display_version': True,
     'logo_only': False,
@@ -195,12 +197,10 @@ html_theme_options = {
 #
 # html_sidebars = {}
 
-
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'NVIDIATritonServerdoc'
-
 
 # -- Options for LaTeX output ------------------------------------------------
 
@@ -226,20 +226,17 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'NVIDIATritonServer.tex', u'NVIDIA Triton Inference Server Documentation',
-     u'NVIDIA Corporation', 'manual'),
+    (master_doc, 'NVIDIATritonServer.tex',
+     u'NVIDIA Triton Inference Server Documentation', u'NVIDIA Corporation',
+     'manual'),
 ]
-
 
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'nvidiatritonserver', u'NVIDIA Triton Inference Server Documentation',
-     [author], 1)
-]
-
+man_pages = [(master_doc, 'nvidiatritonserver',
+              u'NVIDIA Triton Inference Server Documentation', [author], 1)]
 
 # -- Options for Texinfo output ----------------------------------------------
 
@@ -247,17 +244,19 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'NVIDIATritonServer', u'NVIDIA Triton Inference Server Documentation',
-     author, 'NVIDIATritonServer', 'ML/DL inference server',
-     'Miscellaneous'),
+    (master_doc, 'NVIDIATritonServer',
+     u'NVIDIA Triton Inference Server Documentation', author,
+     'NVIDIATritonServer', 'ML/DL inference server', 'Miscellaneous'),
 ]
 
-
 # -- Extension configuration -------------------------------------------------
-extlinks = {'issue': ('https://github.com/NVIDIA/triton-inference-server/issues/%s',
-                      'issue '),
-            'fileref': ('https://github.com/NVIDIA/triton-inference-server/tree/' +
-                        (git_sha if git_sha != u'0000000' else "master") + '/%s', ''),}
+extlinks = {
+    'issue':
+    ('https://github.com/NVIDIA/triton-inference-server/issues/%s', 'issue '),
+    'fileref': ('https://github.com/NVIDIA/triton-inference-server/tree/' +
+                (git_sha if git_sha != u'0000000' else "master") + '/%s', ''),
+}
+
 
 def setup(app):
     # If envvar is set then the file is expected to contain a script

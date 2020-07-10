@@ -36,7 +36,6 @@ import struct
 
 
 class _utf8(object):
-
     @classmethod
     def from_param(cls, value):
         if value is None:
@@ -49,8 +48,8 @@ class _utf8(object):
 
 import os
 _cshm_lib = "cshm" if os.name == 'nt' else 'libcshm.so'
-_cshm_path = pkg_resources.resource_filename(
-    'tritonshmutils.shared_memory', _cshm_lib)
+_cshm_path = pkg_resources.resource_filename('tritonshmutils.shared_memory',
+                                             _cshm_lib)
 _cshm = cdll.LoadLibrary(_cshm_path)
 
 _cshm_shared_memory_region_create = _cshm.SharedMemoryRegionCreate
@@ -251,7 +250,6 @@ class SharedMemoryException(Exception):
         Pointer to an Error that should be used to initialize the exception.
 
     """
-
     def __init__(self, err):
         self.err_code_map = {
             -2: "unable to get shared memory descriptor",

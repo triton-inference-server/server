@@ -64,6 +64,7 @@ def model_dtype_to_np(model_dtype):
         return np.dtype(object)
     return None
 
+
 def deserialize_bytes_tensor(encoded_tensor):
     strs = list()
     offset = 0
@@ -75,6 +76,7 @@ def deserialize_bytes_tensor(encoded_tensor):
         offset += l
         strs.append(sb)
     return (np.array(strs, dtype=bytes))
+
 
 def parse_model(model_metadata, model_config):
     """
@@ -127,8 +129,8 @@ def parse_model(model_metadata, model_config):
             format(expected_input_dims, model_metadata.name,
                    len(input_metadata.shape)))
 
-    if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
-        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
+    if ((input_config.format != mc.ModelInput.FORMAT_NCHW)
+            and (input_config.format != mc.ModelInput.FORMAT_NHWC)):
         raise Exception("unexpected input format " +
                         mc.ModelInput.Format.Name(input_config.format) +
                         ", expecting " +
@@ -173,7 +175,7 @@ def preprocess(img, format, dtype, c, h, w, scaling):
         scaled = (typed / 128) - 1
     elif scaling == 'VGG':
         if c == 1:
-            scaled = typed - np.asarray((128,), dtype=npdtype)
+            scaled = typed - np.asarray((128, ), dtype=npdtype)
         else:
             scaled = typed - np.asarray((123, 117, 104), dtype=npdtype)
     else:
@@ -254,8 +256,8 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
     image_data = []
     for filename in filenames:
         img = Image.open(filename)
-        image_data.append(preprocess(img, format, dtype, c, h, w,
-                                     FLAGS.scaling))
+        image_data.append(
+            preprocess(img, format, dtype, c, h, w, FLAGS.scaling))
 
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just
@@ -323,12 +325,13 @@ if __name__ == '__main__':
                         required=False,
                         default=1,
                         help='Batch size. Default is 1.')
-    parser.add_argument('-c',
-                        '--classes',
-                        type=int,
-                        required=False,
-                        default=1,
-                        help='Number of class results to report. Default is 1.')
+    parser.add_argument(
+        '-c',
+        '--classes',
+        type=int,
+        required=False,
+        default=1,
+        help='Number of class results to report. Default is 1.')
     parser.add_argument(
         '-s',
         '--scaling',
@@ -337,12 +340,13 @@ if __name__ == '__main__':
         required=False,
         default='NONE',
         help='Type of scaling to apply to image pixels. Default is NONE.')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8001',
-                        help='Inference server URL. Default is localhost:8001.')
+    parser.add_argument(
+        '-u',
+        '--url',
+        type=str,
+        required=False,
+        default='localhost:8001',
+        help='Inference server URL. Default is localhost:8001.')
     parser.add_argument('image_filename',
                         type=str,
                         nargs='?',
@@ -382,7 +386,8 @@ if __name__ == '__main__':
             responses.append(response)
     else:
         for request in requestGenerator(input_name, output_name, c, h, w,
-                                        format, dtype, FLAGS, result_filenames):
+                                        format, dtype, FLAGS,
+                                        result_filenames):
             if not FLAGS.async_set:
                 responses.append(grpc_stub.ModelInfer(request))
             else:
@@ -401,9 +406,11 @@ if __name__ == '__main__':
                 error_found = True
                 print(response.error_message)
             else:
-                postprocess(response.infer_response.outputs, result_filenames[idx], FLAGS.batch_size)
+                postprocess(response.infer_response.outputs,
+                            result_filenames[idx], FLAGS.batch_size)
         else:
-            postprocess(response.outputs, result_filenames[idx], FLAGS.batch_size)
+            postprocess(response.outputs, result_filenames[idx],
+                        FLAGS.batch_size)
         idx += 1
 
     if error_found:

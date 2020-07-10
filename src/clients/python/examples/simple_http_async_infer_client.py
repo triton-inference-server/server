@@ -41,22 +41,22 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8000',
-                        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument(
+        '-u',
+        '--url',
+        type=str,
+        required=False,
+        default='localhost:8000',
+        help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
 
-    request_count=2
+    request_count = 2
     try:
         # Need to specify large enough concurrency to issue all the
         # inference requests to the server in parallel.
-        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose,
-                                                         concurrency=request_count)
+        triton_client = tritonhttpclient.InferenceServerClient(
+            url=FLAGS.url, verbose=FLAGS.verbose, concurrency=request_count)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -79,17 +79,18 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=True)
     inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0',
-                                                   binary_data=True))
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=True))
+    outputs.append(
+        tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(
+        tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
     async_requests = []
 
     for i in range(request_count):
         # Asynchronous inference call.
-        async_requests.append(triton_client.async_infer(model_name=model_name,
-                                                inputs=inputs,
-                                                outputs=outputs))
+        async_requests.append(
+            triton_client.async_infer(model_name=model_name,
+                                      inputs=inputs,
+                                      outputs=outputs))
 
     for async_request in async_requests:
         # Get the result from the initiated asynchronous inference request.

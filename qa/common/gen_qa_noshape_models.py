@@ -33,6 +33,7 @@ import numpy as np
 FLAGS = None
 np_dtype_string = np.dtype(object)
 
+
 def np_to_model_dtype(np_dtype):
     if np_dtype == np.bool:
         return "TYPE_BOOL"
@@ -57,6 +58,7 @@ def np_to_model_dtype(np_dtype):
     elif np_dtype == np_dtype_string:
         return "TYPE_STRING"
     return None
+
 
 def np_to_tf_dtype(np_dtype):
     if np_dtype == np.bool:
@@ -83,10 +85,17 @@ def np_to_tf_dtype(np_dtype):
         return tf.string
     return None
 
-def create_savedmodel_modelfile(
-        models_dir, max_batch, model_version,
-        input_shape, output0_shape, output1_shape,
-        input_dtype, output0_dtype, output1_dtype, swap=False):
+
+def create_savedmodel_modelfile(models_dir,
+                                max_batch,
+                                model_version,
+                                input_shape,
+                                output0_shape,
+                                output1_shape,
+                                input_dtype,
+                                output0_dtype,
+                                output1_dtype,
+                                swap=False):
 
     if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
@@ -100,11 +109,16 @@ def create_savedmodel_modelfile(
     # dimension.
     tf.reset_default_graph()
     if max_batch == 0:
-        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape([]), "TENSOR_INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT1")
+        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape([]),
+                             "TENSOR_INPUT0")
+        in1 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape),
+                             "TENSOR_INPUT1")
     else:
-        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape([]), "TENSOR_INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, [None,] + tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT1")
+        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape([]),
+                             "TENSOR_INPUT0")
+        in1 = tf.placeholder(tf_input_dtype, [
+            None,
+        ] + tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT1")
 
     # If the input is a string, then convert each string to the
     # equivalent float value.
@@ -130,30 +144,42 @@ def create_savedmodel_modelfile(
     out1 = tf.identity(cast1, "TENSOR_OUTPUT1")
 
     # Use a different model name for the non-batching variant
-    model_name = tu.get_model_name("savedmodel_nobatch" if max_batch == 0 else "savedmodel",
-                                   input_dtype, output0_dtype, output1_dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_name = tu.get_model_name(
+        "savedmodel_nobatch" if max_batch == 0 else "savedmodel", input_dtype,
+        output0_dtype, output1_dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(
+        model_version)
 
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with tf.Session() as sess:
-        input0_tensor = tf.get_default_graph().get_tensor_by_name("TENSOR_INPUT0:0")
-        input1_tensor = tf.get_default_graph().get_tensor_by_name("TENSOR_INPUT1:0")
-        output0_tensor = tf.get_default_graph().get_tensor_by_name("TENSOR_OUTPUT0:0")
-        output1_tensor = tf.get_default_graph().get_tensor_by_name("TENSOR_OUTPUT1:0")
-        tf.saved_model.simple_save(sess, model_version_dir + "/model.savedmodel",
-                                   inputs={"INPUT0": input0_tensor, "INPUT1": input1_tensor},
-                                   outputs={"OUTPUT0": output0_tensor, "OUTPUT1": output1_tensor})
+        input0_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_INPUT0:0")
+        input1_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_INPUT1:0")
+        output0_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_OUTPUT0:0")
+        output1_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_OUTPUT1:0")
+        tf.saved_model.simple_save(sess,
+                                   model_version_dir + "/model.savedmodel",
+                                   inputs={
+                                       "INPUT0": input0_tensor,
+                                       "INPUT1": input1_tensor
+                                   },
+                                   outputs={
+                                       "OUTPUT0": output0_tensor,
+                                       "OUTPUT1": output1_tensor
+                                   })
 
 
-def create_savedmodel_modelconfig(
-        models_dir, max_batch, model_version,
-        input_shape, output0_shape, output1_shape,
-        input_dtype, output0_dtype, output1_dtype,
-        output0_label_cnt, version_policy):
+def create_savedmodel_modelconfig(models_dir, max_batch, model_version,
+                                  input_shape, output0_shape, output1_shape,
+                                  input_dtype, output0_dtype, output1_dtype,
+                                  output0_label_cnt, version_policy):
 
     if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
@@ -164,15 +190,17 @@ def create_savedmodel_modelconfig(
     if version_policy is not None:
         type, val = version_policy
         if type == 'latest':
-            version_policy_str = "{{ latest {{ num_versions: {} }}}}".format(val)
+            version_policy_str = "{{ latest {{ num_versions: {} }}}}".format(
+                val)
         elif type == 'specific':
             version_policy_str = "{{ specific {{ versions: {} }}}}".format(val)
         else:
             version_policy_str = "{ all { }}"
 
     # Use a different model name for the non-batching variant
-    model_name = tu.get_model_name("savedmodel_nobatch" if max_batch == 0 else "savedmodel",
-                                   input_dtype, output0_dtype, output1_dtype)
+    model_name = tu.get_model_name(
+        "savedmodel_nobatch" if max_batch == 0 else "savedmodel", input_dtype,
+        output0_dtype, output1_dtype)
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -207,13 +235,15 @@ output [
 '''.format(model_name, max_batch, version_policy_str,
            np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
            np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
-           np_to_model_dtype(output0_dtype), tu.shape_to_dims_str(output0_shape),
-           np_to_model_dtype(output1_dtype), tu.shape_to_dims_str(output1_shape))
+           np_to_model_dtype(output0_dtype),
+           tu.shape_to_dims_str(output0_shape),
+           np_to_model_dtype(output1_dtype),
+           tu.shape_to_dims_str(output1_shape))
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
@@ -222,10 +252,16 @@ output [
         for l in range(output0_label_cnt):
             lfile.write("label" + str(l) + "\n")
 
-def create_models(
-        models_dir, input_dtype, output0_dtype, output1_dtype,
-        input_shape, output0_shape, output1_shape,
-        output0_label_cnt, version_policy=None):
+
+def create_models(models_dir,
+                  input_dtype,
+                  output0_dtype,
+                  output1_dtype,
+                  input_shape,
+                  output0_shape,
+                  output1_shape,
+                  output0_label_cnt,
+                  version_policy=None):
     model_version = 1
 
     # Create two models, one that supports batching with a max-batch
@@ -233,57 +269,77 @@ def create_models(
 
     if FLAGS.savedmodel:
         # max-batch 8
-        create_savedmodel_modelconfig(
-            models_dir, 8, model_version,
-            input_shape, output0_shape, output1_shape,
-            input_dtype, output0_dtype, output1_dtype,
-            output0_label_cnt, version_policy)
-        create_savedmodel_modelfile(
-            models_dir, 8, model_version,
-            input_shape, output0_shape, output1_shape,
-            input_dtype, output0_dtype, output1_dtype)
+        create_savedmodel_modelconfig(models_dir, 8, model_version,
+                                      input_shape, output0_shape,
+                                      output1_shape, input_dtype,
+                                      output0_dtype, output1_dtype,
+                                      output0_label_cnt, version_policy)
+        create_savedmodel_modelfile(models_dir, 8, model_version, input_shape,
+                                    output0_shape, output1_shape, input_dtype,
+                                    output0_dtype, output1_dtype)
         # max-batch 0
-        create_savedmodel_modelconfig(
-            models_dir, 0, model_version,
-            input_shape, output0_shape, output1_shape,
-            input_dtype, output0_dtype, output1_dtype,
-            output0_label_cnt, version_policy)
-        create_savedmodel_modelfile(
-            models_dir, 0, model_version,
-            input_shape, output0_shape, output1_shape,
-            input_dtype, output0_dtype, output1_dtype)
+        create_savedmodel_modelconfig(models_dir, 0, model_version,
+                                      input_shape, output0_shape,
+                                      output1_shape, input_dtype,
+                                      output0_dtype, output1_dtype,
+                                      output0_label_cnt, version_policy)
+        create_savedmodel_modelfile(models_dir, 0, model_version, input_shape,
+                                    output0_shape, output1_shape, input_dtype,
+                                    output0_dtype, output1_dtype)
 
-def create_fixed_models(
-        models_dir, input_dtype, output0_dtype, output1_dtype, version_policy=None):
+
+def create_fixed_models(models_dir,
+                        input_dtype,
+                        output0_dtype,
+                        output1_dtype,
+                        version_policy=None):
     input_size = 16
 
     create_models(models_dir, input_dtype, output0_dtype, output1_dtype,
-                  (input_size,), (input_size,), (input_size,),
-                  input_size, version_policy)
+                  (input_size, ), (input_size, ), (input_size, ), input_size,
+                  version_policy)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir', type=str, required=True,
+    parser.add_argument('--models_dir',
+                        type=str,
+                        required=True,
                         help='Top-level model directory')
-    parser.add_argument('--graphdef', required=False, action='store_true',
+    parser.add_argument('--graphdef',
+                        required=False,
+                        action='store_true',
                         help='Generate GraphDef models')
-    parser.add_argument('--savedmodel', required=False, action='store_true',
+    parser.add_argument('--savedmodel',
+                        required=False,
+                        action='store_true',
                         help='Generate SavedModel models')
-    parser.add_argument('--netdef', required=False, action='store_true',
+    parser.add_argument('--netdef',
+                        required=False,
+                        action='store_true',
                         help='Generate NetDef models')
-    parser.add_argument('--tensorrt', required=False, action='store_true',
+    parser.add_argument('--tensorrt',
+                        required=False,
+                        action='store_true',
                         help='Generate TensorRT PLAN models')
-    parser.add_argument('--onnx', required=False, action='store_true',
+    parser.add_argument('--onnx',
+                        required=False,
+                        action='store_true',
                         help='Generate Onnx Runtime Onnx models')
-    parser.add_argument('--libtorch', required=False, action='store_true',
+    parser.add_argument('--libtorch',
+                        required=False,
+                        action='store_true',
                         help='Generate Pytorch LibTorch models')
-    parser.add_argument('--variable', required=False, action='store_true',
+    parser.add_argument('--variable',
+                        required=False,
+                        action='store_true',
                         help='Used variable-shape tensors for input/output')
-    parser.add_argument('--ensemble', required=False, action='store_true',
-                        help='Generate ensemble models against the models'
-                        + ' in all platforms. Note that the models generated'
-                        + ' are not completed.')
+    parser.add_argument('--ensemble',
+                        required=False,
+                        action='store_true',
+                        help='Generate ensemble models against the models' +
+                        ' in all platforms. Note that the models generated' +
+                        ' are not completed.')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.savedmodel:
@@ -294,13 +350,21 @@ if __name__ == '__main__':
 
     # Tests with models that accept fixed-shape input/output tensors
     if not FLAGS.variable:
-        create_fixed_models(FLAGS.models_dir, np.int8, np.int8, np.int8, ('latest', 1))
-        create_fixed_models(FLAGS.models_dir, np.int16, np.int16, np.int16, ('latest', 2))
-        create_fixed_models(FLAGS.models_dir, np.int32, np.int32, np.int32, ('all', None))
+        create_fixed_models(FLAGS.models_dir, np.int8, np.int8, np.int8,
+                            ('latest', 1))
+        create_fixed_models(FLAGS.models_dir, np.int16, np.int16, np.int16,
+                            ('latest', 2))
+        create_fixed_models(FLAGS.models_dir, np.int32, np.int32, np.int32,
+                            ('all', None))
         create_fixed_models(FLAGS.models_dir, np.int64, np.int64, np.int64)
-        create_fixed_models(FLAGS.models_dir, np.float16, np.float16, np.float16, ('specific', [1,]))
-        create_fixed_models(FLAGS.models_dir, np.float32, np.float32, np.float32, ('specific', [1, 3]))
-        create_fixed_models(FLAGS.models_dir, np.float16, np.float32, np.float32)
+        create_fixed_models(FLAGS.models_dir, np.float16, np.float16,
+                            np.float16, ('specific', [
+                                1,
+                            ]))
+        create_fixed_models(FLAGS.models_dir, np.float32, np.float32,
+                            np.float32, ('specific', [1, 3]))
+        create_fixed_models(FLAGS.models_dir, np.float16, np.float32,
+                            np.float32)
         create_fixed_models(FLAGS.models_dir, np.int32, np.int8, np.int8)
         create_fixed_models(FLAGS.models_dir, np.int8, np.int32, np.int32)
         create_fixed_models(FLAGS.models_dir, np.int32, np.int8, np.int16)
@@ -310,11 +374,31 @@ if __name__ == '__main__':
 
         if FLAGS.savedmodel:
             for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
-                create_savedmodel_modelfile(FLAGS.models_dir, 8, 2,
-                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
-                create_savedmodel_modelfile(FLAGS.models_dir, 8, 3,
-                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
-                create_savedmodel_modelfile(FLAGS.models_dir, 0, 2,
-                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
-                create_savedmodel_modelfile(FLAGS.models_dir, 0, 3,
-                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_savedmodel_modelfile(FLAGS.models_dir,
+                                            8,
+                                            2, (16, ), (16, ), (16, ),
+                                            vt,
+                                            vt,
+                                            vt,
+                                            swap=True)
+                create_savedmodel_modelfile(FLAGS.models_dir,
+                                            8,
+                                            3, (16, ), (16, ), (16, ),
+                                            vt,
+                                            vt,
+                                            vt,
+                                            swap=True)
+                create_savedmodel_modelfile(FLAGS.models_dir,
+                                            0,
+                                            2, (16, ), (16, ), (16, ),
+                                            vt,
+                                            vt,
+                                            vt,
+                                            swap=True)
+                create_savedmodel_modelfile(FLAGS.models_dir,
+                                            0,
+                                            3, (16, ), (16, ), (16, ),
+                                            vt,
+                                            vt,
+                                            vt,
+                                            swap=True)

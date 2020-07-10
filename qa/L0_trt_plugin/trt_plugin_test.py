@@ -35,18 +35,22 @@ import os
 import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
+
 class PluginModelTest(unittest.TestCase):
     def _full_exact(self, batch_size, model_name, plugin_name):
-        triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+        triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                         verbose=True)
 
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT0', [batch_size, 16], "FP32"))
+        inputs.append(httpclient.InferInput('INPUT0', [batch_size, 16],
+                                            "FP32"))
 
         input0_data = np.random.randn(batch_size, 16).astype(np.float32)
         inputs[0].set_data_from_numpy(input0_data, binary_data=True)
 
-        outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
 
         results = triton_client.infer(model_name + '_' + plugin_name,
                                       inputs,
@@ -58,7 +62,8 @@ class PluginModelTest(unittest.TestCase):
         # and for CustomClipPlugin min_clip = 0.1, max_clip = 0.5
         for b in range(batch_size):
             if plugin_name == 'LReLU_TRT':
-                test_input = np.where(input0_data > 0, input0_data, input0_data * 0.1)
+                test_input = np.where(input0_data > 0, input0_data,
+                                      input0_data * 0.1)
                 self.assertTrue(np.isclose(output0_data, test_input).all())
             else:
                 # [TODO] Add test for CustomClip output
@@ -70,6 +75,7 @@ class PluginModelTest(unittest.TestCase):
             self._full_exact(bs, 'plan_float32_float32_float32', 'LReLU_TRT')
 
     # add test for CustomClipPlugin after model is fixed
+
 
 if __name__ == '__main__':
     unittest.main()

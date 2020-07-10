@@ -28,6 +28,7 @@ import numpy as np
 
 _last_request_id = 0
 
+
 def shape_element_count(shape):
     cnt = 0
     for d in shape:
@@ -39,11 +40,14 @@ def shape_element_count(shape):
             cnt = cnt * d
     return cnt
 
+
 def shape_is_fixed(shape):
     return shape_element_count(shape) != -1
 
+
 def shape_to_tf_shape(shape):
     return [None if i == -1 else i for i in shape]
+
 
 def shape_to_onnx_shape(shape, idx=0, increment_index=True):
     # Onnx use string for variable size dimension, and the same string
@@ -60,8 +64,10 @@ def shape_to_onnx_shape(shape, idx=0, increment_index=True):
             res.append(dim)
     return res, idx
 
+
 def shape_to_dims_str(shape):
     return ','.join(str(i) for i in shape)
+
 
 def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                           input_shape, output0_shape, output1_shape):
@@ -77,19 +83,20 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
 
     return True
 
+
 def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                           input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a Caffe2 model."""
 
     # Some operations used by test don't support fp16.
-    if ((input_dtype == np.float16) or (output0_dtype == np.float16) or
-        (output1_dtype == np.float16)):
+    if ((input_dtype == np.float16) or (output0_dtype == np.float16)
+            or (output1_dtype == np.float16)):
         return False
 
     # Some operations don't support any int type except int32.
-    if ((input_dtype == np.int8) or (output0_dtype == np.int8) or
-        (output1_dtype == np.int8) or (input_dtype == np.int16) or
-        (output0_dtype == np.int16) or (output1_dtype == np.int16)):
+    if ((input_dtype == np.int8) or (output0_dtype == np.int8)
+            or (output1_dtype == np.int8) or (input_dtype == np.int16)
+            or (output0_dtype == np.int16) or (output1_dtype == np.int16)):
         return False
 
     # If the input type is string the output type must be string or
@@ -101,11 +108,12 @@ def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
         return False
 
     # Don't support string inputs or outputs.
-    if ((input_dtype == np.object) or (output0_dtype == np.object) or
-        (output1_dtype == np.object)):
+    if ((input_dtype == np.object) or (output0_dtype == np.object)
+            or (output1_dtype == np.object)):
         return False
 
     return True
+
 
 def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                            input_shape, output0_shape, output1_shape):
@@ -128,6 +136,7 @@ def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
 
     return True
 
+
 def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
                               input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by custom model."""
@@ -140,16 +149,16 @@ def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
         return False
 
     # Input and output shapes must be fixed-size.
-    if (not shape_is_fixed(input_shape) or
-        not shape_is_fixed(output0_shape) or
-        not shape_is_fixed(output1_shape)):
+    if (not shape_is_fixed(input_shape) or not shape_is_fixed(output0_shape)
+            or not shape_is_fixed(output1_shape)):
         return False
 
     return True
 
-def validate_for_ensemble_model(ensemble_type,
-                              input_dtype, output0_dtype, output1_dtype,
-                              input_shape, output0_shape, output1_shape):
+
+def validate_for_ensemble_model(ensemble_type, input_dtype, output0_dtype,
+                                output1_dtype, input_shape, output0_shape,
+                                output1_shape):
     """Return True if input and output dtypes are supported by the ensemble type."""
 
     # Those ensemble types contains "identity" model which doesn't allow STRING
@@ -167,8 +176,9 @@ def validate_for_ensemble_model(ensemble_type,
 
     return True
 
+
 def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
-                           input_shape, output0_shape, output1_shape):
+                            input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a Onnx model."""
 
     # If the input type is string the output type must be string or
@@ -177,34 +187,46 @@ def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
     if ((input_dtype == np.object) and
         (((output0_dtype != np.object) and (output0_dtype != np.int32)) or
          ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
-         return False
+        return False
 
     return True
+
 
 def validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
                                 input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a libtorch model."""
 
-     # STRING, FLOAT16 and UINT16 data types are not supported currently
-    if (input_dtype == np.object) or (output0_dtype == np.object) or (output1_dtype == np.object):
+    # STRING, FLOAT16 and UINT16 data types are not supported currently
+    if (input_dtype == np.object) or (output0_dtype
+                                      == np.object) or (output1_dtype
+                                                        == np.object):
         return False
-    if (input_dtype == np.uint16) or (output0_dtype == np.uint16) or (output1_dtype == np.uint16):
+    if (input_dtype == np.uint16) or (output0_dtype
+                                      == np.uint16) or (output1_dtype
+                                                        == np.uint16):
         return False
-    if (input_dtype == np.float16) or (output0_dtype == np.float16) or (output1_dtype == np.float16):
+    if (input_dtype == np.float16) or (output0_dtype
+                                       == np.float16) or (output1_dtype
+                                                          == np.float16):
         return False
 
     return True
 
+
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
-    return "{}_{}_{}_{}".format(
-        pf, np.dtype(input_dtype).name, np.dtype(output0_dtype).name,
-        np.dtype(output1_dtype).name)
+    return "{}_{}_{}_{}".format(pf,
+                                np.dtype(input_dtype).name,
+                                np.dtype(output0_dtype).name,
+                                np.dtype(output1_dtype).name)
+
 
 def get_sequence_model_name(pf, dtype):
     return "{}_sequence_{}".format(pf, np.dtype(dtype).name)
 
+
 def get_dyna_sequence_model_name(pf, dtype):
     return "{}_dyna_sequence_{}".format(pf, np.dtype(dtype).name)
+
 
 def get_zero_model_name(pf, io_cnt, dtype):
     return "{}_zero_{}_{}".format(pf, io_cnt, np.dtype(dtype).name)

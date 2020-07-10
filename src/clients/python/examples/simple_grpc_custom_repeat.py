@@ -38,7 +38,6 @@ FLAGS = None
 
 
 class UserData:
-
     def __init__(self):
         self._completed_requests = queue.Queue()
 

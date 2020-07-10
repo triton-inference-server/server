@@ -165,7 +165,6 @@ class InferenceServerClient:
             If unable to create a client.
 
     """
-
     def __init__(self,
                  url,
                  verbose=False,
@@ -611,7 +610,8 @@ class InferenceServerClient:
             If unable to unload the model.
 
         """
-        request_uri = "v2/repository/models/{}/unload".format(quote(model_name))
+        request_uri = "v2/repository/models/{}/unload".format(
+            quote(model_name))
         response = self._post(request_uri=request_uri,
                               request_body="",
                               headers=headers,
@@ -778,7 +778,8 @@ class InferenceServerClient:
                               query_params=query_params)
         _raise_if_error(response)
         if self._verbose:
-            print("Registered system shared memory with name '{}'".format(name))
+            print(
+                "Registered system shared memory with name '{}'".format(name))
 
     def unregister_system_shared_memory(self,
                                         name="",
@@ -819,8 +820,9 @@ class InferenceServerClient:
         _raise_if_error(response)
         if self._verbose:
             if name is not "":
-                print("Unregistered system shared memory with name '{}'".format(
-                    name))
+                print(
+                    "Unregistered system shared memory with name '{}'".format(
+                        name))
             else:
                 print("Unregistered all system shared memory regions")
 
@@ -1162,7 +1164,6 @@ class InferenceServerClient:
         InferenceServerException
             If server fails to issue inference.
         """
-
         def wrapped_post(request_uri, request_body, headers, query_params):
             return self._post(request_uri, request_body, headers, query_params)
 
@@ -1223,7 +1224,6 @@ class InferAsyncRequest:
     verbose : bool
         If True generate verbose output. Default value is False.
     """
-
     def __init__(self, greenlet, verbose=False):
         self._greenlet = greenlet
         self._verbose = verbose
@@ -1276,7 +1276,6 @@ class InferInput:
     datatype : str
         The datatype of the associated input.
     """
-
     def __init__(self, name, shape, datatype):
         self._name = name
         self._shape = shape
@@ -1344,7 +1343,7 @@ class InferInput:
         InferenceServerException
             If failed to set data for the tensor.
         """
-        if not isinstance(input_tensor, (np.ndarray,)):
+        if not isinstance(input_tensor, (np.ndarray, )):
             raise_error("input_tensor must be a numpy array")
         dtype = np_to_triton_dtype(input_tensor.dtype)
         if self._datatype != dtype:
@@ -1461,7 +1460,6 @@ class InferRequestedOutput:
         value is 0 which means the classification results are not
         requested.
     """
-
     def __init__(self, name, binary_data=True, class_count=0):
         self._name = name
         self._parameters = {}
@@ -1540,7 +1538,6 @@ class InferResult:
     verbose : bool
         If True generate verbose output. Default value is False.
     """
-
     def __init__(self, response, verbose):
         header_length = response.get('Inference-Header-Content-Length')
         if header_length is None:

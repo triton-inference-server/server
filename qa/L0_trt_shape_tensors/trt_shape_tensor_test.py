@@ -41,7 +41,8 @@ import sequence_util as su
 
 import tritongrpcclient as grpcclient
 
-TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_SYSTEM_SHARED_MEMORY = bool(
+    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 
 _model_instances = 1
 _max_queue_delay_ms = 10000
@@ -52,10 +53,10 @@ _deferred_exceptions = []
 
 
 class InferShapeTensorTest(unittest.TestCase):
-
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
-        self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
+        self.triton_client_ = grpcclient.InferenceServerClient(
+            "localhost:8001")
         global _deferred_exceptions
         _deferred_exceptions = []
 
@@ -85,7 +86,9 @@ class InferShapeTensorTest(unittest.TestCase):
         try:
             # Add batch size to shape as full shape is expected
             for i in range(len(dummy_input_shapes)):
-                dummy_input_shapes[i] = [bs,] + dummy_input_shapes[i]
+                dummy_input_shapes[i] = [
+                    bs,
+                ] + dummy_input_shapes[i]
             start_ms = int(round(time.time() * 1000))
 
             iu.infer_shape_tensor(
@@ -123,48 +126,55 @@ class InferShapeTensorTest(unittest.TestCase):
         bconfig = config.dynamic_batching
         self.assertTrue(2 in bconfig.preferred_batch_size)
         self.assertTrue(6 in bconfig.preferred_batch_size)
-        self.assertEqual(bconfig.max_queue_delay_microseconds, _max_queue_delay_ms * 1000) # 10 secs
+        self.assertEqual(bconfig.max_queue_delay_microseconds,
+                         _max_queue_delay_ms * 1000)  # 10 secs
 
     def check_status(self, model_name, batch_exec, exec_cnt, infer_cnt):
         stats = self.triton_client_.get_inference_statistics(model_name, "1")
         self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
         self.assertEqual(stats.model_stats[0].name, model_name,
                          "expect model stats for model {}".format(model_name))
-        self.assertEqual(stats.model_stats[0].version, "1",
-                         "expect model stats for model {} version 1".format(model_name))
+        self.assertEqual(
+            stats.model_stats[0].version, "1",
+            "expect model stats for model {} version 1".format(model_name))
 
         if batch_exec is not None:
             batch_stats = stats.model_stats[0].batch_stats
             print(batch_stats)
-            self.assertEqual(len(batch_stats), len(batch_exec),
-                             "expected {} different batch-sizes, got {}".format(
-                               len(batch_exec), len(batch_stats)))
+            self.assertEqual(
+                len(batch_stats), len(batch_exec),
+                "expected {} different batch-sizes, got {}".format(
+                    len(batch_exec), len(batch_stats)))
 
             for batch_stat in batch_stats:
                 bs = batch_stat.batch_size
                 bc = batch_stat.compute_infer.count
-                self.assertTrue(bs in batch_exec,
-                                "did not find expected batch-size {}".format(bs))
+                self.assertTrue(
+                    bs in batch_exec,
+                    "did not find expected batch-size {}".format(bs))
                 # Get count from one of the stats
-                self.assertEqual(bc, batch_exec[bs],
-                                 "expected model-execution-count {} for batch size {}, got {}".format(
-                                   batch_exec[bs], bs, bc))
+                self.assertEqual(
+                    bc, batch_exec[bs],
+                    "expected model-execution-count {} for batch size {}, got {}"
+                    .format(batch_exec[bs], bs, bc))
 
         actual_exec_cnt = stats.model_stats[0].execution_count
-        self.assertEqual(actual_exec_cnt, exec_cnt,
-                        "expected model-exec-count {}, got {}".format(
-                                exec_cnt, actual_exec_cnt))
+        self.assertEqual(
+            actual_exec_cnt, exec_cnt,
+            "expected model-exec-count {}, got {}".format(
+                exec_cnt, actual_exec_cnt))
 
         actual_infer_cnt = stats.model_stats[0].inference_count
-        self.assertEqual(actual_infer_cnt, infer_cnt,
-                         "expected model-inference-count {}, got {}".format(
-                                 infer_cnt, actual_infer_cnt))
-        
-        actual_infer_cnt = stats.model_stats[0].inference_count
-        self.assertEqual(actual_infer_cnt, infer_cnt,
-                         "expected model-inference-count {}, got {}".format(
-                                 infer_cnt, actual_infer_cnt))
+        self.assertEqual(
+            actual_infer_cnt, infer_cnt,
+            "expected model-inference-count {}, got {}".format(
+                infer_cnt, actual_infer_cnt))
 
+        actual_infer_cnt = stats.model_stats[0].inference_count
+        self.assertEqual(
+            actual_infer_cnt, infer_cnt,
+            "expected model-inference-count {}, got {}".format(
+                infer_cnt, actual_infer_cnt))
 
     def test_static_batch(self):
         iu.infer_shape_tensor(
@@ -299,7 +309,6 @@ class InferShapeTensorTest(unittest.TestCase):
 
 
 class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
-
     def get_expected_result(self, expected_result, value, flag_str=None):
         # Adjust the expected_result for models
         expected_result = value
@@ -322,8 +331,10 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             # Need scheduler to wait for queue to contain all
             # inferences for both sequences.
             self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-            self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-            self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]),
+                             12)
+            self.assertTrue(
+                "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
             self.assertEqual(
                 int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
             precreated_shm0_handles = self.precreate_register_shape_tensor_regions(
@@ -440,8 +451,10 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             # Need scheduler to wait for queue to contain all
             # inferences for both sequences.
             self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-            self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-            self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]),
+                             12)
+            self.assertTrue(
+                "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
             self.assertEqual(
                 int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
@@ -530,8 +543,10 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
 
 
 class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
-
-    def get_expected_result(self, expected_result, corrid, value,
+    def get_expected_result(self,
+                            expected_result,
+                            corrid,
+                            value,
                             flag_str=None):
         expected_result = value
         if flag_str is not None:
@@ -558,7 +573,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             model_name = tu.get_dyna_sequence_model_name("plan", dtype)
             self.check_setup(model_name)
             self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-            self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertFalse(
+                "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
             corrids = [1001, 1002, 1003, 1004]
             threads = []
@@ -571,16 +587,16 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[0],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 1, 1, None), (None, 12, 2, None), ("end", 2,
-                                                                      3, None)),
+                        (("start", 1, 1, None), (None, 12, 2, None),
+                         ("end", 2, 3, None)),
                         self.get_expected_result(4 + corrids[0], corrids[0], 3,
                                                  "end"),
                         precreated_shm0_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[0]),
+                        "{}_{}".format(self._testMethodName, corrids[0]),
                         'using_dynamic_batcher':
-                            True
+                        True
                     }))
             threads.append(
                 threading.Thread(
@@ -598,9 +614,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm1_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[1]),
+                        "{}_{}".format(self._testMethodName, corrids[1]),
                         'using_dynamic_batcher':
-                            True
+                        True
                     }))
             threads.append(
                 threading.Thread(
@@ -618,9 +634,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm2_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[2]),
+                        "{}_{}".format(self._testMethodName, corrids[2]),
                         'using_dynamic_batcher':
-                            True
+                        True
                     }))
             threads.append(
                 threading.Thread(
@@ -638,9 +654,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm3_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[3]),
+                        "{}_{}".format(self._testMethodName, corrids[3]),
                         'using_dynamic_batcher':
-                            True
+                        True
                     }))
 
             for t in threads:
@@ -678,7 +694,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
 
             self.check_setup(model_name)
             self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-            self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertFalse(
+                "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
             corrids = [1001, 1002, 1003, 1004]
             threads = []
@@ -698,9 +715,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm0_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[0]),
+                        "{}_{}".format(self._testMethodName, corrids[0]),
                         'using_dynamic_batcher':
-                            True
+                        True
                     }))
             threads.append(
                 threading.Thread(
@@ -718,9 +735,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm1_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[1]),
+                        "{}_{}".format(self._testMethodName, corrids[1]),
                         'using_dynamic_batcher':
-                            True
+                        True
                     }))
             threads.append(
                 threading.Thread(
@@ -738,9 +755,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm2_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[2]),
+                        "{}_{}".format(self._testMethodName, corrids[2]),
                         'using_dynamic_batcher':
-                            True
+                        True
                     }))
             threads.append(
                 threading.Thread(
@@ -758,9 +775,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         precreated_shm3_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[3]),
+                        "{}_{}".format(self._testMethodName, corrids[3]),
                         'using_dynamic_batcher':
-                            True
+                        True
                     }))
 
             for t in threads:

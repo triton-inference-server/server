@@ -43,18 +43,19 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8000',
-                        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument(
+        '-u',
+        '--url',
+        type=str,
+        required=False,
+        default='localhost:8000',
+        help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
 
     try:
-        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose)
+        triton_client = tritonhttpclient.InferenceServerClient(
+            url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit(1)
@@ -120,12 +121,12 @@ if __name__ == '__main__':
     inputs[-1].set_shared_memory("input1_data", input_byte_size)
 
     outputs = []
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0',
-                                                   binary_data=True))
+    outputs.append(
+        tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
     outputs[-1].set_shared_memory("output0_data", output_byte_size)
 
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=True))
+    outputs.append(
+        tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
     outputs[-1].set_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,

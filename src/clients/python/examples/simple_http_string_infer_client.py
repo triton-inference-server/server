@@ -37,11 +37,13 @@ def TestIdentityInference(np_array, binary_data):
     inputs = []
     outputs = []
 
-    inputs.append(tritonhttpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
+    inputs.append(
+        tritonhttpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
     inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
 
     outputs.append(
-        tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=binary_data))
+        tritonhttpclient.InferRequestedOutput('OUTPUT0',
+                                              binary_data=binary_data))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
@@ -49,7 +51,7 @@ def TestIdentityInference(np_array, binary_data):
     if (np_array.dtype == np.object):
         if binary_data:
             if not np.array_equal(np_array,
-                        np.char.decode(results.as_numpy('OUTPUT0'))):
+                                  np.char.decode(results.as_numpy('OUTPUT0'))):
                 print(results.as_numpy('OUTPUT0'))
                 sys.exit(1)
         else:
@@ -58,8 +60,7 @@ def TestIdentityInference(np_array, binary_data):
                 sys.exit(1)
     else:
         encoded_results = np.char.encode(
-            results.as_numpy('OUTPUT0').astype(str)
-            )
+            results.as_numpy('OUTPUT0').astype(str))
         if not np.array_equal(np_array, encoded_results):
             print(encoded_results)
             sys.exit(1)
@@ -73,17 +74,18 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8000',
-                        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument(
+        '-u',
+        '--url',
+        type=str,
+        required=False,
+        default='localhost:8000',
+        help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose)
+        triton_client = tritonhttpclient.InferenceServerClient(
+            url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -112,9 +114,10 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=True)
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=False))
+    outputs.append(
+        tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(
+        tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,

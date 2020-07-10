@@ -31,40 +31,52 @@ import sys
 
 FLAGS = None
 
+
 def create_zeroout_modelfile(create_savedmodel, models_dir, model_version):
     # Load the zero-out custom operator
-    _zero_out_module = tf.load_op_library(os.path.join(FLAGS.zero_out_lib_path))
+    _zero_out_module = tf.load_op_library(os.path.join(
+        FLAGS.zero_out_lib_path))
     zero_out = _zero_out_module.zero_out
 
     # Create the model that uses custom operator.
     tf.reset_default_graph()
-    zin = tf.placeholder(tf.int32, [ None, ], "to_zero")
+    zin = tf.placeholder(tf.int32, [
+        None,
+    ], "to_zero")
     zout = zero_out(zin, name="zeroed")
 
     model_name = "savedmodel_zeroout" if create_savedmodel else "graphdef_zeroout"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(
+        model_version)
 
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     if create_savedmodel:
         with tf.Session() as sess:
             input_name = "to_zero"
             output_name = "zeroed"
-            input_tensor = tf.get_default_graph().get_tensor_by_name(input_name + ":0")
-            output_tensor = tf.get_default_graph().get_tensor_by_name(output_name + ":0")
+            input_tensor = tf.get_default_graph().get_tensor_by_name(
+                input_name + ":0")
+            output_tensor = tf.get_default_graph().get_tensor_by_name(
+                output_name + ":0")
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.saved_model.simple_save(sess, model_version_dir + "/model.savedmodel",
-                                       inputs=input_dict, outputs=output_dict)
+            tf.saved_model.simple_save(sess,
+                                       model_version_dir + "/model.savedmodel",
+                                       inputs=input_dict,
+                                       outputs=output_dict)
     else:
         with tf.Session() as sess:
-            graph_io.write_graph(sess.graph.as_graph_def(), model_version_dir,
-                                 "model.graphdef", as_text=False)
+            graph_io.write_graph(sess.graph.as_graph_def(),
+                                 model_version_dir,
+                                 "model.graphdef",
+                                 as_text=False)
+
 
 def create_zeroout_modelconfig(create_savedmodel, models_dir, model_version):
     model_name = "savedmodel_zeroout" if create_savedmodel else "graphdef_zeroout"
@@ -87,16 +99,18 @@ output [
     dims: [ -1 ]
   }}
 ]
-'''.format(model_name,
-           "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
+'''.format(
+        model_name, "tensorflow_savedmodel"
+        if create_savedmodel else "tensorflow_graphdef")
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
+
 
 def create_cudaop_modelfile(create_savedmodel, models_dir, model_version):
     # Load the add_one custom operator
@@ -105,33 +119,43 @@ def create_cudaop_modelfile(create_savedmodel, models_dir, model_version):
 
     # Create the model that uses custom operator.
     tf.reset_default_graph()
-    zin = tf.placeholder(tf.int32, [ None, ], "in")
+    zin = tf.placeholder(tf.int32, [
+        None,
+    ], "in")
     zout = add_one(zin, name="out")
 
     model_name = "savedmodel_cudaop" if create_savedmodel else "graphdef_cudaop"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(
+        model_version)
 
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     if create_savedmodel:
         with tf.Session() as sess:
             input_name = "in"
             output_name = "out"
-            input_tensor = tf.get_default_graph().get_tensor_by_name(input_name + ":0")
-            output_tensor = tf.get_default_graph().get_tensor_by_name(output_name + ":0")
+            input_tensor = tf.get_default_graph().get_tensor_by_name(
+                input_name + ":0")
+            output_tensor = tf.get_default_graph().get_tensor_by_name(
+                output_name + ":0")
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.saved_model.simple_save(sess, model_version_dir + "/model.savedmodel",
-                                       inputs=input_dict, outputs=output_dict)
+            tf.saved_model.simple_save(sess,
+                                       model_version_dir + "/model.savedmodel",
+                                       inputs=input_dict,
+                                       outputs=output_dict)
     else:
         with tf.Session() as sess:
-            graph_io.write_graph(sess.graph.as_graph_def(), model_version_dir,
-                                 "model.graphdef", as_text=False)
+            graph_io.write_graph(sess.graph.as_graph_def(),
+                                 model_version_dir,
+                                 "model.graphdef",
+                                 as_text=False)
+
 
 def create_cudaop_modelconfig(create_savedmodel, models_dir, model_version):
     model_name = "savedmodel_cudaop" if create_savedmodel else "graphdef_cudaop"
@@ -154,16 +178,18 @@ output [
     dims: [ -1 ]
   }}
 ]
-'''.format(model_name,
-           "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
+'''.format(
+        model_name, "tensorflow_savedmodel"
+        if create_savedmodel else "tensorflow_graphdef")
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
+
 
 def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
     # Load the busy_loop custom operator
@@ -172,33 +198,43 @@ def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
 
     # Create the model that uses custom operator.
     tf.reset_default_graph()
-    zin = tf.placeholder(tf.int32, [ None, ], "in")
+    zin = tf.placeholder(tf.int32, [
+        None,
+    ], "in")
     zout = busy_loop(zin, name="out")
 
     model_name = "savedmodel_busyop" if create_savedmodel else "graphdef_busyop"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(
+        model_version)
 
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     if create_savedmodel:
         with tf.Session() as sess:
             input_name = "in"
             output_name = "out"
-            input_tensor = tf.get_default_graph().get_tensor_by_name(input_name + ":0")
-            output_tensor = tf.get_default_graph().get_tensor_by_name(output_name + ":0")
+            input_tensor = tf.get_default_graph().get_tensor_by_name(
+                input_name + ":0")
+            output_tensor = tf.get_default_graph().get_tensor_by_name(
+                output_name + ":0")
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.saved_model.simple_save(sess, model_version_dir + "/model.savedmodel",
-                                       inputs=input_dict, outputs=output_dict)
+            tf.saved_model.simple_save(sess,
+                                       model_version_dir + "/model.savedmodel",
+                                       inputs=input_dict,
+                                       outputs=output_dict)
     else:
         with tf.Session() as sess:
-            graph_io.write_graph(sess.graph.as_graph_def(), model_version_dir,
-                                 "model.graphdef", as_text=False)
+            graph_io.write_graph(sess.graph.as_graph_def(),
+                                 model_version_dir,
+                                 "model.graphdef",
+                                 as_text=False)
+
 
 def create_busyop_modelconfig(create_savedmodel, models_dir, model_version):
     model_name = "savedmodel_busyop" if create_savedmodel else "graphdef_busyop"
@@ -221,16 +257,18 @@ output [
     dims: [ -1 ]
   }}
 ]
-'''.format(model_name,
-           "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
+'''.format(
+        model_name, "tensorflow_savedmodel"
+        if create_savedmodel else "tensorflow_graphdef")
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
+
 
 def create_moduloop_modelfile(models_dir, model_version):
     model_name = "libtorch_modulo"
@@ -255,22 +293,26 @@ def create_moduloop_modelfile(models_dir, model_version):
     class ModuloCustomNet(nn.Module):
         def __init__(self):
             super(ModuloCustomNet, self).__init__()
+
         def forward(self, input0, input1):
             return torch.ops.my_ops.custom_modulo(input0, input1)
 
     moduloCustomModel = ModuloCustomNet()
     example_input0 = torch.arange(1, 11, dtype=torch.float32)
     example_input1 = torch.tensor([2] * 10, dtype=torch.float32)
-    traced = torch.jit.trace(moduloCustomModel, (example_input0, example_input1))
+    traced = torch.jit.trace(moduloCustomModel,
+                             (example_input0, example_input1))
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(
+        model_version)
 
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
+
 
 def create_moduloop_modelconfig(models_dir, model_version):
     model_name = "libtorch_modulo"
@@ -303,10 +345,11 @@ output [
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
+
 
 def create_zero_out_models(models_dir):
     model_version = 1
@@ -319,6 +362,7 @@ def create_zero_out_models(models_dir):
         create_zeroout_modelconfig(True, models_dir, model_version)
         create_zeroout_modelfile(True, models_dir, model_version)
 
+
 def create_cuda_op_models(models_dir):
     model_version = 1
 
@@ -329,6 +373,7 @@ def create_cuda_op_models(models_dir):
     if FLAGS.savedmodel:
         create_cudaop_modelconfig(True, models_dir, model_version)
         create_cudaop_modelfile(True, models_dir, model_version)
+
 
 def create_busy_op_models(models_dir):
     model_version = 1
@@ -341,6 +386,7 @@ def create_busy_op_models(models_dir):
         create_busyop_modelconfig(True, models_dir, model_version)
         create_busyop_modelfile(True, models_dir, model_version)
 
+
 def create_modulo_op_models(models_dir):
     model_version = 1
 
@@ -348,24 +394,39 @@ def create_modulo_op_models(models_dir):
         create_moduloop_modelconfig(models_dir, model_version)
         create_moduloop_modelfile(models_dir, model_version)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir', type=str, required=True,
+    parser.add_argument('--models_dir',
+                        type=str,
+                        required=True,
                         help='Top-level model directory')
-    parser.add_argument('--zero_out_lib_path', type=str, required=False,
+    parser.add_argument('--zero_out_lib_path',
+                        type=str,
+                        required=False,
                         default="./libzeroout.so",
                         help='Fullpath to libzeroout.so')
-    parser.add_argument('--cuda_op_lib_path', type=str, required=False,
+    parser.add_argument('--cuda_op_lib_path',
+                        type=str,
+                        required=False,
                         default="./libcudaop.so",
                         help='Fullpath to libcudaop.so')
-    parser.add_argument('--busy_op_lib_path', type=str, required=False,
+    parser.add_argument('--busy_op_lib_path',
+                        type=str,
+                        required=False,
                         default="./libbusyop.so",
                         help='Fullpath to libbusyop.so')
-    parser.add_argument('--graphdef', required=False, action='store_true',
+    parser.add_argument('--graphdef',
+                        required=False,
+                        action='store_true',
                         help='Generate GraphDef models')
-    parser.add_argument('--savedmodel', required=False, action='store_true',
+    parser.add_argument('--savedmodel',
+                        required=False,
+                        action='store_true',
                         help='Generate SavedModel models')
-    parser.add_argument('--libtorch', required=False, action='store_true',
+    parser.add_argument('--libtorch',
+                        required=False,
+                        action='store_true',
                         help='Generate Pytorch LibTorch models')
     FLAGS, unparsed = parser.parse_known_args()
 

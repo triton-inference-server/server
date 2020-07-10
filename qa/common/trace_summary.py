@@ -64,8 +64,8 @@ class HttpFrontend(AbstractFrontend):
         return "HTTP_RECV_START"
 
     def add_frontend_span(self, span_map, timestamps):
-        if ("HTTP_RECV_START" in timestamps) and (
-                "HTTP_SEND_END" in timestamps):
+        if ("HTTP_RECV_START" in timestamps) and ("HTTP_SEND_END"
+                                                  in timestamps):
             add_span(span_map, timestamps, "HTTP_INFER", "HTTP_RECV_START",
                      "HTTP_SEND_END")
             add_span(span_map, timestamps, "HTTP_RECV", "HTTP_RECV_START",
@@ -95,8 +95,8 @@ class GrpcFrontend(AbstractFrontend):
         return "GRPC_WAITREAD_START"
 
     def add_frontend_span(self, span_map, timestamps):
-        if ("GRPC_WAITREAD_START" in timestamps) and (
-                "GRPC_SEND_END" in timestamps):
+        if ("GRPC_WAITREAD_START" in timestamps) and ("GRPC_SEND_END"
+                                                      in timestamps):
             add_span(span_map, timestamps, "GRPC_INFER", "GRPC_WAITREAD_START",
                      "GRPC_SEND_END")
             add_span(span_map, timestamps, "GRPC_WAITREAD",
@@ -191,16 +191,16 @@ def summarize(frontend, traces):
                      "REQUEST_START", "REQUEST_END")
 
             # The tags below will be missing for ensemble model
-            if ("QUEUE_START" in timestamps) and (
-                    "COMPUTE_START" in timestamps):
+            if ("QUEUE_START" in timestamps) and ("COMPUTE_START"
+                                                  in timestamps):
                 add_span(model_span_map[key], timestamps, "QUEUE",
                          "QUEUE_START", "COMPUTE_START")
-            if ("COMPUTE_START" in timestamps) and (
-                    "COMPUTE_END" in timestamps):
+            if ("COMPUTE_START" in timestamps) and ("COMPUTE_END"
+                                                    in timestamps):
                 add_span(model_span_map[key], timestamps, "COMPUTE",
                          "COMPUTE_START", "COMPUTE_END")
-            if ("COMPUTE_INPUT_END" in timestamps) and (
-                    "COMPUTE_OUTPUT_START" in timestamps):
+            if ("COMPUTE_INPUT_END" in timestamps) and ("COMPUTE_OUTPUT_START"
+                                                        in timestamps):
                 add_span(model_span_map[key], timestamps, "COMPUTE_INPUT",
                          "COMPUTE_START", "COMPUTE_INPUT_END")
                 add_span(model_span_map[key], timestamps, "COMPUTE_INFER",
@@ -237,17 +237,17 @@ def summarize(frontend, traces):
 
         print("\tHandler (avg): {}us".format(model_span_map[key]["REQUEST"] /
                                              (cnt * 1000)))
-        if ("QUEUE" in model_span_map[key]
-           ) and "COMPUTE" in model_span_map[key]:
+        if ("QUEUE"
+                in model_span_map[key]) and "COMPUTE" in model_span_map[key]:
             print("\t\tOverhead (avg): {}us".format(
-                (model_span_map[key]["REQUEST"] - model_span_map[key]["QUEUE"] -
-                 model_span_map[key]["COMPUTE"]) / (cnt * 1000)))
+                (model_span_map[key]["REQUEST"] - model_span_map[key]["QUEUE"]
+                 - model_span_map[key]["COMPUTE"]) / (cnt * 1000)))
             print("\t\tQueue (avg): {}us".format(model_span_map[key]["QUEUE"] /
                                                  (cnt * 1000)))
             print("\t\tCompute (avg): {}us".format(
                 model_span_map[key]["COMPUTE"] / (cnt * 1000)))
         if ("COMPUTE_INPUT" in model_span_map[key]
-           ) and "COMPUTE_OUTPUT" in model_span_map[key]:
+            ) and "COMPUTE_OUTPUT" in model_span_map[key]:
             print("\t\t\tInput (avg): {}us".format(
                 model_span_map[key]["COMPUTE_INPUT"] / (cnt * 1000)))
             print("\t\t\tInfer (avg): {}us".format(

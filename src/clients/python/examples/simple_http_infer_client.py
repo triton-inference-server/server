@@ -33,6 +33,7 @@ import gevent.ssl
 import tritonhttpclient
 from tritonclientutils import InferenceServerException
 
+
 def test_infer(model_name, input0_data, input1_data, headers=None):
     inputs = []
     outputs = []
@@ -43,9 +44,10 @@ def test_infer(model_name, input0_data, input1_data, headers=None):
     inputs[0].set_data_from_numpy(input0_data, binary_data=False)
     inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=False))
+    outputs.append(
+        tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(
+        tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
     query_params = {'test_1': 1, 'test_2': 2}
     results = triton_client.infer(model_name,
                                   inputs,
@@ -89,39 +91,45 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Use custom model')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8000',
-                        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument(
+        '-u',
+        '--url',
+        type=str,
+        required=False,
+        default='localhost:8000',
+        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument('-s',
                         '--ssl',
                         action="store_true",
                         required=False,
                         default=False,
                         help='Enable encrypted link to the server using HTTPS')
-    parser.add_argument('-H', dest='http_headers', metavar="HTTP_HEADER",
-                        required=False, action='append',
-                        help='HTTP headers to add to inference server requests. ' +
-                        'Format is -H"Header:Value".')
+    parser.add_argument(
+        '-H',
+        dest='http_headers',
+        metavar="HTTP_HEADER",
+        required=False,
+        action='append',
+        help='HTTP headers to add to inference server requests. ' +
+        'Format is -H"Header:Value".')
 
     FLAGS = parser.parse_args()
     try:
         if FLAGS.ssl:
-            triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose,
-                                                         ssl=True,
-                                                         ssl_context_factory=gevent.ssl._create_unverified_context,
-                                                         insecure=True)
+            triton_client = tritonhttpclient.InferenceServerClient(
+                url=FLAGS.url,
+                verbose=FLAGS.verbose,
+                ssl=True,
+                ssl_context_factory=gevent.ssl._create_unverified_context,
+                insecure=True)
         else:
-            triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose)
+            triton_client = tritonhttpclient.InferenceServerClient(
+                url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit(1)
 
-    model_name = "simple_custom" if FLAGS.use_custom_model else "simple" 
+    model_name = "simple_custom" if FLAGS.use_custom_model else "simple"
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -130,8 +138,10 @@ if __name__ == '__main__':
     input1_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
 
     if FLAGS.http_headers is not None:
-        headers_dict = {l.split(':')[0]: l.split(':')[1]
-                        for l in FLAGS.http_headers}
+        headers_dict = {
+            l.split(':')[0]: l.split(':')[1]
+            for l in FLAGS.http_headers
+        }
     else:
         headers_dict = None
 
@@ -139,7 +149,8 @@ if __name__ == '__main__':
     results = test_infer(model_name, input0_data, input1_data, headers_dict)
     print(results.get_response())
 
-    statistics = triton_client.get_inference_statistics(model_name=model_name, headers=headers_dict)
+    statistics = triton_client.get_inference_statistics(model_name=model_name,
+                                                        headers=headers_dict)
     print(statistics)
     if len(statistics['model_stats']) != 1:
         print("FAILED: Inference Statistics")
@@ -161,7 +172,10 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Infer without requested Outputs
-    results = test_infer_no_outputs(model_name, input0_data, input1_data, headers=headers_dict)
+    results = test_infer_no_outputs(model_name,
+                                    input0_data,
+                                    input1_data,
+                                    headers=headers_dict)
     print(results.get_response())
 
     # Validate the results by comparing with precomputed values.
@@ -182,7 +196,7 @@ if __name__ == '__main__':
     # Infer with incorrect model name
     try:
         response = test_infer("wrong_model_name", input0_data,
-                            input1_data).get_response()
+                              input1_data).get_response()
         print("expected error message for wrong model name")
         sys.exit(1)
     except InferenceServerException as ex:

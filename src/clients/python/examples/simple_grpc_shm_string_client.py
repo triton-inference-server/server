@@ -44,12 +44,13 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8001',
-                        help='Inference server URL. Default is localhost:8001.')
+    parser.add_argument(
+        '-u',
+        '--url',
+        type=str,
+        required=False,
+        default='localhost:8001',
+        help='Inference server URL. Default is localhost:8001.')
 
     FLAGS = parser.parse_args()
 
@@ -82,10 +83,10 @@ if __name__ == '__main__':
     in1n = np.array([str(x) for x in in1.flatten()], dtype=object)
     input1_data = in1n.reshape(in1.shape)
 
-    expected_sum = np.array([str(x)
-                             for x in np.add(in0, in1).flatten()], dtype=object)
-    expected_diff = np.array([str(x)
-                             for x in np.subtract(in0, in1).flatten()], dtype=object)
+    expected_sum = np.array([str(x) for x in np.add(in0, in1).flatten()],
+                            dtype=object)
+    expected_diff = np.array([str(x) for x in np.subtract(in0, in1).flatten()],
+                             dtype=object)
     expected_sum_serialized = utils.serialize_byte_tensor(expected_sum)
     expected_diff_serialized = utils.serialize_byte_tensor(expected_diff)
 
@@ -126,9 +127,11 @@ if __name__ == '__main__':
     shm.set_shared_memory_region(shm_ip1_handle, [input1_data_serialized])
 
     # Register Input0 and Input1 shared memory with Triton Server
-    triton_client.register_system_shared_memory("input0_data", "/input0_simple",
+    triton_client.register_system_shared_memory("input0_data",
+                                                "/input0_simple",
                                                 input0_byte_size)
-    triton_client.register_system_shared_memory("input1_data", "/input1_simple",
+    triton_client.register_system_shared_memory("input1_data",
+                                                "/input1_simple",
                                                 input1_byte_size)
 
     # Set the parameters to use data from shared memory

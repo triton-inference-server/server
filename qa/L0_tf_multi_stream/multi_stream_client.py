@@ -38,43 +38,79 @@ from tritonclientutils import InferenceServerException
 from time import time
 
 if sys.version_info >= (3, 0):
-  import queue
+    import queue
 else:
-  import Queue as queue
+    import Queue as queue
 
 FLAGS = None
 
 start_time = None
 finish_times = queue.Queue()
 
+
 # Callback function used for async_infer(), it can capture
 # additional information using functools.partial as long as the last
 # two arguments are reserved for result and error
 def completion_callback(result, error):
     if error is None:
-      finish_times.put((result, time()-start_time))
+        finish_times.put((result, time() - start_time))
     else:
-      finish_times.put((error, time()-start_time))
+        finish_times.put((error, time() - start_time))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
+    parser.add_argument('-v',
+                        '--verbose',
+                        action="store_true",
+                        required=False,
+                        default=False,
                         help='Enable verbose output')
-    parser.add_argument('-u', '--url', type=str, required=False, default='localhost:8000',
-                        help='Inference server URL. Default is localhost:8000.')
-    parser.add_argument('-m', '--model', type=str, required=False, default='graphdef_busyop',
-                        help='Model to request for inference. Default is graphdef_busyop')
-    parser.add_argument('-c', '--count', type=int, required=False, default=1,
-                        help='Number of inference requests to send. Default is 1')
-    parser.add_argument('-n', '--delay', type=int, required=False, default=12000000,
-                        help='Number of cycles to perform the busyloop op. Default is 12000000')
-    parser.add_argument('-i', '--protocol', type=str, required=False, default='http',
-                        help='Protocol ("http"/"grpc") used to ' +
-                        'communicate with inference service. Default is "http".')
-    parser.add_argument('-H', dest='http_headers', metavar="HTTP_HEADER",
-                        required=False, action='append',
-                        help='HTTP headers to add to inference server requests. ' +
-                        'Format is -H"Header:Value".')
+    parser.add_argument(
+        '-u',
+        '--url',
+        type=str,
+        required=False,
+        default='localhost:8000',
+        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument(
+        '-m',
+        '--model',
+        type=str,
+        required=False,
+        default='graphdef_busyop',
+        help='Model to request for inference. Default is graphdef_busyop')
+    parser.add_argument(
+        '-c',
+        '--count',
+        type=int,
+        required=False,
+        default=1,
+        help='Number of inference requests to send. Default is 1')
+    parser.add_argument(
+        '-n',
+        '--delay',
+        type=int,
+        required=False,
+        default=12000000,
+        help='Number of cycles to perform the busyloop op. Default is 12000000'
+    )
+    parser.add_argument(
+        '-i',
+        '--protocol',
+        type=str,
+        required=False,
+        default='http',
+        help='Protocol ("http"/"grpc") used to ' +
+        'communicate with inference service. Default is "http".')
+    parser.add_argument(
+        '-H',
+        dest='http_headers',
+        metavar="HTTP_HEADER",
+        required=False,
+        action='append',
+        help='HTTP headers to add to inference server requests. ' +
+        'Format is -H"Header:Value".')
 
     FLAGS = parser.parse_args()
 
@@ -88,24 +124,26 @@ if __name__ == '__main__':
 
     # Create the inference context for the model.
     if FLAGS.protocol.lower() == "grpc":
-      triton_client = tritongrpcclient.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
-      inputs = [tritongrpcclient.InferInput('in', input_data.shape, "INT32")]
+        triton_client = tritongrpcclient.InferenceServerClient(
+            FLAGS.url, verbose=FLAGS.verbose)
+        inputs = [tritongrpcclient.InferInput('in', input_data.shape, "INT32")]
     else:
-      # Need to specify the correct concurrency for all the requests
-      # to be delivered to the server.
-      triton_client = tritonhttpclient.InferenceServerClient(FLAGS.url,
-                                                  verbose=FLAGS.verbose,
-                                                  concurrency=FLAGS.count)
-      inputs = [tritonhttpclient.InferInput('in', input_data.shape, "INT32")]
+        # Need to specify the correct concurrency for all the requests
+        # to be delivered to the server.
+        triton_client = tritonhttpclient.InferenceServerClient(
+            FLAGS.url, verbose=FLAGS.verbose, concurrency=FLAGS.count)
+        inputs = [tritonhttpclient.InferInput('in', input_data.shape, "INT32")]
 
     inputs[0].set_data_from_numpy(input_data)
 
-    # Send N inference requests to the inference server. Time the inference for both 
+    # Send N inference requests to the inference server. Time the inference for both
     # requests
     start_time = time()
 
     for i in range(FLAGS.count):
-        triton_client.async_infer(model_name, inputs, partial(completion_callback),
+        triton_client.async_infer(model_name,
+                                  inputs,
+                                  partial(completion_callback),
                                   model_version=model_version,
                                   request_id=str(i),
                                   headers=FLAGS.http_headers)
@@ -117,7 +155,7 @@ if __name__ == '__main__':
 
     while True:
         result, finish_time = finish_times.get()
-        
+
         if type(result) == InferenceServerException:
             print(result)
             sys.exit(1)
@@ -126,9 +164,10 @@ if __name__ == '__main__':
         else:
             request_id = int(result.get_response()["id"])
         finished_requests += 1
-        print("Request %d"%request_id + " finished in %f"%finish_time)
+        print("Request %d" % request_id + " finished in %f" % finish_time)
         max_completion_time = max(max_completion_time, finish_time)
         if (finished_requests == FLAGS.count):
             break
-    
-    print("Completion time for %d instances: %f secs"%(i+1, max_completion_time))
+
+    print("Completion time for %d instances: %f secs" %
+          (i + 1, max_completion_time))
