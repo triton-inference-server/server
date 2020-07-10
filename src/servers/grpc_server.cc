@@ -1729,8 +1729,6 @@ class InferHandlerState {
     InferHandlerStateType* WriteResponseIfReady(
         InferHandlerStateType* required_state)
     {
-      std::this_thread::sleep_for(
-            std::chrono::milliseconds(2000));
       std::lock_guard<std::mutex> lock(mu_);
       if (states_.empty()) {
         return nullptr;

@@ -206,16 +206,31 @@ main(int argc, char** argv)
         (v == 1) /* end-of-sequence */, index++);
   }
 
-  // Wait until all callbacks are invoked
-  {
-    std::unique_lock<std::mutex> lk(mutex_);
-    cv_.wait(lk, [&]() {
-      if (result_list.size() > (2 * values.size() + 1)) {
-        return true;
-      } else {
-        return false;
+  if (stream_timeout == 0) {
+    // Wait until all callbacks are invoked
+    {
+      std::unique_lock<std::mutex> lk(mutex_);
+      cv_.wait(lk, [&]() {
+        if (result_list.size() > (2 * values.size() + 1)) {
+          return true;
+        } else {
+          return false;
+        }
+      });
+    }
+  } else {
+    auto timeout = std::chrono::microseconds(stream_timeout);
+    // Wait until all callbacks are invoked or the timeout expires
+    {
+      std::unique_lock<std::mutex> lk(mutex_);
+      if (!cv_.wait_for(lk, timeout, [&]() {
+            return (result_list.size() > (2 * values.size() + 1));
+          })) {
+        std::cerr << "Stream has been closed"
+                  << std::endl;
+        exit(1);
       }
-    });
+    }
   }
 
   // Extract data from the result

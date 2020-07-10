@@ -159,7 +159,7 @@ class ClientTimeoutTest(unittest.TestCase):
         # value
         triton_client.stop_stream()
         triton_client.start_stream(callback=partial(callback, user_data),
-                                   stream_timeout=10)
+                                   stream_timeout=100)
 
         triton_client.async_stream_infer(model_name=self.model_name_,
                                          inputs=self.inputs_,
@@ -167,6 +167,8 @@ class ClientTimeoutTest(unittest.TestCase):
         data_item = user_data._completed_requests.get()
         triton_client.stop_stream()
 
+        if type(data_item) == InferenceServerException:
+            raise data_item
         output0_data = data_item.as_numpy('OUTPUT0')
         self.assertTrue(np.array_equal(self.input0_data_, output0_data))
 

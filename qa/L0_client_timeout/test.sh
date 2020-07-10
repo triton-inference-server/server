@@ -144,7 +144,7 @@ for i in simple_grpc_infer_client \
     simple_http_async_infer_client \
    ; do
    echo "TEST:  $i" >> ${CLIENT_LOG}
-   ../clients/$i -v -t 10000 >> ${CLIENT_LOG} 2>&1
+   ../clients/$i -v -t 100000000 >> ${CLIENT_LOG} 2>&1
    if [ $? -ne 0 ]; then
         RET=1
     fi
