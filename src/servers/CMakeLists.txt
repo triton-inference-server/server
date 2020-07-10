@@ -394,6 +394,7 @@ if(${TRITON_ENABLE_CAFFE2} OR ${TRITON_ENABLE_PYTORCH})
     PUBLIC -ltorch
     PUBLIC -ltorch_cpu
     PUBLIC -ltorch_cuda
+    PUBLIC -ltorchvision
     PUBLIC -lcaffe2_detectron_ops_gpu
     PUBLIC -lcaffe2_nvrtc
     PUBLIC -lc10

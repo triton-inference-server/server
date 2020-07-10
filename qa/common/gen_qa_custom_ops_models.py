@@ -346,6 +346,62 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
+# Use Torchvision ops
+def create_visionop_modelfile(models_dir, model_version):
+    model_name = "libtorch_visionop"
+    
+    class CustomVisionNet(nn.Module):
+        def __init__(self):
+            super(CustomVisionNet, self).__init__()
+            self.conv2 = ops.misc.ConvTranspose2d(16, 33, (3, 5))
+        def forward(self, input0):
+            return self.conv2(input0)
+
+    moduloCustomModel = CustomVisionNet()
+    example_input0 = torch.rand(1, 16, 10, 10, dtype=torch.float32)
+    traced = torch.jit.trace(moduloCustomModel, (example_input0,))
+
+    model_version_dir = models_dir + "/" + \
+        model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    traced.save(model_version_dir + "/model.pt")
+
+
+def create_visionop_modelconfig(models_dir, model_version):
+    model_name = "libtorch_visionop"
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "pytorch_libtorch"
+max_batch_size: 0
+input [
+  {{
+    name: "INPUT__0"
+    data_type: TYPE_FP32
+    dims: [ 1, 16, 10, 10 ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT__0"
+    data_type: TYPE_FP32
+    dims: [1, 33, 12, 14]
+  }}
+]
+'''.format(model_name)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
 
 def create_zero_out_models(models_dir):
     model_version = 1
@@ -436,5 +492,6 @@ if __name__ == '__main__':
     if FLAGS.libtorch:
         import torch
         from torch import nn
+        from torchvision import ops
         import torch.utils.cpp_extension
         create_modulo_op_models(FLAGS.models_dir)
