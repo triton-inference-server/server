@@ -2444,6 +2444,38 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   RETURN_IF_ERR(response_json.AddString(
       "model_version", std::move(std::to_string(model_version))));
 
+  // If the response has any parameters, convert them to JSON.
+  uint32_t parameter_count;
+  RETURN_IF_ERR(
+      TRITONSERVER_InferenceResponseParameterCount(response, &parameter_count));
+  if (parameter_count > 0) {
+    TritonJson::Value params_json(response_json, TritonJson::ValueType::OBJECT);
+
+    for (uint32_t pidx = 0; pidx < parameter_count; ++pidx) {
+      const char* name;
+      TRITONSERVER_ParameterType type;
+      const void* vvalue;
+      RETURN_IF_ERR(TRITONSERVER_InferenceResponseParameter(
+          response, pidx, &name, &type, &vvalue));
+      switch (type) {
+        case TRITONSERVER_PARAMETER_BOOL:
+          RETURN_IF_ERR(params_json.AddBool(
+              name, *(reinterpret_cast<const bool*>(vvalue))));
+          break;
+        case TRITONSERVER_PARAMETER_INT:
+          RETURN_IF_ERR(params_json.AddInt(
+              name, *(reinterpret_cast<const int64_t*>(vvalue))));
+          break;
+        case TRITONSERVER_PARAMETER_STRING:
+          RETURN_IF_ERR(params_json.AddStringRef(
+              name, reinterpret_cast<const char*>(vvalue)));
+          break;
+      }
+    }
+
+    RETURN_IF_ERR(response_json.Add("parameters", std::move(params_json)));
+  }
+
   // Go through each response output and transfer information to JSON
   uint32_t output_count;
   RETURN_IF_ERR(

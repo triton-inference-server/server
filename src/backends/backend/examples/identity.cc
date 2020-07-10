@@ -486,6 +486,21 @@ ModelInstance::ExecuteThread()
         }
       }
 
+      // To demonstrate response parameters we attach some here. Most
+      // responses do not use parameters but they provide a way for
+      // backends to communicate arbitrary information along with the
+      // response.
+      LOG_IF_ERROR(
+          TRITONBACKEND_ResponseSetStringParameter(
+              responses[r], "param0", "an example string parameter"),
+          "failed setting string parameter");
+      LOG_IF_ERROR(
+          TRITONBACKEND_ResponseSetIntParameter(responses[r], "param1", 42),
+          "failed setting integer parameter");
+      LOG_IF_ERROR(
+          TRITONBACKEND_ResponseSetBoolParameter(responses[r], "param2", false),
+          "failed setting boolean parameter");
+
       // If we get to this point then there hasn't been any error and
       // the response is complete and we can send it. This is the last
       // (and only) response that we are sending for the request so we
