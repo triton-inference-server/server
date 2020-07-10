@@ -24,16 +24,76 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "square_int32"
-backend: "square"
+name: "fan_repeat"
 max_batch_size: 0
-model_transaction_policy {
-  decoupled: True
+platform: "ensemble"
+ensemble_scheduling {
+  step [
+    {
+      model_name: "repeat_int32"
+      model_version: -1
+      input_map {
+        key: "IN"
+        value: "IN"
+      }
+      input_map {
+        key: "DELAY"
+        value: "DELAY"
+      }
+      input_map {
+        key: "WAIT"
+        value: "WAIT"
+      }
+      output_map {
+        key: "OUT"
+        value: "repeat_out"
+      }
+    },
+    {
+      model_name: "identity_int32"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "repeat_out"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "identity_out"
+      }
+    },
+    {
+      model_name: "custom_nobatch_int32_int32_int32"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "repeat_out"
+      }
+      input_map {
+        key: "INPUT1"
+        value: "identity_out"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "OUT"
+      }
+
+    }
+  ]
 }
 input [
   {
     name: "IN"
     data_type: TYPE_INT32
+    dims: [ -1 ]
+  },
+  {
+    name: "DELAY"
+    data_type: TYPE_UINT32
+    dims: [ -1 ]
+  },
+  {
+    name: "WAIT"
+    data_type: TYPE_UINT32
     dims: [ 1 ]
   }
 ]

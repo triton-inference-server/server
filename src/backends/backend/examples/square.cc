@@ -285,7 +285,7 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request)
                    request, "IN", reinterpret_cast<char*>(in_buffer.data()),
                    &in_byte_size));
 
-  if ((in_dims_count == 2) && (in_buffer[0] != 1)) {
+  if ((in_dims_count == 2) && (in_shape[0] != 1)) {
     RESPOND_AND_RETURN_IF_ERROR(
         request,
         TRITONSERVER_ErrorNew(
