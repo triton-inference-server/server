@@ -196,7 +196,8 @@ struct InferOptions {
   // The maximum end-to-end time, in microseconds, the request is allowed
   // to take. Note the HTTP library only offer the precision upto
   // milliseconds. The client will abort request when the specified time
-  // elapses. The default value is 0 which means client will wait for the
+  // elapses. The request will return error with message "Deadline Exceeded".
+  // The default value is 0 which means client will wait for the
   // response from the server. This option is not supported for streaming
   // requests. Instead see 'stream_timeout' argument in
   // InferenceServerGrpcClient::StartStream().

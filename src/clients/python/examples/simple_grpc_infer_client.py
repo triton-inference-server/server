@@ -53,7 +53,7 @@ if __name__ == '__main__':
                         help='Inference server URL. Default is localhost:8001.')
     parser.add_argument('-t',
                         '--client-timeout',
-                        type=int,
+                        type=float,
                         required=False,
                         default=None,
                         help='Client timeout in seconds. Default is None.')

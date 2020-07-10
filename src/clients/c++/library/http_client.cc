@@ -637,21 +637,25 @@ InferResultHttp::InferResultHttp(
     : infer_request_(infer_request)
 {
   size_t offset = infer_request->response_json_size_;
-  if (offset != 0) {
-    if (infer_request->verbose_) {
-      std::cout << "inference response: "
-                << infer_request->infer_response_buffer_->substr(0, offset)
-                << std::endl;
-    }
-    status_ = response_json_.Parse(
-        (char*)infer_request->infer_response_buffer_.get()->c_str(), offset);
+  if (infer_request->http_code_ == 499) {
+    status_ = Error("Deadline Exceeded");
   } else {
-    if (infer_request->verbose_) {
-      std::cout << "inference response: "
-                << *infer_request->infer_response_buffer_ << std::endl;
+    if (offset != 0) {
+      if (infer_request->verbose_) {
+        std::cout << "inference response: "
+                  << infer_request->infer_response_buffer_->substr(0, offset)
+                  << std::endl;
+      }
+      status_ = response_json_.Parse(
+          (char*)infer_request->infer_response_buffer_.get()->c_str(), offset);
+    } else {
+      if (infer_request->verbose_) {
+        std::cout << "inference response: "
+                  << *infer_request->infer_response_buffer_ << std::endl;
+      }
+      status_ = response_json_.Parse(
+          (char*)infer_request->infer_response_buffer_.get()->c_str());
     }
-    status_ = response_json_.Parse(
-        (char*)infer_request->infer_response_buffer_.get()->c_str());
   }
 
   // There should be a valid JSON response in all cases. Either the
@@ -1081,11 +1085,10 @@ InferenceServerHttpClient::Infer(
   // During this call SEND_END (except in above case), RECV_START, and
   // RECV_END will be set.
   auto curl_status = curl_easy_perform(easy_handle_);
-  if (curl_status != CURLE_OK) {
+  if (curl_status == CURLE_OPERATION_TIMEDOUT) {
+    sync_request->http_code_ = 499;
+  } else if (curl_status != CURLE_OK) {
     sync_request->http_code_ = 400;
-    if (curl_status == CURLE_OPERATION_TIMEDOUT) {
-      std::cerr << "Request timedout..." << std::endl;
-    }
   } else {
     curl_easy_getinfo(
         easy_handle_, CURLINFO_RESPONSE_CODE, &sync_request->http_code_);
@@ -1366,7 +1369,7 @@ InferenceServerHttpClient::AsyncTransfer()
       if (msg->data.result == CURLE_OK) {
         curl_easy_getinfo(msg->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
       } else if (msg->data.result == CURLE_OPERATION_TIMEDOUT) {
-        std::cerr << "Request timedout..." << std::endl;
+        http_code = 499;
       }
 
       request_list.emplace_back(itr->second);

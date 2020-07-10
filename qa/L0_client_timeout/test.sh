@@ -39,11 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-SIMPLE_GRPC_ASYNC_INFER=../clients/simple_grpc_async_infer_client
-SIMPLE_GRPC_ASYNC_STREAM_INFER=../clients/simple_grpc_sequence_stream_infer_client
-
-SIMPLE_HTTP_INFER=../clients/simple_http_infer_client
-SIMPLE_HTTP_ASYNC_INFER=../clients/simple_http_async_infer_client
+CLIENT_TIMEOUT_TEST=client_timeout_test.py
 
 rm -f *.log
 rm -f *.log.*
@@ -53,6 +49,9 @@ DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
+
+mkdir -p $DATADIR/custom_identity_int32/1
+cp libidentity.so $DATADIR/custom_identity_int32/1/.
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -107,7 +106,7 @@ $CLIENT -t 1000 -v >> ${CLIENT_LOG}.c++.http_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
-if [ `grep -c "Request timedout..." ${CLIENT_LOG}.c++.http_infer` == "0" ]; then
+if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.http_infer` == "0" ]; then
     cat ${CLIENT_LOG}.c++.http_infer
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -120,7 +119,7 @@ $CLIENT -t 1000 -v >> ${CLIENT_LOG}.c++.http_async_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
-if [ `grep -c "Request timedout..." ${CLIENT_LOG}.c++.http_async_infer` == "0" ]; then
+if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.http_async_infer` == "0" ]; then
     cat ${CLIENT_LOG}.c++.http_async_infer
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -137,7 +136,6 @@ fi
 
 
 # CASE 2: Provide sufficiently large timeout value
-
 set +e
 for i in simple_grpc_infer_client \
     simple_grpc_async_infer_client \
@@ -149,6 +147,24 @@ for i in simple_grpc_infer_client \
    ../clients/$i -v -t 10000 >> ${CLIENT_LOG} 2>&1
    if [ $? -ne 0 ]; then
         RET=1
+    fi
+done
+
+echo "TEST:  Python Library" >> ${CLIENT_LOG}
+
+# CASE 3: Python Library
+
+for i in test_grpc_infer \
+    test_grpc_async_infer \
+    test_grpc_stream_infer \
+    test_http_infer \
+    test_http_async_infer \
+   ; do
+    python $CLIENT_TIMEOUT_TEST ClientTimeoutTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+            echo -e "\n***\n*** Test $i Failed\n***"
+            RET=1
     fi
 done
 

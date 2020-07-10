@@ -191,6 +191,8 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_cmdline_trace/. && \
     cp builddir/custom-backend/install/lib/libidentity.so \
         qa/L0_batcher/. && \
+    cp builddir/custom-backend/install/lib/libidentity.so \
+        qa/L0_client_timeout/. && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_infer_cudashm && \
