@@ -1000,9 +1000,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response);
 
-    void IncrementResponseCount();
-
-    uint32_t GetResponseCount() { return response_count_; }
+    uint32_t IncrementResponseCount();
 
 #ifdef TRITON_ENABLE_TRACING
     TraceManager* trace_manager_;
@@ -1022,7 +1020,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     evthr_t* thread_;
 
     // Counter to keep track of number of responses generated.
-    uint32_t response_count_;
+    std::atomic<uint32_t> response_count_;
   };
 
  private:
@@ -2389,7 +2387,7 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
 
-  infer_request->IncrementResponseCount();
+  auto response_count = infer_request->IncrementResponseCount();
 
   // Defer to the callback with the final response
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
@@ -2397,14 +2395,12 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
     return;
   }
 
-  auto response_count = infer_request->GetResponseCount();
-
   TRITONSERVER_Error* err = nullptr;
-  if (response_count != 1) {
+  if (response_count != 0) {
     err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         std::string(
-            "expected a single response, got " + std::to_string(response_count))
+            "expected a single response, got " + std::to_string(response_count + 1))
             .c_str());
   } else if (response == nullptr) {
     err = TRITONSERVER_ErrorNew(
@@ -2625,10 +2621,10 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   return nullptr;  // success
 }
 
-void
+uint32_t
 HTTPAPIServer::InferRequestClass::IncrementResponseCount()
 {
-  response_count_++;
+  return response_count_++;
 }
 
 TRITONSERVER_Error*
