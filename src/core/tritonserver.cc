@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
+#include "src/core/infer_parameter.h"
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
 #include "src/core/infer_stats.h"
@@ -374,6 +375,26 @@ TRITONSERVER_MemoryTypeString(TRITONSERVER_MemoryType memtype)
       return "CPU_PINNED";
     case TRITONSERVER_MEMORY_GPU:
       return "GPU";
+    default:
+      break;
+  }
+
+  return "<invalid>";
+}
+
+//
+// TRITONSERVER_ParameterType
+//
+const char*
+TRITONSERVER_ParameterTypeString(TRITONSERVER_ParameterType paramtype)
+{
+  switch (paramtype) {
+    case TRITONSERVER_PARAMETER_STRING:
+      return "STRING";
+    case TRITONSERVER_PARAMETER_INT:
+      return "INT";
+    case TRITONSERVER_PARAMETER_BOOL:
+      return "BOOL";
     default:
       break;
   }
@@ -1247,6 +1268,45 @@ TRITONSERVER_InferenceResponseId(
       reinterpret_cast<ni::InferenceResponse*>(inference_response);
 
   *request_id = lresponse->Id().c_str();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseParameterCount(
+    TRITONSERVER_InferenceResponse* inference_response, uint32_t* count)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  const auto& parameters = lresponse->Parameters();
+  *count = parameters.size();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseParameter(
+    TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
+    const char** name, TRITONSERVER_ParameterType* type, const void** vvalue)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  const auto& parameters = lresponse->Parameters();
+  if (index >= parameters.size()) {
+    return TritonServerError::Create(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "out of bounds index " + std::to_string(index) +
+            std::string(": response has ") + std::to_string(parameters.size()) +
+            " parameters");
+  }
+
+  const ni::InferenceParameter& param = parameters[index];
+
+  *name = param.Name().c_str();
+  *type = param.Type();
+  *vvalue = param.ValuePointer();
 
   return nullptr;  // Success
 }

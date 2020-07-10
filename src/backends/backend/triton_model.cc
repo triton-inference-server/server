@@ -560,6 +560,45 @@ TRITONBACKEND_ResponseDelete(TRITONBACKEND_Response* response)
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_ResponseSetStringParameter(
+    TRITONBACKEND_Response* response, const char* name, const char* value)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+  Status status = tr->AddParameter(name, value);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseSetIntParameter(
+    TRITONBACKEND_Response* response, const char* name, const int64_t value)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+  Status status = tr->AddParameter(name, value);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseSetBoolParameter(
+    TRITONBACKEND_Response* response, const char* name, const bool value)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+  Status status = tr->AddParameter(name, value);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_ResponseOutput(
     TRITONBACKEND_Response* response, TRITONBACKEND_Output** output,
     const char* name, const TRITONSERVER_DataType datatype,

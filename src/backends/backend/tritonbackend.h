@@ -328,6 +328,34 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseNewFromFactory(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseDelete(
     TRITONBACKEND_Response* response);
 
+/// Set a string parameter in the response.
+///
+/// \param response The response.
+/// \param name The name of the parameter.
+/// \param value The value of the parameter.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error*
+TRITONBACKEND_ResponseSetStringParameter(
+    TRITONBACKEND_Response* response, const char* name, const char* value);
+
+/// Set an integer parameter in the response.
+///
+/// \param response The response.
+/// \param name The name of the parameter.
+/// \param value The value of the parameter.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSetIntParameter(
+    TRITONBACKEND_Response* response, const char* name, const int64_t value);
+
+/// Set an boolean parameter in the response.
+///
+/// \param response The response.
+/// \param name The name of the parameter.
+/// \param value The value of the parameter.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSetBoolParameter(
+    TRITONBACKEND_Response* response, const char* name, const bool value);
+
 /// Create an output tensor in the response. The lifetime of the
 /// returned output tensor object matches that of the response and so
 /// the output tensor object should not be accessed after the response
