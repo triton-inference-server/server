@@ -161,6 +161,7 @@ ARG TRITON_CONTAINER_VERSION=20.08dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
+# python3-dev is needed by Torchvision
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -176,6 +177,7 @@ RUN apt-get update && \
             rapidjson-dev \
             libb64-dev \
             patchelf \
+            python3-dev \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
@@ -224,7 +226,7 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/triton
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tritonserver/lib/pytorch/
 
-# LibTorch headers and libraries
+# LibTorch and Torchvision headers and libraries
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
      /opt/tritonserver/include/torch
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
@@ -235,6 +237,10 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/li
       /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
      /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/pytorch/vision/torchvision/csrc \
+    /opt/tritonserver/include/torchvision/torchvision/
+COPY --from=tritonserver_pytorch /opt/pytorch/vision/build/libtorchvision.so \
+    /opt/tritonserver/lib/pytorch/
 RUN cd /opt/tritonserver/lib/pytorch && \
     for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
@@ -330,7 +336,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_PYTORCH=ON \
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
-                  -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch" \
+                  -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
                   -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
                   ../build && \
             make -j16 server && \
@@ -370,6 +376,10 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
+
+# Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom 
+# ops from that path
+ENV LD_LIBRARY_PATH /opt/tritonserver/lib/pytorch/:$LD_LIBRARY_PATH
 
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
