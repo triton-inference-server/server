@@ -55,8 +55,8 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
 
     try:
-        triton_client = tritongrpcclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose)
+        triton_client = tritongrpcclient.InferenceServerClient(
+            url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit(1)

@@ -32,15 +32,19 @@ import os
 
 
 class FuzzTest(unittest.TestCase):
-    def _run_fuzz(self, url, logger):
-        session = Session(target=Target(
-            connection=TCPSocketConnection("127.0.0.1", 8000)),
-            fuzz_loggers=logger, keep_web_open=False)
 
-        s_initialize(name="Request"+url)
+    def _run_fuzz(self, url, logger):
+        session = Session(
+            target=Target(connection=TCPSocketConnection("127.0.0.1", 8000)),
+            fuzz_loggers=logger,
+            keep_web_open=False)
+
+        s_initialize(name="Request" + url)
         with s_block("Request-Line"):
-            s_group("Method", ["GET", "HEAD", "POST", "PUT",
-                               "DELETE", "CONNECT", "OPTIONS", "TRACE"])
+            s_group("Method", [
+                "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS",
+                "TRACE"
+            ])
             s_delim(" ", name="space-1")
             s_string(url, name="Request-URI")
             s_delim(" ", name="space-2")
@@ -48,20 +52,24 @@ class FuzzTest(unittest.TestCase):
             s_static("\r\n", name="Request-Line-CRLF")
         s_static("\r\n", "Request-CRLF")
 
-        session.connect(s_get("Request"+url))
+        session.connect(s_get("Request" + url))
         session.fuzz()
 
     def test_failures_from_db(self):
-        url_list = ["/v2", "/v2/models/simple", "/v2/models/simple/infer",
-                    "/v2/models/simple/versions/v1", "/v2/models/simple/config", 
-                    "/v2/models/simple/stats", "/v2/models/simple/ready", 
-                    "/v2/health/ready", "/v2/health/live",
-                    "/v2/repository/index", "/v2/repository/models/simple/unload",
-                    "/v2/repository/models/simple/load", 
-                    "/v2/systemsharedmemory/status", "/v2/systemsharedmemory/register",
-                    "/v2/systemsharedmemory/unregister", "/v2/systemsharedmemory/region/xx/status",
-                    "/v2/cudasharedmemory/status", "/v2/cudasharedmemory/register",
-                    "/v2/cudasharedmemory/unregister", "/v2/cudasharedmemory/region/xx/status"]
+        url_list = [
+            "/v2", "/v2/models/simple", "/v2/models/simple/infer",
+            "/v2/models/simple/versions/v1", "/v2/models/simple/config",
+            "/v2/models/simple/stats", "/v2/models/simple/ready",
+            "/v2/health/ready", "/v2/health/live", "/v2/repository/index",
+            "/v2/repository/models/simple/unload",
+            "/v2/repository/models/simple/load",
+            "/v2/systemsharedmemory/status", "/v2/systemsharedmemory/register",
+            "/v2/systemsharedmemory/unregister",
+            "/v2/systemsharedmemory/region/xx/status",
+            "/v2/cudasharedmemory/status", "/v2/cudasharedmemory/register",
+            "/v2/cudasharedmemory/unregister",
+            "/v2/cudasharedmemory/region/xx/status"
+        ]
 
         csv_log = open('fuzz_results.csv', 'w')
         logger = [FuzzLoggerCsv(file_handle=csv_log)]
@@ -77,8 +85,11 @@ class FuzzTest(unittest.TestCase):
             c = conn.cursor()
 
             # Get number of failures, should be 0
-            self.assertEqual(len([x for x in c.execute(
-                "SELECT * FROM steps WHERE type=\"fail\"")]), 0)
+            self.assertEqual(
+                len([
+                    x for x in c.execute(
+                        "SELECT * FROM steps WHERE type=\"fail\"")
+                ]), 0)
 
 
 if __name__ == "__main__":

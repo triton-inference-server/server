@@ -40,9 +40,12 @@ import tritongrpcclient as grpcclient
 import tritonshmutils.shared_memory as shm
 import tritonshmutils.cuda_shared_memory as cudashm
 
-TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
-BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
+TEST_SYSTEM_SHARED_MEMORY = bool(
+    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
+                                                  0)))
+BACKENDS = os.environ.get(
+    'BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
 
 _trials = BACKENDS.split(" ")
 if "custom" in BACKENDS:
@@ -55,7 +58,9 @@ _max_queue_delay_ms = 10000
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
+
 class BatcherTest(unittest.TestCase):
+
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
         self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
@@ -74,18 +79,23 @@ class BatcherTest(unittest.TestCase):
             destroy_fun(precreated_shm_region)
 
     # FIXME why only used for outputs
-    def create_advance(self, shm_regions = None):
+    def create_advance(self, shm_regions=None):
         if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
             precreated_shm_regions = []
             if shm_regions is None:
-                shm_regions = ['output0','output1']
+                shm_regions = ['output0', 'output1']
             for shm_region in shm_regions:
                 if TEST_SYSTEM_SHARED_MEMORY:
-                    shm_handle = shm.create_shared_memory_region(shm_region +'_data', '/'+ shm_region, 512)
-                    self.triton_client_.register_system_shared_memory(shm_region +'_data', '/'+ shm_region, 512)
+                    shm_handle = shm.create_shared_memory_region(
+                        shm_region + '_data', '/' + shm_region, 512)
+                    self.triton_client_.register_system_shared_memory(
+                        shm_region + '_data', '/' + shm_region, 512)
                 else:
-                    shm_handle = cudashm.create_shared_memory_region(shm_region +'_data', 512, 0)
-                    self.triton_client_.register_cuda_shared_memory(shm_region +'_data', cudashm.get_raw_handle(shm_handle), 0, 512)
+                    shm_handle = cudashm.create_shared_memory_region(
+                        shm_region + '_data', 512, 0)
+                    self.triton_client_.register_cuda_shared_memory(
+                        shm_region + '_data',
+                        cudashm.get_raw_handle(shm_handle), 0, 512)
                 # Collect precreated handles for cleanup
                 self.precreated_shm_regions_.append(shm_handle)
                 precreated_shm_regions.append(shm_handle)
@@ -103,9 +113,14 @@ class BatcherTest(unittest.TestCase):
             if len(_deferred_exceptions) > 0:
                 raise _deferred_exceptions[0]
 
-    def check_response(self, trial, bs, thresholds,
-                       requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16,
-                       shm_region_names=None, precreated_shm_regions=None):
+    def check_response(self,
+                       trial,
+                       bs,
+                       thresholds,
+                       requested_outputs=("OUTPUT0", "OUTPUT1"),
+                       input_size=16,
+                       shm_region_names=None,
+                       precreated_shm_regions=None):
         try:
             start_ms = int(round(time.time() * 1000))
 
@@ -113,15 +128,25 @@ class BatcherTest(unittest.TestCase):
                     or trial == "custom" or trial == "libtorch" or trial == "onnx" \
                     or trial == "plan":
                 tensor_shape = (bs, input_size)
-                iu.infer_exact(self, trial, tensor_shape, bs,
-                               np.float32, np.float32, np.float32, swap=False,
-                               model_version=1, outputs=requested_outputs,
-                               use_http_json_tensors=False,
-                               use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False, shm_region_names=shm_region_names,
-                               precreated_shm_regions=precreated_shm_regions,
-                               use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                               use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                iu.infer_exact(
+                    self,
+                    trial,
+                    tensor_shape,
+                    bs,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=1,
+                    outputs=requested_outputs,
+                    use_http_json_tensors=False,
+                    use_grpc=False,
+                    skip_request_id_check=True,
+                    use_streaming=False,
+                    shm_region_names=shm_region_names,
+                    precreated_shm_regions=precreated_shm_regions,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
 
@@ -130,13 +155,15 @@ class BatcherTest(unittest.TestCase):
             lt_ms = thresholds[0]
             gt_ms = thresholds[1]
             if lt_ms is not None:
-                self.assertTrue((end_ms - start_ms) < lt_ms,
-                                "expected less than " + str(lt_ms) +
-                                "ms response time, got " + str(end_ms - start_ms) + " ms")
+                self.assertTrue(
+                    (end_ms - start_ms) < lt_ms,
+                    "expected less than " + str(lt_ms) +
+                    "ms response time, got " + str(end_ms - start_ms) + " ms")
             if gt_ms is not None:
-                self.assertTrue((end_ms - start_ms) > gt_ms,
-                                "expected greater than " + str(gt_ms) +
-                                "ms response time, got " + str(end_ms - start_ms) + " ms")
+                self.assertTrue(
+                    (end_ms - start_ms) > gt_ms,
+                    "expected greater than " + str(gt_ms) +
+                    "ms response time, got " + str(end_ms - start_ms) + " ms")
         except Exception as ex:
             self.add_deferred_exception(ex)
 
@@ -146,46 +173,52 @@ class BatcherTest(unittest.TestCase):
         bconfig = config.dynamic_batching
         self.assertTrue(2 in bconfig.preferred_batch_size)
         self.assertTrue(6 in bconfig.preferred_batch_size)
-        self.assertEqual(bconfig.max_queue_delay_microseconds, _max_queue_delay_ms * 1000) # 10 secs
+        self.assertEqual(bconfig.max_queue_delay_microseconds,
+                         _max_queue_delay_ms * 1000)  # 10 secs
 
     def check_status(self, model_name, batch_exec, request_cnt, infer_cnt):
         stats = self.triton_client_.get_inference_statistics(model_name, "1")
         self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
         self.assertEqual(stats.model_stats[0].name, model_name,
                          "expect model stats for model {}".format(model_name))
-        self.assertEqual(stats.model_stats[0].version, "1",
-                         "expect model stats for model {} version 1".format(model_name))
+        self.assertEqual(
+            stats.model_stats[0].version, "1",
+            "expect model stats for model {} version 1".format(model_name))
 
         batch_stats = stats.model_stats[0].batch_stats
-        self.assertEqual(len(batch_stats), len(batch_exec),
-                          "expected {} different batch-sizes, got {}".format(
-                                 len(batch_exec), len(batch_stats)))
+        self.assertEqual(
+            len(batch_stats), len(batch_exec),
+            "expected {} different batch-sizes, got {}".format(
+                len(batch_exec), len(batch_stats)))
 
         for batch_stat in batch_stats:
-             bs = batch_stat.batch_size
-             bc = batch_stat.compute_infer.count
-             self.assertTrue(bs in batch_exec,
-                             "unexpected batch-size {}".format(bs))
-             # Get count from one of the stats
-             self.assertEqual(bc, batch_exec[bs],
-                             "expected model-execution-count {} for batch size {}, got {}".format(
-                                     batch_exec[bs], bs, bc))
-        
+            bs = batch_stat.batch_size
+            bc = batch_stat.compute_infer.count
+            self.assertTrue(bs in batch_exec,
+                            "unexpected batch-size {}".format(bs))
+            # Get count from one of the stats
+            self.assertEqual(
+                bc, batch_exec[bs],
+                "expected model-execution-count {} for batch size {}, got {}".
+                format(batch_exec[bs], bs, bc))
+
         actual_request_cnt = stats.model_stats[0].inference_stats.success.count
-        self.assertEqual(actual_request_cnt, request_cnt,
-                        "expected model-request-count {}, got {}".format(
-                                request_cnt, actual_request_cnt))
+        self.assertEqual(
+            actual_request_cnt, request_cnt,
+            "expected model-request-count {}, got {}".format(
+                request_cnt, actual_request_cnt))
 
         actual_exec_cnt = stats.model_stats[0].execution_count
-        self.assertEqual(actual_request_cnt, request_cnt,
-                        "expected model-exec-count {}, got {}".format(
-                                request_cnt, actual_exec_cnt))
-        
-        actual_infer_cnt = stats.model_stats[0].inference_count
-        self.assertEqual(actual_infer_cnt, infer_cnt,
-                         "expected model-inference-count {}, got {}".format(
-                                 infer_cnt, actual_infer_cnt))
+        self.assertEqual(
+            actual_request_cnt, request_cnt,
+            "expected model-exec-count {}, got {}".format(
+                request_cnt, actual_exec_cnt))
 
+        actual_infer_cnt = stats.model_stats[0].inference_count
+        self.assertEqual(
+            actual_infer_cnt, infer_cnt,
+            "expected model-inference-count {}, got {}".format(
+                infer_cnt, actual_infer_cnt))
 
     def test_static_batch_preferred(self):
         # Send two requests with static batch sizes == preferred
@@ -194,13 +227,20 @@ class BatcherTest(unittest.TestCase):
         precreated_shm_regions = self.create_advance()
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 2, (3000, None), precreated_shm_regions=precreated_shm_regions)
-                self.check_response(trial, 6, (3000, None), precreated_shm_regions=precreated_shm_regions)
+                self.check_response(
+                    trial,
+                    2, (3000, None),
+                    precreated_shm_regions=precreated_shm_regions)
+                self.check_response(
+                    trial,
+                    6, (3000, None),
+                    precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
                 self.check_status(model_name, {2: 1, 6: 1}, 2, 8)
             except Exception as ex:
@@ -213,13 +253,16 @@ class BatcherTest(unittest.TestCase):
         precreated_shm_regions = self.create_advance()
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
-                                    precreated_shm_regions=precreated_shm_regions)
+                self.check_response(
+                    trial,
+                    1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                    precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
                 self.check_status(model_name, {1: 1}, 1, 1)
             except Exception as ex:
@@ -232,13 +275,16 @@ class BatcherTest(unittest.TestCase):
         precreated_shm_regions = self.create_advance()
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
-                                    precreated_shm_regions=precreated_shm_regions)
+                self.check_response(
+                    trial,
+                    3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                    precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
                 self.check_status(model_name, {3: 1}, 1, 3)
             except Exception as ex:
@@ -251,12 +297,16 @@ class BatcherTest(unittest.TestCase):
         precreated_shm_regions = self.create_advance()
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 7, (3000, None), precreated_shm_regions=precreated_shm_regions)
+                self.check_response(
+                    trial,
+                    7, (3000, None),
+                    precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
                 self.check_status(model_name, {7: 1}, 1, 7)
             except Exception as ex:
@@ -276,16 +326,24 @@ class BatcherTest(unittest.TestCase):
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=iu.infer_zero,
-                                                args=(self, trial, 1, dtype, ([1, 16],), ([1, 16],)),
-                                                kwargs={'use_grpc': False,
-                                                'use_http_json_tensors': False,
-                                                'use_streaming': False}))
-                threads.append(threading.Thread(target=iu.infer_zero,
-                                                args=(self, trial, 1, dtype, ([1, 8],), ([1, 8],)),
-                                                kwargs={'use_grpc': False,
-                                                'use_http_json_tensors': False,
-                                                'use_streaming': False}))
+                threads.append(
+                    threading.Thread(target=iu.infer_zero,
+                                     args=(self, trial, 1, dtype, ([1, 16],),
+                                           ([1, 16],)),
+                                     kwargs={
+                                         'use_grpc': False,
+                                         'use_http_json_tensors': False,
+                                         'use_streaming': False
+                                     }))
+                threads.append(
+                    threading.Thread(target=iu.infer_zero,
+                                     args=(self, trial, 1, dtype, ([1, 8],),
+                                           ([1, 8],)),
+                                     kwargs={
+                                         'use_grpc': False,
+                                         'use_http_json_tensors': False,
+                                         'use_streaming': False
+                                     }))
                 threads[0].start()
                 threads[1].start()
                 for t in threads:
@@ -312,23 +370,32 @@ class BatcherTest(unittest.TestCase):
         precreated_shm1_regions = self.create_advance(['op10', 'op11'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'input_size': 16,
-                                                'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1,
-                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'input_size': 8,
-                                                'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'input_size': 16,
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms)),
+                        kwargs={
+                            'input_size': 8,
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -355,22 +422,31 @@ class BatcherTest(unittest.TestCase):
         precreated_shm1_regions = self.create_advance(['op10', 'op11'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1,
-                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3,
-                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms - 2000)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 3, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms - 2000)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -400,26 +476,39 @@ class BatcherTest(unittest.TestCase):
         precreated_shm2_regions = self.create_advance(['op20', 'op21'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (6000, None)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1,
-                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'input_size': 8,
-                                                'shm_region_names': shm2_region_names,
-                                                'precreated_shm_regions': precreated_shm2_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 3, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms)),
+                        kwargs={
+                            'input_size': 8,
+                            'shm_region_names': shm2_region_names,
+                            'precreated_shm_regions': precreated_shm2_regions
+                        }))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -430,9 +519,6 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(model_name, {1: 1, 4: 1}, 3, 5)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-
-
-
 
     def test_multi_batch_preferred_different_shape(self):
         # Send two requests with total static batch size in between
@@ -458,30 +544,47 @@ class BatcherTest(unittest.TestCase):
         precreated_shm3_regions = self.create_advance(['op30', 'op31'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (6000, None)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'input_size': 8,
-                                                'shm_region_names': shm2_region_names,
-                                                'precreated_shm_regions': precreated_shm2_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 5, (6000, None)),
-                                                kwargs={'input_size': 8,
-                                                'shm_region_names': shm3_region_names,
-                                                'precreated_shm_regions': precreated_shm3_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 3, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'input_size': 8,
+                            'shm_region_names': shm2_region_names,
+                            'precreated_shm_regions': precreated_shm2_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 5, (6000, None)),
+                        kwargs={
+                            'input_size': 8,
+                            'shm_region_names': shm3_region_names,
+                            'precreated_shm_regions': precreated_shm3_regions
+                        }))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -510,20 +613,29 @@ class BatcherTest(unittest.TestCase):
         precreated_shm1_regions = self.create_advance(['op10', 'op11'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (3000, None)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 7, (3000, None)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 3, (3000, None)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 7, (3000, None)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -553,21 +665,30 @@ class BatcherTest(unittest.TestCase):
         precreated_shm1_regions = self.create_advance(['op10', 'op11'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (3000, None)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 4,
-                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 3, (3000, None)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 4, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -592,23 +713,32 @@ class BatcherTest(unittest.TestCase):
         precreated_shm1_regions = self.create_advance(['op10'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
 
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
-                                                kwargs={'requested_outputs': ("OUTPUT0",),
-                                                'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
-                                                kwargs={'requested_outputs': ("OUTPUT0",),
-                                                'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (3000, None)),
+                        kwargs={
+                            'requested_outputs': ("OUTPUT0",),
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (3000, None)),
+                        kwargs={
+                            'requested_outputs': ("OUTPUT0",),
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
                 threads[0].start()
                 threads[1].start()
                 for t in threads:
@@ -632,23 +762,32 @@ class BatcherTest(unittest.TestCase):
         precreated_shm1_regions = self.create_advance(['op11'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
 
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
-                                                kwargs={'requested_outputs': ("OUTPUT1",),
-                                                'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
-                                                kwargs={'requested_outputs': ("OUTPUT1",),
-                                                'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (3000, None)),
+                        kwargs={
+                            'requested_outputs': ("OUTPUT1",),
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (3000, None)),
+                        kwargs={
+                            'requested_outputs': ("OUTPUT1",),
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
                 threads[0].start()
                 threads[1].start()
                 for t in threads:
@@ -673,23 +812,32 @@ class BatcherTest(unittest.TestCase):
         precreated_shm1_regions = self.create_advance(['op11'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
 
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'requested_outputs': ("OUTPUT0",),
-                                                'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'requested_outputs': ("OUTPUT1",),
-                                                'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'requested_outputs': ("OUTPUT0",),
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'requested_outputs': ("OUTPUT1",),
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
                 threads[0].start()
                 threads[1].start()
                 for t in threads:
@@ -704,28 +852,37 @@ class BatcherTest(unittest.TestCase):
         # different order. They should be batched and get the correct
         # response even though they use different order.
         if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-            shm0_region_names = ['ip00', 'ip01', 'op00','op01']
-            shm1_region_names = ['ip10', 'ip11', 'op11','op10']
+            shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
+            shm1_region_names = ['ip10', 'ip11', 'op11', 'op10']
         else:
             shm0_region_names = None
             shm1_region_names = None
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
 
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'requested_outputs': ("OUTPUT0","OUTPUT1"),
-                                                'shm_region_names': shm0_region_names}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'requested_outputs': ("OUTPUT1","OUTPUT0"),
-                                                'shm_region_names': shm1_region_names}))
+                threads.append(
+                    threading.Thread(target=self.check_response,
+                                     args=(trial, 1, (6000, None)),
+                                     kwargs={
+                                         'requested_outputs':
+                                             ("OUTPUT0", "OUTPUT1"),
+                                         'shm_region_names': shm0_region_names
+                                     }))
+                threads.append(
+                    threading.Thread(target=self.check_response,
+                                     args=(trial, 1, (6000, None)),
+                                     kwargs={
+                                         'requested_outputs':
+                                             ("OUTPUT1", "OUTPUT0"),
+                                         'shm_region_names': shm1_region_names
+                                     }))
                 threads[0].start()
                 threads[1].start()
                 for t in threads:
@@ -754,24 +911,34 @@ class BatcherTest(unittest.TestCase):
         precreated_shm1_regions = self.create_advance(['op10', 'op11'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain 2 requests
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (6000, None)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 4,
-                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 3, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 4, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -808,33 +975,51 @@ class BatcherTest(unittest.TestCase):
         precreated_shm3_regions = self.create_advance(['op30', 'op31'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain 4 requests
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (3000, None)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
-                                                kwargs={'input_size': 8,
-                                                'shm_region_names': shm2_region_names,
-                                                'precreated_shm_regions': precreated_shm2_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 5, (3000, None)),
-                                                kwargs={'input_size': 8,
-                                                'shm_region_names': shm3_region_names,
-                                                'precreated_shm_regions': precreated_shm3_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (3000, None)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 3, (3000, None)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (3000, None)),
+                        kwargs={
+                            'input_size': 8,
+                            'shm_region_names': shm2_region_names,
+                            'precreated_shm_regions': precreated_shm2_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 5, (3000, None)),
+                        kwargs={
+                            'input_size': 8,
+                            'shm_region_names': shm3_region_names,
+                            'precreated_shm_regions': precreated_shm3_regions
+                        }))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -875,39 +1060,65 @@ class BatcherTest(unittest.TestCase):
         precreated_shm5_regions = self.create_advance(['op50', 'op51'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain 6 request
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 6)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 6)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm2_region_names,
-                                                'precreated_shm_regions': precreated_shm2_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm3_region_names,
-                                                'precreated_shm_regions': precreated_shm3_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm4_region_names,
-                                                'precreated_shm_regions': precreated_shm4_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm5_region_names,
-                                                'precreated_shm_regions': precreated_shm5_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm2_region_names,
+                            'precreated_shm_regions': precreated_shm2_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm3_region_names,
+                            'precreated_shm_regions': precreated_shm3_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm4_region_names,
+                            'precreated_shm_regions': precreated_shm4_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm5_region_names,
+                            'precreated_shm_regions': precreated_shm5_regions
+                        }))
                 for t in threads:
                     t.start()
                 for t in threads:
@@ -938,28 +1149,42 @@ class BatcherTest(unittest.TestCase):
         precreated_shm2_regions = self.create_advance(['op20', 'op21'])
         for trial in _trials:
             try:
-                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
 
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain 3 requests
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 3)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 3)
 
                 threads = []
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm0_region_names,
-                                                'precreated_shm_regions': precreated_shm0_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (6000, None)),
-                                                kwargs={'shm_region_names': shm1_region_names,
-                                                'precreated_shm_regions': precreated_shm1_regions}))
-                threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1,
-                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'shm_region_names': shm2_region_names,
-                                                'precreated_shm_regions': precreated_shm2_regions}))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms)),
+                        kwargs={
+                            'shm_region_names': shm2_region_names,
+                            'precreated_shm_regions': precreated_shm2_regions
+                        }))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -974,24 +1199,39 @@ class BatcherTest(unittest.TestCase):
     def test_multi_batch_preserve_ordering(self):
         model_base = "custom"
         dtype = np.float32
-        shapes = ([1, 1,],)
+        shapes = ([
+            1,
+            1,
+        ],)
 
         try:
             # use threads to send 12 requests without waiting for response
             threads = []
             for i in range(12):
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    shm_region_name_prefix = ["input" + str(i), "output" + str(i)]
+                    shm_region_name_prefix = [
+                        "input" + str(i), "output" + str(i)
+                    ]
                 else:
                     shm_region_name_prefix = None
-                threads.append(threading.Thread(target=iu.infer_zero,
-                                                args=(self, model_base, 1, dtype, shapes, shapes),
-                                                kwargs={'use_grpc': False,
-                                                'use_http_json_tensors': False,
-                                                'use_streaming': False,
-                                                'shm_region_name_prefix': shm_region_name_prefix,
-                                                'use_system_shared_memory': TEST_SYSTEM_SHARED_MEMORY,
-                                                'use_cuda_shared_memory': TEST_CUDA_SHARED_MEMORY}))
+                threads.append(
+                    threading.Thread(target=iu.infer_zero,
+                                     args=(self, model_base, 1, dtype, shapes,
+                                           shapes),
+                                     kwargs={
+                                         'use_grpc':
+                                             False,
+                                         'use_http_json_tensors':
+                                             False,
+                                         'use_streaming':
+                                             False,
+                                         'shm_region_name_prefix':
+                                             shm_region_name_prefix,
+                                         'use_system_shared_memory':
+                                             TEST_SYSTEM_SHARED_MEMORY,
+                                         'use_cuda_shared_memory':
+                                             TEST_CUDA_SHARED_MEMORY
+                                     }))
             for t in threads:
                 t.start()
             for t in threads:

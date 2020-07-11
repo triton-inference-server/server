@@ -124,5 +124,6 @@ if __name__ == '__main__':
     try:
         response = grpc_stub.ModelInfer(request)
     except Exception as e:
-        if "failed to get model version from specified version string 'wrong_specification'" in e.__str__():
+        if "failed to get model version from specified version string 'wrong_specification'" in e.__str__(
+        ):
             print('PASS: explicit int8')

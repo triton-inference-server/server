@@ -36,20 +36,37 @@ FLAGS = None
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
+    parser.add_argument('-v',
+                        '--verbose',
+                        action="store_true",
+                        required=False,
+                        default=False,
                         help='Enable verbose output')
-    parser.add_argument('-m', '--model-name', type=str, required=True,
+    parser.add_argument('-m',
+                        '--model-name',
+                        type=str,
+                        required=True,
                         help='Name of model')
-    parser.add_argument('-u', '--url', type=str, required=False, default='localhost:8000',
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
                         help='Inference server URL. Default is localhost:8000.')
-    parser.add_argument('-i', '--protocol', type=str, required=False, default='http',
-                        help='Protocol ("http"/"grpc") used to ' +
-                        'communicate with inference service. Default is "http".')
+    parser.add_argument(
+        '-i',
+        '--protocol',
+        type=str,
+        required=False,
+        default='http',
+        help='Protocol ("http"/"grpc") used to ' +
+        'communicate with inference service. Default is "http".')
 
     FLAGS = parser.parse_args()
 
     if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
-        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(FLAGS.protocol))
+        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
+            FLAGS.protocol))
         exit(1)
 
     client_util = httpclient if FLAGS.protocol == "http" else grpcclient
@@ -68,8 +85,10 @@ if __name__ == '__main__':
 
     # Send inference request to the inference server. Get results for
     # output tensor.
-    inputs = [client_util.InferInput(
-                "INPUT0", input0_data.shape, np_to_triton_dtype(np.object))]
+    inputs = [
+        client_util.InferInput("INPUT0", input0_data.shape,
+                               np_to_triton_dtype(np.object))
+    ]
     inputs[0].set_data_from_numpy(input0_data)
 
     results = client.infer(FLAGS.model_name, inputs)
@@ -79,7 +98,11 @@ if __name__ == '__main__':
     output0_data = results.as_numpy('OUTPUT0')
     # Element type returned is different between HTTP and GRPC client.
     # The former is str and the latter is bytes
-    output0_data2 = np.array([output0_data[0] if type(output0_data[0]) == str else output0_data[0].decode('utf8')], dtype=object)
+    output0_data2 = np.array([
+        output0_data[0]
+        if type(output0_data[0]) == str else output0_data[0].decode('utf8')
+    ],
+                             dtype=object)
 
-    print(input0_data,"?=?",output0_data2)
-    assert np.equal(input0_data,output0_data2).all()
+    print(input0_data, "?=?", output0_data2)
+    assert np.equal(input0_data, output0_data2).all()

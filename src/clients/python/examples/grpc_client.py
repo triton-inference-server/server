@@ -74,8 +74,8 @@ if __name__ == '__main__':
     response = grpc_stub.ServerReady(request)
     print("server {}".format(response))
 
-    request = grpc_service_pb2.ModelReadyRequest(
-        name="resnet_v1_50_graphdef", version=model_version)
+    request = grpc_service_pb2.ModelReadyRequest(name="resnet_v1_50_graphdef",
+                                                 version=model_version)
     response = grpc_stub.ModelReady(request)
     print("model {}".format(response))
 
@@ -90,8 +90,8 @@ if __name__ == '__main__':
     print("model metadata:\n{}".format(response))
 
     # Configuration
-    request = grpc_service_pb2.ModelConfigRequest(
-        name="resnet_v1_50_graphdef", version=model_version)
+    request = grpc_service_pb2.ModelConfigRequest(name="resnet_v1_50_graphdef",
+                                                  version=model_version)
     response = grpc_stub.ModelConfig(request)
     print("model config:\n{}".format(response))
 

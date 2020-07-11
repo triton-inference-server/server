@@ -82,10 +82,10 @@ if __name__ == '__main__':
     in1n = np.array([str(x) for x in in1.flatten()], dtype=object)
     input1_data = in1n.reshape(in1.shape)
 
-    expected_sum = np.array([str(x)
-                             for x in np.add(in0, in1).flatten()], dtype=object)
-    expected_diff = np.array([str(x)
-                             for x in np.subtract(in0, in1).flatten()], dtype=object)
+    expected_sum = np.array([str(x) for x in np.add(in0, in1).flatten()],
+                            dtype=object)
+    expected_diff = np.array([str(x) for x in np.subtract(in0, in1).flatten()],
+                             dtype=object)
     expected_sum_serialized = utils.serialize_byte_tensor(expected_sum)
     expected_diff_serialized = utils.serialize_byte_tensor(expected_diff)
 
@@ -140,12 +140,10 @@ if __name__ == '__main__':
     inputs[-1].set_shared_memory("input1_data", input1_byte_size)
 
     outputs = []
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT0',
-                                                   binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
     outputs[-1].set_shared_memory("output0_data", output0_byte_size)
 
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
     outputs[-1].set_shared_memory("output1_data", output1_byte_size)
 
     results = triton_client.infer(model_name=model_name,

@@ -39,7 +39,9 @@ from tritongrpcclient import grpc_service_pb2_grpc
 
 _trials = ("graphdef", "libtorch", "netdef", "onnx", "plan", "savedmodel")
 
+
 class OutputNameValidationTest(unittest.TestCase):
+
     def requestGenerator(self, model_name, output_name):
         request = grpc_service_pb2.ModelInferRequest()
         request.model_name = model_name
@@ -56,7 +58,8 @@ class OutputNameValidationTest(unittest.TestCase):
 
         request.inputs.extend([input])
 
-        output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
+        output = grpc_service_pb2.ModelInferRequest(
+        ).InferRequestedOutputTensor()
         output.name = output_name
         request.outputs.extend([output])
 
@@ -72,11 +75,15 @@ class OutputNameValidationTest(unittest.TestCase):
             request = self.requestGenerator(model_name, "DUMMY")
             try:
                 response = grpc_stub.ModelInfer(request)
-                self.assertTrue(False, "unexpected success for unknown output " + model_name)
-            except grpc.RpcError as rpc_error:
-                msg=rpc_error.details()
                 self.assertTrue(
-                    msg.startswith("unexpected inference output 'DUMMY' for model"))
+                    False,
+                    "unexpected success for unknown output " + model_name)
+            except grpc.RpcError as rpc_error:
+                msg = rpc_error.details()
+                self.assertTrue(
+                    msg.startswith(
+                        "unexpected inference output 'DUMMY' for model"))
+
 
 if __name__ == '__main__':
     unittest.main()

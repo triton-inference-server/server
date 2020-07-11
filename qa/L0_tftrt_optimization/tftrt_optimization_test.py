@@ -32,15 +32,19 @@ import numpy as np
 import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
+
 class TFTRTOptimizationTest(unittest.TestCase):
+
     def setUp(self):
-        self.input0_ = np.arange(start=0, stop=16, dtype=np.float32).reshape(1, 16)
+        self.input0_ = np.arange(start=0, stop=16,
+                                 dtype=np.float32).reshape(1, 16)
         self.input1_ = np.ones(shape=16, dtype=np.float32).reshape(1, 16)
         self.expected_output0_ = self.input0_ + self.input1_
         self.expected_output1_ = self.input0_ - self.input1_
 
     def _addsub_infer(self, model_name):
-        triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+        triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                         verbose=True)
 
         inputs = []
         outputs = []
@@ -51,18 +55,20 @@ class TFTRTOptimizationTest(unittest.TestCase):
         inputs[0].set_data_from_numpy(self.input0_, binary_data=True)
         inputs[1].set_data_from_numpy(self.input1_, binary_data=False)
 
-        outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-        outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
 
-        results = triton_client.infer(model_name,
-                                      inputs,
-                                      outputs=outputs)
+        results = triton_client.infer(model_name, inputs, outputs=outputs)
 
         output0_data = results.as_numpy('OUTPUT0')
         output1_data = results.as_numpy('OUTPUT1')
 
-        self.assertTrue(np.array_equal(self.expected_output0_, output0_data), "incorrect sum")
-        self.assertTrue(np.array_equal(self.expected_output1_, output1_data), "incorrect difference")
+        self.assertTrue(np.array_equal(self.expected_output0_, output0_data),
+                        "incorrect sum")
+        self.assertTrue(np.array_equal(self.expected_output1_, output1_data),
+                        "incorrect difference")
 
     def test_graphdef(self):
         self._addsub_infer("graphdef_float32_float32_float32_trt")

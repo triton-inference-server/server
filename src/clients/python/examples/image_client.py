@@ -45,6 +45,7 @@ else:
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -263,7 +264,7 @@ def postprocess(results, output_name, batch_size, batching):
         raise Exception("expected {} results, got {}".format(
             batch_size, len(output_array)))
 
-    # Include special handling for non-batching models 
+    # Include special handling for non-batching models
     for results in output_array:
         if not batching:
             results = [results]
@@ -390,9 +391,7 @@ if __name__ == '__main__':
             # the number of requests.
             concurrency = 20 if FLAGS.async_set else 1
             triton_client = tritonhttpclient.InferenceServerClient(
-                                            url=FLAGS.url,
-                                            verbose=FLAGS.verbose,
-                                            concurrency=concurrency)
+                url=FLAGS.url, verbose=FLAGS.verbose, concurrency=concurrency)
     except Exception as e:
         print("client creation failed: " + str(e))
         sys.exit(1)
@@ -439,8 +438,9 @@ if __name__ == '__main__':
     image_data = []
     for filename in filenames:
         img = Image.open(filename)
-        image_data.append(preprocess(img, format, dtype, c, h, w,
-                                     FLAGS.scaling, FLAGS.protocol.lower()))
+        image_data.append(
+            preprocess(img, format, dtype, c, h, w, FLAGS.scaling,
+                       FLAGS.protocol.lower()))
 
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just
@@ -459,9 +459,7 @@ if __name__ == '__main__':
     sent_count = 0
 
     if FLAGS.streaming:
-        triton_client.start_stream(
-            partial(completion_callback, user_data))
-
+        triton_client.start_stream(partial(completion_callback, user_data))
 
     while not last_request:
         input_filenames = []
