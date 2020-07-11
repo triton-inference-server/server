@@ -970,8 +970,9 @@ TRITONSERVER_InferenceResponseParameterCount(
 ///
 ///   void* vvalue;
 ///   TRITONSERVER_ParameterType type;
-///   TRITONSERVER_InferenceResponseParameter(response, index, &name, &type,
-///   &vvalue); switch (type) {
+///   TRITONSERVER_InferenceResponseParameter(
+///                     response, index, &name, &type, &vvalue);
+///   switch (type) {
 ///     case TRITONSERVER_PARAMETER_BOOL:
 ///       bool value = *(reinterpret_cast<bool*>(vvalue));
 ///       ...
@@ -979,7 +980,7 @@ TRITONSERVER_InferenceResponseParameterCount(
 ///       int64_t value = *(reinterpret_cast<int64_t*>(vvalue));
 ///       ...
 ///     case TRITONSERVER_PARAMETER_STRING:
-///       const char* value = *(reinterpret_cast<const char*>(vvalue));
+///       const char* value = reinterpret_cast<const char*>(vvalue);
 ///       ...
 ///
 /// \param inference_response The response object.

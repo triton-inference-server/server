@@ -2714,6 +2714,30 @@ InferResponseCompleteCommon(
   response.set_model_name(model_name);
   response.set_model_version(std::to_string(model_version));
 
+  // Propagate response parameters.
+  uint32_t parameter_count;
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseParameterCount(
+      iresponse, &parameter_count));
+  for (uint32_t pidx = 0; pidx < parameter_count; ++pidx) {
+    const char* name;
+    TRITONSERVER_ParameterType type;
+    const void* vvalue;
+    RETURN_IF_ERR(TRITONSERVER_InferenceResponseParameter(
+        iresponse, pidx, &name, &type, &vvalue));
+    InferParameter& param = (*response.mutable_parameters())[name];
+    switch (type) {
+      case TRITONSERVER_PARAMETER_BOOL:
+        param.set_bool_param(*(reinterpret_cast<const bool*>(vvalue)));
+        break;
+      case TRITONSERVER_PARAMETER_INT:
+        param.set_int64_param(*(reinterpret_cast<const int64_t*>(vvalue)));
+        break;
+      case TRITONSERVER_PARAMETER_STRING:
+        param.set_string_param(reinterpret_cast<const char*>(vvalue));
+        break;
+    }
+  }
+
   // Go through each response output and transfer information to the
   // corresponding GRPC response output.
   uint32_t output_count;
