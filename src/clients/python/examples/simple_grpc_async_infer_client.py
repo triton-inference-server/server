@@ -48,6 +48,12 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
+    parser.add_argument('-t',
+                        '--client-timeout',
+                        type=float,
+                        required=False,
+                        default=None,
+                        help='Client timeout in seconds. Default is None.')
 
     FLAGS = parser.parse_args()
     try:
@@ -96,7 +102,8 @@ if __name__ == '__main__':
     triton_client.async_infer(model_name=model_name,
                               inputs=inputs,
                               callback=partial(callback, user_data),
-                              outputs=outputs)
+                              outputs=outputs,
+                              client_timeout=FLAGS.client_timeout)
 
     # Wait until the results are available in user_data
     time_out = 10

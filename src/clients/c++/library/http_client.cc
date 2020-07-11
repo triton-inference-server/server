@@ -223,7 +223,7 @@ HttpInferRequest::PrepareRequestJson(
       "id", options.request_id_.c_str(), options.request_id_.size());
 
   if ((options.sequence_id_ != 0) || (options.priority_ != 0) ||
-      (options.timeout_ != 0)) {
+      (options.server_timeout_ != 0)) {
     TritonJson::Value parameters_json(
         *request_json, TritonJson::ValueType::OBJECT);
     {
@@ -237,8 +237,8 @@ HttpInferRequest::PrepareRequestJson(
         parameters_json.AddUInt("priority", options.priority_);
       }
 
-      if (options.timeout_ != 0) {
-        parameters_json.AddUInt("timeout", options.timeout_);
+      if (options.server_timeout_ != 0) {
+        parameters_json.AddUInt("timeout", options.server_timeout_);
       }
     }
 
@@ -637,21 +637,25 @@ InferResultHttp::InferResultHttp(
     : infer_request_(infer_request)
 {
   size_t offset = infer_request->response_json_size_;
-  if (offset != 0) {
-    if (infer_request->verbose_) {
-      std::cout << "inference response: "
-                << infer_request->infer_response_buffer_->substr(0, offset)
-                << std::endl;
-    }
-    status_ = response_json_.Parse(
-        (char*)infer_request->infer_response_buffer_.get()->c_str(), offset);
+  if (infer_request->http_code_ == 499) {
+    status_ = Error("Deadline Exceeded");
   } else {
-    if (infer_request->verbose_) {
-      std::cout << "inference response: "
-                << *infer_request->infer_response_buffer_ << std::endl;
+    if (offset != 0) {
+      if (infer_request->verbose_) {
+        std::cout << "inference response: "
+                  << infer_request->infer_response_buffer_->substr(0, offset)
+                  << std::endl;
+      }
+      status_ = response_json_.Parse(
+          (char*)infer_request->infer_response_buffer_.get()->c_str(), offset);
+    } else {
+      if (infer_request->verbose_) {
+        std::cout << "inference response: "
+                  << *infer_request->infer_response_buffer_ << std::endl;
+      }
+      status_ = response_json_.Parse(
+          (char*)infer_request->infer_response_buffer_.get()->c_str());
     }
-    status_ = response_json_.Parse(
-        (char*)infer_request->infer_response_buffer_.get()->c_str());
   }
 
   // There should be a valid JSON response in all cases. Either the
@@ -1080,7 +1084,10 @@ InferenceServerHttpClient::Infer(
 
   // During this call SEND_END (except in above case), RECV_START, and
   // RECV_END will be set.
-  if (curl_easy_perform(easy_handle_) != CURLE_OK) {
+  auto curl_status = curl_easy_perform(easy_handle_);
+  if (curl_status == CURLE_OPERATION_TIMEDOUT) {
+    sync_request->http_code_ = 499;
+  } else if (curl_status != CURLE_OK) {
     sync_request->http_code_ = 400;
   } else {
     curl_easy_getinfo(
@@ -1273,6 +1280,11 @@ InferenceServerHttpClient::PreRunProcessing(
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
   curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
+  if (options.client_timeout_ != 0) {
+    uint64_t timeout_ms = (options.client_timeout_ / 1000);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
+  }
+
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
@@ -1356,6 +1368,8 @@ InferenceServerHttpClient::AsyncTransfer()
       long http_code = 400;
       if (msg->data.result == CURLE_OK) {
         curl_easy_getinfo(msg->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+      } else if (msg->data.result == CURLE_OPERATION_TIMEDOUT) {
+        http_code = 499;
       }
 
       request_list.emplace_back(itr->second);

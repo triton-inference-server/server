@@ -66,6 +66,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << "For -H, header must be 'Header:Value'. May be given multiple times."
       << std::endl;
+  std::cerr << "\t-t <stream timeout in microseconds>" << std::endl;
   std::cerr << "\t-o <offset for sequence ID>" << std::endl;
   std::cerr << std::endl;
   std::cerr << "For -o, the client will use sequence ID <1 + 2 * offset> "
@@ -115,10 +116,11 @@ main(int argc, char** argv)
   std::string url("localhost:8001");
   nic::Headers http_headers;
   int sequence_id_offset = 0;
+  uint32_t stream_timeout = 0;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vdu:H:o:")) != -1) {
+  while ((opt = getopt(argc, argv, "vdu:H:t:o:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -135,6 +137,9 @@ main(int argc, char** argv)
         http_headers[header] = arg.substr(header.size() + 1);
         break;
       }
+      case 't':
+        stream_timeout = std::stoi(optarg);
+        break;
       case 'o':
         sequence_id_offset = std::stoi(optarg);
         break;
@@ -179,7 +184,7 @@ main(int argc, char** argv)
             }
             cv_.notify_all();
           },
-          false /*ship_stats*/, http_headers),
+          false /*ship_stats*/, stream_timeout, http_headers),
       "unable to establish a streaming connection to server");
 
   // Send requests, first reset accumulator for the sequence.
@@ -201,16 +206,31 @@ main(int argc, char** argv)
         (v == 1) /* end-of-sequence */, index++);
   }
 
-  // Wait until all callbacks are invoked
-  {
-    std::unique_lock<std::mutex> lk(mutex_);
-    cv_.wait(lk, [&]() {
-      if (result_list.size() > (2 * values.size() + 1)) {
-        return true;
-      } else {
-        return false;
+  if (stream_timeout == 0) {
+    // Wait until all callbacks are invoked
+    {
+      std::unique_lock<std::mutex> lk(mutex_);
+      cv_.wait(lk, [&]() {
+        if (result_list.size() > (2 * values.size() + 1)) {
+          return true;
+        } else {
+          return false;
+        }
+      });
+    }
+  } else {
+    auto timeout = std::chrono::microseconds(stream_timeout);
+    // Wait until all callbacks are invoked or the timeout expires
+    {
+      std::unique_lock<std::mutex> lk(mutex_);
+      if (!cv_.wait_for(lk, timeout, [&]() {
+            return (result_list.size() > (2 * values.size() + 1));
+          })) {
+        std::cerr << "Stream has been closed"
+                  << std::endl;
+        exit(1);
       }
-    });
+    }
   }
 
   // Extract data from the result

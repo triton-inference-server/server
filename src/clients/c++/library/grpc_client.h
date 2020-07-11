@@ -311,12 +311,16 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// The library does not support client side statistics for decoupled
   /// streaming. Set this option false when there is no 1:1 mapping between
   /// request and response on the stream.
+  /// \param stream_timeout Specifies the end-to-end timeout for the streaming
+  /// connection in microseconds. The default value is 0 which means that
+  /// there is no limitation on deadline. The stream will be closed once
+  /// the specified time elapses.
   /// \param headers Optional map specifying additional HTTP headers to
   /// include in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error StartStream(
       OnCompleteFn callback, bool enable_stats = true,
-      const Headers& headers = Headers());
+      uint32_t stream_timeout = 0, const Headers& headers = Headers());
 
   /// Stops an active grpc bi-directional stream, if one available.
   /// \return Error object indicating success or failure of the request.
