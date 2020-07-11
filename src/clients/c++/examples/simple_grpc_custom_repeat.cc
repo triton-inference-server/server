@@ -166,7 +166,7 @@ main(int argc, char** argv)
             }
             cv_.notify_all();
           },
-          false /*enable_stats*/, http_headers),
+          false /*enable_stats*/, 0 /* stream_timeout */, http_headers),
       "unable to establish a streaming connection to server");
 
   // Prepare the data for the tensors

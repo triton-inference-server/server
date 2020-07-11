@@ -844,6 +844,7 @@ class InferenceServerClient:
               sequence_end=False,
               priority=0,
               timeout=None,
+              client_timeout=None,
               headers=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -893,6 +894,12 @@ class InferenceServerClient:
             model-specific action such as terminating the request. If not
             provided, the server will handle the request using default setting
             for the model.
+        client_timeout : float
+            The maximum end-to-end time, in seconds, the request is allowed
+            to take. The client will abort request and raise
+            InferenceServerExeption with message "Deadline Exceeded" when the
+            specified time elapses. The default value is None which means
+            client will wait for the response from the server.
         headers : dict
             Optional dictionary specifying additional HTTP headers to include
             in the request.
@@ -931,7 +938,8 @@ class InferenceServerClient:
 
         try:
             response = self._client_stub.ModelInfer(request=request,
-                                                    metadata=metadata)
+                                                    metadata=metadata,
+                                                    timeout=client_timeout)
             if self._verbose:
                 print(response)
             result = InferResult(response)
@@ -951,6 +959,7 @@ class InferenceServerClient:
                     sequence_end=False,
                     priority=0,
                     timeout=None,
+                    client_timeout=None,
                     headers=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -1007,6 +1016,12 @@ class InferenceServerClient:
             model-specific action such as terminating the request. If not
             provided, the server will handle the request using default setting
             for the model.
+        client_timeout : float
+            The maximum end-to-end time, in seconds, the request is allowed
+            to take. The client will abort request and provide
+            error with message "Deadline Exceeded" in the callback when the
+            specified time elapses. The default value is None which means
+            client will wait for the response from the server.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -1051,7 +1066,7 @@ class InferenceServerClient:
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
-                request=request, metadata=metadata)
+                request=request, metadata=metadata, timeout=client_timeout)
             self._call_future.add_done_callback(wrapped_callback)
             if self._verbose:
                 verbose_message = "Sent request"
@@ -1062,7 +1077,7 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def start_stream(self, callback, headers=None):
+    def start_stream(self, callback, stream_timeout=None, headers=None):
         """Starts a grpc bi-directional stream to send streaming inferences.
         Note: When using stream, user must ensure the InferenceServerClient.close()
         gets called at exit.
@@ -1077,6 +1092,9 @@ class InferenceServerClient:
             provided to the function when executing the callback. The
             ownership of these objects will be given to the user. The
             'error' would be None for a successful inference.
+        stream_timeout : float
+            Optional stream timeout. The stream will be closed once the
+            specified timeout expires.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -1104,7 +1122,9 @@ class InferenceServerClient:
 
         try:
             response_iterator = self._client_stub.ModelStreamInfer(
-                _RequestIterator(self._stream), metadata=metadata)
+                                    _RequestIterator(self._stream),
+                                    metadata=metadata,
+                                    timeout=stream_timeout)
             self._stream._init_handler(response_iterator)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
