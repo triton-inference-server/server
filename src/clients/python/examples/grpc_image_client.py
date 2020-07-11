@@ -64,6 +64,7 @@ def model_dtype_to_np(model_dtype):
         return np.dtype(object)
     return None
 
+
 def deserialize_bytes_tensor(encoded_tensor):
     strs = list()
     offset = 0
@@ -75,6 +76,7 @@ def deserialize_bytes_tensor(encoded_tensor):
         offset += l
         strs.append(sb)
     return (np.array(strs, dtype=bytes))
+
 
 def parse_model(model_metadata, model_config):
     """
@@ -401,9 +403,11 @@ if __name__ == '__main__':
                 error_found = True
                 print(response.error_message)
             else:
-                postprocess(response.infer_response.outputs, result_filenames[idx], FLAGS.batch_size)
+                postprocess(response.infer_response.outputs,
+                            result_filenames[idx], FLAGS.batch_size)
         else:
-            postprocess(response.outputs, result_filenames[idx], FLAGS.batch_size)
+            postprocess(response.outputs, result_filenames[idx],
+                        FLAGS.batch_size)
         idx += 1
 
     if error_found:

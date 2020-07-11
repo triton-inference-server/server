@@ -31,43 +31,35 @@ import os
 import re
 
 FLAGS = None
-SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png',
-             'log', 'serverlog',
-             'preprocessed', 'jmx', 'gz',
-             'caffemodel', 'json', 'pdf', 'so', 'onnx')
-SKIP_PATHS = ('builddir',
-              'build/libevhtp',
-              'build/onnxruntime',
-              'deploy/single_server/.helmignore',
-              'docs/examples/model_repository',
-              'docs/examples/ensemble_model_repository',
-              'qa/common/cuda_op_kernel.cu.cc.patch',
-              'qa/custom_models/custom_float32_float32_float32/output0_labels.txt',
-              'qa/custom_models/custom_nobatch_float32_float32_float32/output0_labels.txt',
-              'qa/custom_models/custom_int32_int32_int32/output0_labels.txt',
-              'qa/custom_models/custom_nobatch_int32_int32_int32/output0_labels.txt',
-              'qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt',
-              'qa/ensemble_models/mix_type_int32_float32_float32/output0_labels.txt',
-              'qa/ensemble_models/mix_ensemble_int32_float32_float32/output0_labels.txt',
-              'qa/ensemble_models/wrong_label_int32_float32_float32/output0_labels.txt',
-              'qa/ensemble_models/label_override_int32_float32_float32/output0_labels.txt',
-              'qa/L0_custom_image_preprocess/preprocessed_mug_image',
-              'qa/L0_model_config/noautofill_platform',
-              'qa/L0_model_config/autofill_noplatform',
-              'qa/L0_model_config/autofill_noplatform_success',
-              'qa/L0_model_config/special_cases',
-              'qa/L0_perf_nomodel/baseline',
-              'qa/L0_perf_nomodel/legacy_baseline',
-              'qa/L0_warmup/raw_mug_data',
-              'src/clients/c++/library/cencode.c',
-              'src/clients/c++/library/cencode.h',
-              'tools/patch',
-              'VERSION')
+SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
+             'jmx', 'gz', 'caffemodel', 'json', 'pdf', 'so', 'onnx')
+SKIP_PATHS = (
+    'builddir', 'build/libevhtp', 'build/onnxruntime',
+    'deploy/single_server/.helmignore', 'docs/examples/model_repository',
+    'docs/examples/ensemble_model_repository',
+    'qa/common/cuda_op_kernel.cu.cc.patch',
+    'qa/custom_models/custom_float32_float32_float32/output0_labels.txt',
+    'qa/custom_models/custom_nobatch_float32_float32_float32/output0_labels.txt',
+    'qa/custom_models/custom_int32_int32_int32/output0_labels.txt',
+    'qa/custom_models/custom_nobatch_int32_int32_int32/output0_labels.txt',
+    'qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt',
+    'qa/ensemble_models/mix_type_int32_float32_float32/output0_labels.txt',
+    'qa/ensemble_models/mix_ensemble_int32_float32_float32/output0_labels.txt',
+    'qa/ensemble_models/wrong_label_int32_float32_float32/output0_labels.txt',
+    'qa/ensemble_models/label_override_int32_float32_float32/output0_labels.txt',
+    'qa/L0_custom_image_preprocess/preprocessed_mug_image',
+    'qa/L0_model_config/noautofill_platform',
+    'qa/L0_model_config/autofill_noplatform',
+    'qa/L0_model_config/autofill_noplatform_success',
+    'qa/L0_model_config/special_cases', 'qa/L0_perf_nomodel/baseline',
+    'qa/L0_perf_nomodel/legacy_baseline', 'qa/L0_warmup/raw_mug_data',
+    'src/clients/c++/library/cencode.c', 'src/clients/c++/library/cencode.h',
+    'tools/patch', 'VERSION')
 
 COPYRIGHT_YEAR_RE0 = 'Copyright \\(c\\) (20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
 COPYRIGHT_YEAR_RE1 = 'Copyright \\(c\\) (20[0-9][0-9])-(20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
 
-COPYRIGHT ='''
+COPYRIGHT = '''
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -97,6 +89,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 single_re = re.compile(COPYRIGHT_YEAR_RE0)
 range_re = re.compile(COPYRIGHT_YEAR_RE1)
 
+
 def visit(path):
     if FLAGS.verbose:
         print("visiting " + path)
@@ -125,7 +118,8 @@ def visit(path):
                 if first_line:
                     first_line = False
                     if (fline.startswith("#!") or fline.startswith("..") or
-                        fline.startswith("<!--")  or fline.startswith("{{/*")):
+                            fline.startswith("<!--") or
+                            fline.startswith("{{/*")):
                         continue
                 # Skip empty lines...
                 if len(fline.strip()) != 0:
@@ -155,8 +149,9 @@ def visit(path):
         elif line.startswith('// '):
             prefix = '// '
         elif not line.startswith(COPYRIGHT_YEAR_RE0[0]):
-            print("incorrect prefix for copyright line, allowed prefixes '# ' or '// ', for " +
-                  path + ": " + line)
+            print(
+                "incorrect prefix for copyright line, allowed prefixes '# ' or '// ', for "
+                + path + ": " + line)
             return False
 
         start_year = 0
@@ -171,21 +166,27 @@ def visit(path):
                 start_year = int(m.group(1))
                 end_year = int(m.group(2))
             else:
-                print("copyright year is not recognized for " + path + ": " + line)
+                print("copyright year is not recognized for " + path + ": " +
+                      line)
                 return False
 
         if start_year > FLAGS.year:
-            print("copyright start year greater than current year for " + path + ": " + line)
+            print("copyright start year greater than current year for " + path +
+                  ": " + line)
             return False
         if end_year > FLAGS.year:
-            print("copyright end year greater than current year for " + path + ": " + line)
+            print("copyright end year greater than current year for " + path +
+                  ": " + line)
             return False
         if end_year < start_year:
-            print("copyright start year greater than end year for " + path + ": " + line)
+            print("copyright start year greater than end year for " + path +
+                  ": " + line)
             return False
 
         # Subsequent lines must match the copyright body.
-        copyright_body = [l.rstrip() for i, l in enumerate(COPYRIGHT.splitlines()) if i > 0]
+        copyright_body = [
+            l.rstrip() for i, l in enumerate(COPYRIGHT.splitlines()) if i > 0
+        ]
         copyright_idx = 0
         for line in f:
             if copyright_idx >= len(copyright_body):
@@ -216,13 +217,24 @@ def visit(path):
         print("copyright correct for " + path)
     return True
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
+    parser.add_argument('-v',
+                        '--verbose',
+                        action="store_true",
+                        required=False,
+                        default=False,
                         help='Enable verbose output')
-    parser.add_argument('-y', '--year', type=int, required=True,
+    parser.add_argument('-y',
+                        '--year',
+                        type=int,
+                        required=True,
                         help='Copyright year')
-    parser.add_argument('paths', type=str, nargs='*', default=None,
+    parser.add_argument('paths',
+                        type=str,
+                        nargs='*',
+                        default=None,
                         help='Directories or files to check')
     FLAGS = parser.parse_args()
 

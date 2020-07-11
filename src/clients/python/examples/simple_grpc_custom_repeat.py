@@ -95,8 +95,8 @@ if __name__ == '__main__':
     inputs = []
     inputs.append(tritongrpcclient.InferInput('IN', [repeat_count], "INT32"))
     inputs[-1].set_data_from_numpy(input_data)
-    inputs.append(
-        tritongrpcclient.InferInput('DELAY', [repeat_count], "UINT32"))
+    inputs.append(tritongrpcclient.InferInput('DELAY', [repeat_count],
+                                              "UINT32"))
     inputs[-1].set_data_from_numpy(delay_data)
     inputs.append(tritongrpcclient.InferInput('WAIT', [1], "UINT32"))
     inputs[-1].set_data_from_numpy(wait_data)

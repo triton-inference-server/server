@@ -55,12 +55,10 @@ setup(
     version=VERSION,
     author='NVIDIA Inc.',
     author_email='tanmayv@nvidia.com',
-    description=
-    'Python utils library for NVIDIA Triton Inference Server client',
+    description='Python utils library for NVIDIA Triton Inference Server client',
     license='BSD',
     url='http://nvidia.com',
-    keywords=
-    'triton tensorrt inference server utils client',
+    keywords='triton tensorrt inference server utils client',
     packages=find_packages(),
     install_requires=REQUIRED,
     zip_safe=False,

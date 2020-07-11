@@ -40,6 +40,7 @@ from tritonclientutils import InferenceServerException
 
 FLAGS = None
 
+
 def parse_model_grpc(model_metadata, model_config):
     """
     Check the configuration of a model to make sure it meets the
