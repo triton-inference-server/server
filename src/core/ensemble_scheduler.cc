@@ -140,6 +140,28 @@ struct Step {
 };
 
 struct TensorData {
+  struct Metadata {
+    Metadata() = default;
+    Metadata(
+        std::unique_ptr<InferenceRequest::Input>&& data, size_t reference_count)
+        : data_(std::move(data)), remaining_reference_count_(reference_count),
+          parameter_override_(false)
+    {
+    }
+    Metadata(
+        std::unique_ptr<InferenceRequest::Input>&& data, size_t reference_count,
+        uint64_t correlation_id, uint32_t flags)
+        : data_(std::move(data)), remaining_reference_count_(reference_count),
+          parameter_override_(true), correlation_id_(correlation_id),
+          flags_(flags)
+    {
+    }
+    std::unique_ptr<InferenceRequest::Input> data_;
+    size_t remaining_reference_count_;
+    bool parameter_override_;
+    int64_t correlation_id_;
+    uint32_t flags_;
+  };
   TensorData() = default;
   TensorData(size_t outgoing_steps_count)
       : current_iteration_(0), outgoing_steps_count_(outgoing_steps_count),
@@ -150,8 +172,18 @@ struct TensorData {
   IterationCount AddTensor(std::unique_ptr<InferenceRequest::Input>&& tensor)
   {
     tensor_.emplace(
+        current_iteration_, Metadata(std::move(tensor), outgoing_steps_count_));
+    return current_iteration_++;
+  }
+
+  IterationCount AddTensor(
+      std::unique_ptr<InferenceRequest::Input>&& tensor,
+      uint64_t correlation_id, uint32_t flags)
+  {
+    tensor_.emplace(
         current_iteration_,
-        std::make_pair(std::move(tensor), outgoing_steps_count_));
+        Metadata(
+            std::move(tensor), outgoing_steps_count_, correlation_id, flags));
     return current_iteration_++;
   }
 
@@ -159,10 +191,7 @@ struct TensorData {
   // A container is used to handle the decoupled case
   // where variable number of tensors will be produced.
   // map 'iteration count' to pair of <tensor, remaining outgoing count>
-  std::unordered_map<
-      IterationCount,
-      std::pair<std::unique_ptr<InferenceRequest::Input>, size_t>>
-      tensor_;
+  std::unordered_map<IterationCount, Metadata> tensor_;
   size_t current_iteration_;
   size_t outgoing_steps_count_;
   size_t batch_size_;
@@ -520,8 +549,60 @@ EnsembleContext::ResponseComplete(
 
   if (response != nullptr) {
     auto err = TRITONSERVER_InferenceResponseError(response);
+    uint32_t count;
+    bool parameter_override = false;
+    int64_t correlation_id = 0;
+    uint32_t flags = 0;
     if (err == nullptr) {
-      uint32_t count;
+      err = TRITONSERVER_InferenceResponseParameterCount(response, &count);
+      if (err == nullptr) {
+        for (uint32_t idx = 0; idx < count; idx++) {
+          const char* name;
+          TRITONSERVER_ParameterType type;
+          const void* vvalue;
+          err = TRITONSERVER_InferenceResponseParameter(
+              response, idx, &name, &type, &vvalue);
+          if (err == nullptr) {
+            if (!strcmp(name, "sequence_id")) {
+              if (type != TRITONSERVER_PARAMETER_INT) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "expect paremeter 'sequence_id' to be "
+                    "TRITONSERVER_PARAMETER_INT");
+              } else {
+                correlation_id = *reinterpret_cast<const int64_t*>(vvalue);
+                parameter_override = true;
+              }
+            } else if (!strcmp(name, "sequence_start")) {
+              if (type != TRITONSERVER_PARAMETER_BOOL) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "expect paremeter 'sequence_start' to be "
+                    "TRITONSERVER_PARAMETER_BOOL");
+              } else {
+                if (*reinterpret_cast<const bool*>(vvalue)) {
+                  flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+                }
+                parameter_override = true;
+              }
+            } else if (!strcmp(name, "sequence_end")) {
+              if (type != TRITONSERVER_PARAMETER_BOOL) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "expect paremeter 'sequence_end' to be "
+                    "TRITONSERVER_PARAMETER_BOOL");
+              } else {
+                if (*reinterpret_cast<const bool*>(vvalue)) {
+                  flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+                }
+                parameter_override = true;
+              }
+            }
+          }
+        }
+      }
+    }
+    if (err == nullptr) {
       err = TRITONSERVER_InferenceResponseOutputCount(response, &count);
       if (err == nullptr) {
         std::lock_guard<std::mutex> lock(step_ptr->ctx_->mutex_);
@@ -567,8 +648,14 @@ EnsembleContext::ResponseComplete(
               }
 
               auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
-              step_ptr->updated_tensors_.emplace(
-                  it->second, tensor_data.AddTensor(std::move(tensor)));
+              if (parameter_override) {
+                step_ptr->updated_tensors_.emplace(
+                    it->second, tensor_data.AddTensor(
+                                    std::move(tensor), correlation_id, flags));
+              } else {
+                step_ptr->updated_tensors_.emplace(
+                    it->second, tensor_data.AddTensor(std::move(tensor)));
+              }
             } else {
               LOG_VERBOSE(1)
                   << "in ensemble, an internal response header specified "
@@ -734,7 +821,10 @@ EnsembleContext::InitStep(
   // multiple inputs in the same step.
   std::map<TensorData*, size_t*> releasing_tensors;
 
-  // Set inputs in request and prepare input map
+  // Set inputs in request, prepare input map,
+  // and set overridden paremeter if any.
+  auto correlation_id = correlation_id_;
+  auto flags = flags_;
   for (const auto& pair : istep.input_to_tensor_) {
     auto& tensor_data = tensor_data_[pair.second];
     auto& tensor = tensor_data.tensor_[iteration_count];
@@ -745,14 +835,19 @@ EnsembleContext::InitStep(
     backend->GetInput(pair.first, &input_config);
     auto shape = ReshapeTensorDims(
         input_config->dims(), allow_batching, tensor_data.batch_size_,
-        tensor.first->OriginalShape());
+        tensor.data_->OriginalShape());
 
     InferenceRequest::Input* input;
     RETURN_IF_ERROR(irequest->AddOriginalInput(
-        pair.first, tensor.first->DType(), shape, &input));
-    RETURN_IF_ERROR(input->SetData(tensor.first->Data()));
+        pair.first, tensor.data_->DType(), shape, &input));
+    RETURN_IF_ERROR(input->SetData(tensor.data_->Data()));
 
-    releasing_tensors.emplace(&tensor_data, &tensor.second);
+    releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
+
+    if (tensor.parameter_override_) {
+      correlation_id = tensor.correlation_id_;
+      flags = tensor.flags_;
+    }
   }
 
   // Prune the tensor if it is not needed by other steps
@@ -770,8 +865,8 @@ EnsembleContext::InitStep(
   step->reset(new Step(step_idx));
 
   irequest->SetId(request_id_);
-  irequest->SetCorrelationId(correlation_id_);
-  irequest->SetFlags(flags_);
+  irequest->SetCorrelationId(correlation_id);
+  irequest->SetFlags(flags);
   irequest->SetPriority(priority_);
 #ifdef TRITON_ENABLE_STATS
   irequest->SetSecondaryStatsAggregator(
@@ -944,17 +1039,17 @@ EnsembleContext::CheckAndSetEnsembleOutput(
 
     auto shape = ReshapeTensorDims(
         output_pair.second, (lrequest->BatchSize() != 0),
-        tensor_data.batch_size_, tensor.first->OriginalShape());
+        tensor_data.batch_size_, tensor.data_->OriginalShape());
 
     InferenceResponse::Output* output;
     RETURN_IF_ERROR((*response)->AddOutput(
-        output_pair.first, tensor.first->DType(), shape, &output));
+        output_pair.first, tensor.data_->DType(), shape, &output));
 
     // Use the memory type of the memory block as preferred memory type
     TRITONSERVER_MemoryType dst_memory_type;
     int64_t dst_memory_type_id;
     size_t content_size;
-    tensor.first->Data()->BufferAt(
+    tensor.data_->Data()->BufferAt(
         0, &content_size, &dst_memory_type, &dst_memory_type_id);
 
     void* buffer;
@@ -975,7 +1070,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
-    const char* content = tensor.first->Data()->BufferAt(
+    const char* content = tensor.data_->Data()->BufferAt(
         content_idx, &content_size, &src_memory_type, &src_memory_type_id);
     bool cuda_used = false;
     while (content != nullptr) {
@@ -987,11 +1082,21 @@ EnsembleContext::CheckAndSetEnsembleOutput(
 
       content_offset += content_size;
       content_idx++;
-      content = tensor.first->Data()->BufferAt(
+      content = tensor.data_->Data()->BufferAt(
           content_idx, &content_size, &src_memory_type, &src_memory_type_id);
     }
 
-    releasing_tensors.emplace(&tensor_data, &tensor.second);
+    releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
+
+    if (tensor.parameter_override_) {
+      (*response)->AddParameter("sequence_id", tensor.correlation_id_);
+      (*response)->AddParameter(
+          "sequence_start",
+          (tensor.flags_ & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START) != 0);
+      (*response)->AddParameter(
+          "sequence_end",
+          (tensor.flags_ & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END) != 0);
+    }
   }
 
   if (cuda_async_copy) {
