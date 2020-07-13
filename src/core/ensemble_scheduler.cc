@@ -125,6 +125,9 @@ struct Step {
 
   std::shared_ptr<EnsembleContext> ctx_;
   std::unique_ptr<InferenceRequest> request_;
+  uint32_t flags_;
+  uint64_t correlation_id_;
+
   std::mutex output_mtx_;
   // Different output map to avoid address conflict from different memory types
   std::unordered_map<uintptr_t, std::shared_ptr<AllocatedMemory>>
@@ -159,7 +162,7 @@ struct TensorData {
     std::unique_ptr<InferenceRequest::Input> data_;
     size_t remaining_reference_count_;
     bool parameter_override_;
-    int64_t correlation_id_;
+    uint64_t correlation_id_;
     uint32_t flags_;
   };
   TensorData() = default;
@@ -551,7 +554,7 @@ EnsembleContext::ResponseComplete(
     auto err = TRITONSERVER_InferenceResponseError(response);
     uint32_t count;
     bool parameter_override = false;
-    int64_t correlation_id = 0;
+    uint64_t correlation_id = 0;
     uint32_t flags = 0;
     if (err == nullptr) {
       err = TRITONSERVER_InferenceResponseParameterCount(response, &count);
@@ -570,7 +573,7 @@ EnsembleContext::ResponseComplete(
                     "expect paremeter 'sequence_id' to be "
                     "TRITONSERVER_PARAMETER_INT");
               } else {
-                correlation_id = *reinterpret_cast<const int64_t*>(vvalue);
+                correlation_id = *reinterpret_cast<const uint64_t*>(vvalue);
                 parameter_override = true;
               }
             } else if (!strcmp(name, "sequence_start")) {
@@ -654,7 +657,10 @@ EnsembleContext::ResponseComplete(
                                     std::move(tensor), correlation_id, flags));
               } else {
                 step_ptr->updated_tensors_.emplace(
-                    it->second, tensor_data.AddTensor(std::move(tensor)));
+                    it->second,
+                    tensor_data.AddTensor(
+                        std::move(tensor), step_ptr->correlation_id_,
+                        step_ptr->flags_));
               }
             } else {
               LOG_VERBOSE(1)
@@ -822,9 +828,10 @@ EnsembleContext::InitStep(
   std::map<TensorData*, size_t*> releasing_tensors;
 
   // Set inputs in request, prepare input map,
-  // and set overridden paremeter if any.
+  // and set overridden parameter if any.
   auto correlation_id = correlation_id_;
   auto flags = flags_;
+  bool parameter_set = false;
   for (const auto& pair : istep.input_to_tensor_) {
     auto& tensor_data = tensor_data_[pair.second];
     auto& tensor = tensor_data.tensor_[iteration_count];
@@ -845,8 +852,16 @@ EnsembleContext::InitStep(
     releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
 
     if (tensor.parameter_override_) {
+      if (parameter_set && ((correlation_id != tensor.correlation_id_) ||
+                            (flags != tensor.flags_))) {
+        LOG_ERROR << "Different set of response parameters are set for '"
+                  << istep.model_name_ << "'. Parameter correlation ID "
+                  << correlation_id << ", flags " << flags << " is used.";
+        continue;
+      }
       correlation_id = tensor.correlation_id_;
       flags = tensor.flags_;
+      parameter_set = true;
     }
   }
 
@@ -1089,7 +1104,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
 
     if (tensor.parameter_override_) {
-      (*response)->AddParameter("sequence_id", tensor.correlation_id_);
+      (*response)->AddParameter("sequence_id", (int64_t)tensor.correlation_id_);
       (*response)->AddParameter(
           "sequence_start",
           (tensor.flags_ & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START) != 0);
