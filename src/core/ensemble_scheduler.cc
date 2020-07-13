@@ -118,15 +118,16 @@ class RequestTracker {
 // Step contains metadata, and status for the
 // internal infer request
 struct Step {
-  Step(size_t step_idx)
-      : response_flags_(0), infer_status_(nullptr), step_idx_(step_idx)
+  Step(size_t step_idx, uint64_t correlation_id, uint32_t flags)
+      : correlation_id_(correlation_id), flags_(flags),
+        response_flags_(0), infer_status_(nullptr), step_idx_(step_idx)
   {
   }
 
   std::shared_ptr<EnsembleContext> ctx_;
   std::unique_ptr<InferenceRequest> request_;
-  uint32_t flags_;
   uint64_t correlation_id_;
+  uint32_t flags_;
 
   std::mutex output_mtx_;
   // Different output map to avoid address conflict from different memory types
@@ -877,7 +878,7 @@ EnsembleContext::InitStep(
     irequest->AddOriginalRequestedOutput(pair.first);
   }
 
-  step->reset(new Step(step_idx));
+  step->reset(new Step(step_idx, correlation_id, flags));
 
   irequest->SetId(request_id_);
   irequest->SetCorrelationId(correlation_id);
