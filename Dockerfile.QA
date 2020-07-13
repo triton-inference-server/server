@@ -56,6 +56,7 @@ RUN cd builddir && \
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
     cp -r /workspace/src/backends/backend/examples/models/repeat_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/backends/backend/examples/models/square_int32 qa/L0_decoupled/models/ && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_go_client/models && \
@@ -220,11 +221,20 @@ RUN cp builddir/server/install/backends/libtriton_repeat.so \
 RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
     cp builddir/server/install/backends/libtriton_repeat.so \
         qa/L0_decoupled/models/repeat_int32/1/.
+RUN mkdir -p qa/L0_decoupled/models/square_int32/1 && \
+    cp builddir/server/install/backends/libtriton_square.so \
+        qa/L0_decoupled/models/square_int32/1/.
 RUN mkdir -p qa/L0_decoupled/models/identity_int32/1 && \
     cp builddir/server/install/backends/libtriton_identity.so \
         qa/L0_decoupled/models/identity_int32/1/.
+RUN mkdir -p qa/L0_decoupled/models/custom_nobatch_int32_int32_int32/1 && \
+    cp builddir/custom-backend/install/lib/libaddsub.so \
+        qa/L0_decoupled/models/custom_nobatch_int32_int32_int32/1/.
 RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
-    mkdir -p qa/L0_decoupled/models/sequence_repeat/1
+    mkdir -p qa/L0_decoupled/models/fan_repeat/1 && \
+    mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
+    mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
+    mkdir -p qa/L0_decoupled/models/nested_square/1
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.
