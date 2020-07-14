@@ -326,15 +326,13 @@ DynamicBatchScheduler::SchedulerThread(
             for (auto& request : requests) {
               completion_queue_.emplace_back();
               auto queue_slot = &completion_queue_.back();
-              queue_slot->second = 0;
               request->SetResponseDelegator(
                   [this, queue_slot](
                       std::unique_ptr<InferenceResponse>&& response,
                       const uint32_t flags) {
                     {
                       std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      queue_slot->first = std::move(response);
-                      queue_slot->second = flags;
+                      queue_slot->emplace_back(std::move(response), flags);
                     }
                     FinalizeResponses();
                   });
@@ -374,15 +372,13 @@ DynamicBatchScheduler::SchedulerThread(
             for (auto& request : requests) {
               completion_queue_.emplace_back();
               auto queue_slot = &completion_queue_.back();
-              queue_slot->second = 0;
               request->SetResponseDelegator(
                   [this, queue_slot](
                       std::unique_ptr<InferenceResponse>&& response,
                       const uint32_t flags) {
                     {
                       std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      queue_slot->first = std::move(response);
-                      queue_slot->second = flags;
+                      queue_slot->emplace_back(std::move(response), flags);
                     }
                     FinalizeResponses();
                   });
@@ -596,21 +592,18 @@ DynamicBatchScheduler::FinalizeResponses()
       responses;
   {
     std::lock_guard<std::mutex> queue_lock(completion_queue_mtx_);
-    while (true) {
-      // No response left or ready
-      if (completion_queue_.empty()) {
-        break;
+    while (!completion_queue_.empty() && !completion_queue_.front().empty()) {
+      bool response_complete = false;
+      for (auto& response_pair : completion_queue_.front()) {
+        response_complete =
+            ((response_pair.second & TRITONSERVER_RESPONSE_COMPLETE_FINAL) !=
+             0);
+        responses.emplace_back(std::move(response_pair));
       }
-      auto& queue_item = completion_queue_.front();
-      bool response_complete =
-          ((queue_item.second & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
-      if ((queue_item.first == nullptr) && (!response_complete)) {
-        break;
-      }
-
-      responses.emplace_back(std::move(queue_item.first), queue_item.second);
       if (response_complete) {
         completion_queue_.pop_front();
+      } else {
+        completion_queue_.front().clear();
       }
     }
   }
