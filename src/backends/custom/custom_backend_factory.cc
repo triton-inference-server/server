@@ -71,10 +71,10 @@ CustomBackendFactory::CreateBackend(
   for (const auto& filename : custom_files) {
     const auto custom_path = JoinPath({path, filename});
     local_custom_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
-    RETURN_IF_ERROR(LocalizeFileFolder(custom_path, &local_custom_path.back()));
+    RETURN_IF_ERROR(LocalizeDirectory(custom_path, &local_custom_path.back()));
     custom_paths.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_custom_path.back()->local_path_));
+        std::make_tuple(local_custom_path.back()->Path()));
   }
 
   // Create the vector of server parameter values, indexed by the

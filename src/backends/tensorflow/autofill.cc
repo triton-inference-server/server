@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -292,7 +292,7 @@ AutoFillSavedModel::Create(
     local_savedmodel_path.push_back(
         std::shared_ptr<LocalizedDirectory>(nullptr));
     RETURN_IF_ERROR(
-        LocalizeFileFolder(savedmodel_path, &local_savedmodel_path.back()));
+        LocalizeDirectory(savedmodel_path, &local_savedmodel_path.back()));
 
     auto graphdef_backend_config =
         std::static_pointer_cast<GraphDefBackendFactory::Config>(
@@ -301,8 +301,8 @@ AutoFillSavedModel::Create(
     trtistf_model = nullptr;
     err = TRTISTF_ModelCreateFromSavedModel(
         &trtistf_model, model_name.c_str(),
-        local_savedmodel_path.back()->local_path_.c_str(),
-        TRTISTF_NO_GPU_DEVICE, false /* have_graph */, 0 /* graph_level */,
+        local_savedmodel_path.back()->Path().c_str(), TRTISTF_NO_GPU_DEVICE,
+        false /* have_graph */, 0 /* graph_level */,
         graphdef_backend_config->allow_gpu_memory_growth,
         graphdef_backend_config->per_process_gpu_memory_fraction,
         graphdef_backend_config->allow_soft_placement,

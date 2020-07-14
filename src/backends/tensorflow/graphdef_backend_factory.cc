@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -75,10 +75,10 @@ GraphDefBackendFactory::CreateBackend(
     const auto graphdef_path = JoinPath({path, filename});
     local_graphdef_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
     RETURN_IF_ERROR(
-        LocalizeFileFolder(graphdef_path, &local_graphdef_path.back()));
+        LocalizeDirectory(graphdef_path, &local_graphdef_path.back()));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_graphdef_path.back()->local_path_));
+        std::make_tuple(local_graphdef_path.back()->Path()));
   }
 
   // Create the backend for the model and all the execution contexts

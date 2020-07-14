@@ -39,25 +39,34 @@ namespace nvidia { namespace inferenceserver {
 // models are loaded.
 class LocalizedDirectory {
  public:
-  std::string true_path_;
-  std::string local_path_;
-
-  // Store both the true path and the temporary local path. For LocalFileSystem
-  // this will be the same.
-  LocalizedDirectory(std::string true_path, std::string local_path)
-      : true_path_(true_path), local_path_(local_path)
+  // Create an object for a directory path that is already local.
+  LocalizedDirectory(const std::string& original_path)
+      : original_path_(original_path)
   {
   }
 
-  // Only delete the file/folder if it is a local copy created from a Cloud
-  // repository i.e. local_path != true_path.
+  // Create an object for a remote directory path. Store both the
+  // original path and the temporary local path.
+  LocalizedDirectory(
+      const std::string& original_path, const std::string& local_path)
+      : original_path_(original_path), local_path_(local_path)
+  {
+  }
+
+  // Destructor. Remove temporary local storage associated with the object.
   ~LocalizedDirectory();
 
+  // Return the localized path represented by this object.
+  const std::string& Path() const
+  {
+    return (local_path_.empty()) ? original_path_ : local_path_;
+  }
+
  private:
-  bool IsPathDirectory(const char* path);
-  // Helper function used in destructor to cleanup local temporary
-  // files/folders.
-  void DeleteFolderRecursive(const std::string& path);
+  Status DeleteDirectory(const std::string& path);
+
+  std::string original_path_;
+  std::string local_path_;
 };
 
 /// Is a path an absolute path?
@@ -127,12 +136,13 @@ Status GetDirectoryFiles(
 /// \return Error status
 Status ReadTextFile(const std::string& path, std::string* contents);
 
-/// Create a local copy of the file/folder (if needed).
-/// \param path The path of the file.
-/// \param local_path Returns the local path of the file.
+/// Create an object representing a local copy of a directory.
+/// \param path The path of the directory.
+/// \param localized Returns the LocalizedDirectory object
+/// representing the local copy of the directory.
 /// \return Error status
-Status LocalizeFileFolder(
-    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path);
+Status LocalizeDirectory(
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* localized);
 
 /// Write a string to a file.
 /// \param path The path of the file.

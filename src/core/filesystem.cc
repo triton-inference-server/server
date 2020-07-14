@@ -52,33 +52,43 @@
 #include <cerrno>
 #include <fstream>
 #include "src/core/constants.h"
+#include "src/core/logging.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+// Check if a local path is a directory. We need to use this in
+// LocalFileSystem and LocalizedDirectory so have this common
+// function.
+Status
+IsPathDirectory(const std::string& path, bool* is_dir)
+{
+  *is_dir = false;
+
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0) {
+    return Status(Status::Code::INTERNAL, "failed to stat file " + path);
+  }
+
+  *is_dir = S_ISDIR(st.st_mode);
+  return Status::Success;
+}
+
+}  // namespace
+
 LocalizedDirectory::~LocalizedDirectory()
 {
-  if (true_path_ == local_path_) {
-    if (IsPathDirectory(local_path_.c_str())) {
-      DeleteFolderRecursive(local_path_);
-    } else {
-      remove(local_path_.c_str());
-    }
+  if (!local_path_.empty()) {
+    LOG_STATUS_ERROR(
+        DeleteDirectory(local_path_),
+        "failed to delete localized model directory");
   }
 }
 
-bool
-LocalizedDirectory::IsPathDirectory(const char* path)
-{
-  struct stat s_buf;
-  if (stat(path, &s_buf)) {
-    return 0;
-  }
-
-  return S_ISDIR(s_buf.st_mode);
-}
-
-void
-LocalizedDirectory::DeleteFolderRecursive(const std::string& path)
+Status
+LocalizedDirectory::DeleteDirectory(const std::string& path)
 {
   struct dirent* ep;
   DIR* dp = opendir(path.c_str());
@@ -88,8 +98,10 @@ LocalizedDirectory::DeleteFolderRecursive(const std::string& path)
       continue;
     }
     std::string tmp_path = path + "/" + std::string(ep->d_name);
-    if (IsPathDirectory(tmp_path.c_str())) {
-      DeleteFolderRecursive(tmp_path);
+    bool is_dir = false;
+    RETURN_IF_ERROR(IsPathDirectory(tmp_path.c_str(), &is_dir));
+    if (is_dir) {
+      DeleteDirectory(tmp_path);
     } else {
       remove(tmp_path.c_str());
     }
@@ -97,6 +109,8 @@ LocalizedDirectory::DeleteFolderRecursive(const std::string& path)
 
   closedir(dp);
   rmdir(path.c_str());
+
+  return Status::Success;
 }
 
 namespace {
@@ -115,9 +129,9 @@ class FileSystem {
       const std::string& path, std::set<std::string>* files) = 0;
   virtual Status ReadTextFile(
       const std::string& path, std::string* contents) = 0;
-  virtual Status LocalizeFileFolder(
+  virtual Status LocalizeDirectory(
       const std::string& path,
-      std::shared_ptr<LocalizedDirectory>* local_path) = 0;
+      std::shared_ptr<LocalizedDirectory>* localized) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
 };
@@ -135,13 +149,12 @@ class LocalFileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
-  Status LocalizeFileFolder(
+  Status LocalizeDirectory(
       const std::string& path,
-      std::shared_ptr<LocalizedDirectory>* local_path) override;
+      std::shared_ptr<LocalizedDirectory>* localized) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 };
-
 
 Status
 LocalFileSystem::FileExists(const std::string& path, bool* exists)
@@ -153,15 +166,7 @@ LocalFileSystem::FileExists(const std::string& path, bool* exists)
 Status
 LocalFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 {
-  *is_dir = false;
-
-  struct stat st;
-  if (stat(path.c_str(), &st) != 0) {
-    return Status(Status::Code::INTERNAL, "failed to stat file " + path);
-  }
-
-  *is_dir = S_ISDIR(st.st_mode);
-  return Status::Success;
+  return IsPathDirectory(path, is_dir);
 }
 
 Status
@@ -259,12 +264,12 @@ LocalFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
-LocalFileSystem::LocalizeFileFolder(
-    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path)
+LocalFileSystem::LocalizeDirectory(
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* localized)
 {
-  // For local file system we don't actually need to download the folder. We use
-  // it in place.
-  local_path->reset(new LocalizedDirectory(path, path));
+  // For local file system we don't actually need to download the
+  // directory. We use it in place.
+  localized->reset(new LocalizedDirectory(path));
   return Status::Success;
 }
 
@@ -317,9 +322,9 @@ class GCSFileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
-  Status LocalizeFileFolder(
+  Status LocalizeDirectory(
       const std::string& path,
-      std::shared_ptr<LocalizedDirectory>* local_path) override;
+      std::shared_ptr<LocalizedDirectory>* localized) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -578,12 +583,12 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
-GCSFileSystem::LocalizeFileFolder(
-    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path)
+GCSFileSystem::LocalizeDirectory(
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* localized)
 {
   // For GCS we don't download the folder.
   // FIXME We will need to fix this in the future.
-  local_path->reset(new LocalizedDirectory(path, path));
+  localized->reset(new LocalizedDirectory(path));
   return Status::Success;
 }
 
@@ -617,9 +622,9 @@ class S3FileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
-  Status LocalizeFileFolder(
+  Status LocalizeDirectory(
       const std::string& path,
-      std::shared_ptr<LocalizedDirectory>* local_path) override;
+      std::shared_ptr<LocalizedDirectory>* localized) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -938,15 +943,20 @@ S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
-S3FileSystem::LocalizeFileFolder(
-    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path)
+S3FileSystem::LocalizeDirectory(
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* localized)
 {
   bool exists;
   RETURN_IF_ERROR(FileExists(path, &exists));
 
-  if (!exists) {
+  bool is_dir = false;
+  if (exists) {
+    RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  }
+
+  if (!is_dir) {
     return Status(
-        Status::Code::INTERNAL, "File/folder does not exist at " + path);
+        Status::Code::INTERNAL, "directory does not exist at " + path);
   }
 
   std::string effective_path, host_name, host_port, bucket, object;
@@ -957,87 +967,50 @@ S3FileSystem::LocalizeFileFolder(
     effective_path = path;
   }
 
-  bool is_dir = false;
-  std::set<std::string> contents, files;
   std::string file_template = "/tmp/fileXXXXXX";
-  RETURN_IF_ERROR(IsDirectory(effective_path, &is_dir));
-  if (is_dir) {
-    char* tmp_folder = mkdtemp(const_cast<char*>(file_template.c_str()));
-    if (tmp_folder == nullptr) {
-      return Status(
-          Status::Code::INTERNAL,
-          "Failed to create local temp folder: " + file_template +
-              ", errno:" + strerror(errno));
-    }
+  char* tmp_folder = mkdtemp(const_cast<char*>(file_template.c_str()));
+  if (tmp_folder == nullptr) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder: " + file_template +
+            ", errno:" + strerror(errno));
+  }
 
-    local_path->reset(new LocalizedDirectory(effective_path, tmp_folder));
-    RETURN_IF_ERROR(GetDirectoryContents(effective_path, &contents));
+  localized->reset(new LocalizedDirectory(effective_path, tmp_folder));
 
-    for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
-      bool is_subdir;
-      std::string s3_fpath = JoinPath({effective_path, *iter});
-      std::string local_fpath = JoinPath({(*local_path)->local_path_, *iter});
-      RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
-      if (is_subdir) {
-        // Create local mirror of sub-directories
-        int status = mkdir(
-            const_cast<char*>(local_fpath.c_str()),
-            S_IRUSR | S_IWUSR | S_IXUSR);
-        if (status == -1) {
-          return Status(
-              Status::Code::INTERNAL,
-              "Failed to create local folder: " + local_fpath +
-                  ", errno:" + strerror(errno));
-        }
+  std::set<std::string> contents, files;
+  RETURN_IF_ERROR(GetDirectoryContents(effective_path, &contents));
 
-        // Add with s3 path
-        std::set<std::string> subdir_files;
-        RETURN_IF_ERROR(GetDirectoryFiles(s3_fpath, &subdir_files));
-        for (auto itr = subdir_files.begin(); itr != subdir_files.end();
-             ++itr) {
-          files.insert(JoinPath({s3_fpath, *itr}));
-        }
-
-      } else {
-        files.insert(s3_fpath);
-      }
-    }
-
-    for (auto iter = files.begin(); iter != files.end(); ++iter) {
-      std::string bucket, object;
-      RETURN_IF_ERROR(ParsePath(*iter, &bucket, &object));
-
-      // Send a request for the objects metadata
-      s3::Model::GetObjectRequest object_request;
-      object_request.SetBucket(bucket.c_str());
-      object_request.SetKey(object.c_str());
-
-      auto get_object_outcome = client_.GetObject(object_request);
-      if (get_object_outcome.IsSuccess()) {
-        auto& retrieved_file =
-            get_object_outcome.GetResultWithOwnership().GetBody();
-        std::string s3_removed_path = (*iter).substr(effective_path.size());
-        std::string local_file_path =
-            JoinPath({(*local_path)->local_path_, s3_removed_path});
-        std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
-        output_file << retrieved_file.rdbuf();
-        output_file.close();
-      } else {
+  for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
+    bool is_subdir;
+    std::string s3_fpath = JoinPath({effective_path, *iter});
+    std::string local_fpath = JoinPath({(*localized)->Path(), *iter});
+    RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
+    if (is_subdir) {
+      // Create local mirror of sub-directories
+      int status = mkdir(
+          const_cast<char*>(local_fpath.c_str()), S_IRUSR | S_IWUSR | S_IXUSR);
+      if (status == -1) {
         return Status(
-            Status::Code::INTERNAL, "Failed to get object at " + *iter);
+            Status::Code::INTERNAL,
+            "Failed to create local folder: " + local_fpath +
+                ", errno:" + strerror(errno));
       }
-    }
-  } else {
-    int status = mkstemp(const_cast<char*>(file_template.c_str()));
-    if (status == -1) {
-      return Status(
-          Status::Code::INTERNAL,
-          "Failed to create local temp file: " + file_template);
-    }
 
-    local_path->reset(new LocalizedDirectory(effective_path, file_template));
+      // Add with s3 path
+      std::set<std::string> subdir_files;
+      RETURN_IF_ERROR(GetDirectoryFiles(s3_fpath, &subdir_files));
+      for (auto itr = subdir_files.begin(); itr != subdir_files.end(); ++itr) {
+        files.insert(JoinPath({s3_fpath, *itr}));
+      }
+    } else {
+      files.insert(s3_fpath);
+    }
+  }
+
+  for (auto iter = files.begin(); iter != files.end(); ++iter) {
     std::string bucket, object;
-    RETURN_IF_ERROR(ParsePath(effective_path, &bucket, &object));
+    RETURN_IF_ERROR(ParsePath(*iter, &bucket, &object));
 
     // Send a request for the objects metadata
     s3::Model::GetObjectRequest object_request;
@@ -1048,15 +1021,17 @@ S3FileSystem::LocalizeFileFolder(
     if (get_object_outcome.IsSuccess()) {
       auto& retrieved_file =
           get_object_outcome.GetResultWithOwnership().GetBody();
-      std::ofstream output_file(
-          (*local_path)->local_path_.c_str(), std::ios::binary);
+      std::string s3_removed_path = (*iter).substr(effective_path.size());
+      std::string local_file_path =
+          JoinPath({(*localized)->Path(), s3_removed_path});
+      std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
       output_file << retrieved_file.rdbuf();
       output_file.close();
     } else {
-      return Status(
-          Status::Code::INTERNAL, "Failed to get object at " + effective_path);
+      return Status(Status::Code::INTERNAL, "Failed to get object at " + *iter);
     }
   }
+
   return Status::Success;
 }
 
@@ -1282,12 +1257,12 @@ ReadTextProto(const std::string& path, google::protobuf::Message* msg)
 }
 
 Status
-LocalizeFileFolder(
-    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path)
+LocalizeDirectory(
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* localized)
 {
   FileSystem* fs;
   RETURN_IF_ERROR(GetFileSystem(path, &fs));
-  return fs->LocalizeFileFolder(path, local_path);
+  return fs->LocalizeDirectory(path, localized);
 }
 
 Status

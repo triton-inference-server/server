@@ -90,11 +90,11 @@ OnnxBackendFactory::CreateBackend(
   for (const auto& dirname : onnx_subdirs) {
     const auto onnx_path = JoinPath({path, dirname});
     local_onnx_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
-    RETURN_IF_ERROR(LocalizeFileFolder(onnx_path, &local_onnx_path.back()));
+    RETURN_IF_ERROR(LocalizeDirectory(onnx_path, &local_onnx_path.back()));
     models.emplace(
         std::piecewise_construct, std::make_tuple(dirname),
-        std::make_tuple(std::move(
-            std::make_pair(false, local_onnx_path.back()->local_path_))));
+        std::make_tuple(
+            std::move(std::make_pair(false, local_onnx_path.back()->Path()))));
   }
 
   for (const auto& filename : onnx_files) {

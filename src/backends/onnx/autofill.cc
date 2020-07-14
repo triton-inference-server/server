@@ -387,7 +387,7 @@ AutoFillOnnx::Create(
       for (auto dir : onnx_dirs) {
         const auto onnx_path = JoinPath({version_path, dir});
         local_onnx_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
-        status = LocalizeFileFolder(onnx_path, &local_onnx_path.back());
+        status = LocalizeDirectory(onnx_path, &local_onnx_path.back());
         if (!status.IsOk()) {
           LOG_VERBOSE(1) << "failed to download " << onnx_path << ": "
                          << status.AsString();
@@ -395,7 +395,7 @@ AutoFillOnnx::Create(
         }
 
         status = OnnxLoader::LoadSession(
-            std::make_pair(false, local_onnx_path.back()->local_path_),
+            std::make_pair(false, local_onnx_path.back()->Path()),
             session_options, &session);
 
         if (status.IsOk()) {
