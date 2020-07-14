@@ -50,10 +50,13 @@ Status
 InferenceResponseFactory::SendFlags(const uint32_t flags) const
 {
   if (response_delegator_ != nullptr) {
-    response_delegator_(nullptr /* response */, flags);
+    std::unique_ptr<InferenceResponse> response(
+        new InferenceResponse(response_fn_, response_userp_));
+    response_delegator_(std::move(response), flags);
+  } else {
+    void* userp = response_userp_;
+    response_fn_(nullptr /* response */, flags, userp);
   }
-  void* userp = response_userp_;
-  response_fn_(nullptr /* response */, flags, userp);
   return Status::Success;
 }
 
@@ -69,7 +72,8 @@ InferenceResponse::InferenceResponse(
         void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
     : backend_(backend), id_(id), allocator_(allocator),
       alloc_userp_(alloc_userp), response_fn_(response_fn),
-      response_userp_(response_userp), response_delegator_(delegator)
+      response_userp_(response_userp), response_delegator_(delegator),
+      null_response_(false)
 {
   // If the allocator has a start_fn then invoke it.
   TRITONSERVER_ResponseAllocatorStartFn_t start_fn = allocator_->StartFn();
@@ -81,6 +85,14 @@ InferenceResponse::InferenceResponse(
             alloc_userp_),
         "response allocation start failed");
   }
+}
+
+InferenceResponse::InferenceResponse(
+    TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+    void* response_userp)
+    : response_fn_(response_fn), response_userp_(response_userp),
+      null_response_(true)
+{
 }
 
 const std::string&
@@ -194,9 +206,13 @@ InferenceResponse::Send(
     return Status::Success;
   }
   void* userp = response->response_userp_;
-  response->response_fn_(
-      reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
-      flags, userp);
+  if (response->null_response_) {
+    response->response_fn_(nullptr /* response */, flags, userp);
+  } else {
+    response->response_fn_(
+        reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
+        flags, userp);
+  }
   return Status::Success;
 }
 
