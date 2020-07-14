@@ -207,6 +207,14 @@ class InferenceResponse {
       const std::function<void(
           std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator);
 
+  // "null" InferenceResponse is a special instance of InferenceResponse which
+  // contains minimal information for calling InferenceResponse::Send,
+  // InferenceResponse::NullResponse. nullptr will be passed as response in
+  // 'response_fn'.
+  InferenceResponse(
+      TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+      void* response_userp);
+
   const std::string& Id() const { return id_; }
   const std::string& ModelName() const;
   int64_t ActualModelVersion() const;
@@ -292,6 +300,8 @@ class InferenceResponse {
   // Delegator to be invoked on sending responses.
   std::function<void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>
       response_delegator_;
+
+  bool null_response_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceResponse& response);
