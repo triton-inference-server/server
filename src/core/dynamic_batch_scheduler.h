@@ -149,8 +149,9 @@ class DynamicBatchScheduler : public Scheduler {
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
 
-  // Per completion-id queues to store the ready requests
-  std::deque<std::pair<std::unique_ptr<InferenceResponse>, uint32_t>>
+  // Per completion-id queues to store the ready responses
+  std::deque<
+      std::vector<std::pair<std::unique_ptr<InferenceResponse>, uint32_t>>>
       completion_queue_;
   // Lock to protect the completion_queues_
   std::mutex completion_queue_mtx_;
