@@ -300,6 +300,8 @@ class InferenceResponse {
   // Delegator to be invoked on sending responses.
   std::function<void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>
       response_delegator_;
+
+  bool null_response_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceResponse& response);
