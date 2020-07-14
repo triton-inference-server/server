@@ -119,8 +119,8 @@ class RequestTracker {
 // internal infer request
 struct Step {
   Step(size_t step_idx, uint64_t correlation_id, uint32_t flags)
-      : correlation_id_(correlation_id), flags_(flags),
-        response_flags_(0), infer_status_(nullptr), step_idx_(step_idx)
+      : correlation_id_(correlation_id), flags_(flags), response_flags_(0),
+        infer_status_(nullptr), step_idx_(step_idx)
   {
   }
 
