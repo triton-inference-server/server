@@ -123,10 +123,12 @@ if __name__ == '__main__':
         output0_data = user_data[0].as_numpy('OUTPUT0')
         output1_data = user_data[0].as_numpy('OUTPUT1')
         for i in range(16):
-            print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
-                  " = " + str(output0_data[0][i]))
-            print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
-                  " = " + str(output1_data[0][i]))
+            print(
+                str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
+                " = " + str(output0_data[0][i]))
+            print(
+                str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
+                " = " + str(output1_data[0][i]))
             if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
                 print("sync infer error: incorrect sum")
                 sys.exit(1)

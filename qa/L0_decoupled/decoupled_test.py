@@ -56,11 +56,11 @@ def callback(user_data, result, error):
 class DecoupledTest(unittest.TestCase):
 
     def setUp(self):
-        self.trials_ = [
-            ("repeat_int32", None), ("simple_repeat", None),
-            ("sequence_repeat", None), ("fan_repeat", self._fan_validate),
-            ("repeat_square", self._nested_validate), ("nested_square", self._nested_validate)
-        ]
+        self.trials_ = [("repeat_int32", None), ("simple_repeat", None),
+                        ("sequence_repeat", None),
+                        ("fan_repeat", self._fan_validate),
+                        ("repeat_square", self._nested_validate),
+                        ("nested_square", self._nested_validate)]
         self.model_name_ = "repeat_int32"
 
         self.inputs_ = []
@@ -84,10 +84,11 @@ class DecoupledTest(unittest.TestCase):
             for i in range(request_count):
                 time.sleep((request_delay / 1000))
                 self.inputs_[1].set_data_from_numpy(delay_data)
-                triton_client.async_stream_infer(model_name=self.model_name_,
-                                                 inputs=self.inputs_,
-                                                 request_id=str(i),
-                                                 outputs=self.requested_outputs_)
+                triton_client.async_stream_infer(
+                    model_name=self.model_name_,
+                    inputs=self.inputs_,
+                    request_id=str(i),
+                    outputs=self.requested_outputs_)
                 # Update delay input in accordance with the scaling factor
                 delay_data = delay_data * delay_factor
                 delay_data = delay_data.astype(np.uint32)
@@ -115,11 +116,12 @@ class DecoupledTest(unittest.TestCase):
             self.assertEqual(len(this_data), 1)
             self.assertEqual(this_data[0], expected_data)
             expected_data += 2
-    
+
     def _nested_validate(self, result_list, data_offset, repeat_count):
         # if repeat model returns repeat result n, repeat_square-like model
         # will return the same result n times
-        expected_len = sum(x for x in range(data_offset, data_offset+repeat_count))
+        expected_len = sum(
+            x for x in range(data_offset, data_offset + repeat_count))
         self.assertEqual(len(result_list), expected_len)
         expected_data = data_offset
         expected_count = expected_data
@@ -158,19 +160,21 @@ class DecoupledTest(unittest.TestCase):
         self.inputs_[2].set_data_from_numpy(wait_data)
 
         # use validate_fn to differentiate requested outputs
-        self.requested_outputs_ = self.outputs_ if validate_fn is None else self.outputs_[0:1]
+        self.requested_outputs_ = self.outputs_ if validate_fn is None else self.outputs_[
+            0:1]
 
         user_data = UserData()
         result_dict = {}
 
-        try: 
+        try:
             if "square" not in self.model_name_:
                 expected_count = (repeat_count * request_count)
             else:
-                expected_count = sum(x for x in range(data_offset, data_offset+repeat_count)) * request_count
+                expected_count = sum(
+                    x for x in range(data_offset, data_offset +
+                                     repeat_count)) * request_count
             self._stream_infer(request_count, request_delay, expected_count,
-                               delay_data, delay_factor, user_data,
-                               result_dict)
+                               delay_data, delay_factor, user_data, result_dict)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -194,7 +198,7 @@ class DecoupledTest(unittest.TestCase):
                     for j in range(len(result_list)):
                         if order_sequence is not None:
                             self.assertEqual(result_list[j][0],
-                                            order_sequence[i][j])
+                                             order_sequence[i][j])
                         this_data = result_list[j][1].as_numpy('OUT')
                         self.assertEqual(len(this_data), 1)
                         self.assertEqual(this_data[0], expected_data)
@@ -213,9 +217,13 @@ class DecoupledTest(unittest.TestCase):
         for trial in self.trials_:
             self.model_name_ = trial[0]
             # Single request case
-            self._decoupled_infer(request_count=1, repeat_count=0, validate_fn=trial[1])
+            self._decoupled_infer(request_count=1,
+                                  repeat_count=0,
+                                  validate_fn=trial[1])
             # Multiple request case
-            self._decoupled_infer(request_count=5, repeat_count=0, validate_fn=trial[1])
+            self._decoupled_infer(request_count=5,
+                                  repeat_count=0,
+                                  validate_fn=trial[1])
 
     def test_one_to_one(self):
         # Test cases where each request generates single response.
@@ -226,15 +234,23 @@ class DecoupledTest(unittest.TestCase):
             self.model_name_ = trial[0]
             # Single request case
             # Release request before the response is delivered
-            self._decoupled_infer(request_count=1, wait_time=500, validate_fn=trial[1])
+            self._decoupled_infer(request_count=1,
+                                  wait_time=500,
+                                  validate_fn=trial[1])
             # Release request after the response is delivered
-            self._decoupled_infer(request_count=1, wait_time=2000, validate_fn=trial[1])
+            self._decoupled_infer(request_count=1,
+                                  wait_time=2000,
+                                  validate_fn=trial[1])
 
             # Multiple request case
             # Release request before the response is delivered
-            self._decoupled_infer(request_count=5, wait_time=500, validate_fn=trial[1])
+            self._decoupled_infer(request_count=5,
+                                  wait_time=500,
+                                  validate_fn=trial[1])
             # Release request after the response is delivered
-            self._decoupled_infer(request_count=5, wait_time=2000, validate_fn=trial[1])
+            self._decoupled_infer(request_count=5,
+                                  wait_time=2000,
+                                  validate_fn=trial[1])
 
     def test_one_to_many(self):
         # Test cases where each request generates multiple response.

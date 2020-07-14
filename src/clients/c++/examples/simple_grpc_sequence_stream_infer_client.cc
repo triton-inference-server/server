@@ -226,8 +226,7 @@ main(int argc, char** argv)
       if (!cv_.wait_for(lk, timeout, [&]() {
             return (result_list.size() > (2 * values.size() + 1));
           })) {
-        std::cerr << "Stream has been closed"
-                  << std::endl;
+        std::cerr << "Stream has been closed" << std::endl;
         exit(1);
       }
     }
