@@ -105,7 +105,7 @@ for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
         PER_VGPU_MEM_LIMIT_MBYTES=$(( TOTAL_MEM / INSTANCE_CNT ))
 
         for i in $(seq 0 $(( NUM_GPUS - 1 ))); do
-           VGPU_ARG=--tf-add-vgpu="${i};${INSTANCE_CNT};${PER_VGPU_MEM_LIMIT_MBYTES}"
+           VGPU_ARG=--backend-config="tensorflow,add-vgpu=${i};${INSTANCE_CNT};${PER_VGPU_MEM_LIMIT_MBYTES}"
            SERVER_ARGS=${SERVER_ARGS}" "${VGPU_ARG}
         done
         run_server
