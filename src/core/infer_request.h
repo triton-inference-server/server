@@ -352,9 +352,8 @@ class InferenceRequest {
   }
 
   // Add a delegator to be invoked on sending the responses of this request.
-  // The responses will be passed to 'delegator', a response may be a response
-  // object or may be nullptr, 'delegator' must call the
-  // InferenceResponse::Send() to send non-null responses.
+  // The response will be passed to 'delegator' and 'delegator' must call the
+  // InferenceResponse::Send() to send the response.
   Status SetResponseDelegator(
       std::function<void(
           std::unique_ptr<InferenceResponse>&&, const uint32_t)>&& delegator)

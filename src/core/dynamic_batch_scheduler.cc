@@ -595,6 +595,7 @@ DynamicBatchScheduler::FinalizeResponses()
     while (!completion_queue_.empty() && !completion_queue_.front().empty()) {
       bool response_complete = false;
       for (auto& response_pair : completion_queue_.front()) {
+        // Assuming FINAL flag is set only in the last response of the request
         response_complete =
             ((response_pair.second & TRITONSERVER_RESPONSE_COMPLETE_FINAL) !=
              0);
