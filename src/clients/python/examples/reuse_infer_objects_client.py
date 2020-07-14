@@ -100,10 +100,12 @@ def infer_and_validata(use_shared_memory, orig_input0_data, orig_input1_data):
     else:
         print("\n\n======== NO_SHARED_MEMORY ========\n")
     for i in range(16):
-        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
-              str(output0_data[0][i]))
-        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
-              str(output1_data[0][i]))
+        print(
+            str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
+            str(output0_data[0][i]))
+        print(
+            str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
+            str(output1_data[0][i]))
         if (input0_data[i] + input1_data[i]) != output0_data[0][i]:
             print("shm infer error: incorrect sum")
             sys.exit(1)

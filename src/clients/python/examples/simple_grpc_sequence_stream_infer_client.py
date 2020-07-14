@@ -147,7 +147,8 @@ if __name__ == '__main__':
             url=FLAGS.url, verbose=FLAGS.verbose) as triton_client:
         try:
             # Establish stream
-            triton_client.start_stream(callback=partial(callback, user_data), stream_timeout=FLAGS.stream_timeout)
+            triton_client.start_stream(callback=partial(callback, user_data),
+                                       stream_timeout=FLAGS.stream_timeout)
             # Now send the inference sequences...
             async_stream_send(triton_client, [0] + values, batch_size,
                               sequence_id0, model_name, model_version)

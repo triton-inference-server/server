@@ -1141,9 +1141,9 @@ class InferenceServerClient:
 
         try:
             response_iterator = self._client_stub.ModelStreamInfer(
-                                    _RequestIterator(self._stream),
-                                    metadata=metadata,
-                                    timeout=stream_timeout)
+                _RequestIterator(self._stream),
+                metadata=metadata,
+                timeout=stream_timeout)
             self._stream._init_handler(response_iterator)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)

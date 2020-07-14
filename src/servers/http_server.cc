@@ -2398,10 +2398,10 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
   TRITONSERVER_Error* err = nullptr;
   if (response_count != 0) {
     err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string(
-            "expected a single response, got " + std::to_string(response_count + 1))
-            .c_str());
+        TRITONSERVER_ERROR_INTERNAL, std::string(
+                                         "expected a single response, got " +
+                                         std::to_string(response_count + 1))
+                                         .c_str());
   } else if (response == nullptr) {
     err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");

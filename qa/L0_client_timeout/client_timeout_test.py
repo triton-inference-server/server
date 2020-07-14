@@ -42,6 +42,7 @@ from tritonclientutils import InferenceServerException
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -54,6 +55,7 @@ def callback(user_data, result, error):
 
 
 class ClientTimeoutTest(unittest.TestCase):
+
     def setUp(self):
         self.model_name_ = "custom_identity_int32"
         self.input0_data_ = np.array([[10]], dtype=np.int32)
@@ -61,14 +63,14 @@ class ClientTimeoutTest(unittest.TestCase):
     def _prepare_request(self, protocol):
         if (protocol == "grpc"):
             self.inputs_ = []
-            self.inputs_.append(
-                grpcclient.InferInput('INPUT0', [1, 1], "INT32"))
+            self.inputs_.append(grpcclient.InferInput('INPUT0', [1, 1],
+                                                      "INT32"))
             self.outputs_ = []
             self.outputs_.append(grpcclient.InferRequestedOutput('OUTPUT0'))
         else:
             self.inputs_ = []
-            self.inputs_.append(
-                httpclient.InferInput('INPUT0', [1, 1], "INT32"))
+            self.inputs_.append(httpclient.InferInput('INPUT0', [1, 1],
+                                                      "INT32"))
             self.outputs_ = []
             self.outputs_.append(httpclient.InferRequestedOutput('OUTPUT0'))
 

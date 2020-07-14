@@ -154,10 +154,12 @@ if __name__ == '__main__':
         sys.exit(1)
 
     for i in range(16):
-        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
-              str(output0_data[0][i]))
-        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
-              str(output1_data[0][i]))
+        print(
+            str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
+            str(output0_data[0][i]))
+        print(
+            str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
+            str(output1_data[0][i]))
         if (input0_data[i] + input1_data[i]) != output0_data[0][i]:
             print("shm infer error: incorrect sum")
             sys.exit(1)
