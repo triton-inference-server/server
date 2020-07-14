@@ -28,6 +28,7 @@
 
 #include <dlfcn.h>
 #include "src/core/logging.h"
+#include "src/core/server_message.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -77,10 +78,26 @@ GetEntrypoint(
 Status
 TritonBackend::Create(
     const std::string& name, const std::string& path,
+    const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
-  auto local_backend =
-      std::shared_ptr<TritonBackend>(new TritonBackend(name, path));
+  // Create the JSON representation of the backend configuration.
+  TritonJson::Value backend_config_json(TritonJson::ValueType::OBJECT);
+  if (!backend_cmdline_config.empty()) {
+    TritonJson::Value cmdline_json(
+        backend_config_json, TritonJson::ValueType::OBJECT);
+    for (const auto& pr : backend_cmdline_config) {
+      RETURN_IF_ERROR(cmdline_json.AddString(pr.first.c_str(), pr.second));
+    }
+
+    RETURN_IF_ERROR(
+        backend_config_json.Add("cmdline", std::move(cmdline_json)));
+  }
+
+  TritonServerMessage backend_config(backend_config_json);
+
+  auto local_backend = std::shared_ptr<TritonBackend>(
+      new TritonBackend(name, path, backend_config));
 
   // Load the library and initialize all the entrypoints
   RETURN_IF_ERROR(local_backend->LoadBackendLibrary());
@@ -96,8 +113,10 @@ TritonBackend::Create(
   return Status::Success;
 }
 
-TritonBackend::TritonBackend(const std::string& name, const std::string& path)
-    : name_(name), path_(path), state_(nullptr)
+TritonBackend::TritonBackend(
+    const std::string& name, const std::string& path,
+    const TritonServerMessage& backend_config)
+    : name_(name), path_(path), backend_config_(backend_config), state_(nullptr)
 {
   ClearHandles();
 }
@@ -208,6 +227,16 @@ TRITONBACKEND_BackendApiVersion(
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_BackendConfig(
+    TRITONBACKEND_Backend* backend, TRITONSERVER_Message** backend_config)
+{
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  *backend_config = const_cast<TRITONSERVER_Message*>(
+      reinterpret_cast<const TRITONSERVER_Message*>(&tb->BackendConfig()));
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_BackendState(TRITONBACKEND_Backend* backend, void** state)
 {
   TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
@@ -231,6 +260,7 @@ TRITONBACKEND_BackendSetState(TRITONBACKEND_Backend* backend, void* state)
 Status
 TritonBackendManager::CreateBackend(
     const std::string& name, const std::string& path,
+    const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
   static TritonBackendManager singleton_manager;
@@ -252,7 +282,8 @@ TritonBackendManager::CreateBackend(
     singleton_manager.backend_map_.erase(itr);
   }
 
-  RETURN_IF_ERROR(TritonBackend::Create(name, path, backend));
+  RETURN_IF_ERROR(
+      TritonBackend::Create(name, path, backend_cmdline_config, backend));
   singleton_manager.backend_map_.insert({path, *backend});
 
   return Status::Success;

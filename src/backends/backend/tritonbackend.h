@@ -417,6 +417,24 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendName(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendApiVersion(
     TRITONBACKEND_Backend* backend, uint32_t* api_version);
 
+/// Get the backend configuration.  The 'backend_config' message is
+/// owned by Triton and should not be modified or freed by the caller.
+///
+/// The backend configuration, as JSON, is:
+///
+///   {
+///     "cmdline" : {
+///       "<setting>" : "<value>",
+///       ...
+///     }
+///   }
+///
+/// \param backend The backend.
+/// \param backend_config Returns the backend configuration as a message.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendConfig(
+    TRITONBACKEND_Backend* backend, TRITONSERVER_Message** backend_config);
+
 /// Get the user-specified state associated with the backend. The
 /// state is completely owned and managed by the backend.
 ///

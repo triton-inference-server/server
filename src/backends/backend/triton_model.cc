@@ -41,6 +41,7 @@ namespace nvidia { namespace inferenceserver {
 Status
 TritonModel::Create(
     InferenceServer* server, const std::string& model_repository_path,
+    const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const std::string& model_name, const int64_t version,
     const ModelConfig& model_config, const double min_compute_capability,
     std::unique_ptr<TritonModel>* model)
@@ -87,10 +88,19 @@ TritonModel::Create(
                                        model_path + ", " + global_path);
   }
 
-  // Find the backend
+  // Find/create the backend
+  BackendCmdlineConfig empty_backend_cmdline_config;
+  const BackendCmdlineConfig* config;
+  const auto& itr = backend_cmdline_config_map.find(model_config.backend());
+  if (itr == backend_cmdline_config_map.end()) {
+    config = &empty_backend_cmdline_config;
+  } else {
+    config = &itr->second;
+  }
+
   std::shared_ptr<TritonBackend> backend;
   RETURN_IF_ERROR(TritonBackendManager::CreateBackend(
-      model_config.backend(), backend_libpath, &backend));
+      model_config.backend(), backend_libpath, *config, &backend));
 
   // Create and initialize the model.
   std::unique_ptr<TritonModel> local_model(
