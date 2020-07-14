@@ -616,7 +616,11 @@ DynamicBatchScheduler::FinalizeResponses()
   }
 
   for (auto& response : responses) {
-    InferenceResponse::Send(std::move(response.first), response.second);
+    // if response is nullptr, the delegator is called from response factory and
+    // nothing needed to be done
+    if (response.first != nullptr) {
+      InferenceResponse::Send(std::move(response.first), response.second);
+    }
   }
 }
 

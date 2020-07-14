@@ -49,6 +49,9 @@ InferenceResponseFactory::CreateResponse(
 Status
 InferenceResponseFactory::SendFlags(const uint32_t flags) const
 {
+  if (response_delegator_ != nullptr) {
+    response_delegator_(nullptr /* response */, flags);
+  }
   void* userp = response_userp_;
   response_fn_(nullptr /* response */, flags, userp);
   return Status::Success;
