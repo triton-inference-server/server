@@ -185,6 +185,15 @@ class InferenceServer {
   int32_t ExitTimeoutSeconds() const { return exit_timeout_secs_; }
   void SetExitTimeoutSeconds(int32_t s) { exit_timeout_secs_ = std::max(0, s); }
 
+  // Set a backend command-line configuration
+  void SetBackendCmdlineConfig(const BackendCmdlineConfigMap& bc)
+  {
+    backend_cmdline_config_map_ = bc;
+  }
+
+  // FIXME TF specific functions should be removed once all backends
+  // use BackendConfig.
+
   // Get / set Tensorflow soft placement enable.
   bool TensorFlowSoftPlacementEnabled() const
   {
@@ -238,7 +247,9 @@ class InferenceServer {
   uint64_t pinned_memory_pool_size_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_supported_compute_capability_;
+  BackendCmdlineConfigMap backend_cmdline_config_map_;
 
+  // FIXME, remove once all backends use backend config.
   // Tensorflow options
   bool tf_soft_placement_enabled_;
   float tf_gpu_memory_fraction_;

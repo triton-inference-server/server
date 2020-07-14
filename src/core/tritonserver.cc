@@ -211,6 +211,14 @@ class TritonServerOptions {
   bool GpuMetrics() const { return gpu_metrics_; }
   void SetGpuMetrics(bool b) { gpu_metrics_ = b; }
 
+  const ni::BackendCmdlineConfigMap& BackendCmdlineConfigMap() const
+  {
+    return backend_cmdline_config_map_;
+  }
+  TRITONSERVER_Error* AddBackendConfig(
+      const std::string& backend_name, const std::string& setting,
+      const std::string& value);
+
   bool TensorFlowSoftPlacement() const { return tf_soft_placement_; }
   void SetTensorFlowSoftPlacement(bool b) { tf_soft_placement_ = b; }
 
@@ -243,6 +251,7 @@ class TritonServerOptions {
   uint64_t pinned_memory_pool_size_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_compute_capability_;
+  ni::BackendCmdlineConfigMap backend_cmdline_config_map_;
 
   bool tf_soft_placement_;
   float tf_gpu_mem_fraction_;
@@ -270,6 +279,127 @@ TritonServerOptions::TritonServerOptions()
 #ifndef TRITON_ENABLE_METRICS_GPU
   gpu_metrics_ = false;
 #endif  // TRITON_ENABLE_METRICS_GPU
+}
+
+TRITONSERVER_Error*
+ParseVGPUOption(
+    const std::string arg, std::map<int, std::pair<int, uint64_t>>* val)
+{
+  int delim_gpu = arg.find(";");
+  int delim_num_vgpus = arg.find(";", delim_gpu + 1);
+
+  // Check for 2 semicolons
+  if ((delim_gpu < 0) || (delim_num_vgpus < 0)) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string(
+             "'add-vgpu' argument requires format <physical GPU>;<number of "
+             "virtual GPUs>;<memory limit per VGPU in megabytes>. Got: ") +
+         arg)
+            .c_str());
+  }
+
+  std::string gpu_string = arg.substr(0, delim_gpu);
+  std::string vgpu_string =
+      arg.substr(delim_gpu + 1, delim_num_vgpus - delim_gpu - 1);
+  std::string mem_limit_string = arg.substr(delim_num_vgpus + 1);
+
+  try {
+    int gpu_device = std::stoi(gpu_string);
+    int num_vgpus_on_device = std::stoi(vgpu_string);
+    uint64_t mem_limit = std::stoi(mem_limit_string);
+
+    if (gpu_device < 0) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string(
+               "'add-vgpu' requires physical GPU device index >= 0. Got: ") +
+           gpu_string)
+              .c_str());
+    }
+
+    if (num_vgpus_on_device <= 0) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string(
+               "'add-vgpu' requires number of virtual GPUs to be >= 0. Got: ") +
+           vgpu_string)
+              .c_str());
+    }
+
+    (*val)[gpu_device] = std::make_pair(num_vgpus_on_device, mem_limit);
+  }
+  catch (const std::invalid_argument& ia) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string(
+             "'add-vgpu' argument requires format <physical GPU>;<number of "
+             "virtual GPUs>;<memory limit per VGPU in megabytes>. Got ") +
+         arg)
+            .c_str());
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+ParseBoolOption(std::string arg, bool* val)
+{
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  if ((arg == "true") || (arg == "on") || (arg == "1")) {
+    *val = true;
+    return nullptr;  // success
+  }
+  if ((arg == "false") || (arg == "off") || (arg == "0")) {
+    *val = false;
+    return nullptr;  // success
+  }
+
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("invalid value for bool option: '" + arg + "'").c_str());
+}
+
+TRITONSERVER_Error*
+ParseFloatOption(const std::string arg, float* val)
+{
+  try {
+    *val = std::stof(arg);
+  }
+  catch (const std::invalid_argument& ia) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("invalid value for float option: '" + arg + "'").c_str());
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TritonServerOptions::AddBackendConfig(
+    const std::string& backend_name, const std::string& setting,
+    const std::string& value)
+{
+  ni::BackendCmdlineConfig& cc = backend_cmdline_config_map_[backend_name];
+  cc.push_back(std::make_pair(setting, value));
+
+  // FIXME this TF specific parsing and option setting and also the
+  // corresponding functions in InferenceServer should be removed or
+  // moved to backend once TF backend is moved to TritonBackend.
+  if (backend_name == "tensorflow") {
+    if (setting == "allow-soft-placement") {
+      return ParseBoolOption(value, &tf_soft_placement_);
+    } else if (setting == "gpu-memory-fraction") {
+      return ParseFloatOption(value, &tf_gpu_mem_fraction_);
+    } else if (setting == "add-vgpu") {
+      return ParseVGPUOption(value, &tf_vgpu_memory_limits_);
+    }
+  }
+
+  return nullptr;  // success
 }
 
 #define SetDurationStat(DOC, PARENT, STAT_NAME, COUNT, NS)               \
@@ -937,35 +1067,13 @@ TRITONSERVER_ServerOptionsSetGpuMetrics(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsSetTensorFlowSoftPlacement(
-    TRITONSERVER_ServerOptions* options, bool soft_placement)
+TRITONSERVER_ServerOptionsSetBackendConfig(
+    TRITONSERVER_ServerOptions* options, const char* backend_name,
+    const char* setting, const char* value)
 {
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
-  loptions->SetTensorFlowSoftPlacement(soft_placement);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
-    TRITONSERVER_ServerOptions* options, float fraction)
-{
-  TritonServerOptions* loptions =
-      reinterpret_cast<TritonServerOptions*>(options);
-  loptions->SetTensorFlowGpuMemoryFraction(fraction);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
-    TRITONSERVER_ServerOptions* options, int gpu_device, int num_vgpus,
-    uint64_t per_vgpu_memory_mbytes)
-{
-  TritonServerOptions* loptions =
-      reinterpret_cast<TritonServerOptions*>(options);
-  loptions->AddTensorFlowVgpuMemoryLimits(
-      gpu_device, num_vgpus, per_vgpu_memory_mbytes);
-  return nullptr;  // Success
+  return loptions->AddBackendConfig(backend_name, setting, value);
 }
 
 //
@@ -1417,6 +1525,10 @@ TRITONSERVER_ServerNew(
       loptions->MinSupportedComputeCapability());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
+  lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
+
+  // FIXME these should be removed once all backends use
+  // BackendConfig.
   lserver->SetTensorFlowSoftPlacementEnabled(
       loptions->TensorFlowSoftPlacement());
   lserver->SetTensorFlowGPUMemoryFraction(

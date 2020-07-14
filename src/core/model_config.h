@@ -39,6 +39,12 @@ using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 using MetricTagsMap = ::google::protobuf::Map<
     ::google::protobuf::string, ::google::protobuf::string>;
 
+// Map from backend name to list of setting=value pairs of cmdline
+// settings for the backend.
+using BackendCmdlineConfig = std::vector<std::pair<std::string, std::string>>;
+using BackendCmdlineConfigMap =
+    std::unordered_map<std::string, BackendCmdlineConfig>;
+
 /// The type from platform name to the backend configuration for that
 /// platform. The configuration is determined primarily by
 /// command-line options and is the same for every backend created for

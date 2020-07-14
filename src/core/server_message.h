@@ -26,6 +26,7 @@
 #pragma once
 
 #include <string>
+#include "src/core/status.h"
 
 #define TRITONJSON_STATUSTYPE Status
 #define TRITONJSON_STATUSRETURN(M) return Status(Status::Code::INTERNAL, (M))

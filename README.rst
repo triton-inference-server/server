@@ -149,14 +149,19 @@ transitioning from version 1 to version 2:
 * The Triton executables and libraries are in /opt/tritonserver. The
   Triton executable is /opt/tritonserver/bin/tritonserver.
 
-* Some *tritonserver* command-line arguments are removed or have
-  different default behavior in version 2.
+* Some *tritonserver* command-line arguments are removed, changed or
+  have different default behavior in version 2.
 
   * --api-version, --http-health-port, --grpc-infer-thread-count,
     --grpc-stream-infer-thread-count,--allow-poll-model-repository
     and --allow-model-control are removed.
 
   * The default for --model-control-mode is changed to *none*.
+
+  * --tf-allow-soft-placement, --tf-gpu-memory-fraction
+     and --tf-add-vgpu are renamed
+     to --backend-config="tensorflow,allow-soft-placement=<true,false>", --backend-config="tensorflow,gpu-memory-fraction=<float>"
+     and --backend-config="tensorflow,add-vgpu=<arg>".
 
 * The HTTP/REST and GRPC protocols, while conceptually similar to
   version 1, are completely changed in version 2. See the `inference

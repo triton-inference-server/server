@@ -124,6 +124,8 @@ class ModelRepositoryManager {
   /// if model control is enabled.
   /// \param strict_model_config If false attempt to autofill missing required
   /// information in each model configuration.
+  /// \param backend_cmdline_config_map The backend configuration setting
+  /// specified on the command-line.
   /// \param tf_gpu_memory_fraction The portion of GPU memory to be reserved
   /// for TensorFlow models.
   /// \param tf_allow_soft_placement If true instruct TensorFlow to use CPU
@@ -142,8 +144,9 @@ class ModelRepositoryManager {
       InferenceServer* server, const std::string& server_version,
       const std::set<std::string>& repository_paths,
       const std::set<std::string>& startup_models,
-      const bool strict_model_config, const float tf_gpu_memory_fraction,
-      const bool tf_allow_soft_placement,
+      const bool strict_model_config,
+      const BackendCmdlineConfigMap& backend_cmdline_config_map,
+      const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
       const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
       const bool polling_enabled, const bool model_control_enabled,
       const double min_compute_capability,

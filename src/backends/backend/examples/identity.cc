@@ -799,6 +799,21 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
             .c_str());
   }
 
+  // The backend configuration may contain information needed by the
+  // backend, such a command-line arguments. This backend doesn't use
+  // any such configuration but we print whatever is available.
+  TRITONSERVER_Message* backend_config_message;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_BackendConfig(backend, &backend_config_message));
+
+  const char* buffer;
+  size_t byte_size;
+  RETURN_IF_ERROR(TRITONSERVER_MessageSerializeToJson(
+      backend_config_message, &buffer, &byte_size));
+  TRITONSERVER_LogMessage(
+      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      (std::string("backend configuration:\n") + buffer).c_str());
+
   // If we have any global backend state we create and set it here. We
   // don't need anything for this backend but for demonstration
   // purposes we just create something...
