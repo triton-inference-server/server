@@ -56,14 +56,20 @@ TritonModel::Create(
         "must specify 'backend' for '" + model_config.name() + "'");
   }
 
+  // Localize the content of the model repository corresponding to
+  // 'model_name'. This model holds a handle to the localized content
+  // so that it persists as long as the model is loaded.
+  std::shared_ptr<LocalizedDirectory> localized_model_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(
+      JoinPath({model_repository_path, model_name}), &localized_model_dir));
+
   const std::string backend_libname =
       "libtriton_" + model_config.backend() + ".so";
 
   // Get the path to the backend shared library. Search path is
   // version directory, model directory, global backend directory.
-  const auto version_path =
-      JoinPath({model_repository_path, model_name, std::to_string(version)});
-  const auto model_path = JoinPath({model_repository_path, model_name});
+  const auto model_path = localized_model_dir->Path();
+  const auto version_path = JoinPath({model_path, std::to_string(version)});
   const std::string global_path =
       "/opt/tritonserver/backends";  // FIXME need cmdline flag
   const std::vector<std::string> search_paths = {version_path, model_path,
@@ -103,8 +109,8 @@ TritonModel::Create(
       model_config.backend(), backend_libpath, *config, &backend));
 
   // Create and initialize the model.
-  std::unique_ptr<TritonModel> local_model(
-      new TritonModel(server, model_path, backend, min_compute_capability));
+  std::unique_ptr<TritonModel> local_model(new TritonModel(
+      server, localized_model_dir, backend, min_compute_capability));
   RETURN_IF_ERROR(
       local_model->Init(version_path, model_config, "" /* platform */));
 
@@ -173,11 +179,13 @@ TritonModel::Create(
 }
 
 TritonModel::TritonModel(
-    InferenceServer* server, const std::string& model_path,
+    InferenceServer* server,
+    const std::shared_ptr<LocalizedDirectory>& localized_model_dir,
     const std::shared_ptr<TritonBackend>& backend,
     const double min_compute_capability)
     : InferenceBackend(min_compute_capability), server_(server),
-      model_path_(model_path), backend_(backend), state_(nullptr)
+      localized_model_dir_(localized_model_dir), backend_(backend),
+      state_(nullptr)
 {
 }
 
@@ -241,7 +249,7 @@ TRITONSERVER_Error*
 TRITONBACKEND_ModelRepositoryPath(TRITONBACKEND_Model* model, const char** path)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
-  *path = tm->ModelPath().c_str();
+  *path = tm->LocalizedModelPath().c_str();
   return nullptr;  // success
 }
 

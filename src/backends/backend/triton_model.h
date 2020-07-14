@@ -29,6 +29,7 @@
 #include <string>
 #include "src/backends/backend/triton_backend_manager.h"
 #include "src/core/backend.h"
+#include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
@@ -53,7 +54,10 @@ class TritonModel : public InferenceBackend {
       std::unique_ptr<TritonModel>* model);
   ~TritonModel();
 
-  const std::string& ModelPath() const { return model_path_; }
+  const std::string& LocalizedModelPath() const
+  {
+    return localized_model_dir_->Path();
+  }
   InferenceServer* Server() { return server_; }
   const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
   void* State() { return state_; }
@@ -66,7 +70,8 @@ class TritonModel : public InferenceBackend {
   DISALLOW_COPY_AND_ASSIGN(TritonModel);
 
   TritonModel(
-      InferenceServer* server, const std::string& model_path,
+      InferenceServer* server,
+      const std::shared_ptr<LocalizedDirectory>& localized_model_dir,
       const std::shared_ptr<TritonBackend>& backend,
       const double min_compute_capability);
 
@@ -75,8 +80,10 @@ class TritonModel : public InferenceBackend {
   // be longer than the lifetime of a model owned by the server.
   InferenceServer* server_;
 
-  // Full path to the repo directory holding the model
-  const std::string model_path_;
+  // The localized repo directory holding the model. If localization
+  // required creation of a temporary local copy then that copy will
+  // persist as along as this object is retained by this model.
+  std::shared_ptr<LocalizedDirectory> localized_model_dir_;
 
   // Backend used by this model.
   std::shared_ptr<TritonBackend> backend_;
