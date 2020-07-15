@@ -30,12 +30,18 @@ import grpc
 import rapidjson as json
 import threading
 import queue
+import struct
 
 from google.protobuf.json_format import MessageToJson
 
 from tritongrpcclient import grpc_service_pb2
 from tritongrpcclient import grpc_service_pb2_grpc
 from tritonclientutils import *
+
+# Should be kept consistent with the value specified in
+# src/core/constants.h, which specifies MAX_GRPC_MESSAGE_SIZE
+# as INT32_MAX.
+MAX_GRPC_MESSAGE_SIZE = 2**(struct.Struct('i').size * 8 - 1) - 1
 
 
 def get_error_grpc(rpc_error):
@@ -120,6 +126,9 @@ class InferenceServerClient:
                  certificate_chain=None):
         # FixMe: Are any of the channel options worth exposing?
         # https://grpc.io/grpc/core/group__grpc__arg__keys.html
+        channel_opt = [('grpc.max_send_message_length', MAX_GRPC_MESSAGE_SIZE),
+                       ('grpc.max_receive_message_length',
+                        MAX_GRPC_MESSAGE_SIZE)]
         if ssl:
             rc_bytes = pk_bytes = cc_bytes = None
             if root_certificates is not None:
@@ -134,9 +143,9 @@ class InferenceServerClient:
             creds = grpc.ssl_channel_credentials(root_certificates=rc_bytes,
                                                  private_key=pk_bytes,
                                                  certificate_chain=cc_bytes)
-            self._channel = grpc.secure_channel(url, creds)
+            self._channel = grpc.secure_channel(url, creds, options=channel_opt)
         else:
-            self._channel = grpc.insecure_channel(url, options=None)
+            self._channel = grpc.insecure_channel(url, options=channel_opt)
         self._client_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(
             self._channel)
         self._verbose = verbose
