@@ -57,24 +57,25 @@ CustomBackendFactory::CreateBackend(
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
-  const auto path =
+  const auto nonlocal_path =
       JoinPath({model_repository_path, model_name, std::to_string(version)});
 
-  // Read all the files in 'path'.
+  // Localize 'nonlocal_path' so that the entire model version
+  // directory is available locally.
+  std::shared_ptr<LocalizedDirectory> local_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(nonlocal_path, &local_dir));
+
+  // Read all the files in 'local_dir'.
   std::set<std::string> custom_files;
-  RETURN_IF_ERROR(
-      GetDirectoryFiles(path, true /* skip_hidden_files */, &custom_files));
+  RETURN_IF_ERROR(GetDirectoryFiles(
+      local_dir->Path(), true /* skip_hidden_files */, &custom_files));
 
   std::unordered_map<std::string, std::string> custom_paths;
-  std::vector<std::shared_ptr<LocalizedDirectory>> local_custom_path;
-
   for (const auto& filename : custom_files) {
-    const auto custom_path = JoinPath({path, filename});
-    local_custom_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
-    RETURN_IF_ERROR(LocalizeDirectory(custom_path, &local_custom_path.back()));
+    const auto custom_path = JoinPath({local_dir->Path(), filename});
     custom_paths.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_custom_path.back()->Path()));
+        std::make_tuple(custom_path));
   }
 
   // Create the vector of server parameter values, indexed by the
@@ -89,7 +90,8 @@ CustomBackendFactory::CreateBackend(
   // requested for this model.
   std::unique_ptr<CustomBackend> local_backend(
       new CustomBackend(min_compute_capability));
-  RETURN_IF_ERROR(local_backend->Init(path, server_params, model_config));
+  RETURN_IF_ERROR(
+      local_backend->Init(nonlocal_path, server_params, model_config));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(custom_paths));
 
   *backend = std::move(local_backend);

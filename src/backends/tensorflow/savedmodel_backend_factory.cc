@@ -59,26 +59,25 @@ SavedModelBackendFactory::Create(
 
 Status
 SavedModelBackendFactory::CreateBackend(
-    const std::string& path, const ModelConfig& model_config,
+    const std::string& nonlocal_path, const ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
-  // Read all the savedmodel directories in 'path'.
+  // Localize 'nonlocal_path' so that the entire model version
+  // directory is available locally.
+  std::shared_ptr<LocalizedDirectory> local_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(nonlocal_path, &local_dir));
+
+  // Read all the savedmodel directories in 'local_dir'.
   std::set<std::string> savedmodel_subdirs;
-  RETURN_IF_ERROR(GetDirectorySubdirs(path, &savedmodel_subdirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(local_dir->Path(), &savedmodel_subdirs));
 
   std::unordered_map<std::string, std::string> models;
-  std::vector<std::shared_ptr<LocalizedDirectory>> local_savedmodel_path;
-
   for (const auto& filename : savedmodel_subdirs) {
-    const auto savedmodel_path = JoinPath({path, filename});
-    local_savedmodel_path.push_back(
-        std::shared_ptr<LocalizedDirectory>(nullptr));
-    RETURN_IF_ERROR(
-        LocalizeDirectory(savedmodel_path, &local_savedmodel_path.back()));
+    const auto savedmodel_path = JoinPath({local_dir->Path(), filename});
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_savedmodel_path.back()->Path()));
+        std::make_tuple(savedmodel_path));
   }
 
   // Create the backend for the model and all the execution contexts
@@ -86,7 +85,7 @@ SavedModelBackendFactory::CreateBackend(
   std::unique_ptr<SavedModelBackend> local_backend(
       new SavedModelBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(
-      path, model_config, backend_config_.get(),
+      nonlocal_path, model_config, backend_config_.get(),
       kTensorFlowSavedModelPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
 

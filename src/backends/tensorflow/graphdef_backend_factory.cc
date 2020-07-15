@@ -59,26 +59,26 @@ GraphDefBackendFactory::Create(
 
 Status
 GraphDefBackendFactory::CreateBackend(
-    const std::string& path, const ModelConfig& model_config,
+    const std::string& nonlocal_path, const ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
-  // Read all the graphdef files in 'path'.
+  // Localize 'nonlocal_path' so that the entire model version
+  // directory is available locally.
+  std::shared_ptr<LocalizedDirectory> local_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(nonlocal_path, &local_dir));
+
+  // Read all the graphdef files in 'local_dir'.
   std::set<std::string> graphdef_files;
-  RETURN_IF_ERROR(
-      GetDirectoryFiles(path, true /* skip_hidden_files */, &graphdef_files));
+  RETURN_IF_ERROR(GetDirectoryFiles(
+      local_dir->Path(), true /* skip_hidden_files */, &graphdef_files));
 
   std::unordered_map<std::string, std::string> models;
-  std::vector<std::shared_ptr<LocalizedDirectory>> local_graphdef_path;
-
   for (const auto& filename : graphdef_files) {
-    const auto graphdef_path = JoinPath({path, filename});
-    local_graphdef_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
-    RETURN_IF_ERROR(
-        LocalizeDirectory(graphdef_path, &local_graphdef_path.back()));
+    const auto graphdef_path = JoinPath({local_dir->Path(), filename});
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_graphdef_path.back()->Path()));
+        std::make_tuple(graphdef_path));
   }
 
   // Create the backend for the model and all the execution contexts
@@ -86,7 +86,8 @@ GraphDefBackendFactory::CreateBackend(
   std::unique_ptr<GraphDefBackend> local_backend(
       new GraphDefBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(
-      path, model_config, backend_config_.get(), kTensorFlowGraphDefPlatform));
+      nonlocal_path, model_config, backend_config_.get(),
+      kTensorFlowGraphDefPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
 
   *backend = std::move(local_backend);

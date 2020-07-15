@@ -269,11 +269,17 @@ AutoFillSavedModel::Create(
 
   // The model configuration will be identical across all the version
   // directories.
-  const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
+  const auto nonlocal_version_path =
+      JoinPath({model_path, *(version_dirs.begin())});
+
+  // Localize 'nonlocal_version_path' so that the entire model version
+  // directory is available locally.
+  std::shared_ptr<LocalizedDirectory> local_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(nonlocal_version_path, &local_dir));
 
   // There can be multiple savedmodel directories so we try each...
   std::set<std::string> savedmodel_dirs;
-  RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &savedmodel_dirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(local_dir->Path(), &savedmodel_dirs));
 
   if (savedmodel_dirs.empty()) {
     return Status(
@@ -285,24 +291,16 @@ AutoFillSavedModel::Create(
   TRTISTF_Error* err = nullptr;
   TRTISTF_Model* trtistf_model;
 
-  std::vector<std::shared_ptr<LocalizedDirectory>> local_savedmodel_path;
-
   for (auto dir : savedmodel_dirs) {
-    const auto savedmodel_path = JoinPath({version_path, dir});
-    local_savedmodel_path.push_back(
-        std::shared_ptr<LocalizedDirectory>(nullptr));
-    RETURN_IF_ERROR(
-        LocalizeDirectory(savedmodel_path, &local_savedmodel_path.back()));
-
+    const auto savedmodel_path = JoinPath({local_dir->Path(), dir});
     auto graphdef_backend_config =
         std::static_pointer_cast<GraphDefBackendFactory::Config>(
             backend_config);
 
     trtistf_model = nullptr;
     err = TRTISTF_ModelCreateFromSavedModel(
-        &trtistf_model, model_name.c_str(),
-        local_savedmodel_path.back()->Path().c_str(), TRTISTF_NO_GPU_DEVICE,
-        false /* have_graph */, 0 /* graph_level */,
+        &trtistf_model, model_name.c_str(), savedmodel_path.c_str(),
+        TRTISTF_NO_GPU_DEVICE, false /* have_graph */, 0 /* graph_level */,
         graphdef_backend_config->allow_gpu_memory_growth,
         graphdef_backend_config->per_process_gpu_memory_fraction,
         graphdef_backend_config->allow_soft_placement,

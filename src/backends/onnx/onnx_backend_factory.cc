@@ -64,41 +64,38 @@ OnnxBackendFactory::Create(
 
 Status
 OnnxBackendFactory::CreateBackend(
-    const std::string& path, const ModelConfig& model_config,
+    const std::string& nonlocal_path, const ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
+  // Localize 'nonlocal_path' so that the entire model version
+  // directory is available locally.
+  std::shared_ptr<LocalizedDirectory> local_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(nonlocal_path, &local_dir));
+
   // ONNX models can be in single file or as a subdirectory containing
   // multiple files (the main file and separate binary files for
   // tensors).
   std::set<std::string> onnx_files;
   RETURN_IF_ERROR(
-      GetDirectoryFiles(path, true /* skip_hidden_files */, &onnx_files));
+      GetDirectoryFiles(local_dir->Path(), true /* skip_hidden_files */, &onnx_files));
 
   std::set<std::string> onnx_subdirs;
-  RETURN_IF_ERROR(GetDirectorySubdirs(path, &onnx_subdirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(local_dir->Path(), &onnx_subdirs));
 
   // 'models' is a map from filename/subdirname to either file contents
   // or path to downloaded copy of the subdir.
   std::unordered_map<std::string, std::pair<bool, std::string>> models;
-
-  std::vector<std::shared_ptr<LocalizedDirectory>> local_onnx_path(
-      onnx_files.size());
-
-  // Download the subdirs so that relative file references in the main
-  // model file work correctly.
   for (const auto& dirname : onnx_subdirs) {
-    const auto onnx_path = JoinPath({path, dirname});
-    local_onnx_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
-    RETURN_IF_ERROR(LocalizeDirectory(onnx_path, &local_onnx_path.back()));
+    const auto onnx_path = JoinPath({local_dir->Path(), dirname});
     models.emplace(
         std::piecewise_construct, std::make_tuple(dirname),
         std::make_tuple(
-            std::move(std::make_pair(false, local_onnx_path.back()->Path()))));
+            std::move(std::make_pair(false, onnx_path))));
   }
 
   for (const auto& filename : onnx_files) {
-    const auto onnx_path = JoinPath({path, filename});
+    const auto onnx_path = JoinPath({local_dir->Path(), filename});
     std::string model_data_str;
 
     RETURN_IF_ERROR(ReadTextFile(onnx_path, &model_data_str));
@@ -113,7 +110,7 @@ OnnxBackendFactory::CreateBackend(
   std::unique_ptr<OnnxBackend> local_backend(
       new OnnxBackend(min_compute_capability));
   RETURN_IF_ERROR(
-      local_backend->Init(path, model_config, kOnnxRuntimeOnnxPlatform));
+      local_backend->Init(nonlocal_path, model_config, kOnnxRuntimeOnnxPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
 
   *backend = std::move(local_backend);
