@@ -48,13 +48,12 @@ class TritonBackendFactory {
   Status CreateBackend(
       const std::string& model_repository_path, const std::string& model_name,
       const int64_t version, const ModelConfig& model_config,
-      const double min_compute_capability,
       std::unique_ptr<InferenceBackend>* backend)
   {
     std::unique_ptr<TritonModel> model;
     RETURN_IF_ERROR(TritonModel::Create(
         server_, model_repository_path, cmdline_config_map_, model_name,
-        version, model_config, min_compute_capability, &model));
+        version, model_config, &model));
     backend->reset(model.release());
     return Status::Success;
   }

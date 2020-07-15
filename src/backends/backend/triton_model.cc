@@ -38,15 +38,76 @@
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+Status
+BackendConfiguration(
+    const BackendCmdlineConfig& config, const std::string& key,
+    std::string* val)
+{
+  for (const auto& pr : config) {
+    if (pr.first == key) {
+      *val = pr.second;
+      return Status::Success;
+    }
+  }
+
+  return Status(
+      Status::Code::INTERNAL,
+      std::string("unable to find common backend configuration for '") + key +
+          "'");
+}
+
+Status
+ParseStringToDouble(const std::string& str, double* val)
+{
+  try {
+    *val = std::stod(str);
+  }
+  catch (...) {
+    return Status(
+        Status::Code::INTERNAL,
+        "unable to parse common backend configuration as double");
+  }
+
+  return Status::Success;
+}
+
+}  // namespace
+
 Status
 TritonModel::Create(
     InferenceServer* server, const std::string& model_repository_path,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const std::string& model_name, const int64_t version,
-    const ModelConfig& model_config, const double min_compute_capability,
-    std::unique_ptr<TritonModel>* model)
+    const ModelConfig& model_config, std::unique_ptr<TritonModel>* model)
 {
   model->reset();
+
+  // Get some internal configuration values needed for initialization.
+  std::string backend_dir;
+#ifdef TRITON_ENABLE_GPU
+  double min_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
+#else
+  double min_compute_capability = 0;
+#endif  // TRITON_ENABLE_GPU
+  {
+    const auto& itr = backend_cmdline_config_map.find(std::string());
+    if (itr == backend_cmdline_config_map.end()) {
+      return Status(
+          Status::Code::INTERNAL,
+          "unable to find common backend configuration");
+    }
+
+    RETURN_IF_ERROR(
+        BackendConfiguration(itr->second, "backend-directory", &backend_dir));
+
+    std::string min_compute_capability_str;
+    RETURN_IF_ERROR(BackendConfiguration(
+        itr->second, "min-compute-capability", &min_compute_capability_str));
+    RETURN_IF_ERROR(ParseStringToDouble(
+        min_compute_capability_str, &min_compute_capability));
+  }
 
   // The model configuration must specify a backend. The name of the
   // corresponding shared library must be libtriton_<backend>.so.
@@ -71,7 +132,7 @@ TritonModel::Create(
   const auto model_path = localized_model_dir->Path();
   const auto version_path = JoinPath({model_path, std::to_string(version)});
   const std::string global_path =
-      "/opt/tritonserver/backends";  // FIXME need cmdline flag
+      JoinPath({backend_dir, model_config.backend()});
   const std::vector<std::string> search_paths = {version_path, model_path,
                                                  global_path};
 
