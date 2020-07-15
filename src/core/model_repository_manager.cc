@@ -878,8 +878,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 #ifdef TRITON_ENABLE_CUSTOM
   if (!model_config.backend().empty()) {
     status = triton_backend_factory_->CreateBackend(
-        backend_info->repository_path_, model_name, version, model_config,
-        min_compute_capability_, &is);
+        backend_info->repository_path_, model_name, version, model_config, &is);
   } else
 #endif  // TRITON_ENABLE_CUSTOM
   {
