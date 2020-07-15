@@ -100,9 +100,9 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx onnx_trt libtorch; do
 done
 
 #
-# Test large static batch = 256 w/ 2 instances
+# Test large static batch = 192 w/ 2 instances
 #
-STATIC_BATCH=256
+STATIC_BATCH=192
 INSTANCE_CNT=2
 
 # Create the TensorRT plan from TF
