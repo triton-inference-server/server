@@ -1263,6 +1263,19 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerOptionsSetMetrics(
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerOptionsSetGpuMetrics(
     TRITONSERVER_ServerOptions* options, bool gpu_metrics);
 
+/// Set the directory containing backend shared libraries. This
+/// directory is searched last after the version and model directory
+/// in the model repository when looking for the backend shared
+/// library for a model. If the backend is named 'be' the directory
+/// searched is 'backend_dir'/be/libtriton_be.so.
+///
+/// \param options The server options object.
+/// \param backend_dir The full path of the backend directory.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_ServerOptionsSetBackendDirectory(
+    TRITONSERVER_ServerOptions* options, const char* backend_dir);
+
 /// Set a configuration setting for a named backend in a server
 /// options.
 ///

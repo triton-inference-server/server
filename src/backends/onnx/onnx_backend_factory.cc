@@ -77,8 +77,8 @@ OnnxBackendFactory::CreateBackend(
   // multiple files (the main file and separate binary files for
   // tensors).
   std::set<std::string> onnx_files;
-  RETURN_IF_ERROR(
-      GetDirectoryFiles(local_dir->Path(), true /* skip_hidden_files */, &onnx_files));
+  RETURN_IF_ERROR(GetDirectoryFiles(
+      local_dir->Path(), true /* skip_hidden_files */, &onnx_files));
 
   std::set<std::string> onnx_subdirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(local_dir->Path(), &onnx_subdirs));
@@ -90,8 +90,7 @@ OnnxBackendFactory::CreateBackend(
     const auto onnx_path = JoinPath({local_dir->Path(), dirname});
     models.emplace(
         std::piecewise_construct, std::make_tuple(dirname),
-        std::make_tuple(
-            std::move(std::make_pair(false, onnx_path))));
+        std::make_tuple(std::move(std::make_pair(false, onnx_path))));
   }
 
   for (const auto& filename : onnx_files) {
@@ -109,8 +108,8 @@ OnnxBackendFactory::CreateBackend(
   // requested for this model.
   std::unique_ptr<OnnxBackend> local_backend(
       new OnnxBackend(min_compute_capability));
-  RETURN_IF_ERROR(
-      local_backend->Init(nonlocal_path, model_config, kOnnxRuntimeOnnxPlatform));
+  RETURN_IF_ERROR(local_backend->Init(
+      nonlocal_path, model_config, kOnnxRuntimeOnnxPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
 
   *backend = std::move(local_backend);
