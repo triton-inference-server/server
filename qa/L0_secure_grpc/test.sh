@@ -48,8 +48,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --grpc-use-ssl=1 --grpc-server-cert server.crt --grpc-server-key server.key --grpc-root-cert ca.crt"
 source ../common/util.sh
 
-rm *.log
-rm *.log.*
+rm -fr *.log *.log.*
 
 # Generate valid CA
 openssl genrsa -passout pass:1234 -des3 -out ca.key 4096
