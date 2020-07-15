@@ -30,10 +30,12 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <fstream>
 #include <list>
 #include <map>
 #include <mutex>
 #include <queue>
+#include <sstream>
 #include <thread>
 #include "grpc++/grpc++.h"
 #include "grpc++/security/server_credentials.h"
@@ -3721,6 +3723,19 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   }
 }
 
+void
+ReadFile(const std::string& filename, std::string& data)
+{
+  std::ifstream file(filename.c_str(), std::ios::in);
+  if (file.is_open()) {
+    std::stringstream ss;
+    ss << file.rdbuf();
+    file.close();
+    data = ss.str();
+  }
+  return;
+}
+
 }  // namespace
 
 //
@@ -3730,9 +3745,10 @@ GRPCServer::GRPCServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const std::string& server_addr, const int infer_allocation_pool_size)
+    const std::string& server_addr, bool use_ssl, const SslOptions& ssl_options,
+    const int infer_allocation_pool_size)
     : server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
-      server_addr_(server_addr),
+      server_addr_(server_addr), use_ssl_(use_ssl), ssl_options_(ssl_options),
       infer_allocation_pool_size_(infer_allocation_pool_size), running_(false)
 {
 }
@@ -3747,11 +3763,13 @@ GRPCServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
-    int infer_allocation_pool_size, std::unique_ptr<GRPCServer>* grpc_server)
+    bool use_ssl, const SslOptions& ssl_options, int infer_allocation_pool_size,
+    std::unique_ptr<GRPCServer>* grpc_server)
 {
   const std::string addr = "0.0.0.0:" + std::to_string(port);
   grpc_server->reset(new GRPCServer(
-      server, trace_manager, shm_manager, addr, infer_allocation_pool_size));
+      server, trace_manager, shm_manager, addr, use_ssl, ssl_options,
+      infer_allocation_pool_size));
 
   return nullptr;  // success
 }
@@ -3764,8 +3782,24 @@ GRPCServer::Start()
         TRITONSERVER_ERROR_ALREADY_EXISTS, "GRPC server is already running.");
   }
 
-  grpc_builder_.AddListeningPort(
-      server_addr_, grpc::InsecureServerCredentials());
+  std::shared_ptr<grpc::ServerCredentials> credentials;
+  if (use_ssl_) {
+    std::string key;
+    std::string cert;
+    std::string root;
+    ReadFile(ssl_options_.server_cert, cert);
+    ReadFile(ssl_options_.server_key, key);
+    ReadFile(ssl_options_.root_cert, root);
+    grpc::SslServerCredentialsOptions::PemKeyCertPair keycert = {key, cert};
+    grpc::SslServerCredentialsOptions sslOpts;
+    sslOpts.pem_root_certs = root;
+    sslOpts.pem_key_cert_pairs.push_back(keycert);
+    credentials = grpc::SslServerCredentials(sslOpts);
+  } else {
+    credentials = grpc::InsecureServerCredentials();
+  }
+
+  grpc_builder_.AddListeningPort(server_addr_, credentials);
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
   common_cq_ = grpc_builder_.AddCompletionQueue();

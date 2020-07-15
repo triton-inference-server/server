@@ -87,6 +87,8 @@ int32_t http_port_ = 8000;
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
+bool grpc_use_ssl_ = false;
+nvidia::inferenceserver::SslOptions grpc_ssl_options_;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -138,6 +140,10 @@ enum OptionId {
   OPTION_ALLOW_GRPC,
   OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
+  OPTION_GRPC_USE_SSL,
+  OPTION_GRPC_SERVER_CERT,
+  OPTION_GRPC_SERVER_KEY,
+  OPTION_GRPC_ROOT_CERT,
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
@@ -239,6 +245,14 @@ std::vector<Option> options_
        "allocated for reuse. As long as the number of in-flight requests "
        "doesn't exceed this value there will be no allocation/deallocation of "
        "request/response objects."},
+      {OPTION_GRPC_USE_SSL, "grpc-use-ssl", Option::ArgBool,
+       "Use SSL authentication for GRPC requests."},
+      {OPTION_GRPC_SERVER_CERT, "grpc-server-cert", Option::ArgStr,
+       "File holding PEM-encoded server certificate."},
+      {OPTION_GRPC_SERVER_KEY, "grpc-server-key", Option::ArgStr,
+       "File holding PEM-encoded server key."},
+      {OPTION_GRPC_ROOT_CERT, "grpc-root-cert", Option::ArgStr,
+       "File holding PEM-encoded root certificate."},
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
       {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
@@ -376,8 +390,8 @@ StartGrpcService(
         shm_manager)
 {
   TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
-      server, trace_manager, shm_manager, grpc_port_,
-      grpc_infer_allocation_pool_size_, service);
+      server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
+      grpc_ssl_options_, grpc_infer_allocation_pool_size_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -807,6 +821,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_GRPC)
   int32_t grpc_port = grpc_port_;
+  int32_t grpc_use_ssl = grpc_use_ssl_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
 #endif  // TRITON_ENABLE_GRPC
 
@@ -897,6 +912,18 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
         grpc_infer_allocation_pool_size = ParseIntOption(optarg);
+        break;
+      case OPTION_GRPC_USE_SSL:
+        grpc_use_ssl = ParseBoolOption(optarg);
+        break;
+      case OPTION_GRPC_SERVER_CERT:
+        grpc_ssl_options_.server_cert = optarg;
+        break;
+      case OPTION_GRPC_SERVER_KEY:
+        grpc_ssl_options_.server_key = optarg;
+        break;
+      case OPTION_GRPC_ROOT_CERT:
+        grpc_ssl_options_.root_cert = optarg;
         break;
 #endif  // TRITON_ENABLE_GRPC
 
@@ -994,6 +1021,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #if defined(TRITON_ENABLE_GRPC)
   grpc_port_ = grpc_port;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
+  grpc_use_ssl_ = grpc_use_ssl;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS

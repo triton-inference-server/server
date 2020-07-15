@@ -40,6 +40,16 @@ namespace nvidia { namespace inferenceserver { namespace client {
 /// metadata
 typedef std::map<std::string, std::string> Headers;
 
+struct SslOptions {
+  explicit SslOptions() {}
+  // File holding PEM-encoded root certificates
+  std::string root_certificates;
+  // File holding PEM-encoded private key
+  std::string private_key;
+  // File holding PEM-encoded certificate chain
+  std::string certificate_chain;
+};
+
 //==============================================================================
 /// An InferenceServerGrpcClient object is used to perform any kind of
 /// communication with the InferenceServer using gRPC protocol.
@@ -62,10 +72,14 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// \param server_url The inference server name and port.
   /// \param verbose If true generate verbose output when contacting
   /// the inference server.
+  /// \param use_ssl If true use encrypted channel to the server.
+  /// \param ssl_options Specifies the files required for
+  /// SSL encryption and authorization.
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<InferenceServerGrpcClient>* client,
-      const std::string& server_url, bool verbose = false);
+      const std::string& server_url, bool verbose = false, bool use_ssl = false,
+      const SslOptions& ssl_options = SslOptions());
 
   /// Contact the inference server and get its liveness.
   /// \param live Returns whether the server is live or not.
@@ -342,7 +356,9 @@ class InferenceServerGrpcClient : public InferenceServerClient {
           std::vector<const InferRequestedOutput*>());
 
  private:
-  InferenceServerGrpcClient(const std::string& url, bool verbose);
+  InferenceServerGrpcClient(
+      const std::string& url, bool verbose, bool use_ssl,
+      const SslOptions& ssl_options);
   Error PreRunProcessing(
       const InferOptions& options, const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs);

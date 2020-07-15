@@ -81,6 +81,8 @@ RUN mkdir -p qa/common && \
     cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_http/models && \
     mkdir qa/L0_https/models && \
     cp -r docs/examples/model_repository/simple qa/L0_https/models/. && \
+    mkdir qa/L0_secure_grpc/models && \
+    cp -r docs/examples/model_repository/simple qa/L0_secure_grpc/models/. && \
     cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_client/ && \
     cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \

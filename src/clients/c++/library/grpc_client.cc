@@ -33,9 +33,11 @@
 #include <grpcpp/grpcpp.h>
 #include <chrono>
 #include <cstdint>
+#include <fstream>
 #include <future>
 #include <iostream>
 #include <mutex>
+#include <sstream>
 
 namespace nvidia { namespace inferenceserver { namespace client {
 namespace {
@@ -46,8 +48,22 @@ namespace {
 // If context is created on url that has established Channel, then reuse it.
 std::map<std::string, std::shared_ptr<grpc::Channel>> grpc_channel_map_;
 std::mutex grpc_channel_map_mtx_;
+
+void
+ReadFile(const std::string& filename, std::string& data)
+{
+  std::ifstream file(filename.c_str(), std::ios::in);
+  if (file.is_open()) {
+    std::stringstream ss;
+    ss << file.rdbuf();
+    file.close();
+    data = ss.str();
+  }
+  return;
+}
+
 std::shared_ptr<grpc::Channel>
-GetChannel(const std::string& url)
+GetChannel(const std::string& url, bool use_ssl, const SslOptions& ssl_options)
 {
   std::lock_guard<std::mutex> lock(grpc_channel_map_mtx_);
 
@@ -58,8 +74,21 @@ GetChannel(const std::string& url)
     grpc::ChannelArguments arguments;
     arguments.SetMaxSendMessageSize(MAX_GRPC_MESSAGE_SIZE);
     arguments.SetMaxReceiveMessageSize(MAX_GRPC_MESSAGE_SIZE);
-    std::shared_ptr<grpc::Channel> channel = grpc::CreateCustomChannel(
-        url, grpc::InsecureChannelCredentials(), arguments);
+    std::shared_ptr<grpc::ChannelCredentials> credentials;
+    if (use_ssl) {
+      std::string root;
+      std::string key;
+      std::string cert;
+      ReadFile(ssl_options.root_certificates, root);
+      ReadFile(ssl_options.private_key, key);
+      ReadFile(ssl_options.certificate_chain, cert);
+      grpc::SslCredentialsOptions opts = {root, key, cert};
+      credentials = grpc::SslCredentials(opts);
+    } else {
+      credentials = grpc::InsecureChannelCredentials();
+    }
+    std::shared_ptr<grpc::Channel> channel =
+        grpc::CreateCustomChannel(url, credentials, arguments);
     grpc_channel_map_.insert(std::make_pair(url, channel));
     return channel;
   }
@@ -292,9 +321,11 @@ InferResultGrpc::InferResultGrpc(
 Error
 InferenceServerGrpcClient::Create(
     std::unique_ptr<InferenceServerGrpcClient>* client,
-    const std::string& server_url, bool verbose)
+    const std::string& server_url, bool verbose, bool use_ssl,
+    const SslOptions& ssl_options)
 {
-  client->reset(new InferenceServerGrpcClient(server_url, verbose));
+  client->reset(
+      new InferenceServerGrpcClient(server_url, verbose, use_ssl, ssl_options));
   return Error::Success;
 }
 
@@ -1232,9 +1263,11 @@ InferenceServerGrpcClient::AsyncStreamTransfer()
 
 
 InferenceServerGrpcClient::InferenceServerGrpcClient(
-    const std::string& url, bool verbose)
+    const std::string& url, bool verbose, bool use_ssl,
+    const SslOptions& ssl_options)
     : InferenceServerClient(verbose),
-      stub_(GRPCInferenceService::NewStub(GetChannel(url)))
+      stub_(
+          GRPCInferenceService::NewStub(GetChannel(url, use_ssl, ssl_options)))
 {
 }
 
