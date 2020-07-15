@@ -3726,14 +3726,16 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 void
 ReadFile(const std::string& filename, std::string& data)
 {
-  std::ifstream file(filename.c_str(), std::ios::in);
-  if (file.is_open()) {
-    std::stringstream ss;
-    ss << file.rdbuf();
-    file.close();
-    data = ss.str();
+  data.clear();
+  if (!filename.empty()) {
+    std::ifstream file(filename.c_str(), std::ios::in);
+    if (file.is_open()) {
+      std::stringstream ss;
+      ss << file.rdbuf();
+      file.close();
+      data = ss.str();
+    }
   }
-  return;
 }
 
 }  // namespace

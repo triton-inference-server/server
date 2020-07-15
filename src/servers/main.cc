@@ -246,13 +246,16 @@ std::vector<Option> options_
        "doesn't exceed this value there will be no allocation/deallocation of "
        "request/response objects."},
       {OPTION_GRPC_USE_SSL, "grpc-use-ssl", Option::ArgBool,
-       "Use SSL authentication for GRPC requests."},
+       "Use SSL authentication for GRPC requests. Default is false."},
       {OPTION_GRPC_SERVER_CERT, "grpc-server-cert", Option::ArgStr,
-       "File holding PEM-encoded server certificate."},
+       "File holding PEM-encoded server certificate. Ignored unless "
+       "--grpc-use-ssl is true."},
       {OPTION_GRPC_SERVER_KEY, "grpc-server-key", Option::ArgStr,
-       "File holding PEM-encoded server key."},
+       "File holding PEM-encoded server key. Ignored unless "
+       "--grpc-use-ssl is true."},
       {OPTION_GRPC_ROOT_CERT, "grpc-root-cert", Option::ArgStr,
-       "File holding PEM-encoded root certificate."},
+       "File holding PEM-encoded root certificate. Ignore unless "
+       "--grpc-use-ssl is false."},
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
       {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,

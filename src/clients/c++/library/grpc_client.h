@@ -42,11 +42,19 @@ typedef std::map<std::string, std::string> Headers;
 
 struct SslOptions {
   explicit SslOptions() {}
-  // File holding PEM-encoded root certificates
+  // File containing the PEM encoding of the server root certificates.
+  // If this parameter is empty, the default roots will be used. The
+  // default roots can be overridden using the
+  // GRPC_DEFAULT_SSL_ROOTS_FILE_PATH environment variable pointing
+  // to a file on the file system containing the roots.
   std::string root_certificates;
-  // File holding PEM-encoded private key
+  // File containing the PEM encoding of the client's private key.
+  // This parameter can be empty if the client does not have a
+  // private key.
   std::string private_key;
-  // File holding PEM-encoded certificate chain
+  // File containing the PEM encoding of the client's certificate chain.
+  // This parameter can be empty if the client does not have a
+  // certificate chain.
   std::string certificate_chain;
 };
 

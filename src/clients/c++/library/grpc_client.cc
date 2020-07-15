@@ -52,14 +52,16 @@ std::mutex grpc_channel_map_mtx_;
 void
 ReadFile(const std::string& filename, std::string& data)
 {
-  std::ifstream file(filename.c_str(), std::ios::in);
-  if (file.is_open()) {
-    std::stringstream ss;
-    ss << file.rdbuf();
-    file.close();
-    data = ss.str();
+  data.clear();
+  if (!filename.empty()) {
+    std::ifstream file(filename.c_str(), std::ios::in);
+    if (file.is_open()) {
+      std::stringstream ss;
+      ss << file.rdbuf();
+      file.close();
+      data = ss.str();
+    }
   }
-  return;
 }
 
 std::shared_ptr<grpc::Channel>
