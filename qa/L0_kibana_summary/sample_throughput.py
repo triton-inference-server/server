@@ -4,7 +4,8 @@ from datetime import datetime
 
 qk = query_kibana.QueryKibana()
 value_list = ["d_infer_per_sec", "s_framework", "\'@timestamp\'"]
-where_dict = {"s_shared_memory": "none","s_benchmark_name": "nomodel", "l_size": "4194304", "s_protocol": "http"}
+where_dict = {"s_shared_memory": "none", "s_benchmark_name": "nomodel",
+              "l_size": "4194304", "s_protocol": "http", "l_instance_count": "2"}
 rows = qk.fetch_results(value_list, where_dict=where_dict, limit=0)
 qk.close()
 
