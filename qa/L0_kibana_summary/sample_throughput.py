@@ -67,14 +67,17 @@ def create_date_dataframe(x):
     return df_days
 
 df_days = create_date_dataframe(x)
-# Save to csv
 df_days.to_csv("throughput_p4194304_http_nomodel_d1.csv", index=False)
 
-# def calc_moving_avg(df, i, n_days, col):
-#     return (df.iloc[i:i+n_days, col]).sum(axis=0)
+def create_moving_average_dataframe(df_days, ma_days=7):
+    ma_df = pandas.DataFrame(columns=['date'] + list(set(df['backend'])))
+    for i in range(df_days.shape[0]-ma_days):
+        val_list = dict()
+        for col in range(1, len(unique_backends)+1):
+            val_list[unique_backends[col-1]] = round(df_days.iloc[i:i+ma_days, col].mean(), 2)
+        val_list['date'] = df_days.iloc[i+ma_days]['date']
+        ma_df = ma_df.append(val_list, ignore_index = True)
+    return ma_df
 
-# # Create Moving average
-# moving_average_days = 7
-# for i in range(0, x.shape[0]-moving_average_days):
-#     x.loc[df.index[i+2], 'MA_3'] = np.round(
-#         ((df.iloc[i, 1] + df.iloc[i+1, 1] + df.iloc[i+2, 1])/3), 1)
+ma_df = create_moving_average_dataframe(df_days, 7)
+ma_df.to_csv("throughput_p4194304_http_nomodel_d7.csv", index=False)
