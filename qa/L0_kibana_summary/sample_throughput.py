@@ -2,16 +2,19 @@ import query_kibana
 import pandas
 from datetime import datetime
 
+input_size = "4194304"
+protocol = "http"
 qk = query_kibana.QueryKibana()
 value_list = ["d_infer_per_sec", "s_framework", "\'@timestamp\'"]
 where_dict = {"s_shared_memory": "none", "s_benchmark_name": "nomodel",
-              "l_size": "4194304", "s_protocol": "http", "l_instance_count": "2"}
-rows = qk.fetch_results(value_list, where_dict=where_dict, limit=0)
+              "l_size": input_size, "s_protocol": protocol, "l_instance_count": "2"}
+rows = qk.fetch_results(value_list, where_dict=where_dict,
+                        limit=0, start_date="2020-05-16", end_date="2020-07-16")
 qk.close()
 
 df = pandas.DataFrame(rows, columns=['throughput', 'backend', 'timestamp'])
-print(df.head())
-print(df.shape)
+print(df.info(verbose=False))
+
 # Order by asc timestamp
 df = df.sort_values('timestamp')
 unique_backends = list(set(df['backend']))
@@ -45,7 +48,7 @@ def create_timestamp_dataframe(df):
 
 x = create_timestamp_dataframe(df)
 # Save to csv
-x.to_csv("throughput_p4194304_http_nomodel.csv", index=False)
+x.to_csv("throughput_p"+ input_size +"_"+ protocol +"_nomodel.csv", index=False)
 
 # Smoothen to YYYY-MM-DD
 def create_date_dataframe(x):
@@ -71,7 +74,7 @@ def create_date_dataframe(x):
     return df_days
 
 df_days = create_date_dataframe(x)
-df_days.to_csv("throughput_p4194304_http_nomodel_d1.csv", index=False)
+df_days.to_csv("throughput_p"+ input_size +"_"+ protocol +"_nomodel_d1.csv", index=False)
 
 def create_moving_average_dataframe(df_days, ma_days=7):
     ma_df = pandas.DataFrame(columns=['date'] + unique_backends)
@@ -84,4 +87,4 @@ def create_moving_average_dataframe(df_days, ma_days=7):
     return ma_df
 
 ma_df = create_moving_average_dataframe(df_days, 7)
-ma_df.to_csv("throughput_p4194304_http_nomodel_d7.csv", index=False)
+ma_df.to_csv("throughput_p"+ input_size +"_"+ protocol +"_nomodel_d7.csv", index=False)
