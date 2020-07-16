@@ -42,18 +42,34 @@
 
 namespace nvidia { namespace inferenceserver { namespace backend {
 
+#define IGNORE_ERROR(X)                   \
+  do {                                    \
+    TRITONSERVER_Error* ie_err__ = (X);   \
+    if (ie_err__ != nullptr) {            \
+      TRITONSERVER_ErrorDelete(ie_err__); \
+    }                                     \
+  } while (false)
+
 #define LOG_IF_ERROR(X, MSG)                                                   \
   do {                                                                         \
     TRITONSERVER_Error* lie_err__ = (X);                                       \
     if (lie_err__ != nullptr) {                                                \
-      TRITONSERVER_LogMessage(                                                 \
+      IGNORE_ERROR(TRITONSERVER_LogMessage(                                    \
           TRITONSERVER_LOG_INFO, __FILE__, __LINE__,                           \
           (std::string(MSG) + ": " + TRITONSERVER_ErrorCodeString(lie_err__) + \
            " - " + TRITONSERVER_ErrorMessage(lie_err__))                       \
-              .c_str());                                                       \
+              .c_str()));                                                      \
       TRITONSERVER_ErrorDelete(lie_err__);                                     \
     }                                                                          \
   } while (false)
+
+#define LOG_MESSAGE(LEVEL, MSG)                                  \
+  do {                                                           \
+    LOG_IF_ERROR(                                                \
+        TRITONSERVER_LogMessage(LEVEL, __FILE__, __LINE__, MSG), \
+        ("failed to log message: "));                            \
+  } while (false)
+
 
 #define RETURN_ERROR_IF_FALSE(P, C, MSG)              \
   do {                                                \
