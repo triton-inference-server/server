@@ -20,6 +20,7 @@ class QueryKibana():
             The mapping of of fields and values to match them with.
         limit : int
             The max size of the values to return. Defaults to 1.
+            Use 0 for no limit.
 
         Returns
         -------
@@ -41,8 +42,11 @@ class QueryKibana():
             else:
                 where_str += key + "=" + where_dict[key]
 
-        body = {"query": "SELECT "+ str(value_list).strip("[]").replace("\'","")+" FROM \""+ self.index +
-                "\" WHERE (" + where_str + ") ORDER BY \'@timestamp\' DESC LIMIT " + str(limit)}
+        query_str = "SELECT " + str(value_list).strip("[]").replace("\'", "")+" FROM \"" + self.index + \
+                "\" WHERE (" + where_str + ") ORDER BY \'@timestamp\' DESC"
+        if limit:
+            query_str += " LIMIT " + str(limit)
+        body = {"query": query_str}
 
         results = self.es.transport.perform_request(
             'POST', '/_xpack/sql', params={'format': 'json'}, body=body)
