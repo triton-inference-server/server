@@ -42,11 +42,12 @@ class QueryKibana():
             else:
                 where_str += key + "=" + where_dict[key]
 
+        # Use order by desc at first to get latest subset of results when 10000 is not enough
         query_str = "SELECT " + str(value_list).strip("[]").replace("\'", "")+" FROM \"" + self.index + \
-                "\" WHERE (" + where_str + ") ORDER BY \'@timestamp\' DESC"
+                "\" WHERE (" + where_str + ") ORDER BY CAST(ts_created AS DATE) DESC"
         if limit:
             query_str += " LIMIT " + str(limit)
-        body = {"query": query_str}
+        body = {"query": query_str, "fetch_size": 10000}
 
         results = self.es.transport.perform_request(
             'POST', '/_xpack/sql', params={'format': 'json'}, body=body)

@@ -10,6 +10,8 @@ qk.close()
 
 df = pandas.DataFrame(rows, columns=['throughput', 'backend', 'timestamp'])
 print(df.head())
+# Order by asc timestamp
+df = df.sort_values('timestamp')
 unique_backends = list(set(df['backend']))
 
 # convert string timestamp to datatime object
@@ -45,7 +47,7 @@ x.to_csv("throughput_p4194304_http_nomodel.csv", index=False)
 
 # Smoothen to YYYY-MM-DD
 def create_date_dataframe(x):
-    df_days = pandas.DataFrame(columns=['date'] + list(set(df['backend'])))
+    df_days = pandas.DataFrame(columns=['date'] + unique_backends)
     old_ymd = None
     curr_i = 0
     same_day = 1
@@ -70,7 +72,7 @@ df_days = create_date_dataframe(x)
 df_days.to_csv("throughput_p4194304_http_nomodel_d1.csv", index=False)
 
 def create_moving_average_dataframe(df_days, ma_days=7):
-    ma_df = pandas.DataFrame(columns=['date'] + list(set(df['backend'])))
+    ma_df = pandas.DataFrame(columns=['date'] + unique_backends)
     for i in range(df_days.shape[0]-ma_days):
         val_list = dict()
         for col in range(1, len(unique_backends)+1):
