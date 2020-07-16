@@ -24,6 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <getopt.h>
 #include <unistd.h>
 #include <iostream>
 #include <string>
@@ -99,11 +100,34 @@ main(int argc, char** argv)
   std::string url("localhost:8001");
   nic::Headers http_headers;
   uint32_t client_timeout = 0;
+  bool use_ssl = false;
+  std::string root_certificates;
+  std::string private_key;
+  std::string certificate_chain;
+
+  // {name, has_arg, *flag, val}
+  static struct option long_options[] = {{"ssl", 0, 0, 0},
+                                         {"root-certificates", 1, 0, 1},
+                                         {"private-key", 1, 0, 2},
+                                         {"certificate-chain", 1, 0, 3}};
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vcu:t:H:")) != -1) {
+  while ((opt = getopt_long(argc, argv, "vcu:t:H:", long_options, NULL)) !=
+         -1) {
     switch (opt) {
+      case 0:
+        use_ssl = true;
+        break;
+      case 1:
+        root_certificates = optarg;
+        break;
+      case 2:
+        private_key = optarg;
+        break;
+      case 3:
+        certificate_chain = optarg;
+        break;
       case 'v':
         verbose = true;
         break;
@@ -138,9 +162,20 @@ main(int argc, char** argv)
   // Create a InferenceServerGrpcClient instance to communicate with the
   // server using gRPC protocol.
   std::unique_ptr<nic::InferenceServerGrpcClient> client;
-  FAIL_IF_ERR(
-      nic::InferenceServerGrpcClient::Create(&client, url, verbose),
-      "unable to create grpc client");
+  if (use_ssl) {
+    nic::SslOptions ssl_options;
+    ssl_options.root_certificates = root_certificates;
+    ssl_options.private_key = private_key;
+    ssl_options.certificate_chain = certificate_chain;
+    FAIL_IF_ERR(
+        nic::InferenceServerGrpcClient::Create(
+            &client, url, verbose, use_ssl, ssl_options),
+        "unable to create secure grpc client");
+  } else {
+    FAIL_IF_ERR(
+        nic::InferenceServerGrpcClient::Create(&client, url, verbose),
+        "unable to create grpc client");
+  }
 
   // Create the data for the two input tensors. Initialize the first
   // to unique integers and the second to all ones.

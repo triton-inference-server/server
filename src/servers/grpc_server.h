@@ -33,12 +33,23 @@
 
 namespace nvidia { namespace inferenceserver {
 
+struct SslOptions {
+  explicit SslOptions() {}
+  // File holding PEM-encoded server certificate
+  std::string server_cert;
+  // File holding PEM-encoded server key
+  std::string server_key;
+  // File holding PEM-encoded root certificate
+  std::string root_cert;
+};
+
 class GRPCServer {
  public:
   static TRITONSERVER_Error* Create(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
+      bool use_ssl, const SslOptions& ssl_options,
       int infer_allocation_pool_size, std::unique_ptr<GRPCServer>* grpc_server);
 
   ~GRPCServer();
@@ -65,12 +76,15 @@ class GRPCServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const std::string& server_addr, const int infer_allocation_pool_size);
+      const std::string& server_addr, bool use_ssl,
+      const SslOptions& ssl_options, const int infer_allocation_pool_size);
 
   std::shared_ptr<TRITONSERVER_Server> server_;
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   const std::string server_addr_;
+  const bool use_ssl_;
+  const SslOptions ssl_options_;
 
   const int infer_allocation_pool_size_;
 
