@@ -38,7 +38,7 @@ class QueryKibana():
             if where_str != "":
                 where_str += " AND "
             if key.startswith("s_"):
-                where_str += key + " LIKE \'" + where_dict[key] + "\'"
+                where_str += key + " = \'" + where_dict[key] + "\'"
             else:
                 where_str += key + "=" + where_dict[key]
 

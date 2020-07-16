@@ -11,6 +11,7 @@ qk.close()
 
 df = pandas.DataFrame(rows, columns=['throughput', 'backend', 'timestamp'])
 print(df.head())
+print(df.shape)
 # Order by asc timestamp
 df = df.sort_values('timestamp')
 unique_backends = list(set(df['backend']))
