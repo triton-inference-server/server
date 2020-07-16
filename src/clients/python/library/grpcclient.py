@@ -30,12 +30,18 @@ import grpc
 import rapidjson as json
 import threading
 import queue
+import struct
 
 from google.protobuf.json_format import MessageToJson
 
 from tritongrpcclient import grpc_service_pb2
 from tritongrpcclient import grpc_service_pb2_grpc
 from tritonclientutils import *
+
+# Should be kept consistent with the value specified in
+# src/core/constants.h, which specifies MAX_GRPC_MESSAGE_SIZE
+# as INT32_MAX.
+MAX_GRPC_MESSAGE_SIZE = 2**(struct.Struct('i').size * 8 - 1) - 1
 
 
 def get_error_grpc(rpc_error):
@@ -85,6 +91,25 @@ class InferenceServerClient:
     verbose : bool
         If True generate verbose output. Default value is False.
 
+    ssl : bool
+        If True use SSL encrypted secure channel. Default is False.
+    
+    root_certificates : str
+        File holding the PEM-encoded root certificates as a byte
+        string, or None to retrieve them from a default location
+        chosen by gRPC runtime. The option is ignored if `ssl` 
+        is False. Default is None.
+    
+    private_key : str
+        File holding the PEM-encoded private key as a byte string,
+        or None if no private key should be used. The option is
+        ignored if `ssl` is False. Default is None.
+    
+    certificate_chain : str
+        File holding PEM-encoded certificate chain as a byte string
+        to use or None if no certificate chain should be used. The
+        option is ignored if `ssl` is False. Default is None.
+
     Raises
     ------
     Exception
@@ -92,10 +117,35 @@ class InferenceServerClient:
 
     """
 
-    def __init__(self, url, verbose=False):
+    def __init__(self,
+                 url,
+                 verbose=False,
+                 ssl=False,
+                 root_certificates=None,
+                 private_key=None,
+                 certificate_chain=None):
         # FixMe: Are any of the channel options worth exposing?
         # https://grpc.io/grpc/core/group__grpc__arg__keys.html
-        self._channel = grpc.insecure_channel(url, options=None)
+        channel_opt = [('grpc.max_send_message_length', MAX_GRPC_MESSAGE_SIZE),
+                       ('grpc.max_receive_message_length',
+                        MAX_GRPC_MESSAGE_SIZE)]
+        if ssl:
+            rc_bytes = pk_bytes = cc_bytes = None
+            if root_certificates is not None:
+                with open(root_certificates, 'rb') as rc_fs:
+                    rc_bytes = rc_fs.read()
+            if private_key is not None:
+                with open(private_key, 'rb') as pk_fs:
+                    pk_bytes = pk_fs.read()
+            if certificate_chain is not None:
+                with open(certificate_chain, 'rb') as cc_fs:
+                    cc_bytes = cc_fs.read()
+            creds = grpc.ssl_channel_credentials(root_certificates=rc_bytes,
+                                                 private_key=pk_bytes,
+                                                 certificate_chain=cc_bytes)
+            self._channel = grpc.secure_channel(url, creds, options=channel_opt)
+        else:
+            self._channel = grpc.insecure_channel(url, options=channel_opt)
         self._client_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(
             self._channel)
         self._verbose = verbose

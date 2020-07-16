@@ -51,17 +51,49 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
+    parser.add_argument('-s',
+                        '--ssl',
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Enable SSL encrypted channel to the server')
     parser.add_argument('-t',
                         '--client-timeout',
                         type=float,
                         required=False,
                         default=None,
                         help='Client timeout in seconds. Default is None.')
+    parser.add_argument(
+        '-r',
+        '--root-certificates',
+        type=str,
+        required=False,
+        default=None,
+        help='File holding PEM-encoded root certificates. Default is None.')
+    parser.add_argument(
+        '-p',
+        '--private-key',
+        type=str,
+        required=False,
+        default=None,
+        help='File holding PEM-encoded private key. Default is None.')
+    parser.add_argument(
+        '-x',
+        '--certificate-chain',
+        type=str,
+        required=False,
+        default=None,
+        help='File holding PEM-encoded certicate chain. Default is None.')
 
     FLAGS = parser.parse_args()
     try:
         triton_client = tritongrpcclient.InferenceServerClient(
-            url=FLAGS.url, verbose=FLAGS.verbose)
+            url=FLAGS.url,
+            verbose=FLAGS.verbose,
+            ssl=FLAGS.ssl,
+            root_certificates=FLAGS.root_certificates,
+            private_key=FLAGS.private_key,
+            certificate_chain=FLAGS.certificate_chain)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit()
