@@ -552,7 +552,7 @@ TRITONSERVER_LogIsEnabled(TRITONSERVER_LogLevel level)
   return false;
 }
 
-TRITONSERVER_Error*
+void
 TRITONSERVER_LogMessage(
     TRITONSERVER_LogLevel level, const char* filename, const int line,
     const char* msg)
@@ -570,12 +570,10 @@ TRITONSERVER_LogMessage(
     case TRITONSERVER_LOG_VERBOSE:
       LOG_VERBOSE_FL(1, filename, line) << msg;
       break;
+    default:
+      LOG_ERROR_FL(__FILE__, __LINE__)
+          << "unknown logging level '" << level << "'";
   }
-
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("unknown logging level '" + std::to_string(level) + "'")
-          .c_str());
 }
 
 //

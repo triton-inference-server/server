@@ -117,6 +117,13 @@ class TritonJson {
     // Move constructor.
     explicit Value(Value&& other) { *this = std::move(other); }
 
+    ~Value()
+    {
+      if (value_ != nullptr) {
+        delete value_;
+      }
+    }
+
     // Move assignment operator.
     Value& operator=(Value&& other)
     {

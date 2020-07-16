@@ -1215,6 +1215,7 @@ main(int argc, char** argv)
   if (keep_alive == nullptr) {
     return 1;
   }
+  delete keep_alive;
 
   return 0;
 }
