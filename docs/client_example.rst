@@ -149,7 +149,7 @@ To use the C++ examples you must install some dependencies. For Ubuntu
 18.04::
 
   $ apt-get update
-  $ apt-get install curl libcurl4-openssl-dev
+  $ apt-get install curl libcurl4-openssl-dev libb64-dev
 
 The Python examples require that you additionally install the wheel
 files and some other dependencies::
