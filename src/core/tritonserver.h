@@ -161,6 +161,7 @@ TRITONSERVER_EXPORT bool TRITONSERVER_LogIsEnabled(TRITONSERVER_LogLevel level);
 /// \param filename The file name of the location of the log message.
 /// \param line The line number of the log message.
 /// \param msg The log message.
+/// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_LogMessage(
     TRITONSERVER_LogLevel level, const char* filename, const int line,
     const char* msg);
