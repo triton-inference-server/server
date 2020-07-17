@@ -953,15 +953,6 @@ class TritonJson {
       return TRITONJSON_STATUSSUCCESS;
     }
 
-   private:
-    // Construct a non-top-level JSON value that references an
-    // existing element in a docuemnt.
-    explicit Value(
-        rapidjson::Value& v, rapidjson::Document::AllocatorType* allocator)
-        : value_(&v), allocator_(allocator)
-    {
-    }
-
     // Release/clear a value.
     void Release()
     {
@@ -969,6 +960,15 @@ class TritonJson {
         delete value_;
         value_ = nullptr;
       }
+    }
+
+   private:
+    // Construct a non-top-level JSON value that references an
+    // existing element in a docuemnt.
+    explicit Value(
+        rapidjson::Value& v, rapidjson::Document::AllocatorType* allocator)
+        : value_(&v), allocator_(allocator)
+    {
     }
 
     // Return a value object that can be used for both a top-level

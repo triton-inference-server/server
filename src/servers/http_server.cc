@@ -66,7 +66,7 @@ class HTTPServerImpl : public HTTPServer {
   {
   }
 
-  virtual ~HTTPServerImpl() { Stop(); }
+  virtual ~HTTPServerImpl() { IGNORE_ERR(Stop()); }
 
   static void Dispatch(evhtp_request_t* req, void* arg);
 
@@ -270,7 +270,9 @@ JsonBytesArrayByteSize(TritonJson::Value& tensor_data, size_t* byte_size)
     RETURN_IF_ERR(tensor_data.At(i, &el));
 
     // Recurse if not last dimension...
-    if (el.AssertType(TritonJson::ValueType::ARRAY) == nullptr) {
+    TRITONSERVER_Error* assert_err =
+        el.AssertType(TritonJson::ValueType::ARRAY);
+    if (assert_err == nullptr) {
       RETURN_IF_ERR(JsonBytesArrayByteSize(el, byte_size));
     } else {
       // Serialized data size is the length of the string itself plus
@@ -281,6 +283,7 @@ JsonBytesArrayByteSize(TritonJson::Value& tensor_data, size_t* byte_size)
           el.AsString(&str, &len), "Unable to parse JSON bytes array");
       *byte_size += len + sizeof(uint32_t);
     }
+    TRITONSERVER_ErrorDelete(assert_err);
   }
 
   return nullptr;  // success
@@ -298,7 +301,9 @@ ReadDataFromJsonHelper(
     RETURN_IF_ERR(tensor_data.At(i, &el));
 
     // Recurse if not last dimension...
-    if (el.AssertType(TritonJson::ValueType::ARRAY) == nullptr) {
+    TRITONSERVER_Error* assert_err =
+        el.AssertType(TritonJson::ValueType::ARRAY);
+    if (assert_err == nullptr) {
       RETURN_IF_ERR(ReadDataFromJsonHelper(base, dtype, el, counter));
     } else {
       switch (dtype) {
@@ -410,6 +415,7 @@ ReadDataFromJsonHelper(
           break;
       }
     }
+    TRITONSERVER_ErrorDelete(assert_err);
   }
 
   return nullptr;  // success

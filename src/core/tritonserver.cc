@@ -560,22 +560,22 @@ TRITONSERVER_LogMessage(
   switch (level) {
     case TRITONSERVER_LOG_INFO:
       LOG_INFO_FL(filename, line) << msg;
-      break;
+      return nullptr;
     case TRITONSERVER_LOG_WARN:
       LOG_WARNING_FL(filename, line) << msg;
-      break;
+      return nullptr;
     case TRITONSERVER_LOG_ERROR:
       LOG_ERROR_FL(filename, line) << msg;
-      break;
+      return nullptr;
     case TRITONSERVER_LOG_VERBOSE:
       LOG_VERBOSE_FL(1, filename, line) << msg;
-      break;
+      return nullptr;
+    default:
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          std::string("unknown logging level '" + std::to_string(level) + "'")
+              .c_str());
   }
-
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("unknown logging level '" + std::to_string(level) + "'")
-          .c_str());
 }
 
 //

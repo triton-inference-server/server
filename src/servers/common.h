@@ -76,6 +76,14 @@ namespace nvidia { namespace inferenceserver {
     }                                                             \
   } while (false)
 
+#define IGNORE_ERR(X)                  \
+  do {                                 \
+    TRITONSERVER_Error* err__ = (X);   \
+    if (err__ != nullptr) {            \
+      TRITONSERVER_ErrorDelete(err__); \
+    }                                  \
+  } while (false)
+
 #ifdef TRITON_ENABLE_GPU
 #define FAIL_IF_CUDA_ERR(X, MSG)                                           \
   do {                                                                     \

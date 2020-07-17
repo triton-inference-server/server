@@ -1209,12 +1209,5 @@ main(int argc, char** argv)
   //  __lsan_do_leak_check();
 #endif  // TRITON_ENABLE_ASAN
 
-  // FIXME. TF backend aborts if we attempt cleanup...
-  std::shared_ptr<TRITONSERVER_Server>* keep_alive =
-      new std::shared_ptr<TRITONSERVER_Server>(server);
-  if (keep_alive == nullptr) {
-    return 1;
-  }
-
   return 0;
 }
