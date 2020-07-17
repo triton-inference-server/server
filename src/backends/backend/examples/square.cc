@@ -174,8 +174,8 @@ ModelState::ValidateModelConfig()
   // We have the json DOM for the model configuration...
   ni::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("model configuration:\n") + buffer.Contents()).c_str());
 
   ni::TritonJson::Value inputs, outputs;
@@ -243,8 +243,8 @@ ModelState::ValidateModelConfig()
   std::vector<nib::InstanceProperties> instances;
   RETURN_IF_ERROR(nib::ParseInstanceGroups(model_config_, &instances));
   if (instances.size() != 1) {
-    TRITONSERVER_LogMessage(
-        TRITONSERVER_LOG_WARN, __FILE__, __LINE__,
+    LOG_MESSAGE(
+        TRITONSERVER_LOG_WARN,
         (std::string("model configuration specifies ") +
          std::to_string(instances.size()) +
          " instances but square backend supports only a single CPU instance. "
@@ -364,8 +364,8 @@ ModelState::RequestThread(
             response, 0 /* flags */, nullptr /* success */),
         "failed sending response");
 
-    TRITONSERVER_LogMessage(
-        TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+    LOG_MESSAGE(
+        TRITONSERVER_LOG_INFO,
         (std::string("sent response ") + std::to_string(e + 1) + " of " +
          std::to_string(element_count))
             .c_str());
@@ -374,9 +374,7 @@ ModelState::RequestThread(
   // Add some logging for the case where IN was size 0 and so no
   // responses were sent.
   if (element_count == 0) {
-    TRITONSERVER_LogMessage(
-        TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-        "IN size is zero, no responses send ");
+    LOG_MESSAGE(TRITONSERVER_LOG_INFO, "IN size is zero, no responses send ");
   }
 
   // All responses have been sent so we must signal that we are done
@@ -412,8 +410,8 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   uint64_t version;
   RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(model, &version));
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
        std::to_string(version) + ")")
           .c_str());
@@ -444,9 +442,8 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
   ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      "TRITONBACKEND_ModelFinalize: delete model state");
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO, "TRITONBACKEND_ModelFinalize: delete model state");
 
   delete model_state;
 
@@ -462,8 +459,8 @@ TRITONBACKEND_ModelExecute(
   const char* model_name;
   RETURN_IF_ERROR(TRITONBACKEND_ModelName(model, &model_name));
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("TRITONBACKEND_ModelExecute: model ") + model_name +
        " with " + std::to_string(request_count) + " requests")
           .c_str());
@@ -501,8 +498,8 @@ TRITONBACKEND_ModelExecute(
         "failed releasing request");
   }
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("TRITONBACKEND_ModelExecute: model ") + model_name +
        " released " + std::to_string(request_count) + " requests")
           .c_str());

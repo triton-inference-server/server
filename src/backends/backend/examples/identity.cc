@@ -205,8 +205,8 @@ ModelInstance::Execute(
 void
 ModelInstance::ExecuteThread()
 {
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("model ") + model_state_->ModelName() +
        ": starting execute thread for instance " + props_.AsString())
           .c_str());
@@ -250,8 +250,8 @@ ModelInstance::ExecuteThread()
     uint32_t request_count = exec_requests->request_count_;
     std::vector<TRITONBACKEND_Response*>& responses = exec_requests->responses_;
 
-    TRITONSERVER_LogMessage(
-        TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+    LOG_MESSAGE(
+        TRITONSERVER_LOG_INFO,
         (std::string("model ") + model_state_->ModelName() + ": executing " +
          std::to_string(request_count) + " requests on instance " +
          props_.AsString())
@@ -297,16 +297,16 @@ ModelInstance::ExecuteThread()
       // If an error response was sent for the above then display an
       // error message and move on to next request.
       if (responses[r] == nullptr) {
-        TRITONSERVER_LogMessage(
-            TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
+        LOG_MESSAGE(
+            TRITONSERVER_LOG_ERROR,
             (std::string("request ") + std::to_string(r) +
              ": failed to read request properties, error response sent")
                 .c_str());
         continue;
       }
 
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_INFO,
           (std::string("request ") + std::to_string(r) + ": id = \"" +
            request_id +
            "\", correlation_id = " + std::to_string(correlation_id) +
@@ -337,8 +337,8 @@ ModelInstance::ExecuteThread()
       // requested output name then display an error message and move on
       // to next request.
       if (responses[r] == nullptr) {
-        TRITONSERVER_LogMessage(
-            TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
+        LOG_MESSAGE(
+            TRITONSERVER_LOG_ERROR,
             (std::string("request ") + std::to_string(r) +
              ": failed to read input or requested output name, error response "
              "sent")
@@ -358,24 +358,24 @@ ModelInstance::ExecuteThread()
               input, &input_name, &input_datatype, &input_shape,
               &input_dims_count, &input_byte_size, &input_buffer_count));
       if (responses[r] == nullptr) {
-        TRITONSERVER_LogMessage(
-            TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
+        LOG_MESSAGE(
+            TRITONSERVER_LOG_ERROR,
             (std::string("request ") + std::to_string(r) +
              ": failed to read input properties, error response sent")
                 .c_str());
         continue;
       }
 
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_INFO,
           (std::string("\tinput ") + input_name +
            ": datatype = " + TRITONSERVER_DataTypeString(input_datatype) +
            ", shape = " + nib::ShapeToString(input_shape, input_dims_count) +
            ", byte_size = " + std::to_string(input_byte_size) +
            ", buffer_count = " + std::to_string(input_buffer_count))
               .c_str());
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_INFO,
           (std::string("\trequested_output ") + requested_output_name).c_str());
 
       // For statistics we need to collect the total batch size of all
@@ -412,8 +412,8 @@ ModelInstance::ExecuteThread()
                 response, &output, requested_output_name, input_datatype,
                 input_shape, input_dims_count));
         if (responses[r] == nullptr) {
-          TRITONSERVER_LogMessage(
-              TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
               (std::string("request ") + std::to_string(r) +
                ": failed to create response output, error response sent")
                   .c_str());
@@ -438,8 +438,8 @@ ModelInstance::ExecuteThread()
               TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_UNSUPPORTED,
                   "failed to create output buffer in CPU memory"));
-          TRITONSERVER_LogMessage(
-              TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
               (std::string("request ") + std::to_string(r) +
                ": failed to create output buffer in CPU memory, error response "
                "sent")
@@ -476,8 +476,8 @@ ModelInstance::ExecuteThread()
         }
 
         if (responses[r] == nullptr) {
-          TRITONSERVER_LogMessage(
-              TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
               (std::string("request ") + std::to_string(r) +
                ": failed to get input buffer in CPU memory, error response "
                "sent")
@@ -570,8 +570,8 @@ ModelInstance::ExecuteThread()
     }
   } while (true);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("model ") + model_state_->ModelName() +
        ": ending execute thread for instance " + props_.AsString())
           .c_str());
@@ -649,8 +649,8 @@ ModelState::ValidateModelConfig()
   // We have the json DOM for the model configuration...
   ni::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("model configuration:\n") + buffer.Contents()).c_str());
 
   ni::TritonJson::Value inputs, outputs;
@@ -716,8 +716,8 @@ ModelState::CreateModelInstances()
     // so set it appropriately.
     instance.id_ = idx++;
 
-    TRITONSERVER_LogMessage(
-        TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+    LOG_MESSAGE(
+        TRITONSERVER_LOG_INFO,
         (std::string("created instance: ") + instance.AsString()).c_str());
 
     instances_.emplace_back(new ModelInstance(this, instance));
@@ -769,8 +769,8 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
   RETURN_IF_ERROR(TRITONBACKEND_BackendName(backend, &cname));
   std::string name(cname);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("TRITONBACKEND_Initialize: ") + name).c_str());
 
   // We should check the backend API version that Triton supports
@@ -778,13 +778,13 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
   uint32_t api_version;
   RETURN_IF_ERROR(TRITONBACKEND_BackendApiVersion(backend, &api_version));
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("Triton TRITONBACKEND API version: ") +
        std::to_string(api_version))
           .c_str());
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("'") + name + "' TRITONBACKEND API version: " +
        std::to_string(TRITONBACKEND_API_VERSION))
           .c_str());
@@ -810,8 +810,8 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
   size_t byte_size;
   RETURN_IF_ERROR(TRITONSERVER_MessageSerializeToJson(
       backend_config_message, &buffer, &byte_size));
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("backend configuration:\n") + buffer).c_str());
 
   // If we have any global backend state we create and set it here. We
@@ -834,8 +834,8 @@ TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
   std::string* state = reinterpret_cast<std::string*>(vstate);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("TRITONBACKEND_Finalize: state is '") + *state + "'")
           .c_str());
 
@@ -857,8 +857,8 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   uint64_t version;
   RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(model, &version));
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
        std::to_string(version) + ")")
           .c_str());
@@ -869,9 +869,8 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   RETURN_IF_ERROR(TRITONBACKEND_ModelRepositoryPath(model, &cdir));
   std::string dir(cdir);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      (std::string("Repository path: ") + dir).c_str());
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO, (std::string("Repository path: ") + dir).c_str());
 
   // The model can access the backend as well... here we can access
   // the backend global state.
@@ -882,8 +881,8 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vbackendstate));
   std::string* backend_state = reinterpret_cast<std::string*>(vbackendstate);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("backend state is '") + *backend_state + "'").c_str());
 
   // With each model we create a ModelState object and associate it
@@ -918,9 +917,8 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
   ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      "TRITONBACKEND_ModelFinalize: delete model state");
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO, "TRITONBACKEND_ModelFinalize: delete model state");
 
   delete model_state;
 

@@ -2906,6 +2906,13 @@ class ModelInferHandler
         "creating inference response allocator");
   }
 
+  ~ModelInferHandler()
+  {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_ResponseAllocatorDelete(allocator_),
+        "deleting response allocator");
+  }
+
  protected:
   void StartNewRequest() override;
   bool Process(State* state, bool rpc_ok) override;
@@ -3237,6 +3244,13 @@ class ModelStreamInferHandler
             &allocator_, StreamInferResponseAlloc, InferResponseFree,
             StreamInferResponseStart),
         "creating response allocator");
+  }
+
+  ~ModelStreamInferHandler()
+  {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_ResponseAllocatorDelete(allocator_),
+        "deleting response allocator");
   }
 
  protected:
@@ -3757,7 +3771,7 @@ GRPCServer::GRPCServer(
 
 GRPCServer::~GRPCServer()
 {
-  Stop();
+  IGNORE_ERR(Stop());
 }
 
 TRITONSERVER_Error*

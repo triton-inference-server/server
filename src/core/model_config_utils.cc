@@ -1446,6 +1446,7 @@ FixIntArray(
   }
 
   shape_array.Swap(fixed_shape_array);
+  fixed_shape_array.Release();
 
   return Status::Success;
 }

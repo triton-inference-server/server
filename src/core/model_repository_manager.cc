@@ -317,7 +317,7 @@ class ModelRepositoryManager::BackendLifeCycle {
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
-  ~BackendLifeCycle() = default;
+  ~BackendLifeCycle() { map_.clear(); }
 
   // Start loading model backends with specified versions asynchronously.
   // If 'force_unload', all versions that are being served will
