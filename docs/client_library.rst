@@ -206,6 +206,12 @@ headers in include/, and the Python wheel files in python/. The bin/
 and python/ directories contain the built examples that you can learn
 more about in :ref:`section-client-examples`.
 
+To use the C++ libraries you must install some dependencies. For
+Ubuntu 18.04::
+
+  $ apt-get update
+  $ apt-get install curl libcurl4-openssl-dev libb64-dev
+
 .. _section-client-libraries-download-from-ngc:
 
 Download Docker Image From NGC
