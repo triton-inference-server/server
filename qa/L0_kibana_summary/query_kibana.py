@@ -1,14 +1,24 @@
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 import json
 
+
 class QueryKibana():
+
     def __init__(self):
         host = "https://gpuwa.nvidia.com/elasticsearch"
         timeout = 1000
         self.index = "df-dlfw-trtis-benchmarks-*"
-        self.es = Elasticsearch(timeout=timeout, hosts=host, connection_class=RequestsHttpConnection)
- 
-    def fetch_results(self, value_list, where_dict, limit=1, start_date=None, end_date=None, verbose=False):
+        self.es = Elasticsearch(timeout=timeout,
+                                hosts=host,
+                                connection_class=RequestsHttpConnection)
+
+    def fetch_results(self,
+                      value_list,
+                      where_dict,
+                      limit=1,
+                      start_date=None,
+                      end_date=None,
+                      verbose=False):
         """Runs a query to fetch data given a where condition and the names of fields asked for.
         The values are ordered in desc order of '@timestamp'.
 
@@ -56,20 +66,14 @@ class QueryKibana():
         if verbose:
             print(body)
 
-        results = self.es.transport.perform_request(
-            'POST', '/_xpack/sql', params={'format': 'json'}, body=body)
+        results = self.es.transport.perform_request('POST',
+                                                    '/_xpack/sql',
+                                                    params={'format': 'json'},
+                                                    body=body)
         return results['rows']
-    
+
     def close(self):
         """Closes the current connection to Elasticsearch
 
         """
         self.es.transport.connection_pool.close()
-
-# Sample 
-# qk = QueryKibana()
-# value_list = ["d_infer_per_sec", "d_latency_p95_ms", "l_instance_count", "s_shared_memory",
-#               "s_protocol", "s_framework", "l_batch_size", "s_benchmark_repo_branch"]
-# where_dict = {"s_shared_memory": "none", "s_benchmark_name": "nomodel", "s_benchmark_repo_branch":"r20.06"}
-# print(qk.fetch_results(value_list, where_dict=where_dict))
-# qk.close()
