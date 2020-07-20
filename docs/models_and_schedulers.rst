@@ -30,12 +30,13 @@
 Models And Schedulers
 =====================
 
-By incorporating :ref:`multiple frameworks
-<section-framework-model-definition>` and also :ref:`custom backends
-<section-custom-backends>`, the Triton Inference Server supports a
-wide variety of models. Triton also supports multiple :ref:`scheduling
-and batching configurations <section-scheduling-and-batching>` that
-further expand the class of models that can be handled.
+By incorporating backends for :ref:`multiple frameworks
+<section-framework-model-definition>` and also allowing backends with
+:ref:`custom implementations <section-custom-backends>`, the Triton
+Inference Server supports a wide variety of models. Triton also
+supports multiple :ref:`scheduling and batching configurations
+<section-scheduling-and-batching>` that further expand the class of
+models that can be handled.
 
 This section describes *stateless*, *stateful* and *ensemble* models
 and how Triton provides schedulers to support those model types.
@@ -46,9 +47,9 @@ Stateless Models
 ----------------
 
 With respect to Triton's schedulers, a *stateless* model (or stateless
-custom backend) does not maintain state between inference
-requests. Each inference performed on a stateless model is independent
-of all other inferences using that model.
+backend) does not maintain state between inference requests. Each
+inference performed on a stateless model is independent of all other
+inferences using that model.
 
 Examples of stateless models are CNNs such as image classification and
 object detection. The :ref:`default scheduler
@@ -71,12 +72,12 @@ Stateful Models
 ---------------
 
 With respect to Triton's schedulers, a *stateful* model (or stateful
-custom backend) does maintain state between inference requests. The
-model is expecting multiple inference requests that together form a
-sequence of inferences that must be routed to the same model instance
-so that the state being maintained by the model is correctly
-updated. Moreover, the model may require that Triton provide *control*
-signals indicating, for example, sequence start.
+backend) does maintain state between inference requests. The model is
+expecting multiple inference requests that together form a sequence of
+inferences that must be routed to the same model instance so that the
+state being maintained by the model is correctly updated. Moreover,
+the model may require that Triton provide *control* signals
+indicating, for example, sequence start.
 
 The :ref:`sequence batcher <section-sequence-batcher>` must be used
 for these stateful models. As explained below, the sequence batcher
@@ -366,7 +367,7 @@ needed because all inferences in the batch will always be ready for
 inference.
 
 As an example of the sequence batcher using the Oldest scheduling
-strategy, assume a Custom stateful model that has the following model
+strategy, assume a stateful model that has the following model
 configuration::
 
   name: "oldest_stateful_model"
