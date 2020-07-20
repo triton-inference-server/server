@@ -77,7 +77,7 @@ subsequently the bucket path::
 
 When using S3, the credentials and default region can be passed by
 using either the `aws config
-<https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html>_`
+<https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html>`_
 command or via the respective `environment variables
 <https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html>`_.
 If the environment variables are set they will take a higher priority
@@ -132,13 +132,12 @@ the output it corresponds to in the :ref:`model configuration
 Each <model-name> directory must have at least one numeric
 sub-directory representing a version of the model.  For more
 information about how the model versions are handled by Triton see
-:ref:`section-model-versions`.  Within each version sub-directory
-there are one or more model definition files that specify the actual
-model, except for :ref:`ensemble models
-<section-ensemble-models>`. The model definition can be either a
-:ref:`framework-specific model file
-<section-framework-model-definition>` or a shared library implementing
-a :ref:`custom backend <section-custom-backends>`.
+:ref:`section-model-versions`.  Each model is executed by a specific
+:ref:`backend <section-backends>`. Within each version sub-directory
+there must be files required by that backend. For example, models that
+use framework backends such as PyTorch, ONNX and TensorFlow must
+provide the :ref:`framework-specific model file
+<section-framework-model-definition>`.
 
 .. _section-modifying-the-model-repository:
 
@@ -158,8 +157,8 @@ Each model can have one or more versions available in the model
 repository. Each version is stored in its own, numerically named,
 subdirectory where the name of the subdirectory corresponds to the
 version number of the model. The subdirectories that are not
-numerically named, or that have zero prefix will be ignored. Each
-model configuration specifies a :ref:`version policy
+numerically named, or have names that start with zero (0) will be
+ignored. Each model configuration specifies a :ref:`version policy
 <section-version-policy>` that controls which of the versions in the
 model repository are made available by Triton at any given time.
 
@@ -168,8 +167,9 @@ model repository are made available by Triton at any given time.
 Framework Model Definition
 --------------------------
 
-Each model version sub-directory must contain at least one model
-definition. By default, the name of this file or directory must be:
+The contents of each model version sub-directory is determined by the
+model's :ref:`backend <section-model-backends>`. For models of deep
+learning frameworks, the default name of this file or directory is:
 
 * **model.plan** for TensorRT models
 * **model.graphdef** for TensorFlow GraphDef models
@@ -386,61 +386,3 @@ model repository for a single NetDef model would look like::
       config.pbtxt
       1/
         model.netdef
-
-.. _section-custom-backends:
-
-Custom Backends
----------------
-
-A model using a custom backend is represented in the model repository
-in the same way as models using a deep-learning framework backend.
-Each model version sub-directory must contain at least one shared
-library that implements the custom model backend. By default, the name
-of this shared library must be **libcustom.so** but the default name
-can be overridden using the *default_model_filename* property in the
-:ref:`model configuration <section-model-configuration>`.
-
-Optionally, a model can provide multiple shared libraries, each
-targeted at a GPU with a different `Compute Capability
-<https://developer.nvidia.com/cuda-gpus>`_. See the
-*cc_model_filenames* property in the :ref:`model configuration
-<section-model-configuration>` for description of how to specify
-different shared libraries for different compute capabilities.
-
-Currently, only model repositories on the local filesystem support
-custom backends. A custom backend contained in a model repository in
-cloud storage (for example, a repository accessed with the gs://
-prefix or s3:// prefix as described above) cannot be loaded.
-
-Custom Backend API
-^^^^^^^^^^^^^^^^^^
-
-A custom backend must implement the C interface defined in `custom.h
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/backends/custom/custom.h>`_. The
-interface is also documented in the API Reference.
-
-Example Custom Backend
-^^^^^^^^^^^^^^^^^^^^^^
-
-Several example custom backends can be found in the `src/custom
-directory
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/custom>`_. For
-more information on building your own custom backends as well as a
-simple example you can build yourself, see
-:ref:`section-building-a-custom-backend`.
-
-.. _section-ensemble-backends:
-
-Ensemble Backends
----------------
-
-A model using an ensemble backend is represented in the model repository
-in the same way as models using a deep-learning framework backend.
-Currently, the ensemble backend does not require any version specific data,
-so each model version subdirectory must exist but should be empty.
-
-An example of an ensemble backend in a model repository can be found
-in the
-`docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble
-<https://github.com/NVIDIA/triton-inference-server/tree/master/docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble>`_
-directory.

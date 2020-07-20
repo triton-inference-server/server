@@ -66,6 +66,7 @@ NVIDIA Triton Inference Server
    :caption: Developer Guide
 
    architecture
+   backend
    custom_operation
    http_grpc_api
    library_api
