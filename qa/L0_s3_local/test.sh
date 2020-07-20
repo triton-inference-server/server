@@ -49,6 +49,9 @@ DUMMY_MODEL="Model_repo-1.0"
 cp -r $MODELDIR/libtorch_float32_float32_float32 $MODELDIR/$DUMMY_MODEL
 sed -i 's/libtorch_float32_float32_float32/Model_repo-1.0/g' $MODELDIR/$DUMMY_MODEL/config.pbtxt
 
+# Copy custom model 
+cp -r /opt/tritonserver/qa/custom_models/custom_float32_float32_float32/ $MODELDIR/
+
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
