@@ -262,7 +262,7 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request)
   // response.
   TRITONBACKEND_Input* in;
   RESPOND_AND_RETURN_IF_ERROR(
-      request, TRITONBACKEND_RequestInputByName(request, "IN", &in));
+      request, TRITONBACKEND_RequestInput(request, "IN", &in));
 
   const int64_t* in_shape_arr;
   uint32_t in_dims_count;

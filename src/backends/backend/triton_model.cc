@@ -378,14 +378,15 @@ TRITONBACKEND_RequestInputCount(TRITONBACKEND_Request* request, uint32_t* count)
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_RequestInput(
+TRITONBACKEND_RequestInputName(
     TRITONBACKEND_Request* request, const uint32_t index,
-    TRITONBACKEND_Input** input)
+    const char** input_name)
 {
+  *input_name = nullptr;
+
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   const auto& inputs = tr->ImmutableInputs();
   if (index >= inputs.size()) {
-    *input = nullptr;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         (std::string("out of bounds index ") + std::to_string(index) +
@@ -403,7 +404,7 @@ TRITONBACKEND_RequestInput(
   for (const auto& pr : inputs) {
     if (cnt++ == index) {
       InferenceRequest::Input* in = pr.second;
-      *input = reinterpret_cast<TRITONBACKEND_Input*>(in);
+      *input_name = in->Name().c_str();
       break;
     }
   }
@@ -412,7 +413,7 @@ TRITONBACKEND_RequestInput(
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_RequestInputByName(
+TRITONBACKEND_RequestInput(
     TRITONBACKEND_Request* request, const char* name,
     TRITONBACKEND_Input** input)
 {
@@ -446,10 +447,11 @@ TRITONBACKEND_RequestOutputName(
     TRITONBACKEND_Request* request, const uint32_t index,
     const char** output_name)
 {
+  *output_name = nullptr;
+
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   const auto& routputs = tr->ImmutableRequestedOutputs();
   if (index >= routputs.size()) {
-    *output_name = nullptr;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         (std::string("out of bounds index ") + std::to_string(index) +

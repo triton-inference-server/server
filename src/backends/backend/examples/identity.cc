@@ -317,10 +317,15 @@ ModelInstance::ExecuteThread()
 
       // We already validated that the model configuration specifies
       // only a single input and Triton enforces that.
+      const char* input_name;
+      GUARDED_RESPOND_IF_ERROR(
+          responses, r,
+          TRITONBACKEND_RequestInputName(request, 0 /* index */, &input_name));
+
       TRITONBACKEND_Input* input = nullptr;
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
-          TRITONBACKEND_RequestInput(request, 0 /* index */, &input));
+          TRITONBACKEND_RequestInput(request, input_name, &input));
 
       // We also validated that the model configuration specifies only a
       // single output, but the request is not required to request any
@@ -346,7 +351,6 @@ ModelInstance::ExecuteThread()
         continue;
       }
 
-      const char* input_name;
       TRITONSERVER_DataType input_datatype;
       const int64_t* input_shape;
       uint32_t input_dims_count;
@@ -355,7 +359,7 @@ ModelInstance::ExecuteThread()
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_InputProperties(
-              input, &input_name, &input_datatype, &input_shape,
+              input, nullptr /* input_name */, &input_datatype, &input_shape,
               &input_dims_count, &input_byte_size, &input_buffer_count));
       if (responses[r] == nullptr) {
         LOG_MESSAGE(

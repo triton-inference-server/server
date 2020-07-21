@@ -362,10 +362,10 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
   // check that for each request they are equal.
   TRITONBACKEND_Input* in;
   RESPOND_AND_RETURN_IF_ERROR(
-      request, TRITONBACKEND_RequestInputByName(request, "IN", &in));
+      request, TRITONBACKEND_RequestInput(request, "IN", &in));
   TRITONBACKEND_Input* delay;
   RESPOND_AND_RETURN_IF_ERROR(
-      request, TRITONBACKEND_RequestInputByName(request, "DELAY", &delay));
+      request, TRITONBACKEND_RequestInput(request, "DELAY", &delay));
 
   const int64_t* in_shape_arr;
   uint32_t in_dims_count;

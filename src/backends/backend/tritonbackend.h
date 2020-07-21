@@ -170,31 +170,30 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestCorrelationId(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInputCount(
     TRITONBACKEND_Request* request, uint32_t* count);
 
-/// Get a request input tensor. The lifetime of the returned input
-/// tensor object matches that of the request and so the input tensor
-/// object should not be accessed after the request object is
-/// released.
+/// Get the name of an input tensor. The caller does not own
+/// the returned string and must not modify or delete it. The lifetime
+/// of the returned string extends only as long as 'request'.
 ///
 /// \param request The inference request.
 /// \param index The index of the input tensor. Must be 0 <= index <
 /// count, where count is the value returned by
 /// TRITONBACKEND_RequestInputCount.
-/// \param input Returns the input tensor corresponding to the index.
+/// \param input_name Returns the name of the input tensor
+/// corresponding to the index.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInput(
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInputName(
     TRITONBACKEND_Request* request, const uint32_t index,
-    TRITONBACKEND_Input** input);
+    const char** input_name);
 
-/// Get a named request input tensor. The lifetime of the returned
-/// input tensor object matches that of the request and so the input
-/// tensor object should not be accessed after the request object is
-/// released.
+/// Get a request input. The lifetime of the returned input object
+/// matches that of the request and so the input object should not be
+/// accessed after the request object is released.
 ///
 /// \param request The inference request.
-/// \param name The name of the input tensor.
-/// \param input Returns the input tensor corresponding to the name.
+/// \param name The name of the input.
+/// \param input Returns the input corresponding to the name.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInputByName(
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInput(
     TRITONBACKEND_Request* request, const char* name,
     TRITONBACKEND_Input** input);
 
