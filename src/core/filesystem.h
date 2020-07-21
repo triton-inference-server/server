@@ -25,11 +25,49 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <string>
 #include "google/protobuf/message.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
+
+// This class stores the paths of local temporary files needed for loading
+// models from Cloud repositories and performs necessary cleanup after the
+// models are loaded.
+class LocalizedDirectory {
+ public:
+  // Create an object for a directory path that is already local.
+  LocalizedDirectory(const std::string& original_path)
+      : original_path_(original_path)
+  {
+  }
+
+  // Create an object for a remote directory path. Store both the
+  // original path and the temporary local path.
+  LocalizedDirectory(
+      const std::string& original_path, const std::string& local_path)
+      : original_path_(original_path), local_path_(local_path)
+  {
+  }
+
+  // Destructor. Remove temporary local storage associated with the object.
+  ~LocalizedDirectory();
+
+  // Return the localized path represented by this object.
+  const std::string& Path() const
+  {
+    return (local_path_.empty()) ? original_path_ : local_path_;
+  }
+
+ private:
+  Status DeleteDirectory(const std::string& path);
+
+  std::string original_path_;
+  std::string local_path_;
+};
 
 /// Is a path an absolute path?
 /// \param path The path.
@@ -98,16 +136,13 @@ Status GetDirectoryFiles(
 /// \return Error status
 Status ReadTextFile(const std::string& path, std::string* contents);
 
-/// Create a local copy of the file/folder (if needed).
-/// \param path The path of the file.
-/// \param local_path Returns the local path of the file.
+/// Create an object representing a local copy of a directory.
+/// \param path The path of the directory.
+/// \param localized Returns the LocalizedDirectory object
+/// representing the local copy of the directory.
 /// \return Error status
-Status DownloadFileFolder(const std::string& path, std::string* local_path);
-
-/// Delete the local copy of the file/folder (if needed).
-/// \param path The path of the file.
-/// \return Error status
-Status DestroyFileFolder(const std::string& path);
+Status LocalizeDirectory(
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* localized);
 
 /// Write a string to a file.
 /// \param path The path of the file.
