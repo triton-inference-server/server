@@ -193,15 +193,20 @@ def preprocess(img, format, dtype, c, h, w, scaling):
     return ordered
 
 
-def postprocess(results, filenames, batch_size):
+def postprocess(response, filenames, batch_size):
     """
-    Post-process results to show classifications.
+    Post-process response to show classifications.
     """
-    if len(results) != 1:
-        raise Exception("expected 1 result, got {}".format(len(results)))
+    if len(response.outputs) != 1:
+        raise Exception("expected 1 output, got {}".format(len(
+            response.outputs)))
 
-    batched_result = deserialize_bytes_tensor(results[0].contents.raw_contents)
-    contents = np.reshape(batched_result, results[0].shape)
+    if len(response.raw_output_contents) != 1:
+        raise Exception("expected 1 output content, got {}".format(
+            len(response.raw_output_contents)))
+
+    batched_result = deserialize_bytes_tensor(response.raw_output_contents[0])
+    contents = np.reshape(batched_result, response.outputs[0].shape)
 
     if len(contents) != batch_size:
         raise Exception("expected {} results, got {}".format(
@@ -279,11 +284,9 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
             if image_idx == 0:
                 last_request = True
 
-        input_contents = grpc_service_pb2.InferTensorContents()
-        input_contents.raw_contents = input_bytes
-        input.contents.CopyFrom(input_contents)
         request.inputs.extend([input])
         result_filenames.append(input_filenames)
+        request.raw_input_contents.extend([input_bytes])
         yield request
 
 
@@ -403,11 +406,10 @@ if __name__ == '__main__':
                 error_found = True
                 print(response.error_message)
             else:
-                postprocess(response.infer_response.outputs,
-                            result_filenames[idx], FLAGS.batch_size)
+                postprocess(response.infer_response, result_filenames[idx],
+                            FLAGS.batch_size)
         else:
-            postprocess(response.outputs, result_filenames[idx],
-                        FLAGS.batch_size)
+            postprocess(response, result_filenames[idx], FLAGS.batch_size)
         idx += 1
 
     if error_found:

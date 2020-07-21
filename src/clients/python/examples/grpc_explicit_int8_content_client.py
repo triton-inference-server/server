@@ -95,13 +95,15 @@ if __name__ == '__main__':
     response = grpc_stub.ModelInfer(request)
 
     output_results = []
+    index = 0
     for output in response.outputs:
         shape = []
         for value in output.shape:
             shape.append(value)
         output_results.append(
-            np.frombuffer(output.contents.raw_contents, dtype=np.int32))
+            np.frombuffer(response.raw_output_contents[index], dtype=np.int32))
         output_results[-1] = np.resize(output_results[-1], shape)
+        index += 1
 
     if len(output_results) != 2:
         print("expected two output results")

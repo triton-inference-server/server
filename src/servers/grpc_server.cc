@@ -2071,8 +2071,7 @@ ResponseAllocatorHelper(
   ModelInferResponse::InferOutputTensor* output_tensor =
       response->add_outputs();
   output_tensor->set_name(tensor_name);
-  std::string* raw_output =
-      output_tensor->mutable_contents()->mutable_raw_contents();
+  std::string* raw_output = response->add_raw_output_contents();
 
   if (byte_size > 0) {
     const auto& pr = shm_map.find(tensor_name);
@@ -2380,9 +2379,10 @@ InferGRPCToInput(
 {
   // Verify that the batch-byte-size of each input matches the size of
   // the provided tensor data (provided raw or from shared memory)
+  int index = 0;
   for (const auto& io : request.inputs()) {
     const void* base;
-    size_t byte_size;
+    size_t byte_size = 0;
     TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
 
@@ -2408,173 +2408,181 @@ InferGRPCToInput(
           region_name, offset, &tmp, &memory_type, &memory_type_id));
       base = tmp;
     } else {
-      if (!io.has_contents()) {
+      if (io.has_contents() && (!request.raw_input_contents().empty())) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             std::string(
-                "expected tensor data for input tensor '" + io.name() +
-                "' for model '" + request.model_name() + "'")
+                "contents field must not be specified when using "
+                "raw_input_contents for '" +
+                io.name() + "' for model '" + request.model_name() + "'")
                 .c_str());
-      }
-
-      // Try to read the raw contents if available
-      const std::string& raw = io.contents().raw_contents();
-      base = raw.c_str();
-      byte_size = raw.size();
-
-      // Check the presence of explicit tensors
-      TRITONSERVER_DataType dtype =
-          TRITONSERVER_StringToDataType(io.datatype().c_str());
-      const size_t elem_byte_size = TRITONSERVER_DataTypeByteSize(dtype);
-      if (io.contents().bool_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), TRITONSERVER_TYPE_BOOL, dtype,
-            byte_size));
-        base = (const void*)io.contents().bool_contents().data();
-        byte_size = io.contents().bool_contents_size() * elem_byte_size;
-      }
-
-      if (io.contents().int_contents_size() != 0) {
-        if (dtype == TRITONSERVER_TYPE_INT8) {
+      } else if (io.has_contents()) {
+        // Check the presence of explicit tensors
+        TRITONSERVER_DataType dtype =
+            TRITONSERVER_StringToDataType(io.datatype().c_str());
+        const size_t elem_byte_size = TRITONSERVER_DataTypeByteSize(dtype);
+        if (io.contents().bool_contents_size() != 0) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), TRITONSERVER_TYPE_INT8, dtype,
+              io.name(), request.model_name(), TRITONSERVER_TYPE_BOOL, dtype,
               byte_size));
-          serialized_data->emplace_back();
-          auto& serialized = serialized_data->back();
-          serialized.reserve(
-              io.contents().int_contents_size() * elem_byte_size);
-          for (const auto& element : io.contents().int_contents()) {
-            // Assuming the system is little-endian, picking the
-            // least significant byte of 32-bit integer as a
-            // int8 element
-            serialized.append(
-                reinterpret_cast<const char*>(&element), elem_byte_size);
-          }
-          base = serialized.c_str();
-          byte_size = serialized.size();
-        } else if (dtype == TRITONSERVER_TYPE_INT16) {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), TRITONSERVER_TYPE_INT16, dtype,
-              byte_size));
-          serialized_data->emplace_back();
-          auto& serialized = serialized_data->back();
-          serialized.reserve(
-              io.contents().int_contents_size() * elem_byte_size);
-          for (const auto& element : io.contents().int_contents()) {
-            // Assuming the system is little-endian, picking the
-            // least 2 significant bytes of 32-bit integer as a
-            // int16 element
-            serialized.append(
-                reinterpret_cast<const char*>(&element), elem_byte_size);
-          }
-          base = serialized.c_str();
-          byte_size = serialized.size();
-        } else {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), TRITONSERVER_TYPE_INT32, dtype,
-              byte_size));
-          base = (const void*)io.contents().int_contents().data();
-          byte_size = io.contents().int_contents_size() * elem_byte_size;
+          base = (const void*)io.contents().bool_contents().data();
+          byte_size = io.contents().bool_contents_size() * elem_byte_size;
         }
-      }
 
-      if (io.contents().int64_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), TRITONSERVER_TYPE_INT64, dtype,
-            byte_size));
-        base = (const void*)io.contents().int64_contents().data();
-        byte_size = io.contents().int64_contents_size() * elem_byte_size;
-      }
-
-      if (io.contents().uint_contents_size() != 0) {
-        if (dtype == TRITONSERVER_TYPE_UINT8) {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), TRITONSERVER_TYPE_UINT8, dtype,
-              byte_size));
-          serialized_data->emplace_back();
-          auto& serialized = serialized_data->back();
-          serialized.reserve(
-              io.contents().uint_contents_size() * elem_byte_size);
-          for (const auto& element : io.contents().uint_contents()) {
-            // Assuming the system is little-endian, picking the
-            // least significant byte of 32-bit unsigned integer as a
-            // uint8 element
-            serialized.append(
-                reinterpret_cast<const char*>(&element), elem_byte_size);
-          }
-          base = serialized.c_str();
-          byte_size = serialized.size();
-        } else if (dtype == TRITONSERVER_TYPE_UINT16) {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), TRITONSERVER_TYPE_UINT16, dtype,
-              byte_size));
-          serialized_data->emplace_back();
-          auto& serialized = serialized_data->back();
-          serialized.reserve(
-              io.contents().uint_contents_size() * elem_byte_size);
-          for (const auto& element : io.contents().uint_contents()) {
-            // Assuming the system is little-endian, picking the
-            // least 2 significant bytes of 32-bit integer as a
-            // uint16 element
-            serialized.append(
-                reinterpret_cast<const char*>(&element), elem_byte_size);
-          }
-          base = serialized.c_str();
-          byte_size = serialized.size();
-        } else {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), TRITONSERVER_TYPE_UINT32, dtype,
-              byte_size));
-          base = (const void*)io.contents().int_contents().data();
-          byte_size = io.contents().int_contents_size() * elem_byte_size;
-        }
-      }
-
-      if (io.contents().uint64_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), TRITONSERVER_TYPE_UINT64, dtype,
-            byte_size));
-        base = (const void*)io.contents().uint64_contents().data();
-        byte_size = io.contents().uint64_contents_size() * elem_byte_size;
-      }
-
-      if (io.contents().fp32_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), TRITONSERVER_TYPE_FP32, dtype,
-            byte_size));
-        base = (const void*)io.contents().fp32_contents().data();
-        byte_size = io.contents().fp32_contents_size() * elem_byte_size;
-      }
-
-      if (io.contents().fp64_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), TRITONSERVER_TYPE_FP64, dtype,
-            byte_size));
-        base = (const void*)io.contents().fp64_contents().data();
-        byte_size = io.contents().fp64_contents_size() * elem_byte_size;
-      }
-
-      if (io.contents().byte_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), TRITONSERVER_TYPE_BYTES, dtype,
-            byte_size));
-
-        serialized_data->emplace_back();
-        auto& serialized = serialized_data->back();
-
-        // Serialize the output tensor strings. Each string is
-        // serialized as a 4-byte length followed by the string itself
-        // with no null-terminator.
-        for (const auto& element : io.contents().byte_contents()) {
-          uint32_t len{(uint32_t)element.size()};
-          serialized.append(
-              reinterpret_cast<const char*>(&len), sizeof(uint32_t));
-          if (element.size() > 0) {
-            serialized.append(element.c_str(), len);
+        if (io.contents().int_contents_size() != 0) {
+          if (dtype == TRITONSERVER_TYPE_INT8) {
+            RETURN_IF_ERR(InferGRPCToInputHelper(
+                io.name(), request.model_name(), TRITONSERVER_TYPE_INT8, dtype,
+                byte_size));
+            serialized_data->emplace_back();
+            auto& serialized = serialized_data->back();
+            serialized.reserve(
+                io.contents().int_contents_size() * elem_byte_size);
+            for (const auto& element : io.contents().int_contents()) {
+              // Assuming the system is little-endian, picking the
+              // least significant byte of 32-bit integer as a
+              // int8 element
+              serialized.append(
+                  reinterpret_cast<const char*>(&element), elem_byte_size);
+            }
+            base = serialized.c_str();
+            byte_size = serialized.size();
+          } else if (dtype == TRITONSERVER_TYPE_INT16) {
+            RETURN_IF_ERR(InferGRPCToInputHelper(
+                io.name(), request.model_name(), TRITONSERVER_TYPE_INT16, dtype,
+                byte_size));
+            serialized_data->emplace_back();
+            auto& serialized = serialized_data->back();
+            serialized.reserve(
+                io.contents().int_contents_size() * elem_byte_size);
+            for (const auto& element : io.contents().int_contents()) {
+              // Assuming the system is little-endian, picking the
+              // least 2 significant bytes of 32-bit integer as a
+              // int16 element
+              serialized.append(
+                  reinterpret_cast<const char*>(&element), elem_byte_size);
+            }
+            base = serialized.c_str();
+            byte_size = serialized.size();
+          } else {
+            RETURN_IF_ERR(InferGRPCToInputHelper(
+                io.name(), request.model_name(), TRITONSERVER_TYPE_INT32, dtype,
+                byte_size));
+            base = (const void*)io.contents().int_contents().data();
+            byte_size = io.contents().int_contents_size() * elem_byte_size;
           }
         }
-        base = serialized.c_str();
-        byte_size = serialized.size();
+
+        if (io.contents().int64_contents_size() != 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), TRITONSERVER_TYPE_INT64, dtype,
+              byte_size));
+          base = (const void*)io.contents().int64_contents().data();
+          byte_size = io.contents().int64_contents_size() * elem_byte_size;
+        }
+
+        if (io.contents().uint_contents_size() != 0) {
+          if (dtype == TRITONSERVER_TYPE_UINT8) {
+            RETURN_IF_ERR(InferGRPCToInputHelper(
+                io.name(), request.model_name(), TRITONSERVER_TYPE_UINT8, dtype,
+                byte_size));
+            serialized_data->emplace_back();
+            auto& serialized = serialized_data->back();
+            serialized.reserve(
+                io.contents().uint_contents_size() * elem_byte_size);
+            for (const auto& element : io.contents().uint_contents()) {
+              // Assuming the system is little-endian, picking the
+              // least significant byte of 32-bit unsigned integer as a
+              // uint8 element
+              serialized.append(
+                  reinterpret_cast<const char*>(&element), elem_byte_size);
+            }
+            base = serialized.c_str();
+            byte_size = serialized.size();
+          } else if (dtype == TRITONSERVER_TYPE_UINT16) {
+            RETURN_IF_ERR(InferGRPCToInputHelper(
+                io.name(), request.model_name(), TRITONSERVER_TYPE_UINT16,
+                dtype, byte_size));
+            serialized_data->emplace_back();
+            auto& serialized = serialized_data->back();
+            serialized.reserve(
+                io.contents().uint_contents_size() * elem_byte_size);
+            for (const auto& element : io.contents().uint_contents()) {
+              // Assuming the system is little-endian, picking the
+              // least 2 significant bytes of 32-bit integer as a
+              // uint16 element
+              serialized.append(
+                  reinterpret_cast<const char*>(&element), elem_byte_size);
+            }
+            base = serialized.c_str();
+            byte_size = serialized.size();
+          } else {
+            RETURN_IF_ERR(InferGRPCToInputHelper(
+                io.name(), request.model_name(), TRITONSERVER_TYPE_UINT32,
+                dtype, byte_size));
+            base = (const void*)io.contents().int_contents().data();
+            byte_size = io.contents().int_contents_size() * elem_byte_size;
+          }
+        }
+
+        if (io.contents().uint64_contents_size() != 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), TRITONSERVER_TYPE_UINT64, dtype,
+              byte_size));
+          base = (const void*)io.contents().uint64_contents().data();
+          byte_size = io.contents().uint64_contents_size() * elem_byte_size;
+        }
+
+        if (io.contents().fp32_contents_size() != 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), TRITONSERVER_TYPE_FP32, dtype,
+              byte_size));
+          base = (const void*)io.contents().fp32_contents().data();
+          byte_size = io.contents().fp32_contents_size() * elem_byte_size;
+        }
+
+        if (io.contents().fp64_contents_size() != 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), TRITONSERVER_TYPE_FP64, dtype,
+              byte_size));
+          base = (const void*)io.contents().fp64_contents().data();
+          byte_size = io.contents().fp64_contents_size() * elem_byte_size;
+        }
+
+        if (io.contents().byte_contents_size() != 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), TRITONSERVER_TYPE_BYTES, dtype,
+              byte_size));
+
+          serialized_data->emplace_back();
+          auto& serialized = serialized_data->back();
+
+          // Serialize the output tensor strings. Each string is
+          // serialized as a 4-byte length followed by the string itself
+          // with no null-terminator.
+          for (const auto& element : io.contents().byte_contents()) {
+            uint32_t len{(uint32_t)element.size()};
+            serialized.append(
+                reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+            if (element.size() > 0) {
+              serialized.append(element.c_str(), len);
+            }
+          }
+          base = serialized.c_str();
+          byte_size = serialized.size();
+        }
+      } else if (request.raw_input_contents().size() > index) {
+        // Try to read the raw contents if available
+        const std::string& raw = request.raw_input_contents()[index++];
+        base = raw.c_str();
+        byte_size = raw.size();
+      } else {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "unable to find data for input tensor '" + io.name() +
+                "' for model '" + request.model_name() + "' in request.")
+                .c_str());
       }
     }
 
@@ -2857,8 +2865,7 @@ InferResponseCompleteCommon(
       }
       output->add_shape(classification_count);
 
-      output->mutable_contents()->Clear();
-      *(output->mutable_contents()->mutable_raw_contents()) =
+      (*response.mutable_raw_output_contents())[output_idx] =
           std::move(serialized);
     }
   }

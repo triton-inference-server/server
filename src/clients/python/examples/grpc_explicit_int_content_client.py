@@ -95,13 +95,15 @@ if __name__ == '__main__':
     response = grpc_stub.ModelInfer(request)
 
     output_results = []
+    index = 0
     for output in response.outputs:
         shape = []
         for value in output.shape:
             shape.append(value)
         output_results.append(
-            np.frombuffer(output.contents.raw_contents, dtype=np.int32))
+            np.frombuffer(response.raw_output_contents[index], dtype=np.int32))
         output_results[-1] = np.resize(output_results[-1], shape)
+        index += 1
 
     if len(output_results) != 2:
         print("expected two output results")
@@ -122,13 +124,13 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Populating additional content field should generate an error
-    request.inputs[0].contents.raw_contents = np.array(
-        input0_data[0:8]).tobytes()
+    request.raw_input_contents.extend([np.array(input0_data[0:8]).tobytes()])
     request.inputs[0].contents.int_contents[:] = input0_data[8:]
 
     try:
         response = grpc_stub.ModelInfer(request)
     except Exception as e:
-        if "unexpected explicit tensor data for input tensor 'INPUT0' for " \
-            "model 'simple', binary data was already supplied" in e.__str__():
+        if "contents field must not be specified when using " \
+            "raw_input_contents for 'INPUT0' for model 'simple'" \
+                in e.__str__():
             print('PASS: explicit int')

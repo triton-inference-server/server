@@ -150,7 +150,9 @@ class InferResultGrpc : public InferResult {
   InferResultGrpc(std::shared_ptr<ModelStreamInferResponse> response);
 
   std::map<std::string, const ModelInferResponse::InferOutputTensor*>
-      output_name_to_result_map_;
+      output_name_to_tensor_map_;
+  std::map<std::string, std::pair<const uint8_t*, const uint32_t>>
+      output_name_to_buffer_map_;
 
   std::shared_ptr<ModelInferResponse> response_;
   std::shared_ptr<ModelStreamInferResponse> stream_response_;
@@ -208,8 +210,8 @@ InferResultGrpc::Shape(
     const std::string& output_name, std::vector<int64_t>* shape) const
 {
   shape->clear();
-  auto it = output_name_to_result_map_.find(output_name);
-  if (it != output_name_to_result_map_.end()) {
+  auto it = output_name_to_tensor_map_.find(output_name);
+  if (it != output_name_to_tensor_map_.end()) {
     for (const auto dim : it->second->shape()) {
       shape->push_back(dim);
     }
@@ -225,8 +227,8 @@ Error
 InferResultGrpc::Datatype(
     const std::string& output_name, std::string* datatype) const
 {
-  auto it = output_name_to_result_map_.find(output_name);
-  if (it != output_name_to_result_map_.end()) {
+  auto it = output_name_to_tensor_map_.find(output_name);
+  if (it != output_name_to_tensor_map_.end()) {
     *datatype = it->second->datatype();
   } else {
     return Error(
@@ -242,10 +244,10 @@ InferResultGrpc::RawData(
     const std::string& output_name, const uint8_t** buf,
     size_t* byte_size) const
 {
-  auto it = output_name_to_result_map_.find(output_name);
-  if (it != output_name_to_result_map_.end()) {
-    *buf = (uint8_t*)&(it->second->contents().raw_contents()[0]);
-    *byte_size = it->second->contents().raw_contents().size();
+  auto it = output_name_to_buffer_map_.find(output_name);
+  if (it != output_name_to_buffer_map_.end()) {
+    *buf = it->second.first;
+    *byte_size = it->second.second;
   } else {
     return Error(
         "The response does not contain results for output name '" +
@@ -288,7 +290,7 @@ InferResultGrpc::StringData(
       buf_offset += (sizeof(element_size) + element_size);
     }
   } else {
-    auto it = output_name_to_result_map_.find(output_name);
+    auto it = output_name_to_tensor_map_.find(output_name);
     for (const auto& element : it->second->contents().byte_contents()) {
       string_result->push_back(element);
     }
@@ -301,8 +303,15 @@ InferResultGrpc::InferResultGrpc(
     std::shared_ptr<ModelInferResponse> response, Error& request_status)
     : response_(response), request_status_(request_status)
 {
+  uint32_t index = 0;
   for (const auto& output : response_->outputs()) {
-    output_name_to_result_map_[output.name()] = &output;
+    output_name_to_tensor_map_[output.name()] = &output;
+    const uint8_t* buf =
+        (uint8_t*)&(response_->raw_output_contents()[index][0]);
+    const uint32_t byte_size = response_->raw_output_contents()[index].size();
+    output_name_to_buffer_map_.insert(
+        std::make_pair(output.name(), std::make_pair(buf, byte_size)));
+    index++;
   }
 }
 
@@ -313,8 +322,15 @@ InferResultGrpc::InferResultGrpc(
   request_status_ = Error(stream_response_->error_message());
   response_.reset(
       stream_response->mutable_infer_response(), [](ModelInferResponse*) {});
+  uint32_t index = 0;
   for (const auto& output : response_->outputs()) {
-    output_name_to_result_map_[output.name()] = &output;
+    output_name_to_tensor_map_[output.name()] = &output;
+    const uint8_t* buf =
+        (uint8_t*)&(response_->raw_output_contents()[index][0]);
+    const uint32_t byte_size = response_->raw_output_contents()[index].size();
+    output_name_to_buffer_map_.insert(
+        std::make_pair(output.name(), std::make_pair(buf, byte_size)));
+    index++;
   }
 }
 
@@ -1060,6 +1076,7 @@ InferenceServerGrpcClient::PreRunProcessing(
   }
 
   int index = 0;
+  infer_request_.mutable_raw_input_contents()->Clear();
   for (const auto input : inputs) {
     // Add new InferInputTensor submessages only if required, otherwise
     // reuse the submessages already available.
@@ -1097,18 +1114,17 @@ InferenceServerGrpcClient::PreRunProcessing(
       }
     } else {
       bool end_of_input = false;
-      std::string* contents =
-          grpc_input->mutable_contents()->mutable_raw_contents();
+      std::string* raw_contents = infer_request_.add_raw_input_contents();
       size_t content_size;
       input->ByteSize(&content_size);
-      contents->reserve(content_size);
-      contents->clear();
+      raw_contents->reserve(content_size);
+      raw_contents->clear();
       while (!end_of_input) {
         const uint8_t* buf;
         size_t buf_size;
         input->GetNext(&buf, &buf_size, &end_of_input);
         if (buf != nullptr) {
-          contents->append(reinterpret_cast<const char*>(buf), buf_size);
+          raw_contents->append(reinterpret_cast<const char*>(buf), buf_size);
         }
       }
     }
