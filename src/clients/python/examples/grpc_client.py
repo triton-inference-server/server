@@ -105,16 +105,13 @@ if __name__ == '__main__':
     input.name = "input"
     input.datatype = "FP32"
     input.shape.extend([1, 224, 224, 3])
-
-    input_contents = grpc_service_pb2.InferTensorContents()
-    input_contents.raw_contents = bytes(602112 * 'a', 'utf-8')
-    input.contents.CopyFrom(input_contents)
-
     request.inputs.extend([input])
 
     output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output.name = "resnet_v1_50/predictions/Softmax"
     request.outputs.extend([output])
+
+    request.raw_input_contents.extend([bytes(602112 * 'a', 'utf-8')])
 
     response = grpc_stub.ModelInfer(request)
     print("model infer:\n{}".format(response))

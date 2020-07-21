@@ -52,16 +52,14 @@ class OutputNameValidationTest(unittest.TestCase):
         input.datatype = "FP32"
         input.shape.extend([1])
 
-        input_contents = grpc_service_pb2.InferTensorContents()
-        input_contents.raw_contents = bytes(4 * 'a', 'utf-8')
-        input.contents.CopyFrom(input_contents)
-
         request.inputs.extend([input])
 
         output = grpc_service_pb2.ModelInferRequest(
         ).InferRequestedOutputTensor()
         output.name = output_name
         request.outputs.extend([output])
+
+        request.raw_input_contents.extend([bytes(4 * 'a', 'utf-8')])
 
         return request
 

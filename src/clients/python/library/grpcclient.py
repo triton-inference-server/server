@@ -65,6 +65,8 @@ def _get_inference_request(model_name, inputs, model_version, request_id,
         request.id = request_id
     for infer_input in inputs:
         request.inputs.extend([infer_input._get_tensor()])
+        if infer_input._get_content() is not None:
+            request.raw_input_contents.extend([infer_input._get_content()])
     if outputs is not None:
         for infer_output in outputs:
             request.outputs.extend([infer_output._get_tensor()])
@@ -1320,6 +1322,7 @@ class InferInput:
         self._input.ClearField('shape')
         self._input.shape.extend(shape)
         self._input.datatype = datatype
+        self._raw_content = None
 
     def name(self):
         """Get the name of input associated with this object.
@@ -1400,10 +1403,9 @@ class InferInput:
         self._input.parameters.pop('shared_memory_offset', None)
 
         if self._input.datatype == "BYTES":
-            self._input.contents.raw_contents = serialize_byte_tensor(
-                input_tensor).tobytes()
+            self._raw_content = serialize_byte_tensor(input_tensor).tobytes()
         else:
-            self._input.contents.raw_contents = input_tensor.tobytes()
+            self._raw_content = input_tensor.tobytes()
 
     def set_shared_memory(self, region_name, byte_size, offset=0):
         """Set the tensor data from the specified shared memory region.
@@ -1420,6 +1422,7 @@ class InferInput:
 
         """
         self._input.ClearField("contents")
+        self._raw_content = None
 
         self._input.parameters[
             'shared_memory_region'].string_param = region_name
@@ -1436,6 +1439,15 @@ class InferInput:
             The underlying InferInputTensor protobuf message.
         """
         return self._input
+
+    def _get_content(self):
+        """Retrieve the contents for this tensor in raw bytes.
+        Returns
+        -------
+        bytes
+            The associated contents for this tensor in raw bytes.
+        """
+        return self._raw_content
 
 
 class InferRequestedOutput:
@@ -1548,6 +1560,7 @@ class InferResult:
             The numpy array containing the response data for the tensor or
             None if the data for specified tensor name is not found.
         """
+        index = 0
         for output in self._result.outputs:
             if output.name == name:
                 shape = []
@@ -1555,17 +1568,17 @@ class InferResult:
                     shape.append(value)
 
                 datatype = output.datatype
-                if len(output.contents.raw_contents) != 0:
+                if index < len(self._result.raw_output_contents):
                     if datatype == 'BYTES':
                         # String results contain a 4-byte string length
                         # followed by the actual string characters. Hence,
                         # need to decode the raw bytes to convert into
                         # array elements.
                         np_array = deserialize_bytes_tensor(
-                            output.contents.raw_contents)
+                            self._result.raw_output_contents[index])
                     else:
                         np_array = np.frombuffer(
-                            output.contents.raw_contents,
+                            self._result.raw_output_contents[index],
                             dtype=triton_to_np_dtype(datatype))
                 elif len(output.contents.byte_contents) != 0:
                     np_array = np.array(output.contents.byte_contents)
@@ -1573,6 +1586,8 @@ class InferResult:
                     np_array = np.empty(0)
                 np_array = np.resize(np_array, shape)
                 return np_array
+            else:
+                index += 1
         return None
 
     def get_output(self, name, as_json=False):
