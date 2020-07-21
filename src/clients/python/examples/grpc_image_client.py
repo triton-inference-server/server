@@ -273,6 +273,7 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
         input_bytes = None
         input_filenames = []
         request.ClearField("inputs")
+        request.ClearField("raw_input_contents")
         for idx in range(FLAGS.batch_size):
             input_filenames.append(filenames[image_idx])
             if input_bytes is None:
