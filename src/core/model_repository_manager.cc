@@ -105,7 +105,6 @@ void
 BuildBackendConfigMap(
     const std::string& version, const bool strict_model_config,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-    const std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limit_mb,
     BackendConfigMap* backend_configs)
 {
 #ifdef TRITON_ENABLE_TENSORFLOW
@@ -132,19 +131,6 @@ BuildBackendConfigMap(
                    "BackendConfigMap: ("
                 << cuerr << ") " << cudaGetErrorString(cuerr);
       device_cnt = 0;
-    }
-
-    if (!tf_vgpu_memory_limit_mb.empty()) {
-      for (int device = 0; device < device_cnt; device++) {
-        auto device_mapping = tf_vgpu_memory_limit_mb.find(device);
-        if (device_mapping != tf_vgpu_memory_limit_mb.end()) {
-          graphdef_config->memory_limit_mb[device] = std::vector<float>(
-              device_mapping->second.first, device_mapping->second.second);
-        } else {
-          graphdef_config->memory_limit_mb[device] = {};
-        }
-      }
-      graphdef_config->per_process_gpu_memory_fraction = 0.0;
     }
 #endif  // TRITON_ENABLE_GPU
 
@@ -1040,7 +1026,6 @@ ModelRepositoryManager::Create(
     const std::set<std::string>& startup_models, const bool strict_model_config,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-    const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
     const bool polling_enabled, const bool model_control_enabled,
     const double min_compute_capability,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
@@ -1066,7 +1051,7 @@ ModelRepositoryManager::Create(
 
   BuildBackendConfigMap(
       server_version, strict_model_config, tf_gpu_memory_fraction,
-      tf_allow_soft_placement, tf_memory_limit_mb, &backend_config_map);
+      tf_allow_soft_placement, &backend_config_map);
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(

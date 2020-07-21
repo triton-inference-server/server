@@ -153,15 +153,14 @@ transitioning from version 1 to version 2:
   have different default behavior in version 2.
 
   * --api-version, --http-health-port, --grpc-infer-thread-count,
-    --grpc-stream-infer-thread-count,--allow-poll-model-repository
-    and --allow-model-control are removed.
+    --grpc-stream-infer-thread-count,--allow-poll-model-repository, --allow-model-control
+    and --tf-add-vgpu are removed.
 
   * The default for --model-control-mode is changed to *none*.
 
-  * --tf-allow-soft-placement, --tf-gpu-memory-fraction
-     and --tf-add-vgpu are renamed
-     to --backend-config="tensorflow,allow-soft-placement=<true,false>", --backend-config="tensorflow,gpu-memory-fraction=<float>"
-     and --backend-config="tensorflow,add-vgpu=<arg>".
+  * --tf-allow-soft-placement and --tf-gpu-memory-fraction are renamed
+     to --backend-config="tensorflow,allow-soft-placement=<true,false>"
+     and --backend-config="tensorflow,gpu-memory-fraction=<float>".
 
 * The HTTP/REST and GRPC protocols, while conceptually similar to
   version 1, are completely changed in version 2. See the `inference
