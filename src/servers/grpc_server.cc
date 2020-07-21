@@ -26,6 +26,7 @@
 
 #include "src/servers/grpc_server.h"
 
+#include <google/protobuf/arena.h>
 #include <grpc++/alarm.h>
 #include <chrono>
 #include <condition_variable>
@@ -2602,24 +2603,21 @@ SetInferenceRequestMetadata(
   RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(
       inference_request, request.id().c_str()));
 
-  // FIXME, instead of find perhaps we should just iterate through the
-  // parameters...
-  const auto& sequence_id_it = request.parameters().find("sequence_id");
-  if (sequence_id_it != request.parameters().end()) {
-    const auto& infer_param = sequence_id_it->second;
-    if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          "invalid value type for 'sequence_id' parameter, expected "
-          "int64_param.");
-    }
-    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
-        inference_request, infer_param.int64_param()));
-    uint32_t flags = 0;
-    const auto& sequence_start_it = request.parameters().find("sequence_start");
-    if (sequence_start_it != request.parameters().end()) {
-      const auto& infer_param = sequence_start_it->second;
+  uint32_t flags = 0;
+  for (auto param : request.parameters()) {
+    if (param.first.compare("sequence_id") == 0) {
+      const auto& infer_param = param.second;
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kInt64Param) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'sequence_id' parameter, expected "
+            "int64_param.");
+      }
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
+          inference_request, infer_param.int64_param()));
+    } else if (param.first.compare("sequence_start") == 0) {
+      const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() !=
           InferParameter::ParameterChoiceCase::kBoolParam) {
         return TRITONSERVER_ErrorNew(
@@ -2630,10 +2628,8 @@ SetInferenceRequestMetadata(
       if (infer_param.bool_param()) {
         flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
       }
-    }
-    const auto& sequence_end_it = request.parameters().find("sequence_end");
-    if (sequence_end_it != request.parameters().end()) {
-      const auto& infer_param = sequence_end_it->second;
+    } else if (param.first.compare("sequence_end") == 0) {
+      const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() !=
           InferParameter::ParameterChoiceCase::kBoolParam) {
         return TRITONSERVER_ErrorNew(
@@ -2644,38 +2640,34 @@ SetInferenceRequestMetadata(
       if (infer_param.bool_param()) {
         flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
       }
+    } else if (param.first.compare("priority") == 0) {
+      const auto& infer_param = param.second;
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kInt64Param) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'priority' parameter, expected "
+            "int64_param.");
+      }
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriority(
+          inference_request, infer_param.int64_param()));
+
+    } else if (param.first.compare("timeout") == 0) {
+      const auto& infer_param = param.second;
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kInt64Param) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'timeout' parameter, expected "
+            "int64_param.");
+      }
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
+          inference_request, infer_param.int64_param()));
     }
-    RETURN_IF_ERR(
-        TRITONSERVER_InferenceRequestSetFlags(inference_request, flags));
   }
 
-  const auto& priority_it = request.parameters().find("priority");
-  if (priority_it != request.parameters().end()) {
-    const auto& infer_param = priority_it->second;
-    if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          "invalid value type for 'sequence_id' parameter, expected "
-          "int64_param.");
-    }
-    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriority(
-        inference_request, infer_param.int64_param()));
-  }
-
-  const auto& timeout_it = request.parameters().find("timeout");
-  if (timeout_it != request.parameters().end()) {
-    const auto& infer_param = timeout_it->second;
-    if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          "invalid value type for 'sequence_id' parameter, expected "
-          "int64_param.");
-    }
-    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
-        inference_request, infer_param.int64_param()));
-  }
+  RETURN_IF_ERR(
+      TRITONSERVER_InferenceRequestSetFlags(inference_request, flags));
 
   for (const auto& input : request.inputs()) {
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
