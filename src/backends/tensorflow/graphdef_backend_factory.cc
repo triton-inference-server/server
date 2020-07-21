@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -59,24 +59,26 @@ GraphDefBackendFactory::Create(
 
 Status
 GraphDefBackendFactory::CreateBackend(
-    const std::string& path, const ModelConfig& model_config,
+    const std::string& nonlocal_path, const ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
-  // Read all the graphdef files in 'path'.
+  // Localize 'nonlocal_path' so that the entire model version
+  // directory is available locally.
+  std::shared_ptr<LocalizedDirectory> local_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(nonlocal_path, &local_dir));
+
+  // Read all the graphdef files in 'local_dir'.
   std::set<std::string> graphdef_files;
-  RETURN_IF_ERROR(
-      GetDirectoryFiles(path, true /* skip_hidden_files */, &graphdef_files));
+  RETURN_IF_ERROR(GetDirectoryFiles(
+      local_dir->Path(), true /* skip_hidden_files */, &graphdef_files));
 
   std::unordered_map<std::string, std::string> models;
   for (const auto& filename : graphdef_files) {
-    const auto graphdef_path = JoinPath({path, filename});
-    std::string local_graphdef_path;
-
-    RETURN_IF_ERROR(DownloadFileFolder(graphdef_path, &local_graphdef_path));
+    const auto graphdef_path = JoinPath({local_dir->Path(), filename});
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_graphdef_path));
+        std::make_tuple(graphdef_path));
   }
 
   // Create the backend for the model and all the execution contexts
@@ -84,13 +86,9 @@ GraphDefBackendFactory::CreateBackend(
   std::unique_ptr<GraphDefBackend> local_backend(
       new GraphDefBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(
-      path, model_config, backend_config_.get(), kTensorFlowGraphDefPlatform));
+      nonlocal_path, model_config, backend_config_.get(),
+      kTensorFlowGraphDefPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
-
-  // Destroy local copy if exists
-  for (const auto& model : models) {
-    RETURN_IF_ERROR(DestroyFileFolder(model.second));
-  }
 
   *backend = std::move(local_backend);
   return Status::Success;

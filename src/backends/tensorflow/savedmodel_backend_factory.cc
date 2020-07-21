@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -59,24 +59,25 @@ SavedModelBackendFactory::Create(
 
 Status
 SavedModelBackendFactory::CreateBackend(
-    const std::string& path, const ModelConfig& model_config,
+    const std::string& nonlocal_path, const ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
-  // Read all the savedmodel directories in 'path'.
+  // Localize 'nonlocal_path' so that the entire model version
+  // directory is available locally.
+  std::shared_ptr<LocalizedDirectory> local_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(nonlocal_path, &local_dir));
+
+  // Read all the savedmodel directories in 'local_dir'.
   std::set<std::string> savedmodel_subdirs;
-  RETURN_IF_ERROR(GetDirectorySubdirs(path, &savedmodel_subdirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(local_dir->Path(), &savedmodel_subdirs));
 
   std::unordered_map<std::string, std::string> models;
   for (const auto& filename : savedmodel_subdirs) {
-    const auto savedmodel_path = JoinPath({path, filename});
-    std::string local_savedmodel_path;
-
-    RETURN_IF_ERROR(
-        DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
+    const auto savedmodel_path = JoinPath({local_dir->Path(), filename});
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_savedmodel_path));
+        std::make_tuple(savedmodel_path));
   }
 
   // Create the backend for the model and all the execution contexts
@@ -84,14 +85,9 @@ SavedModelBackendFactory::CreateBackend(
   std::unique_ptr<SavedModelBackend> local_backend(
       new SavedModelBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(
-      path, model_config, backend_config_.get(),
+      nonlocal_path, model_config, backend_config_.get(),
       kTensorFlowSavedModelPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
-
-  // Destroy local copy if exists
-  for (const auto& model : models) {
-    RETURN_IF_ERROR(DestroyFileFolder(model.second));
-  }
 
   *backend = std::move(local_backend);
   return Status::Success;

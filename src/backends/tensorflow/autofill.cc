@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -269,11 +269,17 @@ AutoFillSavedModel::Create(
 
   // The model configuration will be identical across all the version
   // directories.
-  const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
+  const auto nonlocal_version_path =
+      JoinPath({model_path, *(version_dirs.begin())});
+
+  // Localize 'nonlocal_version_path' so that the entire model version
+  // directory is available locally.
+  std::shared_ptr<LocalizedDirectory> local_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(nonlocal_version_path, &local_dir));
 
   // There can be multiple savedmodel directories so we try each...
   std::set<std::string> savedmodel_dirs;
-  RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &savedmodel_dirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(local_dir->Path(), &savedmodel_dirs));
 
   if (savedmodel_dirs.empty()) {
     return Status(
@@ -286,18 +292,14 @@ AutoFillSavedModel::Create(
   TRTISTF_Model* trtistf_model;
 
   for (auto dir : savedmodel_dirs) {
-    const auto savedmodel_path = JoinPath({version_path, dir});
-    std::string local_savedmodel_path;
-    RETURN_IF_ERROR(
-        DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
-
+    const auto savedmodel_path = JoinPath({local_dir->Path(), dir});
     auto graphdef_backend_config =
         std::static_pointer_cast<GraphDefBackendFactory::Config>(
             backend_config);
 
     trtistf_model = nullptr;
     err = TRTISTF_ModelCreateFromSavedModel(
-        &trtistf_model, model_name.c_str(), local_savedmodel_path.c_str(),
+        &trtistf_model, model_name.c_str(), savedmodel_path.c_str(),
         TRTISTF_NO_GPU_DEVICE, false /* have_graph */, 0 /* graph_level */,
         graphdef_backend_config->allow_gpu_memory_growth,
         graphdef_backend_config->per_process_gpu_memory_fraction,
@@ -305,7 +307,6 @@ AutoFillSavedModel::Create(
         graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */,
         false /* auto_mixed precision */);
 
-    RETURN_IF_ERROR(DestroyFileFolder(local_savedmodel_path));
     if (err == nullptr) {
       savedmodel_dir = dir;
       break;
