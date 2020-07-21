@@ -142,7 +142,7 @@ ReadInputTensor(
 {
   TRITONBACKEND_Input* input;
   RETURN_IF_ERROR(
-      TRITONBACKEND_RequestInputByName(request, input_name.c_str(), &input));
+      TRITONBACKEND_RequestInput(request, input_name.c_str(), &input));
 
   uint64_t input_byte_size;
   uint32_t input_buffer_count;
