@@ -238,18 +238,6 @@ class TritonServerOptions {
   float TensorFlowGpuMemoryFraction() const { return tf_gpu_mem_fraction_; }
   void SetTensorFlowGpuMemoryFraction(float f) { tf_gpu_mem_fraction_ = f; }
 
-  const std::map<int, std::pair<int, uint64_t>>& TensorFlowVgpuMemoryLimits()
-      const
-  {
-    return tf_vgpu_memory_limits_;
-  }
-  void AddTensorFlowVgpuMemoryLimits(
-      int gpu_device, int num_vgpus, uint64_t per_vgpu_memory_mbytes)
-  {
-    tf_vgpu_memory_limits_[gpu_device] =
-        std::make_pair(num_vgpus, per_vgpu_memory_mbytes);
-  }
-
  private:
   std::string server_id_;
   std::set<std::string> repo_paths_;
@@ -269,7 +257,6 @@ class TritonServerOptions {
 
   bool tf_soft_placement_;
   float tf_gpu_mem_fraction_;
-  std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limits_;
 };
 
 TritonServerOptions::TritonServerOptions()
@@ -294,67 +281,6 @@ TritonServerOptions::TritonServerOptions()
 #ifndef TRITON_ENABLE_METRICS_GPU
   gpu_metrics_ = false;
 #endif  // TRITON_ENABLE_METRICS_GPU
-}
-
-TRITONSERVER_Error*
-ParseVGPUOption(
-    const std::string arg, std::map<int, std::pair<int, uint64_t>>* val)
-{
-  int delim_gpu = arg.find(";");
-  int delim_num_vgpus = arg.find(";", delim_gpu + 1);
-
-  // Check for 2 semicolons
-  if ((delim_gpu < 0) || (delim_num_vgpus < 0)) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        (std::string(
-             "'add-vgpu' argument requires format <physical GPU>;<number of "
-             "virtual GPUs>;<memory limit per VGPU in megabytes>. Got: ") +
-         arg)
-            .c_str());
-  }
-
-  std::string gpu_string = arg.substr(0, delim_gpu);
-  std::string vgpu_string =
-      arg.substr(delim_gpu + 1, delim_num_vgpus - delim_gpu - 1);
-  std::string mem_limit_string = arg.substr(delim_num_vgpus + 1);
-
-  try {
-    int gpu_device = std::stoi(gpu_string);
-    int num_vgpus_on_device = std::stoi(vgpu_string);
-    uint64_t mem_limit = std::stoi(mem_limit_string);
-
-    if (gpu_device < 0) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          (std::string(
-               "'add-vgpu' requires physical GPU device index >= 0. Got: ") +
-           gpu_string)
-              .c_str());
-    }
-
-    if (num_vgpus_on_device <= 0) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          (std::string(
-               "'add-vgpu' requires number of virtual GPUs to be >= 0. Got: ") +
-           vgpu_string)
-              .c_str());
-    }
-
-    (*val)[gpu_device] = std::make_pair(num_vgpus_on_device, mem_limit);
-  }
-  catch (const std::invalid_argument& ia) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        (std::string(
-             "'add-vgpu' argument requires format <physical GPU>;<number of "
-             "virtual GPUs>;<memory limit per VGPU in megabytes>. Got ") +
-         arg)
-            .c_str());
-  }
-
-  return nullptr;  // success
 }
 
 TRITONSERVER_Error*
@@ -409,8 +335,6 @@ TritonServerOptions::AddBackendConfig(
       return ParseBoolOption(value, &tf_soft_placement_);
     } else if (setting == "gpu-memory-fraction") {
       return ParseFloatOption(value, &tf_gpu_mem_fraction_);
-    } else if (setting == "add-vgpu") {
-      return ParseVGPUOption(value, &tf_vgpu_memory_limits_);
     }
   }
 
@@ -1558,8 +1482,6 @@ TRITONSERVER_ServerNew(
       loptions->TensorFlowSoftPlacement());
   lserver->SetTensorFlowGPUMemoryFraction(
       loptions->TensorFlowGpuMemoryFraction());
-  lserver->SetTensorFlowVGPUMemoryLimits(
-      loptions->TensorFlowVgpuMemoryLimits());
 
   ni::Status status = lserver->Init();
   if (!status.IsOk()) {
@@ -1824,7 +1746,7 @@ TRITONSERVER_ServerModelStatistics(
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   auto model_name_string = std::string(model_name);
-  std::map<std::string, std::vector<int64_t>> ready_model_versions;
+  std::map<std::string, std::vector<int64_t> > ready_model_versions;
   if (model_name_string.empty()) {
     RETURN_IF_STATUS_ERROR(lserver->ModelReadyVersions(&ready_model_versions));
   } else {
