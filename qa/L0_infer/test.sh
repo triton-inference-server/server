@@ -168,9 +168,6 @@ for TARGET in cpu gpu; do
 
     set +e
 
-    # python unittest seems to swallow ImportError and still return 0
-    # exit code. So need to explicitly check CLIENT_LOG to make sure
-    # we see some running tests
     python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
@@ -178,8 +175,12 @@ for TARGET in cpu gpu; do
         RET=1
     fi
 
-    grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-    if [ $? -ne 0 ]; then
+    # At the end of $CLIENT_LOG there is a single line JSON containing the
+    # result of unittests.
+    test_result_json=`tail -n 1 $CLIENT_LOG`
+    num_failures=`echo $test_result_json | jq .failures`
+    num_tests=`echo $test_result_json | jq .total`
+    if [ $num_failures != "0" ] || [ $num_tests -le 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed To Run\n***"
         RET=1
