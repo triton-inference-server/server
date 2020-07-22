@@ -191,40 +191,28 @@ ConvertDataType(const std::string& dtype)
     return TRTISTF_DataType::TRTISTF_TYPE_INVALID;
   } else if (dtype == "TYPE_BOOL") {
     return TRTISTF_DataType::TRTISTF_TYPE_BOOL;
-
   } else if (dtype == "TYPE_UINT8") {
     return TRTISTF_DataType::TRTISTF_TYPE_UINT8;
-
   } else if (dtype == "TYPE_UINT16") {
     return TRTISTF_DataType::TRTISTF_TYPE_UINT16;
-
   } else if (dtype == "TYPE_UINT32") {
     return TRTISTF_DataType::TRTISTF_TYPE_UINT32;
-
   } else if (dtype == "TYPE_UINT64") {
     return TRTISTF_DataType::TRTISTF_TYPE_UINT64;
-
   } else if (dtype == "TYPE_INT8") {
     return TRTISTF_DataType::TRTISTF_TYPE_INT8;
-
   } else if (dtype == "TYPE_INT16") {
     return TRTISTF_DataType::TRTISTF_TYPE_INT16;
-
   } else if (dtype == "TYPE_INT32") {
     return TRTISTF_DataType::TRTISTF_TYPE_INT32;
-
   } else if (dtype == "TYPE_INT64") {
     return TRTISTF_DataType::TRTISTF_TYPE_INT64;
-
   } else if (dtype == "TYPE_FP16") {
     return TRTISTF_DataType::TRTISTF_TYPE_FP16;
-
   } else if (dtype == "TYPE_FP32") {
     return TRTISTF_DataType::TRTISTF_TYPE_FP32;
-
   } else if (dtype == "TYPE_FP64") {
     return TRTISTF_DataType::TRTISTF_TYPE_FP64;
-
   } else if (dtype == "TYPE_STRING") {
     return TRTISTF_DataType::TRTISTF_TYPE_STRING;
   }

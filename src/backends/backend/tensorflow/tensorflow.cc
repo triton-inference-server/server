@@ -51,6 +51,10 @@ namespace nib = nvidia::inferenceserver::backend;
 
 namespace {
 
+#ifndef TRITON_ENABLE_GPU
+using cudaStream_t = void*;
+#endif  // !TRITON_ENABLE_GPU
+
 using IONameMap = std::unordered_map<std::string, std::string>;
 using TRTISTFModelHandle =
     std::unique_ptr<TRTISTF_Model, decltype(&TRTISTF_ModelDelete)>;
@@ -1174,7 +1178,7 @@ ModelState::CreateInstance(
               .c_str());
 #else
       RETURN_ERROR_IF_FALSE(
-          false, TRITONSERVER_ERROR_INTERNAL, "GPU instances not supported");
+          false, TRITONSERVER_ERROR_INTERNAL, std::string("GPU instances not supported"));
 #endif  // TRITON_ENABLE_GPU
       break;
     }

@@ -29,8 +29,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-// FIXME need memory utilties
-// #include "src/core/memory.h"
 #include "src/backends/backend/tritonbackend.h"
 
 #ifdef TRITON_ENABLE_GPU
