@@ -311,7 +311,7 @@ TensorFlow Automatic FP16 Optimization
 
 TensorFlow has another option to provide FP16 optimization that can be
 enabled in the model configuration. As with the TensorRT optimization
-described above, you enable this optimization using the
+described above, you can enable this optimization by using the
 gpu_execution_accelerator property::
 
   optimization { execution_accelerators {
