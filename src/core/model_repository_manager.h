@@ -147,7 +147,6 @@ class ModelRepositoryManager {
       const bool strict_model_config,
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
       const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-      const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
       const bool polling_enabled, const bool model_control_enabled,
       const double min_compute_capability,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);

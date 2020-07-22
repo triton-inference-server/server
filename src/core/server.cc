@@ -105,7 +105,6 @@ InferenceServer::InferenceServer()
 
   tf_soft_placement_enabled_ = true;
   tf_gpu_memory_fraction_ = 0.0;
-  tf_vgpu_memory_limits_ = {};
 
   inflight_request_counter_ = 0;
 }
@@ -169,9 +168,9 @@ InferenceServer::Init()
   status = ModelRepositoryManager::Create(
       this, version_, model_repository_paths_, startup_models_,
       strict_model_config_, backend_cmdline_config_map_,
-      tf_gpu_memory_fraction_, tf_soft_placement_enabled_,
-      tf_vgpu_memory_limits_, polling_enabled, model_control_enabled,
-      min_supported_compute_capability_, &model_repository_manager_);
+      tf_gpu_memory_fraction_, tf_soft_placement_enabled_, polling_enabled,
+      model_control_enabled, min_supported_compute_capability_,
+      &model_repository_manager_);
   if (!status.IsOk()) {
     if (model_repository_manager_ == nullptr) {
       ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;

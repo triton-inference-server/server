@@ -639,18 +639,6 @@ Usage()
             "allocate all of GPU memory.",
             0)
      << std::endl;
-  ss << "  --backend-config=tensorflow,add-vgpu=<arg>" << std::endl;
-  ss << "\t"
-     << FormatUsageMessage(
-            "Add a tensorflow virtual GPU instances on a physical GPU. Input "
-            "should be 2 integers and 1 float separated by semicolons in the "
-            "format <physical GPU>;<number of virtual GPUs>;<memory limit per "
-            "VGPU in megabytes>. This option can be used multiple times, but "
-            "only once per physical GPU device. Subsequent uses will overwrite "
-            "previous uses with the same physical device. By default, no VGPUs "
-            "are enabled.",
-            0)
-     << std::endl;
 
   return ss.str();
 }
