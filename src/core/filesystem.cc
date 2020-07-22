@@ -500,8 +500,8 @@ GCSFileSystem::GetDirectoryContents(
     // We have to make sure that subdirectory contents do not appear here
     std::string name = object_metadata->name();
     int item_start = name.find(full_dir) + full_dir.size();
-    int item_end = name.find(
-        "/", item_start);  // GCS response prepends parent directory name
+    // GCS response prepends parent directory name
+    int item_end = name.find("/", item_start);
 
     // Let set take care of subdirectory contents
     std::string item = name.substr(item_start, item_end - item_start);
@@ -629,7 +629,7 @@ GCSFileSystem::LocalizeDirectory(
                 ", errno:" + strerror(errno));
       }
 
-      // Add with gcs path
+      // Append gcs path
       std::set<std::string> subdir_files;
       RETURN_IF_ERROR(GetDirectoryFiles(gcs_fpath, &subdir_files));
       for (auto itr = subdir_files.begin(); itr != subdir_files.end(); ++itr) {
@@ -644,7 +644,7 @@ GCSFileSystem::LocalizeDirectory(
     std::string bucket, object;
     RETURN_IF_ERROR(ParsePath(*iter, &bucket, &object));
 
-    // Send a request for the objects metadata
+    // Send a request to read the object
     gcs::ObjectReadStream filestream = client_->ReadObject(bucket, object);
     if (!filestream) {
       return Status(Status::Code::INTERNAL, "Failed to get object at " + *iter);
@@ -912,8 +912,8 @@ S3FileSystem::GetDirectoryContents(
       // We have to make sure that subdirectory contents do not appear here
       std::string name(s3_object.GetKey().c_str());
       int item_start = name.find(full_dir) + full_dir.size();
-      int item_end = name.find(
-          "/", item_start);  // GCS response prepends parent directory name
+      // S3 response prepends parent directory name
+      int item_end = name.find("/", item_start);
 
       // Let set take care of subdirectory contents
       std::string item = name.substr(item_start, item_end - item_start);
