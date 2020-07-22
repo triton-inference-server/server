@@ -74,7 +74,7 @@ class ModelInstance {
   // releasing the requests.
   virtual void Run(
       TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
-      const uint32_t request_count, const uint64_t exec_start_ns) = 0;
+      const uint32_t request_count) = 0;
 
   // Name of the model instance
   std::string name_;

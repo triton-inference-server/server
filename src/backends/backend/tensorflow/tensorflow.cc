@@ -797,7 +797,7 @@ class ModelState {
 
     void Run(
         TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
-        const uint32_t request_count, const uint64_t exec_start_ns) override;
+        const uint32_t request_count) override;
 
     // Map from configuration name for an input to tensor name for
     // that input in the model.
@@ -812,6 +812,10 @@ class ModelState {
 
     // use for GPU allocator
     int input_device_id_;
+
+    // A blocking queue for the instance to fetch its jobs.
+    nib::BlockingQueue<std::pair<TRITONBACKEND_Request**, uint32_t>>
+        batch_queue_;
   };
 
   static TRITONSERVER_Error* Create(
@@ -826,8 +830,7 @@ class ModelState {
   // Spawn a thread to produce outputs for a request. Return the
   // request wait time before it should release.
   void ProcessRequest(
-      TRITONBACKEND_Request** requests, const uint32_t request_count,
-      const uint64_t exec_start_ns);
+      TRITONBACKEND_Request** requests, const uint32_t request_count);
 
  private:
   ModelState(
@@ -844,8 +847,8 @@ class ModelState {
   TRITONBACKEND_Model* triton_model_;
   const std::string name_;
   ni::TritonJson::Value model_config_;
-  std::atomic<size_t> inflight_thread_count_;
   std::vector<std::unique_ptr<Instance>> instances_;
+  std::vector<std::thread> instance_threads_;
   nib::BlockingQueue<Instance*> available_instances_;
 };
 
@@ -1269,6 +1272,19 @@ ModelState::CreateInstance(
         config_outputs.ArraySize());
   }
 
+  instance_threads_.emplace_back([this, instance]() {
+    while (true) {
+      auto requests = instance->batch_queue_.Pop();
+      if (requests.first != nullptr) {
+        instance->Run(triton_model_, requests.first, requests.second);
+        available_instances_.Push(instance);
+      } else {
+        // Always push back to available_instances_ to unblock scheduler
+        available_instances_.Push(instance);
+        break;
+      }
+    }
+  });
   available_instances_.Push(instance);
   return nullptr;  // success
 }
@@ -1277,15 +1293,18 @@ ModelState::ModelState(
     TRITONBACKEND_Model* triton_model, const std::string& name,
     ni::TritonJson::Value&& model_config)
     : triton_model_(triton_model), name_(name),
-      model_config_(std::move(model_config)), inflight_thread_count_(0)
+      model_config_(std::move(model_config))
 {
 }
 
 ModelState::~ModelState()
 {
-  // Wait for all threads to exit...
-  while (inflight_thread_count_ > 0) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  // Push nullptr to signal the instances to exit
+  for (auto& instance : instances_) {
+    instance->batch_queue_.Push(std::make_pair(nullptr, 0));
+  }
+  for (auto& instance_thread : instance_threads_) {
+    instance_thread.join();
   }
 }
 
@@ -1338,35 +1357,26 @@ ModelState::ValidateModelConfig()
 
 void
 ModelState::ProcessRequest(
-    TRITONBACKEND_Request** requests, const uint32_t request_count,
-    const uint64_t exec_start_ns)
+    TRITONBACKEND_Request** requests, const uint32_t request_count)
 {
-  inflight_thread_count_++;
   auto instance = available_instances_.Pop();
-
-  // Currently launch thread for each batch, but we may launch long-running
-  // thread for each instance.
-  std::thread process_thread(
-      [this, exec_start_ns, instance, requests, request_count]() {
-        instance->Run(triton_model_, requests, request_count, exec_start_ns);
-        available_instances_.Push(instance);
-        inflight_thread_count_--;
-      });
-
-  process_thread.detach();
+  instance->batch_queue_.Push(std::make_pair(requests, request_count));
   available_instances_.WaitNotEmpty();
 }
 
 void
 ModelState::Instance::Run(
     TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
-    const uint32_t request_count, const uint64_t exec_start_ns)
+    const uint32_t request_count)
 {
   TRITONSERVER_LogMessage(
       TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
       (std::string("TRITONBACKEND_ModelExecute: Running ") + name_ + " with " +
        std::to_string(request_count) + " requests")
           .c_str());
+
+  uint64_t exec_start_ns = 0;
+  SET_TIMESTAMP(exec_start_ns);
 
   // For each request collect the total batch size for this inference
   // execution. The batch-size, number of inputs, and size of each
@@ -1912,13 +1922,10 @@ TRITONBACKEND_ModelExecute(
   // particular request then we send an error response just for the
   // specific request.
 
-  uint64_t exec_start_ns = 0;
-  SET_TIMESTAMP(exec_start_ns);
-
   // Each batch will be processed in a separate thread to avoid occupying
   // the ONLY scheduler thread. Note that this function will be blocked
   // until there is available instances
-  state->ProcessRequest(requests, request_count, exec_start_ns);
+  state->ProcessRequest(requests, request_count);
 
   return nullptr;  // success
 }
