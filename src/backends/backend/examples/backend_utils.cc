@@ -26,6 +26,9 @@
 
 #include "src/backends/backend/examples/backend_utils.h"
 
+#include <dirent.h>
+#include <sys/stat.h>
+
 namespace nvidia { namespace inferenceserver { namespace backend {
 
 TRITONSERVER_Error*
@@ -591,6 +594,117 @@ CopyBuffer(
 #endif  // TRITON_ENABLE_GPU
   }
 
+  return nullptr;  // success
+}
+
+namespace {
+TRITONSERVER_Error*
+GetDirectoryContents(const std::string& path, std::set<std::string>* contents)
+{
+  DIR* dir = opendir(path.c_str());
+  if (dir == nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        (std::string("failed to open directory ") + path).c_str());
+  }
+
+  struct dirent* entry;
+  while ((entry = readdir(dir)) != nullptr) {
+    std::string entryname = entry->d_name;
+    if ((entryname != ".") && (entryname != "..")) {
+      contents->insert(entryname);
+    }
+  }
+
+  closedir(dir);
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+IsDirectory(const std::string& path, bool* is_dir)
+{
+  *is_dir = false;
+
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        (std::string("failed to stat file ") + path).c_str());
+  }
+
+  *is_dir = S_ISDIR(st.st_mode);
+  return nullptr;  // success
+}
+
+std::string
+JoinPath(std::initializer_list<std::string> segments)
+{
+  std::string joined;
+
+  for (const auto& seg : segments) {
+    if (joined.empty()) {
+      joined = seg;
+    } else if (!seg.empty() && (seg[0] == '/')) {  // IsAbsolutePath(seg)
+      if (joined[joined.size() - 1] == '/') {
+        joined.append(seg.substr(1));
+      } else {
+        joined.append(seg);
+      }
+    } else {  // !IsAbsolutePath(seg)
+      if (joined[joined.size() - 1] != '/') {
+        joined.append("/");
+      }
+      joined.append(seg);
+    }
+  }
+
+  return joined;
+}
+
+}  // namespace
+
+TRITONSERVER_Error*
+ModelPaths(
+    const char* model_repository_path, uint64_t version,
+    const bool ignore_directories, const bool ignore_files,
+    std::unordered_map<std::string, std::string>* model_paths)
+{
+  std::set<std::string> model_files;
+  // Read all the files in 'path' and filter by type for different requirements
+  auto path = JoinPath({model_repository_path, std::to_string(version)});
+  RETURN_IF_ERROR(GetDirectoryContents(path, &model_files));
+  if (ignore_directories) {
+    // Erase directory entries...
+    for (auto iter = model_files.begin(); iter != model_files.end();) {
+      bool is_dir;
+      RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_dir));
+      if (is_dir) {
+        iter = model_files.erase(iter);
+      } else {
+        ++iter;
+      }
+    }
+  }
+  if (ignore_files) {
+    // Erase non-directory entries...
+    for (auto iter = model_files.begin(); iter != model_files.end();) {
+      bool is_dir;
+      RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_dir));
+      if (!is_dir) {
+        iter = model_files.erase(iter);
+      } else {
+        ++iter;
+      }
+    }
+  }
+
+  for (const auto& filename : model_files) {
+    const auto model_path = JoinPath({path, filename});
+    model_paths->emplace(
+        std::piecewise_construct, std::make_tuple(filename),
+        std::make_tuple(model_path));
+  }
   return nullptr;  // success
 }
 

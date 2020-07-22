@@ -32,6 +32,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "src/backends/backend/tritonbackend.h"
 
@@ -355,18 +356,39 @@ TRITONSERVER_Error* GetTypedSequenceControlProperties(
 /// Copy buffer from 'src' to 'dst' for given 'byte_size'. The buffer location
 /// is identified by the memory type and id, and the corresponding copy will be
 /// initiated.
-/// 'msg' is the message to be prepended in error message.
-/// 'cuda_stream' specifies the stream to be associated with, and 0 can be
+/// \param msg The message to be prepended in error message.
+/// \param src_memory_type The memory type of the source buffer.
+/// \param src_memory_type_id The memory type id of the source buffer.
+/// \param dst_memory_type The memory type of the destination buffer.
+/// \param dst_memory_type_id The memory type id of the destination buffer.
+/// \param byte_size The byte size of the source buffer.
+/// \param src The pointer to the source buffer.
+/// \param dst The pointer to the destination buffer.
+/// \param cuda_stream specifies the stream to be associated with, and 0 can be
 /// passed for default stream.
-/// 'cuda_used' returns whether a CUDA memory copy is initiated. If true,
+/// \param cuda_used returns whether a CUDA memory copy is initiated. If true,
 /// the caller should synchronize on the given 'cuda_stream' to ensure data copy
 /// is completed.
-/// \return The error status.
+/// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_Error* CopyBuffer(
     const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
     const int64_t src_memory_type_id,
     const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, bool* cuda_used);
+
+/// Returns the content in the model version path and the path to the content as
+/// key-value pair.
+/// \param model_repository_path The path to the model repository.
+/// \param version The version of the model.
+/// \param ignore_directories Whether the directories will be ignored.
+/// \param ignore_files Whether the files will be ignored.
+/// \param model_paths Returns the content in the model version path and
+/// the path to the content.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* ModelPaths(
+    const char* model_repository_path, uint64_t version,
+    const bool ignore_directories, const bool ignore_files,
+    std::unordered_map<std::string, std::string>* model_paths);
 
 }}}  // namespace nvidia::inferenceserver::backend

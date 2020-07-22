@@ -29,8 +29,6 @@
 #include "src/backends/backend/tensorflow/tf_utils.h"
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
 
-#include <dirent.h>
-#include <sys/stat.h>
 #include <atomic>
 #include <chrono>
 #include <memory>
@@ -58,152 +56,6 @@ using cudaStream_t = void*;
 using IONameMap = std::unordered_map<std::string, std::string>;
 using TRTISTFModelHandle =
     std::unique_ptr<TRTISTF_Model, decltype(&TRTISTF_ModelDelete)>;
-
-#define RESPOND_AND_RETURN_IF_ERROR(REQUEST, X)                         \
-  do {                                                                  \
-    TRITONSERVER_Error* rarie_err__ = (X);                              \
-    if (rarie_err__ != nullptr) {                                       \
-      TRITONBACKEND_Response* rarie_response__ = nullptr;               \
-      LOG_IF_ERROR(                                                     \
-          TRITONBACKEND_ResponseNew(&rarie_response__, REQUEST),        \
-          "failed to create response");                                 \
-      if (rarie_response__ != nullptr) {                                \
-        LOG_IF_ERROR(                                                   \
-            TRITONBACKEND_ResponseSend(                                 \
-                rarie_response__, TRITONSERVER_RESPONSE_COMPLETE_FINAL, \
-                rarie_err__),                                           \
-            "failed to send error response");                           \
-      }                                                                 \
-      TRITONSERVER_ErrorDelete(rarie_err__);                            \
-      return;                                                           \
-    }                                                                   \
-  } while (false)
-
-#define RESPOND_FACTORY_AND_RETURN_IF_ERROR(FACTORY, X)                      \
-  do {                                                                       \
-    TRITONSERVER_Error* rfarie_err__ = (X);                                  \
-    if (rfarie_err__ != nullptr) {                                           \
-      TRITONBACKEND_Response* rfarie_response__ = nullptr;                   \
-      LOG_IF_ERROR(                                                          \
-          TRITONBACKEND_ResponseNewFromFactory(&rfarie_response__, FACTORY), \
-          "failed to create response");                                      \
-      if (rfarie_response__ != nullptr) {                                    \
-        LOG_IF_ERROR(                                                        \
-            TRITONBACKEND_ResponseSend(                                      \
-                rfarie_response__, TRITONSERVER_RESPONSE_COMPLETE_FINAL,     \
-                rfarie_err__),                                               \
-            "failed to send error response");                                \
-      }                                                                      \
-      TRITONSERVER_ErrorDelete(rfarie_err__);                                \
-      return;                                                                \
-    }                                                                        \
-  } while (false)
-
-
-TRITONSERVER_Error*
-GetDirectoryContents(const std::string& path, std::set<std::string>* contents)
-{
-  DIR* dir = opendir(path.c_str());
-  if (dir == nullptr) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        (std::string("failed to open directory ") + path).c_str());
-  }
-
-  struct dirent* entry;
-  while ((entry = readdir(dir)) != nullptr) {
-    std::string entryname = entry->d_name;
-    if ((entryname != ".") && (entryname != "..")) {
-      contents->insert(entryname);
-    }
-  }
-
-  closedir(dir);
-
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-IsDirectory(const std::string& path, bool* is_dir)
-{
-  *is_dir = false;
-
-  struct stat st;
-  if (stat(path.c_str(), &st) != 0) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        (std::string("failed to stat file ") + path).c_str());
-  }
-
-  *is_dir = S_ISDIR(st.st_mode);
-  return nullptr;  // success
-}
-
-std::string
-JoinPath(std::initializer_list<std::string> segments)
-{
-  std::string joined;
-
-  for (const auto& seg : segments) {
-    if (joined.empty()) {
-      joined = seg;
-    } else if (!seg.empty() && (seg[0] == '/')) {  // IsAbsolutePath(seg)
-      if (joined[joined.size() - 1] == '/') {
-        joined.append(seg.substr(1));
-      } else {
-        joined.append(seg);
-      }
-    } else {  // !IsAbsolutePath(seg)
-      if (joined[joined.size() - 1] != '/') {
-        joined.append("/");
-      }
-      joined.append(seg);
-    }
-  }
-
-  return joined;
-}
-
-TRITONSERVER_Error*
-ModelPaths(
-    const std::string& path, const bool is_graphdef,
-    std::unordered_map<std::string, std::string>* model_paths)
-{
-  std::set<std::string> model_files;
-  // Read all the files in 'path' and filter by type for different platform
-  RETURN_IF_ERROR(GetDirectoryContents(path, &model_files));
-  if (is_graphdef) {
-    // Erase directory entries...
-    for (auto iter = model_files.begin(); iter != model_files.end();) {
-      bool is_dir;
-      RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_dir));
-      if (is_dir) {
-        iter = model_files.erase(iter);
-      } else {
-        ++iter;
-      }
-    }
-  } else {
-    // Erase non-directory entries...
-    for (auto iter = model_files.begin(); iter != model_files.end();) {
-      bool is_dir;
-      RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_dir));
-      if (!is_dir) {
-        iter = model_files.erase(iter);
-      } else {
-        ++iter;
-      }
-    }
-  }
-
-  for (const auto& filename : model_files) {
-    const auto model_path = JoinPath({path, filename});
-    model_paths->emplace(
-        std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(model_path));
-  }
-  return nullptr;  // success
-}
 
 TRITONSERVER_Error*
 ParseLongLongParameter(
@@ -1064,8 +916,8 @@ ModelState::CreateInstances()
   uint64_t version;
   RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model_, &version));
   std::unordered_map<std::string, std::string> model_paths;
-  RETURN_IF_ERROR(ModelPaths(
-      JoinPath({path, std::to_string(version)}), is_graphdef, &model_paths));
+  RETURN_IF_ERROR(
+      nib::ModelPaths(path, version, is_graphdef, !is_graphdef, &model_paths));
   for (const auto& instance : instances) {
     switch (instance.kind_) {
       case nib::InstanceProperties::Kind::CPU: {
@@ -1178,7 +1030,8 @@ ModelState::CreateInstance(
               .c_str());
 #else
       RETURN_ERROR_IF_FALSE(
-          false, TRITONSERVER_ERROR_INTERNAL, std::string("GPU instances not supported"));
+          false, TRITONSERVER_ERROR_INTERNAL,
+          std::string("GPU instances not supported"));
 #endif  // TRITON_ENABLE_GPU
       break;
     }
