@@ -71,45 +71,6 @@ ShapeToString(const std::vector<int64_t>& shape)
   return ShapeToString(shape.data(), shape.size());
 }
 
-std::string
-DataTypeToString(TRITONSERVER_DataType dtype)
-{
-  switch (dtype) {
-    case TRITONSERVER_TYPE_INVALID:
-      return "INVALID";
-    case TRITONSERVER_TYPE_BOOL:
-      return "BOOL";
-    case TRITONSERVER_TYPE_UINT8:
-      return "UINT8";
-    case TRITONSERVER_TYPE_UINT16:
-      return "UINT16";
-    case TRITONSERVER_TYPE_UINT32:
-      return "UINT32";
-    case TRITONSERVER_TYPE_UINT64:
-      return "UINT64";
-    case TRITONSERVER_TYPE_INT8:
-      return "INT8";
-    case TRITONSERVER_TYPE_INT16:
-      return "INT16";
-    case TRITONSERVER_TYPE_INT32:
-      return "INT32";
-    case TRITONSERVER_TYPE_INT64:
-      return "INT64";
-    case TRITONSERVER_TYPE_FP16:
-      return "FP16";
-    case TRITONSERVER_TYPE_FP32:
-      return "FP32";
-    case TRITONSERVER_TYPE_FP64:
-      return "FP64";
-    case TRITONSERVER_TYPE_BYTES:
-      return "BYTES";
-    default:
-      break;
-  }
-
-  return "INVALID";
-}
-
 int64_t
 GetElementCount(const int64_t* dims, const size_t dims_count)
 {
@@ -141,7 +102,7 @@ int64_t
 GetByteSize(
     const TRITONSERVER_DataType& dtype, const std::vector<int64_t>& dims)
 {
-  size_t dt_size = GetDataTypeByteSize(dtype);
+  size_t dt_size = TRITONSERVER_DataTypeByteSize(dtype);
   if (dt_size == 0) {
     return -1;
   }
@@ -152,43 +113,6 @@ GetByteSize(
   }
 
   return cnt * dt_size;
-}
-
-size_t
-GetDataTypeByteSize(const TRITONSERVER_DataType& dtype)
-{
-  switch (dtype) {
-    case TRITONSERVER_TYPE_BOOL:
-      return 1;
-    case TRITONSERVER_TYPE_UINT8:
-      return 1;
-    case TRITONSERVER_TYPE_UINT16:
-      return 2;
-    case TRITONSERVER_TYPE_UINT32:
-      return 4;
-    case TRITONSERVER_TYPE_UINT64:
-      return 8;
-    case TRITONSERVER_TYPE_INT8:
-      return 1;
-    case TRITONSERVER_TYPE_INT16:
-      return 2;
-    case TRITONSERVER_TYPE_INT32:
-      return 4;
-    case TRITONSERVER_TYPE_INT64:
-      return 8;
-    case TRITONSERVER_TYPE_FP16:
-      return 2;
-    case TRITONSERVER_TYPE_FP32:
-      return 4;
-    case TRITONSERVER_TYPE_FP64:
-      return 8;
-    case TRITONSERVER_TYPE_BYTES:
-      return 0;
-    default:
-      break;
-  }
-
-  return 0;
 }
 
 TRITONSERVER_Error*

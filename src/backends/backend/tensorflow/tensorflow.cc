@@ -294,7 +294,8 @@ ValidateSequenceControl(
           std::string(
               "unable to load model '" + model_name + "', sequence control '" +
               tensor_name + "': the model expects data-type " +
-              nib::DataTypeToString(nib::ConvertDataType(input->data_type_)) +
+              TRITONSERVER_DataTypeString(
+                  nib::ConvertDataType(input->data_type_)) +
               " but the model configuration specifies data-type " +
               tensor_datatype)
               .c_str());
@@ -462,7 +463,8 @@ CreateTRTISTFModel(
           std::string(
               "unable to load model '" + model_name + "', input '" + io_name +
               "' data-type " +
-              nib::DataTypeToString(nib::ConvertDataType(input->data_type_)) +
+              TRITONSERVER_DataTypeString(
+                  nib::ConvertDataType(input->data_type_)) +
               " doesn't match configuration data-type " + io_data_type)
               .c_str());
     }
@@ -519,7 +521,8 @@ CreateTRTISTFModel(
           std::string(
               "unable to load model '" + model_name + "', output '" + io_name +
               "' data-type " +
-              nib::DataTypeToString(nib::ConvertDataType(output->data_type_)) +
+              TRITONSERVER_DataTypeString(
+                  nib::ConvertDataType(output->data_type_)) +
               " doesn't match configuration data-type " + io_data_type)
               .c_str());
     }
@@ -1432,7 +1435,7 @@ ModelState::Instance::Run(
   // 'requests'. Create a response for each request. During input
   // processing if there is an error with any request that error will
   // be sent immediately with the corresponding response (and the
-  // response unique_ptr will then be nullptr). The request object
+  // response pointer will then be nullptr). The request object
   // itself will not be released until after all inferencing is done
   // (below) as we may need to access the request object when
   // determine how to process outputs (for example, even if we don't
@@ -1525,7 +1528,7 @@ ModelState::Instance::Run(
                 TRITONSERVER_ERROR_INTERNAL,
                 (std::string("failed to create input tensor '") + name +
                  "' with shape " + nib::ShapeToString(batchn_shape) +
-                 " and data type " + nib::DataTypeToString(datatype) +
+                 " and data type " + TRITONSERVER_DataTypeString(datatype) +
                  " for '" + name_ + "'")
                     .c_str()));
 

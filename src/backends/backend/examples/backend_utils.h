@@ -239,12 +239,6 @@ std::string ShapeToString(const int64_t* dims, const size_t dims_count);
 /// \return The string representation.
 std::string ShapeToString(const std::vector<int64_t>& shape);
 
-/// Return the string representation of a Triton server data type.
-///
-/// \param dtype The Triton server data type.
-/// \return The string representation.
-std::string DataTypeToString(TRITONSERVER_DataType dtype);
-
 /// Return the number of elements of a shape.
 ///
 /// \param dims The shape dimensions.
@@ -257,14 +251,6 @@ int64_t GetElementCount(const int64_t* dims, const size_t dims_count);
 /// \param shape The shape as a vector of dimensions.
 /// \return The number of elements.
 int64_t GetElementCount(const std::vector<int64_t>& shape);
-
-/// Get the size of objects of a given datatype in bytes.
-/// \param dtype The data-type.
-/// \return The size, in bytes, of objects of the datatype, or 0 if
-/// size cannot be determine (for example, values of type TYPE_STRING
-/// have variable length and so size cannot be determine just from the
-/// type).
-size_t GetDataTypeByteSize(const TRITONSERVER_DataType& dtype);
 
 /// Get the size, in bytes, of a tensor based on datatype and
 /// shape.
