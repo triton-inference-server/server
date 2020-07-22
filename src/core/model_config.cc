@@ -254,6 +254,71 @@ GetPlatform(const std::string& platform_str)
   return Platform::PLATFORM_UNKNOWN;
 }
 
+BackendType
+GetBackendTypeFromPlatform(const std::string& platform_name)
+{
+#ifdef TRITON_ENABLE_TENSORFLOW
+  if ((platform_name == kTensorFlowGraphDefPlatform) ||
+      (platform_name == kTensorFlowSavedModelPlatform)) {
+    return BackendType::BACKEND_TYPE_TENSORFLOW;
+  }
+#endif  // TRITON_ENABLE_TENSORFLOW
+
+#ifdef TRITON_ENABLE_TENSORRT
+  if (platform_name == kTensorRTPlanPlatform) {
+    return BackendType::BACKEND_TYPE_TENSORRT;
+  }
+#endif  // TRITON_ENABLE_TENSORRT
+
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+  if (platform_name == kOnnxRuntimeOnnxPlatform) {
+    return BackendType::BACKEND_TYPE_ONNXRUNTIME;
+  }
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+
+#ifdef TRITON_ENABLE_PYTORCH
+  if (platform_name == kPyTorchLibTorchPlatform) {
+    return BackendType::BACKEND_TYPE_PYTORCH;
+  }
+#endif  // TRITON_ENABLE_PYTORCH
+
+  return BackendType::BACKEND_TYPE_UNKNOWN;
+}
+
+/// Get the BackendType value for a backend name.
+/// \param backend_name The backend name.
+/// \return The BackendType or BackendType::UNKNOWN if the platform string
+/// is not recognized.
+BackendType
+GetBackendType(const std::string& backend_name)
+{
+#ifdef TRITON_ENABLE_TENSORFLOW
+  if (backend_name == kTensorFlowBackend) {
+    return BackendType::BACKEND_TYPE_TENSORFLOW;
+  }
+#endif  // TRITON_ENABLE_TENSORFLOW
+
+#ifdef TRITON_ENABLE_TENSORRT
+  if (backend_name == kTensorRTBackend) {
+    return BackendType::BACKEND_TYPE_TENSORRT;
+  }
+#endif  // TRITON_ENABLE_TENSORRT
+
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+  if (backend_name == kOnnxRuntimeBackend) {
+    return BackendType::BACKEND_TYPE_ONNXRUNTIME;
+  }
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+
+#ifdef TRITON_ENABLE_PYTORCH
+  if (backend_name == kPyTorchBackend) {
+    return BackendType::BACKEND_TYPE_PYTORCH;
+  }
+#endif  // TRITON_ENABLE_PYTORCH
+
+  return BackendType::BACKEND_TYPE_UNKNOWN;
+}
+
 int
 GetCpuNiceLevel(const ModelConfig& config)
 {

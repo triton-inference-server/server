@@ -603,70 +603,84 @@ GetNormalizedModelConfig(
     RETURN_IF_ERROR(ReadTextProto(config_path, config));
   }
 
-  if (config->backend().empty()) {
-    // Autofill if requested...
-    if (autofill) {
-      const std::string model_name(BaseName(path));
-      std::unique_ptr<AutoFill> af;
-      RETURN_IF_ERROR(AutoFill::Create(
-          model_name, backend_config_map, std::string(path), *config, &af));
-      RETURN_IF_ERROR(af->Fix(config));
+  // Autofill if requested...
+  if (autofill) {
+    const std::string model_name(BaseName(path));
+    std::unique_ptr<AutoFill> af;
+    RETURN_IF_ERROR(AutoFill::Create(
+        model_name, backend_config_map, std::string(path), *config, &af));
+    RETURN_IF_ERROR(af->Fix(config));
 
-      LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
+    LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
+  }
+
+  // Fill backend if platform is set for non-custom backend
+  if (config->backend().empty() && !config->platform().empty()) {
+    if ((config->platform() == kTensorFlowGraphDefPlatform) ||
+        (config->platform() == kTensorFlowSavedModelPlatform)) {
+      config->set_backend(kTensorFlowBackend);
     }
+    // FIXME: "else if ()" other supported frameworks once they are ported
+    // to use backend API.
+  }
+  // FIXME: Add other supported frameworks once they are ported
+  // to use backend API.
+  // // Fill platform if backend is set for non-custom backend
+  // if (!config->backend().empty() && config->platform().empty()) {
+  //   // tensorflow can't be filled as platform is not unique
+  // }
 
-    if (config->platform().empty()) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "must specify platform for model '" + config->name() + "'");
-    }
+  if (config->platform().empty()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "must specify platform for model '" + config->name() + "'");
+  }
 
-    // If 'default_model_filename' is not specified set it appropriately
-    // based upon 'platform'.
-    if (config->default_model_filename().empty()) {
+  // If 'default_model_filename' is not specified set it appropriately
+  // based upon 'platform'.
+  if (config->default_model_filename().empty()) {
 #ifdef TRITON_ENABLE_TENSORFLOW
-      if (config->platform() == kTensorFlowGraphDefPlatform) {
-        config->set_default_model_filename(kTensorFlowGraphDefFilename);
-      } else if (config->platform() == kTensorFlowSavedModelPlatform) {
-        config->set_default_model_filename(kTensorFlowSavedModelFilename);
-      } else
+    if (config->platform() == kTensorFlowGraphDefPlatform) {
+      config->set_default_model_filename(kTensorFlowGraphDefFilename);
+    } else if (config->platform() == kTensorFlowSavedModelPlatform) {
+      config->set_default_model_filename(kTensorFlowSavedModelFilename);
+    } else
 #endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
-          if (config->platform() == kTensorRTPlanPlatform) {
-        config->set_default_model_filename(kTensorRTPlanFilename);
-      } else
+        if (config->platform() == kTensorRTPlanPlatform) {
+      config->set_default_model_filename(kTensorRTPlanFilename);
+    } else
 #endif  // TRITON_ENABLE_TENSORRT
 #ifdef TRITON_ENABLE_CAFFE2
-          if (config->platform() == kCaffe2NetDefPlatform) {
-        config->set_default_model_filename(kCaffe2NetDefFilename);
-      } else
+        if (config->platform() == kCaffe2NetDefPlatform) {
+      config->set_default_model_filename(kCaffe2NetDefFilename);
+    } else
 #endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_ONNXRUNTIME
-          if (config->platform() == kOnnxRuntimeOnnxPlatform) {
-        config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
-      } else
+        if (config->platform() == kOnnxRuntimeOnnxPlatform) {
+      config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
+    } else
 #endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
-          if (config->platform() == kPyTorchLibTorchPlatform) {
-        config->set_default_model_filename(kPyTorchLibTorchFilename);
-      } else
+        if (config->platform() == kPyTorchLibTorchPlatform) {
+      config->set_default_model_filename(kPyTorchLibTorchFilename);
+    } else
 #endif  // TRITON_ENABLE_PYTORCH
 #ifdef TRITON_ENABLE_CUSTOM
-          if (config->platform() == kCustomPlatform) {
-        config->set_default_model_filename(kCustomFilename);
-      } else
+        if (config->platform() == kCustomPlatform) {
+      config->set_default_model_filename(kCustomFilename);
+    } else
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
-          if (config->platform() == kEnsemblePlatform) {
-        // No actual model file is needed to be loaded for ensemble.
-      } else
+        if (config->platform() == kEnsemblePlatform) {
+      // No actual model file is needed to be loaded for ensemble.
+    } else
 #endif  // TRITON_ENABLE_ENSEMBLE
-      {
-        return Status(
-            Status::Code::INTERNAL, "unexpected platform type " +
-                                        config->platform() + " for " +
-                                        config->name());
-      }
+    {
+      return Status(
+          Status::Code::INTERNAL, "unexpected platform type " +
+                                      config->platform() + " for " +
+                                      config->name());
     }
   }
 
@@ -793,6 +807,32 @@ ValidateModelConfig(
     return Status(
         Status::Code::INVALID_ARG,
         "must specify 'platform' or 'backend' for '" + config.name() + "'");
+  }
+
+  // Ensure both platform and backend are referring to known backend,
+  // or both referring to unknown backend for user-provided backend.
+  if (GetBackendTypeFromPlatform(config.platform()) !=
+      GetBackendType(config.backend())) {
+    switch (GetBackendTypeFromPlatform(config.platform())) {
+#ifdef TRITON_ENABLE_TENSORRT
+      case BackendType::BACKEND_TYPE_TENSORRT:
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+      case BackendType::BACKEND_TYPE_ONNXRUNTIME:
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
+      case BackendType::BACKEND_TYPE_PYTORCH:
+#endif  // TRITON_ENABLE_PYTORCH
+        // FIXME: Do nothing for above type until they are ported with backend
+        // API
+        break;
+      default:
+        return Status(
+            Status::Code::INVALID_ARG,
+            "Unexpected 'platform' and 'backend' pair, got:" +
+                config.platform() + ", " + config.backend());
+        break;
+    }
   }
 
   if (config.max_batch_size() < 0) {
