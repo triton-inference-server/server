@@ -586,9 +586,78 @@ Status
 GCSFileSystem::LocalizeDirectory(
     const std::string& path, std::shared_ptr<LocalizedDirectory>* localized)
 {
-  // For GCS we don't download the folder.
-  // FIXME We will need to fix this in the future.
-  localized->reset(new LocalizedDirectory(path));
+  bool exists;
+  RETURN_IF_ERROR(FileExists(path, &exists));
+
+  bool is_dir = false;
+  if (exists) {
+    RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  }
+
+  if (!is_dir) {
+    return Status(
+        Status::Code::INTERNAL, "directory does not exist at " + path);
+  }
+
+  std::string folder_template = "/tmp/folderXXXXXX";
+  char* tmp_folder = mkdtemp(const_cast<char*>(folder_template.c_str()));
+  if (tmp_folder == nullptr) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder: " + folder_template +
+            ", errno:" + strerror(errno));
+  }
+
+  localized->reset(new LocalizedDirectory(path, tmp_folder));
+
+  std::set<std::string> contents, files;
+  RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
+
+  for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
+    bool is_subdir;
+    std::string gcs_fpath = JoinPath({path, *iter});
+    std::string local_fpath = JoinPath({(*localized)->Path(), *iter});
+    RETURN_IF_ERROR(IsDirectory(gcs_fpath, &is_subdir));
+    if (is_subdir) {
+      // Create local mirror of sub-directories
+      int status = mkdir(
+          const_cast<char*>(local_fpath.c_str()), S_IRUSR | S_IWUSR | S_IXUSR);
+      if (status == -1) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Failed to create local folder: " + local_fpath +
+                ", errno:" + strerror(errno));
+      }
+
+      // Add with gcs path
+      std::set<std::string> subdir_files;
+      RETURN_IF_ERROR(GetDirectoryFiles(gcs_fpath, &subdir_files));
+      for (auto itr = subdir_files.begin(); itr != subdir_files.end(); ++itr) {
+        files.insert(JoinPath({gcs_fpath, *itr}));
+      }
+    } else {
+      files.insert(gcs_fpath);
+    }
+  }
+
+  for (auto iter = files.begin(); iter != files.end(); ++iter) {
+    std::string bucket, object;
+    RETURN_IF_ERROR(ParsePath(*iter, &bucket, &object));
+
+    // Send a request for the objects metadata
+    gcs::ObjectReadStream filestream = client_->ReadObject(bucket, object);
+    if (!filestream) {
+      return Status(Status::Code::INTERNAL, "Failed to get object at " + *iter);
+    }
+
+    std::string gcs_removed_path = (*iter).substr(path.size());
+    std::string local_file_path =
+        JoinPath({(*localized)->Path(), gcs_removed_path});
+    std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
+    output_file << filestream.rdbuf();
+    output_file.close();
+  }
+
   return Status::Success;
 }
 
@@ -967,12 +1036,12 @@ S3FileSystem::LocalizeDirectory(
     effective_path = path;
   }
 
-  std::string file_template = "/tmp/fileXXXXXX";
-  char* tmp_folder = mkdtemp(const_cast<char*>(file_template.c_str()));
+  std::string folder_template = "/tmp/folderXXXXXX";
+  char* tmp_folder = mkdtemp(const_cast<char*>(folder_template.c_str()));
   if (tmp_folder == nullptr) {
     return Status(
         Status::Code::INTERNAL,
-        "Failed to create local temp folder: " + file_template +
+        "Failed to create local temp folder: " + folder_template +
             ", errno:" + strerror(errno));
   }
 
