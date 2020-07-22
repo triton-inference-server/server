@@ -201,18 +201,16 @@ of the supported model frameworks. These optimization settings are
 controlled by the model configuration :ref:`optimization policy
 <section-optimization-policy>`.
 
-One especially powerful optimization that we will explore here is to
-use :ref:`section-optimization-policy-tensorrt` in conjunction with a
-TensorFlow or ONNX model.
-
 ONNX with TensorRT Optimization
 ...............................
 
-As an example of TensorRT optimization applied to an ONNX model, we
-will use an ONNX DenseNet model that you can obtain by following the
-:ref:`section-quickstart`. As a baseline we use perf\_client to
-determine the performance of the model using a `basic model
-configuration that does not enable any performance features
+One especially powerful optimization is to use
+:ref:`section-optimization-policy-tensorrt` in conjunction with an
+ONNX model. As an example of TensorRT optimization applied to an ONNX
+model, we will use an ONNX DenseNet model that you can obtain by
+following the :ref:`section-quickstart`. As a baseline we use
+perf\_client to determine the performance of the model using a `basic
+model configuration that does not enable any performance features
 <https://github.com/NVIDIA/triton-inference-server/blob/master/docs/examples/model_repository/densenet_onnx/config.pbtxt>`_::
 
   $ perf_client -m densenet_onnx --percentile=95 --concurrency-range 1:4
@@ -308,6 +306,27 @@ cutting latency in half. The benefit provided by TensorRT will vary
 based on the model, but in general it can provide significant
 performance improvement.
 
+TensorFlow Automatic FP16 Optimization
+......................................
+
+TensorFlow has another option to provide FP16 optimization that can be
+enabled in the model configuration. As with the TensorRT optimization
+described above, you can enable this optimization by using the
+gpu_execution_accelerator property::
+
+  optimization { execution_accelerators {
+    gpu_execution_accelerator : [ {
+      name : "auto_mixed_precision"
+  }}
+
+The options are described in detail in the
+:cpp:var:`ModelOptimizationPolicy
+<nvidia::inferenceserver::ModelOptimizationPolicy>` section of the
+model configuration protobuf.
+
+You can follow the steps described above for TensorRT to see how this
+automatic FP16 optimization benefits a model by using perf\_client to
+evaluate the model's performance with and without the optimization.
 
 .. include:: perf_client.rst
 .. include:: trace.rst
