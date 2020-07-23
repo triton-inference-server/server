@@ -119,18 +119,18 @@ The following abstractions are used by the API.
 TRITONBACKEND\_Backend
 ---------------------
 
-A TRITONBACKEND\_Backend object represents the backend itself. The same
-backend object is shared across all models that use the backend. The
-associated API, like TRITONBACKEND\_BackendName, is used to get
-information about the backend and to associate user-defined state with
-the backend.
+A TRITONBACKEND\_Backend object represents the backend itself. The
+same backend object is shared across all models that use the
+backend. The associated API, like TRITONBACKEND\_BackendName, is used
+to get information about the backend and to associate a user-defined
+state with the backend.
 
 A backend can optionally implement TRITONBACKEND\_Initialize and
 TRITONBACKEND\_Finalize to get notification of when the backend object
 is created and destroyed (see :ref:`section-backend-lifecycles` for
-more information about backend lifecycle). Most backends to not
-require user-defined state that spans all models using the backend and
-so do not implement these functions.
+more information about backend lifecycle). Most backends do not
+require a user-defined state that spans all models using the backend
+and so do not need to implement these functions.
 
 TRITONBACKEND\_Model
 -------------------
@@ -142,7 +142,7 @@ representing the backend that is used by the model.
 
 The same model object is shared across all instances of that
 model. The associated API, like TRITONBACKEND\_ModelName, is used to
-get information about the model and to associate user-defined state
+get information about the model and to associate a user-defined state
 with the model.
 
 The only function that the backend must implement is
