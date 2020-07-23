@@ -500,16 +500,12 @@ ModelInputCollector::ProcessTensor(
 
     TRITONBACKEND_Input* input;
     RESPOND_AND_SET_NULL_IF_ERROR(
-        &response,
-        TRITONBACKEND_RequestInput(request, input_name, &input));
+        &response, TRITONBACKEND_RequestInput(request, input_name, &input));
     uint64_t byte_size;
     RESPOND_AND_SET_NULL_IF_ERROR(
         &response,
         TRITONBACKEND_InputProperties(
             input, nullptr, nullptr, nullptr, nullptr, &byte_size, nullptr));
-
-    // const InferenceRequest::Input* request_input;
-    // Status status = request->ImmutableInput(name, &request_input);
     if (response != nullptr) {
       need_sync_ |= SetFixedSizeInputTensor(
           input, buffer_offset, buffer, buffer_byte_size, memory_type,
@@ -594,26 +590,43 @@ ModelInputCollector::SetFixedSizeInputTensor(
   bool cuda_copy = false;
 
   const char* name;
-  uint64_t byte_size;
   uint32_t buffer_count;
   RESPOND_AND_SET_NULL_IF_ERROR(
       response, TRITONBACKEND_InputProperties(
-                    request_input, &name, nullptr, nullptr, nullptr, &byte_size,
+                    request_input, &name, nullptr, nullptr, nullptr, nullptr,
                     &buffer_count));
   if (*response == nullptr) {
     return cuda_copy;
   }
 
-  if ((tensor_buffer_offset + byte_size) > tensor_buffer_byte_size) {
+  // First iterate through the buffers to ensure the byte size is proper
+  size_t total_byte_size = 0;
+  for (size_t idx = 0; idx < buffer_count; ++idx) {
+    const void* src_buffer;
+    size_t src_byte_size;
+    TRITONSERVER_MemoryType src_memory_type;
+    int64_t src_memory_type_id;
+
     RESPOND_AND_SET_NULL_IF_ERROR(
-        response, TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INVALID_ARG,
-                      std::string(
-                          "unexpected total byte size " +
-                          std::to_string(tensor_buffer_offset + byte_size) +
-                          " for input '" + name + "', expecting " +
-                          std::to_string(tensor_buffer_byte_size))
-                          .c_str()));
+        response, TRITONBACKEND_InputBuffer(
+                      request_input, idx, &src_buffer, &src_byte_size,
+                      &src_memory_type, &src_memory_type_id));
+    total_byte_size += src_byte_size;
+  }
+
+  if ((tensor_buffer_offset + total_byte_size) > tensor_buffer_byte_size) {
+    RESPOND_AND_SET_NULL_IF_ERROR(
+        response,
+        TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "unexpected total byte size " +
+                std::to_string(tensor_buffer_offset + total_byte_size) +
+                " for input '" + name + "', expecting " +
+                std::to_string(tensor_buffer_byte_size))
+                .c_str()));
+    return cuda_copy;
+  } else if (response == nullptr) {
     return cuda_copy;
   }
 
@@ -649,7 +662,7 @@ ModelInputCollector::SetFixedSizeInputTensor(
         pending_pinned_offset_ = tensor_buffer_offset;
       }
 
-      pending_pinned_byte_size_ += byte_size;
+      pending_pinned_byte_size_ += total_byte_size;
       pending_pinned_inputs_.push_back(std::make_pair(response, request_input));
       return cuda_copy;
     }

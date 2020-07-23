@@ -1508,10 +1508,9 @@ ModelState::Instance::Run(
       TRITONSERVER_DataType datatype;
       const int64_t* shape;
       uint32_t dims_count;
-      uint64_t byte_size;
       uint32_t buffer_count;
       TRITONBACKEND_InputProperties(
-          input, &name, &datatype, &shape, &dims_count, &byte_size,
+          input, nullptr, &datatype, &shape, &dims_count, nullptr,
           &buffer_count);
 
       // The shape for the entire input patch, [total_batch_size, ...]
