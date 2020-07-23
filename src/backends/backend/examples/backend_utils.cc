@@ -253,7 +253,7 @@ GetBooleanSequenceControlProperties(
       if (control_input.Find("control", &controls)) {
         for (size_t c_idx = 0; c_idx < controls.ArraySize(); c_idx++) {
           TritonJson::Value c;
-          RETURN_IF_ERROR(control_input.IndexAsObject(c_idx, &c));
+          RETURN_IF_ERROR(controls.IndexAsObject(c_idx, &c));
           std::string kind_str;
           RETURN_IF_ERROR(c.MemberAsString("kind", &kind_str));
           if (kind_str == control_kind) {
@@ -270,8 +270,8 @@ GetBooleanSequenceControlProperties(
             seen_control = true;
 
             TritonJson::Value int32_false_true, fp32_false_true;
-            bool found_int32 = c.Find("int32_false_true", &int32_false_true);
-            bool found_fp32 = c.Find("fp32_false_true", &fp32_false_true);
+            bool found_int32 = (c.Find("int32_false_true", &int32_false_true) && (int32_false_true.ArraySize() > 0));
+            bool found_fp32 = (c.Find("fp32_false_true", &fp32_false_true) && (fp32_false_true.ArraySize() > 0));
             if (found_fp32 && found_int32) {
               return TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
@@ -404,7 +404,7 @@ GetTypedSequenceControlProperties(
       if (control_input.Find("control", &controls)) {
         for (size_t c_idx = 0; c_idx < controls.ArraySize(); c_idx++) {
           TritonJson::Value c;
-          RETURN_IF_ERROR(control_input.IndexAsObject(c_idx, &c));
+          RETURN_IF_ERROR(controls.IndexAsObject(c_idx, &c));
           std::string kind_str;
           RETURN_IF_ERROR(c.MemberAsString("kind", &kind_str));
           if (kind_str == control_kind) {
