@@ -235,8 +235,8 @@ def get_zero_model_name(pf, io_cnt, dtype):
 
 
 class InferUnit(unittest.TestCase):
-    # InferUnit stores test result and prints it to stdout in order to use this
-    # class, unittest class should inherit this class
+    # InferUnit stores test result and prints it to stdout. In order to use
+    # this class, unittest class should inherit this class
 
     current_result = None
 
