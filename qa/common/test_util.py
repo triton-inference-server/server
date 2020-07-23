@@ -234,8 +234,8 @@ def get_zero_model_name(pf, io_cnt, dtype):
     return "{}_zero_{}_{}".format(pf, io_cnt, np.dtype(dtype).name)
 
 
-class InferUnit(unittest.TestCase):
-    # InferUnit stores test result and prints it to stdout. In order to use
+class TestResCollector(unittest.TestCase):
+    # TestResCollector stores test result and prints it to stdout. In order to use
     # this class, unittest class should inherit this class
 
     current_result = None

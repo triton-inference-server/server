@@ -39,6 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
+EXPECTED_NUM_TESTS="42"
 
 MODELDIR=`pwd`/models
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -72,8 +73,6 @@ export BACKENDS
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
 
-# Update if the total number of tests changed
-EXPECTED_NUM_TESTS="42"
 
 for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
