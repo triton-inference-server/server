@@ -1214,13 +1214,13 @@ ModelState::CreateInstance(
   if (platform == "tensorflow_graphdef") {
     RETURN_IF_ERROR(GraphDef::CreateTRTISTFModel(
         backend_config_json, model_config_, gpu_device, has_graph_level,
-        graph_level, gdp_itr->first, gdp_itr->second, &instance->trtistf_model_,
+        graph_level, name_, gdp_itr->second, &instance->trtistf_model_,
         &instance->input_name_map_, &instance->output_name_map_,
         tftrt_config_ptr, auto_mixed_precision));
   } else if (platform == "tensorflow_savedmodel") {
     RETURN_IF_ERROR(SavedModel::CreateTRTISTFModel(
         backend_config_json, model_config_, gpu_device, has_graph_level,
-        graph_level, gdp_itr->first, gdp_itr->second, &instance->trtistf_model_,
+        graph_level, name_, gdp_itr->second, &instance->trtistf_model_,
         &instance->input_name_map_, &instance->output_name_map_,
         tftrt_config_ptr, auto_mixed_precision));
   } else {
@@ -1399,8 +1399,12 @@ ModelState::Instance::Run(
     if (max_batch_size_ > 0) {
       // Retrieve the batch size from one of the inputs,
       // if the model support batching, the first dimension size is batch size
+      const char* name;
+      auto err = TRITONBACKEND_RequestInputName(requests[i], 0, &name);
       TRITONBACKEND_Input* input;
-      auto err = TRITONBACKEND_RequestInput(requests[i], 0, &input);
+      if (err == nullptr) {
+        err = TRITONBACKEND_RequestInput(requests[i], name, &input);
+      }
       if (err == nullptr) {
         const int64_t* shape;
         err = TRITONBACKEND_InputProperties(
@@ -1497,9 +1501,10 @@ ModelState::Instance::Run(
     uint32_t input_count;
     TRITONBACKEND_RequestInputCount(requests[0], &input_count);
     for (uint32_t input_idx = 0; input_idx < input_count; input_idx++) {
-      TRITONBACKEND_Input* input;
-      TRITONBACKEND_RequestInput(requests[0], input_idx, &input);
       const char* name;
+      TRITONBACKEND_RequestInputName(requests[0], input_idx, &name);
+      TRITONBACKEND_Input* input;
+      TRITONBACKEND_RequestInput(requests[0], name, &input);
       TRITONSERVER_DataType datatype;
       const int64_t* shape;
       uint32_t dims_count;
@@ -1569,7 +1574,7 @@ ModelState::Instance::Run(
           TRITONBACKEND_Input* input;
           RESPOND_AND_SET_NULL_IF_ERROR(
               &responses[idx],
-              TRITONBACKEND_RequestInputByName(requests[idx], name, &input));
+              TRITONBACKEND_RequestInput(requests[idx], name, &input));
           const int64_t* shape;
           uint32_t dims_count;
           uint32_t buffer_count;
@@ -1742,8 +1747,10 @@ ModelState::Instance::Run(
 
           if (max_batch_size_ != NO_BATCHING) {
             // [TODO] remember some input properties on the first call
+            const char* name;
+            TRITONBACKEND_RequestInputName(request, 0, &name);
             TRITONBACKEND_Input* input;
-            TRITONBACKEND_RequestInput(request, 0, &input);
+            TRITONBACKEND_RequestInput(request, name, &input);
             const int64_t* shape;
             TRITONBACKEND_InputProperties(
                 input, nullptr, nullptr, &shape, nullptr, nullptr, nullptr);

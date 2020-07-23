@@ -169,8 +169,10 @@ ModelResponder::ProcessTensor(
 
     // Override shape to be correct for this response.
     if (max_batch_size_ != ModelInstance::NO_BATCHING) {
+      const char* name;
+      TRITONBACKEND_RequestInputName(request, 0, &name);
       TRITONBACKEND_Input* input;
-      TRITONBACKEND_RequestInput(request, 0, &input);
+      TRITONBACKEND_RequestInput(request, name, &input);
       const int64_t* shape;
       TRITONBACKEND_InputProperties(
           input, nullptr, nullptr, &shape, nullptr, nullptr, nullptr);
@@ -499,7 +501,7 @@ ModelInputCollector::ProcessTensor(
     TRITONBACKEND_Input* input;
     RESPOND_AND_SET_NULL_IF_ERROR(
         &response,
-        TRITONBACKEND_RequestInputByName(request, input_name, &input));
+        TRITONBACKEND_RequestInput(request, input_name, &input));
     uint64_t byte_size;
     RESPOND_AND_SET_NULL_IF_ERROR(
         &response,
