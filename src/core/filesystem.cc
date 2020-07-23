@@ -978,57 +978,65 @@ S3FileSystem::LocalizeDirectory(
 
   localized->reset(new LocalizedDirectory(effective_path, tmp_folder));
 
-  std::set<std::string> contents, files;
-  RETURN_IF_ERROR(GetDirectoryContents(effective_path, &contents));
-
-  for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
-    bool is_subdir;
-    std::string s3_fpath = JoinPath({effective_path, *iter});
-    std::string local_fpath = JoinPath({(*localized)->Path(), *iter});
-    RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
-    if (is_subdir) {
-      // Create local mirror of sub-directories
-      int status = mkdir(
-          const_cast<char*>(local_fpath.c_str()), S_IRUSR | S_IWUSR | S_IXUSR);
-      if (status == -1) {
-        return Status(
-            Status::Code::INTERNAL,
-            "Failed to create local folder: " + local_fpath +
-                ", errno:" + strerror(errno));
-      }
-
-      // Add with s3 path
-      std::set<std::string> subdir_files;
-      RETURN_IF_ERROR(GetDirectoryFiles(s3_fpath, &subdir_files));
-      for (auto itr = subdir_files.begin(); itr != subdir_files.end(); ++itr) {
-        files.insert(JoinPath({s3_fpath, *itr}));
-      }
-    } else {
-      files.insert(s3_fpath);
-    }
+  std::set<std::string> contents, filenames;
+  RETURN_IF_ERROR(GetDirectoryContents(effective_path, &filenames));
+  for (auto itr = filenames.begin(); itr != filenames.end(); ++itr) {
+    contents.insert(JoinPath({effective_path, *itr}));
   }
 
-  for (auto iter = files.begin(); iter != files.end(); ++iter) {
-    std::string bucket, object;
-    RETURN_IF_ERROR(ParsePath(*iter, &bucket, &object));
+  while (contents.size() != 0) {
+    std::set<std::string> tmp_contents = contents;
+    contents.clear();
+    for (auto iter = tmp_contents.begin(); iter != tmp_contents.end(); ++iter) {
+      bool is_subdir;
+      std::string s3_fpath = *iter;
+      std::string local_fpath =
+          JoinPath({(*localized)->Path(),
+                    s3_fpath.substr(s3_fpath.find_last_of("/") + 1)});
+      RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
+      if (is_subdir) {
+        // Create local mirror of sub-directories
+        int status = mkdir(
+            const_cast<char*>(local_fpath.c_str()),
+            S_IRUSR | S_IWUSR | S_IXUSR);
+        if (status == -1) {
+          return Status(
+              Status::Code::INTERNAL,
+              "Failed to create local folder: " + local_fpath +
+                  ", errno:" + strerror(errno));
+        }
 
-    // Send a request for the objects metadata
-    s3::Model::GetObjectRequest object_request;
-    object_request.SetBucket(bucket.c_str());
-    object_request.SetKey(object.c_str());
+        // Add sub-directories and deeper files to contents
+        std::set<std::string> subdir_contents;
+        RETURN_IF_ERROR(GetDirectoryContents(s3_fpath, &subdir_contents));
+        for (auto itr = subdir_contents.begin(); itr != subdir_contents.end();
+             ++itr) {
+          contents.insert(JoinPath({s3_fpath, *itr}));
+        }
+      } else {
+        // Create local copy of file
+        std::string file_bucket, file_object;
+        RETURN_IF_ERROR(ParsePath(s3_fpath, &file_bucket, &file_object));
 
-    auto get_object_outcome = client_.GetObject(object_request);
-    if (get_object_outcome.IsSuccess()) {
-      auto& retrieved_file =
-          get_object_outcome.GetResultWithOwnership().GetBody();
-      std::string s3_removed_path = (*iter).substr(effective_path.size());
-      std::string local_file_path =
-          JoinPath({(*localized)->Path(), s3_removed_path});
-      std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
-      output_file << retrieved_file.rdbuf();
-      output_file.close();
-    } else {
-      return Status(Status::Code::INTERNAL, "Failed to get object at " + *iter);
+        s3::Model::GetObjectRequest object_request;
+        object_request.SetBucket(file_bucket.c_str());
+        object_request.SetKey(file_object.c_str());
+
+        auto get_object_outcome = client_.GetObject(object_request);
+        if (get_object_outcome.IsSuccess()) {
+          auto& retrieved_file =
+              get_object_outcome.GetResultWithOwnership().GetBody();
+          std::string s3_removed_path = s3_fpath.substr(effective_path.size());
+          std::string local_file_path =
+              JoinPath({(*localized)->Path(), s3_removed_path});
+          std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
+          output_file << retrieved_file.rdbuf();
+          output_file.close();
+        } else {
+          return Status(
+              Status::Code::INTERNAL, "Failed to get object at " + s3_fpath);
+        }
+      }
     }
   }
 
