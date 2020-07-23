@@ -72,6 +72,9 @@ export BACKENDS
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
 
+# Update if the total number of tests changed
+EXPECTED_NUM_TESTS="42"
+
 for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
         if [ "$TARGET" == "gpu" ]; then
@@ -182,18 +185,17 @@ for TARGET in cpu gpu; do
     echo $test_result_json | jq
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
+        echo -e "\n***\n*** Test Failed: unable to parse test results\n***"
         RET=1
     else
         num_failures=`echo $test_result_json | jq .failures`
         num_tests=`echo $test_result_json | jq .total`
-        if [ $num_failures != "0" ] || [ $num_tests -le 0 ]; then
+        if [ $num_failures != "0" ] || [ $num_tests -ne $EXPECTED_NUM_TESTS ]; then
             cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed To Run\n***"
+            echo -e "\n***\n*** Test Failed: Expected $EXPECTED_NUM_TESTS test(s), $num_tests test(s) executed, and $num_failures test(s) failed. \n***"
             RET=1
         fi
     fi
-
 
     set -e
 
