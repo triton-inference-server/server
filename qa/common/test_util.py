@@ -235,7 +235,8 @@ def get_zero_model_name(pf, io_cnt, dtype):
 
 
 class InferUnit(unittest.TestCase):
-    # InferUnit stores test result and prints it to stdout
+    # InferUnit stores test result and prints it to stdout in order to use this
+    # class, unittest class should inherit this class
 
     current_result = None
 
@@ -245,6 +246,7 @@ class InferUnit(unittest.TestCase):
             amount, errors, failures, skipped
 
     def tearDown(self):
+        # this is called immediately after the test method
         amount = self.current_result.testsRun
         errors = len(self.current_result.errors)
         failures = len(self.current_result.failures)
@@ -253,6 +255,8 @@ class InferUnit(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        # this method is called when all the unit tests in a class are
+        # finished.
         json_res = {
             'total': cls.amount,
             'errors': cls.errors,
@@ -262,5 +266,6 @@ class InferUnit(unittest.TestCase):
         print(json.dumps(json_res))
 
     def run(self, result=None):
+        # result argument stores the test results
         self.current_result = result
         unittest.TestCase.run(self, result)
