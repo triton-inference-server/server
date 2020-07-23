@@ -43,7 +43,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
-MODELBASE=graphdef_int32_int32_int32
+MODELBASE=onnx_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
 
@@ -51,7 +51,15 @@ SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 rm -f *.log
-rm -fr $MODELSDIR && cp -r models $MODELSDIR
+rm -fr $MODELSDIR && mkdir -p $MODELSDIR
+
+# set up simple model using MODELBASE, this test needs gradually update as
+# backends are ported to use backend API as backend API not yet support tracing.
+rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
+    cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
+    rm -r $MODELSDIR/simple/2 && rm -r $MODELSDIR/simple/3 && \
+    (cd $MODELSDIR/simple && \
+            sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt)
 
 RET=0
 
@@ -239,9 +247,8 @@ set -e
 # Demonstrate trace for ensemble
 # set up "addsub" nested ensemble
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
-    cp -r `pwd`/models/simple $MODELSDIR/$MODELBASE && \
-    (cd $MODELSDIR/$MODELBASE && \
-            sed -i "s/^name:.*/name: \"$MODELBASE\"/" config.pbtxt)
+    cp -r $DATADIR/$MODELBASE $MODELSDIR/$MODELBASE && \
+    rm -r $MODELSDIR/$MODELBASE/2 && rm -r $MODELSDIR/$MODELBASE/3
 
 # nested ensemble
 mkdir -p $MODELSDIR/fan_$MODELBASE/1 && \

@@ -70,8 +70,6 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_shared_memory/models/. && \
     mkdir qa/L0_cuda_shared_memory/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
-    mkdir qa/L0_cmdline_trace/models && \
-    cp -r docs/examples/model_repository/simple qa/L0_cmdline_trace/models/. && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_client_timeout/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc/models && \
