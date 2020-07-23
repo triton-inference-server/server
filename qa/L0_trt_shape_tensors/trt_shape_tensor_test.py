@@ -52,7 +52,7 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 
-class InferShapeTensorTest(unittest.TestCase):
+class InferShapeTensorTest(tu.TestResCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.

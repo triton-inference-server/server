@@ -36,7 +36,7 @@ import tritonhttpclient as httpclient
 from tritonclientutils import np_to_triton_dtype, InferenceServerException
 
 
-class LargePayLoadTest(unittest.TestCase):
+class LargePayLoadTest(tu.TestResCollector):
 
     def setUp(self):
         self.data_type_ = np.float32

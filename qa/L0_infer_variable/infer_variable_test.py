@@ -41,7 +41,7 @@ TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
 
 
-class InferVariableTest(unittest.TestCase):
+class InferVariableTest(tu.TestResCollector):
 
     def _full_exact(self,
                     input_dtype,

@@ -30,10 +30,11 @@ sys.path.append("../common")
 import unittest
 import numpy as np
 import infer_util as iu
+import test_util as tu
 from tritonclientutils import *
 
 
-class TrtCudaGraphTest(unittest.TestCase):
+class TrtCudaGraphTest(tu.TestResCollector):
 
     def setUp(self):
         self.dtype_ = np.float32

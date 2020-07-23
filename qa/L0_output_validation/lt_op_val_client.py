@@ -26,11 +26,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+sys.path.append("../common")
+
 import requests
 import unittest
+import test_util as tu
 
 
-class OutputValidationTest(unittest.TestCase):
+class OutputValidationTest(tu.TestResCollector):
     # for datatype mismatch
     def test_datatype(self):
         url = 'http://localhost:8000/v2/models/libtorch_datatype_1_float32/infer'

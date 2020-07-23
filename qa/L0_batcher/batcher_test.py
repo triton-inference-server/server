@@ -59,7 +59,7 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 
-class BatcherTest(unittest.TestCase):
+class BatcherTest(tu.TestResCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.

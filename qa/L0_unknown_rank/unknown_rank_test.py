@@ -24,13 +24,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+sys.path.append("../common")
+
 import unittest
 import numpy as np
+import test_util as tu
 import tritonhttpclient
 from tritonclientutils import *
 
 
-class UnknownRankTest(unittest.TestCase):
+class UnknownRankTest(tu.TestResCollector):
     # helper function to generate requests to the server
     def infer_unknown(self, model_name, tensor_shape):
         print("About to run the test")

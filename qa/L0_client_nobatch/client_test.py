@@ -37,7 +37,7 @@ from tritonclientutils import InferenceServerException
 import test_util as tu
 
 
-class ClientNoBatchTest(unittest.TestCase):
+class ClientNoBatchTest(tu.TestResCollector):
 
     def test_nobatch_request_for_batching_model(self):
         input_size = 16

@@ -43,7 +43,7 @@ TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
 
 
-class InferZeroTest(unittest.TestCase):
+class InferZeroTest(tu.TestResCollector):
 
     def _full_zero(self, dtype, shapes):
         # 'shapes' is list of shapes, one for each input.

@@ -39,7 +39,12 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
-EXPECTED_NUM_TESTS="42"
+if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ] then
+elif [ -z "$TEST_CUDA_SHARED_MEMORY" ] then
+elif [ -z "$CPU_ONLY" ] then
+elif [ -z "$ENSEMBLES" ] then
+elif [ -z "$BACKENDS" ] then
+fi
 
 MODELDIR=`pwd`/models
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -180,21 +185,7 @@ for TARGET in cpu gpu; do
     # At the end of $CLIENT_LOG there is a single line JSON containing the
     # result of unittests.
     test_result_json=`tail -n 1 $CLIENT_LOG`
-
-    echo $test_result_json | jq
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed: unable to parse test results\n***"
-        RET=1
-    else
-        num_failures=`echo $test_result_json | jq .failures`
-        num_tests=`echo $test_result_json | jq .total`
-        if [ $num_failures != "0" ] || [ $num_tests -ne $EXPECTED_NUM_TESTS ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed: Expected $EXPECTED_NUM_TESTS test(s), $num_tests test(s) executed, and $num_failures test(s) failed. \n***"
-            RET=1
-        fi
-    fi
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
 
     set -e
 

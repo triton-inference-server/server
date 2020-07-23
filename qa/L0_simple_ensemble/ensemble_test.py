@@ -34,10 +34,11 @@ import os
 import unittest
 import numpy as np
 import infer_util as iu
+import test_util as tu
 import tritonhttpclient
 
 
-class EnsembleTest(unittest.TestCase):
+class EnsembleTest(tu.TestResCollector):
 
     def _get_infer_count_per_version(self, model_name):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000",

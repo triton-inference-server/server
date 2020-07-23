@@ -38,7 +38,7 @@ import os
 np_dtype_string = np.dtype(object)
 
 
-class InferTest(unittest.TestCase):
+class InferTest(tu.TestResCollector):
 
     def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
                     output0_raw, output1_raw, swap):

@@ -33,6 +33,7 @@ import threading
 import unittest
 import numpy as np
 import infer_util as iu
+import test_util as tu
 from tritonclientutils import InferenceServerException
 from ctypes import *
 
@@ -42,7 +43,7 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 
-class ModelQueueTest(unittest.TestCase):
+class ModelQueueTest(tu.TestResCollector):
 
     def setUp(self):
         global _deferred_exceptions

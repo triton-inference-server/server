@@ -24,16 +24,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+sys.path.append("../common")
+
 import numpy as np
 import unittest
 import os
+import test_util as tu
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 import tritonshmutils.shared_memory as shm
 from tritonclientutils import *
 
 
-class SharedMemoryTest(unittest.TestCase):
+class SharedMemoryTest(tu.TestResCollector):
 
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid system shared memory region

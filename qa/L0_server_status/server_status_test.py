@@ -35,12 +35,13 @@ import unittest
 import json
 import requests
 import infer_util as iu
+import test_util as tu
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 from tritonclientutils import *
 
 
-class ServerMetadataTest(unittest.TestCase):
+class ServerMetadataTest(tu.TestResCollector):
 
     def test_basic(self):
         try:

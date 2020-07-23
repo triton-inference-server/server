@@ -39,6 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 STRING_CLIENT_TEST_PY=string_client_test.py
+EXPECTED_NUM_TESTS="1"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
@@ -64,6 +65,8 @@ python $STRING_CLIENT_TEST_PY -v >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
+
+check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
 
 set -e
 

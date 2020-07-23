@@ -39,6 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 INFER_TEST=infer_zero_test.py
+EXPECTED_NUM_TESTS="24"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
@@ -73,13 +74,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    RET=1
-fi
-
+check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
 set -e
 
 kill $SERVER_PID

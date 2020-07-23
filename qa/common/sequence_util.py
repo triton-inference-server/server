@@ -33,6 +33,7 @@ import threading
 import unittest
 import numpy as np
 import infer_util as iu
+import test_util as tu
 from functools import partial
 
 import tritongrpcclient as grpcclient
@@ -69,7 +70,7 @@ def completion_callback(user_data, result, error):
     user_data._completed_requests.put((result, error))
 
 
-class SequenceBatcherTestUtil(unittest.TestCase):
+class SequenceBatcherTestUtil(tu.TestResCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.

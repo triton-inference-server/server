@@ -24,14 +24,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+sys.path.append("../common")
+
 import unittest
+import test_util as tu
 import sqlite3
 from boofuzz import *
 import glob
 import os
 
 
-class FuzzTest(unittest.TestCase):
+class FuzzTest(tu.TestResCollector):
 
     def _run_fuzz(self, url, logger):
         session = Session(

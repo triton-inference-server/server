@@ -43,7 +43,7 @@ TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
 
 
-class InferReshapeTest(unittest.TestCase):
+class InferReshapeTest(tu.TestResCollector):
 
     def _full_reshape(self,
                       dtype,

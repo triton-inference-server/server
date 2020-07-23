@@ -29,11 +29,12 @@ sys.path.append("../common")
 
 import unittest
 import numpy as np
+import test_util as tu
 import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
 
-class TFTRTOptimizationTest(unittest.TestCase):
+class TFTRTOptimizationTest(tu.TestResCollector):
 
     def setUp(self):
         self.input0_ = np.arange(start=0, stop=16,

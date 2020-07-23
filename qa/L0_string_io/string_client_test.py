@@ -25,15 +25,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+sys.path.append('../common')
+
 import argparse
 import numpy as np
 import os
 from builtins import range
 import tritonhttpclient
 import unittest
+import test_util as tu
 
 
-class ClientStringTest(unittest.TestCase):
+class ClientStringTest(tu.TestResCollector):
 
     def test_tf_unicode_bytes(self):
         # We use a simple model that takes an input tensor of 8 byte strings

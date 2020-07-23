@@ -24,9 +24,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+sys.path.append("../common")
+
 import numpy as np
 import unittest
 import os
+import test_util as tu
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
@@ -34,7 +38,7 @@ import tritonshmutils.cuda_shared_memory as cshm
 from tritonclientutils import *
 
 
-class CudaSharedMemoryTest(unittest.TestCase):
+class CudaSharedMemoryTest(tu.TestResCollector):
 
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid cuda shared memory region

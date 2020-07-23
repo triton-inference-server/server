@@ -34,6 +34,7 @@ import queue
 import unittest
 import os
 import time
+import test_util as tu
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
@@ -53,7 +54,7 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class DecoupledTest(unittest.TestCase):
+class DecoupledTest(tu.TestResCollector):
 
     def setUp(self):
         self.trials_ = [("repeat_int32", None), ("simple_repeat", None),

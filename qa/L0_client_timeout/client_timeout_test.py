@@ -35,6 +35,7 @@ import unittest
 import os
 import time
 import socket
+import test_util as tu
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
@@ -54,7 +55,7 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class ClientTimeoutTest(unittest.TestCase):
+class ClientTimeoutTest(tu.TestResCollector):
 
     def setUp(self):
         self.model_name_ = "custom_identity_int32"
