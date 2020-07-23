@@ -610,52 +610,62 @@ GCSFileSystem::LocalizeDirectory(
 
   localized->reset(new LocalizedDirectory(path, tmp_folder));
 
-  std::set<std::string> contents, files;
-  RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
-
-  for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
-    bool is_subdir;
-    std::string gcs_fpath = JoinPath({path, *iter});
-    std::string local_fpath = JoinPath({(*localized)->Path(), *iter});
-    RETURN_IF_ERROR(IsDirectory(gcs_fpath, &is_subdir));
-    if (is_subdir) {
-      // Create local mirror of sub-directories
-      int status = mkdir(
-          const_cast<char*>(local_fpath.c_str()), S_IRUSR | S_IWUSR | S_IXUSR);
-      if (status == -1) {
-        return Status(
-            Status::Code::INTERNAL,
-            "Failed to create local folder: " + local_fpath +
-                ", errno:" + strerror(errno));
-      }
-
-      // Append gcs path
-      std::set<std::string> subdir_files;
-      RETURN_IF_ERROR(GetDirectoryFiles(gcs_fpath, &subdir_files));
-      for (auto itr = subdir_files.begin(); itr != subdir_files.end(); ++itr) {
-        files.insert(JoinPath({gcs_fpath, *itr}));
-      }
-    } else {
-      files.insert(gcs_fpath);
-    }
+  std::set<std::string> contents, filenames;
+  RETURN_IF_ERROR(GetDirectoryContents(path, &filenames));
+  for (auto itr = filenames.begin(); itr != filenames.end(); ++itr) {
+    contents.insert(JoinPath({path, *itr}));
   }
 
-  for (auto iter = files.begin(); iter != files.end(); ++iter) {
-    std::string bucket, object;
-    RETURN_IF_ERROR(ParsePath(*iter, &bucket, &object));
+  while (contents.size() != 0) {
+    std::set<std::string> tmp_contents = contents;
+    contents.clear();
+    for (auto iter = tmp_contents.begin(); iter != tmp_contents.end(); ++iter) {
+      bool is_subdir;
+      std::string gcs_fpath = *iter;
+      std::string gcs_removed_path = gcs_fpath.substr(path.size());
+      std::string local_fpath =
+          JoinPath({(*localized)->Path(), gcs_removed_path});
+      RETURN_IF_ERROR(IsDirectory(gcs_fpath, &is_subdir));
+      if (is_subdir) {
+        // Create local mirror of sub-directories
+        int status = mkdir(
+            const_cast<char*>(local_fpath.c_str()),
+            S_IRUSR | S_IWUSR | S_IXUSR);
+        if (status == -1) {
+          return Status(
+              Status::Code::INTERNAL,
+              "Failed to create local folder: " + local_fpath +
+                  ", errno:" + strerror(errno));
+        }
 
-    // Send a request to read the object
-    gcs::ObjectReadStream filestream = client_->ReadObject(bucket, object);
-    if (!filestream) {
-      return Status(Status::Code::INTERNAL, "Failed to get object at " + *iter);
+        // Add sub-directories and deeper files to contents
+        std::set<std::string> subdir_contents;
+        RETURN_IF_ERROR(GetDirectoryContents(gcs_fpath, &subdir_contents));
+        for (auto itr = subdir_contents.begin(); itr != subdir_contents.end();
+             ++itr) {
+          contents.insert(JoinPath({gcs_fpath, *itr}));
+        }
+      } else {
+        // Create local copy of file
+        std::string file_bucket, file_object;
+        RETURN_IF_ERROR(ParsePath(gcs_fpath, &file_bucket, &file_object));
+
+        // Send a request to read the object
+        gcs::ObjectReadStream filestream =
+            client_->ReadObject(file_bucket, file_object);
+        if (!filestream) {
+          return Status(
+              Status::Code::INTERNAL, "Failed to get object at " + *iter);
+        }
+
+        std::string gcs_removed_path = (*iter).substr(path.size());
+        std::string local_file_path =
+            JoinPath({(*localized)->Path(), gcs_removed_path});
+        std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
+        output_file << filestream.rdbuf();
+        output_file.close();
+      }
     }
-
-    std::string gcs_removed_path = (*iter).substr(path.size());
-    std::string local_file_path =
-        JoinPath({(*localized)->Path(), gcs_removed_path});
-    std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
-    output_file << filestream.rdbuf();
-    output_file.close();
   }
 
   return Status::Success;
