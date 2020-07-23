@@ -27,6 +27,7 @@
 #include "src/backends/backend/triton_model.h"
 
 #include <vector>
+#include "src/backends/backend/triton_model_instance.h"
 #include "src/backends/backend/tritonbackend.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
@@ -175,25 +176,28 @@ TritonModel::Create(
   RETURN_IF_ERROR(
       local_model->Init(version_path, model_config, "" /* platform */));
 
-  TRITONBACKEND_Model* triton_model =
-      reinterpret_cast<TRITONBACKEND_Model*>(local_model.get());
-  TritonBackend::TritonModelExecFn_t model_exec_fn = backend->ModelExecFn();
+  TritonModel* raw_local_model = local_model.get();
 
   // Model initialization is optional... The TRITONBACKEND_Model
   // object is this TritonModel object.
   if (backend->ModelInitFn() != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(triton_model));
+    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(
+        reinterpret_cast<TRITONBACKEND_Model*>(raw_local_model)));
   }
 
-  // Create a scheduler with 1 thread. The backend is already
-  // initialized so there is no need to have the scheduler thread call
-  // any initialization.
+  // Create and initialize the model instances for this model.
+  RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
+      raw_local_model, model_config, &local_model->instances_));
+
+  // Create a scheduler with 1 thread per instance. The backend is
+  // already initialized so there is no need to have the scheduler
+  // thread call any initialization.
   RETURN_IF_ERROR(local_model->SetConfiguredScheduler(
-      1 /* runner_cnt */,
+      local_model->instances_.size() /* runner_cnt */,
       /* Initialization callback */
       [](uint32_t runner_idx) -> Status { return Status::Success; },
       /* Run callback */
-      [model_exec_fn, triton_model, backend](
+      [raw_local_model, backend](
           uint32_t runner_idx,
           std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
         // There is only a single thread calling this function so can
@@ -208,16 +212,22 @@ TritonModel::Create(
         // We don't want the backend used by this model to unload
         // while exec_fn is running (can happen if model is unloaded
         // during the request and then that request is released in
-        // exec_fn as the last reference to the model. So we hold a
+        // exec_fn as the last reference to the model). So we hold a
         // copy of the backend here... This convoluted flow will be
         // cleaned up once legacy InferenceBackend is replaced with
         // TritonModel.
         std::shared_ptr<TritonBackend> backendx = backend;
 
+        TRITONBACKEND_ModelInstance* triton_model_instance =
+            reinterpret_cast<TRITONBACKEND_ModelInstance*>(
+                raw_local_model->instances_[runner_idx].get());
+        TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
+            backend->ModelInstanceExecFn();
+
         // If there is an error then we retain ownership of 'requests'
         // and must send error responses.
-        TRITONSERVER_Error* err = model_exec_fn(
-            triton_model, &triton_requests[0], triton_requests.size());
+        TRITONSERVER_Error* err = inst_exec_fn(
+            triton_model_instance, &triton_requests[0], triton_requests.size());
         if (err != nullptr) {
           Status status = Status(
               TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
@@ -252,6 +262,10 @@ TritonModel::TritonModel(
 
 TritonModel::~TritonModel()
 {
+  // Explicitly delete/finalize all model instances before finalizing
+  // the model itself.
+  instances_.clear();
+
   // Model finalization is optional... The TRITONBACKEND_Model
   // object is this TritonModel object.
   if (backend_->ModelFiniFn() != nullptr) {

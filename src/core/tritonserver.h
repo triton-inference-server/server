@@ -138,6 +138,26 @@ typedef enum TRITONSERVER_parametertype_enum {
 TRITONSERVER_EXPORT const char* TRITONSERVER_ParameterTypeString(
     TRITONSERVER_ParameterType paramtype);
 
+/// TRITONSERVER_InstanceGroupKind
+///
+/// Kinds of instance groups recognized by TRITONSERVER.
+///
+typedef enum TRITONSERVER_instancegroupkind_enum {
+  TRITONSERVER_INSTANCEGROUPKIND_AUTO,
+  TRITONSERVER_INSTANCEGROUPKIND_CPU,
+  TRITONSERVER_INSTANCEGROUPKIND_GPU,
+  TRITONSERVER_INSTANCEGROUPKIND_MODEL
+} TRITONSERVER_InstanceGroupKind;
+
+/// Get the string representation of an instance-group kind. The
+/// returned string is not owned by the caller and so should not be
+/// modified or freed.
+///
+/// \param kind The instance-group kind.
+/// \return The string representation of the kind.
+TRITONSERVER_EXPORT const char* TRITONSERVER_InstanceGroupKindString(
+    TRITONSERVER_InstanceGroupKind kind);
+
 /// TRITONSERVER_Logging
 ///
 /// Types/levels of logging.
