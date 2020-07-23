@@ -990,9 +990,9 @@ S3FileSystem::LocalizeDirectory(
     for (auto iter = tmp_contents.begin(); iter != tmp_contents.end(); ++iter) {
       bool is_subdir;
       std::string s3_fpath = *iter;
+      std::string s3_removed_path = s3_fpath.substr(effective_path.size());
       std::string local_fpath =
-          JoinPath({(*localized)->Path(),
-                    s3_fpath.substr(s3_fpath.find_last_of("/") + 1)});
+          JoinPath({(*localized)->Path(), s3_removed_path});
       RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
       if (is_subdir) {
         // Create local mirror of sub-directories
@@ -1026,10 +1026,7 @@ S3FileSystem::LocalizeDirectory(
         if (get_object_outcome.IsSuccess()) {
           auto& retrieved_file =
               get_object_outcome.GetResultWithOwnership().GetBody();
-          std::string s3_removed_path = s3_fpath.substr(effective_path.size());
-          std::string local_file_path =
-              JoinPath({(*localized)->Path(), s3_removed_path});
-          std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
+          std::ofstream output_file(local_fpath.c_str(), std::ios::binary);
           output_file << retrieved_file.rdbuf();
           output_file.close();
         } else {
