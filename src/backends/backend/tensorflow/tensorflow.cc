@@ -595,10 +595,10 @@ GetContiguousInputContent(
           &src_memory_type_id));
       RETURN_IF_ERROR(nib::CopyBuffer(
           "Contiguous input", src_memory_type, src_memory_type_id,
-          TRITONSERVER_MEMORY_CPU, 0, *content_byte_size, src_ptr,
+          TRITONSERVER_MEMORY_CPU, 0, src_byte_size, src_ptr,
           *contiguous_buffer + offset, stream, &cuda_used));
       *cuda_copy |= cuda_used;
-      offset += *content_byte_size;
+      offset += src_byte_size;
     }
 
     *content = *contiguous_buffer;
@@ -1121,9 +1121,9 @@ ModelState::CreateInstance(
 
         ni::TritonJson::Value gpu_eas;
         if (eas.Find("gpu_execution_accelerator", &gpu_eas)) {
-          for (size_t ea_idx = 0; ea_idx < eas.ArraySize(); ea_idx++) {
+          for (size_t ea_idx = 0; ea_idx < gpu_eas.ArraySize(); ea_idx++) {
             ni::TritonJson::Value ea;
-            RETURN_IF_ERROR(eas.IndexAsObject(ea_idx, &ea));
+            RETURN_IF_ERROR(gpu_eas.IndexAsObject(ea_idx, &ea));
             std::string name;
             RETURN_IF_ERROR(ea.MemberAsString("name", &name));
             if (name == nib::kTensorRTExecutionAccelerator) {
@@ -1266,10 +1266,10 @@ ModelState::CreateInstance(
       output_names.push_back(io_names.back().c_str());
       output_types.push_back(nib::ConvertDataType(io_data_type));
     }
-    TRTISTF_ModelMakeCallable(
+    RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelMakeCallable(
         instance->trtistf_model_.get(), input_names.data(), input_types.data(),
         config_inputs.ArraySize(), output_names.data(), output_types.data(),
-        config_outputs.ArraySize());
+        config_outputs.ArraySize()));
   }
 
   instance_threads_.emplace_back([this, instance]() {
@@ -1532,20 +1532,28 @@ ModelState::Instance::Run(
           (batchn_shape.size() == 0) ? nullptr : &batchn_shape[0],
           input_device_id_);
       if (tensor == nullptr) {
-        RequestsRespondIfError(
-            requests, request_count,
-            TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL,
-                (std::string("failed to create input tensor '") + name +
-                 "' with shape " + nib::ShapeToString(batchn_shape) +
-                 " and data type " + TRITONSERVER_DataTypeString(datatype) +
-                 " for '" + name_ + "'")
-                    .c_str()));
+        auto err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            (std::string("failed to create input tensor '") + name +
+             "' with shape " + nib::ShapeToString(batchn_shape) +
+             " and data type " + TRITONSERVER_DataTypeString(datatype) +
+             " for '" + name_ + "'")
+                .c_str());
+        // Send remaining responses and returned
+        for (uint32_t r = 0; r < request_count; ++r) {
+          if (responses[r] != nullptr) {
+            LOG_IF_ERROR(
+                TRITONBACKEND_ResponseSend(
+                    responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
+                "failed to send TensorFlow backend response");
+          }
 
-        // Delete previously created responses and returned
-        for (auto& response : responses) {
-          TRITONBACKEND_ResponseDelete(response);
+          LOG_IF_ERROR(
+              TRITONBACKEND_RequestRelease(
+                  requests[r], TRITONSERVER_REQUEST_RELEASE_ALL),
+              "failed releasing request");
         }
+        TRITONSERVER_ErrorDelete(err);
         return;
       }
 
@@ -1664,22 +1672,28 @@ ModelState::Instance::Run(
   {
     TRTISTF_TensorList* rtl = nullptr;
 
-    TRTISTF_Error* err = TRTISTF_ModelRun(
+    TRTISTF_Error* tf_err = TRTISTF_ModelRun(
         trtistf_model_.get(), *(input_tensors.release()),
         required_outputs.size(), output_names_cstr, &rtl);
-    if (err != nullptr) {
-      // Something went wrong with the entire batch inference. For
-      // every response that has not already been sent with an
-      // error... send it now...
-      RequestsRespondIfError(
-          requests, request_count,
-          TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, err->msg_));
-      TRTISTF_ErrorDelete(err);
+    if (tf_err != nullptr) {
+      auto err =
+          TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, tf_err->msg_);
+      TRTISTF_ErrorDelete(tf_err);
+      // Send remaining responses and returned
+      for (uint32_t r = 0; r < request_count; ++r) {
+        if (responses[r] != nullptr) {
+          LOG_IF_ERROR(
+              TRITONBACKEND_ResponseSend(
+                  responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
+              "failed to send TensorFlow backend response");
+        }
 
-      // Delete previously created responses and returned
-      for (auto& response : responses) {
-        TRITONBACKEND_ResponseDelete(response);
+        LOG_IF_ERROR(
+            TRITONBACKEND_RequestRelease(
+                requests[r], TRITONSERVER_REQUEST_RELEASE_ALL),
+            "failed releasing request");
       }
+      TRITONSERVER_ErrorDelete(err);
       return;
     }
 

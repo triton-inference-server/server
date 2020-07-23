@@ -616,10 +616,12 @@ GetNormalizedModelConfig(
 
   // Fill backend if platform is set for non-custom backend
   if (config->backend().empty() && !config->platform().empty()) {
+#ifdef TRITON_ENABLE_TENSORFLOW
     if ((config->platform() == kTensorFlowGraphDefPlatform) ||
         (config->platform() == kTensorFlowSavedModelPlatform)) {
       config->set_backend(kTensorFlowBackend);
     }
+#endif  // TRITON_ENABLE_TENSORFLOW
     // FIXME: "else if ()" other supported frameworks once they are ported
     // to use backend API.
   }
@@ -629,12 +631,6 @@ GetNormalizedModelConfig(
   // if (!config->backend().empty() && config->platform().empty()) {
   //   // tensorflow can't be filled as platform is not unique
   // }
-
-  if (config->platform().empty()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "must specify platform for model '" + config->name() + "'");
-  }
 
   // If 'default_model_filename' is not specified set it appropriately
   // based upon 'platform'.
@@ -676,7 +672,9 @@ GetNormalizedModelConfig(
       // No actual model file is needed to be loaded for ensemble.
     } else
 #endif  // TRITON_ENABLE_ENSEMBLE
-    {
+        if (config->backend().empty()) {
+      // If backend is empty, we expect known platform. Otherwise, it is
+      // user-provided backend.
       return Status(
           Status::Code::INTERNAL, "unexpected platform type " +
                                       config->platform() + " for " +
@@ -829,7 +827,7 @@ ValidateModelConfig(
       default:
         return Status(
             Status::Code::INVALID_ARG,
-            "Unexpected 'platform' and 'backend' pair, got:" +
+            "unexpected 'platform' and 'backend' pair, got:" +
                 config.platform() + ", " + config.backend());
         break;
     }
