@@ -76,7 +76,7 @@ for i in \
         check_test_results $CLIENT_LOG 1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed\n***"
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
         fi
     fi
@@ -98,7 +98,7 @@ else
     check_test_results $CLIENT_LOG 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
         RET=1
     fi
 fi

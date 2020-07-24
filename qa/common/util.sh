@@ -275,6 +275,11 @@ function check_test_results () {
     local expected_num_tests=$2
     test_result_json=`tail -n 1 $log_file`
 
+    if [ -z "$expected_num_tests" ]; then
+        echo "=== expected number of tests must be defined"
+        return
+    fi
+
     echo "$test_result_json" | jq
     if [ $? -ne 0 ]; then
         cat $log_file
