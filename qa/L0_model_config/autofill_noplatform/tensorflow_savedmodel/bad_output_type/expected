@@ -1,1 +1,1 @@
-unable to load model 'bad_output_type', output 'OUTPUT0' data-type TYPE_INT8 doesn't match configuration data-type TYPE_INT16
+unable to load model 'bad_output_type', output 'OUTPUT0' data-type INT8 doesn't match configuration data-type TYPE_INT16
