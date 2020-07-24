@@ -100,6 +100,13 @@ for model_trial in 4; do
             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
+        else
+            check_test_results $CLIENT_LOG 1
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
         fi
         set -e
 

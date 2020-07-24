@@ -39,6 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
+EXPECTED_NUM_TESTS="1"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
 
@@ -60,21 +61,18 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-# python unittest seems to swallow ImportError and still return 0
-# exit code. So need to explicitly check CLIENT_LOG to make sure
-# we see some running tests
 python $PLUGIN_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
-fi
-
-grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 

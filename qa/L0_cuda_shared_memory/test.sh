@@ -65,6 +65,13 @@ for i in \
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
+        else
+            check_test_results $CLIENT_LOG 1
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
         fi
         set -e
 
@@ -72,11 +79,6 @@ for i in \
         wait $SERVER_PID
     done
 done
-
-if [ `grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG` != "40" ]; then
-    echo -e "\n***\n*** Failed. Expected 40 HTTPSocketPoolResponse status=200 headers for client\n***"
-    RET=1
-fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

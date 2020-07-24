@@ -39,6 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_variable_test.py
+EXPECTED_NUM_TESTS="21"
 
 DATADIR=`pwd`/models
 
@@ -85,22 +86,20 @@ for TARGET in cpu gpu; do
 
     set +e
 
-    # python unittest seems to swallow ImportError and still return 0
-    # exit code. So need to explicitly check CLIENT_LOG to make sure
-    # we see some running tests
     python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
+    else
+        check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
     fi
 
-    grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed To Run\n***"
-        RET=1
-    fi
 
     set -e
 

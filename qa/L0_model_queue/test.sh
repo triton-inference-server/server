@@ -97,6 +97,13 @@ python $MODEL_QUEUE_TEST ModelQueueTest.$TEST_CASE >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -132,6 +139,13 @@ python $MODEL_QUEUE_TEST ModelQueueTest.$TEST_CASE >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -166,6 +180,13 @@ python $MODEL_QUEUE_TEST ModelQueueTest.$TEST_CASE >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -201,6 +222,13 @@ python $MODEL_QUEUE_TEST ModelQueueTest.$TEST_CASE >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -234,6 +262,13 @@ python $MODEL_QUEUE_TEST ModelQueueTest.$TEST_CASE >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -283,20 +318,18 @@ python $MODEL_QUEUE_TEST ModelQueueTest.$TEST_CASE >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
-
-# python unittest seems to swallow ImportError and still return 0 exit
-# code. So need to explicitly check CLIENT_LOG to make sure we see
-# some running tests
-grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    RET=1
-fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

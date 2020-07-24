@@ -77,6 +77,13 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -126,6 +133,13 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 

@@ -39,6 +39,8 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 SERVER_STATUS_TEST=server_status_test.py
+EXPECTED_NUM_TESTS_MMDT="4"
+EXPECTED_NUM_TESTS_SMDT="5"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
@@ -67,6 +69,13 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS_SMDT
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 
 set -e
@@ -83,16 +92,13 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
-fi
-
-# python unittest seems to swallow ImportError and still return 0 exit
-# code. So need to explicitly check CLIENT_LOG to make sure we see
-# some running tests
-grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS_SMDT
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 
 set -e

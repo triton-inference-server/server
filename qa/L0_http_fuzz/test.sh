@@ -40,6 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 rm -f *.log *.db
+EXPECTED_NUM_TESTS="1"
 
 mkdir -p models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
@@ -65,6 +66,13 @@ python $FUZZTEST -v >> ${FUZZ_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat ${FUZZ_LOG}
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 
 set -e

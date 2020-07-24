@@ -72,8 +72,14 @@ for i in \
             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
+    else
+        check_test_results $CLIENT_LOG 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
     fi
-    check_test_results $CLIENT_LOG 1
     set -e
 done
 
@@ -88,9 +94,15 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test test_one_to_multi_many Failed\n***" >>$CLIENT_LOG
         echo -e "\n***\n*** Test test_one_to_multi_many Failed\n***"
         RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 
-check_test_results $CLIENT_LOG 1
 set -e
 
 unset TRITONSERVER_DELAY_GRPC_RESPONSE

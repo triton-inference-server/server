@@ -392,7 +392,7 @@ class ServerMetadataTest(tu.TestResCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
 
-class ModelMetadataTest(unittest.TestCase):
+class ModelMetadataTest(tu.TestResCollector):
     '''
     These tests must be run after the ServerMetadataTest. See test.sh
     file for correct test running.

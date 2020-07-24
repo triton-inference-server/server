@@ -40,6 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 LIBTORCH_OP_VAL_CLIENT=lt_op_val_client.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/libtorch_model_store2
+EXPECTED_NUM_TESTS="4"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false"
@@ -64,6 +65,13 @@ set +e
 python $LIBTORCH_OP_VAL_CLIENT >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
