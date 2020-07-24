@@ -39,12 +39,13 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
-if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ] then
-elif [ -z "$TEST_CUDA_SHARED_MEMORY" ] then
-elif [ -z "$CPU_ONLY" ] then
-elif [ -z "$ENSEMBLES" ] then
-elif [ -z "$BACKENDS" ] then
-fi
+EXPECTED_NUM_TESTS="42"
+# if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
+# elif [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
+# elif [ -z "$CPU_ONLY" ]; then
+# elif [ -z "$ENSEMBLES" ]; then
+# elif [ -z "$BACKENDS" ]; then
+# fi
 
 MODELDIR=`pwd`/models
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -180,12 +181,15 @@ for TARGET in cpu gpu; do
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
+    else
+        check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
     fi
 
-    # At the end of $CLIENT_LOG there is a single line JSON containing the
-    # result of unittests.
-    test_result_json=`tail -n 1 $CLIENT_LOG`
-    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
 
     set -e
 

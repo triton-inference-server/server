@@ -38,7 +38,6 @@ import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
 
-
 class PluginModelTest(tu.TestResCollector):
 
     def _full_exact(self, batch_size, model_name, plugin_name):
