@@ -273,26 +273,24 @@ function create_nop_modelfile () {
 function check_test_results () {
     local log_file=$1
     local expected_num_tests=$2
-    test_result_json=`tail -n 1 $log_file`
 
     if [ -z "$expected_num_tests" ]; then
         echo "=== expected number of tests must be defined"
         return
     fi
 
-    echo "$test_result_json" | jq
+    test_result_json=`tail -n 1 $log_file`
+    num_failures=`echo $test_result_json | jq .failures`
+    num_tests=`echo $test_result_json | jq .total`
     if [ $? -ne 0 ]; then
         cat $log_file
         echo -e "\n***\n*** Test Failed: unable to parse test results\n***"
         return 1
-    else
-        num_failures=`echo $test_result_json | jq .failures`
-        num_tests=`echo $test_result_json | jq .total`
-        if [ $num_failures != "0" ] || [ $num_tests -ne $expected_num_tests ]; then
-            cat $log_file
-            echo -e "\n***\n*** Test Failed: Expected $expected_num_tests test(s), $num_tests test(s) executed, and $num_failures test(s) failed. \n***"
-            return 1
-        fi
+    fi
+    if [ $num_failures != "0" ] || [ $num_tests -ne $expected_num_tests ]; then
+        cat $log_file
+        echo -e "\n***\n*** Test Failed: Expected $expected_num_tests test(s), $num_tests test(s) executed, and $num_failures test(s) failed. \n***"
+        return 1
     fi
 
     return 0
