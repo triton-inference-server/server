@@ -1595,13 +1595,11 @@ ModelState::Instance::Run(
 
           const int64_t batch_element_cnt =
               nib::GetElementCount(shape, dims_count);
-          const size_t request_element_cnt = std::max(1L, batch_element_cnt);
 
           cuda_copy |= SetStringInputTensor(
-              tensor, input, name, buffer_count, request_element_cnt,
+              tensor, input, name, buffer_count, batch_element_cnt,
               tensor_offset, &responses[idx], stream_);
-
-          tensor_offset += request_element_cnt;
+          tensor_offset += batch_element_cnt;
         }
       }
       // Use the collector for non-STRING datatype...
