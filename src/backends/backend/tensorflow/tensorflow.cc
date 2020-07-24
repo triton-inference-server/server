@@ -791,7 +791,7 @@ class ModelState {
               name, gpu_device, max_batch_size, enable_pinned_input,
               enable_pinned_output),
           trtistf_model_(nullptr, TRTISTF_ModelDelete),
-          input_device_id_(MODEL_DEVICE)
+          input_device_id_(MODEL_DEVICE), requests_(max_batch_size_)
     {
     }
 
@@ -814,8 +814,8 @@ class ModelState {
     int input_device_id_;
 
     // A blocking queue for the instance to fetch its jobs.
-    nib::BlockingQueue<std::pair<TRITONBACKEND_Request**, uint32_t>>
-        batch_queue_;
+    nib::BlockingQueue<std::pair<bool, uint32_t>> batch_queue_;
+    std::vector<TRITONBACKEND_Request*> requests_;
   };
 
   static TRITONSERVER_Error* Create(
@@ -836,9 +836,6 @@ class ModelState {
   ModelState(
       TRITONBACKEND_Model* triton_model, const std::string& name,
       ni::TritonJson::Value&& model_config);
-  void ProcessThread(
-      TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
-      const int32_t* delay_buffer_ptr, const uint32_t element_count);
 
   TRITONSERVER_Error* CreateInstance(
       const std::string& instance_name, const nib::InstanceProperties& device,
@@ -1286,8 +1283,9 @@ ModelState::CreateInstance(
   instance_threads_.emplace_back([this, instance]() {
     while (true) {
       auto requests = instance->batch_queue_.Pop();
-      if (requests.first != nullptr) {
-        instance->Run(triton_model_, requests.first, requests.second);
+      if (requests.first) {
+        instance->Run(
+            triton_model_, instance->requests_.data(), requests.second);
         available_instances_.Push(instance);
       } else {
         // Always push back to available_instances_ to unblock scheduler
@@ -1312,7 +1310,7 @@ ModelState::~ModelState()
 {
   // Push nullptr to signal the instances to exit
   for (auto& instance : instances_) {
-    instance->batch_queue_.Push(std::make_pair(nullptr, 0));
+    instance->batch_queue_.Push(std::make_pair(false /* process_request */, 0));
   }
   for (auto& instance_thread : instance_threads_) {
     instance_thread.join();
@@ -1371,7 +1369,16 @@ ModelState::ProcessRequest(
     TRITONBACKEND_Request** requests, const uint32_t request_count)
 {
   auto instance = available_instances_.Pop();
-  instance->batch_queue_.Push(std::make_pair(requests, request_count));
+  // FIXME Is there a better solution? Leaky abstraction here..
+  // 'requests' is actually owned by the scheduler and stored as thread-local
+  // variable. So the pointers to requests need to be copied to instance
+  // specific location to prevent the instances to access the thread-local
+  // variable and interfere each other.
+  memcpy(
+      instance->requests_.data(), requests,
+      request_count * sizeof(TRITONBACKEND_Request*));
+  instance->batch_queue_.Push(
+      std::make_pair(true /* process_request */, request_count));
   available_instances_.WaitNotEmpty();
 }
 
