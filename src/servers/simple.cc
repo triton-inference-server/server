@@ -517,6 +517,14 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
       "setting verbose logging level");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetBackendDirectory(
+          server_options, "/opt/tritonserver/backends"),
+      "setting backend directory");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
+          server_options, TRITON_MIN_COMPUTE_CAPABILITY),
+      "setting minimum supported CUDA compute capability");
 
   TRITONSERVER_Server* server_ptr = nullptr;
   FAIL_IF_ERR(

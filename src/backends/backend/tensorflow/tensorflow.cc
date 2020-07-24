@@ -1130,38 +1130,49 @@ ModelState::CreateInstance(
               // Validate and set parameters
               ni::TritonJson::Value params;
               if (ea.Find("parameters", &params)) {
-                ni::TritonJson::Value param_value;
-                std::string value_string;
-                if (params.Find("precision_mode", &param_value)) {
-                  RETURN_IF_ERROR(param_value.AsString(&value_string));
-                  if (value_string == "FP32") {
-                    tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
-                  } else if (value_string == "FP16") {
-                    tftrt_config.precision_mode_ = TRTISTF_MODE_FP16;
+                std::vector<std::string> param_keys;
+                RETURN_IF_ERROR(params.Members(&param_keys));
+                for (const auto& param_key : param_keys) {
+                  std::string value_string;
+                  if (param_key == "precision_mode") {
+                    RETURN_IF_ERROR(params.MemberAsString(
+                        param_key.c_str(), &value_string));
+                    if (value_string == "FP32") {
+                      tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
+                    } else if (value_string == "FP16") {
+                      tftrt_config.precision_mode_ = TRTISTF_MODE_FP16;
+                    } else {
+                      RETURN_ERROR_IF_FALSE(
+                          false, TRITONSERVER_ERROR_INVALID_ARG,
+                          std::string("unsupported precision mode '") +
+                              value_string + "' is requested");
+                    }
+                  } else if (param_key == "minimum_segment_size") {
+                    RETURN_IF_ERROR(params.MemberAsString(
+                        param_key.c_str(), &value_string));
+                    RETURN_IF_ERROR(ParseLongLongParameter(
+                        "minimum_segment_size", value_string,
+                        &tftrt_config.minimum_segment_size_));
+                  } else if (param_key == "max_workspace_size_bytes") {
+                    RETURN_IF_ERROR(params.MemberAsString(
+                        param_key.c_str(), &value_string));
+                    RETURN_IF_ERROR(ParseLongLongParameter(
+                        "max_workspace_size_bytes", value_string,
+                        &tftrt_config.max_workspace_size_bytes_));
+                  } else if (param_key == "max_cached_engines") {
+                    RETURN_IF_ERROR(params.MemberAsString(
+                        param_key.c_str(), &value_string));
+                    RETURN_IF_ERROR(ParseLongLongParameter(
+                        "max_cached_engines", value_string,
+                        &tftrt_config.max_cached_engines_));
                   } else {
-                    RETURN_ERROR_IF_FALSE(
-                        false, TRITONSERVER_ERROR_INVALID_ARG,
-                        std::string("unsupported precision mode '") +
-                            value_string + "' is requested");
+                    return TRITONSERVER_ErrorNew(
+                        TRITONSERVER_ERROR_INVALID_ARG,
+                        std::string(
+                            "unknown parameter '" + param_key +
+                            "' is provided for TensorRT Execution Accelerator")
+                            .c_str());
                   }
-                }
-                if (params.Find("minimum_segment_size", &param_value)) {
-                  RETURN_IF_ERROR(param_value.AsString(&value_string));
-                  RETURN_IF_ERROR(ParseLongLongParameter(
-                      "minimum_segment_size", value_string,
-                      &tftrt_config.minimum_segment_size_));
-                }
-                if (params.Find("max_workspace_size_bytes", &param_value)) {
-                  RETURN_IF_ERROR(param_value.AsString(&value_string));
-                  RETURN_IF_ERROR(ParseLongLongParameter(
-                      "max_workspace_size_bytes", value_string,
-                      &tftrt_config.max_workspace_size_bytes_));
-                }
-                if (params.Find("max_cached_engines", &param_value)) {
-                  RETURN_IF_ERROR(param_value.AsString(&value_string));
-                  RETURN_IF_ERROR(ParseLongLongParameter(
-                      "max_cached_engines", value_string,
-                      &tftrt_config.max_cached_engines_));
                 }
               }
               tftrt_config_ptr = &tftrt_config;
