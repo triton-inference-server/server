@@ -500,8 +500,8 @@ GCSFileSystem::GetDirectoryContents(
     // We have to make sure that subdirectory contents do not appear here
     std::string name = object_metadata->name();
     int item_start = name.find(full_dir) + full_dir.size();
-    int item_end = name.find(
-        "/", item_start);  // GCS response prepends parent directory name
+    // GCS response prepends parent directory name
+    int item_end = name.find("/", item_start);
 
     // Let set take care of subdirectory contents
     std::string item = name.substr(item_start, item_end - item_start);
@@ -586,9 +586,88 @@ Status
 GCSFileSystem::LocalizeDirectory(
     const std::string& path, std::shared_ptr<LocalizedDirectory>* localized)
 {
-  // For GCS we don't download the folder.
-  // FIXME We will need to fix this in the future.
-  localized->reset(new LocalizedDirectory(path));
+  bool exists;
+  RETURN_IF_ERROR(FileExists(path, &exists));
+
+  bool is_dir = false;
+  if (exists) {
+    RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  }
+
+  if (!is_dir) {
+    return Status(
+        Status::Code::INTERNAL, "directory does not exist at " + path);
+  }
+
+  std::string folder_template = "/tmp/folderXXXXXX";
+  char* tmp_folder = mkdtemp(const_cast<char*>(folder_template.c_str()));
+  if (tmp_folder == nullptr) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder: " + folder_template +
+            ", errno:" + strerror(errno));
+  }
+
+  localized->reset(new LocalizedDirectory(path, tmp_folder));
+
+  std::set<std::string> contents, filenames;
+  RETURN_IF_ERROR(GetDirectoryContents(path, &filenames));
+  for (auto itr = filenames.begin(); itr != filenames.end(); ++itr) {
+    contents.insert(JoinPath({path, *itr}));
+  }
+
+  while (contents.size() != 0) {
+    std::set<std::string> tmp_contents = contents;
+    contents.clear();
+    for (auto iter = tmp_contents.begin(); iter != tmp_contents.end(); ++iter) {
+      bool is_subdir;
+      std::string gcs_fpath = *iter;
+      std::string gcs_removed_path = gcs_fpath.substr(path.size());
+      std::string local_fpath =
+          JoinPath({(*localized)->Path(), gcs_removed_path});
+      RETURN_IF_ERROR(IsDirectory(gcs_fpath, &is_subdir));
+      if (is_subdir) {
+        // Create local mirror of sub-directories
+        int status = mkdir(
+            const_cast<char*>(local_fpath.c_str()),
+            S_IRUSR | S_IWUSR | S_IXUSR);
+        if (status == -1) {
+          return Status(
+              Status::Code::INTERNAL,
+              "Failed to create local folder: " + local_fpath +
+                  ", errno:" + strerror(errno));
+        }
+
+        // Add sub-directories and deeper files to contents
+        std::set<std::string> subdir_contents;
+        RETURN_IF_ERROR(GetDirectoryContents(gcs_fpath, &subdir_contents));
+        for (auto itr = subdir_contents.begin(); itr != subdir_contents.end();
+             ++itr) {
+          contents.insert(JoinPath({gcs_fpath, *itr}));
+        }
+      } else {
+        // Create local copy of file
+        std::string file_bucket, file_object;
+        RETURN_IF_ERROR(ParsePath(gcs_fpath, &file_bucket, &file_object));
+
+        // Send a request to read the object
+        gcs::ObjectReadStream filestream =
+            client_->ReadObject(file_bucket, file_object);
+        if (!filestream) {
+          return Status(
+              Status::Code::INTERNAL, "Failed to get object at " + *iter);
+        }
+
+        std::string gcs_removed_path = (*iter).substr(path.size());
+        std::string local_file_path =
+            JoinPath({(*localized)->Path(), gcs_removed_path});
+        std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
+        output_file << filestream.rdbuf();
+        output_file.close();
+      }
+    }
+  }
+
   return Status::Success;
 }
 
@@ -843,8 +922,8 @@ S3FileSystem::GetDirectoryContents(
       // We have to make sure that subdirectory contents do not appear here
       std::string name(s3_object.GetKey().c_str());
       int item_start = name.find(full_dir) + full_dir.size();
-      int item_end = name.find(
-          "/", item_start);  // GCS response prepends parent directory name
+      // S3 response prepends parent directory name
+      int item_end = name.find("/", item_start);
 
       // Let set take care of subdirectory contents
       std::string item = name.substr(item_start, item_end - item_start);
@@ -967,12 +1046,12 @@ S3FileSystem::LocalizeDirectory(
     effective_path = path;
   }
 
-  std::string file_template = "/tmp/fileXXXXXX";
-  char* tmp_folder = mkdtemp(const_cast<char*>(file_template.c_str()));
+  std::string folder_template = "/tmp/folderXXXXXX";
+  char* tmp_folder = mkdtemp(const_cast<char*>(folder_template.c_str()));
   if (tmp_folder == nullptr) {
     return Status(
         Status::Code::INTERNAL,
-        "Failed to create local temp folder: " + file_template +
+        "Failed to create local temp folder: " + folder_template +
             ", errno:" + strerror(errno));
   }
 
