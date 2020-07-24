@@ -160,6 +160,7 @@ GetBooleanOverrideInputs(
   int64_t memory_type_id;
 
   const std::vector<int64_t> tensor_shape{1};
+  const std::vector<int64_t> tensor_shape_with_batch_dim{1, 1};
   const size_t size_p = GetDataTypeByteSize(tensor_datatype);
 
   auto true_p =
@@ -197,11 +198,13 @@ GetBooleanOverrideInputs(
   auto ltrue_override = std::make_shared<InferenceRequest::Input>(
       tensor_name, tensor_datatype, tensor_shape);
   *ltrue_override->MutableShape() = ltrue_override->OriginalShape();
+  *ltrue_override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
   RETURN_IF_ERROR(ltrue_override->SetData(true_p));
 
   auto lfalse_override = std::make_shared<InferenceRequest::Input>(
       tensor_name, tensor_datatype, tensor_shape);
   *lfalse_override->MutableShape() = lfalse_override->OriginalShape();
+  *lfalse_override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
   RETURN_IF_ERROR(lfalse_override->SetData(false_p));
 
   *true_override = std::move(ltrue_override);
@@ -710,6 +713,7 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
     }
 
     const std::vector<int64_t> tensor_shape{1};
+    const std::vector<int64_t> tensor_shape_with_batch_dim{1, 1};
     const size_t size_p = GetDataTypeByteSize(correlation_id_datatype);
 
     for (size_t b = 0; b < seq_slot_cnt_; ++b) {
@@ -732,6 +736,7 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
       auto override = std::make_shared<InferenceRequest::Input>(
           correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
       *override->MutableShape() = override->OriginalShape();
+      *override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
       corrid_status = override->SetData(corrid_p);
       if (!corrid_status.IsOk()) {
         LOG_ERROR << "failed creating CORRID control for sequence-batch "
