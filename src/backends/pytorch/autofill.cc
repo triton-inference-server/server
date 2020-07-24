@@ -35,11 +35,11 @@ namespace nvidia { namespace inferenceserver {
 class AutoFillPyTorchImpl : public AutoFill {
  public:
   AutoFillPyTorchImpl(const std::string& model_name) : AutoFill(model_name) {}
-  Status Fix(ModelConfig* config) override;
+  Status Fix(inference::ModelConfig* config) override;
 };
 
 Status
-AutoFillPyTorchImpl::Fix(ModelConfig* config)
+AutoFillPyTorchImpl::Fix(inference::ModelConfig* config)
 {
   config->set_platform(kPyTorchLibTorchPlatform);
 

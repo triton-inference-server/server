@@ -839,7 +839,7 @@ EnsembleContext::InitStep(
 
     // If the actual shape and config shape agree with each other without
     // considering batch size, non-batch / batch conversion are not required.
-    const ModelInput* input_config;
+    const inference::ModelInput* input_config;
     backend->GetInput(pair.first, &input_config);
     auto shape = ReshapeTensorDims(
         input_config->dims(), allow_batching, tensor_data.batch_size_,
@@ -1167,7 +1167,7 @@ EnsembleContext::ScheduleSteps(
 Status
 EnsembleScheduler::Create(
     InferenceStatsAggregator* const stats_aggregator,
-    InferenceServer* const server, const ModelConfig& config,
+    InferenceServer* const server, const inference::ModelConfig& config,
     std::unique_ptr<Scheduler>* scheduler)
 {
   scheduler->reset(new EnsembleScheduler(stats_aggregator, server, config));
@@ -1186,7 +1186,7 @@ EnsembleScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 
 EnsembleScheduler::EnsembleScheduler(
     InferenceStatsAggregator* const stats_aggregator,
-    InferenceServer* const server, const ModelConfig& config)
+    InferenceServer* const server, const inference::ModelConfig& config)
     : stats_aggregator_(stats_aggregator), is_(server), stream_(nullptr)
 {
 #ifdef TRITON_ENABLE_GPU

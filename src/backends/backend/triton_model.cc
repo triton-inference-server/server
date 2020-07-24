@@ -81,7 +81,7 @@ TritonModel::Create(
     InferenceServer* server, const std::string& model_repository_path,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const std::string& model_name, const int64_t version,
-    const ModelConfig& model_config, std::unique_ptr<TritonModel>* model)
+    const inference::ModelConfig& model_config, std::unique_ptr<TritonModel>* model)
 {
   model->reset();
 

@@ -160,7 +160,7 @@ PriorityQueue::PolicyQueue::ApplyPolicy(
     while (curr_idx < queue_.size()) {
       if ((timeout_timestamp_ns_[curr_idx] != 0) &&
           (now_nanoseconds > timeout_timestamp_ns_[curr_idx])) {
-        if (timeout_action_ == ModelQueuePolicy::DELAY) {
+        if (timeout_action_ == inference::ModelQueuePolicy::DELAY) {
           delayed_queue_.emplace_back(std::move(queue_[curr_idx]));
         } else {
           rejected_queue_.emplace_back(std::move(queue_[curr_idx]));
@@ -225,14 +225,14 @@ PriorityQueue::PolicyQueue::TimeoutAt(size_t idx)
 PriorityQueue::PriorityQueue()
     : size_(0), front_priority_level_(0), last_priority_level_(0)
 {
-  ModelQueuePolicy default_policy;
+  inference::ModelQueuePolicy default_policy;
   queues_.emplace(0, PolicyQueue(default_policy));
   front_priority_level_ = queues_.begin()->first;
   ResetCursor();
 }
 
 PriorityQueue::PriorityQueue(
-    const ModelQueuePolicy& default_queue_policy, uint32_t priority_levels,
+    const inference::ModelQueuePolicy& default_queue_policy, uint32_t priority_levels,
     const ModelQueuePolicyMap queue_policy_map)
     : size_(0), last_priority_level_(priority_levels)
 {

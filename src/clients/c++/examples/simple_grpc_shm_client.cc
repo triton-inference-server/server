@@ -274,7 +274,7 @@ main(int argc, char** argv)
   }
 
   // Get shared memory regions active/registered within triton
-  ni::SystemSharedMemoryStatusResponse status;
+  inference::SystemSharedMemoryStatusResponse status;
   FAIL_IF_ERR(
       client->SystemSharedMemoryStatus(&status),
       "failed to get shared memory status");

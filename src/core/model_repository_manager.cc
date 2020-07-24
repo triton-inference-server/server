@@ -290,7 +290,7 @@ struct ModelRepositoryManager::ModelInfo {
   // so that we have more information on whether the model reload
   // is necessary
   int64_t mtime_nsec_;
-  ModelConfig model_config_;
+  inference::ModelConfig model_config_;
   Platform platform_;
   std::string model_repository_path_;
 };
@@ -310,7 +310,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   // be unloaded before loading the specified versions.
   Status AsyncLoad(
       const std::string& repository_path, const std::string& model_name,
-      const std::set<int64_t>& versions, const ModelConfig& model_config,
+      const std::set<int64_t>& versions, const inference::ModelConfig& model_config,
       bool force_unload = true,
       std::function<void(int64_t, ModelReadyState, size_t)> OnComplete =
           nullptr);
@@ -343,7 +343,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   struct BackendInfo {
     BackendInfo(
         const std::string& repository_path, const ModelReadyState state,
-        const ActionType next_action, const ModelConfig& model_config)
+        const ActionType next_action, const inference::ModelConfig& model_config)
         : repository_path_(repository_path),
           platform_(GetPlatform(model_config.platform())), state_(state),
           next_action_(next_action), model_config_(model_config)
@@ -363,7 +363,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     ActionType next_action_;
     // callback function that will be triggered when there is no next action
     std::function<void()> OnComplete_;
-    ModelConfig model_config_;
+    inference::ModelConfig model_config_;
 
     std::shared_ptr<InferenceBackend> backend_;
   };
@@ -667,7 +667,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
 Status
 ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     const std::string& repository_path, const std::string& model_name,
-    const std::set<int64_t>& versions, const ModelConfig& model_config,
+    const std::set<int64_t>& versions, const inference::ModelConfig& model_config,
     bool force_unload,
     std::function<void(int64_t, ModelReadyState, size_t)> OnComplete)
 {
@@ -849,7 +849,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
       {backend_info->repository_path_, model_name, std::to_string(version)});
   // make copy of the current model config in case model config in backend info
   // is updated (another poll) during the creation of backend handle
-  ModelConfig model_config;
+  inference::ModelConfig model_config;
   {
     std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
     model_config = backend_info->model_config_;
@@ -1152,7 +1152,7 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
   UpdateDependencyGraph(added, deleted, modified);
 
   for (const auto& name : deleted) {
-    ModelConfig model_config;
+    inference::ModelConfig model_config;
     std::set<int64_t> versions;
     std::string empty_path;
     // Utilize "force_unload" of AsyncLoad()
@@ -1183,7 +1183,7 @@ ModelRepositoryManager::LoadModelByDependency()
     loaded_models.clear();
     // Unload invalid models first
     for (auto& invalid_model : set_pair.second) {
-      ModelConfig model_config;
+      inference::ModelConfig model_config;
       std::set<int64_t> versions;
       std::string empty_path;
       // Utilize "force_unload" of AsyncLoad()
@@ -1394,7 +1394,7 @@ ModelRepositoryManager::LoadUnloadModels(
   // In all cases, should unload them and remove from 'infos_' explicitly.
   for (const auto& name : deleted) {
     infos_.erase(name);
-    ModelConfig model_config;
+    inference::ModelConfig model_config;
     std::set<int64_t> versions;
     std::string empty_path;
     // Utilize "force_unload" of AsyncLoad()
@@ -1415,7 +1415,7 @@ ModelRepositoryManager::UnloadAllModels()
 {
   Status status;
   // Reload an empty version list to cause the model to unload.
-  ModelConfig model_config;
+  inference::ModelConfig model_config;
   std::set<int64_t> versions;
   std::string empty_path;
   for (const auto& name_info : infos_) {
@@ -1628,7 +1628,7 @@ ModelRepositoryManager::Poll(
     Status status = Status::Success;
     if (model_poll_state != STATE_UNMODIFIED) {
       model_info.reset(new ModelInfo());
-      ModelConfig& model_config = model_info->model_config_;
+      inference::ModelConfig& model_config = model_info->model_config_;
       model_info->mtime_nsec_ = mtime_ns;
       model_info->model_repository_path_ = repository;
 
@@ -1851,7 +1851,7 @@ ModelRepositoryManager::ConnectDependencyGraph(DependencyNode* updated_node)
 
 Status
 ModelRepositoryManager::GetModelConfig(
-    const std::string& name, ModelConfig* model_config)
+    const std::string& name, inference::ModelConfig* model_config)
 {
   const auto itr = infos_.find(name);
   if (itr == infos_.end()) {
@@ -1957,7 +1957,7 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
 Status
 ModelRepositoryManager::VersionsToLoad(
     const std::string model_repository_path, const std::string& name,
-    const ModelConfig& model_config, std::set<int64_t>* versions)
+    const inference::ModelConfig& model_config, std::set<int64_t>* versions)
 {
   versions->clear();
 

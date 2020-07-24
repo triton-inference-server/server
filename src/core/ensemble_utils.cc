@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@ namespace {
 /// of the ensemble tensor and which model they are inferred from.
 struct TensorNode {
   TensorNode(
-      const std::string& model_name, const bool batching, const DataType& type,
+      const std::string& model_name, const bool batching, const inference::DataType& type,
       const DimsList& dims)
       : model_name_(model_name), type_(type), dims_(dims), is_decoupled_(false),
         decouple_label_(0), visited_(false)
@@ -61,7 +61,7 @@ struct TensorNode {
   }
 
   std::string model_name_;
-  DataType type_;
+  inference::DataType type_;
   DimsList dims_;
   DimsList full_dims_;
   bool is_decoupled_;
@@ -89,9 +89,9 @@ ValidateTensorConsistency(
   if (lhs.type_ != rhs.type_) {
     return Status(
         Status::Code::INVALID_ARG,
-        message + "inconsistent data type: " + DataType_Name(lhs.type_) +
+        message + "inconsistent data type: " + inference::DataType_Name(lhs.type_) +
             " is inferred from model " + lhs.model_name_ + " while " +
-            DataType_Name(rhs.type_) + " is inferred from model " +
+            inference::DataType_Name(rhs.type_) + " is inferred from model " +
             rhs.model_name_);
   }
 
@@ -116,8 +116,8 @@ ValidateTensorConsistency(
 
 Status
 ValidateTensorMapping(
-    const std::string& ensemble, const ModelEnsembling::Step& step,
-    const ModelConfig& model_config,
+    const std::string& ensemble, const inference::ModelEnsembling::Step& step,
+    const inference::ModelConfig& model_config,
     std::unordered_map<std::string, TensorNode>* ensemble_tensors)
 {
   const bool batching = (model_config.max_batch_size() > 0);
@@ -279,7 +279,7 @@ ValidateEnsembleConfig(
 
   for (const auto& step : ensemble_config.ensemble_scheduling().step()) {
     const auto& model_name = step.model_name();
-    ModelConfig model_config;
+    inference::ModelConfig model_config;
     for (auto& node : ensemble->upstreams_) {
       if (model_name == node.first->model_name_) {
         model_config = node.first->model_config_;

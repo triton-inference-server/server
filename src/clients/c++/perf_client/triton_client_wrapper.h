@@ -70,7 +70,7 @@ class TritonClientWrapper {
   /// Get the model metadata from the server for specified name and
   /// version as message.
   nic::Error ModelMetadata(
-      ni::ModelMetadataResponse* model_metadata, const std::string& model_name,
+      inference::ModelMetadataResponse* model_metadata, const std::string& model_name,
       const std::string& model_version);
 
   /// Get the model config from the server for specified name and
@@ -82,7 +82,7 @@ class TritonClientWrapper {
   /// Get the model config from the server for specified name and
   /// version as message.
   nic::Error ModelConfig(
-      ni::ModelConfigResponse* model_config, const std::string& model_name,
+      inference::ModelConfigResponse* model_config, const std::string& model_name,
       const std::string& model_version);
 
   /// Issues a synchronous inference request to the server.
@@ -137,7 +137,7 @@ class TritonClientWrapper {
   }
 
   void ParseStatistics(
-      ni::ModelStatisticsResponse& infer_stat,
+      inference::ModelStatisticsResponse& infer_stat,
       std::map<ModelIdentifier, ModelStatistics>* model_stats);
 
   void ParseStatistics(

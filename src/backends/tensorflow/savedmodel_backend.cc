@@ -80,16 +80,16 @@ SavedModelBackend::CreateTRTISTFModel(
   if (Config().has_sequence_batching()) {
     bool have_start, have_end, have_ready, have_corrid;
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
         false /* required */, &have_start));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
         false /* required */, &have_end));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
         false /* required */, &have_ready));
     RETURN_IF_ERROR(ValidateTypedSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, inputs,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, inputs,
         false /* required */, &have_corrid));
     if (have_start) {
       expected_input_cnt += 1;
@@ -153,9 +153,9 @@ SavedModelBackend::CreateTRTISTFModel(
           Status::Code::INVALID_ARG,
           "unable to load model '" + Name() + "', input '" + io.name() +
               "' data-type " +
-              DataType_Name(ConvertDataType(input->data_type_)) +
+              inference::DataType_Name(ConvertDataType(input->data_type_)) +
               " doesn't match configuration data-type " +
-              DataType_Name(io.data_type()));
+              inference::DataType_Name(io.data_type()));
     }
   }
 
@@ -196,9 +196,9 @@ SavedModelBackend::CreateTRTISTFModel(
           Status::Code::INVALID_ARG,
           "unable to load model '" + Name() + "', output '" + io.name() +
               "' data-type " +
-              DataType_Name(ConvertDataType(output->data_type_)) +
+              inference::DataType_Name(ConvertDataType(output->data_type_)) +
               " doesn't match configuration data-type " +
-              DataType_Name(io.data_type()));
+              inference::DataType_Name(io.data_type()));
     }
   }
 
@@ -207,11 +207,11 @@ SavedModelBackend::CreateTRTISTFModel(
 
 Status
 SavedModelBackend::ValidateBooleanSequenceControl(
-    const ModelSequenceBatching::Control::Kind control_kind,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
     const TRTISTF_IOList* inputs, bool required, bool* have_control)
 {
   std::string tensor_name;
-  DataType tensor_datatype;
+  inference::DataType tensor_datatype;
   RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
       Config().sequence_batching(), Name(), control_kind, required,
       &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
@@ -244,9 +244,9 @@ SavedModelBackend::ValidateBooleanSequenceControl(
           Status::Code::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
               tensor_name + "': the model expects data-type " +
-              DataType_Name(ConvertDataType(input->data_type_)) +
+              inference::DataType_Name(ConvertDataType(input->data_type_)) +
               " but the model configuration specifies data-type " +
-              DataType_Name(tensor_datatype));
+              inference::DataType_Name(tensor_datatype));
     }
   }
 
@@ -255,11 +255,11 @@ SavedModelBackend::ValidateBooleanSequenceControl(
 
 Status
 SavedModelBackend::ValidateTypedSequenceControl(
-    const ModelSequenceBatching::Control::Kind control_kind,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
     const TRTISTF_IOList* inputs, bool required, bool* have_control)
 {
   std::string tensor_name;
-  DataType tensor_datatype;
+  inference::DataType tensor_datatype;
   RETURN_IF_ERROR(GetTypedSequenceControlProperties(
       Config().sequence_batching(), Name(), control_kind, required,
       &tensor_name, &tensor_datatype));
@@ -292,9 +292,9 @@ SavedModelBackend::ValidateTypedSequenceControl(
           Status::Code::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
               tensor_name + "', the model expects data-type " +
-              DataType_Name(ConvertDataType(input->data_type_)) +
+              inference::DataType_Name(ConvertDataType(input->data_type_)) +
               " but the model configuration specifies data-type " +
-              DataType_Name(tensor_datatype));
+              inference::DataType_Name(tensor_datatype));
     }
   }
 

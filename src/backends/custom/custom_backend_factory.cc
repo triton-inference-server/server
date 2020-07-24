@@ -53,7 +53,7 @@ CustomBackendFactory::Create(
 Status
 CustomBackendFactory::CreateBackend(
     const std::string& model_repository_path, const std::string& model_name,
-    const int64_t version, const ModelConfig& model_config,
+    const int64_t version, const inference::ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {

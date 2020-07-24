@@ -46,7 +46,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
-    const ModelQueuePolicy& default_queue_policy,
+    const inference::ModelQueuePolicy& default_queue_policy,
     const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
       dynamic_batching_enabled_(dynamic_batching_enabled),
@@ -80,7 +80,7 @@ DynamicBatchScheduler::Create(
   return Create(
       runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule,
       dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
-      preferred_batch_sizes, max_queue_delay_microseconds, ModelQueuePolicy(),
+      preferred_batch_sizes, max_queue_delay_microseconds, inference::ModelQueuePolicy(),
       0, ModelQueuePolicyMap(), scheduler);
 }
 
@@ -93,7 +93,7 @@ DynamicBatchScheduler::Create(
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
-    const ModelQueuePolicy& default_queue_policy,
+    const inference::ModelQueuePolicy& default_queue_policy,
     const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map,
     std::unique_ptr<Scheduler>* scheduler)
 {

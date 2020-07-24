@@ -56,7 +56,7 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
 
   Error SetInputTensor(
       const std::string& name, const std::vector<int64_t>& shape,
-      const DataType dtype, const char* content, size_t byte_size) override;
+      const inference::DataType dtype, const char* content, size_t byte_size) override;
   Error GetOutputTensor(
       const std::string& name, const Caffe2Workspace::DataType dtype,
       const char** content, size_t* byte_size,
@@ -118,51 +118,51 @@ ReadBinaryProto(
 std::pair<bool, const caffe2::TypeMeta>
 ConvertDatatype(Caffe2Workspace::DataType dtype)
 {
-  caffe2::TensorProto::DataType ctype;
+  caffe2::TensorProto::inference::DataType ctype;
 
   switch (dtype) {
     case Caffe2Workspace::DataType::TYPE_BOOL:
-      ctype = caffe2::TensorProto_DataType_BOOL;
+      ctype = caffe2::TensorProto_inference::DataType_BOOL;
       break;
     case Caffe2Workspace::DataType::TYPE_UINT8:
-      ctype = caffe2::TensorProto_DataType_UINT8;
+      ctype = caffe2::TensorProto_inference::DataType_UINT8;
       break;
     case Caffe2Workspace::DataType::TYPE_UINT16:
-      ctype = caffe2::TensorProto_DataType_UINT16;
+      ctype = caffe2::TensorProto_inference::DataType_UINT16;
       break;
     case Caffe2Workspace::DataType::TYPE_INT8:
-      ctype = caffe2::TensorProto_DataType_INT8;
+      ctype = caffe2::TensorProto_inference::DataType_INT8;
       break;
     case Caffe2Workspace::DataType::TYPE_INT16:
-      ctype = caffe2::TensorProto_DataType_INT16;
+      ctype = caffe2::TensorProto_inference::DataType_INT16;
       break;
     case Caffe2Workspace::DataType::TYPE_INT32:
-      ctype = caffe2::TensorProto_DataType_INT32;
+      ctype = caffe2::TensorProto_inference::DataType_INT32;
       break;
     case Caffe2Workspace::DataType::TYPE_INT64:
-      ctype = caffe2::TensorProto_DataType_INT64;
+      ctype = caffe2::TensorProto_inference::DataType_INT64;
       break;
     case Caffe2Workspace::DataType::TYPE_FP16:
-      ctype = caffe2::TensorProto_DataType_FLOAT16;
+      ctype = caffe2::TensorProto_inference::DataType_FLOAT16;
       break;
     case Caffe2Workspace::DataType::TYPE_FP32:
-      ctype = caffe2::TensorProto_DataType_FLOAT;
+      ctype = caffe2::TensorProto_inference::DataType_FLOAT;
       break;
     case Caffe2Workspace::DataType::TYPE_FP64:
-      ctype = caffe2::TensorProto_DataType_DOUBLE;
+      ctype = caffe2::TensorProto_inference::DataType_DOUBLE;
       break;
     case Caffe2Workspace::DataType::TYPE_STRING:
-      ctype = caffe2::TensorProto_DataType_STRING;
+      ctype = caffe2::TensorProto_inference::DataType_STRING;
       break;
     default:
       return std::make_pair(false, caffe2::TypeMeta());
   }
 
-  return std::make_pair(true, caffe2::DataTypeToTypeMeta(ctype));
+  return std::make_pair(true, caffe2::inference::DataTypeToTypeMeta(ctype));
 }
 
 const std::string
-DataTypeName(const Caffe2Workspace::DataType datatype)
+inference::DataTypeName(const Caffe2Workspace::DataType datatype)
 {
   switch (datatype) {
     case Caffe2Workspace::DataType::TYPE_INVALID:
@@ -450,7 +450,7 @@ Caffe2WorkspaceImpl::SetInputTensor(
   const auto pr = ConvertDatatype(dtype);
   if (!pr.first) {
     return Error(
-        "Failed to convert datatype '" + DataTypeName(dtype) +
+        "Failed to convert datatype '" + inference::DataTypeName(dtype) +
         "' to Caffe2 NetDef datatype");
   }
 
@@ -500,7 +500,7 @@ Caffe2WorkspaceImpl::GetOutputTensor(
   const auto pr = ConvertDatatype(dtype);
   if (!pr.first) {
     return Error(
-        "Failed to convert datatype '" + DataTypeName(dtype) +
+        "Failed to convert datatype '" + inference::DataTypeName(dtype) +
         "' to Caffe2 NetDef datatype");
   }
 

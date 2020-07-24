@@ -80,18 +80,18 @@ class OnnxBackend : public InferenceBackend {
 
     Status ValidateInputs(
         const std::string& model_name,
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios,
         const size_t expected_input_cnt);
     Status ValidateOutputs(
         const std::string& model_name,
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios);
     Status ValidateBooleanSequenceControl(
-        const std::string& model_name, const ModelSequenceBatching& batcher,
-        const ModelSequenceBatching::Control::Kind control_kind, bool required,
+        const std::string& model_name, const inference::ModelSequenceBatching& batcher,
+        const inference::ModelSequenceBatching::Control::Kind control_kind, bool required,
         bool* have_control);
     Status ValidateTypedSequenceControl(
-        const std::string& model_name, const ModelSequenceBatching& batcher,
-        const ModelSequenceBatching::Control::Kind control_kind, bool required,
+        const std::string& model_name, const inference::ModelSequenceBatching& batcher,
+        const inference::ModelSequenceBatching::Control::Kind control_kind, bool required,
         bool* have_control);
 
     // See BackendContext::Run()

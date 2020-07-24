@@ -203,38 +203,38 @@ OnnxDataTypeName(ONNXTensorElementDataType onnx_type)
   return "UNDEFINED";
 }
 
-DataType
+inference::DataType
 ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type)
 {
   switch (onnx_type) {
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:
       // maps to c type float (4 bytes)
-      return TYPE_FP32;
+      return inference::DataType::TYPE_FP32;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8:
-      return TYPE_UINT8;
+      return inference::DataType::TYPE_UINT8;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8:
-      return TYPE_INT8;
+      return inference::DataType::TYPE_INT8;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16:
-      return TYPE_UINT16;
+      return inference::DataType::TYPE_UINT16;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16:
-      return TYPE_INT16;
+      return inference::DataType::TYPE_INT16;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32:
-      return TYPE_INT32;
+      return inference::DataType::TYPE_INT32;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64:
-      return TYPE_INT64;
+      return inference::DataType::TYPE_INT64;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING:
-      return TYPE_STRING;
+      return inference::DataType::TYPE_STRING;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL:
-      return TYPE_BOOL;
+      return inference::DataType::TYPE_BOOL;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16:
-      return TYPE_FP16;
+      return inference::DataType::TYPE_FP16;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE:
       // maps to c type double (8 bytes)
-      return TYPE_FP64;
+      return inference::DataType::TYPE_FP64;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32:
-      return TYPE_UINT32;
+      return inference::DataType::TYPE_UINT32;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64:
-      return TYPE_UINT64;
+      return inference::DataType::TYPE_UINT64;
     // The following types are not supported:
     // complex with float32 real and imaginary components
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64:
@@ -247,38 +247,38 @@ ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type)
       break;
   }
 
-  return TYPE_INVALID;
+  return inference::DataType::TYPE_INVALID;
 }
 
 ONNXTensorElementDataType
-ConvertToOnnxDataType(DataType data_type)
+ConvertToOnnxDataType(inference::DataType data_type)
 {
   switch (data_type) {
-    case TYPE_UINT8:
+    case inference::DataType::TYPE_UINT8:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8;
-    case TYPE_UINT16:
+    case inference::DataType::TYPE_UINT16:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16;
-    case TYPE_UINT32:
+    case inference::DataType::TYPE_UINT32:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32;
-    case TYPE_UINT64:
+    case inference::DataType::TYPE_UINT64:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64;
-    case TYPE_INT8:
+    case inference::DataType::TYPE_INT8:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8;
-    case TYPE_INT16:
+    case inference::DataType::TYPE_INT16:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16;
-    case TYPE_INT32:
+    case inference::DataType::TYPE_INT32:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32;
-    case TYPE_INT64:
+    case inference::DataType::TYPE_INT64:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64;
-    case TYPE_FP16:
+    case inference::DataType::TYPE_FP16:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16;
-    case TYPE_FP32:
+    case inference::DataType::TYPE_FP32:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;
-    case TYPE_FP64:
+    case inference::DataType::TYPE_FP64:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE;
-    case TYPE_STRING:
+    case inference::DataType::TYPE_STRING:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING;
-    case TYPE_BOOL:
+    case inference::DataType::TYPE_BOOL:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL;
     default:
       break;

@@ -31,40 +31,40 @@
 namespace nvidia { namespace inferenceserver {
 
 bool
-IsFixedSizeDataType(const DataType dtype)
+IsFixedSizeDataType(const inference::DataType dtype)
 {
-  return dtype != TYPE_STRING;
+  return dtype != inference::DataType::TYPE_STRING;
 }
 
 size_t
-GetDataTypeByteSize(const DataType dtype)
+GetDataTypeByteSize(const inference::DataType dtype)
 {
   switch (dtype) {
-    case TYPE_BOOL:
+    case inference::DataType::TYPE_BOOL:
       return 1;
-    case TYPE_UINT8:
+    case inference::DataType::TYPE_UINT8:
       return 1;
-    case TYPE_UINT16:
+    case inference::DataType::TYPE_UINT16:
       return 2;
-    case TYPE_UINT32:
+    case inference::DataType::TYPE_UINT32:
       return 4;
-    case TYPE_UINT64:
+    case inference::DataType::TYPE_UINT64:
       return 8;
-    case TYPE_INT8:
+    case inference::DataType::TYPE_INT8:
       return 1;
-    case TYPE_INT16:
+    case inference::DataType::TYPE_INT16:
       return 2;
-    case TYPE_INT32:
+    case inference::DataType::TYPE_INT32:
       return 4;
-    case TYPE_INT64:
+    case inference::DataType::TYPE_INT64:
       return 8;
-    case TYPE_FP16:
+    case inference::DataType::TYPE_FP16:
       return 2;
-    case TYPE_FP32:
+    case inference::DataType::TYPE_FP32:
       return 4;
-    case TYPE_FP64:
+    case inference::DataType::TYPE_FP64:
       return 8;
-    case TYPE_STRING:
+    case inference::DataType::TYPE_STRING:
       return 0;
     default:
       break;
@@ -116,19 +116,19 @@ GetElementCount(const std::vector<int64_t>& dims)
 }
 
 int64_t
-GetElementCount(const ModelInput& mio)
+GetElementCount(const inference::ModelInput& mio)
 {
   return GetElementCount(mio.dims());
 }
 
 int64_t
-GetElementCount(const ModelOutput& mio)
+GetElementCount(const inference::ModelOutput& mio)
 {
   return GetElementCount(mio.dims());
 }
 
 int64_t
-GetByteSize(const DataType& dtype, const DimsList& dims)
+GetByteSize(const inference::DataType& dtype, const DimsList& dims)
 {
   size_t dt_size = GetDataTypeByteSize(dtype);
   if (dt_size == 0) {
@@ -144,7 +144,7 @@ GetByteSize(const DataType& dtype, const DimsList& dims)
 }
 
 int64_t
-GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims)
+GetByteSize(const inference::DataType& dtype, const std::vector<int64_t>& dims)
 {
   size_t dt_size = GetDataTypeByteSize(dtype);
   if (dt_size == 0) {
@@ -160,7 +160,7 @@ GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims)
 }
 
 int64_t
-GetByteSize(const int batch_size, const DataType& dtype, const DimsList& dims)
+GetByteSize(const int batch_size, const inference::DataType& dtype, const DimsList& dims)
 {
   if (dims.size() == 0) {
     return batch_size * GetDataTypeByteSize(dtype);
@@ -176,7 +176,7 @@ GetByteSize(const int batch_size, const DataType& dtype, const DimsList& dims)
 
 int64_t
 GetByteSize(
-    const int batch_size, const DataType& dtype,
+    const int batch_size, const inference::DataType& dtype,
     const std::vector<int64_t>& dims)
 {
   if (dims.size() == 0) {
@@ -192,13 +192,13 @@ GetByteSize(
 }
 
 int64_t
-GetByteSize(const ModelInput& mio)
+GetByteSize(const inference::ModelInput& mio)
 {
   return GetByteSize(mio.data_type(), mio.dims());
 }
 
 int64_t
-GetByteSize(const ModelOutput& mio)
+GetByteSize(const inference::ModelOutput& mio)
 {
   return GetByteSize(mio.data_type(), mio.dims());
 }
@@ -320,15 +320,15 @@ GetBackendType(const std::string& backend_name)
 }
 
 int
-GetCpuNiceLevel(const ModelConfig& config)
+GetCpuNiceLevel(const inference::ModelConfig& config)
 {
   int nice = SCHEDULER_DEFAULT_NICE;
   if (config.has_optimization()) {
     switch (config.optimization().priority()) {
-      case ModelOptimizationPolicy::PRIORITY_MAX:
+      case inference::ModelOptimizationPolicy::PRIORITY_MAX:
         nice = 0;
         break;
-      case ModelOptimizationPolicy::PRIORITY_MIN:
+      case inference::ModelOptimizationPolicy::PRIORITY_MIN:
         nice = 19;
         break;
       default:
@@ -448,34 +448,34 @@ DimsListToString(const std::vector<int64_t>& dims, const int start_idx)
 }
 
 const char*
-DataTypeToProtocolString(const DataType dtype)
+DataTypeToProtocolString(const inference::DataType dtype)
 {
   switch (dtype) {
-    case TYPE_BOOL:
+    case inference::DataType::TYPE_BOOL:
       return "BOOL";
-    case TYPE_UINT8:
+    case inference::DataType::TYPE_UINT8:
       return "UINT8";
-    case TYPE_UINT16:
+    case inference::DataType::TYPE_UINT16:
       return "UINT16";
-    case TYPE_UINT32:
+    case inference::DataType::TYPE_UINT32:
       return "UINT32";
-    case TYPE_UINT64:
+    case inference::DataType::TYPE_UINT64:
       return "UINT64";
-    case TYPE_INT8:
+    case inference::DataType::TYPE_INT8:
       return "INT8";
-    case TYPE_INT16:
+    case inference::DataType::TYPE_INT16:
       return "INT16";
-    case TYPE_INT32:
+    case inference::DataType::TYPE_INT32:
       return "INT32";
-    case TYPE_INT64:
+    case inference::DataType::TYPE_INT64:
       return "INT64";
-    case TYPE_FP16:
+    case inference::DataType::TYPE_FP16:
       return "FP16";
-    case TYPE_FP32:
+    case inference::DataType::TYPE_FP32:
       return "FP32";
-    case TYPE_FP64:
+    case inference::DataType::TYPE_FP64:
       return "FP64";
-    case TYPE_STRING:
+    case inference::DataType::TYPE_STRING:
       return "BYTES";
     default:
       break;
@@ -484,93 +484,93 @@ DataTypeToProtocolString(const DataType dtype)
   return "<invalid>";
 }
 
-DataType
+inference::DataType
 ProtocolStringToDataType(const std::string& dtype)
 {
   return ProtocolStringToDataType(dtype.c_str(), dtype.size());
 }
 
-DataType
+inference::DataType
 ProtocolStringToDataType(const char* dtype, size_t len)
 {
   if (len < 4 || len > 6) {
-    return TYPE_INVALID;
+    return inference::DataType::TYPE_INVALID;
   }
 
   if ((*dtype == 'I') && (len != 6)) {
     if ((dtype[1] == 'N') && (dtype[2] == 'T')) {
       if ((dtype[3] == '8') && (len == 4)) {
-        return TYPE_INT8;
+        return inference::DataType::TYPE_INT8;
       } else if ((dtype[3] == '1') && (dtype[4] == '6')) {
-        return TYPE_INT16;
+        return inference::DataType::TYPE_INT16;
       } else if ((dtype[3] == '3') && (dtype[4] == '2')) {
-        return TYPE_INT32;
+        return inference::DataType::TYPE_INT32;
       } else if ((dtype[3] == '6') && (dtype[4] == '4')) {
-        return TYPE_INT64;
+        return inference::DataType::TYPE_INT64;
       }
     }
   } else if ((*dtype == 'U') && (len != 4)) {
     if ((dtype[1] == 'I') && (dtype[2] == 'N') && (dtype[3] == 'T')) {
       if ((dtype[4] == '8') && (len == 5)) {
-        return TYPE_UINT8;
+        return inference::DataType::TYPE_UINT8;
       } else if ((dtype[4] == '1') && (dtype[5] == '6')) {
-        return TYPE_UINT16;
+        return inference::DataType::TYPE_UINT16;
       } else if ((dtype[4] == '3') && (dtype[5] == '2')) {
-        return TYPE_UINT32;
+        return inference::DataType::TYPE_UINT32;
       } else if ((dtype[4] == '6') && (dtype[5] == '4')) {
-        return TYPE_UINT64;
+        return inference::DataType::TYPE_UINT64;
       }
     }
   } else if ((*dtype == 'F') && (dtype[1] == 'P') && (len == 4)) {
     if ((dtype[2] == '1') && (dtype[3] == '6')) {
-      return TYPE_FP16;
+      return inference::DataType::TYPE_FP16;
     } else if ((dtype[2] == '3') && (dtype[3] == '2')) {
-      return TYPE_FP32;
+      return inference::DataType::TYPE_FP32;
     } else if ((dtype[2] == '6') && (dtype[3] == '4')) {
-      return TYPE_FP64;
+      return inference::DataType::TYPE_FP64;
     }
   } else if (*dtype == 'B') {
     if (dtype[1] == 'Y') {
       if (!strcmp(dtype + 2, "TES")) {
-        return TYPE_STRING;
+        return inference::DataType::TYPE_STRING;
       }
     } else if (!strcmp(dtype + 1, "OOL")) {
-      return TYPE_BOOL;
+      return inference::DataType::TYPE_BOOL;
     }
   }
 
-  return TYPE_INVALID;
+  return inference::DataType::TYPE_INVALID;
 }
 
 TRITONSERVER_DataType
-DataTypeToTriton(const DataType dtype)
+DataTypeToTriton(const inference::DataType dtype)
 {
   switch (dtype) {
-    case DataType::TYPE_BOOL:
+    case inference::DataType::TYPE_BOOL:
       return TRITONSERVER_TYPE_BOOL;
-    case DataType::TYPE_UINT8:
+    case inference::DataType::TYPE_UINT8:
       return TRITONSERVER_TYPE_UINT8;
-    case DataType::TYPE_UINT16:
+    case inference::DataType::TYPE_UINT16:
       return TRITONSERVER_TYPE_UINT16;
-    case DataType::TYPE_UINT32:
+    case inference::DataType::TYPE_UINT32:
       return TRITONSERVER_TYPE_UINT32;
-    case DataType::TYPE_UINT64:
+    case inference::DataType::TYPE_UINT64:
       return TRITONSERVER_TYPE_UINT64;
-    case DataType::TYPE_INT8:
+    case inference::DataType::TYPE_INT8:
       return TRITONSERVER_TYPE_INT8;
-    case DataType::TYPE_INT16:
+    case inference::DataType::TYPE_INT16:
       return TRITONSERVER_TYPE_INT16;
-    case DataType::TYPE_INT32:
+    case inference::DataType::TYPE_INT32:
       return TRITONSERVER_TYPE_INT32;
-    case DataType::TYPE_INT64:
+    case inference::DataType::TYPE_INT64:
       return TRITONSERVER_TYPE_INT64;
-    case DataType::TYPE_FP16:
+    case inference::DataType::TYPE_FP16:
       return TRITONSERVER_TYPE_FP16;
-    case DataType::TYPE_FP32:
+    case inference::DataType::TYPE_FP32:
       return TRITONSERVER_TYPE_FP32;
-    case DataType::TYPE_FP64:
+    case inference::DataType::TYPE_FP64:
       return TRITONSERVER_TYPE_FP64;
-    case DataType::TYPE_STRING:
+    case inference::DataType::TYPE_STRING:
       return TRITONSERVER_TYPE_BYTES;
     default:
       break;
@@ -579,41 +579,41 @@ DataTypeToTriton(const DataType dtype)
   return TRITONSERVER_TYPE_INVALID;
 }
 
-DataType
+inference::DataType
 TritonToDataType(const TRITONSERVER_DataType dtype)
 {
   switch (dtype) {
     case TRITONSERVER_TYPE_BOOL:
-      return DataType::TYPE_BOOL;
+      return inference::DataType::TYPE_BOOL;
     case TRITONSERVER_TYPE_UINT8:
-      return DataType::TYPE_UINT8;
+      return inference::DataType::TYPE_UINT8;
     case TRITONSERVER_TYPE_UINT16:
-      return DataType::TYPE_UINT16;
+      return inference::DataType::TYPE_UINT16;
     case TRITONSERVER_TYPE_UINT32:
-      return DataType::TYPE_UINT32;
+      return inference::DataType::TYPE_UINT32;
     case TRITONSERVER_TYPE_UINT64:
-      return DataType::TYPE_UINT64;
+      return inference::DataType::TYPE_UINT64;
     case TRITONSERVER_TYPE_INT8:
-      return DataType::TYPE_INT8;
+      return inference::DataType::TYPE_INT8;
     case TRITONSERVER_TYPE_INT16:
-      return DataType::TYPE_INT16;
+      return inference::DataType::TYPE_INT16;
     case TRITONSERVER_TYPE_INT32:
-      return DataType::TYPE_INT32;
+      return inference::DataType::TYPE_INT32;
     case TRITONSERVER_TYPE_INT64:
-      return DataType::TYPE_INT64;
+      return inference::DataType::TYPE_INT64;
     case TRITONSERVER_TYPE_FP16:
-      return DataType::TYPE_FP16;
+      return inference::DataType::TYPE_FP16;
     case TRITONSERVER_TYPE_FP32:
-      return DataType::TYPE_FP32;
+      return inference::DataType::TYPE_FP32;
     case TRITONSERVER_TYPE_FP64:
-      return DataType::TYPE_FP64;
+      return inference::DataType::TYPE_FP64;
     case TRITONSERVER_TYPE_BYTES:
-      return DataType::TYPE_STRING;
+      return inference::DataType::TYPE_STRING;
     default:
       break;
   }
 
-  return DataType::TYPE_INVALID;
+  return inference::DataType::TYPE_INVALID;
 }
 
 }}  // namespace nvidia::inferenceserver

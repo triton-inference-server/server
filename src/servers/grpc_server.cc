@@ -292,7 +292,7 @@ class CommonHandler : public GRPCServer::HandlerBase {
       const std::string& name,
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      GRPCInferenceService::AsyncService* service,
+      inference::GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq);
 
   // Descriptive name of of the handler.
@@ -312,7 +312,7 @@ class CommonHandler : public GRPCServer::HandlerBase {
 
   std::shared_ptr<SharedMemoryManager> shm_manager_;
 
-  GRPCInferenceService::AsyncService* service_;
+  inference::GRPCInferenceService::AsyncService* service_;
   grpc::ServerCompletionQueue* cq_;
   std::unique_ptr<std::thread> thread_;
 };
@@ -321,7 +321,7 @@ CommonHandler::CommonHandler(
     const std::string& name,
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    GRPCInferenceService::AsyncService* service,
+    inference::GRPCInferenceService::AsyncService* service,
     grpc::ServerCompletionQueue* cq)
     : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
       service_(service), cq_(cq)
@@ -385,16 +385,16 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterServerLive =
       [this](
-          grpc::ServerContext* ctx, ServerLiveRequest* request,
-          grpc::ServerAsyncResponseWriter<ServerLiveResponse>* responder,
+          grpc::ServerContext* ctx, inference::ServerLiveRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::ServerLiveResponse>* responder,
           void* tag) {
         this->service_->RequestServerLive(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteServerLive = [this](
-                                 ServerLiveRequest& request,
-                                 ServerLiveResponse* response,
+                                 inference::ServerLiveRequest& request,
+                                 inference::ServerLiveResponse* response,
                                  grpc::Status* status) {
     bool live = false;
     TRITONSERVER_Error* err =
@@ -407,8 +407,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<ServerLiveResponse>, ServerLiveRequest,
-      ServerLiveResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ServerLiveResponse>, inference::ServerLiveRequest,
+      inference::ServerLiveResponse>(
       "ServerLive", 0, OnRegisterServerLive, OnExecuteServerLive);
 
   //
@@ -416,16 +416,16 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterServerReady =
       [this](
-          grpc::ServerContext* ctx, ServerReadyRequest* request,
-          grpc::ServerAsyncResponseWriter<ServerReadyResponse>* responder,
+          grpc::ServerContext* ctx, inference::ServerReadyRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>* responder,
           void* tag) {
         this->service_->RequestServerReady(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteServerReady = [this](
-                                  ServerReadyRequest& request,
-                                  ServerReadyResponse* response,
+                                  inference::ServerReadyRequest& request,
+                                  inference::ServerReadyResponse* response,
                                   grpc::Status* status) {
     bool ready = false;
     TRITONSERVER_Error* err =
@@ -438,8 +438,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<ServerReadyResponse>, ServerReadyRequest,
-      ServerReadyResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>, inference::ServerReadyRequest,
+      inference::ServerReadyResponse>(
       "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady);
 
   //
@@ -447,16 +447,16 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterModelReady =
       [this](
-          grpc::ServerContext* ctx, ModelReadyRequest* request,
-          grpc::ServerAsyncResponseWriter<ModelReadyResponse>* responder,
+          grpc::ServerContext* ctx, inference::ModelReadyRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>* responder,
           void* tag) {
         this->service_->RequestModelReady(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteModelReady = [this](
-                                 ModelReadyRequest& request,
-                                 ModelReadyResponse* response,
+                                 inference::ModelReadyRequest& request,
+                                 inference::ModelReadyResponse* response,
                                  grpc::Status* status) {
     bool is_ready = false;
     int64_t requested_model_version;
@@ -475,8 +475,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<ModelReadyResponse>, ModelReadyRequest,
-      ModelReadyResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>, inference::ModelReadyRequest,
+      inference::ModelReadyResponse>(
       "ModelReady", 0, OnRegisterModelReady, OnExecuteModelReady);
 
   //
@@ -484,16 +484,16 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterServerMetadata =
       [this](
-          grpc::ServerContext* ctx, ServerMetadataRequest* request,
-          grpc::ServerAsyncResponseWriter<ServerMetadataResponse>* responder,
+          grpc::ServerContext* ctx, inference::ServerMetadataRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>* responder,
           void* tag) {
         this->service_->RequestServerMetadata(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteServerMetadata = [this](
-                                     ServerMetadataRequest& request,
-                                     ServerMetadataResponse* response,
+                                     inference::ServerMetadataRequest& request,
+                                     inference::ServerMetadataResponse* response,
                                      grpc::Status* status) {
     TRITONSERVER_Message* server_metadata_message = nullptr;
     TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
@@ -548,8 +548,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<ServerMetadataResponse>,
-      ServerMetadataRequest, ServerMetadataResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>,
+      inference::ServerMetadataRequest, inference::ServerMetadataResponse>(
       "ServerMetadata", 0, OnRegisterServerMetadata, OnExecuteServerMetadata);
 
   //
@@ -557,16 +557,16 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterModelMetadata =
       [this](
-          grpc::ServerContext* ctx, ModelMetadataRequest* request,
-          grpc::ServerAsyncResponseWriter<ModelMetadataResponse>* responder,
+          grpc::ServerContext* ctx, inference::ModelMetadataRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::ModelMetadataResponse>* responder,
           void* tag) {
         this->service_->RequestModelMetadata(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteModelMetadata = [this](
-                                    ModelMetadataRequest& request,
-                                    ModelMetadataResponse* response,
+                                    inference::ModelMetadataRequest& request,
+                                    inference::ModelMetadataResponse* response,
                                     grpc::Status* status) {
     int64_t requested_model_version;
     auto err =
@@ -628,7 +628,7 @@ CommonHandler::SetUpAllRequests()
           err = inputs_json.IndexAsObject(idx, &io_json);
           GOTO_IF_ERR(err, earlyexit);
 
-          ModelMetadataResponse::TensorMetadata* io = response->add_inputs();
+          inference::ModelMetadataResponse::TensorMetadata* io = response->add_inputs();
 
           const char* name;
           size_t namelen;
@@ -669,7 +669,7 @@ CommonHandler::SetUpAllRequests()
           err = outputs_json.IndexAsObject(idx, &io_json);
           GOTO_IF_ERR(err, earlyexit);
 
-          ModelMetadataResponse::TensorMetadata* io = response->add_outputs();
+          inference::ModelMetadataResponse::TensorMetadata* io = response->add_outputs();
 
           const char* name;
           size_t namelen;
@@ -709,8 +709,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<ModelMetadataResponse>,
-      ModelMetadataRequest, ModelMetadataResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ModelMetadataResponse>,
+      inference::ModelMetadataRequest, inference::ModelMetadataResponse>(
       "ModelMetadata", 0, OnRegisterModelMetadata, OnExecuteModelMetadata);
 
   //
@@ -718,16 +718,16 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterModelConfig =
       [this](
-          grpc::ServerContext* ctx, ModelConfigRequest* request,
-          grpc::ServerAsyncResponseWriter<ModelConfigResponse>* responder,
+          grpc::ServerContext* ctx, inference::ModelConfigRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>* responder,
           void* tag) {
         this->service_->RequestModelConfig(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteModelConfig = [this](
-                                  ModelConfigRequest& request,
-                                  ModelConfigResponse* response,
+                                  inference::ModelConfigRequest& request,
+                                  inference::ModelConfigResponse* response,
                                   grpc::Status* status) {
     int64_t requested_model_version;
     auto err =
@@ -755,8 +755,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<ModelConfigResponse>, ModelConfigRequest,
-      ModelConfigResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>, inference::ModelConfigRequest,
+      inference::ModelConfigResponse>(
       "ModelConfig", 0, OnRegisterModelConfig, OnExecuteModelConfig);
 
   //
@@ -764,16 +764,16 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterModelStatistics =
       [this](
-          grpc::ServerContext* ctx, ModelStatisticsRequest* request,
-          grpc::ServerAsyncResponseWriter<ModelStatisticsResponse>* responder,
+          grpc::ServerContext* ctx, inference::ModelStatisticsRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>* responder,
           void* tag) {
         this->service_->RequestModelStatistics(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteModelStatistics = [this](
-                                      ModelStatisticsRequest& request,
-                                      ModelStatisticsResponse* response,
+                                      inference::ModelStatisticsRequest& request,
+                                      inference::ModelStatisticsResponse* response,
                                       grpc::Status* status) {
 #ifdef TRITON_ENABLE_STATS
     TritonJson::Value model_stats_json;
@@ -1016,8 +1016,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<ModelStatisticsResponse>,
-      ModelStatisticsRequest, ModelStatisticsResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>,
+      inference::ModelStatisticsRequest, inference::ModelStatisticsResponse>(
       "ModelStatistics", 0, OnRegisterModelStatistics,
       OnExecuteModelStatistics);
 
@@ -1027,8 +1027,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterSystemSharedMemoryStatus =
       [this](
-          grpc::ServerContext* ctx, SystemSharedMemoryStatusRequest* request,
-          grpc::ServerAsyncResponseWriter<SystemSharedMemoryStatusResponse>*
+          grpc::ServerContext* ctx, inference::SystemSharedMemoryStatusRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryStatusResponse>*
               responder,
           void* tag) {
         this->service_->RequestSystemSharedMemoryStatus(
@@ -1037,8 +1037,8 @@ CommonHandler::SetUpAllRequests()
 
   auto OnExecuteSystemSharedMemoryStatus =
       [this](
-          SystemSharedMemoryStatusRequest& request,
-          SystemSharedMemoryStatusResponse* response, grpc::Status* status) {
+          inference::SystemSharedMemoryStatusRequest& request,
+          inference::SystemSharedMemoryStatusResponse* response, grpc::Status* status) {
         TritonJson::Value shm_status_json(TritonJson::ValueType::ARRAY);
         TRITONSERVER_Error* err = shm_manager_->GetStatus(
             request.name(), TRITONSERVER_MEMORY_CPU, &shm_status_json);
@@ -1067,7 +1067,7 @@ CommonHandler::SetUpAllRequests()
           err = shm_region_json.MemberAsUInt("byte_size", &byte_size);
           GOTO_IF_ERR(err, earlyexit);
 
-          SystemSharedMemoryStatusResponse::RegionStatus region_status;
+          inference::SystemSharedMemoryStatusResponse::RegionStatus region_status;
           region_status.set_name(std::string(name, namelen));
           region_status.set_key(std::string(key, keylen));
           region_status.set_offset(offset);
@@ -1082,8 +1082,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<SystemSharedMemoryStatusResponse>,
-      SystemSharedMemoryStatusRequest, SystemSharedMemoryStatusResponse>(
+      grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryStatusResponse>,
+      inference::SystemSharedMemoryStatusRequest, inference::SystemSharedMemoryStatusResponse>(
       "SystemSharedMemoryStatus", 0, OnRegisterSystemSharedMemoryStatus,
       OnExecuteSystemSharedMemoryStatus);
 
@@ -1093,8 +1093,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterSystemSharedMemoryRegister =
       [this](
-          grpc::ServerContext* ctx, SystemSharedMemoryRegisterRequest* request,
-          grpc::ServerAsyncResponseWriter<SystemSharedMemoryRegisterResponse>*
+          grpc::ServerContext* ctx, inference::SystemSharedMemoryRegisterRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryRegisterResponse>*
               responder,
           void* tag) {
         this->service_->RequestSystemSharedMemoryRegister(
@@ -1103,8 +1103,8 @@ CommonHandler::SetUpAllRequests()
 
   auto OnExecuteSystemSharedMemoryRegister =
       [this](
-          SystemSharedMemoryRegisterRequest& request,
-          SystemSharedMemoryRegisterResponse* response, grpc::Status* status) {
+          inference::SystemSharedMemoryRegisterRequest& request,
+          inference::SystemSharedMemoryRegisterResponse* response, grpc::Status* status) {
         TRITONSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
             request.name(), request.key(), request.offset(),
             request.byte_size());
@@ -1114,8 +1114,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<SystemSharedMemoryRegisterResponse>,
-      SystemSharedMemoryRegisterRequest, SystemSharedMemoryRegisterResponse>(
+      grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryRegisterResponse>,
+      inference::SystemSharedMemoryRegisterRequest, inference::SystemSharedMemoryRegisterResponse>(
       "SystemSharedMemoryRegister", 0, OnRegisterSystemSharedMemoryRegister,
       OnExecuteSystemSharedMemoryRegister);
 
@@ -1126,8 +1126,8 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterSystemSharedMemoryUnregister =
       [this](
           grpc::ServerContext* ctx,
-          SystemSharedMemoryUnregisterRequest* request,
-          grpc::ServerAsyncResponseWriter<SystemSharedMemoryUnregisterResponse>*
+          inference::SystemSharedMemoryUnregisterRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryUnregisterResponse>*
               responder,
           void* tag) {
         this->service_->RequestSystemSharedMemoryUnregister(
@@ -1136,8 +1136,8 @@ CommonHandler::SetUpAllRequests()
 
   auto OnExecuteSystemSharedMemoryUnregister =
       [this](
-          SystemSharedMemoryUnregisterRequest& request,
-          SystemSharedMemoryUnregisterResponse* response,
+          inference::SystemSharedMemoryUnregisterRequest& request,
+          inference::SystemSharedMemoryUnregisterResponse* response,
           grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.name().empty()) {
@@ -1152,9 +1152,9 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<SystemSharedMemoryUnregisterResponse>,
-      SystemSharedMemoryUnregisterRequest,
-      SystemSharedMemoryUnregisterResponse>(
+      grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryUnregisterResponse>,
+      inference::SystemSharedMemoryUnregisterRequest,
+      inference::SystemSharedMemoryUnregisterResponse>(
       "SystemSharedMemoryUnregister", 0, OnRegisterSystemSharedMemoryUnregister,
       OnExecuteSystemSharedMemoryUnregister);
 
@@ -1164,8 +1164,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterCudaSharedMemoryStatus =
       [this](
-          grpc::ServerContext* ctx, CudaSharedMemoryStatusRequest* request,
-          grpc::ServerAsyncResponseWriter<CudaSharedMemoryStatusResponse>*
+          grpc::ServerContext* ctx, inference::CudaSharedMemoryStatusRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryStatusResponse>*
               responder,
           void* tag) {
         this->service_->RequestCudaSharedMemoryStatus(
@@ -1173,8 +1173,8 @@ CommonHandler::SetUpAllRequests()
       };
   auto OnExecuteCudaSharedMemoryStatus =
       [this](
-          CudaSharedMemoryStatusRequest& request,
-          CudaSharedMemoryStatusResponse* response, grpc::Status* status) {
+          inference::CudaSharedMemoryStatusRequest& request,
+          inference::CudaSharedMemoryStatusResponse* response, grpc::Status* status) {
         TritonJson::Value shm_status_json(TritonJson::ValueType::ARRAY);
         TRITONSERVER_Error* err = shm_manager_->GetStatus(
             request.name(), TRITONSERVER_MEMORY_GPU, &shm_status_json);
@@ -1199,7 +1199,7 @@ CommonHandler::SetUpAllRequests()
           GOTO_IF_ERR(err, earlyexit);
 
 
-          CudaSharedMemoryStatusResponse::RegionStatus region_status;
+          inference::CudaSharedMemoryStatusResponse::RegionStatus region_status;
           region_status.set_name(std::string(name, namelen));
           region_status.set_device_id(device_id);
           region_status.set_byte_size(byte_size);
@@ -1211,8 +1211,8 @@ CommonHandler::SetUpAllRequests()
         TRITONSERVER_ErrorDelete(err);
       };
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<CudaSharedMemoryStatusResponse>,
-      CudaSharedMemoryStatusRequest, CudaSharedMemoryStatusResponse>(
+      grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryStatusResponse>,
+      inference::CudaSharedMemoryStatusRequest, inference::CudaSharedMemoryStatusResponse>(
       "CudaSharedMemoryStatus", 0, OnRegisterCudaSharedMemoryStatus,
       OnExecuteCudaSharedMemoryStatus);
 
@@ -1222,8 +1222,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterCudaSharedMemoryRegister =
       [this](
-          grpc::ServerContext* ctx, CudaSharedMemoryRegisterRequest* request,
-          grpc::ServerAsyncResponseWriter<CudaSharedMemoryRegisterResponse>*
+          grpc::ServerContext* ctx, inference::CudaSharedMemoryRegisterRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryRegisterResponse>*
               responder,
           void* tag) {
         this->service_->RequestCudaSharedMemoryRegister(
@@ -1232,8 +1232,8 @@ CommonHandler::SetUpAllRequests()
 
   auto OnExecuteCudaSharedMemoryRegister =
       [this](
-          CudaSharedMemoryRegisterRequest& request,
-          CudaSharedMemoryRegisterResponse* response, grpc::Status* status) {
+          inference::CudaSharedMemoryRegisterRequest& request,
+          inference::CudaSharedMemoryRegisterResponse* response, grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
 #ifdef TRITON_ENABLE_GPU
         err = shm_manager_->RegisterCUDASharedMemory(
@@ -1255,8 +1255,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<CudaSharedMemoryRegisterResponse>,
-      CudaSharedMemoryRegisterRequest, CudaSharedMemoryRegisterResponse>(
+      grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryRegisterResponse>,
+      inference::CudaSharedMemoryRegisterRequest, inference::CudaSharedMemoryRegisterResponse>(
       "CudaSharedMemoryRegister", 0, OnRegisterCudaSharedMemoryRegister,
       OnExecuteCudaSharedMemoryRegister);
 
@@ -1265,8 +1265,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterCudaSharedMemoryUnregister =
       [this](
-          grpc::ServerContext* ctx, CudaSharedMemoryUnregisterRequest* request,
-          grpc::ServerAsyncResponseWriter<CudaSharedMemoryUnregisterResponse>*
+          grpc::ServerContext* ctx, inference::CudaSharedMemoryUnregisterRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryUnregisterResponse>*
               responder,
           void* tag) {
         this->service_->RequestCudaSharedMemoryUnregister(
@@ -1275,8 +1275,8 @@ CommonHandler::SetUpAllRequests()
 
   auto OnExecuteCudaSharedMemoryUnregister =
       [this](
-          CudaSharedMemoryUnregisterRequest& request,
-          CudaSharedMemoryUnregisterResponse* response, grpc::Status* status) {
+          inference::CudaSharedMemoryUnregisterRequest& request,
+          inference::CudaSharedMemoryUnregisterResponse* response, grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.name().empty()) {
           err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
@@ -1290,8 +1290,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<CudaSharedMemoryUnregisterResponse>,
-      CudaSharedMemoryUnregisterRequest, CudaSharedMemoryUnregisterResponse>(
+      grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryUnregisterResponse>,
+      inference::CudaSharedMemoryUnregisterRequest, inference::CudaSharedMemoryUnregisterResponse>(
       "CudaSharedMemoryUnregister", 0, OnRegisterCudaSharedMemoryUnregister,
       OnExecuteCudaSharedMemoryUnregister);
 
@@ -1300,16 +1300,16 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterRepositoryIndex =
       [this](
-          grpc::ServerContext* ctx, RepositoryIndexRequest* request,
-          grpc::ServerAsyncResponseWriter<RepositoryIndexResponse>* responder,
+          grpc::ServerContext* ctx, inference::RepositoryIndexRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>* responder,
           void* tag) {
         this->service_->RequestRepositoryIndex(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteRepositoryIndex = [this](
-                                      RepositoryIndexRequest& request,
-                                      RepositoryIndexResponse* response,
+                                      inference::RepositoryIndexRequest& request,
+                                      inference::RepositoryIndexResponse* response,
                                       grpc::Status* status) {
     TRITONSERVER_Error* err = nullptr;
     if (request.repository_name().empty()) {
@@ -1385,8 +1385,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<RepositoryIndexResponse>,
-      RepositoryIndexRequest, RepositoryIndexResponse>(
+      grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>,
+      inference::RepositoryIndexRequest, inference::RepositoryIndexResponse>(
       "RepositoryIndex", 0, OnRegisterRepositoryIndex,
       OnExecuteRepositoryIndex);
 
@@ -1395,8 +1395,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterRepositoryModelLoad =
       [this](
-          grpc::ServerContext* ctx, RepositoryModelLoadRequest* request,
-          grpc::ServerAsyncResponseWriter<RepositoryModelLoadResponse>*
+          grpc::ServerContext* ctx, inference::RepositoryModelLoadRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::RepositoryModelLoadResponse>*
               responder,
           void* tag) {
         this->service_->RequestRepositoryModelLoad(
@@ -1404,8 +1404,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   auto OnExecuteRepositoryModelLoad = [this](
-                                          RepositoryModelLoadRequest& request,
-                                          RepositoryModelLoadResponse* response,
+                                          inference::RepositoryModelLoadRequest& request,
+                                          inference::RepositoryModelLoadResponse* response,
                                           grpc::Status* status) {
     TRITONSERVER_Error* err = nullptr;
     if (request.repository_name().empty()) {
@@ -1422,8 +1422,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<RepositoryModelLoadResponse>,
-      RepositoryModelLoadRequest, RepositoryModelLoadResponse>(
+      grpc::ServerAsyncResponseWriter<inference::RepositoryModelLoadResponse>,
+      inference::RepositoryModelLoadRequest, inference::RepositoryModelLoadResponse>(
       "RepositoryModelLoad", 0, OnRegisterRepositoryModelLoad,
       OnExecuteRepositoryModelLoad);
 
@@ -1432,8 +1432,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterRepositoryModelUnload =
       [this](
-          grpc::ServerContext* ctx, RepositoryModelUnloadRequest* request,
-          grpc::ServerAsyncResponseWriter<RepositoryModelUnloadResponse>*
+          grpc::ServerContext* ctx, inference::RepositoryModelUnloadRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::RepositoryModelUnloadResponse>*
               responder,
           void* tag) {
         this->service_->RequestRepositoryModelUnload(
@@ -1442,8 +1442,8 @@ CommonHandler::SetUpAllRequests()
 
   auto OnExecuteRepositoryModelUnload =
       [this](
-          RepositoryModelUnloadRequest& request,
-          RepositoryModelUnloadResponse* response, grpc::Status* status) {
+          inference::RepositoryModelUnloadRequest& request,
+          inference::RepositoryModelUnloadResponse* response, grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
           err = TRITONSERVER_ServerUnloadModel(
@@ -1459,8 +1459,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<RepositoryModelUnloadResponse>,
-      RepositoryModelUnloadRequest, RepositoryModelUnloadResponse>(
+      grpc::ServerAsyncResponseWriter<inference::RepositoryModelUnloadResponse>,
+      inference::RepositoryModelUnloadRequest, inference::RepositoryModelUnloadResponse>(
       "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
       OnExecuteRepositoryModelUnload);
 }
@@ -2058,7 +2058,7 @@ TRITONSERVER_Error*
 ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
-    int64_t preferred_memory_type_id, ModelInferResponse* response,
+    int64_t preferred_memory_type_id, inference::ModelInferResponse* response,
     const ShmMapType& shm_map, void** buffer, void** buffer_userp,
     TRITONSERVER_MemoryType* actual_memory_type, int64_t* actual_memory_type_id)
 {
@@ -2069,7 +2069,7 @@ ResponseAllocatorHelper(
 
   // We add an output contents even if the 'byte_size' == 0 because we
   // expect to have a contents for every output.
-  ModelInferResponse::InferOutputTensor* output_tensor =
+  inference::ModelInferResponse::InferOutputTensor* output_tensor =
       response->add_outputs();
   output_tensor->set_name(tensor_name);
   std::string* raw_output = response->add_raw_output_contents();
@@ -2132,15 +2132,15 @@ InferResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  AllocPayload<ModelInferResponse>* payload =
-      reinterpret_cast<AllocPayload<ModelInferResponse>*>(userp);
+  AllocPayload<inference::ModelInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
 
   // ModelInfer RPC expects exactly one response per request. Hence,
   // will be creating and using just one response object.
-  ModelInferResponse* response =
+  inference::ModelInferResponse* response =
       payload->response_queue_->GetNonDecoupledResponse();
   return ResponseAllocatorHelper<
-      AllocPayload<ModelInferResponse>::TensorShmMap>(
+      AllocPayload<inference::ModelInferResponse>::TensorShmMap>(
       allocator, tensor_name, byte_size, preferred_memory_type,
       preferred_memory_type_id, response, payload->shm_map_, buffer,
       buffer_userp, actual_memory_type, actual_memory_type_id);
@@ -2173,7 +2173,7 @@ ParseSharedMemoryParams(
     *has_shared_memory = true;
     const auto& infer_param = region_it->second;
     if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kStringParam) {
+        inference::InferParameter::ParameterChoiceCase::kStringParam) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
@@ -2198,7 +2198,7 @@ ParseSharedMemoryParams(
     }
     const auto& infer_param = offset_it->second;
     if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
+        inference::InferParameter::ParameterChoiceCase::kInt64Param) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
@@ -2223,7 +2223,7 @@ ParseSharedMemoryParams(
     }
     const auto& infer_param = bs_it->second;
     if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
+        inference::InferParameter::ParameterChoiceCase::kInt64Param) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
@@ -2252,7 +2252,7 @@ ParseSharedMemoryParams(
 
 TRITONSERVER_Error*
 ParseClassificationParams(
-    const ModelInferRequest::InferRequestedOutputTensor& output,
+    const inference::ModelInferRequest::InferRequestedOutputTensor& output,
     bool* has_classification, uint32_t* classification_count)
 {
   *has_classification = false;
@@ -2263,7 +2263,7 @@ ParseClassificationParams(
 
     const auto& param = class_it->second;
     if (param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
+        inference::InferParameter::ParameterChoiceCase::kInt64Param) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "invalid value type for 'classification' parameter, expected "
@@ -2288,7 +2288,7 @@ TRITONSERVER_Error*
 InferAllocatorPayload(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const ModelInferRequest& request, std::list<std::string>&& serialized_data,
+    const inference::ModelInferRequest& request, std::list<std::string>&& serialized_data,
     std::shared_ptr<ResponseQueue<ResponseType>> response_queue,
     AllocPayload<ResponseType>* alloc_payload)
 {
@@ -2307,7 +2307,7 @@ InferAllocatorPayload(
     size_t byte_size;
     bool has_shared_memory;
     RETURN_IF_ERR(
-        ParseSharedMemoryParams<ModelInferRequest::InferRequestedOutputTensor>(
+        ParseSharedMemoryParams<inference::ModelInferRequest::InferRequestedOutputTensor>(
             io, &has_shared_memory, &region_name, &offset, &byte_size));
 
     bool has_classification;
@@ -2375,7 +2375,7 @@ TRITONSERVER_Error*
 InferGRPCToInput(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const ModelInferRequest& request, std::list<std::string>* serialized_data,
+    const inference::ModelInferRequest& request, std::list<std::string>* serialized_data,
     TRITONSERVER_InferenceRequest* inference_request)
 {
   // Verify that the batch-byte-size of each input matches the size of
@@ -2390,7 +2390,7 @@ InferGRPCToInput(
     std::string region_name;
     int64_t offset;
     bool has_shared_memory;
-    RETURN_IF_ERR(ParseSharedMemoryParams<ModelInferRequest::InferInputTensor>(
+    RETURN_IF_ERR(ParseSharedMemoryParams<inference::ModelInferRequest::InferInputTensor>(
         io, &has_shared_memory, &region_name, &offset, &byte_size));
 
     if (has_shared_memory) {
@@ -2598,7 +2598,7 @@ InferGRPCToInput(
 TRITONSERVER_Error*
 SetInferenceRequestMetadata(
     TRITONSERVER_InferenceRequest* inference_request,
-    const ModelInferRequest& request)
+    const inference::ModelInferRequest& request)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(
       inference_request, request.id().c_str()));
@@ -2608,7 +2608,7 @@ SetInferenceRequestMetadata(
     if (param.first.compare("sequence_id") == 0) {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kInt64Param) {
+          inference::InferParameter::ParameterChoiceCase::kInt64Param) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             "invalid value type for 'sequence_id' parameter, expected "
@@ -2619,7 +2619,7 @@ SetInferenceRequestMetadata(
     } else if (param.first.compare("sequence_start") == 0) {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kBoolParam) {
+          inference::InferParameter::ParameterChoiceCase::kBoolParam) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             "invalid value type for 'sequence_start' parameter, expected "
@@ -2631,7 +2631,7 @@ SetInferenceRequestMetadata(
     } else if (param.first.compare("sequence_end") == 0) {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kBoolParam) {
+          inference::InferParameter::ParameterChoiceCase::kBoolParam) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             "invalid value type for 'sequence_end' parameter, expected "
@@ -2643,7 +2643,7 @@ SetInferenceRequestMetadata(
     } else if (param.first.compare("priority") == 0) {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kInt64Param) {
+          inference::InferParameter::ParameterChoiceCase::kInt64Param) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             "invalid value type for 'priority' parameter, expected "
@@ -2655,7 +2655,7 @@ SetInferenceRequestMetadata(
     } else if (param.first.compare("timeout") == 0) {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kInt64Param) {
+          inference::InferParameter::ParameterChoiceCase::kInt64Param) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             "invalid value type for 'timeout' parameter, expected "
@@ -2701,7 +2701,7 @@ template <typename ResponseType>
 TRITONSERVER_Error*
 InferResponseCompleteCommon(
     TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* iresponse,
-    ModelInferResponse& response,
+    inference::ModelInferResponse& response,
     const AllocPayload<ResponseType>& alloc_payload)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(iresponse));
@@ -2726,7 +2726,7 @@ InferResponseCompleteCommon(
     const void* vvalue;
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseParameter(
         iresponse, pidx, &name, &type, &vvalue));
-    InferParameter& param = (*response.mutable_parameters())[name];
+    inference::InferParameter& param = (*response.mutable_parameters())[name];
     switch (type) {
       case TRITONSERVER_PARAMETER_BOOL:
         param.set_bool_param(*(reinterpret_cast<const bool*>(vvalue)));
@@ -2770,7 +2770,7 @@ InferResponseCompleteCommon(
     // There are usually very few outputs so fastest just to look for
     // the one we want... could create a map for cases where there are
     // a large number of outputs. Or rely on order to be same...
-    ModelInferResponse::InferOutputTensor* output = nullptr;
+    inference::ModelInferResponse::InferOutputTensor* output = nullptr;
     for (auto& io : *(response.mutable_outputs())) {
       if (io.name() == name) {
         output = &io;
@@ -2882,16 +2882,16 @@ InferResponseCompleteCommon(
 //
 class ModelInferHandler
     : public InferHandler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<ModelInferResponse>,
-          ModelInferRequest, ModelInferResponse> {
+          inference::GRPCInferenceService::AsyncService,
+          grpc::ServerAsyncResponseWriter<inference::ModelInferResponse>,
+          inference::ModelInferRequest, inference::ModelInferResponse> {
  public:
   ModelInferHandler(
       const std::string& name,
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      GRPCInferenceService::AsyncService* service,
+      inference::GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
       : InferHandler(name, tritonserver, service, cq, max_state_bucket_count),
         trace_manager_(trace_manager), shm_manager_(shm_manager)
@@ -2977,7 +2977,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     finished = true;
   }
 
-  const ModelInferRequest& request = state->request_;
+  const inference::ModelInferRequest& request = state->request_;
   auto response_queue = state->response_queue_;
 
   if (state->step_ == Steps::START) {
@@ -3035,7 +3035,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           tritonserver_, shm_manager_, request, &serialized_data, irequest);
     }
     if (err == nullptr) {
-      err = InferAllocatorPayload<ModelInferResponse>(
+      err = InferAllocatorPayload<inference::ModelInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
           response_queue, &state->alloc_payload_);
     }
@@ -3073,7 +3073,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       GrpcStatusUtil::Create(&status, err);
       TRITONSERVER_ErrorDelete(err);
 
-      ModelInferResponse error_response;
+      inference::ModelInferResponse error_response;
 
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
@@ -3123,7 +3123,7 @@ ModelInferHandler::InferResponseComplete(
   // This callback is expected to be called exactly once for each request.
   // Will use the single response object in the response list to hold the
   // information.
-  ModelInferResponse* response = state->response_queue_->GetResponseAt(0);
+  inference::ModelInferResponse* response = state->response_queue_->GetResponseAt(0);
   bool response_created = false;
   if (response == nullptr) {
     LOG_ERROR << "expected allocator to have created a response object";
@@ -3131,7 +3131,7 @@ ModelInferHandler::InferResponseComplete(
         TRITONSERVER_ERROR_INTERNAL,
         "No response object found in the callback");
     response_created = true;
-    response = new ModelInferResponse();
+    response = new inference::ModelInferResponse();
   }
 
   if (state->cb_count_ != 1) {
@@ -3144,7 +3144,7 @@ ModelInferHandler::InferResponseComplete(
     err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
   } else {
-    err = InferResponseCompleteCommon<ModelInferResponse>(
+    err = InferResponseCompleteCommon<inference::ModelInferResponse>(
         state->tritonserver_, iresponse, *response, state->alloc_payload_);
   }
 
@@ -3180,8 +3180,8 @@ ModelInferHandler::InferResponseComplete(
 TRITONSERVER_Error*
 StreamInferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
 {
-  AllocPayload<ModelStreamInferResponse>* payload =
-      reinterpret_cast<AllocPayload<ModelStreamInferResponse>*>(userp);
+  AllocPayload<inference::ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(userp);
 
   // Move to the next response object
   payload->response_queue_->AllocateResponse();
@@ -3197,8 +3197,8 @@ StreamInferResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  AllocPayload<ModelStreamInferResponse>* payload =
-      reinterpret_cast<AllocPayload<ModelStreamInferResponse>*>(userp);
+  AllocPayload<inference::ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(userp);
 
   auto response = payload->response_queue_->GetLastAllocatedResponse();
 
@@ -3209,7 +3209,7 @@ StreamInferResponseAlloc(
   }
 
   return ResponseAllocatorHelper<
-      AllocPayload<ModelStreamInferResponse>::TensorShmMap>(
+      AllocPayload<inference::ModelStreamInferResponse>::TensorShmMap>(
       allocator, tensor_name, byte_size, preferred_memory_type,
       preferred_memory_type_id, response->mutable_infer_response(),
       payload->shm_map_, buffer, buffer_userp, actual_memory_type,
@@ -3221,17 +3221,17 @@ StreamInferResponseAlloc(
 //
 class ModelStreamInferHandler
     : public InferHandler<
-          GRPCInferenceService::AsyncService,
+          inference::GRPCInferenceService::AsyncService,
           grpc::ServerAsyncReaderWriter<
-              ModelStreamInferResponse, ModelInferRequest>,
-          ModelInferRequest, ModelStreamInferResponse> {
+              inference::ModelStreamInferResponse, inference::ModelInferRequest>,
+          inference::ModelInferRequest, inference::ModelStreamInferResponse> {
  public:
   ModelStreamInferHandler(
       const std::string& name,
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      GRPCInferenceService::AsyncService* service,
+      inference::GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
       : InferHandler(name, tritonserver, service, cq, max_state_bucket_count),
         trace_manager_(trace_manager), shm_manager_(shm_manager)
@@ -3328,7 +3328,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
   } else if (state->step_ == Steps::READ) {
     TRITONSERVER_Error* err = nullptr;
-    const ModelInferRequest& request = state->request_;
+    const inference::ModelInferRequest& request = state->request_;
 #ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
@@ -3413,7 +3413,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           tritonserver_, shm_manager_, request, &serialized_data, irequest);
     }
     if (err == nullptr) {
-      err = InferAllocatorPayload<ModelStreamInferResponse>(
+      err = InferAllocatorPayload<inference::ModelStreamInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
           response_queue_, &state->alloc_payload_);
     }
@@ -3443,7 +3443,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // WRITEREADY or WRITTEN. If there was an error then enqueue the
     // error response and show it to be ready for writing.
     if (err != nullptr) {
-      ModelStreamInferResponse* response;
+      inference::ModelStreamInferResponse* response;
       if (state->is_decoupled_) {
         state->response_queue_->AllocateResponse();
         response = state->response_queue_->GetLastAllocatedResponse();
@@ -3699,9 +3699,9 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 
     TRITONSERVER_Error* err = nullptr;
     if (iresponse != nullptr) {
-      ModelInferResponse& infer_response =
+      inference::ModelInferResponse& infer_response =
           *(response->mutable_infer_response());
-      err = InferResponseCompleteCommon<ModelStreamInferResponse>(
+      err = InferResponseCompleteCommon<inference::ModelStreamInferResponse>(
           state->tritonserver_, iresponse, infer_response,
           state->alloc_payload_);
     }

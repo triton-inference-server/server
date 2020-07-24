@@ -118,7 +118,7 @@ OnnxBackend::CreateExecutionContextsHelper(
   // Create a session for each instance.
   for (const auto& group : Config().instance_group()) {
     for (int c = 0; c < group.count(); c++) {
-      if (group.kind() == ModelInstanceGroup::KIND_CPU) {
+      if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
@@ -325,19 +325,19 @@ OnnxBackend::CreateExecutionContext(
     bool have_start, have_end, have_ready, have_corrid;
     RETURN_IF_ERROR(context->ValidateBooleanSequenceControl(
         Config().name(), Config().sequence_batching(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &have_start));
     RETURN_IF_ERROR(context->ValidateBooleanSequenceControl(
         Config().name(), Config().sequence_batching(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &have_end));
     RETURN_IF_ERROR(context->ValidateBooleanSequenceControl(
         Config().name(), Config().sequence_batching(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &have_ready));
     RETURN_IF_ERROR(context->ValidateTypedSequenceControl(
         Config().name(), Config().sequence_batching(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
         false /* required */, &have_corrid));
     if (have_start) {
       expected_input_cnt += 1;
@@ -362,12 +362,12 @@ OnnxBackend::CreateExecutionContext(
 
 Status
 OnnxBackend::Context::ValidateBooleanSequenceControl(
-    const std::string& model_name, const ModelSequenceBatching& batcher,
-    const ModelSequenceBatching::Control::Kind control_kind, bool required,
+    const std::string& model_name, const inference::ModelSequenceBatching& batcher,
+    const inference::ModelSequenceBatching::Control::Kind control_kind, bool required,
     bool* have_control)
 {
   std::string tensor_name;
-  DataType tensor_datatype;
+  inference::DataType tensor_datatype;
   RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
       batcher, model_name, control_kind, required, &tensor_name,
       &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
@@ -405,7 +405,7 @@ OnnxBackend::Context::ValidateBooleanSequenceControl(
               tensor_name + "', the model expects data-type " +
               OnnxDataTypeName(iit->second.type_) +
               " but the model configuration specifies data-type " +
-              DataType_Name(tensor_datatype));
+              inference::DataType_Name(tensor_datatype));
     }
   }
 
@@ -414,12 +414,12 @@ OnnxBackend::Context::ValidateBooleanSequenceControl(
 
 Status
 OnnxBackend::Context::ValidateTypedSequenceControl(
-    const std::string& model_name, const ModelSequenceBatching& batcher,
-    const ModelSequenceBatching::Control::Kind control_kind, bool required,
+    const std::string& model_name, const inference::ModelSequenceBatching& batcher,
+    const inference::ModelSequenceBatching::Control::Kind control_kind, bool required,
     bool* have_control)
 {
   std::string tensor_name;
-  DataType tensor_datatype;
+  inference::DataType tensor_datatype;
   RETURN_IF_ERROR(GetTypedSequenceControlProperties(
       batcher, model_name, control_kind, required, &tensor_name,
       &tensor_datatype));
@@ -457,7 +457,7 @@ OnnxBackend::Context::ValidateTypedSequenceControl(
               tensor_name + "', the model expects data-type " +
               OnnxDataTypeName(iit->second.type_) +
               " but the model configuration specifies data-type " +
-              DataType_Name(tensor_datatype));
+              inference::DataType_Name(tensor_datatype));
     }
   }
 
@@ -467,7 +467,7 @@ OnnxBackend::Context::ValidateTypedSequenceControl(
 Status
 OnnxBackend::Context::ValidateInputs(
     const std::string& model_name,
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+    const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios,
     const size_t expected_input_cnt)
 {
   std::set<std::string> input_tensor_names;
@@ -494,15 +494,15 @@ OnnxBackend::Context::ValidateInputs(
     if (onnx_data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
       return Status(
           Status::Code::INTERNAL,
-          "unsupported datatype " + DataType_Name(io.data_type()) +
+          "unsupported datatype " + inference::DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + model_name + "'");
     } else if (onnx_data_type != iit->second.type_) {
       return Status(
           Status::Code::INVALID_ARG,
           "unable to load model '" + model_name + ", unexpected datatype " +
-              DataType_Name(ConvertFromOnnxDataType(iit->second.type_)) +
+              inference::DataType_Name(ConvertFromOnnxDataType(iit->second.type_)) +
               " for input '" + io.name() + "', expecting " +
-              DataType_Name(io.data_type()));
+              inference::DataType_Name(io.data_type()));
     }
 
     // If a reshape is provided for the input then use that when
@@ -520,7 +520,7 @@ OnnxBackend::Context::ValidateInputs(
 Status
 OnnxBackend::Context::ValidateOutputs(
     const std::string& model_name,
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios)
 {
   std::set<std::string> output_tensor_names;
   RETURN_IF_ERROR(OutputNames(session_, output_tensor_names));
@@ -538,15 +538,15 @@ OnnxBackend::Context::ValidateOutputs(
     if (onnx_data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
       return Status(
           Status::Code::INTERNAL,
-          "unsupported datatype " + DataType_Name(io.data_type()) +
+          "unsupported datatype " + inference::DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + model_name + "'");
     } else if (onnx_data_type != iit->second.type_) {
       return Status(
           Status::Code::INVALID_ARG,
           "unable to load model '" + model_name + ", unexpected datatype " +
-              DataType_Name(ConvertFromOnnxDataType(iit->second.type_)) +
+              inference::DataType_Name(ConvertFromOnnxDataType(iit->second.type_)) +
               " for output '" + io.name() + "', expecting " +
-              DataType_Name(io.data_type()));
+              inference::DataType_Name(io.data_type()));
     }
 
     // If a reshape is provided for the input then use that when
@@ -763,11 +763,11 @@ OnnxBackend::Context::SetInputTensors(
     batchn_shape.insert(
         batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
 
-    const DataType datatype = repr_input->DType();
+    const inference::DataType datatype = repr_input->DType();
 
     // [TODO] currently ONNX Runtime only recognize input data on CPU
     // https://github.com/microsoft/onnxruntime/issues/1621
-    if (datatype != TYPE_STRING) {
+    if (datatype != inference::DataType::TYPE_STRING) {
       input_buffers->emplace_back(new AllocatedMemory(
           GetByteSize(datatype, batchn_shape), TRITONSERVER_MEMORY_CPU_PINNED,
           0));
@@ -1093,7 +1093,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
       }
       InferenceResponse::Output* response_output = nullptr;
       response->AddOutput(
-          name, DataType::TYPE_STRING, *batchn_shape, &response_output);
+          name, inference::DataType::TYPE_STRING, *batchn_shape, &response_output);
       // Calculate expected byte size in advance using string offsets
       const size_t data_byte_size =
           offsets[element_idx + expected_element_cnt] - offsets[element_idx];

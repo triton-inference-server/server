@@ -86,27 +86,27 @@ class PlanBackend : public InferenceBackend {
     struct TensorRTContext;
 
     Status ValidateInputs(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios,
         const std::set<std::string>& allowed_shape_tensors);
     Status ValidateOutputs(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios,
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios,
         const std::set<std::string>& allowed_shape_tensors);
 
     Status InitializeExecuteInputBinding(
-        const std::string& input_name, const DataType input_datatype,
+        const std::string& input_name, const inference::DataType input_datatype,
         const DimsList& input_dims, const bool is_control = false);
     Status InitializeShapeInputBinding(
-        const std::string& input_name, const DataType input_datatype,
+        const std::string& input_name, const inference::DataType input_datatype,
         const DimsList& input_dims);
-    Status InitializeSequenceControlInputBindings(const ModelConfig& config);
+    Status InitializeSequenceControlInputBindings(const inference::ModelConfig& config);
     Status InitializeConfigExecuteInputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status InitializeConfigShapeInputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status InitializeConfigExecuteOutputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios);
     Status InitializeConfigShapeOutputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios);
     bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
 
     Status InitOptimizationProfiles(

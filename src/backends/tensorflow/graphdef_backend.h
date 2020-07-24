@@ -50,10 +50,10 @@ class GraphDefBackend : public BaseBackend {
   DISALLOW_COPY_AND_ASSIGN(GraphDefBackend);
 
   Status ValidateBooleanSequenceControl(
-      const ModelSequenceBatching::Control::Kind control_kind,
+      const inference::ModelSequenceBatching::Control::Kind control_kind,
       const TRTISTF_IOList* inputs, bool required);
   Status ValidateTypedSequenceControl(
-      const ModelSequenceBatching::Control::Kind control_kind,
+      const inference::ModelSequenceBatching::Control::Kind control_kind,
       const TRTISTF_IOList* inputs, bool required);
 };
 

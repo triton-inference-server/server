@@ -28,7 +28,7 @@
 
 nic::Error
 ModelParser::Init(
-    const ni::ModelMetadataResponse& metadata, const ni::ModelConfig& config,
+    const inference::ModelMetadataResponse& metadata, const inference::ModelConfig& config,
     const std::string& model_version,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     std::unique_ptr<TritonClientWrapper>& client_wrapper)
@@ -129,7 +129,7 @@ ModelParser::Init(
 
 nic::Error
 ModelParser::GetEnsembleSchedulerType(
-    const ni::ModelConfig& config, const std::string& model_version,
+    const inference::ModelConfig& config, const std::string& model_version,
     std::unique_ptr<TritonClientWrapper>& client_wrapper, bool* is_sequential)
 {
   if (config.has_sequence_batching()) {
@@ -138,7 +138,7 @@ ModelParser::GetEnsembleSchedulerType(
 
   if (config.platform() == "ensemble") {
     for (const auto& step : config.ensemble_scheduling().step()) {
-      ni::ModelConfigResponse model_config;
+      inference::ModelConfigResponse model_config;
       std::string step_version;
       if (step.model_version() != -1) {
         step_version = std::to_string(step.model_version());

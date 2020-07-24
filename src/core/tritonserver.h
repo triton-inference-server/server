@@ -571,7 +571,7 @@ typedef void (*TRITONSERVER_InferenceTraceReleaseFn_t)(
 /// The release callback is called for both 'trace' and for any child
 /// traces spawned by 'trace'.
 ///
-/// \param trace Returns the new infernece trace object.
+/// \param trace Returns the new inference trace object.
 /// \param level The tracing level.
 /// \param parent_id The parent trace id for this trace. A value of 0
 /// indicates that there is not parent trace.

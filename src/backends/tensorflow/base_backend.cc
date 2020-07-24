@@ -61,7 +61,7 @@ BaseBackend::Context::~Context()
 
 Status
 BaseBackend::Init(
-    const std::string& path, const ModelConfig& model_config,
+    const std::string& path, const inference::ModelConfig& model_config,
     const GraphDefBackendFactory::Config* backend_config,
     const std::string& platform)
 {
@@ -84,13 +84,13 @@ BaseBackend::CreateExecutionContexts(
 
   for (const auto& group : Config().instance_group()) {
     for (int c = 0; c < group.count(); c++) {
-      if (group.kind() == ModelInstanceGroup::KIND_CPU) {
+      if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
             instance_name, Context::NO_GPU_DEVICE, paths));
         total_context_cnt++;
-      } else if (group.kind() == ModelInstanceGroup::KIND_MODEL) {
+      } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_model_device";
         RETURN_IF_ERROR(CreateExecutionContext(
@@ -334,14 +334,14 @@ BaseBackend::CreateExecutionContext(
 
 Status
 BaseBackend::Context::ValidateInputs(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios)
 {
   for (const auto& io : ios) {
     if (ConvertDataType(io.data_type()) ==
         TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
       return Status(
           Status::Code::INTERNAL,
-          "unsupported datatype " + DataType_Name(io.data_type()) +
+          "unsupported datatype " + inference::DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
     }
   }
@@ -351,14 +351,14 @@ BaseBackend::Context::ValidateInputs(
 
 Status
 BaseBackend::Context::ValidateOutputs(
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios)
 {
   for (const auto& io : ios) {
     if (ConvertDataType(io.data_type()) ==
         TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
       return Status(
           Status::Code::INTERNAL,
-          "unsupported datatype " + DataType_Name(io.data_type()) +
+          "unsupported datatype " + inference::DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
     }
   }
@@ -732,7 +732,7 @@ BaseBackend::Context::Run(
       batchn_shape.insert(
           batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
 
-      const DataType datatype = repr_input->DType();
+      const inference::DataType datatype = repr_input->DType();
 
       // The name of the input in the model can be different...
       const std::string* input_tensor_name = &input_name;
@@ -755,7 +755,7 @@ BaseBackend::Context::Run(
             Status::Code::INTERNAL,
             "failed to create input tensor '" + input_name + "' with shape " +
                 DimsListToString(batchn_shape) + " and data type " +
-                DataType_Name(datatype) + " for '" + name_ + "'");
+                inference::DataType_Name(datatype) + " for '" + name_ + "'");
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
             requests, responses, metric_reporter_.get(), status,
@@ -767,7 +767,7 @@ BaseBackend::Context::Run(
       *input_tensors = tlink;
 
       // Custom handling for string/bytes tensor...
-      if (datatype == DataType::TYPE_STRING) {
+      if (datatype == inference::DataType::TYPE_STRING) {
         size_t tensor_offset = 0;
         const size_t batch1_element_cnt = GetElementCount(batch1_shape);
 
@@ -893,7 +893,7 @@ BaseBackend::Context::Run(
       TRTISTF_DataType tf_datatype = TRTISTF_TensorDataType(output_tensor);
       TRTISTF_Shape* tf_shape = TRTISTF_TensorShape(output_tensor);
 
-      const DataType datatype = ConvertDataType(tf_datatype);
+      const inference::DataType datatype = ConvertDataType(tf_datatype);
 
       // batchn_shape holds the shape of the entire tensor batch, but
       // is overwritten below and used as the shape for each response
@@ -906,7 +906,7 @@ BaseBackend::Context::Run(
       }
 
       // Custom handling for string/bytes tensor...
-      if (datatype == DataType::TYPE_STRING) {
+      if (datatype == inference::DataType::TYPE_STRING) {
         size_t tensor_offset = 0;
 
         for (size_t idx = 0; idx < responses.size(); idx++) {

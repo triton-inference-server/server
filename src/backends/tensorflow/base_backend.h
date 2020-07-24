@@ -46,7 +46,7 @@ class BaseBackend : public InferenceBackend {
   BaseBackend(BaseBackend&&) = default;
 
   Status Init(
-      const std::string& path, const ModelConfig& model_config,
+      const std::string& path, const inference::ModelConfig& model_config,
       const GraphDefBackendFactory::Config* backend_config,
       const std::string& platform);
 
@@ -79,9 +79,9 @@ class BaseBackend : public InferenceBackend {
     DISALLOW_COPY_AND_ASSIGN(Context);
 
     Status ValidateInputs(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status ValidateOutputs(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios);
 
     // See BackendContext::Run()
     void Run(

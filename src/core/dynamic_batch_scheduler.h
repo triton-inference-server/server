@@ -68,7 +68,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
-      const ModelQueuePolicy& default_queue_policy,
+      const inference::ModelQueuePolicy& default_queue_policy,
       const uint32_t priority_level,
       const ModelQueuePolicyMap& queue_policy_map,
       std::unique_ptr<Scheduler>* scheduler);
@@ -87,7 +87,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
-      const ModelQueuePolicy& default_queue_policy,
+      const inference::ModelQueuePolicy& default_queue_policy,
       const uint32_t priority_levels,
       const ModelQueuePolicyMap& queue_policy_map);
   void SchedulerThread(

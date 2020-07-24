@@ -97,7 +97,7 @@ class InferenceBackend {
   int64_t Version() const { return version_; }
 
   // Get the configuration of model being served.
-  const ModelConfig& Config() const { return config_; }
+  const inference::ModelConfig& Config() const { return config_; }
 
   // Get the stats collector for the model being served.
   InferenceStatsAggregator* MutableStatsAggregator()
@@ -110,10 +110,10 @@ class InferenceBackend {
   }
 
   // Get the model configuration for a named input.
-  Status GetInput(const std::string& name, const ModelInput** input) const;
+  Status GetInput(const std::string& name, const inference::ModelInput** input) const;
 
   // Get the model configuration for a named output.
-  Status GetOutput(const std::string& name, const ModelOutput** output) const;
+  Status GetOutput(const std::string& name, const inference::ModelOutput** output) const;
 
   // Get a label provider for the model.
   const std::shared_ptr<LabelProvider>& GetLabelProvider() const
@@ -122,7 +122,7 @@ class InferenceBackend {
   }
 
   Status Init(
-      const std::string& path, const ModelConfig& config,
+      const std::string& path, const inference::ModelConfig& config,
       const std::string& platform);
 
   // Enqueue a request for execution. If Status::Success is returned
@@ -163,7 +163,7 @@ class InferenceBackend {
   virtual void WarmUp(uint32_t runner_idx, WarmupData& sample);
 
   // Set the configuration of the model being served.
-  Status SetModelConfig(const std::string& path, const ModelConfig& config);
+  Status SetModelConfig(const std::string& path, const inference::ModelConfig& config);
 
   // Explicitly set the scheduler to use for inference requests to the
   // model. The scheduler can only be set once for a backend.
@@ -188,7 +188,7 @@ class InferenceBackend {
   const double min_compute_capability_;
 
   // Configuration of the model that this backend represents.
-  ModelConfig config_;
+  inference::ModelConfig config_;
 
   // Version of the model that this backend represents.
   int64_t version_;
@@ -203,10 +203,10 @@ class InferenceBackend {
   std::unique_ptr<Scheduler> scheduler_;
 
   // Map from input name to the model configuration for that input.
-  std::unordered_map<std::string, ModelInput> input_map_;
+  std::unordered_map<std::string, inference::ModelInput> input_map_;
 
   // Map from output name to the model configuration for that output.
-  std::unordered_map<std::string, ModelOutput> output_map_;
+  std::unordered_map<std::string, inference::ModelOutput> output_map_;
 
   // Path to model
   std::string model_dir_;

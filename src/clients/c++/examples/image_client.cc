@@ -409,8 +409,8 @@ ParseType(const std::string& dtype, int* type1, int* type3)
 
 void
 ParseModelGrpc(
-    const ni::ModelMetadataResponse& model_metadata,
-    const ni::ModelConfigResponse& model_config, const size_t batch_size,
+    const inference::ModelMetadataResponse& model_metadata,
+    const inference::ModelConfigResponse& model_config, const size_t batch_size,
     ModelInfo* model_info)
 {
   if (model_metadata.inputs().size() != 1) {
@@ -495,14 +495,14 @@ ParseModelGrpc(
     exit(1);
   }
 
-  if ((input_config.format() != ni::ModelInput::FORMAT_NCHW) &&
-      (input_config.format() != ni::ModelInput::FORMAT_NHWC)) {
+  if ((input_config.format() != inference::ModelInput::FORMAT_NCHW) &&
+      (input_config.format() != inference::ModelInput::FORMAT_NHWC)) {
     std::cerr << "unexpected input format "
-              << ni::ModelInput_Format_Name(input_config.format())
+              << inference::ModelInput_Format_Name(input_config.format())
               << ", expecting "
-              << ni::ModelInput_Format_Name(ni::ModelInput::FORMAT_NHWC)
+              << inference::ModelInput_Format_Name(inference::ModelInput::FORMAT_NHWC)
               << " or "
-              << ni::ModelInput_Format_Name(ni::ModelInput::FORMAT_NCHW)
+              << inference::ModelInput_Format_Name(inference::ModelInput::FORMAT_NCHW)
               << std::endl;
     exit(1);
   }
@@ -511,7 +511,7 @@ ParseModelGrpc(
   model_info->input_name_ = input_metadata.name();
   model_info->input_datatype_ = input_metadata.datatype();
 
-  if (input_config.format() == ni::ModelInput::FORMAT_NHWC) {
+  if (input_config.format() == inference::ModelInput::FORMAT_NHWC) {
     model_info->input_format_ = "FORMAT_NHWC";
     model_info->input_h_ = input_metadata.shape(input_batch_dim ? 1 : 0);
     model_info->input_w_ = input_metadata.shape(input_batch_dim ? 2 : 1);
@@ -889,13 +889,13 @@ main(int argc, char** argv)
     ParseModelHttp(
         model_metadata_json, model_config_json, batch_size, &model_info);
   } else {
-    ni::ModelMetadataResponse model_metadata;
+    inference::ModelMetadataResponse model_metadata;
     err = triton_client.grpc_client_->ModelMetadata(
         &model_metadata, model_name, model_version, http_headers);
     if (!err.IsOk()) {
       std::cerr << "error: failed to get model metadata: " << err << std::endl;
     }
-    ni::ModelConfigResponse model_config;
+    inference::ModelConfigResponse model_config;
     err = triton_client.grpc_client_->ModelConfig(
         &model_config, model_name, model_version, http_headers);
     if (!err.IsOk()) {

@@ -48,7 +48,7 @@ bool CompareWithRequiredEqualInputs(
 // PriorityQueue
 //
 using ModelQueuePolicyMap =
-    ::google::protobuf::Map<::google::protobuf::uint32, ModelQueuePolicy>;
+    ::google::protobuf::Map<::google::protobuf::uint32, inference::ModelQueuePolicy>;
 
 class PriorityQueue {
  public:
@@ -60,7 +60,7 @@ class PriorityQueue {
   // Different priority level may follow different queue policies given by
   // 'queue_policy_map', otherwise, the 'default_queue_policy' will be used.
   PriorityQueue(
-      const ModelQueuePolicy& default_queue_policy, uint32_t priority_levels,
+      const inference::ModelQueuePolicy& default_queue_policy, uint32_t priority_levels,
       const ModelQueuePolicyMap queue_policy_map);
 
   // Enqueue a request with priority set to 'priority_level'. If
@@ -144,13 +144,13 @@ class PriorityQueue {
     // Construct a policy queue with default policy, which will behave the same
     // as regular queue.
     PolicyQueue()
-        : timeout_action_(ModelQueuePolicy::REJECT), default_timeout_us_(0),
+        : timeout_action_(inference::ModelQueuePolicy::REJECT), default_timeout_us_(0),
           allow_timeout_override_(false), max_queue_size_(0)
     {
     }
 
     // Construct a policy queue with given 'policy'.
-    PolicyQueue(const ModelQueuePolicy& policy)
+    PolicyQueue(const inference::ModelQueuePolicy& policy)
         : timeout_action_(policy.timeout_action()),
           default_timeout_us_(policy.default_timeout_microseconds()),
           allow_timeout_override_(policy.allow_timeout_override()),
@@ -201,7 +201,7 @@ class PriorityQueue {
 
    private:
     // Variables that define the policy for the queue
-    const ModelQueuePolicy::TimeoutAction timeout_action_;
+    const inference::ModelQueuePolicy::TimeoutAction timeout_action_;
     const uint64_t default_timeout_us_;
     const bool allow_timeout_override_;
     const uint32_t max_queue_size_;

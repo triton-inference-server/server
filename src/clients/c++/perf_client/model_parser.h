@@ -74,7 +74,7 @@ class ModelParser {
   /// \param client_wrapper The wrapped triton client object.
   /// \return Error object indicating success or failure.
   nic::Error Init(
-      const ni::ModelMetadataResponse& metadata, const ni::ModelConfig& config,
+      const inference::ModelMetadataResponse& metadata, const inference::ModelConfig& config,
       const std::string& model_version,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       std::unique_ptr<TritonClientWrapper>& client_wrapper);
@@ -135,7 +135,7 @@ class ModelParser {
 
  private:
   nic::Error GetEnsembleSchedulerType(
-      const ni::ModelConfig& config, const std::string& model_version,
+      const inference::ModelConfig& config, const std::string& model_version,
       std::unique_ptr<TritonClientWrapper>& client_wrapper,
       bool* is_sequential);
 

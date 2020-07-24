@@ -35,11 +35,11 @@ namespace nvidia { namespace inferenceserver {
 class AutoFillNetDefImpl : public AutoFill {
  public:
   AutoFillNetDefImpl(const std::string& model_name) : AutoFill(model_name) {}
-  Status Fix(ModelConfig* config) override;
+  Status Fix(inference::ModelConfig* config) override;
 };
 
 Status
-AutoFillNetDefImpl::Fix(ModelConfig* config)
+AutoFillNetDefImpl::Fix(inference::ModelConfig* config)
 {
   config->set_platform(kCaffe2NetDefPlatform);
 
