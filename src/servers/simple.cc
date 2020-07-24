@@ -521,9 +521,14 @@ main(int argc, char** argv)
       TRITONSERVER_ServerOptionsSetBackendDirectory(
           server_options, "/opt/tritonserver/backends"),
       "setting backend directory");
+#ifdef TRITON_ENABLE_GPU
+      double min_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
+#else
+      double min_compute_capability = 0;
+#endif  // TRITON_ENABLE_GPU
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
-          server_options, TRITON_MIN_COMPUTE_CAPABILITY),
+          server_options, min_compute_capability),
       "setting minimum supported CUDA compute capability");
 
   TRITONSERVER_Server* server_ptr = nullptr;

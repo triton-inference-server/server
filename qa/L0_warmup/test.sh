@@ -55,6 +55,13 @@ source ../common/util.sh
 RET=0
 
 for BACKEND in ${BACKENDS}; do
+    # FIXME new Backend API does not follow the warmup path, and the warmup
+    # will not be proper until instance interface is provided so that
+    # the scheduler can signal which particular instance should be run.
+    if [ $BACKEND == "savedmodel" ] || [ $BACKEND == "graphdef" ]; then
+        echo -e "\n*** Skipping $BACKEND Test as warmup is not supported ***"
+        continue
+    fi
     rm -f $SERVER_LOG $CLIENT_LOG
     # Test for fixed-size data type
     # Use the addsub models as example.

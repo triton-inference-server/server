@@ -791,7 +791,8 @@ class ModelState {
               name, gpu_device, max_batch_size, enable_pinned_input,
               enable_pinned_output),
           trtistf_model_(nullptr, TRTISTF_ModelDelete),
-          input_device_id_(MODEL_DEVICE), requests_(max_batch_size_)
+          input_device_id_(MODEL_DEVICE),
+          requests_(std::max(max_batch_size_, 1))
     {
     }
 
