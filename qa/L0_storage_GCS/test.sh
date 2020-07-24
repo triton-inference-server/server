@@ -41,9 +41,12 @@ CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 EXPECTED_NUM_TESTS="3"
 
-# Google cloud variables (Point to bucket when testing cloud storage)
+# GCS credentials are necessary for this test. Pass via ENV variables
+export GOOGLE_APPLICATION_CREDENTIALS="file.json"
+# TODO set contents/credentials in json file using ENV variables
 
-BUCKET_URL="gs://bucket"
+# Google cloud variables (Point to bucket when testing cloud storage)
+BUCKET_URL="gs://bucket-${CI_PIPELINE_ID}"
 
 # Remove Slash in BUCKET_URL
 BUCKET_URL=${BUCKET_URL%/}
@@ -179,6 +182,47 @@ for MAYBE_SLASH in "" "/"; do
 
     done
 done 
+
+# Test with polling enabled
+SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --model-control-mode=poll"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# copy contents of /models into S3 bucket and wait for them to be loaded.
+gsutil cp -r models/ "$BUCKET_URL_SLASH"
+sleep 60
+
+set +e
+
+# python unittest seems to swallow ImportError and still return 0
+# exit code. So need to explicitly check CLIENT_LOG to make sure
+# we see some running tests
+python $INFER_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed To Run\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Delete all contents of bucket and bucket itself
+gsutil rm -r "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
