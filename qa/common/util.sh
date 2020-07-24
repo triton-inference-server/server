@@ -279,9 +279,8 @@ function check_test_results () {
         return
     fi
 
-    test_result_json=`tail -n 1 $log_file`
-    num_failures=`echo $test_result_json | jq .failures`
-    num_tests=`echo $test_result_json | jq .total`
+    num_failures=`tail -n 1 $log_file | jq .failures`
+    num_tests=`tail -n 1 $log_file | jq .total`
     if [ $? -ne 0 ]; then
         cat $log_file
         echo -e "\n***\n*** Test Failed: unable to parse test results\n***"
