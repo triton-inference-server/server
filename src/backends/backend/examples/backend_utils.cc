@@ -428,7 +428,14 @@ GetTypedSequenceControlProperties(
 
             seen_control = true;
 
-            if (c.Find("int32_false_true") || c.Find("fp32_false_true")) {
+            TritonJson::Value int32_false_true, fp32_false_true;
+            bool found_int32 =
+                (c.Find("int32_false_true", &int32_false_true) &&
+                 (int32_false_true.ArraySize() > 0));
+            bool found_fp32 =
+                (c.Find("fp32_false_true", &fp32_false_true) &&
+                 (fp32_false_true.ArraySize() > 0));
+            if (found_int32 || found_fp32) {
               return TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
                   (std::string(

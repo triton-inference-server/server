@@ -552,7 +552,7 @@ ModelInputCollector::Finalize()
 
     // If something goes wrong with the copy all the pending
     // responses fail...
-    if (err == nullptr) {
+    if (err != nullptr) {
       for (auto& pr : def.requests_) {
         auto& response = pr.first;
         if (*response != nullptr) {
@@ -779,7 +779,7 @@ ModelInputCollector::FlushPendingPinned(
 
       // If something goes wrong with the copy all the pending
       // responses fail...
-      if (err == nullptr) {
+      if (err != nullptr) {
         for (auto& pr : pending_pinned_inputs_) {
           auto& response = pr.first;
           if (*response != nullptr) {

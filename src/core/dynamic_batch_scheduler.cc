@@ -247,8 +247,8 @@ DynamicBatchScheduler::SchedulerThread(
     const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
     if (dstr != nullptr) {
       backend_release_wait_milliseconds = atoi(dstr);
-      LOG_INFO << "Delaying scheduler backend release for " << runner_id << ": "
-               << backend_release_wait_milliseconds << "ms";
+      LOG_VERBOSE(1) << "Delaying scheduler backend release for " << runner_id
+                     << ": " << backend_release_wait_milliseconds << "ms";
     }
   }
 
@@ -259,8 +259,8 @@ DynamicBatchScheduler::SchedulerThread(
     const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER");
     if (dstr != nullptr) {
       delay_cnt = atoi(dstr);
-      LOG_INFO << "Delaying scheduler thread " << runner_id << " until "
-               << delay_cnt << " queued requests...";
+      LOG_VERBOSE(1) << "Delaying scheduler thread " << runner_id << " until "
+                     << delay_cnt << " queued requests...";
     }
   }
 
@@ -289,9 +289,9 @@ DynamicBatchScheduler::SchedulerThread(
         if (queue_.Size() >= delay_cnt) {
           delay_cnt = 0;
         }
-        LOG_INFO << "Delaying scheduler thread " << runner_id << " until "
-                 << delay_cnt
-                 << " queued requests, current total = " << queue_.Size();
+        LOG_VERBOSE(1) << "Delaying scheduler thread " << runner_id << " until "
+                       << delay_cnt
+                       << " queued requests, current total = " << queue_.Size();
       } else if (queue_.Empty()) {
         wait_microseconds = default_wait_microseconds;
       } else if (dynamic_batching_enabled_) {

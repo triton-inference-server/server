@@ -522,9 +522,9 @@ main(int argc, char** argv)
           server_options, "/opt/tritonserver/backends"),
       "setting backend directory");
 #ifdef TRITON_ENABLE_GPU
-      double min_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
+  double min_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
 #else
-      double min_compute_capability = 0;
+  double min_compute_capability = 0;
 #endif  // TRITON_ENABLE_GPU
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(

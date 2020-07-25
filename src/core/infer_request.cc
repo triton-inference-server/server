@@ -247,8 +247,8 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
         input.first, input.second.DType(), input.second.Shape(), &new_input);
 
     // Must normalize shape here...
-    *new_input->MutableShape() = new_input->OriginalShape();
-    *new_input->MutableShapeWithBatchDim() = new_input->OriginalShape();
+    *new_input->MutableShape() = input.second.Shape();
+    *new_input->MutableShapeWithBatchDim() = input.second.ShapeWithBatchDim();
 
     new_input->SetData(data);
   }
@@ -285,8 +285,8 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
         input.first, input.second.DType(), input.second.Shape(), &new_input);
 
     // Must normalize shape here...
-    *new_input->MutableShape() = new_input->OriginalShape();
-    *new_input->MutableShapeWithBatchDim() = new_input->OriginalShape();
+    *new_input->MutableShape() = input.second.Shape();
+    *new_input->MutableShapeWithBatchDim() = input.second.ShapeWithBatchDim();
 
     // Note that the input that have max byte size will be responsible for
     // holding the artifical data, while other inputs will hold a reference to
