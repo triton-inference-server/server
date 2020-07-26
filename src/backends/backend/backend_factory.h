@@ -47,19 +47,14 @@ class TritonBackendFactory {
   }
 
   Status CreateBackend(
-      const std::string& nonlocal_path, const std::string& model_name,
+      const std::string& model_repository_path, const std::string& model_name,
       const int64_t version, const ModelConfig& model_config,
       std::unique_ptr<InferenceBackend>* backend)
   {
-    // Localize 'nonlocal_path' so that the entire model version
-    // directory is available locally.
-    std::shared_ptr<LocalizedDirectory> local_dir;
-    RETURN_IF_ERROR(LocalizeDirectory(nonlocal_path, &local_dir));
-
     std::unique_ptr<TritonModel> model;
     RETURN_IF_ERROR(TritonModel::Create(
-        server_, local_dir->Path(), cmdline_config_map_, model_name, version,
-        model_config, &model));
+        server_, model_repository_path, cmdline_config_map_, model_name,
+        version, model_config, &model));
     backend->reset(model.release());
     return Status::Success;
   }

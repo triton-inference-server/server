@@ -41,8 +41,9 @@ CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
-MODELDIR="qa_model_repository"
-cp -r $DATADIR $MODELDIR
+MODELDIR="models"
+rm -rf ./$MODELDIR && mkdir $MODELDIR
+cp -r $DATADIR/*_float32_float32_float32 $MODELDIR/.
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
