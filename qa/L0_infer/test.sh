@@ -40,12 +40,10 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 EXPECTED_NUM_TESTS="42"
-# if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
-# elif [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
-# elif [ -z "$CPU_ONLY" ]; then
-# elif [ -z "$ENSEMBLES" ]; then
-# elif [ -z "$BACKENDS" ]; then
-# fi
+if [ -v "$TEST_SYSTEM_SHARED_MEMORY" ]; || \
+   [ -v "$TEST_CUDA_SHARED_MEMORY" ]; then
+    EXPECTED_NUM_TESTS="29"
+fi
 
 MODELDIR=`pwd`/models
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}

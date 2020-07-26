@@ -77,6 +77,7 @@ class BatcherTest(tu.TestResCollector):
             destroy_fun = cudashm.destroy_shared_memory_region
         for precreated_shm_region in self.precreated_shm_regions_:
             destroy_fun(precreated_shm_region)
+        super().tearDown()
 
     # FIXME why only used for outputs
     def create_advance(self, shm_regions=None):

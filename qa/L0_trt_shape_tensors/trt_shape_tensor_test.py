@@ -63,6 +63,7 @@ class InferShapeTensorTest(tu.TestResCollector):
     def tearDown(self):
         self.triton_client_.unregister_system_shared_memory()
         self.triton_client_.unregister_cuda_shared_memory()
+        super().tearDown()
 
     def add_deferred_exception(self, ex):
         global _deferred_exceptions
