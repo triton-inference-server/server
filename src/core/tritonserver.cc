@@ -472,6 +472,28 @@ TRITONSERVER_ParameterTypeString(TRITONSERVER_ParameterType paramtype)
 }
 
 //
+// TRITONSERVER_InstanceGroupKind
+//
+const char*
+TRITONSERVER_InstanceGroupKindString(TRITONSERVER_InstanceGroupKind kind)
+{
+  switch (kind) {
+    case TRITONSERVER_INSTANCEGROUPKIND_AUTO:
+      return "AUTO";
+    case TRITONSERVER_INSTANCEGROUPKIND_CPU:
+      return "CPU";
+    case TRITONSERVER_INSTANCEGROUPKIND_GPU:
+      return "GPU";
+    case TRITONSERVER_INSTANCEGROUPKIND_MODEL:
+      return "MODEL";
+    default:
+      break;
+  }
+
+  return "<invalid>";
+}
+
+//
 // TRITONSERVER_Log
 //
 bool

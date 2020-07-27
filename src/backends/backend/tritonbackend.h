@@ -48,6 +48,7 @@ struct TRITONBACKEND_ResponseFactory;
 struct TRITONBACKEND_Response;
 struct TRITONBACKEND_Backend;
 struct TRITONBACKEND_Model;
+struct TRITONBACKEND_ModelInstance;
 
 // Version of this TRITONBACKEND API.
 #define TRITONBACKEND_API_VERSION 1
@@ -517,7 +518,7 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelServer(
 /// Get the backend used by the model.
 ///
 /// \param model The model.
-/// \param model Returns the model object.
+/// \param model Returns the backend object.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelBackend(
     TRITONBACKEND_Model* model, TRITONBACKEND_Backend** backend);
@@ -552,9 +553,9 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelSetState(
 ///
 /// For consistency of measurement across different backends, the
 /// timestamps should be collected at the following points during
-/// TRITONBACKEND_ModelExecute.
+/// TRITONBACKEND_ModelInstanceExecute.
 ///
-///   TRITONBACKEND_ModelExecute()
+///   TRITONBACKEND_ModelInstanceExecute()
 ///     CAPTURE TIMESPACE (exec_start_ns)
 ///     < process input tensors to prepare them for inference
 ///       execution, including copying the tensors to/from GPU if
@@ -603,9 +604,10 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelReportStatistics(
 ///
 /// 'batch_size' is the sum of the batch sizes for the individual
 /// requests that were delivered together in the call to
-/// TRITONBACKEND_ModelExecute. For example, if three requests are
-/// passed to TRITONBACKEND_ModelExecute and those requests have batch
-/// size 1, 2, and 3; then 'batch_size' should be set to 6.
+/// TRITONBACKEND_ModelInstanceExecute. For example, if three requests
+/// are passed to TRITONBACKEND_ModelInstanceExecute and those
+/// requests have batch size 1, 2, and 3; then 'batch_size' should be
+/// set to 6.
 ///
 /// \param model The model.
 /// \param batch_size Combined batch size of all the individual
@@ -622,6 +624,69 @@ TRITONBACKEND_ModelReportBatchStatistics(
     TRITONBACKEND_Model* model, const uint64_t batch_size,
     const uint64_t exec_start_ns, const uint64_t compute_start_ns,
     const uint64_t compute_end_ns, const uint64_t exec_end_ns);
+
+///
+/// TRITONBACKEND_ModelInstance
+///
+/// Object representing a model instance implemented using the
+/// backend.
+///
+
+/// Get the name of the model instance. The returned string is owned by the
+/// model object, not the caller, and so should not be modified or
+/// freed.
+///
+/// \param instance The model instance.
+/// \param name Returns the instance name.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceName(
+    TRITONBACKEND_ModelInstance* instance, const char** name);
+
+/// Get the kind of the model instance.
+///
+/// \param instance The model instance.
+/// \param kind Returns the instance kind.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceKind(
+    TRITONBACKEND_ModelInstance* instance,
+    TRITONSERVER_InstanceGroupKind* kind);
+
+/// Get the device ID of the model instance.
+///
+/// \param instance The model instance.
+/// \param device_id Returns the instance device ID.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceDeviceId(
+    TRITONBACKEND_ModelInstance* instance, int32_t* device_id);
+
+/// Get the model associated with a model instance.
+///
+/// \param instance The model instance.
+/// \param backend Returns the model object.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceModel(
+    TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Model** model);
+
+/// Get the user-specified state associated with the model
+/// instance. The state is completely owned and managed by the
+/// backend.
+///
+/// \param instance The model instance.
+/// \param state Returns the user state, or nullptr if no user state.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceState(
+    TRITONBACKEND_ModelInstance* instance, void** state);
+
+/// Set the user-specified state associated with the model
+/// instance. The state is completely owned and managed by the
+/// backend.
+///
+/// \param instance The model instance.
+/// \param state The user state, or nullptr if no user state.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceSetState(
+    TRITONBACKEND_ModelInstance* instance, void* state);
+
 
 ///
 /// The following functions can be implemented by a backend. Functions
@@ -665,38 +730,59 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInitialize(
     TRITONBACKEND_Model* model);
 
 /// Finalize for a model. This function is optional, a backend is not
-/// required to implement it. This function is called once, just
-/// before the model is unloaded from Triton. All state associated
-/// with the model should be freed and any threads created for the
-/// model should be exited/joined before returning from this function.
+/// required to implement it. This function is called once for a
+/// model, just before the model is unloaded from Triton. All state
+/// associated with the model should be freed and any threads created
+/// for the model should be exited/joined before returning from this
+/// function.
 ///
 /// \param model The model.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelFinalize(
     TRITONBACKEND_Model* model);
 
-/// Execute a batch of one or more requests. This function is
-/// required. Triton will not perform multiple simultaneous calls to
-/// this function for a given model; however, if a backend is used by
-/// multiple models Triton may simultaneously call the function with a
-/// different thread for each model.
+/// Initialize for a model instance. This function is optional, a
+/// backend is not required to implement it. This function is called
+/// once when a model instance is created to allow the backend to
+/// initialize any state associated with the instance.
+///
+/// \param instance The model instance.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceInitialize(
+    TRITONBACKEND_ModelInstance* instance);
+
+/// Finalize for a model instance. This function is optional, a
+/// backend is not required to implement it. This function is called
+/// once for an instance, just before the corresponding model is
+/// unloaded from Triton. All state associated with the instance
+/// should be freed and any threads created for the instance should be
+/// exited/joined before returning from this function.
+///
+/// \param instance The model instance.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceFinalize(
+    TRITONBACKEND_ModelInstance* instance);
+
+/// Execute a batch of one or more requests on a model instance. This
+/// function is required. Triton will not perform multiple
+/// simultaneous calls to this function for a given model 'instance';
+/// however, there may be simultaneous calls for different model
+/// instances (for the same or different models).
 ///
 /// If an error is returned the ownership of the request objects
 /// remains with Triton and the backend must not retain references to
 /// the request objects or access them in any way.
 ///
-/// If success is returned ownership of the request objects is
+/// If success is returned, ownership of the request objects is
 /// transferred to the backend and it is then responsible for creating
-/// responses and releasing the request objects. If the backend needs
-/// to access 'requests' after this function returns the backend must
-/// make a copy of 'requests'.
+/// responses and releasing the request objects.
 ///
-/// \param model The model.
+/// \param instance The model instance.
 /// \param requests The requests.
 /// \param request_count The number of requests in the batch.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelExecute(
-    TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
+    TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request** requests,
     const uint32_t request_count);
 
 

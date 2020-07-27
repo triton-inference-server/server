@@ -37,6 +37,7 @@
 namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
+class TritonModelInstance;
 
 //
 // Represents a model.
@@ -87,8 +88,13 @@ class TritonModel : public InferenceBackend {
   // Backend used by this model.
   std::shared_ptr<TritonBackend> backend_;
 
+  // The model instances for this model.
+  std::vector<std::unique_ptr<TritonModelInstance>> instances_;
+
 #ifdef TRITON_ENABLE_METRICS
-  // The metric model reporters required for instances of this model.
+  // The metric model reporters required for instances of this
+  // model. Indexed by the device ID since the metric will differ
+  // depending on the device ID.
   std::unordered_map<int, std::unique_ptr<MetricModelReporter>> reporters_;
 #endif  // TRITON_ENABLE_METRICS
 

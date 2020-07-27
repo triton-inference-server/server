@@ -65,9 +65,9 @@ namespace nib = nvidia::inferenceserver::backend;
 // sent.
 //
 // After WAIT milliseconds the backend will release the request and
-// return from the TRITONBACKEND_ModelExecute function so that Triton
-// can provide another request to the backend. WAIT can be less than
-// the sum of DELAY so that the request is released before all
+// return from the TRITONBACKEND_ModelInstanceExecute function so that
+// Triton can provide another request to the backend. WAIT can be less
+// than the sum of DELAY so that the request is released before all
 // responses are sent. Thus, even if there is only one instance of the
 // model, the backend can be processing multiple requests at the same
 // time, and the responses for multiple requests can be intermixed,
@@ -127,25 +127,19 @@ class ModelState {
  public:
   static TRITONSERVER_Error* Create(
       TRITONBACKEND_Model* triton_model, ModelState** state);
-  ~ModelState();
+
+  // Get the handle to the TRITONBACKEND model.
+  TRITONBACKEND_Model* TritonModel() { return triton_model_; }
 
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
 
-  // Spawn a thread to produce outputs for a request. Return the
-  // request wait time before it should release.
-  void ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms);
-
  private:
   ModelState(
       TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config);
-  void ResponseThread(
-      TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
-      const int32_t* delay_buffer_ptr, const uint32_t element_count);
 
   TRITONBACKEND_Model* triton_model_;
   ni::TritonJson::Value model_config_;
-  std::atomic<size_t> inflight_thread_count_;
 };
 
 TRITONSERVER_Error*
@@ -178,17 +172,8 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 
 ModelState::ModelState(
     TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config)
-    : triton_model_(triton_model), model_config_(std::move(model_config)),
-      inflight_thread_count_(0)
+    : triton_model_(triton_model), model_config_(std::move(model_config))
 {
-}
-
-ModelState::~ModelState()
-{
-  // Wait for all threads to exit...
-  while (inflight_thread_count_ > 0) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
 }
 
 TRITONSERVER_Error*
@@ -318,26 +303,103 @@ ModelState::ValidateModelConfig()
       idx_dtype == "TYPE_UINT32", TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected IDX datatype to be UINT32, got ") + idx_dtype);
 
-  // For simplicity this backend doesn't support multiple
-  // instances. So check and give a warning if more than one instance
-  // is requested.
-  std::vector<nib::InstanceProperties> instances;
-  RETURN_IF_ERROR(nib::ParseInstanceGroups(model_config_, &instances));
-  if (instances.size() != 1) {
-    LOG_MESSAGE(
-        TRITONSERVER_LOG_WARN,
-        (std::string("model configuration specifies ") +
-         std::to_string(instances.size()) +
-         " instances but repeat backend supports only a single CPU instance. "
-         "Additional instances ignored")
-            .c_str());
-  }
-
   return nullptr;  // success
 }
 
+//
+// ModelInstanceState
+//
+// State associated with a model instance. An object of this class is
+// created and associated with each TRITONBACKEND_ModelInstance.
+//
+class ModelInstanceState {
+ public:
+  static TRITONSERVER_Error* Create(
+      ModelState* model_state,
+      TRITONBACKEND_ModelInstance* triton_model_instance,
+      ModelInstanceState** state);
+  ~ModelInstanceState();
+
+  // Get the handle to the TRITONBACKEND model instance.
+  TRITONBACKEND_ModelInstance* TritonModelInstance()
+  {
+    return triton_model_instance_;
+  }
+
+  // Get the name, kind and device ID of the instance.
+  const std::string& Name() const { return name_; }
+  TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
+  int32_t DeviceId() const { return device_id_; }
+
+  // Get the state of the model that corresponds to this instance.
+  ModelState* StateForModel() const { return model_state_; }
+
+  // Spawn a thread to produce outputs for a request. Return the
+  // request wait time before it should release.
+  void ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms);
+
+ private:
+  ModelInstanceState(
+      ModelState* model_state,
+      TRITONBACKEND_ModelInstance* triton_model_instance, const char* name,
+      const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id);
+  void ResponseThread(
+      TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
+      const int32_t* delay_buffer_ptr, const uint32_t element_count);
+
+  ModelState* model_state_;
+  TRITONBACKEND_ModelInstance* triton_model_instance_;
+  const std::string name_;
+  const TRITONSERVER_InstanceGroupKind kind_;
+  const int32_t device_id_;
+
+  std::atomic<size_t> inflight_thread_count_;
+};
+
+TRITONSERVER_Error*
+ModelInstanceState::Create(
+    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
+    ModelInstanceState** state)
+{
+  const char* instance_name;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceName(triton_model_instance, &instance_name));
+
+  TRITONSERVER_InstanceGroupKind instance_kind;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceKind(triton_model_instance, &instance_kind));
+
+  int32_t instance_id;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &instance_id));
+
+  *state = new ModelInstanceState(
+      model_state, triton_model_instance, instance_name, instance_kind,
+      instance_id);
+  return nullptr;  // success
+}
+
+ModelInstanceState::ModelInstanceState(
+    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
+    const char* name, const TRITONSERVER_InstanceGroupKind kind,
+    const int32_t device_id)
+    : model_state_(model_state), triton_model_instance_(triton_model_instance),
+      name_(name), kind_(kind), device_id_(device_id), inflight_thread_count_(0)
+{
+}
+
+ModelInstanceState::~ModelInstanceState()
+{
+  // Wait for all threads that have been launched by this instance to
+  // exit...
+  while (inflight_thread_count_ > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+}
+
 void
-ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
+ModelInstanceState::ProcessRequest(
+    TRITONBACKEND_Request* request, uint32_t* wait_ms)
 {
   // Get the wait time for the request release.
   *wait_ms = 0;
@@ -399,12 +461,10 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
 
   const uint32_t element_count = in_byte_size / sizeof(int32_t);
 
-  // A performant solution would use the input tensors in place as
-  // much as possible but here we make a copy into a local array to
-  // simplify the implementation. We also need a copy of the inputs
-  // because we can release the request before we are done with the
-  // inputs, and once the request is released we are no longer allowed
-  // to access the input tensor buffers directly.
+  // We need a copy of the inputs because we can release the request
+  // before we are done with the inputs, and once the request is
+  // released we are no longer allowed to access the input tensor
+  // buffers directly.
   std::unique_ptr<int32_t> in_buffer(new int32_t[element_count]);
   RESPOND_AND_RETURN_IF_ERROR(
       request, nib::ReadInputTensor(
@@ -443,7 +503,7 @@ ModelState::ProcessRequest(TRITONBACKEND_Request* request, uint32_t* wait_ms)
 }
 
 void
-ModelState::ResponseThread(
+ModelInstanceState::ResponseThread(
     TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
     const int32_t* delay_buffer_ptr, const uint32_t element_count)
 {
@@ -619,30 +679,94 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
   return nullptr;  // success
 }
 
-// Implementing TRITONBACKEND_ModelExecute is required.
+// Implementing TRITONBACKEND_ModelInstanceInitialize is optional. The
+// backend should initialize any state that is required for a model
+// instance.
 TRITONSERVER_Error*
-TRITONBACKEND_ModelExecute(
-    TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
-    const uint32_t request_count)
+TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
 {
-  const char* model_name;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelName(model, &model_name));
+  const char* cname;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceName(instance, &cname));
+  std::string name(cname);
+
+  int32_t device_id;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id));
 
   LOG_MESSAGE(
       TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_ModelExecute: model ") + model_name +
-       " with " + std::to_string(request_count) + " requests")
+      (std::string("TRITONBACKEND_ModelInstanceInitialize: ") + name +
+       " (device " + std::to_string(device_id) + ")")
           .c_str());
 
-  // Triton only calls model execute from a single thread at a time
-  // *for a given model*. But since this backend could be used by
-  // multiple models the implementation needs to handle multiple
-  // models executing at the same time. Good practice for this is to
-  // use only function-local and model-specific state (obtained from
-  // 'model'), which is what we do here.
-  ModelState* state;
+  // The instance can access the corresponding model as well... here
+  // we get the model and from that get the model's state.
+  TRITONBACKEND_Model* model;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceModel(instance, &model));
+
+  void* vmodelstate;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vmodelstate));
+  ModelState* model_state = reinterpret_cast<ModelState*>(vmodelstate);
+
+  // With each instance we create a ModelInstanceState object and
+  // associate it with the TRITONBACKEND_ModelInstance.
+  ModelInstanceState* instance_state;
   RETURN_IF_ERROR(
-      TRITONBACKEND_ModelState(model, reinterpret_cast<void**>(&state)));
+      ModelInstanceState::Create(model_state, instance, &instance_state));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceSetState(
+      instance, reinterpret_cast<void*>(instance_state)));
+
+  return nullptr;  // success
+}
+
+// Implementing TRITONBACKEND_ModelInstanceFinalize is optional unless
+// state is set using TRITONBACKEND_ModelInstanceSetState. The backend
+// must free this state and perform any other cleanup.
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance)
+{
+  void* vstate;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(instance, &vstate));
+  ModelInstanceState* instance_state =
+      reinterpret_cast<ModelInstanceState*>(vstate);
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      "TRITONBACKEND_ModelInstanceFinalize: delete instance state");
+
+  delete instance_state;
+
+  return nullptr;  // success
+}
+
+// Implementing TRITONBACKEND_ModelInstanceExecute is required.
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceExecute(
+    TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request** requests,
+    const uint32_t request_count)
+{
+  // Triton will not call this function simultaneously for the same
+  // 'instance'. But since this backend could be used by multiple
+  // instances from multiple models the implementation needs to handle
+  // multiple calls to this function at the same time (with different
+  // 'instance' objects). Suggested practice for this is to use only
+  // function-local and model-instance-specific state (obtained from
+  // 'instance'), which is what we do here.
+  ModelInstanceState* instance_state;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(
+      instance, reinterpret_cast<void**>(&instance_state)));
+  ModelState* model_state = instance_state->StateForModel();
+
+  // This backend specifies BLOCKING execution policy. That means that
+  // we should not return from this function until this instance has
+  // completed prcoessing 'requests'. On return from this function,
+  // Triton will automatically show 'instance' as available to execute
+  // a new batch of requests.
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      (std::string("model instance ") + instance_state->Name() +
+       ", executing " + std::to_string(request_count) + " requests")
+          .c_str());
 
   // This backend does not support models that support batching, so
   // 'request_count' should always be 1.
@@ -663,7 +787,7 @@ TRITONBACKEND_ModelExecute(
   // For simplicity we process each request in a separate thread.
   for (uint32_t r = 0; r < request_count; ++r) {
     TRITONBACKEND_Request* request = requests[r];
-    state->ProcessRequest(request, &wait_milliseconds);
+    instance_state->ProcessRequest(request, &wait_milliseconds);
   }
 
   // Wait, release, return...
@@ -688,8 +812,9 @@ TRITONBACKEND_ModelExecute(
     // with the inference computation.
     LOG_IF_ERROR(
         TRITONBACKEND_ModelReportStatistics(
-            model, request, true /* success */, TRITONBACKEND_NO_DEVICE,
-            exec_start_ns, exec_start_ns, exec_end_ns, exec_end_ns),
+            model_state->TritonModel(), request, true /* success */,
+            TRITONBACKEND_NO_DEVICE, exec_start_ns, exec_start_ns, exec_end_ns,
+            exec_end_ns),
         "failed reporting request statistics");
 
     LOG_IF_ERROR(
@@ -701,15 +826,9 @@ TRITONBACKEND_ModelExecute(
   // batching so the total batch size is always 1.
   LOG_IF_ERROR(
       TRITONBACKEND_ModelReportBatchStatistics(
-          model, 1 /*total_batch_size*/, exec_start_ns, exec_start_ns,
-          exec_end_ns, exec_end_ns),
+          model_state->TritonModel(), 1 /*total_batch_size*/, exec_start_ns,
+          exec_start_ns, exec_end_ns, exec_end_ns),
       "failed reporting batch request statistics");
-
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_ModelExecute: model ") + model_name +
-       " released " + std::to_string(request_count) + " requests")
-          .c_str());
 
   return nullptr;  // success
 }
