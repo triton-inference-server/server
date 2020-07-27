@@ -40,8 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 EXPECTED_NUM_TESTS="42"
-if [ -v "$TEST_SYSTEM_SHARED_MEMORY" ]; || \
-   [ -v "$TEST_CUDA_SHARED_MEMORY" ]; then
+if [ -v "$TEST_SYSTEM_SHARED_MEMORY" ] || [ -v "$TEST_CUDA_SHARED_MEMORY" ]; then
     EXPECTED_NUM_TESTS="29"
 fi
 
