@@ -200,8 +200,8 @@ TritonModel::Create(
       [raw_local_model, backend](
           uint32_t runner_idx,
           std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
-        // There is only a single thread calling this function so can
-        // use a thread local vector to avoid needing to malloc each time.
+        // Use a thread local vector to avoid needing to malloc each
+        // time an inference is run.
         thread_local std::vector<TRITONBACKEND_Request*> triton_requests(1024);
         triton_requests.clear();
         for (auto& r : requests) {
