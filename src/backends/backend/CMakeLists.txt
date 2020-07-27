@@ -33,6 +33,7 @@ set(
   BACKEND_SRCS
   triton_backend_manager.cc
   triton_model.cc
+  triton_model_instance.cc
 )
 
 set(
@@ -41,6 +42,7 @@ set(
   tritonbackend.h
   triton_backend_manager.h
   triton_model.h
+  triton_model_instance.h
 )
 
 add_library(

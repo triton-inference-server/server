@@ -45,8 +45,12 @@ class TritonBackend {
       TRITONBACKEND_Model* model);
   typedef TRITONSERVER_Error* (*TritonModelFiniFn_t)(
       TRITONBACKEND_Model* model);
-  typedef TRITONSERVER_Error* (*TritonModelExecFn_t)(
-      TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
+  typedef TRITONSERVER_Error* (*TritonModelInstanceInitFn_t)(
+      TRITONBACKEND_ModelInstance* instance);
+  typedef TRITONSERVER_Error* (*TritonModelInstanceFiniFn_t)(
+      TRITONBACKEND_ModelInstance* instance);
+  typedef TRITONSERVER_Error* (*TritonModelInstanceExecFn_t)(
+      TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request** requests,
       const uint32_t request_cnt);
 
   static Status Create(
@@ -63,7 +67,18 @@ class TritonBackend {
 
   TritonModelInitFn_t ModelInitFn() const { return model_init_fn_; }
   TritonModelFiniFn_t ModelFiniFn() const { return model_fini_fn_; }
-  TritonModelExecFn_t ModelExecFn() const { return model_exec_fn_; }
+  TritonModelInstanceInitFn_t ModelInstanceInitFn() const
+  {
+    return inst_init_fn_;
+  }
+  TritonModelInstanceFiniFn_t ModelInstanceFiniFn() const
+  {
+    return inst_fini_fn_;
+  }
+  TritonModelInstanceExecFn_t ModelInstanceExecFn() const
+  {
+    return inst_exec_fn_;
+  }
 
  private:
   typedef TRITONSERVER_Error* (*TritonBackendInitFn_t)(
@@ -94,7 +109,9 @@ class TritonBackend {
   TritonBackendFiniFn_t backend_fini_fn_;
   TritonModelInitFn_t model_init_fn_;
   TritonModelFiniFn_t model_fini_fn_;
-  TritonModelExecFn_t model_exec_fn_;
+  TritonModelInstanceInitFn_t inst_init_fn_;
+  TritonModelInstanceFiniFn_t inst_fini_fn_;
+  TritonModelInstanceExecFn_t inst_exec_fn_;
 
   // Opaque state associated with the backend.
   void* state_;

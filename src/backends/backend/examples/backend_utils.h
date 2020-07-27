@@ -112,28 +112,6 @@ struct ResponseFactoryDeleter {
   }
 };
 
-///
-/// InstanceProperties
-///
-/// Configuration information for a model instance.
-///
-struct InstanceProperties {
-  enum class Kind { CPU, GPU };
-
-  InstanceProperties(const size_t i, const Kind k, const int d)
-      : id_(i), kind_(k), device_id_(d)
-  {
-  }
-  std::string AsString() const;
-
-  size_t id_;
-
-  // For CPU device_id_ is always 0. For GPU device_id_ indicates the
-  // GPU device to be used by the instance.
-  Kind kind_;
-  int device_id_;
-};
-
 //
 // BlockingQueue
 //
@@ -193,16 +171,6 @@ class BlockingQueue {
   mutable std::condition_variable cv_;
   std::deque<T> queue_;
 };
-
-/// Parse model configuration and extra the model instances that
-/// should be implemented for the specified instance groups.
-///
-/// \param model_config The model configuration.
-/// \param instances Returns the model instance information.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_Error* ParseInstanceGroups(
-    TritonJson::Value& model_config,
-    std::vector<InstanceProperties>* instances);
 
 /// Parse an array in a JSON object into the corresponding shape. The
 /// array must be composed of integers.

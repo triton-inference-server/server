@@ -144,7 +144,9 @@ TritonBackend::ClearHandles()
   backend_fini_fn_ = nullptr;
   model_init_fn_ = nullptr;
   model_fini_fn_ = nullptr;
-  model_exec_fn_ = nullptr;
+  inst_init_fn_ = nullptr;
+  inst_fini_fn_ = nullptr;
+  inst_exec_fn_ = nullptr;
 }
 
 Status
@@ -161,7 +163,9 @@ TritonBackend::LoadBackendLibrary()
   TritonBackendFiniFn_t bffn;
   TritonModelInitFn_t mifn;
   TritonModelFiniFn_t mffn;
-  TritonModelExecFn_t mefn;
+  TritonModelInstanceInitFn_t iifn;
+  TritonModelInstanceFiniFn_t iffn;
+  TritonModelInstanceExecFn_t iefn;
 
   // Backend initialize and finalize functions, optional
   RETURN_IF_ERROR(GetEntrypoint(
@@ -179,17 +183,27 @@ TritonBackend::LoadBackendLibrary()
       handle, "TRITONBACKEND_ModelFinalize", true /* optional */,
       reinterpret_cast<void**>(&mffn)));
 
-  // Model execute function, required
+  // Model instance initialize and finalize functions, optional
   RETURN_IF_ERROR(GetEntrypoint(
-      handle, "TRITONBACKEND_ModelExecute", false /* optional */,
-      reinterpret_cast<void**>(&mefn)));
+      handle, "TRITONBACKEND_ModelInstanceInitialize", true /* optional */,
+      reinterpret_cast<void**>(&iifn)));
+  RETURN_IF_ERROR(GetEntrypoint(
+      handle, "TRITONBACKEND_ModelInstanceFinalize", true /* optional */,
+      reinterpret_cast<void**>(&iffn)));
+
+  // Model instance execute function, required
+  RETURN_IF_ERROR(GetEntrypoint(
+      handle, "TRITONBACKEND_ModelInstanceExecute", false /* optional */,
+      reinterpret_cast<void**>(&iefn)));
 
   dlhandle_ = handle;
   backend_init_fn_ = bifn;
   backend_fini_fn_ = bffn;
   model_init_fn_ = mifn;
   model_fini_fn_ = mffn;
-  model_exec_fn_ = mefn;
+  inst_init_fn_ = iifn;
+  inst_fini_fn_ = iffn;
+  inst_exec_fn_ = iefn;
 
   return Status::Success;
 }
