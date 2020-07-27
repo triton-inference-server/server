@@ -321,10 +321,13 @@ TRITONBACKEND_ModelVersion(TRITONBACKEND_Model* model, uint64_t* version)
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_ModelRepositoryPath(TRITONBACKEND_Model* model, const char** path)
+TRITONBACKEND_ModelRepository(
+    TRITONBACKEND_Model* model, TRITONBACKEND_ModelArtifactType* artifact_type,
+    const char** location)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
-  *path = tm->LocalizedModelPath().c_str();
+  *artifact_type = TRITONBACKEND_ARTIFACT_FILESYSTEM;
+  *location = tm->LocalizedModelPath().c_str();
   return nullptr;  // success
 }
 

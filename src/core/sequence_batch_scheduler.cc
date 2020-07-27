@@ -1327,7 +1327,8 @@ OldestSequenceBatch::Enqueue(
     std::unique_ptr<InferenceRequest>& request)
 {
   // Queue the new request... if there isn't already a request in
-  // flight then send one to the dynamic batcher immediately.
+  // flight for this sequence then send one to the dynamic batcher
+  // immediately.
   bool in_flight;
   {
     std::lock_guard<std::mutex> lock(mu_);

@@ -404,14 +404,18 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
        std::to_string(version) + ")")
           .c_str());
 
-  // Can get the full path to the filesystem directory containing this
-  // model... in case we wanted to load something from the repo.
-  const char* cdir;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelRepositoryPath(model, &cdir));
-  std::string dir(cdir);
-
+  // Can get location of the model artifacts. Normally we would need
+  // to check the artifact type to make sure it was something we can
+  // handle... but we are just going to log the location so we don't
+  // need the check. We would use the location if we wanted to load
+  // something from the model's repo.
+  TRITONBACKEND_ModelArtifactType artifact_type;
+  const char* clocation;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelRepository(model, &artifact_type, &clocation));
   LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO, (std::string("Repository path: ") + dir).c_str());
+      TRITONSERVER_LOG_INFO,
+      (std::string("Repository location: ") + clocation).c_str());
 
   // The model can access the backend as well... here we can access
   // the backend global state.
