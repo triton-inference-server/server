@@ -47,7 +47,7 @@ ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 np_dtype_string = np.dtype(object)
 
 
-class InferTest(tu.TestResCollector):
+class InferTest(tu.TestResultCollector):
 
     def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
                     output0_raw, output1_raw, swap):

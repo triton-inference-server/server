@@ -153,11 +153,14 @@ for ENV_VAR in "env" "env_dummy" "config"; do
             cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
         done
 
+        # Copy custom model
+        cp -r /opt/tritonserver/qa/custom_models/custom_float32_float32_float32/ models/
+
         # Copy models with string inputs and remove nobatch (bs=1) models
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object/ models/
         rm -rf models/*nobatch*
 
-        for FW in graphdef savedmodel netdef onnx libtorch plan; do
+        for FW in graphdef savedmodel netdef onnx libtorch plan custom; do
             for MC in `ls models/${FW}*/config.pbtxt`; do
                 echo "instance_group [ { kind: ${KIND} }]" >> $MC
             done
@@ -248,22 +251,20 @@ sleep 60
 
 set +e
 
-# python unittest seems to swallow ImportError and still return 0
-# exit code. So need to explicitly check CLIENT_LOG to make sure
-# we see some running tests
 python $INFER_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 
-grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    RET=1
-fi
 
 set -e
 
