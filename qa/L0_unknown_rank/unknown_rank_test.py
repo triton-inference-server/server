@@ -34,7 +34,7 @@ import tritonhttpclient
 from tritonclientutils import *
 
 
-class UnknownRankTest(tu.TestResCollector):
+class UnknownRankTest(tu.TestResultCollector):
     # helper function to generate requests to the server
     def infer_unknown(self, model_name, tensor_shape):
         print("About to run the test")

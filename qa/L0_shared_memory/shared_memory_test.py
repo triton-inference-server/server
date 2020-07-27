@@ -37,7 +37,7 @@ import tritonshmutils.shared_memory as shm
 from tritonclientutils import *
 
 
-class SharedMemoryTest(tu.TestResCollector):
+class SharedMemoryTest(tu.TestResultCollector):
 
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid system shared memory region

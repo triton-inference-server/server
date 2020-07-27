@@ -42,7 +42,7 @@ import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
 
-class LifeCycleTest(tu.TestResCollector):
+class LifeCycleTest(tu.TestResultCollector):
 
     def _infer_success_models(self,
                               model_base_names,

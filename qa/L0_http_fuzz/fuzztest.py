@@ -35,7 +35,7 @@ import glob
 import os
 
 
-class FuzzTest(tu.TestResCollector):
+class FuzzTest(tu.TestResultCollector):
 
     def _run_fuzz(self, url, logger):
         session = Session(

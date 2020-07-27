@@ -34,7 +34,7 @@ import test_util as tu
 from tritonclientutils import *
 
 
-class TrtCudaGraphTest(tu.TestResCollector):
+class TrtCudaGraphTest(tu.TestResultCollector):
 
     def setUp(self):
         self.dtype_ = np.float32

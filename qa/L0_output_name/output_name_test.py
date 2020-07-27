@@ -44,7 +44,7 @@ from tritongrpcclient import grpc_service_pb2_grpc
 _trials = ("graphdef", "libtorch", "netdef", "onnx", "plan", "savedmodel")
 
 
-class OutputNameValidationTest(tu.TestResCollector):
+class OutputNameValidationTest(tu.TestResultCollector):
 
     def requestGenerator(self, model_name, output_name):
         request = grpc_service_pb2.ModelInferRequest()

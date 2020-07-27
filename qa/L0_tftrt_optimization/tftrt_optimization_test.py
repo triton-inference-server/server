@@ -34,7 +34,7 @@ import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
 
-class TFTRTOptimizationTest(tu.TestResCollector):
+class TFTRTOptimizationTest(tu.TestResultCollector):
 
     def setUp(self):
         self.input0_ = np.arange(start=0, stop=16,

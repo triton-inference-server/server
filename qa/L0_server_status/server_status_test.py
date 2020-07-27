@@ -41,7 +41,7 @@ import tritonhttpclient as httpclient
 from tritonclientutils import *
 
 
-class ServerMetadataTest(tu.TestResCollector):
+class ServerMetadataTest(tu.TestResultCollector):
 
     def test_basic(self):
         try:
@@ -392,7 +392,7 @@ class ServerMetadataTest(tu.TestResCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
 
-class ModelMetadataTest(tu.TestResCollector):
+class ModelMetadataTest(tu.TestResultCollector):
     '''
     These tests must be run after the ServerMetadataTest. See test.sh
     file for correct test running.

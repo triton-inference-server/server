@@ -70,7 +70,7 @@ def completion_callback(user_data, result, error):
     user_data._completed_requests.put((result, error))
 
 
-class SequenceBatcherTestUtil(tu.TestResCollector):
+class SequenceBatcherTestUtil(tu.TestResultCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.

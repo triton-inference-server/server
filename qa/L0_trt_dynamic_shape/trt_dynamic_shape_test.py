@@ -40,7 +40,7 @@ import tritonhttpclient
 from tritonclientutils import InferenceServerException
 
 
-class TrtDynamicShapeTest(tu.TestResCollector):
+class TrtDynamicShapeTest(tu.TestResultCollector):
 
     def setUp(self):
         self.dtype_ = np.float32

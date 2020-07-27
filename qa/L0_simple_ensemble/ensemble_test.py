@@ -38,7 +38,7 @@ import test_util as tu
 import tritonhttpclient
 
 
-class EnsembleTest(tu.TestResCollector):
+class EnsembleTest(tu.TestResultCollector):
 
     def _get_infer_count_per_version(self, model_name):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000",

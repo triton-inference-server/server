@@ -54,7 +54,7 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class DecoupledTest(tu.TestResCollector):
+class DecoupledTest(tu.TestResultCollector):
 
     def setUp(self):
         self.trials_ = [("repeat_int32", None), ("simple_repeat", None),

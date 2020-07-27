@@ -43,7 +43,7 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 
-class ModelQueueTest(tu.TestResCollector):
+class ModelQueueTest(tu.TestResultCollector):
 
     def setUp(self):
         global _deferred_exceptions

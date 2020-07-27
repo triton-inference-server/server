@@ -34,7 +34,7 @@ import unittest
 import test_util as tu
 
 
-class OutputValidationTest(tu.TestResCollector):
+class OutputValidationTest(tu.TestResultCollector):
     # for datatype mismatch
     def test_datatype(self):
         url = 'http://localhost:8000/v2/models/libtorch_datatype_1_float32/infer'

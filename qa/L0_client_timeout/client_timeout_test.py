@@ -55,7 +55,7 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class ClientTimeoutTest(tu.TestResCollector):
+class ClientTimeoutTest(tu.TestResultCollector):
 
     def setUp(self):
         self.model_name_ = "custom_identity_int32"

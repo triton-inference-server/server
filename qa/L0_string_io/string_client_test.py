@@ -37,7 +37,7 @@ import unittest
 import test_util as tu
 
 
-class ClientStringTest(tu.TestResCollector):
+class ClientStringTest(tu.TestResultCollector):
 
     def test_tf_unicode_bytes(self):
         # We use a simple model that takes an input tensor of 8 byte strings

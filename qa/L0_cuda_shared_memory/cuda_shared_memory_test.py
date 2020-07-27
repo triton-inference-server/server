@@ -38,7 +38,7 @@ import tritonshmutils.cuda_shared_memory as cshm
 from tritonclientutils import *
 
 
-class CudaSharedMemoryTest(tu.TestResCollector):
+class CudaSharedMemoryTest(tu.TestResultCollector):
 
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid cuda shared memory region
