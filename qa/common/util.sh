@@ -276,19 +276,19 @@ function check_test_results () {
 
     if [ -z "$expected_num_tests" ]; then
         echo "=== expected number of tests must be defined"
-        return
+        return 1
     fi
 
     num_failures=`tail -n 1 $log_file | jq .failures`
     num_tests=`tail -n 1 $log_file | jq .total`
     if [ $? -ne 0 ]; then
         cat $log_file
-        echo -e "\n***\n*** Test Failed: unable to parse test results\n***"
+        echo -e "\n***\n*** Test Failed: unable to parse test results\n***" >> $log_file
         return 1
     fi
     if [ $num_failures != "0" ] || [ $num_tests -ne $expected_num_tests ]; then
         cat $log_file
-        echo -e "\n***\n*** Test Failed: Expected $expected_num_tests test(s), $num_tests test(s) executed, and $num_failures test(s) failed. \n***"
+        echo -e "\n***\n*** Test Failed: Expected $expected_num_tests test(s), $num_tests test(s) executed, and $num_failures test(s) failed. \n***" >> $log_file
         return 1
     fi
 
