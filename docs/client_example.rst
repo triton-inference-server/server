@@ -416,7 +416,7 @@ models are provided in an example ensemble model repository. See
 create one.
 
 Follow the instructions in :ref:`section-running-triton` to launch
-Truton using the ensemble model repository. Once Triton is running you
+Triton using the ensemble model repository. Once Triton is running you
 can use the ensemble\_image\_client application to send inference
 requests. You can specify a single image or a directory holding
 images. Here we send a request for the ensemble from the :ref:`example
