@@ -225,18 +225,18 @@ TritonBackend::UnloadBackendLibrary()
 extern "C" {
 
 TRITONSERVER_Error*
-TRITONBACKEND_BackendName(TRITONBACKEND_Backend* backend, const char** name)
+TRITONBACKEND_ApiVersion(uint32_t* major, uint32_t* minor)
 {
-  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
-  *name = tb->Name().c_str();
+  *major = TRITONBACKEND_API_VERSION_MAJOR;
+  *minor = TRITONBACKEND_API_VERSION_MINOR;
   return nullptr;  // success
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_BackendApiVersion(
-    TRITONBACKEND_Backend* backend, uint32_t* api_version)
+TRITONBACKEND_BackendName(TRITONBACKEND_Backend* backend, const char** name)
 {
-  *api_version = TRITONBACKEND_API_VERSION;
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  *name = tb->Name().c_str();
   return nullptr;  // success
 }
 

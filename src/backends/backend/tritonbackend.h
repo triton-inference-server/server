@@ -50,8 +50,46 @@ struct TRITONBACKEND_Backend;
 struct TRITONBACKEND_Model;
 struct TRITONBACKEND_ModelInstance;
 
-// Version of this TRITONBACKEND API.
-#define TRITONBACKEND_API_VERSION 1
+///
+/// TRITONBACKEND API Version
+///
+/// The TRITONBACKEND API is versioned with major and minor version
+/// numbers. Any change to the API that does not impact backwards
+/// compatibility (for example, adding a non-required function)
+/// increases the minor version number. Any change that breaks
+/// backwards compatibility (for example, deleting or changing the
+/// behavior of a function) increases the major version number. A
+/// backend should check that the API version used to compile the
+/// backend is compatible with the API version of the Triton server
+/// that it is running in. This is typically done by code similar to
+/// the following which makes sure that the major versions are equal
+/// and that the minor version of Triton is >= the minor version used
+/// to build the backend.
+///
+///   uint32_t api_version_major, api_version_minor;
+///   TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor);
+///   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
+///       (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
+///     return TRITONSERVER_ErrorNew(
+///       TRITONSERVER_ERROR_UNSUPPORTED,
+///       "triton backend API version does not support this backend");
+///   }
+///
+#define TRITONBACKEND_API_VERSION_MAJOR 0
+#define TRITONBACKEND_API_VERSION_MINOR 1
+
+/// Get the TRITONBACKEND API version supported by Triton. This value
+/// can be compared against the TRITONBACKEND_API_VERSION_MAJOR and
+/// TRITONBACKEND_API_VERSION_MINOR used to build the backend to
+/// ensure that Triton is compatible with the backend.
+///
+/// \param major Returns the TRITONBACKEND API major version supported
+/// by Triton.
+/// \param minor Returns the TRITONBACKEND API minor version supported
+/// by Triton.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ApiVersion(
+    uint32_t* major, uint32_t* minor);
 
 /// Device number that indicates "no device".
 #define TRITONBACKEND_NO_DEVICE -1
@@ -404,18 +442,6 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSend(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendName(
     TRITONBACKEND_Backend* backend, const char** name);
-
-/// Get the TRITONBACKEND API version supported by Triton. This value
-/// can be compared against the TRITONBACKEND_API_VERSION used to
-/// compile the backend to ensure that Triton is compatible with the
-/// backend.
-///
-/// \param backend The backend.
-/// \param api_version Returns the TRITONBACKEND API version supported
-/// by Triton.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendApiVersion(
-    TRITONBACKEND_Backend* backend, uint32_t* api_version);
 
 /// Get the backend configuration.  The 'backend_config' message is
 /// owned by Triton and should not be modified or freed by the caller.
