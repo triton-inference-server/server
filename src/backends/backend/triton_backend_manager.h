@@ -62,6 +62,12 @@ class TritonBackend {
   const std::string& Name() const { return name_; }
   const TritonServerMessage& BackendConfig() const { return backend_config_; }
 
+  TRITONBACKEND_ExecutionPolicy ExecutionPolicy() const { return exec_policy_; }
+  void SetExecutionPolicy(const TRITONBACKEND_ExecutionPolicy policy)
+  {
+    exec_policy_ = policy;
+  }
+
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
@@ -112,6 +118,9 @@ class TritonBackend {
   TritonModelInstanceInitFn_t inst_init_fn_;
   TritonModelInstanceFiniFn_t inst_fini_fn_;
   TritonModelInstanceExecFn_t inst_exec_fn_;
+
+  // Execution policy
+  TRITONBACKEND_ExecutionPolicy exec_policy_;
 
   // Opaque state associated with the backend.
   void* state_;
