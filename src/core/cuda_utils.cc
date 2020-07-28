@@ -178,6 +178,23 @@ GetSupportedGPUs(
   return Status::Success;
 }
 
+Status
+CheckGPUIntegrated(const int gpu_id, bool* is_integrated)
+{
+  // Query the device to check if integrated
+  cudaDeviceProp cuprops;
+  cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_id);
+  if (cuerr != cudaSuccess) {
+    return Status(
+        Status::Code::INTERNAL,
+        "unable to get CUDA device properties for GPU ID" +
+            std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
+  }
+
+  *is_integrated = cuprops.integrated;
+  return Status::Success;
+}
+
 #endif
 
 }}  // namespace nvidia::inferenceserver
