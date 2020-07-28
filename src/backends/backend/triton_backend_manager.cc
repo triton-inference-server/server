@@ -116,7 +116,8 @@ TritonBackend::Create(
 TritonBackend::TritonBackend(
     const std::string& name, const std::string& path,
     const TritonServerMessage& backend_config)
-    : name_(name), path_(path), backend_config_(backend_config), state_(nullptr)
+    : name_(name), path_(path), backend_config_(backend_config),
+      exec_policy_(TRITONBACKEND_EXECUTION_BLOCKING), state_(nullptr)
 {
   ClearHandles();
 }
@@ -247,6 +248,24 @@ TRITONBACKEND_BackendConfig(
   TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
   *backend_config = const_cast<TRITONSERVER_Message*>(
       reinterpret_cast<const TRITONSERVER_Message*>(&tb->BackendConfig()));
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_BackendExecutionPolicy(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_ExecutionPolicy* policy)
+{
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  *policy = tb->ExecutionPolicy();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_BackendSetExecutionPolicy(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_ExecutionPolicy policy)
+{
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  tb->SetExecutionPolicy(policy);
   return nullptr;  // success
 }
 

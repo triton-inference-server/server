@@ -395,6 +395,25 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ResponseSend(
 /// Object representing a backend.
 ///
 
+/// TRITONBACKEND_ExecutionPolicy
+///
+/// Types of execution policy that can be implemented by a backend.
+///
+///   TRITONBACKEND_EXECUTION_BLOCKING: An instance of the model
+///     blocks in TRITONBACKEND_ModelInstanceExecute until it is ready
+///     to handle another inference. Upon returning from
+///     TRITONBACKEND_ModelInstanceExecute, Triton may immediately
+///     call TRITONBACKEND_ModelInstanceExecute for the same instance
+///     to execute a new batch of requests. Thus, most backends using
+///     this policy will not return from
+///     TRITONBACKEND_ModelInstanceExecute until all responses have
+///     been sent and all requests have been released. This is the
+///     default execution policy.
+///
+typedef enum TRITONBACKEND_execpolicy_enum {
+  TRITONBACKEND_EXECUTION_BLOCKING
+} TRITONBACKEND_ExecutionPolicy;
+
 /// Get the name of the backend. The caller does not own the returned
 /// string and must not modify or delete it. The lifetime of the
 /// returned string extends only as long as 'backend'.
@@ -434,6 +453,28 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendApiVersion(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendConfig(
     TRITONBACKEND_Backend* backend, TRITONSERVER_Message** backend_config);
+
+/// Get the execution policy for this backend. By default the
+/// execution policy is TRITONBACKEND_EXECUTION_BLOCKING.
+///
+/// \param backend The backend.
+/// \param policy Returns the execution policy.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendExecutionPolicy(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_ExecutionPolicy* policy);
+
+/// Set the execution policy for this backend. By default the
+/// execution policy is TRITONBACKEND_EXECUTION_BLOCKING. Triton reads
+/// the backend's execution policy after calling
+/// TRITONBACKEND_Initialize, so to be recognized, changes to the
+/// execution policy must be made in TRITONBACKEND_Initialize.
+///
+/// \param backend The backend.
+/// \param policy The execution policy.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error*
+TRITONBACKEND_BackendSetExecutionPolicy(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_ExecutionPolicy policy);
 
 /// Get the user-specified state associated with the backend. The
 /// state is completely owned and managed by the backend.
