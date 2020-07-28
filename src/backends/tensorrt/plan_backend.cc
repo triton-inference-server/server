@@ -151,6 +151,7 @@ PlanBackend::Context::~Context()
 {
   LOG_VERBOSE(1) << "~PlanBackend::Context ";
 
+  cudaSetDevice(gpu_device_);
   for (auto buffer : buffers_) {
     if (buffer != nullptr) {
       cudaError_t err = cudaFree(buffer);
@@ -1413,6 +1414,7 @@ PlanBackend::~PlanBackend()
   contexts_.clear();
 
   for (auto& device_engine : device_engines_) {
+    cudaSetDevice(device_engine.first);
     auto& runtime = device_engine.second.first;
     auto& engine = device_engine.second.second;
     if (engine != nullptr) {
