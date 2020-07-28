@@ -505,6 +505,16 @@ main(int argc, char** argv)
   }
 #endif  // TRITON_ENABLE_GPU
 
+  // Check API version.
+  uint32_t api_version_major, api_version_minor;
+  FAIL_IF_ERR(
+      TRITONSERVER_ApiVersion(&api_version_major, &api_version_minor),
+      "getting Triton API version");
+  if ((TRITONSERVER_API_VERSION_MAJOR != api_version_major) ||
+      (TRITONSERVER_API_VERSION_MINOR > api_version_minor)) {
+    FAIL("triton server API version mismatch");
+  }
+
   // Create the server...
   TRITONSERVER_ServerOptions* server_options = nullptr;
   FAIL_IF_ERR(
