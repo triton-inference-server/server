@@ -500,6 +500,20 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendSetState(
 /// Object representing a model implemented using the backend.
 ///
 
+/// TRITONBACKEND_ModelArtifactType
+///
+/// The ways that the files that make up a model are communicated to
+/// the backend.
+///
+///   TRITONBACKEND_ARTIFACT_FILESYSTEM: The model artifacts are made
+///     available to Triton via a locally accessible filesystem. The
+///     backend can access these files using an appropriate system
+///     API.
+///
+typedef enum TRITONBACKEND_modelartifacttype_enum {
+  TRITONBACKEND_ARTIFACT_FILESYSTEM
+} TRITONBACKEND_ModelArtifactType;
+
 /// Get the name of the model. The returned string is owned by the
 /// model object, not the caller, and so should not be modified or
 /// freed.
@@ -518,15 +532,24 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelName(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelVersion(
     TRITONBACKEND_Model* model, uint64_t* version);
 
-/// Get the full path to the directory in the model repository that
-/// contains this model. The returned string is owned by the model
-/// object, not the caller, and so should not be modified or freed.
+/// Get the location of the files that make up the model. The
+/// 'localtion' communicated depends on how the model is being
+/// communicated to Triton as indicated by 'artifact_type'.
+///
+///   TRITONBACKEND_ARTIFACT_FILESYSTEM: The model artifacts are made
+///     available to Triton via the local filesytem. 'location'
+///     returns the full path to the directory in the model repository
+///     that contains this model's artifacts. The returned string is
+///     owned by 'model', not the caller, and so should not be
+///     modified or freed.
 ///
 /// \param model The model.
-/// \param path Returns the full path.
+/// \param artifact_type Returns the artifact type for the model.
+/// \param path Returns the location.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelRepositoryPath(
-    TRITONBACKEND_Model* model, const char** path);
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelRepository(
+    TRITONBACKEND_Model* model, TRITONBACKEND_ModelArtifactType* artifact_type,
+    const char** location);
 
 /// Get the model configuration. The caller takes ownership of the
 /// message object and must call TRITONSERVER_MessageDelete to release
