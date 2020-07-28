@@ -254,9 +254,9 @@ Triton :ref:`loads a model <section-model-management>`:
 
 * Triton creates the TRITONBACKEND\_Model object that represents the
   model. Triton calls TRITONBACKEND\_ModelInitialize if it is
-  implemented in the backend shared
-  library. TRITONBACKEND\_ModelInitialize should not return until the
-  backend is completely initialized for the model. If
+  implemented in the backend shared library.
+  TRITONBACKEND\_ModelInitialize should not return until the backend
+  is completely initialized for the model. If
   TRITONBACKEND\_ModelInitialize returns an error, Triton will show
   that the model failed to load.
 
@@ -273,8 +273,8 @@ Triton :ref:`loads a model <section-model-management>`:
     TRITONBACKEND\_ModelInstanceInitialize returns an error, Triton
     will show that the model failed to load.
 
-Backend, model and instance finalization is triggered when Triton
-:ref:`unloads a model <section-model-management>`:
+Backend, model and model instance finalization is triggered when
+Triton :ref:`unloads a model <section-model-management>`:
 
 * For each model instance:
 
