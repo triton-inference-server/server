@@ -316,28 +316,28 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
 
   // We should check the backend API version that Triton supports
   // vs. what this backend was compiled against.
-  uint32_t api_version;
-  RETURN_IF_ERROR(TRITONBACKEND_BackendApiVersion(backend, &api_version));
+  uint32_t api_version_major, api_version_minor;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor));
 
   LOG_MESSAGE(
       TRITONSERVER_LOG_INFO,
       (std::string("Triton TRITONBACKEND API version: ") +
-       std::to_string(api_version))
+       std::to_string(api_version_major) + "." +
+       std::to_string(api_version_minor))
           .c_str());
   LOG_MESSAGE(
       TRITONSERVER_LOG_INFO,
       (std::string("'") + name + "' TRITONBACKEND API version: " +
-       std::to_string(TRITONBACKEND_API_VERSION))
+       std::to_string(TRITONBACKEND_API_VERSION_MAJOR) + "." +
+       std::to_string(TRITONBACKEND_API_VERSION_MINOR))
           .c_str());
 
-  if (api_version < TRITONBACKEND_API_VERSION) {
+  if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
+      (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
-        (std::string(" triton backend API version '") +
-         std::to_string(api_version) +
-         "' is less than backend's API version '" +
-         std::to_string(TRITONBACKEND_API_VERSION) + "'")
-            .c_str());
+        "triton backend API version does not support this backend");
   }
 
   // The backend configuration may contain information needed by the
