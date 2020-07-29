@@ -400,8 +400,8 @@ InferenceRequest::RemoveAllOriginalInputs()
 
 Status
 InferenceRequest::AddOverrideInput(
-    const std::string& name, const inference::DataType datatype,const int64_t batch_size,
-    const std::vector<int64_t>& shape,
+    const std::string& name, const inference::DataType datatype,
+    const int64_t batch_size, const std::vector<int64_t>& shape,
     std::shared_ptr<InferenceRequest::Input>* input)
 {
   std::shared_ptr<Input> i = std::make_shared<Input>(name, datatype, shape);

@@ -150,9 +150,10 @@ namespace {
 
 Status
 GetBooleanOverrideInputs(
-    const std::string& tensor_name, const bool support_batching, const inference::DataType tensor_datatype,
-    const float fp32_false_value, const float fp32_true_value,
-    const int32_t int32_false_value, const int32_t int32_true_value,
+    const std::string& tensor_name, const bool support_batching,
+    const inference::DataType tensor_datatype, const float fp32_false_value,
+    const float fp32_true_value, const int32_t int32_false_value,
+    const int32_t int32_true_value,
     std::shared_ptr<InferenceRequest::Input>* true_override,
     std::shared_ptr<InferenceRequest::Input>* false_override)
 {

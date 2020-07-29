@@ -68,7 +68,7 @@ namespace dyna_sequence {
 class Context : public CustomInstance {
  public:
   Context(
-      const std::string& instance_name, const ModelConfig& config,
+      const std::string& instance_name, const inference::ModelConfig& config,
       const int gpu_device);
   ~Context();
 
@@ -122,8 +122,8 @@ class Context : public CustomInstance {
 };
 
 Context::Context(
-    const std::string& instance_name, const ModelConfig& model_config,
-    const int gpu_device)
+    const std::string& instance_name,
+    const inference::ModelConfig& model_config, const int gpu_device)
     : CustomInstance(instance_name, model_config, gpu_device),
       execute_delay_ms_(0)
 {
@@ -155,7 +155,8 @@ Context::Init()
 
   auto& batcher = model_config_.sequence_batching();
 
-  std::unordered_map<std::string, const ModelSequenceBatching::ControlInput*>
+  std::unordered_map<
+      std::string, const inference::ModelSequenceBatching::ControlInput*>
       controls;
   for (const auto& ci : batcher.control_input()) {
     controls.insert({ci.name(), &ci});
@@ -174,7 +175,7 @@ Context::Init()
 
   // The CORRID input must be UINT64 type.
   if (controls.find("CORRID")->second->control(0).data_type() !=
-      DataType::TYPE_UINT64) {
+      inference::DataType::TYPE_UINT64) {
     return kCorrIDType;
   }
 
@@ -184,7 +185,7 @@ Context::Init()
       (model_config_.input(0).dims().size() != 1)) {
     return kInput;
   }
-  if (model_config_.input(0).data_type() != DataType::TYPE_INT32) {
+  if (model_config_.input(0).data_type() != inference::DataType::TYPE_INT32) {
     return kInputOutputDataType;
   }
   if (model_config_.input(0).name() != "INPUT") {
@@ -198,7 +199,7 @@ Context::Init()
       (model_config_.output(0).dims(0) != model_config_.input(0).dims(0))) {
     return kOutput;
   }
-  if (model_config_.output(0).data_type() != DataType::TYPE_INT32) {
+  if (model_config_.output(0).data_type() != inference::DataType::TYPE_INT32) {
     return kInputOutputDataType;
   }
   if (model_config_.output(0).name() != "OUTPUT") {
@@ -283,8 +284,10 @@ Context::Execute(
       continue;
     }
 
-    const size_t batch1_byte_size = GetDataTypeByteSize(TYPE_INT32);
-    const size_t batch1_corrid_byte_size = GetDataTypeByteSize(TYPE_UINT64);
+    const size_t batch1_byte_size =
+        GetDataTypeByteSize(inference::DataType::TYPE_INT32);
+    const size_t batch1_corrid_byte_size =
+        GetDataTypeByteSize(inference::DataType::TYPE_UINT64);
     int64_t input_element_cnt = 0;
 
     // Get the number of elements in the input tensor.
@@ -424,7 +427,7 @@ Context::Execute(
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,
-    const ModelConfig& model_config, int gpu_device,
+    const inference::ModelConfig& model_config, int gpu_device,
     const CustomInitializeData* data)
 {
   dyna_sequence::Context* context =

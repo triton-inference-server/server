@@ -50,7 +50,7 @@ enum ScaleType { NONE = 0, VGG = 1, INCEPTION = 2, ONE255 = 3 };
 class Context : public CustomInstance {
  public:
   Context(
-      const std::string& instance_name, const ModelConfig& config,
+      const std::string& instance_name, const inference::ModelConfig& config,
       const int gpu_device);
 
   // Initialize the context. Validate that the model configuration,
@@ -70,10 +70,10 @@ class Context : public CustomInstance {
 
   int Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size);
 
-  bool ParseType(const DataType& dtype, int* type1, int* type3);
+  bool ParseType(const inference::DataType& dtype, int* type1, int* type3);
 
   // The format of the preprocessed image
-  ModelInput::Format format_;
+  inference::ModelInput::Format format_;
 
   // The scaling used to normalize the image for corresponding models
   ScaleType scaling_ = NONE;
@@ -82,7 +82,7 @@ class Context : public CustomInstance {
   std::vector<int64_t> output_shape_;
 
   // The data type of preprocessed image
-  DataType output_type_;
+  inference::DataType output_type_;
 
   // Local error codes
   const int kBatching = RegisterError("batching not supported");
@@ -100,8 +100,8 @@ class Context : public CustomInstance {
 };
 
 Context::Context(
-    const std::string& instance_name, const ModelConfig& model_config,
-    const int gpu_device)
+    const std::string& instance_name,
+    const inference::ModelConfig& model_config, const int gpu_device)
     : CustomInstance(instance_name, model_config, gpu_device)
 {
 }
@@ -121,7 +121,7 @@ Context::Init()
   if (model_config_.input(0).dims(0) != 1) {
     return kInput;
   }
-  if (model_config_.input(0).data_type() != DataType::TYPE_STRING) {
+  if (model_config_.input(0).data_type() != inference::DataType::TYPE_STRING) {
     return kInput;
   }
 
@@ -146,9 +146,9 @@ Context::Init()
   for (const auto& pr : model_config_.parameters()) {
     if (pr.first == "format") {
       if (pr.second.string_value() == "NHWC") {
-        format_ = ModelInput::FORMAT_NHWC;
+        format_ = inference::ModelInput::FORMAT_NHWC;
       } else {
-        format_ = ModelInput::FORMAT_NCHW;
+        format_ = inference::ModelInput::FORMAT_NCHW;
       }
     } else if (pr.first == "scaling") {
       if (pr.second.string_value() == "VGG") {
@@ -319,7 +319,7 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
   // orderings (like RGB, BGR). We are going to assume that RGB is the
   // most likely ordering and so change the channels to that ordering.
   size_t c, h, w;
-  if (format_ == ModelInput::FORMAT_NHWC) {
+  if (format_ == inference::ModelInput::FORMAT_NHWC) {
     h = output_shape_[0];
     w = output_shape_[1];
     c = output_shape_[2];
@@ -393,7 +393,7 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
 
   // For NHWC format Mat is already in the correct order but need to
   // handle both cases of data being contigious or not.
-  if (format_ == ModelInput::FORMAT_NHWC) {
+  if (format_ == inference::ModelInput::FORMAT_NHWC) {
     if (sample_final.isContinuous()) {
       memcpy(data, sample_final.datastart, *image_byte_size);
       pos = *image_byte_size;
@@ -405,7 +405,7 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
       }
     }
   } else {
-    // (format_ == ModelInput::FORMAT_NCHW)
+    // (format_ == inference::ModelInput::FORMAT_NCHW)
     //
     // For CHW formats must split out each channel from the matrix and
     // order them as BBBB...GGGG...RRRR. To do this split the channels
@@ -430,27 +430,27 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
 }
 
 bool
-Context::ParseType(const DataType& dtype, int* type1, int* type3)
+Context::ParseType(const inference::DataType& dtype, int* type1, int* type3)
 {
-  if (dtype == DataType::TYPE_UINT8) {
+  if (dtype == inference::DataType::TYPE_UINT8) {
     *type1 = CV_8UC1;
     *type3 = CV_8UC3;
-  } else if (dtype == DataType::TYPE_INT8) {
+  } else if (dtype == inference::DataType::TYPE_INT8) {
     *type1 = CV_8SC1;
     *type3 = CV_8SC3;
-  } else if (dtype == DataType::TYPE_UINT16) {
+  } else if (dtype == inference::DataType::TYPE_UINT16) {
     *type1 = CV_16UC1;
     *type3 = CV_16UC3;
-  } else if (dtype == DataType::TYPE_INT16) {
+  } else if (dtype == inference::DataType::TYPE_INT16) {
     *type1 = CV_16SC1;
     *type3 = CV_16SC3;
-  } else if (dtype == DataType::TYPE_INT32) {
+  } else if (dtype == inference::DataType::TYPE_INT32) {
     *type1 = CV_32SC1;
     *type3 = CV_32SC3;
-  } else if (dtype == DataType::TYPE_FP32) {
+  } else if (dtype == inference::DataType::TYPE_FP32) {
     *type1 = CV_32FC1;
     *type3 = CV_32FC3;
-  } else if (dtype == DataType::TYPE_FP64) {
+  } else if (dtype == inference::DataType::TYPE_FP64) {
     *type1 = CV_64FC1;
     *type3 = CV_64FC3;
   } else {
@@ -467,7 +467,7 @@ Context::ParseType(const DataType& dtype, int* type1, int* type3)
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,
-    const ModelConfig& model_config, int gpu_device,
+    const inference::ModelConfig& model_config, int gpu_device,
     const CustomInitializeData* data)
 {
   // Create the context and validate that the model configuration is

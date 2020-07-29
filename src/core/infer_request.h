@@ -309,8 +309,8 @@ class InferenceRequest {
   // backends that implemented w/o backend API (which need correct
   // input.Shape()), but backend API uses input.ShapeWithBatchDim().
   Status AddOverrideInput(
-      const std::string& name, const inference::DataType datatype, const int64_t batch_size,
-      const std::vector<int64_t>& shape,
+      const std::string& name, const inference::DataType datatype,
+      const int64_t batch_size, const std::vector<int64_t>& shape,
       std::shared_ptr<Input>* input = nullptr);
 
   // Add an override input to the request.
