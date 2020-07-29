@@ -27,12 +27,20 @@
 
 /// \file
 
+#cmakedefine TRITON_CLIENT_HEADER_FLAT 1
+
 #include <queue>
+#ifdef TRITON_CLIENT_HEADER_FLAT
+#include "common.h"
+#include "ipc.h"
+#include "grpc_service.grpc.pb.h"
+#include "model_config.pb.h"
+#else
 #include "src/clients/c++/library/common.h"
 #include "src/clients/c++/library/ipc.h"
-#include "src/core/constants.h"
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/model_config.pb.h"
+#endif
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
