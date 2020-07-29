@@ -356,6 +356,17 @@ extern "C" {
 #endif
 
 //
+// TRITONSERVER API Version
+//
+TRITONSERVER_Error*
+TRITONSERVER_ApiVersion(uint32_t* major, uint32_t* minor)
+{
+  *major = TRITONSERVER_API_VERSION_MAJOR;
+  *minor = TRITONSERVER_API_VERSION_MINOR;
+  return nullptr;  // success
+}
+
+//
 // TRITONSERVER_DataType
 //
 const char*
