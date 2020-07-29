@@ -48,6 +48,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
+if(${TRITON_CLIENT_SKIP_EXAMPLES})
+  add_definitions(-DTRITON_CLIENT_SKIP_EXAMPLES=1)
+endif() # TRITON_CLIENT_SKIP_EXAMPLES
+
 if(${TRITON_ENABLE_HTTP})
   add_definitions(-DTRITON_ENABLE_HTTP=1)
 endif() # TRITON_ENABLE_HTTP

@@ -27,5 +27,7 @@
 cmake_minimum_required (VERSION 3.5)
 
 add_subdirectory(library)
-add_subdirectory(examples)
-add_subdirectory(perf_client)
+if(NOT ${TRITON_CLIENT_SKIP_EXAMPLES})
+  add_subdirectory(examples)
+  add_subdirectory(perf_client)
+endif() # TRITON_CLIENT_SKIP_EXAMPLES

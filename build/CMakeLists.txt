@@ -61,6 +61,7 @@ set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server 
 
 # Client
 set(TRITON_CLIENT_CMAKE_DIR "" CACHE PATH "Path to Triton client library cmake configuration")
+option(TRITON_CLIENT_SKIP_EXAMPLES "Skip building client examples" OFF)
 
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
@@ -440,6 +441,7 @@ ExternalProject_Add(client
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     ${_CMAKE_TRITON_DIR}
     -DTRITON_ENABLE_METRICS:BOOL=OFF
+    -DTRITON_CLIENT_SKIP_EXAMPLES:BOOL=${TRITON_CLIENT_SKIP_EXAMPLES}
     -DTRITON_ENABLE_HTTP:BOOL=${TRITON_ENABLE_HTTP}
     -DTRITON_ENABLE_GRPC:BOOL=${TRITON_ENABLE_GRPC}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
