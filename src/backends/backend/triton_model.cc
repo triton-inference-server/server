@@ -322,8 +322,7 @@ TritonModel::MetricReporter(
 
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
-    static std::mutex mp_mtx;
-    std::lock_guard<std::mutex> lk(mp_mtx);
+    std::lock_guard<std::mutex> lk(reporter_mtx_);
     // Metric reporters vary based on 'device'...
     const auto& itr = reporters_.find(device);
     if (itr != reporters_.end()) {
