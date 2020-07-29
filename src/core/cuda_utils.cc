@@ -179,7 +179,7 @@ GetSupportedGPUs(
 }
 
 Status
-CheckGPUIntegrated(const int gpu_id, bool* is_integrated)
+CheckGPUZeroCopySupport(const int gpu_id, bool* zero_copy_support)
 {
   // Query the device to check if integrated
   cudaDeviceProp cuprops;
@@ -191,7 +191,13 @@ CheckGPUIntegrated(const int gpu_id, bool* is_integrated)
             std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
   }
 
-  *is_integrated = cuprops.integrated;
+  // Zero-copy supported only on integrated GPU when it can map host memory
+  if (cuprops.integrated && cuprops.canMapHostMemory) {
+    *zero_copy_support = true;
+  } else {
+    *zero_copy_support = false;
+  }
+
   return Status::Success;
 }
 

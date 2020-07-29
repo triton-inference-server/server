@@ -877,11 +877,20 @@ PlanBackend::Context::InitializeShapeInputBinding(
   }
 
   if (max_byte_size != NO_BATCHING) {
-    // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
-    // indicate that the buffer has been correctly initalized so even
-    // for zero-sized tensors always allocate something.
+    // Allocate CUDA memory. Use cudaHostAlloc if zero copy supported. We rely
+    // on buffer_bindings_ being non-nullptr to indicate that the buffer has
+    // been correctly initalized so even for zero-sized tensors always allocate
+    // something.
+    bool zero_copy_support = false;
     void* buffer;
-    cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    cudaError_t err;
+    Status status = CheckGPUZeroCopySupport(gpu_device_, &zero_copy_support);
+    if (status.IsOk() && zero_copy_support) {
+      err = cudaHostAlloc(
+          &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
+    } else {
+      err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    }
     if (err != cudaSuccess) {
       return Status(
           Status::Code::INTERNAL, "unable to allocate memory for input '" +
@@ -1069,11 +1078,20 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     max_byte_size = std::max(max_byte_size, byte_size);
   }
 
-  // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
-  // indicate that the buffer has been correctly initalized so even
-  // for zero-sized tensors always allocate something.
+  // Allocate CUDA memory. Use cudaHostAlloc if zero copy supported. We rely
+  // on buffer_bindings_ being non-nullptr to indicate that the buffer has
+  // been correctly initalized so even for zero-sized tensors always allocate
+  // something.
+  bool zero_copy_support = false;
   void* buffer;
-  cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+  cudaError_t err;
+  Status status = CheckGPUZeroCopySupport(gpu_device_, &zero_copy_support);
+  if (status.IsOk() && zero_copy_support) {
+    err = cudaHostAlloc(
+        &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
+  } else {
+    err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+  }
   if (err != cudaSuccess) {
     return Status(
         Status::Code::INTERNAL, "unable to allocate memory for input '" +
@@ -1326,17 +1344,25 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
     }
 
     if (max_byte_size != NO_BATCHING) {
-      // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
-      // indicate that the buffer has been correctly initalized so even
-      // for zero-sized tensors always allocate something.
+      // Allocate CUDA memory. Use cudaHostAlloc if zero copy supported. We rely
+      // on buffer_bindings_ being non-nullptr to indicate that the buffer has
+      // been correctly initalized so even for zero-sized tensors always
+      // allocate something.
+      bool zero_copy_support = false;
       void* buffer;
-      cudaError_t err =
-          cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+      cudaError_t err;
+      Status status = CheckGPUZeroCopySupport(gpu_device_, &zero_copy_support);
+      if (status.IsOk() && zero_copy_support) {
+        err = cudaHostAlloc(
+            &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
+      } else {
+        err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+      }
       if (err != cudaSuccess) {
         return Status(
             Status::Code::INTERNAL, "unable to allocate memory for input '" +
                                         io.name() + " for " + name_ + ": " +
-                                        std::string(cudaGetErrorString(err)));
+                                        cudaGetErrorString(err));
       }
 
       io_binding_info.byte_size_ = max_byte_size;
@@ -1457,16 +1483,25 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       max_byte_size = std::max(max_byte_size, byte_size);
     }
 
-    // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
-    // indicate that the buffer has been correctly initalized so even
-    // for zero-sized tensors always allocate something.
+    // Allocate CUDA memory. Use cudaHostAlloc if zero copy supported. We rely
+    // on buffer_bindings_ being non-nullptr to indicate that the buffer has
+    // been correctly initalized so even for zero-sized tensors always allocate
+    // something.
+    bool zero_copy_support = false;
     void* buffer;
-    cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    cudaError_t err;
+    Status status = CheckGPUZeroCopySupport(gpu_device_, &zero_copy_support);
+    if (status.IsOk() && zero_copy_support) {
+      err = cudaHostAlloc(
+          &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
+    } else {
+      err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    }
     if (err != cudaSuccess) {
       return Status(
           Status::Code::INTERNAL, "unable to allocate memory for input '" +
                                       io.name() + " for " + name_ + ": " +
-                                      std::string(cudaGetErrorString(err)));
+                                      cudaGetErrorString(err));
     }
 
     io_binding_info.byte_size_ = max_byte_size;

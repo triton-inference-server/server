@@ -91,6 +91,7 @@ Status CheckGPUCompatibility(
 /// errors encountered while querying GPU devices.
 Status GetSupportedGPUs(
     std::set<int>* supported_gpus, const double min_compute_capability);
+Status CheckGPUZeroCopySupport(const int gpu_id, bool* zero_copy_support);
 #endif
 
 }}  // namespace nvidia::inferenceserver
