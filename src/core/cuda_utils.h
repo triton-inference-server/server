@@ -58,13 +58,21 @@ Status EnablePeerAccess(const double min_compute_capability);
 /// Copy buffer from 'src' to 'dst' for given 'byte_size'. The buffer location
 /// is identified by the memory type and id, and the corresponding copy will be
 /// initiated.
-/// 'msg' is the message to be prepended in error message.
-/// 'cuda_stream' specifies the stream to be associated with, and 0 can be
+/// \param msg The message to be prepended in error message.
+/// \param src_memory_type The memory type CPU/GPU of the source.
+/// \param src_memory_type_id The device id of the source.
+/// \param dst_memory_type The memory type CPU/GPU of the destination.
+/// \param dst_memory_type_id The device id of the destination.
+/// \param byte_size The size in bytes to me copied from source to destination.
+/// \param src The buffer start address of the source.
+/// \param dst The buffer start address of the destination.
+/// \param cuda_stream The stream to be associated with, and 0 can be
 /// passed for default stream.
-/// 'cuda_used' returns whether a CUDA memory copy is initiated. If true,
+/// \param cuda_used returns whether a CUDA memory copy is initiated. If true,
 /// the caller should synchronize on the given 'cuda_stream' to ensure data copy
 /// is completed.
-/// \return The error status.
+/// \return The error status. A non-ok status indicates failure to copy the
+/// buffer.
 Status CopyBuffer(
     const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
     const int64_t src_memory_type_id,
@@ -78,7 +86,7 @@ Status CopyBuffer(
 /// \param min_compute_capability The minimum support CUDA compute
 /// capability.
 /// \return The error status. A non-OK status means the target GPU is
-///  not supported
+/// not supported.
 Status CheckGPUCompatibility(
     const int gpu_id, const double min_compute_capability);
 
@@ -91,6 +99,12 @@ Status CheckGPUCompatibility(
 /// errors encountered while querying GPU devices.
 Status GetSupportedGPUs(
     std::set<int>* supported_gpus, const double min_compute_capability);
+
+/// Checks if the GPU specified is an integrated GPU and supports Zero-copy.
+/// \param gpu_id The index of the target GPU.
+/// \param zero_copy_support If true, Zero-copy is supported by this GPU.
+/// \return The error status. A non-OK status means the target GPU is
+/// not supported.
 Status CheckGPUZeroCopySupport(const int gpu_id, bool* zero_copy_support);
 #endif
 
