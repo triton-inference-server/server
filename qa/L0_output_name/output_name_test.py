@@ -25,6 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+sys.path.append("../common")
+
 import argparse
 import numpy as np
 import os
@@ -32,6 +35,7 @@ from builtins import range
 from functools import partial
 from PIL import Image
 import unittest
+import test_util as tu
 
 import grpc
 from tritongrpcclient import grpc_service_pb2
@@ -40,7 +44,7 @@ from tritongrpcclient import grpc_service_pb2_grpc
 _trials = ("graphdef", "libtorch", "netdef", "onnx", "plan", "savedmodel")
 
 
-class OutputNameValidationTest(unittest.TestCase):
+class OutputNameValidationTest(tu.TestResultCollector):
 
     def requestGenerator(self, model_name, output_name):
         request = grpc_service_pb2.ModelInferRequest()

@@ -39,6 +39,19 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
+EXPECTED_NUM_TESTS="42"
+
+if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
+    TEST_SYSTEM_SHARED_MEMORY="0"
+fi
+
+if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
+    TEST_CUDA_SHARED_MEMORY="0"
+fi
+
+if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
+    EXPECTED_NUM_TESTS="29"
+fi
 
 MODELDIR=`pwd`/models
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -71,6 +84,7 @@ export BACKENDS
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
+
 
 for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
@@ -168,22 +182,20 @@ for TARGET in cpu gpu; do
 
     set +e
 
-    # python unittest seems to swallow ImportError and still return 0
-    # exit code. So need to explicitly check CLIENT_LOG to make sure
-    # we see some running tests
     python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
+    else
+        check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
 
-    grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed To Run\n***"
-        RET=1
-    fi
 
     set -e
 

@@ -39,6 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
+
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
 MODELDIR="qa_model_repository"
@@ -48,9 +49,6 @@ cp -r $DATADIR $MODELDIR
 DUMMY_MODEL="Model_repo-1.0"
 cp -r $MODELDIR/libtorch_float32_float32_float32 $MODELDIR/$DUMMY_MODEL
 sed -i 's/libtorch_float32_float32_float32/Model_repo-1.0/g' $MODELDIR/$DUMMY_MODEL/config.pbtxt
-
-# Copy custom model 
-cp -r /opt/tritonserver/qa/custom_models/custom_float32_float32_float32/ $MODELDIR/
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
@@ -90,7 +88,7 @@ RET=0
 SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=explicit"
 SERVER_LOG="./inference_server_hostname.log"
 
-BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
+BACKENDS="graphdef libtorch netdef onnx plan savedmodel"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -108,18 +106,13 @@ for BACKEND in $BACKENDS; do
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
-    else
-        $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test Failed\n***"
-            cat $CLIENT_LOG
-            RET=1
-        fi
-        code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/unload`
-        if [ "$code" != "200" ]; then
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
+    fi
+
+    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        cat $CLIENT_LOG
+        RET=1
     fi
 done
 
@@ -154,18 +147,13 @@ for BACKEND in $BACKENDS; do
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
-    else
-        $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test Failed\n***"
-            cat $CLIENT_LOG
-            RET=1
-        fi
-        code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/unload`
-        if [ "$code" != "200" ]; then
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
+    fi
+
+    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        cat $CLIENT_LOG
+        RET=1
     fi
 done
 

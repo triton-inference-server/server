@@ -97,9 +97,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     for i in range(elements):
-        print(
-            str(i) + ": input " + str(input_data[i]) + ", output " +
-            str(output_data[i]))
+        print(str(i) + ": input " + str(input_data[i]) + ", output " +
+              str(output_data[i]))
         if output_data[i] != (input_data[i] + 1):
             print("error: incorrect value")
             sys.exit(1)

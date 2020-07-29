@@ -268,3 +268,29 @@ function create_nop_modelfile () {
         cp $model_file $path/1/.
     done
 }
+
+# Check Python unittest results.
+function check_test_results () {
+    local log_file=$1
+    local expected_num_tests=$2
+
+    if [ -z "$expected_num_tests" ]; then
+        echo "=== expected number of tests must be defined"
+        return 1
+    fi
+
+    num_failures=`cat $log_file | grep -E ".*total.*errors.*failures.*skipped.*" | jq .failures`
+    num_tests=`cat $log_file | grep -E ".*total.*errors.*failures.*skipped.*" | jq .total`
+    if [ $? -ne 0 ]; then
+        cat $log_file
+        echo -e "\n***\n*** Test Failed: unable to parse test results\n***" >> $log_file
+        return 1
+    fi
+    if [ $num_failures != "0" ] || [ $num_tests -ne $expected_num_tests ]; then
+        cat $log_file
+        echo -e "\n***\n*** Test Failed: Expected $expected_num_tests test(s), $num_tests test(s) executed, and $num_failures test(s) failed. \n***" >> $log_file
+        return 1
+    fi
+
+    return 0
+}

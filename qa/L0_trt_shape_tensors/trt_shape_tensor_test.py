@@ -52,7 +52,7 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 
-class InferShapeTensorTest(unittest.TestCase):
+class InferShapeTensorTest(tu.TestResultCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
@@ -63,6 +63,7 @@ class InferShapeTensorTest(unittest.TestCase):
     def tearDown(self):
         self.triton_client_.unregister_system_shared_memory()
         self.triton_client_.unregister_cuda_shared_memory()
+        super().tearDown()
 
     def add_deferred_exception(self, ex):
         global _deferred_exceptions

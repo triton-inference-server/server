@@ -59,7 +59,7 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 
-class BatcherTest(unittest.TestCase):
+class BatcherTest(tu.TestResultCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
@@ -77,6 +77,7 @@ class BatcherTest(unittest.TestCase):
             destroy_fun = cudashm.destroy_shared_memory_region
         for precreated_shm_region in self.precreated_shm_regions_:
             destroy_fun(precreated_shm_region)
+        super().tearDown()
 
     # FIXME why only used for outputs
     def create_advance(self, shm_regions=None):
