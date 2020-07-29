@@ -87,8 +87,8 @@ TritonClientWrapper::ModelMetadata(
 
 nic::Error
 TritonClientWrapper::ModelMetadata(
-    inference::ModelMetadataResponse* model_metadata, const std::string& model_name,
-    const std::string& model_version)
+    inference::ModelMetadataResponse* model_metadata,
+    const std::string& model_name, const std::string& model_version)
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->ModelMetadata(

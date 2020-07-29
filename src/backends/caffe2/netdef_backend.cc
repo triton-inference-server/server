@@ -240,17 +240,17 @@ NetDefBackend::CreateExecutionContext(
   // inputs are available in the model.
   if (Config().has_sequence_batching()) {
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &input_names,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        &input_names, false /* required */));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, &input_names,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
+        &input_names, false /* required */));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &input_names,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        &input_names, false /* required */));
     RETURN_IF_ERROR(ValidateTypedSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, &input_names,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+        &input_names, false /* required */));
   }
 
   try {

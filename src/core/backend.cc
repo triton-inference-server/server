@@ -370,7 +370,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
           max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
           break;
         case inference::ModelWarmup_Input::InputDataTypeCase::kRandomData: {
-          if (input_meta.second.data_type() == inference::DataType::TYPE_STRING) {
+          if (input_meta.second.data_type() ==
+              inference::DataType::TYPE_STRING) {
             max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
           } else {
             max_random_byte_size =
@@ -425,14 +426,16 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
             allocated_ptr = zero_buffer;
             break;
           case inference::ModelWarmup_Input::InputDataTypeCase::kRandomData: {
-            if (input_meta.second.data_type() == inference::DataType::TYPE_STRING) {
+            if (input_meta.second.data_type() ==
+                inference::DataType::TYPE_STRING) {
               allocated_ptr = zero_buffer;
             } else {
               allocated_ptr = random_buffer;
             }
             break;
           }
-          case inference::ModelWarmup_Input::InputDataTypeCase::kInputDataFile: {
+          case inference::ModelWarmup_Input::InputDataTypeCase::
+              kInputDataFile: {
             // For data provided from file, we can set buffer in first pass
             warmup_data.provided_data_.emplace_back(new std::string());
             auto input_data = warmup_data.provided_data_.back().get();
@@ -440,7 +443,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                 JoinPath({model_dir_, kWarmupDataFolder,
                           input_meta.second.input_data_file()}),
                 input_data));
-            if (input_meta.second.data_type() == inference::DataType::TYPE_STRING) {
+            if (input_meta.second.data_type() ==
+                inference::DataType::TYPE_STRING) {
               batch_byte_size = input_data->size();
             } else if (((size_t)batch_byte_size) > input_data->size()) {
               return Status(

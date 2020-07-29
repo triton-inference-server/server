@@ -41,8 +41,8 @@ namespace {
 /// of the ensemble tensor and which model they are inferred from.
 struct TensorNode {
   TensorNode(
-      const std::string& model_name, const bool batching, const inference::DataType& type,
-      const DimsList& dims)
+      const std::string& model_name, const bool batching,
+      const inference::DataType& type, const DimsList& dims)
       : model_name_(model_name), type_(type), dims_(dims), is_decoupled_(false),
         decouple_label_(0), visited_(false)
   {
@@ -89,10 +89,10 @@ ValidateTensorConsistency(
   if (lhs.type_ != rhs.type_) {
     return Status(
         Status::Code::INVALID_ARG,
-        message + "inconsistent data type: " + inference::DataType_Name(lhs.type_) +
-            " is inferred from model " + lhs.model_name_ + " while " +
-            inference::DataType_Name(rhs.type_) + " is inferred from model " +
-            rhs.model_name_);
+        message + "inconsistent data type: " +
+            inference::DataType_Name(lhs.type_) + " is inferred from model " +
+            lhs.model_name_ + " while " + inference::DataType_Name(rhs.type_) +
+            " is inferred from model " + rhs.model_name_);
   }
 
   // Shapes must match or either one uses variable size shape, if one uses

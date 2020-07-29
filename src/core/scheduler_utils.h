@@ -47,8 +47,8 @@ bool CompareWithRequiredEqualInputs(
 //
 // PriorityQueue
 //
-using ModelQueuePolicyMap =
-    ::google::protobuf::Map<::google::protobuf::uint32, inference::ModelQueuePolicy>;
+using ModelQueuePolicyMap = ::google::protobuf::Map<
+    ::google::protobuf::uint32, inference::ModelQueuePolicy>;
 
 class PriorityQueue {
  public:
@@ -60,8 +60,8 @@ class PriorityQueue {
   // Different priority level may follow different queue policies given by
   // 'queue_policy_map', otherwise, the 'default_queue_policy' will be used.
   PriorityQueue(
-      const inference::ModelQueuePolicy& default_queue_policy, uint32_t priority_levels,
-      const ModelQueuePolicyMap queue_policy_map);
+      const inference::ModelQueuePolicy& default_queue_policy,
+      uint32_t priority_levels, const ModelQueuePolicyMap queue_policy_map);
 
   // Enqueue a request with priority set to 'priority_level'. If
   // Status::Success is returned then the queue has taken ownership of
@@ -144,8 +144,9 @@ class PriorityQueue {
     // Construct a policy queue with default policy, which will behave the same
     // as regular queue.
     PolicyQueue()
-        : timeout_action_(inference::ModelQueuePolicy::REJECT), default_timeout_us_(0),
-          allow_timeout_override_(false), max_queue_size_(0)
+        : timeout_action_(inference::ModelQueuePolicy::REJECT),
+          default_timeout_us_(0), allow_timeout_override_(false),
+          max_queue_size_(0)
     {
     }
 

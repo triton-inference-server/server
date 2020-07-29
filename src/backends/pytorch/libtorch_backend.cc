@@ -510,14 +510,16 @@ LibTorchBackend::Context::ReadOutputTensors(
 Status
 LibTorchBackend::Context::GetOutputTensor(
     std::vector<torch::Tensor>* outputs_, const int& op_index,
-    const std::string& name, const inference::DataType dtype, const char** content,
-    size_t* byte_size, std::vector<int64_t>* content_shape)
+    const std::string& name, const inference::DataType dtype,
+    const char** content, size_t* byte_size,
+    std::vector<int64_t>* content_shape)
 {
   try {
     torch::Tensor output_flat = (*outputs_)[op_index].contiguous().flatten();
 
     // verify output datatype matches datatype from model config
-    inference::DataType rec_dtype = ConvertTorchTypeToDataType(output_flat.scalar_type());
+    inference::DataType rec_dtype =
+        ConvertTorchTypeToDataType(output_flat.scalar_type());
     if (dtype != rec_dtype) {
       return Status(
           Status::Code::INVALID_ARG,

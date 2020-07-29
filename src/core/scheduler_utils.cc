@@ -232,8 +232,8 @@ PriorityQueue::PriorityQueue()
 }
 
 PriorityQueue::PriorityQueue(
-    const inference::ModelQueuePolicy& default_queue_policy, uint32_t priority_levels,
-    const ModelQueuePolicyMap queue_policy_map)
+    const inference::ModelQueuePolicy& default_queue_policy,
+    uint32_t priority_levels, const ModelQueuePolicyMap queue_policy_map)
     : size_(0), last_priority_level_(priority_levels)
 {
   if (priority_levels == 0) {

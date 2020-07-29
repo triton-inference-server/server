@@ -28,8 +28,8 @@
 
 nic::Error
 ModelParser::Init(
-    const inference::ModelMetadataResponse& metadata, const inference::ModelConfig& config,
-    const std::string& model_version,
+    const inference::ModelMetadataResponse& metadata,
+    const inference::ModelConfig& config, const std::string& model_version,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     std::unique_ptr<TritonClientWrapper>& client_wrapper)
 {

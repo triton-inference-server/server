@@ -77,7 +77,8 @@ using OnnxTensorInfoMap = std::unordered_map<std::string, OnnxTensorInfo>;
 
 std::string OnnxDataTypeName(ONNXTensorElementDataType onnx_type);
 
-inference::DataType ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type);
+inference::DataType ConvertFromOnnxDataType(
+    ONNXTensorElementDataType onnx_type);
 
 ONNXTensorElementDataType ConvertToOnnxDataType(inference::DataType data_type);
 

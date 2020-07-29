@@ -283,7 +283,8 @@ class ModelRepositoryManager {
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
-  Status GetModelConfig(const std::string& name, inference::ModelConfig* model_config);
+  Status GetModelConfig(
+      const std::string& name, inference::ModelConfig* model_config);
 
   /// Get the models to be loaded / unloaded based on the model loaded in
   /// previous iteration.

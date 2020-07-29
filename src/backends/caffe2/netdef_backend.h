@@ -78,7 +78,8 @@ class NetDefBackend : public InferenceBackend {
     Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status ValidateOutputs(
-        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
+            ios);
 
     // Set input tensors from one or more requests.
     Status SetInputTensors(

@@ -31,7 +31,8 @@
 namespace nvidia { namespace inferenceserver {
 
 int
-GetCudaStreamPriority(inference::ModelOptimizationPolicy::ModelPriority priority)
+GetCudaStreamPriority(
+    inference::ModelOptimizationPolicy::ModelPriority priority)
 {
   // Default priority is 0
   int cuda_stream_priority = 0;

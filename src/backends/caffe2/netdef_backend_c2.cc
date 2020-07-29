@@ -56,7 +56,8 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
 
   Error SetInputTensor(
       const std::string& name, const std::vector<int64_t>& shape,
-      const inference::DataType dtype, const char* content, size_t byte_size) override;
+      const inference::DataType dtype, const char* content,
+      size_t byte_size) override;
   Error GetOutputTensor(
       const std::string& name, const Caffe2Workspace::DataType dtype,
       const char** content, size_t* byte_size,

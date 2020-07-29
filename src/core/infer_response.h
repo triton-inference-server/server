@@ -145,7 +145,8 @@ class InferenceResponse {
     // Reshape the output tensor. This function must only be called
     // for outputs that have respace specified in the model
     // configuration.
-    void Reshape(const bool has_batch_dim, const inference::ModelOutput* output_config);
+    void Reshape(
+        const bool has_batch_dim, const inference::ModelOutput* output_config);
 
     // Get information about the buffer allocated for this output
     // tensor's data. If no buffer is allocated 'buffer' will return

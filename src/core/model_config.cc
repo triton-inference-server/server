@@ -160,7 +160,9 @@ GetByteSize(const inference::DataType& dtype, const std::vector<int64_t>& dims)
 }
 
 int64_t
-GetByteSize(const int batch_size, const inference::DataType& dtype, const DimsList& dims)
+GetByteSize(
+    const int batch_size, const inference::DataType& dtype,
+    const DimsList& dims)
 {
   if (dims.size() == 0) {
     return batch_size * GetDataTypeByteSize(dtype);

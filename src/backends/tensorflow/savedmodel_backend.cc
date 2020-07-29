@@ -80,17 +80,17 @@ SavedModelBackend::CreateTRTISTFModel(
   if (Config().has_sequence_batching()) {
     bool have_start, have_end, have_ready, have_corrid;
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
-        false /* required */, &have_start));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        inputs, false /* required */, &have_start));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
         false /* required */, &have_end));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
-        false /* required */, &have_ready));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        inputs, false /* required */, &have_ready));
     RETURN_IF_ERROR(ValidateTypedSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, inputs,
-        false /* required */, &have_corrid));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+        inputs, false /* required */, &have_corrid));
     if (have_start) {
       expected_input_cnt += 1;
     }

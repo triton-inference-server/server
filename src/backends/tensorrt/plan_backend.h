@@ -98,15 +98,18 @@ class PlanBackend : public InferenceBackend {
     Status InitializeShapeInputBinding(
         const std::string& input_name, const inference::DataType input_datatype,
         const DimsList& input_dims);
-    Status InitializeSequenceControlInputBindings(const inference::ModelConfig& config);
+    Status InitializeSequenceControlInputBindings(
+        const inference::ModelConfig& config);
     Status InitializeConfigExecuteInputBindings(
         const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status InitializeConfigShapeInputBindings(
         const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status InitializeConfigExecuteOutputBindings(
-        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
+            ios);
     Status InitializeConfigShapeOutputBindings(
-        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
+            ios);
     bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
 
     Status InitOptimizationProfiles(

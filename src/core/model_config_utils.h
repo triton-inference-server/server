@@ -44,10 +44,12 @@ Status GetModelVersionFromPath(const std::string& path, int64_t* version);
 /// 'tensor_name' as empty-string if the control is not mapped to any
 /// tensor.
 Status GetBooleanSequenceControlProperties(
-    const inference::ModelSequenceBatching& batcher, const std::string& model_name,
+    const inference::ModelSequenceBatching& batcher,
+    const std::string& model_name,
     const inference::ModelSequenceBatching::Control::Kind control_kind,
-    const bool required, std::string* tensor_name, inference::DataType* tensor_datatype,
-    float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
+    const bool required, std::string* tensor_name,
+    inference::DataType* tensor_datatype, float* fp32_false_value,
+    float* fp32_true_value, int32_t* int32_false_value,
     int32_t* int32_true_value);
 
 /// Get the tensor name and datatype for a non-boolean sequence
@@ -57,9 +59,11 @@ Status GetBooleanSequenceControlProperties(
 /// tensor. 'tensor_datatype' returns the required datatype for the
 /// control.
 Status GetTypedSequenceControlProperties(
-    const inference::ModelSequenceBatching& batcher, const std::string& model_name,
+    const inference::ModelSequenceBatching& batcher,
+    const std::string& model_name,
     const inference::ModelSequenceBatching::Control::Kind control_kind,
-    const bool required, std::string* tensor_name, inference::DataType* tensor_datatype);
+    const bool required, std::string* tensor_name,
+    inference::DataType* tensor_datatype);
 
 /// Read a ModelConfig and normalize it as expected by model backends.
 /// \param path The full-path to the directory containing the
@@ -97,7 +101,8 @@ Status ValidateModelConfig(
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
 Status ValidateModelInput(
-    const inference::ModelInput& io, int32_t max_batch_size, const std::string& platform);
+    const inference::ModelInput& io, int32_t max_batch_size,
+    const std::string& platform);
 
 /// Validate that an input matches one of the allowed input names.
 /// \param io The model input.
@@ -115,7 +120,8 @@ Status CheckAllowedModelInput(
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
 Status ValidateModelOutput(
-    const inference::ModelOutput& io, int32_t max_batch_size, const std::string& platform);
+    const inference::ModelOutput& io, int32_t max_batch_size,
+    const std::string& platform);
 
 /// Validate that an output matches one of the allowed output names.
 /// \param io The model output.

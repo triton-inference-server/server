@@ -80,8 +80,8 @@ DynamicBatchScheduler::Create(
   return Create(
       runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule,
       dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
-      preferred_batch_sizes, max_queue_delay_microseconds, inference::ModelQueuePolicy(),
-      0, ModelQueuePolicyMap(), scheduler);
+      preferred_batch_sizes, max_queue_delay_microseconds,
+      inference::ModelQueuePolicy(), 0, ModelQueuePolicyMap(), scheduler);
 }
 
 Status

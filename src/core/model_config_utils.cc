@@ -396,10 +396,12 @@ GetModelVersionFromPath(const std::string& path, int64_t* version)
 
 Status
 GetBooleanSequenceControlProperties(
-    const inference::ModelSequenceBatching& batcher, const std::string& model_name,
+    const inference::ModelSequenceBatching& batcher,
+    const std::string& model_name,
     const inference::ModelSequenceBatching::Control::Kind control_kind,
-    const bool required, std::string* tensor_name, inference::DataType* tensor_datatype,
-    float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
+    const bool required, std::string* tensor_name,
+    inference::DataType* tensor_datatype, float* fp32_false_value,
+    float* fp32_true_value, int32_t* int32_false_value,
     int32_t* int32_true_value)
 {
   // Make sure same tensor is not configured for multiple controls
@@ -431,7 +433,8 @@ GetBooleanSequenceControlProperties(
           return Status(
               Status::Code::INVALID_ARG,
               "sequence batching specifies multiple " +
-                  inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  inference::ModelSequenceBatching_Control_Kind_Name(
+                      control_kind) +
                   " tensors for " + model_name);
         }
 
@@ -444,7 +447,8 @@ GetBooleanSequenceControlProperties(
                 Status::Code::INVALID_ARG,
                 "sequence batching specifies both 'int32_false_true' and "
                 "'fp32_false_true' for " +
-                    inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
                     " for " + model_name);
           }
 
@@ -453,7 +457,8 @@ GetBooleanSequenceControlProperties(
                 Status::Code::INVALID_ARG,
                 "sequence batching control 'int32_false_true' must have "
                 "exactly 2 entries for " +
-                    inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
                     " for " + model_name);
           }
 
@@ -472,7 +477,8 @@ GetBooleanSequenceControlProperties(
                 Status::Code::INVALID_ARG,
                 "sequence batching must specify either 'int32_false_true' or "
                 "'fp32_false_true' for " +
-                    inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
                     " for " + model_name);
           }
 
@@ -481,7 +487,8 @@ GetBooleanSequenceControlProperties(
                 Status::Code::INVALID_ARG,
                 "sequence batching control 'fp32_false_true' must have exactly "
                 "2 entries for " +
-                    inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
                     " for " + model_name);
           }
 
@@ -516,9 +523,11 @@ GetBooleanSequenceControlProperties(
 
 Status
 GetTypedSequenceControlProperties(
-    const inference::ModelSequenceBatching& batcher, const std::string& model_name,
+    const inference::ModelSequenceBatching& batcher,
+    const std::string& model_name,
     const inference::ModelSequenceBatching::Control::Kind control_kind,
-    const bool required, std::string* tensor_name, inference::DataType* tensor_datatype)
+    const bool required, std::string* tensor_name,
+    inference::DataType* tensor_datatype)
 {
   // Make sure same tensor is not configured for multiple controls
   std::set<std::string> seen_tensors;
@@ -549,7 +558,8 @@ GetTypedSequenceControlProperties(
           return Status(
               Status::Code::INVALID_ARG,
               "sequence batching specifies multiple " +
-                  inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  inference::ModelSequenceBatching_Control_Kind_Name(
+                      control_kind) +
                   " tensors for " + model_name);
         }
 
@@ -565,7 +575,8 @@ GetTypedSequenceControlProperties(
               Status::Code::INVALID_ARG,
               "sequence batching must not specify either 'int32_false_true' "
               "nor 'fp32_false_true' for " +
-                  inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  inference::ModelSequenceBatching_Control_Kind_Name(
+                      control_kind) +
                   " for " + model_name);
         }
       }
@@ -932,7 +943,8 @@ ValidateModelConfig(
       const auto& default_policy =
           config.dynamic_batching().default_queue_policy();
       if ((default_policy.default_timeout_microseconds() != 0) &&
-          (default_policy.timeout_action() == inference::ModelQueuePolicy::DELAY)) {
+          (default_policy.timeout_action() ==
+           inference::ModelQueuePolicy::DELAY)) {
         return Status(
             Status::Code::INVALID_ARG,
             "Queue policy can not have DELAY as timeout action when "
@@ -944,7 +956,8 @@ ValidateModelConfig(
       for (const auto& policy :
            config.dynamic_batching().priority_queue_policy()) {
         if ((policy.second.default_timeout_microseconds() != 0) &&
-            (policy.second.timeout_action() == inference::ModelQueuePolicy::DELAY)) {
+            (policy.second.timeout_action() ==
+             inference::ModelQueuePolicy::DELAY)) {
           return Status(
               Status::Code::INVALID_ARG,
               "Queue policy can not have DELAY as timeout action when "
@@ -985,13 +998,16 @@ ValidateModelConfig(
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
         false /* required */, &tensor_name, &tensor_datatype));
     if (!tensor_name.empty()) {
-      if ((tensor_datatype != inference::DataType::TYPE_UINT64) && (tensor_datatype != inference::DataType::TYPE_INT64) &&
-          (tensor_datatype != inference::DataType::TYPE_UINT32) && (tensor_datatype != inference::DataType::TYPE_INT32)) {
+      if ((tensor_datatype != inference::DataType::TYPE_UINT64) &&
+          (tensor_datatype != inference::DataType::TYPE_INT64) &&
+          (tensor_datatype != inference::DataType::TYPE_UINT32) &&
+          (tensor_datatype != inference::DataType::TYPE_INT32)) {
         return Status(
             Status::Code::INVALID_ARG,
             "unexpected data type for control " +
                 inference::ModelSequenceBatching_Control_Kind_Name(
-                    inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID) +
+                    inference::ModelSequenceBatching::Control::
+                        CONTROL_SEQUENCE_CORRID) +
                 " for " + config.name() +
                 ". Allowed data types are TYPE_UINT64, TYPE_INT64, TYPE_UINT32 "
                 "and TYPE_INT32");
@@ -1169,7 +1185,8 @@ ValidateModelConfig(
 
 Status
 ValidateModelInput(
-    const inference::ModelInput& io, int32_t max_batch_size, const std::string& platform)
+    const inference::ModelInput& io, int32_t max_batch_size,
+    const std::string& platform)
 {
   RETURN_IF_ERROR(ValidateIOShape(io, max_batch_size, "model input "));
 
@@ -1225,7 +1242,8 @@ CheckAllowedModelInput(
 
 Status
 ValidateModelOutput(
-    const inference::ModelOutput& io, int32_t max_batch_size, const std::string& platform)
+    const inference::ModelOutput& io, int32_t max_batch_size,
+    const std::string& platform)
 {
   RETURN_IF_ERROR(ValidateIOShape(io, max_batch_size, "model output "));
 

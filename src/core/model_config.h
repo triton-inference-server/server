@@ -158,7 +158,8 @@ int64_t GetByteSize(const inference::DataType& dtype, const DimsList& dims);
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const inference::DataType& dtype, const std::vector<int64_t>& dims);
+int64_t GetByteSize(
+    const inference::DataType& dtype, const std::vector<int64_t>& dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
 /// and shape. A tensor that has empty shape [] and non-zero
@@ -170,7 +171,8 @@ int64_t GetByteSize(const inference::DataType& dtype, const std::vector<int64_t>
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
 int64_t GetByteSize(
-    const int batch_size, const inference::DataType& dtype, const DimsList& dims);
+    const int batch_size, const inference::DataType& dtype,
+    const DimsList& dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
 /// and shape. A tensor that has empty shape [] and non-zero

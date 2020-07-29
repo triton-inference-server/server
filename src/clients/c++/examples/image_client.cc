@@ -497,13 +497,14 @@ ParseModelGrpc(
 
   if ((input_config.format() != inference::ModelInput::FORMAT_NCHW) &&
       (input_config.format() != inference::ModelInput::FORMAT_NHWC)) {
-    std::cerr << "unexpected input format "
-              << inference::ModelInput_Format_Name(input_config.format())
-              << ", expecting "
-              << inference::ModelInput_Format_Name(inference::ModelInput::FORMAT_NHWC)
-              << " or "
-              << inference::ModelInput_Format_Name(inference::ModelInput::FORMAT_NCHW)
-              << std::endl;
+    std::cerr
+        << "unexpected input format "
+        << inference::ModelInput_Format_Name(input_config.format())
+        << ", expecting "
+        << inference::ModelInput_Format_Name(inference::ModelInput::FORMAT_NHWC)
+        << " or "
+        << inference::ModelInput_Format_Name(inference::ModelInput::FORMAT_NCHW)
+        << std::endl;
     exit(1);
   }
 

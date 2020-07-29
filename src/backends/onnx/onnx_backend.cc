@@ -362,9 +362,10 @@ OnnxBackend::CreateExecutionContext(
 
 Status
 OnnxBackend::Context::ValidateBooleanSequenceControl(
-    const std::string& model_name, const inference::ModelSequenceBatching& batcher,
-    const inference::ModelSequenceBatching::Control::Kind control_kind, bool required,
-    bool* have_control)
+    const std::string& model_name,
+    const inference::ModelSequenceBatching& batcher,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
+    bool required, bool* have_control)
 {
   std::string tensor_name;
   inference::DataType tensor_datatype;
@@ -414,9 +415,10 @@ OnnxBackend::Context::ValidateBooleanSequenceControl(
 
 Status
 OnnxBackend::Context::ValidateTypedSequenceControl(
-    const std::string& model_name, const inference::ModelSequenceBatching& batcher,
-    const inference::ModelSequenceBatching::Control::Kind control_kind, bool required,
-    bool* have_control)
+    const std::string& model_name,
+    const inference::ModelSequenceBatching& batcher,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
+    bool required, bool* have_control)
 {
   std::string tensor_name;
   inference::DataType tensor_datatype;
@@ -500,7 +502,8 @@ OnnxBackend::Context::ValidateInputs(
       return Status(
           Status::Code::INVALID_ARG,
           "unable to load model '" + model_name + ", unexpected datatype " +
-              inference::DataType_Name(ConvertFromOnnxDataType(iit->second.type_)) +
+              inference::DataType_Name(
+                  ConvertFromOnnxDataType(iit->second.type_)) +
               " for input '" + io.name() + "', expecting " +
               inference::DataType_Name(io.data_type()));
     }
@@ -544,7 +547,8 @@ OnnxBackend::Context::ValidateOutputs(
       return Status(
           Status::Code::INVALID_ARG,
           "unable to load model '" + model_name + ", unexpected datatype " +
-              inference::DataType_Name(ConvertFromOnnxDataType(iit->second.type_)) +
+              inference::DataType_Name(
+                  ConvertFromOnnxDataType(iit->second.type_)) +
               " for output '" + io.name() + "', expecting " +
               inference::DataType_Name(io.data_type()));
     }
@@ -1093,7 +1097,8 @@ OnnxBackend::Context::SetStringOutputBuffer(
       }
       InferenceResponse::Output* response_output = nullptr;
       response->AddOutput(
-          name, inference::DataType::TYPE_STRING, *batchn_shape, &response_output);
+          name, inference::DataType::TYPE_STRING, *batchn_shape,
+          &response_output);
       // Calculate expected byte size in advance using string offsets
       const size_t data_byte_size =
           offsets[element_idx + expected_element_cnt] - offsets[element_idx];

@@ -710,7 +710,8 @@ SequenceBatch::CreateCorrelationIDControl(const inference::ModelConfig& config)
       LOG_ERROR << "unexpected control data type, expected TYPE_UINT64, "
                    "TYPE_INT64, TYPE_UINT32 or TYPE_INT32 for "
                 << inference::ModelSequenceBatching_Control_Kind_Name(
-                       inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID)
+                       inference::ModelSequenceBatching::Control::
+                           CONTROL_SEQUENCE_CORRID)
                 << " for " << config.name();
       return false;
     }

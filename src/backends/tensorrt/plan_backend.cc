@@ -771,7 +771,9 @@ PlanBackend::Context::InitializeShapeInputBinding(
           Status::Code::INVALID_ARG,
           "unexpected datatype " + inference::DataType_Name(input_datatype) +
               "  in model configuration for shape input '" + input_name +
-              "', expecting " + inference::DataType_Name(inference::DataType::TYPE_INT32) + " for " + name_);
+              "', expecting " +
+              inference::DataType_Name(inference::DataType::TYPE_INT32) +
+              " for " + name_);
     }
 
     inference::DataType dt =
@@ -911,9 +913,9 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     if (dt != input_datatype) {
       return Status(
           Status::Code::INVALID_ARG,
-          "unexpected datatype " + inference::DataType_Name(dt) + " for input '" +
-              input_name + "', expecting " + inference::DataType_Name(input_datatype) +
-              " for " + name_);
+          "unexpected datatype " + inference::DataType_Name(dt) +
+              " for input '" + input_name + "', expecting " +
+              inference::DataType_Name(input_datatype) + " for " + name_);
     }
 
     MemoryFormat fmt =
@@ -1160,7 +1162,9 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
             Status::Code::INVALID_ARG,
             "unexpected datatype " + inference::DataType_Name(io.data_type()) +
                 "  in model configuration for shape output '" + io.name() +
-                "', expecting " + inference::DataType_Name(inference::DataType::TYPE_INT32) + " for " + name_);
+                "', expecting " +
+                inference::DataType_Name(inference::DataType::TYPE_INT32) +
+                " for " + name_);
       }
 
       inference::DataType dt =

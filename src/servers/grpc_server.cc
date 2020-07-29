@@ -386,7 +386,8 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterServerLive =
       [this](
           grpc::ServerContext* ctx, inference::ServerLiveRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::ServerLiveResponse>* responder,
+          grpc::ServerAsyncResponseWriter<inference::ServerLiveResponse>*
+              responder,
           void* tag) {
         this->service_->RequestServerLive(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -407,8 +408,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::ServerLiveResponse>, inference::ServerLiveRequest,
-      inference::ServerLiveResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ServerLiveResponse>,
+      inference::ServerLiveRequest, inference::ServerLiveResponse>(
       "ServerLive", 0, OnRegisterServerLive, OnExecuteServerLive);
 
   //
@@ -417,7 +418,8 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterServerReady =
       [this](
           grpc::ServerContext* ctx, inference::ServerReadyRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>* responder,
+          grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>*
+              responder,
           void* tag) {
         this->service_->RequestServerReady(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -438,8 +440,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>, inference::ServerReadyRequest,
-      inference::ServerReadyResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>,
+      inference::ServerReadyRequest, inference::ServerReadyResponse>(
       "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady);
 
   //
@@ -448,7 +450,8 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterModelReady =
       [this](
           grpc::ServerContext* ctx, inference::ModelReadyRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>* responder,
+          grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>*
+              responder,
           void* tag) {
         this->service_->RequestModelReady(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -475,8 +478,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>, inference::ModelReadyRequest,
-      inference::ModelReadyResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>,
+      inference::ModelReadyRequest, inference::ModelReadyResponse>(
       "ModelReady", 0, OnRegisterModelReady, OnExecuteModelReady);
 
   //
@@ -485,67 +488,68 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterServerMetadata =
       [this](
           grpc::ServerContext* ctx, inference::ServerMetadataRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>* responder,
+          grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>*
+              responder,
           void* tag) {
         this->service_->RequestServerMetadata(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
-  auto OnExecuteServerMetadata = [this](
-                                     inference::ServerMetadataRequest& request,
-                                     inference::ServerMetadataResponse* response,
-                                     grpc::Status* status) {
-    TRITONSERVER_Message* server_metadata_message = nullptr;
-    TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
-        tritonserver_.get(), &server_metadata_message);
-    GOTO_IF_ERR(err, earlyexit);
-
-    const char* buffer;
-    size_t byte_size;
-    err = TRITONSERVER_MessageSerializeToJson(
-        server_metadata_message, &buffer, &byte_size);
-    GOTO_IF_ERR(err, earlyexit);
-
-    {
-      TritonJson::Value server_metadata_json;
-      err = server_metadata_json.Parse(buffer, byte_size);
-      GOTO_IF_ERR(err, earlyexit);
-
-      const char* name;
-      size_t namelen;
-      err = server_metadata_json.MemberAsString("name", &name, &namelen);
-      GOTO_IF_ERR(err, earlyexit);
-
-      const char* version;
-      size_t versionlen;
-      err =
-          server_metadata_json.MemberAsString("version", &version, &versionlen);
-      GOTO_IF_ERR(err, earlyexit);
-
-      response->set_name(std::string(name, namelen));
-      response->set_version(std::string(version, versionlen));
-
-      if (server_metadata_json.Find("extensions")) {
-        TritonJson::Value extensions_json;
-        err =
-            server_metadata_json.MemberAsArray("extensions", &extensions_json);
+  auto OnExecuteServerMetadata =
+      [this](
+          inference::ServerMetadataRequest& request,
+          inference::ServerMetadataResponse* response, grpc::Status* status) {
+        TRITONSERVER_Message* server_metadata_message = nullptr;
+        TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
+            tritonserver_.get(), &server_metadata_message);
         GOTO_IF_ERR(err, earlyexit);
 
-        for (size_t idx = 0; idx < extensions_json.ArraySize(); ++idx) {
-          const char* ext;
-          size_t extlen;
-          err = extensions_json.IndexAsString(idx, &ext, &extlen);
-          GOTO_IF_ERR(err, earlyexit);
-          response->add_extensions(std::string(ext, extlen));
-        }
-      }
-      TRITONSERVER_MessageDelete(server_metadata_message);
-    }
+        const char* buffer;
+        size_t byte_size;
+        err = TRITONSERVER_MessageSerializeToJson(
+            server_metadata_message, &buffer, &byte_size);
+        GOTO_IF_ERR(err, earlyexit);
 
-  earlyexit:
-    GrpcStatusUtil::Create(status, err);
-    TRITONSERVER_ErrorDelete(err);
-  };
+        {
+          TritonJson::Value server_metadata_json;
+          err = server_metadata_json.Parse(buffer, byte_size);
+          GOTO_IF_ERR(err, earlyexit);
+
+          const char* name;
+          size_t namelen;
+          err = server_metadata_json.MemberAsString("name", &name, &namelen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          const char* version;
+          size_t versionlen;
+          err = server_metadata_json.MemberAsString(
+              "version", &version, &versionlen);
+          GOTO_IF_ERR(err, earlyexit);
+
+          response->set_name(std::string(name, namelen));
+          response->set_version(std::string(version, versionlen));
+
+          if (server_metadata_json.Find("extensions")) {
+            TritonJson::Value extensions_json;
+            err = server_metadata_json.MemberAsArray(
+                "extensions", &extensions_json);
+            GOTO_IF_ERR(err, earlyexit);
+
+            for (size_t idx = 0; idx < extensions_json.ArraySize(); ++idx) {
+              const char* ext;
+              size_t extlen;
+              err = extensions_json.IndexAsString(idx, &ext, &extlen);
+              GOTO_IF_ERR(err, earlyexit);
+              response->add_extensions(std::string(ext, extlen));
+            }
+          }
+          TRITONSERVER_MessageDelete(server_metadata_message);
+        }
+
+      earlyexit:
+        GrpcStatusUtil::Create(status, err);
+        TRITONSERVER_ErrorDelete(err);
+      };
 
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>,
@@ -558,7 +562,8 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterModelMetadata =
       [this](
           grpc::ServerContext* ctx, inference::ModelMetadataRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::ModelMetadataResponse>* responder,
+          grpc::ServerAsyncResponseWriter<inference::ModelMetadataResponse>*
+              responder,
           void* tag) {
         this->service_->RequestModelMetadata(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -628,7 +633,8 @@ CommonHandler::SetUpAllRequests()
           err = inputs_json.IndexAsObject(idx, &io_json);
           GOTO_IF_ERR(err, earlyexit);
 
-          inference::ModelMetadataResponse::TensorMetadata* io = response->add_inputs();
+          inference::ModelMetadataResponse::TensorMetadata* io =
+              response->add_inputs();
 
           const char* name;
           size_t namelen;
@@ -669,7 +675,8 @@ CommonHandler::SetUpAllRequests()
           err = outputs_json.IndexAsObject(idx, &io_json);
           GOTO_IF_ERR(err, earlyexit);
 
-          inference::ModelMetadataResponse::TensorMetadata* io = response->add_outputs();
+          inference::ModelMetadataResponse::TensorMetadata* io =
+              response->add_outputs();
 
           const char* name;
           size_t namelen;
@@ -719,7 +726,8 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterModelConfig =
       [this](
           grpc::ServerContext* ctx, inference::ModelConfigRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>* responder,
+          grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>*
+              responder,
           void* tag) {
         this->service_->RequestModelConfig(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -755,8 +763,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>, inference::ModelConfigRequest,
-      inference::ModelConfigResponse>(
+      grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>,
+      inference::ModelConfigRequest, inference::ModelConfigResponse>(
       "ModelConfig", 0, OnRegisterModelConfig, OnExecuteModelConfig);
 
   //
@@ -765,255 +773,260 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterModelStatistics =
       [this](
           grpc::ServerContext* ctx, inference::ModelStatisticsRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>* responder,
+          grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>*
+              responder,
           void* tag) {
         this->service_->RequestModelStatistics(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
-  auto OnExecuteModelStatistics = [this](
-                                      inference::ModelStatisticsRequest& request,
-                                      inference::ModelStatisticsResponse* response,
-                                      grpc::Status* status) {
+  auto OnExecuteModelStatistics =
+      [this](
+          inference::ModelStatisticsRequest& request,
+          inference::ModelStatisticsResponse* response, grpc::Status* status) {
 #ifdef TRITON_ENABLE_STATS
-    TritonJson::Value model_stats_json;
+        TritonJson::Value model_stats_json;
 
-    int64_t requested_model_version;
-    auto err =
-        GetModelVersionFromString(request.version(), &requested_model_version);
-    GOTO_IF_ERR(err, earlyexit);
-
-    {
-      TRITONSERVER_Message* model_stats_message = nullptr;
-      err = TRITONSERVER_ServerModelStatistics(
-          tritonserver_.get(), request.name().c_str(), requested_model_version,
-          &model_stats_message);
-      GOTO_IF_ERR(err, earlyexit);
-
-      const char* buffer;
-      size_t byte_size;
-      err = TRITONSERVER_MessageSerializeToJson(
-          model_stats_message, &buffer, &byte_size);
-      GOTO_IF_ERR(err, earlyexit);
-
-      err = model_stats_json.Parse(buffer, byte_size);
-      GOTO_IF_ERR(err, earlyexit);
-
-      TRITONSERVER_MessageDelete(model_stats_message);
-    }
-
-    if (model_stats_json.Find("model_stats")) {
-      TritonJson::Value stats_json;
-      err = model_stats_json.MemberAsArray("model_stats", &stats_json);
-      GOTO_IF_ERR(err, earlyexit);
-
-      for (size_t idx = 0; idx < stats_json.ArraySize(); ++idx) {
-        TritonJson::Value model_stat;
-        err = stats_json.IndexAsObject(idx, &model_stat);
-        GOTO_IF_ERR(err, earlyexit);
-
-        auto statistics = response->add_model_stats();
-
-        const char* name;
-        size_t namelen;
-        err = model_stat.MemberAsString("name", &name, &namelen);
-        GOTO_IF_ERR(err, earlyexit);
-
-        const char* version;
-        size_t versionlen;
-        err = model_stat.MemberAsString("version", &version, &versionlen);
-        GOTO_IF_ERR(err, earlyexit);
-
-        statistics->set_name(std::string(name, namelen));
-        statistics->set_version(std::string(version, versionlen));
-
-        uint64_t ucnt;
-        err = model_stat.MemberAsUInt("last_inference", &ucnt);
-        GOTO_IF_ERR(err, earlyexit);
-        statistics->set_last_inference(ucnt);
-
-        err = model_stat.MemberAsUInt("inference_count", &ucnt);
-        GOTO_IF_ERR(err, earlyexit);
-        statistics->set_inference_count(ucnt);
-
-        err = model_stat.MemberAsUInt("execution_count", &ucnt);
-        GOTO_IF_ERR(err, earlyexit);
-        statistics->set_execution_count(ucnt);
-
-        TritonJson::Value infer_stats_json;
-        err = model_stat.MemberAsObject("inference_stats", &infer_stats_json);
+        int64_t requested_model_version;
+        auto err = GetModelVersionFromString(
+            request.version(), &requested_model_version);
         GOTO_IF_ERR(err, earlyexit);
 
         {
-          TritonJson::Value success_json;
-          err = infer_stats_json.MemberAsObject("success", &success_json);
+          TRITONSERVER_Message* model_stats_message = nullptr;
+          err = TRITONSERVER_ServerModelStatistics(
+              tritonserver_.get(), request.name().c_str(),
+              requested_model_version, &model_stats_message);
           GOTO_IF_ERR(err, earlyexit);
 
-          err = success_json.MemberAsUInt("count", &ucnt);
+          const char* buffer;
+          size_t byte_size;
+          err = TRITONSERVER_MessageSerializeToJson(
+              model_stats_message, &buffer, &byte_size);
           GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_success()->set_count(
-              ucnt);
-          err = success_json.MemberAsUInt("ns", &ucnt);
+
+          err = model_stats_json.Parse(buffer, byte_size);
           GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_success()->set_ns(
-              ucnt);
+
+          TRITONSERVER_MessageDelete(model_stats_message);
         }
 
-        {
-          TritonJson::Value fail_json;
-          err = infer_stats_json.MemberAsObject("fail", &fail_json);
+        if (model_stats_json.Find("model_stats")) {
+          TritonJson::Value stats_json;
+          err = model_stats_json.MemberAsArray("model_stats", &stats_json);
           GOTO_IF_ERR(err, earlyexit);
 
-          err = fail_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_fail()->set_count(
-              ucnt);
-          err = fail_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_fail()->set_ns(ucnt);
-        }
+          for (size_t idx = 0; idx < stats_json.ArraySize(); ++idx) {
+            TritonJson::Value model_stat;
+            err = stats_json.IndexAsObject(idx, &model_stat);
+            GOTO_IF_ERR(err, earlyexit);
 
-        {
-          TritonJson::Value queue_json;
-          err = infer_stats_json.MemberAsObject("queue", &queue_json);
-          GOTO_IF_ERR(err, earlyexit);
+            auto statistics = response->add_model_stats();
 
-          err = queue_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_queue()->set_count(
-              ucnt);
-          err = queue_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_queue()->set_ns(ucnt);
-        }
+            const char* name;
+            size_t namelen;
+            err = model_stat.MemberAsString("name", &name, &namelen);
+            GOTO_IF_ERR(err, earlyexit);
 
-        {
-          TritonJson::Value compute_input_json;
-          err = infer_stats_json.MemberAsObject(
-              "compute_input", &compute_input_json);
-          GOTO_IF_ERR(err, earlyexit);
+            const char* version;
+            size_t versionlen;
+            err = model_stat.MemberAsString("version", &version, &versionlen);
+            GOTO_IF_ERR(err, earlyexit);
 
-          err = compute_input_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_input()
-              ->set_count(ucnt);
-          err = compute_input_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_input()
-              ->set_ns(ucnt);
-        }
+            statistics->set_name(std::string(name, namelen));
+            statistics->set_version(std::string(version, versionlen));
 
-        {
-          TritonJson::Value compute_infer_json;
-          err = infer_stats_json.MemberAsObject(
-              "compute_infer", &compute_infer_json);
-          GOTO_IF_ERR(err, earlyexit);
+            uint64_t ucnt;
+            err = model_stat.MemberAsUInt("last_inference", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            statistics->set_last_inference(ucnt);
 
-          err = compute_infer_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_infer()
-              ->set_count(ucnt);
-          err = compute_infer_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_infer()
-              ->set_ns(ucnt);
-        }
+            err = model_stat.MemberAsUInt("inference_count", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            statistics->set_inference_count(ucnt);
 
-        {
-          TritonJson::Value compute_output_json;
-          err = infer_stats_json.MemberAsObject(
-              "compute_output", &compute_output_json);
-          GOTO_IF_ERR(err, earlyexit);
+            err = model_stat.MemberAsUInt("execution_count", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            statistics->set_execution_count(ucnt);
 
-          err = compute_output_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_output()
-              ->set_count(ucnt);
-          err = compute_output_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_output()
-              ->set_ns(ucnt);
-        }
-
-
-        TritonJson::Value batches_json;
-        err = model_stat.MemberAsArray("batch_stats", &batches_json);
-        GOTO_IF_ERR(err, earlyexit);
-
-        for (size_t idx = 0; idx < batches_json.ArraySize(); ++idx) {
-          TritonJson::Value batch_stat;
-          err = batches_json.IndexAsObject(idx, &batch_stat);
-          GOTO_IF_ERR(err, earlyexit);
-
-          auto batch_statistics = statistics->add_batch_stats();
-
-          uint64_t ucnt;
-          err = batch_stat.MemberAsUInt("batch_size", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          batch_statistics->set_batch_size(ucnt);
-
-          {
-            TritonJson::Value compute_input_json;
+            TritonJson::Value infer_stats_json;
             err =
-                batch_stat.MemberAsObject("compute_input", &compute_input_json);
+                model_stat.MemberAsObject("inference_stats", &infer_stats_json);
             GOTO_IF_ERR(err, earlyexit);
 
-            err = compute_input_json.MemberAsUInt("count", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_input()->set_count(ucnt);
-            err = compute_input_json.MemberAsUInt("ns", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_input()->set_ns(ucnt);
-          }
+            {
+              TritonJson::Value success_json;
+              err = infer_stats_json.MemberAsObject("success", &success_json);
+              GOTO_IF_ERR(err, earlyexit);
 
-          {
-            TritonJson::Value compute_infer_json;
-            err =
-                batch_stat.MemberAsObject("compute_infer", &compute_infer_json);
+              err = success_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()
+                  ->mutable_success()
+                  ->set_count(ucnt);
+              err = success_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()->mutable_success()->set_ns(
+                  ucnt);
+            }
+
+            {
+              TritonJson::Value fail_json;
+              err = infer_stats_json.MemberAsObject("fail", &fail_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = fail_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()->mutable_fail()->set_count(
+                  ucnt);
+              err = fail_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()->mutable_fail()->set_ns(
+                  ucnt);
+            }
+
+            {
+              TritonJson::Value queue_json;
+              err = infer_stats_json.MemberAsObject("queue", &queue_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = queue_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()->mutable_queue()->set_count(
+                  ucnt);
+              err = queue_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()->mutable_queue()->set_ns(
+                  ucnt);
+            }
+
+            {
+              TritonJson::Value compute_input_json;
+              err = infer_stats_json.MemberAsObject(
+                  "compute_input", &compute_input_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = compute_input_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()
+                  ->mutable_compute_input()
+                  ->set_count(ucnt);
+              err = compute_input_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()
+                  ->mutable_compute_input()
+                  ->set_ns(ucnt);
+            }
+
+            {
+              TritonJson::Value compute_infer_json;
+              err = infer_stats_json.MemberAsObject(
+                  "compute_infer", &compute_infer_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = compute_infer_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()
+                  ->mutable_compute_infer()
+                  ->set_count(ucnt);
+              err = compute_infer_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()
+                  ->mutable_compute_infer()
+                  ->set_ns(ucnt);
+            }
+
+            {
+              TritonJson::Value compute_output_json;
+              err = infer_stats_json.MemberAsObject(
+                  "compute_output", &compute_output_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = compute_output_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()
+                  ->mutable_compute_output()
+                  ->set_count(ucnt);
+              err = compute_output_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()
+                  ->mutable_compute_output()
+                  ->set_ns(ucnt);
+            }
+
+
+            TritonJson::Value batches_json;
+            err = model_stat.MemberAsArray("batch_stats", &batches_json);
             GOTO_IF_ERR(err, earlyexit);
 
-            err = compute_infer_json.MemberAsUInt("count", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_infer()->set_count(ucnt);
-            err = compute_infer_json.MemberAsUInt("ns", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_infer()->set_ns(ucnt);
-          }
+            for (size_t idx = 0; idx < batches_json.ArraySize(); ++idx) {
+              TritonJson::Value batch_stat;
+              err = batches_json.IndexAsObject(idx, &batch_stat);
+              GOTO_IF_ERR(err, earlyexit);
 
-          {
-            TritonJson::Value compute_output_json;
-            err = batch_stat.MemberAsObject(
-                "compute_output", &compute_output_json);
-            GOTO_IF_ERR(err, earlyexit);
+              auto batch_statistics = statistics->add_batch_stats();
 
-            err = compute_output_json.MemberAsUInt("count", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_output()->set_count(ucnt);
-            err = compute_output_json.MemberAsUInt("ns", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_output()->set_ns(ucnt);
+              uint64_t ucnt;
+              err = batch_stat.MemberAsUInt("batch_size", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              batch_statistics->set_batch_size(ucnt);
+
+              {
+                TritonJson::Value compute_input_json;
+                err = batch_stat.MemberAsObject(
+                    "compute_input", &compute_input_json);
+                GOTO_IF_ERR(err, earlyexit);
+
+                err = compute_input_json.MemberAsUInt("count", &ucnt);
+                GOTO_IF_ERR(err, earlyexit);
+                batch_statistics->mutable_compute_input()->set_count(ucnt);
+                err = compute_input_json.MemberAsUInt("ns", &ucnt);
+                GOTO_IF_ERR(err, earlyexit);
+                batch_statistics->mutable_compute_input()->set_ns(ucnt);
+              }
+
+              {
+                TritonJson::Value compute_infer_json;
+                err = batch_stat.MemberAsObject(
+                    "compute_infer", &compute_infer_json);
+                GOTO_IF_ERR(err, earlyexit);
+
+                err = compute_infer_json.MemberAsUInt("count", &ucnt);
+                GOTO_IF_ERR(err, earlyexit);
+                batch_statistics->mutable_compute_infer()->set_count(ucnt);
+                err = compute_infer_json.MemberAsUInt("ns", &ucnt);
+                GOTO_IF_ERR(err, earlyexit);
+                batch_statistics->mutable_compute_infer()->set_ns(ucnt);
+              }
+
+              {
+                TritonJson::Value compute_output_json;
+                err = batch_stat.MemberAsObject(
+                    "compute_output", &compute_output_json);
+                GOTO_IF_ERR(err, earlyexit);
+
+                err = compute_output_json.MemberAsUInt("count", &ucnt);
+                GOTO_IF_ERR(err, earlyexit);
+                batch_statistics->mutable_compute_output()->set_count(ucnt);
+                err = compute_output_json.MemberAsUInt("ns", &ucnt);
+                GOTO_IF_ERR(err, earlyexit);
+                batch_statistics->mutable_compute_output()->set_ns(ucnt);
+              }
+            }
           }
         }
-      }
-    }
 
-  earlyexit:
-    GrpcStatusUtil::Create(status, err);
-    TRITONSERVER_ErrorDelete(err);
+      earlyexit:
+        GrpcStatusUtil::Create(status, err);
+        TRITONSERVER_ErrorDelete(err);
 #else
-    auto err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE,
-        "the server does not suppport model statistics");
-    GrpcStatusUtil::Create(status, err);
-    TRITONSERVER_ErrorDelete(err);
+        auto err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNAVAILABLE,
+            "the server does not suppport model statistics");
+        GrpcStatusUtil::Create(status, err);
+        TRITONSERVER_ErrorDelete(err);
 #endif
-  };
+      };
 
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>,
@@ -1027,9 +1040,10 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterSystemSharedMemoryStatus =
       [this](
-          grpc::ServerContext* ctx, inference::SystemSharedMemoryStatusRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryStatusResponse>*
-              responder,
+          grpc::ServerContext* ctx,
+          inference::SystemSharedMemoryStatusRequest* request,
+          grpc::ServerAsyncResponseWriter<
+              inference::SystemSharedMemoryStatusResponse>* responder,
           void* tag) {
         this->service_->RequestSystemSharedMemoryStatus(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -1038,7 +1052,8 @@ CommonHandler::SetUpAllRequests()
   auto OnExecuteSystemSharedMemoryStatus =
       [this](
           inference::SystemSharedMemoryStatusRequest& request,
-          inference::SystemSharedMemoryStatusResponse* response, grpc::Status* status) {
+          inference::SystemSharedMemoryStatusResponse* response,
+          grpc::Status* status) {
         TritonJson::Value shm_status_json(TritonJson::ValueType::ARRAY);
         TRITONSERVER_Error* err = shm_manager_->GetStatus(
             request.name(), TRITONSERVER_MEMORY_CPU, &shm_status_json);
@@ -1067,7 +1082,8 @@ CommonHandler::SetUpAllRequests()
           err = shm_region_json.MemberAsUInt("byte_size", &byte_size);
           GOTO_IF_ERR(err, earlyexit);
 
-          inference::SystemSharedMemoryStatusResponse::RegionStatus region_status;
+          inference::SystemSharedMemoryStatusResponse::RegionStatus
+              region_status;
           region_status.set_name(std::string(name, namelen));
           region_status.set_key(std::string(key, keylen));
           region_status.set_offset(offset);
@@ -1082,8 +1098,10 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryStatusResponse>,
-      inference::SystemSharedMemoryStatusRequest, inference::SystemSharedMemoryStatusResponse>(
+      grpc::ServerAsyncResponseWriter<
+          inference::SystemSharedMemoryStatusResponse>,
+      inference::SystemSharedMemoryStatusRequest,
+      inference::SystemSharedMemoryStatusResponse>(
       "SystemSharedMemoryStatus", 0, OnRegisterSystemSharedMemoryStatus,
       OnExecuteSystemSharedMemoryStatus);
 
@@ -1093,9 +1111,10 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterSystemSharedMemoryRegister =
       [this](
-          grpc::ServerContext* ctx, inference::SystemSharedMemoryRegisterRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryRegisterResponse>*
-              responder,
+          grpc::ServerContext* ctx,
+          inference::SystemSharedMemoryRegisterRequest* request,
+          grpc::ServerAsyncResponseWriter<
+              inference::SystemSharedMemoryRegisterResponse>* responder,
           void* tag) {
         this->service_->RequestSystemSharedMemoryRegister(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -1104,7 +1123,8 @@ CommonHandler::SetUpAllRequests()
   auto OnExecuteSystemSharedMemoryRegister =
       [this](
           inference::SystemSharedMemoryRegisterRequest& request,
-          inference::SystemSharedMemoryRegisterResponse* response, grpc::Status* status) {
+          inference::SystemSharedMemoryRegisterResponse* response,
+          grpc::Status* status) {
         TRITONSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
             request.name(), request.key(), request.offset(),
             request.byte_size());
@@ -1114,8 +1134,10 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryRegisterResponse>,
-      inference::SystemSharedMemoryRegisterRequest, inference::SystemSharedMemoryRegisterResponse>(
+      grpc::ServerAsyncResponseWriter<
+          inference::SystemSharedMemoryRegisterResponse>,
+      inference::SystemSharedMemoryRegisterRequest,
+      inference::SystemSharedMemoryRegisterResponse>(
       "SystemSharedMemoryRegister", 0, OnRegisterSystemSharedMemoryRegister,
       OnExecuteSystemSharedMemoryRegister);
 
@@ -1127,8 +1149,8 @@ CommonHandler::SetUpAllRequests()
       [this](
           grpc::ServerContext* ctx,
           inference::SystemSharedMemoryUnregisterRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryUnregisterResponse>*
-              responder,
+          grpc::ServerAsyncResponseWriter<
+              inference::SystemSharedMemoryUnregisterResponse>* responder,
           void* tag) {
         this->service_->RequestSystemSharedMemoryUnregister(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -1152,7 +1174,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::SystemSharedMemoryUnregisterResponse>,
+      grpc::ServerAsyncResponseWriter<
+          inference::SystemSharedMemoryUnregisterResponse>,
       inference::SystemSharedMemoryUnregisterRequest,
       inference::SystemSharedMemoryUnregisterResponse>(
       "SystemSharedMemoryUnregister", 0, OnRegisterSystemSharedMemoryUnregister,
@@ -1164,9 +1187,10 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterCudaSharedMemoryStatus =
       [this](
-          grpc::ServerContext* ctx, inference::CudaSharedMemoryStatusRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryStatusResponse>*
-              responder,
+          grpc::ServerContext* ctx,
+          inference::CudaSharedMemoryStatusRequest* request,
+          grpc::ServerAsyncResponseWriter<
+              inference::CudaSharedMemoryStatusResponse>* responder,
           void* tag) {
         this->service_->RequestCudaSharedMemoryStatus(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -1174,7 +1198,8 @@ CommonHandler::SetUpAllRequests()
   auto OnExecuteCudaSharedMemoryStatus =
       [this](
           inference::CudaSharedMemoryStatusRequest& request,
-          inference::CudaSharedMemoryStatusResponse* response, grpc::Status* status) {
+          inference::CudaSharedMemoryStatusResponse* response,
+          grpc::Status* status) {
         TritonJson::Value shm_status_json(TritonJson::ValueType::ARRAY);
         TRITONSERVER_Error* err = shm_manager_->GetStatus(
             request.name(), TRITONSERVER_MEMORY_GPU, &shm_status_json);
@@ -1211,8 +1236,10 @@ CommonHandler::SetUpAllRequests()
         TRITONSERVER_ErrorDelete(err);
       };
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryStatusResponse>,
-      inference::CudaSharedMemoryStatusRequest, inference::CudaSharedMemoryStatusResponse>(
+      grpc::ServerAsyncResponseWriter<
+          inference::CudaSharedMemoryStatusResponse>,
+      inference::CudaSharedMemoryStatusRequest,
+      inference::CudaSharedMemoryStatusResponse>(
       "CudaSharedMemoryStatus", 0, OnRegisterCudaSharedMemoryStatus,
       OnExecuteCudaSharedMemoryStatus);
 
@@ -1222,9 +1249,10 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterCudaSharedMemoryRegister =
       [this](
-          grpc::ServerContext* ctx, inference::CudaSharedMemoryRegisterRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryRegisterResponse>*
-              responder,
+          grpc::ServerContext* ctx,
+          inference::CudaSharedMemoryRegisterRequest* request,
+          grpc::ServerAsyncResponseWriter<
+              inference::CudaSharedMemoryRegisterResponse>* responder,
           void* tag) {
         this->service_->RequestCudaSharedMemoryRegister(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -1233,7 +1261,8 @@ CommonHandler::SetUpAllRequests()
   auto OnExecuteCudaSharedMemoryRegister =
       [this](
           inference::CudaSharedMemoryRegisterRequest& request,
-          inference::CudaSharedMemoryRegisterResponse* response, grpc::Status* status) {
+          inference::CudaSharedMemoryRegisterResponse* response,
+          grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
 #ifdef TRITON_ENABLE_GPU
         err = shm_manager_->RegisterCUDASharedMemory(
@@ -1255,8 +1284,10 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryRegisterResponse>,
-      inference::CudaSharedMemoryRegisterRequest, inference::CudaSharedMemoryRegisterResponse>(
+      grpc::ServerAsyncResponseWriter<
+          inference::CudaSharedMemoryRegisterResponse>,
+      inference::CudaSharedMemoryRegisterRequest,
+      inference::CudaSharedMemoryRegisterResponse>(
       "CudaSharedMemoryRegister", 0, OnRegisterCudaSharedMemoryRegister,
       OnExecuteCudaSharedMemoryRegister);
 
@@ -1265,9 +1296,10 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterCudaSharedMemoryUnregister =
       [this](
-          grpc::ServerContext* ctx, inference::CudaSharedMemoryUnregisterRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryUnregisterResponse>*
-              responder,
+          grpc::ServerContext* ctx,
+          inference::CudaSharedMemoryUnregisterRequest* request,
+          grpc::ServerAsyncResponseWriter<
+              inference::CudaSharedMemoryUnregisterResponse>* responder,
           void* tag) {
         this->service_->RequestCudaSharedMemoryUnregister(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -1276,7 +1308,8 @@ CommonHandler::SetUpAllRequests()
   auto OnExecuteCudaSharedMemoryUnregister =
       [this](
           inference::CudaSharedMemoryUnregisterRequest& request,
-          inference::CudaSharedMemoryUnregisterResponse* response, grpc::Status* status) {
+          inference::CudaSharedMemoryUnregisterResponse* response,
+          grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.name().empty()) {
           err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
@@ -1290,8 +1323,10 @@ CommonHandler::SetUpAllRequests()
       };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::CudaSharedMemoryUnregisterResponse>,
-      inference::CudaSharedMemoryUnregisterRequest, inference::CudaSharedMemoryUnregisterResponse>(
+      grpc::ServerAsyncResponseWriter<
+          inference::CudaSharedMemoryUnregisterResponse>,
+      inference::CudaSharedMemoryUnregisterRequest,
+      inference::CudaSharedMemoryUnregisterResponse>(
       "CudaSharedMemoryUnregister", 0, OnRegisterCudaSharedMemoryUnregister,
       OnExecuteCudaSharedMemoryUnregister);
 
@@ -1301,88 +1336,89 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterRepositoryIndex =
       [this](
           grpc::ServerContext* ctx, inference::RepositoryIndexRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>* responder,
+          grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>*
+              responder,
           void* tag) {
         this->service_->RequestRepositoryIndex(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
-  auto OnExecuteRepositoryIndex = [this](
-                                      inference::RepositoryIndexRequest& request,
-                                      inference::RepositoryIndexResponse* response,
-                                      grpc::Status* status) {
-    TRITONSERVER_Error* err = nullptr;
-    if (request.repository_name().empty()) {
-      uint32_t flags = 0;
-      if (request.ready()) {
-        flags |= TRITONSERVER_INDEX_FLAG_READY;
-      }
+  auto OnExecuteRepositoryIndex =
+      [this](
+          inference::RepositoryIndexRequest& request,
+          inference::RepositoryIndexResponse* response, grpc::Status* status) {
+        TRITONSERVER_Error* err = nullptr;
+        if (request.repository_name().empty()) {
+          uint32_t flags = 0;
+          if (request.ready()) {
+            flags |= TRITONSERVER_INDEX_FLAG_READY;
+          }
 
-      TRITONSERVER_Message* model_index_message = nullptr;
-      err = TRITONSERVER_ServerModelIndex(
-          tritonserver_.get(), flags, &model_index_message);
-      GOTO_IF_ERR(err, earlyexit);
-
-      const char* buffer;
-      size_t byte_size;
-      err = TRITONSERVER_MessageSerializeToJson(
-          model_index_message, &buffer, &byte_size);
-      GOTO_IF_ERR(err, earlyexit);
-
-      TritonJson::Value model_index_json;
-      err = model_index_json.Parse(buffer, byte_size);
-      GOTO_IF_ERR(err, earlyexit);
-
-      err = model_index_json.AssertType(TritonJson::ValueType::ARRAY);
-      GOTO_IF_ERR(err, earlyexit);
-
-      for (size_t idx = 0; idx < model_index_json.ArraySize(); ++idx) {
-        TritonJson::Value index_json;
-        err = model_index_json.IndexAsObject(idx, &index_json);
-        GOTO_IF_ERR(err, earlyexit);
-
-        auto model_index = response->add_models();
-
-        const char* name;
-        size_t namelen;
-        err = index_json.MemberAsString("name", &name, &namelen);
-        GOTO_IF_ERR(err, earlyexit);
-        model_index->set_name(std::string(name, namelen));
-
-        if (index_json.Find("version")) {
-          const char* version;
-          size_t versionlen;
-          err = index_json.MemberAsString("version", &version, &versionlen);
+          TRITONSERVER_Message* model_index_message = nullptr;
+          err = TRITONSERVER_ServerModelIndex(
+              tritonserver_.get(), flags, &model_index_message);
           GOTO_IF_ERR(err, earlyexit);
-          model_index->set_version(std::string(version, versionlen));
-        }
-        if (index_json.Find("state")) {
-          const char* state;
-          size_t statelen;
-          err = index_json.MemberAsString("state", &state, &statelen);
-          GOTO_IF_ERR(err, earlyexit);
-          model_index->set_state(std::string(state, statelen));
-        }
-        if (index_json.Find("reason")) {
-          const char* reason;
-          size_t reasonlen;
-          err = index_json.MemberAsString("reason", &reason, &reasonlen);
-          GOTO_IF_ERR(err, earlyexit);
-          model_index->set_reason(std::string(reason, reasonlen));
-        }
-      }
 
-      TRITONSERVER_MessageDelete(model_index_message);
-    } else {
-      err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED,
-          "'repository_name' specification is not supported");
-    }
+          const char* buffer;
+          size_t byte_size;
+          err = TRITONSERVER_MessageSerializeToJson(
+              model_index_message, &buffer, &byte_size);
+          GOTO_IF_ERR(err, earlyexit);
 
-  earlyexit:
-    GrpcStatusUtil::Create(status, err);
-    TRITONSERVER_ErrorDelete(err);
-  };
+          TritonJson::Value model_index_json;
+          err = model_index_json.Parse(buffer, byte_size);
+          GOTO_IF_ERR(err, earlyexit);
+
+          err = model_index_json.AssertType(TritonJson::ValueType::ARRAY);
+          GOTO_IF_ERR(err, earlyexit);
+
+          for (size_t idx = 0; idx < model_index_json.ArraySize(); ++idx) {
+            TritonJson::Value index_json;
+            err = model_index_json.IndexAsObject(idx, &index_json);
+            GOTO_IF_ERR(err, earlyexit);
+
+            auto model_index = response->add_models();
+
+            const char* name;
+            size_t namelen;
+            err = index_json.MemberAsString("name", &name, &namelen);
+            GOTO_IF_ERR(err, earlyexit);
+            model_index->set_name(std::string(name, namelen));
+
+            if (index_json.Find("version")) {
+              const char* version;
+              size_t versionlen;
+              err = index_json.MemberAsString("version", &version, &versionlen);
+              GOTO_IF_ERR(err, earlyexit);
+              model_index->set_version(std::string(version, versionlen));
+            }
+            if (index_json.Find("state")) {
+              const char* state;
+              size_t statelen;
+              err = index_json.MemberAsString("state", &state, &statelen);
+              GOTO_IF_ERR(err, earlyexit);
+              model_index->set_state(std::string(state, statelen));
+            }
+            if (index_json.Find("reason")) {
+              const char* reason;
+              size_t reasonlen;
+              err = index_json.MemberAsString("reason", &reason, &reasonlen);
+              GOTO_IF_ERR(err, earlyexit);
+              model_index->set_reason(std::string(reason, reasonlen));
+            }
+          }
+
+          TRITONSERVER_MessageDelete(model_index_message);
+        } else {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "'repository_name' specification is not supported");
+        }
+
+      earlyexit:
+        GrpcStatusUtil::Create(status, err);
+        TRITONSERVER_ErrorDelete(err);
+      };
 
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>,
@@ -1395,35 +1431,38 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterRepositoryModelLoad =
       [this](
-          grpc::ServerContext* ctx, inference::RepositoryModelLoadRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::RepositoryModelLoadResponse>*
-              responder,
+          grpc::ServerContext* ctx,
+          inference::RepositoryModelLoadRequest* request,
+          grpc::ServerAsyncResponseWriter<
+              inference::RepositoryModelLoadResponse>* responder,
           void* tag) {
         this->service_->RequestRepositoryModelLoad(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
-  auto OnExecuteRepositoryModelLoad = [this](
-                                          inference::RepositoryModelLoadRequest& request,
-                                          inference::RepositoryModelLoadResponse* response,
-                                          grpc::Status* status) {
-    TRITONSERVER_Error* err = nullptr;
-    if (request.repository_name().empty()) {
-      err = TRITONSERVER_ServerLoadModel(
-          tritonserver_.get(), request.model_name().c_str());
-    } else {
-      err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED,
-          "'repository_name' specification is not supported");
-    }
+  auto OnExecuteRepositoryModelLoad =
+      [this](
+          inference::RepositoryModelLoadRequest& request,
+          inference::RepositoryModelLoadResponse* response,
+          grpc::Status* status) {
+        TRITONSERVER_Error* err = nullptr;
+        if (request.repository_name().empty()) {
+          err = TRITONSERVER_ServerLoadModel(
+              tritonserver_.get(), request.model_name().c_str());
+        } else {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "'repository_name' specification is not supported");
+        }
 
-    GrpcStatusUtil::Create(status, err);
-    TRITONSERVER_ErrorDelete(err);
-  };
+        GrpcStatusUtil::Create(status, err);
+        TRITONSERVER_ErrorDelete(err);
+      };
 
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::RepositoryModelLoadResponse>,
-      inference::RepositoryModelLoadRequest, inference::RepositoryModelLoadResponse>(
+      inference::RepositoryModelLoadRequest,
+      inference::RepositoryModelLoadResponse>(
       "RepositoryModelLoad", 0, OnRegisterRepositoryModelLoad,
       OnExecuteRepositoryModelLoad);
 
@@ -1432,9 +1471,10 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterRepositoryModelUnload =
       [this](
-          grpc::ServerContext* ctx, inference::RepositoryModelUnloadRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::RepositoryModelUnloadResponse>*
-              responder,
+          grpc::ServerContext* ctx,
+          inference::RepositoryModelUnloadRequest* request,
+          grpc::ServerAsyncResponseWriter<
+              inference::RepositoryModelUnloadResponse>* responder,
           void* tag) {
         this->service_->RequestRepositoryModelUnload(
             ctx, request, responder, this->cq_, this->cq_, tag);
@@ -1443,7 +1483,8 @@ CommonHandler::SetUpAllRequests()
   auto OnExecuteRepositoryModelUnload =
       [this](
           inference::RepositoryModelUnloadRequest& request,
-          inference::RepositoryModelUnloadResponse* response, grpc::Status* status) {
+          inference::RepositoryModelUnloadResponse* response,
+          grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
           err = TRITONSERVER_ServerUnloadModel(
@@ -1460,7 +1501,8 @@ CommonHandler::SetUpAllRequests()
 
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::RepositoryModelUnloadResponse>,
-      inference::RepositoryModelUnloadRequest, inference::RepositoryModelUnloadResponse>(
+      inference::RepositoryModelUnloadRequest,
+      inference::RepositoryModelUnloadResponse>(
       "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
       OnExecuteRepositoryModelUnload);
 }
@@ -2288,7 +2330,8 @@ TRITONSERVER_Error*
 InferAllocatorPayload(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const inference::ModelInferRequest& request, std::list<std::string>&& serialized_data,
+    const inference::ModelInferRequest& request,
+    std::list<std::string>&& serialized_data,
     std::shared_ptr<ResponseQueue<ResponseType>> response_queue,
     AllocPayload<ResponseType>* alloc_payload)
 {
@@ -2306,9 +2349,9 @@ InferAllocatorPayload(
     int64_t offset;
     size_t byte_size;
     bool has_shared_memory;
-    RETURN_IF_ERR(
-        ParseSharedMemoryParams<inference::ModelInferRequest::InferRequestedOutputTensor>(
-            io, &has_shared_memory, &region_name, &offset, &byte_size));
+    RETURN_IF_ERR(ParseSharedMemoryParams<
+                  inference::ModelInferRequest::InferRequestedOutputTensor>(
+        io, &has_shared_memory, &region_name, &offset, &byte_size));
 
     bool has_classification;
     uint32_t classification_count;
@@ -2375,7 +2418,8 @@ TRITONSERVER_Error*
 InferGRPCToInput(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const inference::ModelInferRequest& request, std::list<std::string>* serialized_data,
+    const inference::ModelInferRequest& request,
+    std::list<std::string>* serialized_data,
     TRITONSERVER_InferenceRequest* inference_request)
 {
   // Verify that the batch-byte-size of each input matches the size of
@@ -2390,8 +2434,9 @@ InferGRPCToInput(
     std::string region_name;
     int64_t offset;
     bool has_shared_memory;
-    RETURN_IF_ERR(ParseSharedMemoryParams<inference::ModelInferRequest::InferInputTensor>(
-        io, &has_shared_memory, &region_name, &offset, &byte_size));
+    RETURN_IF_ERR(
+        ParseSharedMemoryParams<inference::ModelInferRequest::InferInputTensor>(
+            io, &has_shared_memory, &region_name, &offset, &byte_size));
 
     if (has_shared_memory) {
       if (io.has_contents()) {
@@ -3123,7 +3168,8 @@ ModelInferHandler::InferResponseComplete(
   // This callback is expected to be called exactly once for each request.
   // Will use the single response object in the response list to hold the
   // information.
-  inference::ModelInferResponse* response = state->response_queue_->GetResponseAt(0);
+  inference::ModelInferResponse* response =
+      state->response_queue_->GetResponseAt(0);
   bool response_created = false;
   if (response == nullptr) {
     LOG_ERROR << "expected allocator to have created a response object";
@@ -3181,7 +3227,8 @@ TRITONSERVER_Error*
 StreamInferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
 {
   AllocPayload<inference::ModelStreamInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(userp);
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(
+          userp);
 
   // Move to the next response object
   payload->response_queue_->AllocateResponse();
@@ -3198,7 +3245,8 @@ StreamInferResponseAlloc(
     int64_t* actual_memory_type_id)
 {
   AllocPayload<inference::ModelStreamInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(userp);
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(
+          userp);
 
   auto response = payload->response_queue_->GetLastAllocatedResponse();
 
@@ -3223,7 +3271,8 @@ class ModelStreamInferHandler
     : public InferHandler<
           inference::GRPCInferenceService::AsyncService,
           grpc::ServerAsyncReaderWriter<
-              inference::ModelStreamInferResponse, inference::ModelInferRequest>,
+              inference::ModelStreamInferResponse,
+              inference::ModelInferRequest>,
           inference::ModelInferRequest, inference::ModelStreamInferResponse> {
  public:
   ModelStreamInferHandler(

@@ -1919,8 +1919,8 @@ TRITONSERVER_ServerModelConfig(
       lserver->GetInferenceBackend(model_name, model_version, &backend));
 
   std::string model_config_json;
-  RETURN_IF_STATUS_ERROR(
-      ni::ModelConfigToJson(backend->Config(), config_version, &model_config_json));
+  RETURN_IF_STATUS_ERROR(ni::ModelConfigToJson(
+      backend->Config(), config_version, &model_config_json));
 
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new ni::TritonServerMessage(std::move(model_config_json)));

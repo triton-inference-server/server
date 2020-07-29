@@ -346,8 +346,9 @@ InferenceRequest::ImmutableInput(
 
 Status
 InferenceRequest::AddOriginalInput(
-    const std::string& name, const inference::DataType datatype, const int64_t* shape,
-    const uint64_t dim_count, InferenceRequest::Input** input)
+    const std::string& name, const inference::DataType datatype,
+    const int64_t* shape, const uint64_t dim_count,
+    InferenceRequest::Input** input)
 {
   const auto& pr = original_inputs_.emplace(
       std::piecewise_construct, std::forward_as_tuple(name),
@@ -748,8 +749,8 @@ InferenceRequest::ReportStatisticsWithDuration(
 InferenceRequest::Input::Input() : data_(new MemoryReference) {}
 
 InferenceRequest::Input::Input(
-    const std::string& name, const inference::DataType datatype, const int64_t* shape,
-    const uint64_t dim_count)
+    const std::string& name, const inference::DataType datatype,
+    const int64_t* shape, const uint64_t dim_count)
     : name_(name), datatype_(datatype),
       original_shape_(shape, shape + dim_count), is_shape_tensor_(false),
       data_(new MemoryReference)

@@ -310,8 +310,8 @@ class ModelRepositoryManager::BackendLifeCycle {
   // be unloaded before loading the specified versions.
   Status AsyncLoad(
       const std::string& repository_path, const std::string& model_name,
-      const std::set<int64_t>& versions, const inference::ModelConfig& model_config,
-      bool force_unload = true,
+      const std::set<int64_t>& versions,
+      const inference::ModelConfig& model_config, bool force_unload = true,
       std::function<void(int64_t, ModelReadyState, size_t)> OnComplete =
           nullptr);
 
@@ -343,7 +343,8 @@ class ModelRepositoryManager::BackendLifeCycle {
   struct BackendInfo {
     BackendInfo(
         const std::string& repository_path, const ModelReadyState state,
-        const ActionType next_action, const inference::ModelConfig& model_config)
+        const ActionType next_action,
+        const inference::ModelConfig& model_config)
         : repository_path_(repository_path),
           platform_(GetPlatform(model_config.platform())), state_(state),
           next_action_(next_action), model_config_(model_config)
@@ -667,8 +668,8 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
 Status
 ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     const std::string& repository_path, const std::string& model_name,
-    const std::set<int64_t>& versions, const inference::ModelConfig& model_config,
-    bool force_unload,
+    const std::set<int64_t>& versions,
+    const inference::ModelConfig& model_config, bool force_unload,
     std::function<void(int64_t, ModelReadyState, size_t)> OnComplete)
 {
   LOG_VERBOSE(1) << "AsyncLoad() '" << model_name << "'";

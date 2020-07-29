@@ -64,7 +64,8 @@ OnnxBackendFactory::Create(
 
 Status
 OnnxBackendFactory::CreateBackend(
-    const std::string& nonlocal_path, const inference::ModelConfig& model_config,
+    const std::string& nonlocal_path,
+    const inference::ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {

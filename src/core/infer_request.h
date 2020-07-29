@@ -62,8 +62,8 @@ class InferenceRequest {
         const std::string& name, const inference::DataType datatype,
         const std::vector<int64_t>& shape);
     Input(
-        const std::string& name, const inference::DataType datatype, const int64_t* shape,
-        const uint64_t dim_count);
+        const std::string& name, const inference::DataType datatype,
+        const int64_t* shape, const uint64_t dim_count);
 
     // The name of the input tensor. There is no mutable operator for
     // the name because it is used in a InferenceRequest map and a
@@ -292,8 +292,8 @@ class InferenceRequest {
   // Add an original input to the request. If 'input' is non-null
   // return a pointer to the newly added input.
   Status AddOriginalInput(
-      const std::string& name, const inference::DataType datatype, const int64_t* shape,
-      const uint64_t dim_count, Input** input = nullptr);
+      const std::string& name, const inference::DataType datatype,
+      const int64_t* shape, const uint64_t dim_count, Input** input = nullptr);
   Status AddOriginalInput(
       const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape, Input** input = nullptr);

@@ -81,7 +81,8 @@ class BaseBackend : public InferenceBackend {
     Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status ValidateOutputs(
-        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
+            ios);
 
     // See BackendContext::Run()
     void Run(

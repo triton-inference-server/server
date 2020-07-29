@@ -83,17 +83,17 @@ GraphDefBackend::CreateTRTISTFModel(
   // inputs are present in the model
   if (Config().has_sequence_batching()) {
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        inputs, false /* required */));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
         false /* required */));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        inputs, false /* required */));
     RETURN_IF_ERROR(ValidateTypedSequenceControl(
-        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, inputs,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+        inputs, false /* required */));
   }
 
   for (const auto& io : Config().input()) {

@@ -110,10 +110,12 @@ class InferenceBackend {
   }
 
   // Get the model configuration for a named input.
-  Status GetInput(const std::string& name, const inference::ModelInput** input) const;
+  Status GetInput(
+      const std::string& name, const inference::ModelInput** input) const;
 
   // Get the model configuration for a named output.
-  Status GetOutput(const std::string& name, const inference::ModelOutput** output) const;
+  Status GetOutput(
+      const std::string& name, const inference::ModelOutput** output) const;
 
   // Get a label provider for the model.
   const std::shared_ptr<LabelProvider>& GetLabelProvider() const
@@ -163,7 +165,8 @@ class InferenceBackend {
   virtual void WarmUp(uint32_t runner_idx, WarmupData& sample);
 
   // Set the configuration of the model being served.
-  Status SetModelConfig(const std::string& path, const inference::ModelConfig& config);
+  Status SetModelConfig(
+      const std::string& path, const inference::ModelConfig& config);
 
   // Explicitly set the scheduler to use for inference requests to the
   // model. The scheduler can only be set once for a backend.
