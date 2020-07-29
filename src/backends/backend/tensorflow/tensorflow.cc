@@ -84,9 +84,7 @@ RequestsRespondIfError(
     TRITONBACKEND_Response* response;
     auto err = TRITONBACKEND_ResponseNew(&response, requests[i]);
     if (err != nullptr) {
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
-          "Fail to create response");
+      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Fail to create response");
       TRITONSERVER_ErrorDelete(err);
     } else {
       std::unique_ptr<
@@ -95,18 +93,14 @@ RequestsRespondIfError(
       err = TRITONBACKEND_ResponseSend(
           response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, response_err);
       if (err != nullptr) {
-        TRITONSERVER_LogMessage(
-            TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
-            "Fail to send response");
+        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Fail to send response");
         TRITONSERVER_ErrorDelete(err);
       }
     }
     err = TRITONBACKEND_RequestRelease(
         requests[i], TRITONSERVER_REQUEST_RELEASE_ALL);
     if (err != nullptr) {
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
-          "Fail to release request");
+      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Fail to release request");
       TRITONSERVER_ErrorDelete(err);
     }
   }
@@ -778,82 +772,55 @@ SetStringOutputBuffer(
 //
 class ModelState {
  public:
-  class Instance : public nib::ModelInstance {
-   public:
-    // GPU device number that indicates model will be loaded on GPUs
-    // as specified in model graph
-    static constexpr int MODEL_DEVICE = -2;
-
-    Instance(
-        const std::string& name, const int gpu_device, const int max_batch_size,
-        const bool enable_pinned_input, const bool enable_pinned_output)
-        : nib::ModelInstance(
-              name, gpu_device, max_batch_size, enable_pinned_input,
-              enable_pinned_output),
-          trtistf_model_(nullptr, TRTISTF_ModelDelete),
-          input_device_id_(MODEL_DEVICE),
-          requests_(std::max(max_batch_size_, 1))
-    {
-    }
-
-    void Run(
-        TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
-        const uint32_t request_count) override;
-
-    // Map from configuration name for an input to tensor name for
-    // that input in the model.
-    IONameMap input_name_map_;
-
-    // Map from configuration name for an output to tensor name for
-    // that output in the model.
-    IONameMap output_name_map_;
-
-    // TRTISTFModel for this context.
-    TRTISTFModelHandle trtistf_model_;
-
-    // use for GPU allocator
-    int input_device_id_;
-
-    // A blocking queue for the instance to fetch its jobs.
-    nib::BlockingQueue<std::pair<bool, uint32_t>> batch_queue_;
-    std::vector<TRITONBACKEND_Request*> requests_;
-  };
-
   static TRITONSERVER_Error* Create(
       TRITONBACKEND_Model* triton_model, ModelState** state);
-  ~ModelState();
-
-  TRITONSERVER_Error* CreateInstances();
 
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
 
-  // Spawn a thread to produce outputs for a request. Return the
-  // request wait time before it should release.
-  void ProcessRequest(
-      TRITONBACKEND_Request** requests, const uint32_t request_count);
+  const std::string& Name() { return name_; }
+  TRITONBACKEND_Model* TritonModel() { return triton_model_; }
+  ni::TritonJson::Value& BackendConfig() { return backend_config_; }
+  ni::TritonJson::Value& ModelConfig() { return model_config_; }
+  const std::unordered_map<std::string, std::string>& ModelPaths() const
+  {
+    return model_paths_;
+  }
+  bool IsGraphdef() const { return is_graphdef_; }
 
  private:
   ModelState(
       TRITONBACKEND_Model* triton_model, const std::string& name,
-      ni::TritonJson::Value&& model_config);
-
-  TRITONSERVER_Error* CreateInstance(
-      const std::string& instance_name, const nib::InstanceProperties& device,
-      const std::unordered_map<std::string, std::string>& paths);
+      ni::TritonJson::Value&& backend_config,
+      ni::TritonJson::Value&& model_config,
+      std::unordered_map<std::string, std::string>&& model_paths,
+      const bool is_graphdef);
 
   TRITONBACKEND_Model* triton_model_;
   const std::string name_;
+  ni::TritonJson::Value backend_config_;
   ni::TritonJson::Value model_config_;
-  std::vector<std::unique_ptr<Instance>> instances_;
-  std::vector<std::thread> instance_threads_;
-  nib::BlockingQueue<Instance*> available_instances_;
+  const std::unordered_map<std::string, std::string> model_paths_;
+  const bool is_graphdef_;
 };
 
 TRITONSERVER_Error*
 ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 {
+  // Obtain backend config as JSON object
+  TRITONBACKEND_Backend* backend;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(triton_model, &backend));
   TRITONSERVER_Message* config_message;
+  RETURN_IF_ERROR(TRITONBACKEND_BackendConfig(backend, &config_message));
+  const char* buffer;
+  size_t byte_size;
+  RETURN_IF_ERROR(
+      TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
+  ni::TritonJson::Value backend_config;
+  if (byte_size != 0) {
+    RETURN_IF_ERROR(backend_config.Parse(buffer, byte_size));
+  }
+
   RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
       triton_model, 1 /* config_version */, &config_message));
 
@@ -864,8 +831,6 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   // nice errors (currently the underlying implementation is
   // rapidjson... but others could be added). You can use any json
   // parser you prefer.
-  const char* buffer;
-  size_t byte_size;
   RETURN_IF_ERROR(
       TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
 
@@ -877,157 +842,238 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   const char* name;
   RETURN_IF_ERROR(TRITONBACKEND_ModelName(triton_model, &name));
 
-  std::unique_ptr<ModelState> local_state(
-      new ModelState(triton_model, name, std::move(model_config)));
-  RETURN_IF_ERROR(local_state->ValidateModelConfig());
-  RETURN_IF_ERROR(local_state->CreateInstances());
-  // Sanity check that there is available instances
-  if (local_state->available_instances_.Empty()) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        (std::string("unable to create instances for model '") + name + "'")
-            .c_str());
-  }
-
-  *state = local_state.release();
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-ModelState::CreateInstances()
-{
   std::string platform;
-  RETURN_IF_ERROR(model_config_.MemberAsString("platform", &platform));
+  RETURN_IF_ERROR(model_config.MemberAsString("platform", &platform));
   bool is_graphdef;
   if (platform == "tensorflow_graphdef") {
     is_graphdef = true;
   } else if (platform == "tensorflow_savedmodel") {
     is_graphdef = false;
   } else {
-    RETURN_ERROR_IF_FALSE(
-        false, TRITONSERVER_ERROR_INVALID_ARG,
-        std::string("platform ") + platform + " not supported");
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG, (std::string("platform ") + platform +
+                                         " not supported for TensorFlow "
+                                         "model '" +
+                                         name + "'")
+                                            .c_str());
   }
-  std::vector<nib::InstanceProperties> instances;
-  RETURN_IF_ERROR(nib::ParseInstanceGroups(model_config_, &instances));
-
-  const char* cname = nullptr;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelName(triton_model_, &cname));
-  const std::string name = std::string(cname);
 
   const char* path = nullptr;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelRepositoryPath(triton_model_, &path));
+  TRITONBACKEND_ModelArtifactType artifact_type;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelRepository(triton_model, &artifact_type, &path));
+  if (artifact_type != TRITONBACKEND_ARTIFACT_FILESYSTEM) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        (std::string("unsupported artifact type for model '") + name + "'")
+            .c_str());
+  }
   uint64_t version;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model_, &version));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model, &version));
   std::unordered_map<std::string, std::string> model_paths;
   RETURN_IF_ERROR(
       nib::ModelPaths(path, version, is_graphdef, !is_graphdef, &model_paths));
-  for (const auto& instance : instances) {
-    switch (instance.kind_) {
-      case nib::InstanceProperties::Kind::CPU: {
-        const std::string instance_name =
-            name + "_" + std::to_string(instance.id_) + "_cpu";
-        RETURN_IF_ERROR(CreateInstance(instance_name, instance, model_paths));
-        break;
-      }
-      case nib::InstanceProperties::Kind::GPU: {
-        const std::string instance_name =
-            name + "_" + std::to_string(instance.id_) + "_gpu" +
-            std::to_string(instance.device_id_);
-        RETURN_IF_ERROR(CreateInstance(instance_name, instance, model_paths));
-        break;
-      }
-      case nib::InstanceProperties::Kind::MODEL: {
-        const std::string instance_name =
-            name + "_" + std::to_string(instance.id_) + "_model_device";
-        RETURN_IF_ERROR(CreateInstance(instance_name, instance, model_paths));
-        break;
-      }
-      default: {
-        RETURN_ERROR_IF_FALSE(
-            false, TRITONSERVER_ERROR_INVALID_ARG,
-            std::string("instance setting ") + instance.AsString() +
-                " not supported");
-        break;
-      }
-    }
-  }
+
+  std::unique_ptr<ModelState> local_state(new ModelState(
+      triton_model, name, std::move(backend_config), std::move(model_config),
+      std::move(model_paths), is_graphdef));
+  RETURN_IF_ERROR(local_state->ValidateModelConfig());
+
+  *state = local_state.release();
   return nullptr;  // success
 }
 
-TRITONSERVER_Error*
-ModelState::CreateInstance(
-    const std::string& instance_name, const nib::InstanceProperties& device,
-    const std::unordered_map<std::string, std::string>& paths)
+ModelState::ModelState(
+    TRITONBACKEND_Model* triton_model, const std::string& name,
+    ni::TritonJson::Value&& backend_config,
+    ni::TritonJson::Value&& model_config,
+    std::unordered_map<std::string, std::string>&& model_paths,
+    const bool is_graphdef)
+    : triton_model_(triton_model), name_(name),
+      backend_config_(std::move(backend_config)),
+      model_config_(std::move(model_config)),
+      model_paths_(std::move(model_paths)), is_graphdef_(is_graphdef)
 {
+}
+
+TRITONSERVER_Error*
+ModelState::ValidateModelConfig()
+{
+  // We have the json DOM for the model configuration...
+  ni::TritonJson::WriteBuffer buffer;
+  RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      (std::string("model configuration:\n") + buffer.Contents()).c_str());
+
+  ni::TritonJson::Value ios;
+  RETURN_IF_ERROR(model_config_.MemberAsArray("input", &ios));
+  for (size_t i = 0; i < ios.ArraySize(); i++) {
+    ni::TritonJson::Value io;
+    RETURN_IF_ERROR(ios.IndexAsObject(i, &io));
+    std::string io_name;
+    RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
+    // Check datatypes
+    std::string io_dtype;
+    RETURN_IF_ERROR(io.MemberAsString("data_type", &io_dtype));
+    RETURN_ERROR_IF_TRUE(
+        nib::ConvertDataType(io_dtype) ==
+            TRTISTF_DataType::TRTISTF_TYPE_INVALID,
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("unsupported datatype '") + io_dtype + "' for tensor '" +
+            io_name + "' for model '" + name_ + "'");
+  }
+  RETURN_IF_ERROR(model_config_.MemberAsArray("output", &ios));
+  for (size_t i = 0; i < ios.ArraySize(); i++) {
+    ni::TritonJson::Value io;
+    RETURN_IF_ERROR(ios.IndexAsObject(i, &io));
+    std::string io_name;
+    RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
+    // Check datatypes
+    std::string io_dtype;
+    RETURN_IF_ERROR(io.MemberAsString("data_type", &io_dtype));
+    RETURN_ERROR_IF_TRUE(
+        nib::ConvertDataType(io_dtype) ==
+            TRTISTF_DataType::TRTISTF_TYPE_INVALID,
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("unsupported datatype '") + io_dtype + "' for tensor '" +
+            io_name + "' for model '" + name_ + "'");
+  }
+
+  return nullptr;  // success
+}
+
+//
+// ModelInstanceState
+//
+// State associated with a model instance. An object of this class is
+// created and associated with each TRITONBACKEND_ModelInstance.
+//
+class ModelInstanceState : public nib::ModelInstance {
+ public:
+  // GPU device number that indicates model will be loaded on GPUs
+  // as specified in model graph
+  static constexpr int MODEL_DEVICE = -2;
+
+  void ProcessRequests(
+      TRITONBACKEND_Request** requests, const uint32_t request_count);
+
+  static TRITONSERVER_Error* Create(
+      ModelState* model_state,
+      TRITONBACKEND_ModelInstance* triton_model_instance,
+      ModelInstanceState** state);
+
+  // Get the name, device ID of the instance.
+  const std::string& Name() const { return name_; }
+  int32_t DeviceId() const { return gpu_device_; }
+
+  // Get the state of the model that corresponds to this instance.
+  ModelState* StateForModel() const { return model_state_; }
+
+ private:
+  ModelInstanceState(
+      ModelState* model_state, const std::string& name, const int gpu_device,
+      const int max_batch_size, const bool enable_pinned_input,
+      const bool enable_pinned_output)
+      : nib::ModelInstance(
+            name, gpu_device, max_batch_size, enable_pinned_input,
+            enable_pinned_output),
+        model_state_(model_state), trtistf_model_(nullptr, TRTISTF_ModelDelete),
+        input_device_id_(MODEL_DEVICE)
+  {
+  }
+
+  ModelState* model_state_;
+
+  // Map from configuration name for an input to tensor name for
+  // that input in the model.
+  IONameMap input_name_map_;
+
+  // Map from configuration name for an output to tensor name for
+  // that output in the model.
+  IONameMap output_name_map_;
+
+  // TRTISTFModel for this context.
+  TRTISTFModelHandle trtistf_model_;
+
+  // use for GPU allocator
+  int input_device_id_;
+};
+
+TRITONSERVER_Error*
+ModelInstanceState::Create(
+    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
+    ModelInstanceState** state)
+{
+  *state = nullptr;
+
+  const char* instance_name;
+  TRITONSERVER_InstanceGroupKind kind;
+  int32_t device_id;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceName(triton_model_instance, &instance_name));
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceKind(triton_model_instance, &kind));
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &device_id));
+
+  auto& model_config = model_state->ModelConfig();
   // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
-  std::string platform;
-  RETURN_IF_ERROR(model_config_.MemberAsString("platform", &platform));
-
   std::string cc_model_filename;
-  model_config_.MemberAsString("default_model_filename", &cc_model_filename);
+  model_config.MemberAsString("default_model_filename", &cc_model_filename);
   // FIXME this should be part of model config normalization / autofill
   if (cc_model_filename.empty()) {
-    if (platform == "tensorflow_graphdef") {
+    if (model_state->IsGraphdef()) {
       cc_model_filename = "model.graphdef";
-    } else if (platform == "tensorflow_savedmodel") {
-      cc_model_filename = "model.savedmodel";
     } else {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          std::string(
-              "unsupported platform '" + platform +
-              "' for TensorFlow backend, supported platforms are "
-              "'tensorflow_graphdef', "
-              "'tensorflow_savedmodel'")
-              .c_str());
+      cc_model_filename = "model.savedmodel";
     }
   }
   int gpu_device;
 
-  switch (device.kind_) {
-    case nib::InstanceProperties::Kind::CPU: {
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  switch (kind) {
+    case TRITONSERVER_INSTANCEGROUPKIND_CPU: {
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_INFO,
           (std::string("Creating instance ") + instance_name +
            " on CPU using " + cc_model_filename)
               .c_str());
-      gpu_device = Instance::NO_GPU_DEVICE;
+      gpu_device = ModelInstanceState::NO_GPU_DEVICE;
       break;
     }
-    case nib::InstanceProperties::Kind::MODEL: {
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+    case TRITONSERVER_INSTANCEGROUPKIND_MODEL: {
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_INFO,
           (std::string("Creating instance ") + instance_name +
            " on devices using " + cc_model_filename)
               .c_str());
-      gpu_device = Instance::MODEL_DEVICE;
+      gpu_device = ModelInstanceState::MODEL_DEVICE;
       break;
     }
     default: {
 #ifdef TRITON_ENABLE_GPU
       cudaDeviceProp cuprops;
-      cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, device.device_id_);
+      cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, device_id);
       if (cuerr != cudaSuccess) {
         RETURN_ERROR_IF_FALSE(
             false, TRITONSERVER_ERROR_INTERNAL,
-            std::string("unable to get CUDA device properties for ") + name_ +
-                ": " + cudaGetErrorString(cuerr));
+            std::string("unable to get CUDA device properties for ") +
+                instance_name + ": " + cudaGetErrorString(cuerr));
       }
 
       const std::string cc =
           std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
       ni::TritonJson::Value cc_names;
       ni::TritonJson::Value cc_name;
-      if ((model_config_.Find("cc_model_filenames", &cc_names)) &&
+      if ((model_config.Find("cc_model_filenames", &cc_names)) &&
           (cc_names.Find(cc.c_str(), &cc_name))) {
         cc_name.AsString(&cc_model_filename);
       }
 
-      gpu_device = device.device_id_;
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      gpu_device = device_id;
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_INFO,
           (std::string("Creating instance ") + instance_name + " on GPU " +
            std::to_string(gpu_device) + " (" + cc + ") using " +
            cc_model_filename)
@@ -1041,38 +1087,39 @@ ModelState::CreateInstance(
     }
   }
 
-  const auto& gdp_itr = paths.find(cc_model_filename);
-  if (gdp_itr == paths.end()) {
+  const auto& gdp_itr = model_state->ModelPaths().find(cc_model_filename);
+  if (gdp_itr == model_state->ModelPaths().end()) {
     RETURN_ERROR_IF_FALSE(
         false, TRITONSERVER_ERROR_INTERNAL,
         (std::string("unable to find model '") + cc_model_filename + "' for " +
-         name_));
+         instance_name));
   }
 
   // Max batch size. A value of 0 in the config becomes NO_BATCHING.
   int64_t max_batch_size;
-  RETURN_IF_ERROR(model_config_.MemberAsInt("max_batch_size", &max_batch_size));
+  RETURN_IF_ERROR(model_config.MemberAsInt("max_batch_size", &max_batch_size));
   const int mbs =
-      (max_batch_size <= 0) ? Instance::NO_BATCHING : max_batch_size;
+      (max_batch_size <= 0) ? ModelInstanceState::NO_BATCHING : max_batch_size;
 
   // TODO put the model config related code as backend_utils
   bool pinned_input, pinned_output;
   {
     ni::TritonJson::Value optimization;
-    if (model_config_.Find("optimization", &optimization)) {
+    if (model_config.Find("optimization", &optimization)) {
       ni::TritonJson::Value pinned_memory;
-      if (model_config_.Find("input_pinned_memory", &pinned_memory)) {
+      if (model_config.Find("input_pinned_memory", &pinned_memory)) {
         RETURN_IF_ERROR(pinned_memory.MemberAsBool("enable", &pinned_input));
       }
-      if (model_config_.Find("output_pinned_memory", &pinned_memory)) {
+      if (model_config.Find("output_pinned_memory", &pinned_memory)) {
         RETURN_IF_ERROR(pinned_memory.MemberAsBool("enable", &pinned_output));
       }
     }
   }
 
-  instances_.emplace_back(new Instance(
-      instance_name, gpu_device, mbs, pinned_input, pinned_output));
-  auto instance = instances_.back().get();
+  std::unique_ptr<ModelInstanceState> lstate(new ModelInstanceState(
+      model_state, instance_name, gpu_device, mbs, pinned_input,
+      pinned_output));
+  auto instance = lstate.get();
 
   RETURN_IF_ERROR(instance->CreateCudaStream());
 
@@ -1084,7 +1131,7 @@ ModelState::CreateInstance(
   // [TODO] this can be moved one level above
   {
     ni::TritonJson::Value optimization;
-    if (model_config_.Find("optimization", &optimization)) {
+    if (model_config.Find("optimization", &optimization)) {
       {
         ni::TritonJson::Value graph;
         if ((has_graph_level = optimization.Find("graph", &graph))) {
@@ -1111,7 +1158,7 @@ ModelState::CreateInstance(
                         "TensorFlow backend"));
 
         RETURN_ERROR_IF_TRUE(
-            gpu_device == Instance::NO_GPU_DEVICE,
+            gpu_device == ModelInstanceState::NO_GPU_DEVICE,
             TRITONSERVER_ERROR_INVALID_ARG,
             std::string(
                 "GPU Execution Accelerator can only be set on non-CPU backend "
@@ -1174,18 +1221,18 @@ ModelState::CreateInstance(
                 }
               }
               tftrt_config_ptr = &tftrt_config;
-              TRITONSERVER_LogMessage(
-                  TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
+              LOG_MESSAGE(
+                  TRITONSERVER_LOG_VERBOSE,
                   (std::string("TensorRT Execution Accelerator is set for ") +
                    instance_name)
                       .c_str());
             } else if (name == nib::kGPUIOExecutionAccelerator) {
               // GPU I/O can be set, set hint
-              if ((gpu_device != Instance::NO_GPU_DEVICE) &&
-                  (gpu_device != Instance::MODEL_DEVICE)) {
+              if ((gpu_device != ModelInstanceState::NO_GPU_DEVICE) &&
+                  (gpu_device != ModelInstanceState::MODEL_DEVICE)) {
                 instance->input_device_id_ = gpu_device;
               }
-            } else if (name_ == nib::kAutoMixedPrecisionExecutionAccelerator) {
+            } else if (name == nib::kAutoMixedPrecisionExecutionAccelerator) {
               auto_mixed_precision = true;
             } else {
               return TRITONSERVER_ErrorNew(
@@ -1206,50 +1253,28 @@ ModelState::CreateInstance(
         "Auto mixed precision can not be set with TFTRT optimization");
   }
 
-  // Obtain backend config as JSON object
-  TRITONBACKEND_Backend* backend;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(triton_model_, &backend));
-  TRITONSERVER_Message* backend_config = nullptr;
-  RETURN_IF_ERROR(TRITONBACKEND_BackendConfig(backend, &backend_config));
-  const char* buffer;
-  size_t byte_size;
-  RETURN_IF_ERROR(
-      TRITONSERVER_MessageSerializeToJson(backend_config, &buffer, &byte_size));
-  ni::TritonJson::Value backend_config_json;
-  if (byte_size != 0) {
-    RETURN_IF_ERROR(backend_config_json.Parse(buffer, byte_size));
-  }
-
-  if (platform == "tensorflow_graphdef") {
+  if (model_state->IsGraphdef()) {
+    // TODO better if passing instance name?
     RETURN_IF_ERROR(GraphDef::CreateTRTISTFModel(
-        backend_config_json, model_config_, gpu_device, has_graph_level,
-        graph_level, name_, gdp_itr->second, &instance->trtistf_model_,
-        &instance->input_name_map_, &instance->output_name_map_,
-        tftrt_config_ptr, auto_mixed_precision));
-  } else if (platform == "tensorflow_savedmodel") {
-    RETURN_IF_ERROR(SavedModel::CreateTRTISTFModel(
-        backend_config_json, model_config_, gpu_device, has_graph_level,
-        graph_level, name_, gdp_itr->second, &instance->trtistf_model_,
-        &instance->input_name_map_, &instance->output_name_map_,
-        tftrt_config_ptr, auto_mixed_precision));
+        model_state->BackendConfig(), model_config, gpu_device, has_graph_level,
+        graph_level, model_state->Name(), gdp_itr->second,
+        &instance->trtistf_model_, &instance->input_name_map_,
+        &instance->output_name_map_, tftrt_config_ptr, auto_mixed_precision));
   } else {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unsupported platform '" + platform +
-            "' for TensorFlow backend, supported platforms are "
-            "'tensorflow_graphdef', "
-            "'tensorflow_savedmodel'")
-            .c_str());
+    RETURN_IF_ERROR(SavedModel::CreateTRTISTFModel(
+        model_state->BackendConfig(), model_config, gpu_device, has_graph_level,
+        graph_level, model_state->Name(), gdp_itr->second,
+        &instance->trtistf_model_, &instance->input_name_map_,
+        &instance->output_name_map_, tftrt_config_ptr, auto_mixed_precision));
   }
 
-  if (instance->input_device_id_ != Instance::MODEL_DEVICE) {
+  if (instance->input_device_id_ != ModelInstanceState::MODEL_DEVICE) {
     std::vector<const char*> input_names, output_names;
     std::vector<TRTISTF_DataType> input_types, output_types;
     std::deque<std::string> io_names;
 
     ni::TritonJson::Value config_inputs;
-    RETURN_IF_ERROR(model_config_.MemberAsArray("input", &config_inputs));
+    RETURN_IF_ERROR(model_config.MemberAsArray("input", &config_inputs));
     for (size_t i = 0; i < config_inputs.ArraySize(); i++) {
       ni::TritonJson::Value io;
       RETURN_IF_ERROR(config_inputs.IndexAsObject(i, &io));
@@ -1263,7 +1288,7 @@ ModelState::CreateInstance(
     }
 
     ni::TritonJson::Value config_outputs;
-    RETURN_IF_ERROR(model_config_.MemberAsArray("output", &config_outputs));
+    RETURN_IF_ERROR(model_config.MemberAsArray("output", &config_outputs));
     for (size_t i = 0; i < config_outputs.ArraySize(); i++) {
       ni::TritonJson::Value io;
       RETURN_IF_ERROR(config_outputs.IndexAsObject(i, &io));
@@ -1281,115 +1306,16 @@ ModelState::CreateInstance(
         config_outputs.ArraySize()));
   }
 
-  instance_threads_.emplace_back([this, instance]() {
-    while (true) {
-      auto requests = instance->batch_queue_.Pop();
-      if (requests.first) {
-        instance->Run(
-            triton_model_, instance->requests_.data(), requests.second);
-        available_instances_.Push(instance);
-      } else {
-        // Always push back to available_instances_ to unblock scheduler
-        available_instances_.Push(instance);
-        break;
-      }
-    }
-  });
-  available_instances_.Push(instance);
-  return nullptr;  // success
-}
-
-ModelState::ModelState(
-    TRITONBACKEND_Model* triton_model, const std::string& name,
-    ni::TritonJson::Value&& model_config)
-    : triton_model_(triton_model), name_(name),
-      model_config_(std::move(model_config))
-{
-}
-
-ModelState::~ModelState()
-{
-  // Push nullptr to signal the instances to exit
-  for (auto& instance : instances_) {
-    instance->batch_queue_.Push(std::make_pair(false /* process_request */, 0));
-  }
-  for (auto& instance_thread : instance_threads_) {
-    instance_thread.join();
-  }
-}
-
-TRITONSERVER_Error*
-ModelState::ValidateModelConfig()
-{
-  // We have the json DOM for the model configuration...
-  ni::TritonJson::WriteBuffer buffer;
-  RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      (std::string("model configuration:\n") + buffer.Contents()).c_str());
-
-  ni::TritonJson::Value ios;
-  RETURN_IF_ERROR(model_config_.MemberAsArray("input", &ios));
-  for (size_t i = 0; i < ios.ArraySize(); i++) {
-    ni::TritonJson::Value io;
-    RETURN_IF_ERROR(ios.IndexAsObject(i, &io));
-    std::string io_name;
-    RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
-    // Check datatypes
-    std::string io_dtype;
-    RETURN_IF_ERROR(io.MemberAsString("data_type", &io_dtype));
-    RETURN_ERROR_IF_TRUE(
-        nib::ConvertDataType(io_dtype) ==
-            TRTISTF_DataType::TRTISTF_TYPE_INVALID,
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string("unsupported datatype '") + io_dtype + "' for tensor '" +
-            io_name + "' for model '" + name_ + "'");
-  }
-  RETURN_IF_ERROR(model_config_.MemberAsArray("output", &ios));
-  for (size_t i = 0; i < ios.ArraySize(); i++) {
-    ni::TritonJson::Value io;
-    RETURN_IF_ERROR(ios.IndexAsObject(i, &io));
-    std::string io_name;
-    RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
-    // Check datatypes
-    std::string io_dtype;
-    RETURN_IF_ERROR(io.MemberAsString("data_type", &io_dtype));
-    RETURN_ERROR_IF_TRUE(
-        nib::ConvertDataType(io_dtype) ==
-            TRTISTF_DataType::TRTISTF_TYPE_INVALID,
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string("unsupported datatype '") + io_dtype + "' for tensor '" +
-            io_name + "' for model '" + name_ + "'");
-  }
-
+  *state = lstate.release();
   return nullptr;  // success
 }
 
 void
-ModelState::ProcessRequest(
+ModelInstanceState::ProcessRequests(
     TRITONBACKEND_Request** requests, const uint32_t request_count)
 {
-  auto instance = available_instances_.Pop();
-  // FIXME Is there a better solution? Leaky abstraction here..
-  // 'requests' is actually owned by the scheduler and stored as thread-local
-  // variable. So the pointers to requests need to be copied to instance
-  // specific location to prevent the instances to access the thread-local
-  // variable and interfere each other.
-  memcpy(
-      instance->requests_.data(), requests,
-      request_count * sizeof(TRITONBACKEND_Request*));
-  instance->batch_queue_.Push(
-      std::make_pair(true /* process_request */, request_count));
-  available_instances_.WaitNotEmpty();
-}
-
-void
-ModelState::Instance::Run(
-    TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
-    const uint32_t request_count)
-{
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_VERBOSE,
       (std::string("TRITONBACKEND_ModelExecute: Running ") + name_ + " with " +
        std::to_string(request_count) + " requests")
           .c_str());
@@ -1485,9 +1411,7 @@ ModelState::Instance::Run(
       responses.emplace_back(response);
     } else {
       responses.emplace_back(nullptr);
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
-          "Fail to create response");
+      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Fail to create response");
       TRITONSERVER_ErrorDelete(err);
     }
   }
@@ -1620,8 +1544,8 @@ ModelState::Instance::Run(
             (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0);
       }
 
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_VERBOSE,
           (std::string("TRITONBACKEND_ModelExecute: input '") + name +
            "' is GPU tensor: " +
            std::to_string(TRTISTF_TensorIsGPUTensor(tensor)))
@@ -1804,8 +1728,8 @@ ModelState::Instance::Run(
             (TRTISTF_TensorIsGPUTensor(output_tensor)) ? gpu_device_ : 0);
       }
 
-      TRITONSERVER_LogMessage(
-          TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_VERBOSE,
           (std::string("TRITONBACKEND_ModelExecute: output '") + name +
            "' is GPU tensor: " +
            std::to_string(TRTISTF_TensorIsGPUTensor(output_tensor)))
@@ -1849,9 +1773,9 @@ ModelState::Instance::Run(
     // with the inference computation.
     LOG_IF_ERROR(
         TRITONBACKEND_ModelReportStatistics(
-            model, request, (responses[r] != nullptr) /* success */,
-            gpu_device_, exec_start_ns, compute_start_ns, compute_end_ns,
-            exec_end_ns),
+            model_state_->TritonModel(), request,
+            (responses[r] != nullptr) /* success */, gpu_device_, exec_start_ns,
+            compute_start_ns, compute_end_ns, exec_end_ns),
         "failed reporting request statistics");
 
     LOG_IF_ERROR(
@@ -1863,12 +1787,12 @@ ModelState::Instance::Run(
   // batching so the total batch size is always 1.
   LOG_IF_ERROR(
       TRITONBACKEND_ModelReportBatchStatistics(
-          model, total_batch_size, exec_start_ns, compute_start_ns,
-          compute_end_ns, exec_end_ns),
+          model_state_->TritonModel(), total_batch_size, exec_start_ns,
+          compute_start_ns, compute_end_ns, exec_end_ns),
       "failed reporting batch request statistics");
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_VERBOSE,
       (std::string("TRITONBACKEND_ModelExecute: model ") + name_ +
        " released " + std::to_string(request_count) + " requests")
           .c_str());
@@ -1879,6 +1803,50 @@ ModelState::Instance::Run(
 /////////////
 
 extern "C" {
+
+// Implementing TRITONBACKEND_Initialize is optional. The backend
+// should initialize any global state that is intended to be shared
+// across all models and model instances that use the backend. But here
+// it simply verify the backend API version is compatible
+TRITONSERVER_Error*
+TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
+{
+  const char* cname;
+  RETURN_IF_ERROR(TRITONBACKEND_BackendName(backend, &cname));
+  std::string name(cname);
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      (std::string("TRITONBACKEND_Initialize: ") + name).c_str());
+
+  // We should check the backend API version that Triton supports
+  // vs. what this backend was compiled against.
+  uint32_t api_version_major, api_version_minor;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor));
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      (std::string("Triton TRITONBACKEND API version: ") +
+       std::to_string(api_version_major) + "." +
+       std::to_string(api_version_minor))
+          .c_str());
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      (std::string("'") + name + "' TRITONBACKEND API version: " +
+       std::to_string(TRITONBACKEND_API_VERSION_MAJOR) + "." +
+       std::to_string(TRITONBACKEND_API_VERSION_MINOR))
+          .c_str());
+
+  if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
+      (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        "triton backend API version does not support this backend");
+  }
+
+  return nullptr;  // success
+}
 
 // Implementing TRITONBACKEND_ModelInitialize is optional. The backend
 // should initialize any state that is intended to be shared across
@@ -1893,8 +1861,8 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   uint64_t version;
   RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(model, &version));
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
       (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
        std::to_string(version) + ")")
           .c_str());
@@ -1919,39 +1887,103 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
   ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      "TRITONBACKEND_ModelFinalize: delete model state");
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO, "TRITONBACKEND_ModelFinalize: delete model state");
 
   delete model_state;
 
   return nullptr;  // success
 }
 
-// Implementing TRITONBACKEND_ModelExecute is required.
+// Implementing TRITONBACKEND_ModelInstanceInitialize is optional. The
+// backend should initialize any state that is required for a model
+// instance.
 TRITONSERVER_Error*
-TRITONBACKEND_ModelExecute(
-    TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
-    const uint32_t request_count)
+TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
 {
-  const char* model_name;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelName(model, &model_name));
+  const char* cname;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceName(instance, &cname));
+  std::string name(cname);
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
-      (std::string("TRITONBACKEND_ModelExecute: model ") + model_name +
-       " with " + std::to_string(request_count) + " requests")
+  int32_t device_id;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id));
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      (std::string("TRITONBACKEND_ModelInstanceInitialize: ") + name +
+       " (device " + std::to_string(device_id) + ")")
           .c_str());
 
-  // Triton only calls model execute from a single thread at a time
-  // *for a given model*. But since this backend could be used by
-  // multiple models the implementation needs to handle multiple
-  // models executing at the same time. Good practice for this is to
-  // use only function-local and model-specific state (obtained from
-  // 'model'), which is what we do here.
-  ModelState* state;
+  // The instance can access the corresponding model as well... here
+  // we get the model and from that get the model's state.
+  TRITONBACKEND_Model* model;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceModel(instance, &model));
+
+  void* vmodelstate;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vmodelstate));
+  ModelState* model_state = reinterpret_cast<ModelState*>(vmodelstate);
+
+  // With each instance we create a ModelInstanceState object and
+  // associate it with the TRITONBACKEND_ModelInstance.
+  ModelInstanceState* instance_state;
   RETURN_IF_ERROR(
-      TRITONBACKEND_ModelState(model, reinterpret_cast<void**>(&state)));
+      ModelInstanceState::Create(model_state, instance, &instance_state));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceSetState(
+      instance, reinterpret_cast<void*>(instance_state)));
+
+  return nullptr;  // success
+}
+
+// Implementing TRITONBACKEND_ModelInstanceFinalize is optional unless
+// state is set using TRITONBACKEND_ModelInstanceSetState. The backend
+// must free this state and perform any other cleanup.
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance)
+{
+  void* vstate;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(instance, &vstate));
+  ModelInstanceState* instance_state =
+      reinterpret_cast<ModelInstanceState*>(vstate);
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      "TRITONBACKEND_ModelInstanceFinalize: delete instance state");
+
+  delete instance_state;
+
+  return nullptr;  // success
+}
+
+// Implementing TRITONBACKEND_ModelInstanceExecute is required.
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceExecute(
+    TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request** requests,
+    const uint32_t request_count)
+{
+  // Triton will not call this function simultaneously for the same
+  // 'instance'. But since this backend could be used by multiple
+  // instances from multiple models the implementation needs to handle
+  // multiple calls to this function at the same time (with different
+  // 'instance' objects). Suggested practice for this is to use only
+  // function-local and model-instance-specific state (obtained from
+  // 'instance'), which is what we do here.
+  ModelInstanceState* instance_state;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(
+      instance, reinterpret_cast<void**>(&instance_state)));
+  ModelState* model_state = instance_state->StateForModel();
+
+  // This backend specifies BLOCKING execution policy. That means that
+  // we should not return from this function until execution is
+  // complete. Triton will automatically release 'instance' on return
+  // from this function so that it is again available to be used for
+  // another call to TRITONBACKEND_ModelInstanceExecute.
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      (std::string("model ") + model_state->Name() + ", instance " +
+       instance_state->Name() + ", executing " + std::to_string(request_count) +
+       " requests")
+          .c_str());
 
   // At this point we accept ownership of 'requests', which means that
   // even if something goes wrong we must still return success from
@@ -1959,10 +1991,12 @@ TRITONBACKEND_ModelExecute(
   // particular request then we send an error response just for the
   // specific request.
 
-  // Each batch will be processed in a separate thread to avoid occupying
-  // the ONLY scheduler thread. Note that this function will be blocked
-  // until there is available instances
-  state->ProcessRequest(requests, request_count);
+  // Note that access to 'requests' will be invalidated once
+  // TRITONBACKEND_ModelInstanceExecute returns. If requests need to be
+  // referred after TRITONBACKEND_ModelInstanceExecute returns, i.e. in
+  // non-blocking model, the request array must be copied to a instance
+  // owned buffer.
+  instance_state->ProcessRequests(requests, request_count);
 
   return nullptr;  // success
 }

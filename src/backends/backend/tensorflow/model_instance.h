@@ -67,15 +67,6 @@ class ModelInstance {
   TRITONSERVER_Error* CreateCudaStream(
       const int cuda_stream_priority = 0, cudaStream_t* stream = nullptr);
 
-  // Run model to execute one or more requests. This function assumes
-  // that it is only called by the single runner thread that is
-  // assigned to this context. This function takes ownership of
-  // 'requests' and is responsible for generating responses and
-  // releasing the requests.
-  virtual void Run(
-      TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
-      const uint32_t request_count) = 0;
-
   // Name of the model instance
   std::string name_;
 
