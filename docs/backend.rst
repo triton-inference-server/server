@@ -31,14 +31,14 @@ Backends
 ========
 
 A *backend* is the implementation that executes a model. A backend can
-be a wrapper around an deep learning framework, like PyTorch,
+be a wrapper around a deep learning framework, like PyTorch,
 TensorFlow, TensorRT or ONNX. Or a backend can be custom C/C++ logic
 performing any operation, for example, image pre-processing.
 
 All backends must implement the
 :ref:`section-triton-backend-api`. Triton uses this API to send
-requests to the backend for inferencing/execution, and the backend
-uses the API to communicate with Triton.
+requests to the backend for execution and the backend uses the API to
+communicate with Triton.
 
 Every model must be associated with a backend. A model's backend is
 specified in the :ref:`section-model-configuration` using the
@@ -145,36 +145,66 @@ model. The associated API, like TRITONBACKEND\_ModelName, is used to
 get information about the model and to associate a user-defined state
 with the model.
 
-The only function that the backend must implement is
-TRITONBACKEND\_ModelExecute. The TRITONBACKEND\_ModelExecute function
-is called by Triton to perform inference/computation on a batch of
-inference requests. Most backends will also implement
-TRITONBACKEND\_ModelInitialize and TRITONBACKEND\_ModelFinalize to
-initialize the backend for a given model and to manage the
-user-defined state associated with the model (see
-:ref:`section-backend-lifecycles` for more information about model
-lifecycle).
+Most backends will implement TRITONBACKEND\_ModelInitialize and
+TRITONBACKEND\_ModelFinalize to initialize the backend for a given
+model and to manage the user-defined state associated with the model
+(see :ref:`section-backend-lifecycles` for more information about
+model lifecycle).
 
 The backend must take into account threading concerns when
-implementing TRITONBACKEND\_ModelInitialize,
-TRITONBACKEND\_ModelFinalize and TRITONBACKEND\_ModelExecute.  Triton
-will not perform multiple simultaneous calls to these functions for a
-given model; however, if a backend is used by multiple models Triton
-may simultaneously call the functions with a different thread for each
-model. As a result, the backend must be able to handle multiple
-simultaneous calls to the functions. Best practice for backend
-implementations is to use only function-local and model-specific
-user-defined state in these functions, as is shown in the
-:ref:`example backends <section-example-backends>` like *identity*.
+implementing TRITONBACKEND\_ModelInitialize and
+TRITONBACKEND\_ModelFinalize.  Triton will not perform multiple
+simultaneous calls to these functions for a given model; however, if a
+backend is used by multiple models Triton may simultaneously call the
+functions with a different thread for each model. As a result, the
+backend must be able to handle multiple simultaneous calls to the
+functions. Best practice for backend implementations is to use only
+function-local and model-specific user-defined state in these
+functions, as is shown in the :ref:`example backends
+<section-example-backends>` like *identity*.
+
+TRITONBACKEND\_ModelInstance
+---------------------------
+
+A TRITONBACKEND\_ModelInstance object represents a model
+*instance*. Triton creates one or more instances (that is, copies) of
+the model based on the :ref:`section-instance-groups` specified in the
+model configuration. Each of these instances is associated with a
+TRITONBACKEND\_ModelInstance object.
+
+The only function that the backend must implement is
+TRITONBACKEND\_ModelInstanceExecute. The
+TRITONBACKEND\_ModelInstanceExecute function is called by Triton to
+perform inference/computation on a batch of inference requests. Most
+backends will also implement TRITONBACKEND\_ModelInstanceInitialize
+and TRITONBACKEND\_ModelInstanceFinalize to initialize the backend for
+a given model instance and to manage the user-defined state associated
+with the model (see :ref:`section-backend-lifecycles` for more
+information about model instance lifecycle).
+
+The backend must take into account threading concerns when
+implementing TRITONBACKEND\_ModelInstanceInitialize,
+TRITONBACKEND\_ModelInstanceFinalize and
+TRITONBACKEND\_ModelInstanceExecute.  Triton will not perform multiple
+simultaneous calls to these functions for a given model instance;
+however, if a backend is used by a model with multiple instances or by
+multiple models Triton may simultaneously call the functions with a
+different thread for each model instance. As a result, the backend
+must be able to handle multiple simultaneous calls to the
+functions. Best practice for backend implementations is to use only
+function-local and model-specific user-defined state in these
+functions, as is shown in the :ref:`example backends
+<section-example-backends>` like *identity*.
 
 TRITONBACKEND\_Request
 ---------------------
 
 A TRITONBACKEND\_Request object represents an inference request made
 to the model. The backend takes ownership of the request object(s) in
-TRITONBACKEND\_ModelExecute and must release each request by calling
-TRITONBACKEND\_RequestRelease. See :ref:`section-backend-lifecycles`
-for more information about request lifecycle.
+TRITONBACKEND\_ModelInstanceExecute and must release each request by
+calling TRITONBACKEND\_RequestRelease. See
+:ref:`section-backend-lifecycles` for more information about request
+lifecycle.
 
 The Triton Backend API allows the backend to get information about the
 request as well as the input and request output tensors of the
@@ -197,14 +227,14 @@ Backend Lifecycles
 ..................
 
 A backend must carefully manage the lifecycle of the backend itself,
-the models that use the backend and the inference requests that
-execute on the model using the backend.
+the models and model instances that use the backend and the inference
+requests that execute on the model instances using the backend.
 
 Backend and Model
 -----------------
 
-Backend and model initialization is triggered when Triton :ref:`loads
-a model <section-model-management>`:
+Backend, model and model instance initialization is triggered when
+Triton :ref:`loads a model <section-model-management>`:
 
 * If the model requires a backend that is not already in use by an
   already loaded model, then:
@@ -213,44 +243,69 @@ a model <section-model-management>`:
     <section-backend-shared-library>` that implements the backend
     required by the model.
 
-  * Triton creates the TRITONBACKEND_Backend object that represents
+  * Triton creates the TRITONBACKEND\_Backend object that represents
     the backend.
 
-  * Triton calls TRITONBACKEND_Initialize if it is implemented in the
-    backend shared library. TRITONBACKEND_Initialize should not return
+  * Triton calls TRITONBACKEND\_Initialize if it is implemented in the
+    backend shared library. TRITONBACKEND\_Initialize should not return
     until the backend is completely initialized. If
-    TRITONBACKEND_Initialize returns an error, Triton will unload the
+    TRITONBACKEND\_Initialize returns an error, Triton will unload the
     backend shared library and show that the model failed to load.
 
-* Triton creates the TRITONBACKEND_Model object that represents the model.
+* Triton creates the TRITONBACKEND\_Model object that represents the
+  model. Triton calls TRITONBACKEND\_ModelInitialize if it is
+  implemented in the backend shared library.
+  TRITONBACKEND\_ModelInitialize should not return until the backend
+  is completely initialized for the model. If
+  TRITONBACKEND\_ModelInitialize returns an error, Triton will show
+  that the model failed to load.
 
-* Triton calls TRITONBACKEND_ModelInitialize if it is implemented in
-  the backend shared library. TRITONBACKEND_ModelInitialize should not
-  return until the backend is completely initialized for the model. If
-  TRITONBACKEND_ModelInitialize return an error, Triton will show that
-  the model failed to load.
+* For each model instance specified for the model in the model
+  configuration:
 
-Backend and model finalization is triggered when Triton :ref:`unloads
-a model <section-model-management>`:
+  * Triton creates the TRITONBACKEND\_ModelInstance object that
+    represents the model instance.
 
-* Triton calls TRITONBACKEND_ModelFinalize if it is implemented in the
-  backend shared library. TRITONBACKEND_ModelFinalize should not
+  * Triton calls TRITONBACKEND\_ModelInstanceInitialize if it is
+    implemented in the backend shared library.
+    TRITONBACKEND\_ModelInstanceInitialize should not return until the
+    backend is completely initialized for the instance. If
+    TRITONBACKEND\_ModelInstanceInitialize returns an error, Triton
+    will show that the model failed to load.
+
+Backend, model and model instance finalization is triggered when
+Triton :ref:`unloads a model <section-model-management>`:
+
+* For each model instance:
+
+  * Triton calls TRITONBACKEND\_ModelInstanceFinalize if it is
+    implemented in the backend shared library.
+    TRITONBACKEND\_ModelInstanceFinalize should not return until the
+    backend is completely finalized, including stopping any threads
+    create for the model instance and freeing any user-defined state
+    created for the model instance.
+
+  * Triton destroys the TRITONBACKEND\_ModelInstance object that
+    represents the model instance.
+
+* Triton calls TRITONBACKEND\_ModelFinalize if it is implemented in the
+  backend shared library. TRITONBACKEND\_ModelFinalize should not
   return until the backend is completely finalized, including stopping
   any threads create for the model and freeing any user-defined state
   created for the model.
 
-* Triton destroys the TRITONBACKEND_Model object that represents the
+* Triton destroys the TRITONBACKEND\_Model object that represents the
   model.
 
 * If no other loaded model requires the backend, then:
 
-  * Triton calls TRITONBACKEND_Finalize if it is implemented in the
-    backend shared library. TRITONBACKEND_ModelFinalize should not
+  * Triton calls TRITONBACKEND\_Finalize if it is implemented in the
+    backend shared library. TRITONBACKEND\_ModelFinalize should not
     return until the backend is completely finalized, including
     stopping any threads create for the backend and freeing any
     user-defined state created for the backend.
 
-  * Triton destroys the TRITONBACKEND_Backend object that represents
+  * Triton destroys the TRITONBACKEND\_Backend object that represents
     the backend.
 
   * Triton :ref:`unloads the shared library
@@ -259,46 +314,40 @@ a model <section-model-management>`:
 Inference Requests and Responses
 --------------------------------
 
-For each model there is a single scheduler thread that calls
-TRITONBACKEND_ModelExecute to execute inference requests on the
-model. Each call to TRITONBACKEND_ModelExecute communicates a batch of
-requests to execute and the instance of the model that should be used
-to execute those requests. The backend should not allow the scheduler
-thread to return from TRITONBACKEND_ModelExecute until it is ready to
-handle another set of requests (the :ref:`identity example
-<section-example-backends>` shows how a backend can delay returning
-until there is a model instance available).
-
-A performant backend will allow model instances to execute in
-parallel. Typically this is done by using multiple threads, one for
-each model instance. The scheduler thread can then simply pass the
-batch of requests to the appropriate instance thread where the
-inference execution takes place.
+Triton calls TRITONBACKEND\_ModelInstanceExecute to execute inference
+requests on a model instance. Each call to
+TRITONBACKEND\_ModelInstanceExecute communicates a batch of requests
+to execute and the instance of the model that should be used to
+execute those requests. The backend should not allow the scheduler
+thread to return from TRITONBACKEND\_ModelInstanceExecute until that
+instance is ready to handle another set of requests. Typically this
+means that the TRITONBACKEND\_ModelInstanceExecute function will
+create responses and release the requests before returning.
 
 Most backends will create a single response for each request. For that
 kind of backend executing a single inference requests requires the
 following steps:
 
-* Create a response for the request using TRITONBACKEND_ResponseNew.
+* Create a response for the request using TRITONBACKEND\_ResponseNew.
 
-* For each request input tensor use TRITONBACKEND_InputProperties to
+* For each request input tensor use TRITONBACKEND\_InputProperties to
   get shape and datatype of the input as well as the buffer(s)
   containing the tensor contents.
 
 * For each output tensor that the request expects to be returned, use
-  TRITONBACKEND_ResponseOutput to create the output tensor of the
-  required datatype and shape. Use TRITONBACKEND_OutputBuffer to get a
+  TRITONBACKEND\_ResponseOutput to create the output tensor of the
+  required datatype and shape. Use TRITONBACKEND\_OutputBuffer to get a
   pointer to the buffer where the tensor's contents should be written.
 
 * Use the inputs to perform the inference computation that produces
   the requested output tensor contents into the appropriate output
   buffers.
 
-* Optionally attach parameters to the response.
+* Optionally set parameters in the response.
 
-* Send the response using TRITONBACKEND_ResponseSend.
+* Send the response using TRITONBACKEND\_ResponseSend.
 
-* Release the request using TRITONBACKEND_RequestRelease.
+* Release the request using TRITONBACKEND\_RequestRelease.
 
 For a batch of requests the backend should attempt to combine the
 execution of the individual requests as much as possible to increase
