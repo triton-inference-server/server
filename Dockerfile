@@ -63,7 +63,7 @@ RUN cd pytorch && \
 FROM ${BASE_IMAGE} AS tritonserver_onnx
 
 # Onnx Runtime release version
-ARG ONNX_RUNTIME_VERSION=1.3.0
+ARG ONNX_RUNTIME_VERSION=1.4.0
 
 WORKDIR /workspace
 
@@ -249,7 +249,6 @@ RUN cd /opt/tritonserver/lib/pytorch && \
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
-ARG ONNX_RUNTIME_VERSION=1.3.0
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
@@ -260,10 +259,10 @@ COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/pr
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
-COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
+COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.* \
      /opt/tritonserver/lib/onnx/
 RUN cd /opt/tritonserver/lib/onnx && \
-    ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
+    ln -sf libonnxruntime.so.* libonnxruntime.so
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
