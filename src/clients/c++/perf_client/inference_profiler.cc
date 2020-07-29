@@ -710,8 +710,8 @@ InferenceProfiler::SummarizeClientStat(
   summary.client_stats.sequence_count = valid_sequence_count;
   summary.client_stats.delayed_request_count = delayed_request_count;
   summary.client_stats.duration_ns = duration_ns;
-  float client_duration_sec =
-      (float)summary.client_stats.duration_ns / inference::NANOS_PER_SECOND;
+  float client_duration_sec = (float)summary.client_stats.duration_ns /
+                              nvidia::inferenceserver::NANOS_PER_SECOND;
   summary.client_stats.sequence_per_sec =
       valid_sequence_count / client_duration_sec;
   summary.client_stats.infer_per_sec =
