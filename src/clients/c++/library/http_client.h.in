@@ -27,10 +27,17 @@
 
 /// \file
 
+#cmakedefine TRITON_CLIENT_HEADER_FLAT 1
+
 #include <map>
 #include <memory>
+#ifdef TRITON_CLIENT_HEADER_FLAT
+#include "common.h"
+#include "ipc.h"
+#else
 #include "src/clients/c++/library/common.h"
 #include "src/clients/c++/library/ipc.h"
+#endif
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
