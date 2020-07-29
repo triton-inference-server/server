@@ -249,6 +249,45 @@ TritonModel::Create(
   return Status::Success;
 }
 
+void
+TritonModel::WarmUp(uint32_t runner_idx, WarmupData& sample)
+{
+  std::vector<TRITONBACKEND_Request*> triton_requests(1024);
+  triton_requests.clear();
+  for (auto& request : sample.requests_) {
+    // Capture timestamp before run to avoid incorrect accumulation from
+    // sequential warmup runs
+#ifdef TRITON_ENABLE_STATS
+    request->CaptureRequestStartNs();
+#endif  // TRITON_ENABLE_STATS
+    request->CaptureQueueStartNs();
+    triton_requests.push_back(
+        reinterpret_cast<TRITONBACKEND_Request*>(request.release()));
+  }
+  TRITONBACKEND_ModelInstance* triton_model_instance =
+      reinterpret_cast<TRITONBACKEND_ModelInstance*>(
+          instances_[runner_idx].get());
+  TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
+      backend_->ModelInstanceExecFn();
+
+  // If there is an error then we retain ownership of 'requests'
+  // and must send error responses.
+  TRITONSERVER_Error* err = inst_exec_fn(
+      triton_model_instance, &triton_requests[0], triton_requests.size());
+  if (err != nullptr) {
+    Status status = Status(
+        TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
+        TRITONSERVER_ErrorMessage(err));
+    for (TRITONBACKEND_Request* tr : triton_requests) {
+      std::unique_ptr<InferenceRequest> ur(
+          reinterpret_cast<InferenceRequest*>(tr));
+      InferenceRequest::RespondIfError(ur, status, true /* release_requests */);
+    }
+
+    TRITONSERVER_ErrorDelete(err);
+  }
+}
+
 TritonModel::TritonModel(
     InferenceServer* server,
     const std::shared_ptr<LocalizedDirectory>& localized_model_dir,

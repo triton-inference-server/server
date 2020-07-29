@@ -66,6 +66,8 @@ class TritonModel : public InferenceBackend {
   Status MetricReporter(
       const int device, MetricModelReporter** metric_reporter);
 
+  void WarmUp(uint32_t runner_idx, WarmupData& sample) override;
+
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModel);
 
