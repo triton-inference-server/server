@@ -35,12 +35,13 @@ import unittest
 import json
 import requests
 import infer_util as iu
+import test_util as tu
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 from tritonclientutils import *
 
 
-class ServerMetadataTest(unittest.TestCase):
+class ServerMetadataTest(tu.TestResultCollector):
 
     def test_basic(self):
         try:
@@ -391,7 +392,7 @@ class ServerMetadataTest(unittest.TestCase):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
 
-class ModelMetadataTest(unittest.TestCase):
+class ModelMetadataTest(tu.TestResultCollector):
     '''
     These tests must be run after the ServerMetadataTest. See test.sh
     file for correct test running.

@@ -25,6 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+import unittest
+import json
 
 _last_request_id = 0
 
@@ -230,3 +232,40 @@ def get_dyna_sequence_model_name(pf, dtype):
 
 def get_zero_model_name(pf, io_cnt, dtype):
     return "{}_zero_{}_{}".format(pf, io_cnt, np.dtype(dtype).name)
+
+
+class TestResultCollector(unittest.TestCase):
+    # TestResultCollector stores test result and prints it to stdout. In order to use
+    # this class, unittest class should inherit this class
+
+    current_result = None
+
+    @classmethod
+    def setResult(cls, amount, errors, failures, skipped):
+        cls.amount, cls.errors, cls.failures, cls.skipped = \
+            amount, errors, failures, skipped
+
+    def tearDown(self):
+        # this is called immediately after the test method
+        amount = self.current_result.testsRun
+        errors = len(self.current_result.errors)
+        failures = len(self.current_result.failures)
+        skipped = len(self.current_result.skipped)
+        self.setResult(amount, errors, failures, skipped)
+
+    @classmethod
+    def tearDownClass(cls):
+        # this method is called when all the unit tests in a class are
+        # finished.
+        json_res = {
+            'total': cls.amount,
+            'errors': cls.errors,
+            'failures': cls.failures,
+            'skipped': cls.skipped
+        }
+        print(json.dumps(json_res))
+
+    def run(self, result=None):
+        # result argument stores the test results
+        self.current_result = result
+        unittest.TestCase.run(self, result)

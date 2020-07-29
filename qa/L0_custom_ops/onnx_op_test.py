@@ -103,9 +103,8 @@ if __name__ == '__main__':
 
     for i in range(3):
         for j in range(5):
-            print(
-                str(input_data[0][i][j]) + " + " + str(input_data[1][i][j]) +
-                " = " + str(output_data[i][j]))
+            print(str(input_data[0][i][j]) + " + " + str(input_data[1][i][j]) +
+                  " = " + str(output_data[i][j]))
             if ((input_data[0][i][j] + input_data[1][i][j]) !=
                     output_data[i][j]):
                 print("error: incorrect value")

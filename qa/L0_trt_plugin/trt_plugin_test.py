@@ -32,11 +32,13 @@ from future.utils import iteritems
 import unittest
 import numpy as np
 import os
+import test_util as tu
+
 import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
 
-class PluginModelTest(unittest.TestCase):
+class PluginModelTest(tu.TestResultCollector):
 
     def _full_exact(self, batch_size, model_name, plugin_name):
         triton_client = httpclient.InferenceServerClient("localhost:8000",
