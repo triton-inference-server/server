@@ -27,39 +27,42 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# Triton generic backend
+# libtriton_tensorflow.so
 #
+configure_file(libtriton_tensorflow.ldscript libtriton_tensorflow.ldscript COPYONLY)
+
 set(
-  BACKEND_SRCS
-  triton_backend_manager.cc
-  triton_model.cc
-  triton_model_instance.cc
+  TENSORFLOW_SRCS
+  model_instance.cc
+  tensorflow.cc
+  tf_utils.cc
 )
 
 set(
-  BACKEND_HDRS
-  backend_factory.h
-  tritonbackend.h
-  triton_backend_manager.h
-  triton_model.h
-  triton_model_instance.h
+  TENSORFLOW_HDRS
+  model_instance.h
+  tf_utils.h
 )
 
 add_library(
-  triton-backend-library EXCLUDE_FROM_ALL OBJECT
-  ${BACKEND_SRCS} ${BACKEND_HDRS}
+  triton_tensorflow SHARED
+  ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
+  $<TARGET_OBJECTS:backend-utils-library>
 )
-add_dependencies(triton-backend-library proto-library)
-
 if(${TRITON_ENABLE_GPU})
-  target_include_directories(triton-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(triton_tensorflow PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
-if(${TRITON_ENABLE_METRICS})
-  target_include_directories(
-    triton-backend-library
-    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-endif() # TRITON_ENABLE_METRICS
+set_target_properties(
+  triton_tensorflow
+  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
+)
+set_target_properties(
+  triton_tensorflow
+  PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
+)
 
-add_subdirectory(examples src/backends/backend/examples)
-add_subdirectory(tensorflow src/backends/backend/tensorflow)
+install(
+  TARGETS
+    triton_tensorflow
+  LIBRARY DESTINATION backends
+)

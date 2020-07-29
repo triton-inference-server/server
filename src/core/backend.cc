@@ -481,7 +481,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
         } else {
           input_sps.emplace_back();
           RETURN_IF_ERROR(lrequest->AddOverrideInput(
-              input_meta.first, input_meta.second.data_type(), input_meta_shape,
+              input_meta.first, input_meta.second.data_type(),
+              (config_.max_batch_size() != 0 ? 1 : 0), input_meta_shape,
               &input_sps.back()));
           input = input_sps.back().get();
         }

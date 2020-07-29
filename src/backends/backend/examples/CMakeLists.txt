@@ -33,6 +33,9 @@ add_library(
   backend-utils-library EXCLUDE_FROM_ALL OBJECT
   backend_utils.cc backend_utils.h
 )
+if(${TRITON_ENABLE_GPU})
+  target_include_directories(backend-utils-library PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRITON_ENABLE_GPU
 
 #
 # libtriton_identity.so
@@ -44,6 +47,9 @@ add_library(
   identity.cc
   $<TARGET_OBJECTS:backend-utils-library>
 )
+if(${TRITON_ENABLE_GPU})
+  target_include_directories(triton_identity PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRITON_ENABLE_GPU
 set_target_properties(
   triton_identity
   PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_identity.ldscript
@@ -63,6 +69,9 @@ add_library(
   repeat.cc
   $<TARGET_OBJECTS:backend-utils-library>
 )
+if(${TRITON_ENABLE_GPU})
+  target_include_directories(triton_repeat PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRITON_ENABLE_GPU
 set_target_properties(
   triton_repeat
   PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_repeat.ldscript
@@ -82,6 +91,9 @@ add_library(
   square.cc
   $<TARGET_OBJECTS:backend-utils-library>
 )
+if(${TRITON_ENABLE_GPU})
+  target_include_directories(triton_square PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRITON_ENABLE_GPU
 set_target_properties(
   triton_square
   PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_square.ldscript
