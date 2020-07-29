@@ -85,6 +85,23 @@ enum Platform {
 #endif  // TRITON_ENABLE_PYTORCH
 };
 
+/// Enumeration for the different backend types.
+enum BackendType {
+  BACKEND_TYPE_UNKNOWN = 0,
+#ifdef TRITON_ENABLE_TENSORRT
+  BACKEND_TYPE_TENSORRT = 1,
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORFLOW
+  BACKEND_TYPE_TENSORFLOW = 2,
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+  BACKEND_TYPE_ONNXRUNTIME = 3,
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
+  BACKEND_TYPE_PYTORCH = 4
+#endif  // TRITON_ENABLE_PYTORCH
+};
+
 /// Get the number of elements in a shape.
 /// \param dims The shape.
 /// \return The number of elements, or -1 if the number of elements
@@ -185,6 +202,18 @@ int64_t GetByteSize(const ModelOutput& mio);
 /// \return The Platform or Platform::UNKNOWN if the platform string
 /// is not recognized.
 Platform GetPlatform(const std::string& platform_name);
+
+/// Get the BackendType value for a platform name.
+/// \param platform_name The platform name.
+/// \return The BackendType or BackendType::UNKNOWN if the platform string
+/// is not recognized.
+BackendType GetBackendTypeFromPlatform(const std::string& platform_name);
+
+/// Get the BackendType value for a backend name.
+/// \param backend_name The backend name.
+/// \return The BackendType or BackendType::UNKNOWN if the platform string
+/// is not recognized.
+BackendType GetBackendType(const std::string& backend_name);
 
 /// Get the CPU thread nice level associate with a model
 /// configuration's priority.

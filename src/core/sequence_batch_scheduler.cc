@@ -150,9 +150,10 @@ namespace {
 
 Status
 GetBooleanOverrideInputs(
-    const std::string& tensor_name, const DataType tensor_datatype,
-    const float fp32_false_value, const float fp32_true_value,
-    const int32_t int32_false_value, const int32_t int32_true_value,
+    const std::string& tensor_name, const bool support_batching,
+    const DataType tensor_datatype, const float fp32_false_value,
+    const float fp32_true_value, const int32_t int32_false_value,
+    const int32_t int32_true_value,
     std::shared_ptr<InferenceRequest::Input>* true_override,
     std::shared_ptr<InferenceRequest::Input>* false_override)
 {
@@ -160,6 +161,10 @@ GetBooleanOverrideInputs(
   int64_t memory_type_id;
 
   const std::vector<int64_t> tensor_shape{1};
+  std::vector<int64_t> tensor_shape_with_batch_dim{1};
+  if (support_batching) {
+    tensor_shape_with_batch_dim.push_back(1);
+  }
   const size_t size_p = GetDataTypeByteSize(tensor_datatype);
 
   auto true_p =
@@ -197,11 +202,13 @@ GetBooleanOverrideInputs(
   auto ltrue_override = std::make_shared<InferenceRequest::Input>(
       tensor_name, tensor_datatype, tensor_shape);
   *ltrue_override->MutableShape() = ltrue_override->OriginalShape();
+  *ltrue_override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
   RETURN_IF_ERROR(ltrue_override->SetData(true_p));
 
   auto lfalse_override = std::make_shared<InferenceRequest::Input>(
       tensor_name, tensor_datatype, tensor_shape);
   *lfalse_override->MutableShape() = lfalse_override->OriginalShape();
+  *lfalse_override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
   RETURN_IF_ERROR(lfalse_override->SetData(false_p));
 
   *true_override = std::move(ltrue_override);
@@ -246,9 +253,9 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       std::shared_ptr<InferenceRequest::Input> false_override;
 
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
-          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
-          int32_false_value, int32_true_value, &true_override,
-          &false_override));
+          tensor_name, config.max_batch_size() != 0, tensor_datatype,
+          fp32_false_value, fp32_true_value, int32_false_value,
+          int32_true_value, &true_override, &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(false_override);
@@ -270,9 +277,9 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       std::shared_ptr<InferenceRequest::Input> false_override;
 
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
-          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
-          int32_false_value, int32_true_value, &true_override,
-          &false_override));
+          tensor_name, config.max_batch_size() != 0, tensor_datatype,
+          fp32_false_value, fp32_true_value, int32_false_value,
+          int32_true_value, &true_override, &false_override));
 
       (*start_input_overrides)->emplace_back(false_override);
       (*end_input_overrides)->emplace_back(true_override);
@@ -294,9 +301,9 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       std::shared_ptr<InferenceRequest::Input> false_override;
 
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
-          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
-          int32_false_value, int32_true_value, &true_override,
-          &false_override));
+          tensor_name, config.max_batch_size() != 0, tensor_datatype,
+          fp32_false_value, fp32_true_value, int32_false_value,
+          int32_true_value, &true_override, &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(true_override);
@@ -710,6 +717,10 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
     }
 
     const std::vector<int64_t> tensor_shape{1};
+    std::vector<int64_t> tensor_shape_with_batch_dim{1};
+    if (config.max_batch_size() != 0) {
+      tensor_shape_with_batch_dim.push_back(1);
+    }
     const size_t size_p = GetDataTypeByteSize(correlation_id_datatype);
 
     for (size_t b = 0; b < seq_slot_cnt_; ++b) {
@@ -732,6 +743,7 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
       auto override = std::make_shared<InferenceRequest::Input>(
           correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
       *override->MutableShape() = override->OriginalShape();
+      *override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
       corrid_status = override->SetData(corrid_p);
       if (!corrid_status.IsOk()) {
         LOG_ERROR << "failed creating CORRID control for sequence-batch "
@@ -924,8 +936,8 @@ DirectSequenceBatch::SchedulerThread(
   size_t delay_cnt = 0;
   if (dstr != nullptr) {
     delay_cnt = atoi(dstr);
-    LOG_INFO << "Delaying scheduler thread " << batcher_idx_ << " until "
-             << delay_cnt << " queued requests...";
+    LOG_VERBOSE(1) << "Delaying scheduler thread " << batcher_idx_ << " until "
+                   << delay_cnt << " queued requests...";
   }
 
   // For testing this scheduler thread to be the last to release the
@@ -935,8 +947,9 @@ DirectSequenceBatch::SchedulerThread(
     const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
     if (dstr != nullptr) {
       backend_release_wait_milliseconds = atoi(dstr);
-      LOG_INFO << "Delaying scheduler backend release for " << batcher_idx_
-               << ": " << backend_release_wait_milliseconds << "ms";
+      LOG_VERBOSE(1) << "Delaying scheduler backend release for "
+                     << batcher_idx_ << ": "
+                     << backend_release_wait_milliseconds << "ms";
     }
   }
 
@@ -961,9 +974,9 @@ DirectSequenceBatch::SchedulerThread(
         if (!base_->DelayScheduler(batcher_idx_, total_size, delay_cnt)) {
           delay_cnt = 0;
         }
-        LOG_INFO << "Delaying scheduler thread " << batcher_idx_ << " until "
-                 << delay_cnt
-                 << " queued requests, current total = " << total_size;
+        LOG_VERBOSE(1) << "Delaying scheduler thread " << batcher_idx_
+                       << " until " << delay_cnt
+                       << " queued requests, current total = " << total_size;
       } else {
         RequiredEqualInputs required_equal_inputs;
         InferenceRequest* null_irequest = nullptr;

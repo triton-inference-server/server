@@ -26,6 +26,7 @@
 #pragma once
 
 #include "src/backends/backend/triton_model.h"
+#include "src/core/filesystem.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 

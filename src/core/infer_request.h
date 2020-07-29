@@ -304,9 +304,13 @@ class InferenceRequest {
 
   // Add an override input to the request. If 'input' is non-null
   // return a pointer to the newly added input.
+  // FIXME passing batch size is special handling for backend API.
+  // For override input, the 'shape' is without batch dimension for
+  // backends that implemented w/o backend API (which need correct
+  // input.Shape()), but backend API uses input.ShapeWithBatchDim().
   Status AddOverrideInput(
       const std::string& name, const DataType datatype,
-      const std::vector<int64_t>& shape,
+      const int64_t batch_size, const std::vector<int64_t>& shape,
       std::shared_ptr<Input>* input = nullptr);
 
   // Add an override input to the request.

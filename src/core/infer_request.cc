@@ -247,8 +247,8 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
         input.first, input.second.DType(), input.second.Shape(), &new_input);
 
     // Must normalize shape here...
-    *new_input->MutableShape() = new_input->OriginalShape();
-    *new_input->MutableShapeWithBatchDim() = new_input->OriginalShape();
+    *new_input->MutableShape() = input.second.Shape();
+    *new_input->MutableShapeWithBatchDim() = input.second.ShapeWithBatchDim();
 
     new_input->SetData(data);
   }
@@ -285,8 +285,8 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
         input.first, input.second.DType(), input.second.Shape(), &new_input);
 
     // Must normalize shape here...
-    *new_input->MutableShape() = new_input->OriginalShape();
-    *new_input->MutableShapeWithBatchDim() = new_input->OriginalShape();
+    *new_input->MutableShape() = input.second.Shape();
+    *new_input->MutableShapeWithBatchDim() = input.second.ShapeWithBatchDim();
 
     // Note that the input that have max byte size will be responsible for
     // holding the artifical data, while other inputs will hold a reference to
@@ -399,13 +399,20 @@ InferenceRequest::RemoveAllOriginalInputs()
 
 Status
 InferenceRequest::AddOverrideInput(
-    const std::string& name, const DataType datatype,
+    const std::string& name, const DataType datatype, const int64_t batch_size,
     const std::vector<int64_t>& shape,
     std::shared_ptr<InferenceRequest::Input>* input)
 {
   std::shared_ptr<Input> i = std::make_shared<Input>(name, datatype, shape);
   *(i->MutableShape()) = i->OriginalShape();
-  *(i->MutableShapeWithBatchDim()) = i->OriginalShape();
+  if (batch_size > 0) {
+    *(i->MutableShapeWithBatchDim()) = {batch_size};
+    i->MutableShapeWithBatchDim()->insert(
+        i->MutableShapeWithBatchDim()->end(), i->OriginalShape().begin(),
+        i->OriginalShape().end());
+  } else {
+    *(i->MutableShapeWithBatchDim()) = i->OriginalShape();
+  }
 
   RETURN_IF_ERROR(AddOverrideInput(i));
   if (input != nullptr) {

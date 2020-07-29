@@ -66,6 +66,8 @@ class TritonModel : public InferenceBackend {
   Status MetricReporter(
       const int device, MetricModelReporter** metric_reporter);
 
+  void WarmUp(uint32_t runner_idx, WarmupData& sample) override;
+
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModel);
 
@@ -92,6 +94,8 @@ class TritonModel : public InferenceBackend {
   std::vector<std::unique_ptr<TritonModelInstance>> instances_;
 
 #ifdef TRITON_ENABLE_METRICS
+  std::mutex reporter_mtx_;
+
   // The metric model reporters required for instances of this
   // model. Indexed by the device ID since the metric will differ
   // depending on the device ID.
