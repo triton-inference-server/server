@@ -45,6 +45,9 @@ if(${TRITON_ENABLE_GRPC})
       grpc_client.h common.h ipc.h
   )
 
+  set(TRITON_CLIENT_HEADER_FLAT 0)
+  configure_file(grpc_client.h.in grpc_client.h @ONLY)
+
   add_library(
       grpc-client-library EXCLUDE_FROM_ALL OBJECT
       ${REQUEST_SRCS} ${REQUEST_HDRS}
@@ -135,16 +138,28 @@ if(${TRITON_ENABLE_GRPC})
       ARCHIVE DESTINATION lib
   )
 
+  set(TRITON_CLIENT_HEADER_FLAT 1)
+  configure_file(grpc_client.h.in grpc_client_flat.h @ONLY)
+
+  install(
+      FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/grpc_client_flat.h
+      RENAME grpc_client.h
+      DESTINATION include
+  )
+
   install(
       FILES
       ${CMAKE_CURRENT_SOURCE_DIR}/common.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/grpc_client.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/ipc.h
       DESTINATION include
   )
 
   install(
       FILES
       ${CMAKE_CURRENT_BINARY_DIR}/../../../core/model_config.pb.h
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../core/grpc_service.grpc.pb.h
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../core/grpc_service.pb.h
       DESTINATION include
   )
 endif() # TRITON_ENABLE_GRPC
@@ -169,6 +184,9 @@ if(${TRITON_ENABLE_HTTP})
       REQUEST_HDRS
       http_client.h common.h ipc.h cencode.h
   )
+
+  set(TRITON_CLIENT_HEADER_FLAT 0)
+  configure_file(http_client.h.in http_client.h @ONLY)
 
   add_library(
       http-client-library EXCLUDE_FROM_ALL OBJECT
@@ -242,10 +260,19 @@ if(${TRITON_ENABLE_HTTP})
       PUBLIC Threads::Threads
   )
 
+  set(TRITON_CLIENT_HEADER_FLAT 1)
+  configure_file(http_client.h.in http_client_flat.h @ONLY)
+
+  install(
+      FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/http_client_flat.h
+      RENAME http_client.h
+      DESTINATION include
+  )
+
   install(
       FILES
       ${CMAKE_CURRENT_SOURCE_DIR}/common.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/http_client.h
       DESTINATION include
   )
 
