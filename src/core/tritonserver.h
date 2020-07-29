@@ -53,6 +53,48 @@ struct TRITONSERVER_ResponseAllocator;
 struct TRITONSERVER_Server;
 struct TRITONSERVER_ServerOptions;
 
+///
+/// TRITONSERVER API Version
+///
+/// The TRITONSERVER API is versioned with major and minor version
+/// numbers. Any change to the API that does not impact backwards
+/// compatibility (for example, adding a non-required function)
+/// increases the minor version number. Any change that breaks
+/// backwards compatibility (for example, deleting or changing the
+/// behavior of a function) increases the major version number. A
+/// client should check that the API version used to compile the
+/// client is compatible with the API version of the Triton shared
+/// library that it is linking against. This is typically done by code
+/// similar to the following which makes sure that the major versions
+/// are equal and that the minor version of the Triton shared library
+/// is >= the minor version used to build the client.
+///
+///   uint32_t api_version_major, api_version_minor;
+///   TRITONSERVER_ApiVersion(&api_version_major, &api_version_minor);
+///   if ((api_version_major != TRITONSERVER_API_VERSION_MAJOR) ||
+///       (api_version_minor < TRITONSERVER_API_VERSION_MINOR)) {
+///     return TRITONSERVER_ErrorNew(
+///       TRITONSERVER_ERROR_UNSUPPORTED,
+///       "triton server API version does not support this client");
+///   }
+///
+#define TRITONSERVER_API_VERSION_MAJOR 1
+#define TRITONSERVER_API_VERSION_MINOR 0
+
+/// Get the TRITONBACKEND API version supported by the Triton shared
+/// library. This value can be compared against the
+/// TRITONSERVER_API_VERSION_MAJOR and TRITONSERVER_API_VERSION_MINOR
+/// used to build the client to ensure that Triton shared library is
+/// compatible with the client.
+///
+/// \param major Returns the TRITONSERVER API major version supported
+/// by Triton.
+/// \param minor Returns the TRITONSERVER API minor version supported
+/// by Triton.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ApiVersion(
+    uint32_t* major, uint32_t* minor);
+
 /// TRITONSERVER_DataType
 ///
 /// Tensor data types recognized by TRITONSERVER.

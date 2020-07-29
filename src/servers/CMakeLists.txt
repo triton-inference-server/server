@@ -244,6 +244,7 @@ add_executable(
 set_target_properties(
   simple
   PROPERTIES
+    COMPILE_FLAGS "-Wno-type-limits"
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
