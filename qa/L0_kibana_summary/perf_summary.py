@@ -4,11 +4,11 @@ from datetime import date
 
 pdf = FPDF()
 pdf.set_font('Arial', size=12)
-for protocol in ["http", "grpc"]:
-    for metric in ["throughput", "latency"]:
-        for payload_size in ["1", "4194304"]:
+for metric in ["latency", "throughput"]:
+    for payload_size in ["1", "4194304"]:
+        for protocol in ["grpc", "http"]:
             instances = "2" if metric == "throughput" else "1"
-            payload_label = "small" if payload_size == "1" else "large"
+            payload_label = "4B" if payload_size == "1" else "16MB"
 
             value_list = ["d_infer_per_sec", "s_framework", "\'@timestamp\'"]
             where_dict = {
@@ -20,14 +20,15 @@ for protocol in ["http", "grpc"]:
             }
 
             last_date = date.today().strftime("%Y-%m-%d")
-            title = protocol.upper() + " " + metric + " with " + \
+            title = "Nomodel " + protocol.upper() + " " + metric + " with " + \
                 payload_label + " payload"
             ma_df = sk.current_moving_average_dataframe(metric,
                                                         value_list,
                                                         where_dict,
                                                         last_date,
                                                         plot=True,
-                                                        plot_file=title + ".png")
+                                                        plot_file=title +
+                                                        ".png")
             ma_df.to_csv(title + ".csv", index=False)
 
             pdf.add_page()
