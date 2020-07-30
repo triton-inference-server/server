@@ -81,7 +81,7 @@ class TritonModel : public InferenceBackend {
   // be longer than the lifetime of a model owned by the server.
   InferenceServer* server_;
 
-  // Whether the model needs to complete the model config.
+  // Whether the backend should attempt to auto-complete the model config.
   const bool auto_complete_config_;
 
   // The localized repo directory holding the model. If localization
