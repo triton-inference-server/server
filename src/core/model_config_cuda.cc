@@ -31,7 +31,8 @@
 namespace nvidia { namespace inferenceserver {
 
 int
-GetCudaStreamPriority(ModelOptimizationPolicy::ModelPriority priority)
+GetCudaStreamPriority(
+    inference::ModelOptimizationPolicy::ModelPriority priority)
 {
   // Default priority is 0
   int cuda_stream_priority = 0;
@@ -43,10 +44,10 @@ GetCudaStreamPriority(ModelOptimizationPolicy::ModelPriority priority)
   }
 
   switch (priority) {
-    case ModelOptimizationPolicy::PRIORITY_MAX:
+    case inference::ModelOptimizationPolicy::PRIORITY_MAX:
       cuda_stream_priority = max;
       break;
-    case ModelOptimizationPolicy::PRIORITY_MIN:
+    case inference::ModelOptimizationPolicy::PRIORITY_MIN:
       cuda_stream_priority = min;
       break;
     default:

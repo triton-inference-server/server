@@ -37,11 +37,11 @@ class AutoFill {
   /// Create an AutoFill object for a specific model.
   static Status Create(
       const std::string& model_name, const BackendConfigMap& backend_config_map,
-      const std::string& model_path, const ModelConfig& config,
+      const std::string& model_path, const inference::ModelConfig& config,
       std::unique_ptr<AutoFill>* autofill);
 
   /// Autofill settings in a configuration.
-  virtual Status Fix(ModelConfig* config) = 0;
+  virtual Status Fix(inference::ModelConfig* config) = 0;
 
  protected:
   AutoFill(const std::string& model_name) : model_name_(model_name) {}

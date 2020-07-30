@@ -113,7 +113,7 @@ class InferenceResponse {
   class Output {
    public:
     Output(
-        const std::string& name, const DataType datatype,
+        const std::string& name, const inference::DataType datatype,
         const std::vector<int64_t>& shape, const ResponseAllocator* allocator,
         void* alloc_userp)
         : name_(name), datatype_(datatype), shape_(shape),
@@ -122,7 +122,7 @@ class InferenceResponse {
     {
     }
     Output(
-        const std::string& name, const DataType datatype,
+        const std::string& name, const inference::DataType datatype,
         std::vector<int64_t>&& shape, const ResponseAllocator* allocator,
         void* alloc_userp)
         : name_(name), datatype_(datatype), shape_(std::move(shape)),
@@ -137,7 +137,7 @@ class InferenceResponse {
     const std::string& Name() const { return name_; }
 
     // Data type of the output tensor.
-    DataType DType() const { return datatype_; }
+    inference::DataType DType() const { return datatype_; }
 
     // The shape of the output tensor.
     const std::vector<int64_t>& Shape() const { return shape_; }
@@ -145,7 +145,8 @@ class InferenceResponse {
     // Reshape the output tensor. This function must only be called
     // for outputs that have respace specified in the model
     // configuration.
-    void Reshape(const bool has_batch_dim, const ModelOutput* output_config);
+    void Reshape(
+        const bool has_batch_dim, const inference::ModelOutput* output_config);
 
     // Get information about the buffer allocated for this output
     // tensor's data. If no buffer is allocated 'buffer' will return
@@ -181,7 +182,7 @@ class InferenceResponse {
         std::ostream& out, const InferenceResponse::Output& output);
 
     std::string name_;
-    DataType datatype_;
+    inference::DataType datatype_;
     std::vector<int64_t> shape_;
 
     // The response allocator and user pointer.
@@ -237,10 +238,10 @@ class InferenceResponse {
   // Add an output to the response. If 'output' is non-null
   // return a pointer to the newly added output.
   Status AddOutput(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape, Output** output = nullptr);
   Status AddOutput(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       std::vector<int64_t>&& shape, Output** output = nullptr);
 
   // Get the classification label associated with an output. Return

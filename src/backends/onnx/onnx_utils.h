@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -77,9 +77,10 @@ using OnnxTensorInfoMap = std::unordered_map<std::string, OnnxTensorInfo>;
 
 std::string OnnxDataTypeName(ONNXTensorElementDataType onnx_type);
 
-DataType ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type);
+inference::DataType ConvertFromOnnxDataType(
+    ONNXTensorElementDataType onnx_type);
 
-ONNXTensorElementDataType ConvertToOnnxDataType(DataType data_type);
+ONNXTensorElementDataType ConvertToOnnxDataType(inference::DataType data_type);
 
 Status InputNames(OrtSession* session, std::set<std::string>& names);
 

@@ -53,7 +53,7 @@ namespace nvidia { namespace inferenceserver {
 class AutoFillNull : public AutoFill {
  public:
   static Status Create(std::unique_ptr<AutoFill>* autofill);
-  Status Fix(ModelConfig* config);
+  Status Fix(inference::ModelConfig* config);
 
  private:
   AutoFillNull() : AutoFill(std::string()) {}
@@ -67,7 +67,7 @@ AutoFillNull::Create(std::unique_ptr<AutoFill>* autofill)
 }
 
 Status
-AutoFillNull::Fix(ModelConfig* config)
+AutoFillNull::Fix(inference::ModelConfig* config)
 {
   return Status::Success;
 }
@@ -79,7 +79,7 @@ class AutoFillSimple : public AutoFill {
  public:
   static Status Create(
       const std::string& model_name, std::unique_ptr<AutoFill>* autofill);
-  Status Fix(ModelConfig* config);
+  Status Fix(inference::ModelConfig* config);
 
  private:
   AutoFillSimple(const std::string& model_name) : AutoFill(model_name) {}
@@ -94,7 +94,7 @@ AutoFillSimple::Create(
 }
 
 Status
-AutoFillSimple::Fix(ModelConfig* config)
+AutoFillSimple::Fix(inference::ModelConfig* config)
 {
   // Set name if not already set.
   if (config->name().empty()) {
@@ -110,7 +110,7 @@ AutoFillSimple::Fix(ModelConfig* config)
 Status
 AutoFill::Create(
     const std::string& model_name, const BackendConfigMap& backend_config_map,
-    const std::string& model_path, const ModelConfig& config,
+    const std::string& model_path, const inference::ModelConfig& config,
     std::unique_ptr<AutoFill>* autofill)
 {
   autofill->reset();

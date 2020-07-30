@@ -29,8 +29,8 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 
 CustomInstance::CustomInstance(
-    const std::string& instance_name, const ModelConfig& model_config,
-    int gpu_device)
+    const std::string& instance_name,
+    const inference::ModelConfig& model_config, int gpu_device)
     : instance_name_(instance_name), model_config_(model_config),
       gpu_device_(gpu_device)
 {
@@ -44,7 +44,7 @@ int
 CustomInitialize(const CustomInitializeData* data, void** custom_instance)
 {
   // Convert the serialized model config to a ModelConfig object.
-  ModelConfig model_config;
+  inference::ModelConfig model_config;
   if (!model_config.ParseFromString(std::string(
           data->serialized_model_config, data->serialized_model_config_size))) {
     return ErrorCodes::InvalidModelConfig;

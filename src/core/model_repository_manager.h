@@ -107,7 +107,7 @@ class ModelRepositoryManager {
     std::string model_name_;
     Status status_;
     bool checked_;
-    ModelConfig model_config_;
+    inference::ModelConfig model_config_;
     std::set<int64_t> loaded_versions_;
     std::set<DependencyNode*> missing_upstreams_;
     std::unordered_map<DependencyNode*, std::set<int64_t>> upstreams_;
@@ -283,7 +283,8 @@ class ModelRepositoryManager {
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
-  Status GetModelConfig(const std::string& name, ModelConfig* model_config);
+  Status GetModelConfig(
+      const std::string& name, inference::ModelConfig* model_config);
 
   /// Get the models to be loaded / unloaded based on the model loaded in
   /// previous iteration.
@@ -311,7 +312,7 @@ class ModelRepositoryManager {
   /// \return The error status.
   Status VersionsToLoad(
       const std::string model_repository_path, const std::string& name,
-      const ModelConfig& model_config, std::set<int64_t>* versions);
+      const inference::ModelConfig& model_config, std::set<int64_t>* versions);
 
   const std::set<std::string> repository_paths_;
   const BackendConfigMap backend_config_map_;

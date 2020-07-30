@@ -104,7 +104,7 @@ class GrpcInferRequest : public InferRequest {
  public:
   GrpcInferRequest(InferenceServerClient::OnCompleteFn callback = nullptr)
       : InferRequest(callback), grpc_status_(),
-        grpc_response_(std::make_shared<ModelInferResponse>())
+        grpc_response_(std::make_shared<inference::ModelInferResponse>())
   {
   }
 
@@ -114,7 +114,7 @@ class GrpcInferRequest : public InferRequest {
   // Variables for GRPC call
   grpc::ClientContext grpc_context_;
   grpc::Status grpc_status_;
-  std::shared_ptr<ModelInferResponse> grpc_response_;
+  std::shared_ptr<inference::ModelInferResponse> grpc_response_;
 };
 
 //==============================================================================
@@ -122,11 +122,12 @@ class GrpcInferRequest : public InferRequest {
 class InferResultGrpc : public InferResult {
  public:
   static Error Create(
-      InferResult** infer_result, std::shared_ptr<ModelInferResponse> response,
+      InferResult** infer_result,
+      std::shared_ptr<inference::ModelInferResponse> response,
       Error& request_status);
   static Error Create(
       InferResult** infer_result,
-      std::shared_ptr<ModelStreamInferResponse> response);
+      std::shared_ptr<inference::ModelStreamInferResponse> response);
 
   Error RequestStatus() const override;
   Error ModelName(std::string* name) const override;
@@ -146,22 +147,25 @@ class InferResultGrpc : public InferResult {
 
  private:
   InferResultGrpc(
-      std::shared_ptr<ModelInferResponse> response, Error& request_status);
-  InferResultGrpc(std::shared_ptr<ModelStreamInferResponse> response);
+      std::shared_ptr<inference::ModelInferResponse> response,
+      Error& request_status);
+  InferResultGrpc(
+      std::shared_ptr<inference::ModelStreamInferResponse> response);
 
-  std::map<std::string, const ModelInferResponse::InferOutputTensor*>
+  std::map<std::string, const inference::ModelInferResponse::InferOutputTensor*>
       output_name_to_tensor_map_;
   std::map<std::string, std::pair<const uint8_t*, const uint32_t>>
       output_name_to_buffer_map_;
 
-  std::shared_ptr<ModelInferResponse> response_;
-  std::shared_ptr<ModelStreamInferResponse> stream_response_;
+  std::shared_ptr<inference::ModelInferResponse> response_;
+  std::shared_ptr<inference::ModelStreamInferResponse> stream_response_;
   Error request_status_;
 };
 
 Error
 InferResultGrpc::Create(
-    InferResult** infer_result, std::shared_ptr<ModelInferResponse> response,
+    InferResult** infer_result,
+    std::shared_ptr<inference::ModelInferResponse> response,
     Error& request_status)
 {
   *infer_result = reinterpret_cast<InferResult*>(
@@ -172,7 +176,7 @@ InferResultGrpc::Create(
 Error
 InferResultGrpc::Create(
     InferResult** infer_result,
-    std::shared_ptr<ModelStreamInferResponse> response)
+    std::shared_ptr<inference::ModelStreamInferResponse> response)
 {
   *infer_result = reinterpret_cast<InferResult*>(new InferResultGrpc(response));
   return Error::Success;
@@ -300,7 +304,8 @@ InferResultGrpc::StringData(
 }
 
 InferResultGrpc::InferResultGrpc(
-    std::shared_ptr<ModelInferResponse> response, Error& request_status)
+    std::shared_ptr<inference::ModelInferResponse> response,
+    Error& request_status)
     : response_(response), request_status_(request_status)
 {
   uint32_t index = 0;
@@ -316,12 +321,13 @@ InferResultGrpc::InferResultGrpc(
 }
 
 InferResultGrpc::InferResultGrpc(
-    std::shared_ptr<ModelStreamInferResponse> stream_response)
+    std::shared_ptr<inference::ModelStreamInferResponse> stream_response)
     : stream_response_(stream_response)
 {
   request_status_ = Error(stream_response_->error_message());
   response_.reset(
-      stream_response->mutable_infer_response(), [](ModelInferResponse*) {});
+      stream_response->mutable_infer_response(),
+      [](inference::ModelInferResponse*) {});
   uint32_t index = 0;
   for (const auto& output : response_->outputs()) {
     output_name_to_tensor_map_[output.name()] = &output;
@@ -352,8 +358,8 @@ InferenceServerGrpcClient::IsServerLive(bool* live, const Headers& headers)
 {
   Error err;
 
-  ServerLiveRequest request;
-  ServerLiveResponse response;
+  inference::ServerLiveRequest request;
+  inference::ServerLiveResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -378,8 +384,8 @@ InferenceServerGrpcClient::IsServerReady(bool* ready, const Headers& headers)
 {
   Error err;
 
-  ServerReadyRequest request;
-  ServerReadyResponse response;
+  inference::ServerReadyRequest request;
+  inference::ServerReadyResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -406,8 +412,8 @@ InferenceServerGrpcClient::IsModelReady(
 {
   Error err;
 
-  ModelReadyRequest request;
-  ModelReadyResponse response;
+  inference::ModelReadyRequest request;
+  inference::ModelReadyResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -436,12 +442,12 @@ InferenceServerGrpcClient::IsModelReady(
 
 Error
 InferenceServerGrpcClient::ServerMetadata(
-    ServerMetadataResponse* server_metadata, const Headers& headers)
+    inference::ServerMetadataResponse* server_metadata, const Headers& headers)
 {
   server_metadata->Clear();
   Error err;
 
-  ServerMetadataRequest request;
+  inference::ServerMetadataRequest request;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -464,13 +470,14 @@ InferenceServerGrpcClient::ServerMetadata(
 
 Error
 InferenceServerGrpcClient::ModelMetadata(
-    ModelMetadataResponse* model_metadata, const std::string& model_name,
-    const std::string& model_version, const Headers& headers)
+    inference::ModelMetadataResponse* model_metadata,
+    const std::string& model_name, const std::string& model_version,
+    const Headers& headers)
 {
   model_metadata->Clear();
   Error err;
 
-  ModelMetadataRequest request;
+  inference::ModelMetadataRequest request;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -495,13 +502,13 @@ InferenceServerGrpcClient::ModelMetadata(
 
 Error
 InferenceServerGrpcClient::ModelConfig(
-    ModelConfigResponse* model_config, const std::string& model_name,
+    inference::ModelConfigResponse* model_config, const std::string& model_name,
     const std::string& model_version, const Headers& headers)
 {
   model_config->Clear();
   Error err;
 
-  ModelConfigRequest request;
+  inference::ModelConfigRequest request;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -525,12 +532,13 @@ InferenceServerGrpcClient::ModelConfig(
 
 Error
 InferenceServerGrpcClient::ModelRepositoryIndex(
-    RepositoryIndexResponse* repository_index, const Headers& headers)
+    inference::RepositoryIndexResponse* repository_index,
+    const Headers& headers)
 {
   repository_index->Clear();
   Error err;
 
-  RepositoryIndexRequest request;
+  inference::RepositoryIndexRequest request;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -556,8 +564,8 @@ InferenceServerGrpcClient::LoadModel(
 {
   Error err;
 
-  RepositoryModelLoadRequest request;
-  RepositoryModelLoadResponse response;
+  inference::RepositoryModelLoadRequest request;
+  inference::RepositoryModelLoadResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -584,8 +592,8 @@ InferenceServerGrpcClient::UnloadModel(
 {
   Error err;
 
-  RepositoryModelUnloadRequest request;
-  RepositoryModelUnloadResponse response;
+  inference::RepositoryModelUnloadRequest request;
+  inference::RepositoryModelUnloadResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -608,13 +616,14 @@ InferenceServerGrpcClient::UnloadModel(
 
 Error
 InferenceServerGrpcClient::ModelInferenceStatistics(
-    ModelStatisticsResponse* infer_stat, const std::string& model_name,
-    const std::string& model_version, const Headers& headers)
+    inference::ModelStatisticsResponse* infer_stat,
+    const std::string& model_name, const std::string& model_version,
+    const Headers& headers)
 {
   infer_stat->Clear();
   Error err;
 
-  ModelStatisticsRequest request;
+  inference::ModelStatisticsRequest request;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -638,13 +647,13 @@ InferenceServerGrpcClient::ModelInferenceStatistics(
 
 Error
 InferenceServerGrpcClient::SystemSharedMemoryStatus(
-    SystemSharedMemoryStatusResponse* status, const std::string& region_name,
-    const Headers& headers)
+    inference::SystemSharedMemoryStatusResponse* status,
+    const std::string& region_name, const Headers& headers)
 {
   status->Clear();
   Error err;
 
-  SystemSharedMemoryStatusRequest request;
+  inference::SystemSharedMemoryStatusRequest request;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -672,8 +681,8 @@ InferenceServerGrpcClient::RegisterSystemSharedMemory(
 {
   Error err;
 
-  SystemSharedMemoryRegisterRequest request;
-  SystemSharedMemoryRegisterResponse response;
+  inference::SystemSharedMemoryRegisterRequest request;
+  inference::SystemSharedMemoryRegisterResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -704,8 +713,8 @@ InferenceServerGrpcClient::UnregisterSystemSharedMemory(
 {
   Error err;
 
-  SystemSharedMemoryUnregisterRequest request;
-  SystemSharedMemoryUnregisterResponse response;
+  inference::SystemSharedMemoryUnregisterRequest request;
+  inference::SystemSharedMemoryUnregisterResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -734,13 +743,13 @@ InferenceServerGrpcClient::UnregisterSystemSharedMemory(
 
 Error
 InferenceServerGrpcClient::CudaSharedMemoryStatus(
-    CudaSharedMemoryStatusResponse* status, const std::string& region_name,
-    const Headers& headers)
+    inference::CudaSharedMemoryStatusResponse* status,
+    const std::string& region_name, const Headers& headers)
 {
   status->Clear();
   Error err;
 
-  CudaSharedMemoryStatusRequest request;
+  inference::CudaSharedMemoryStatusRequest request;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -768,8 +777,8 @@ InferenceServerGrpcClient::RegisterCudaSharedMemory(
 {
   Error err;
 
-  CudaSharedMemoryRegisterRequest request;
-  CudaSharedMemoryRegisterResponse response;
+  inference::CudaSharedMemoryRegisterRequest request;
+  inference::CudaSharedMemoryRegisterResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -800,8 +809,8 @@ InferenceServerGrpcClient::UnregisterCudaSharedMemory(
 {
   Error err;
 
-  CudaSharedMemoryUnregisterRequest request;
-  CudaSharedMemoryUnregisterResponse response;
+  inference::CudaSharedMemoryUnregisterRequest request;
+  inference::CudaSharedMemoryUnregisterResponse response;
   grpc::ClientContext context;
 
   for (const auto& it : headers) {
@@ -926,8 +935,9 @@ InferenceServerGrpcClient::AsyncInfer(
 
   async_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
 
-  std::unique_ptr<grpc::ClientAsyncResponseReader<ModelInferResponse>> rpc(
-      stub_->PrepareAsyncModelInfer(
+  std::unique_ptr<
+      grpc::ClientAsyncResponseReader<inference::ModelInferResponse>>
+      rpc(stub_->PrepareAsyncModelInfer(
           &async_request->grpc_context_, infer_request_,
           &async_request_completion_queue_));
 
@@ -1235,8 +1245,8 @@ InferenceServerGrpcClient::AsyncTransfer()
 void
 InferenceServerGrpcClient::AsyncStreamTransfer()
 {
-  std::shared_ptr<ModelStreamInferResponse> response =
-      std::make_shared<ModelStreamInferResponse>();
+  std::shared_ptr<inference::ModelStreamInferResponse> response =
+      std::make_shared<inference::ModelStreamInferResponse>();
   // End loop if Read() returns false
   // (stream ended and all responses are drained)
   while (grpc_stream_->Read(response.get())) {
@@ -1274,7 +1284,7 @@ InferenceServerGrpcClient::AsyncStreamTransfer()
       std::cout << response->DebugString() << std::endl;
     }
     stream_callback_(stream_result);
-    response = std::make_shared<ModelStreamInferResponse>();
+    response = std::make_shared<inference::ModelStreamInferResponse>();
   }
   grpc_stream_->Finish();
 }
@@ -1284,8 +1294,8 @@ InferenceServerGrpcClient::InferenceServerGrpcClient(
     const std::string& url, bool verbose, bool use_ssl,
     const SslOptions& ssl_options)
     : InferenceServerClient(verbose),
-      stub_(
-          GRPCInferenceService::NewStub(GetChannel(url, use_ssl, ssl_options)))
+      stub_(inference::GRPCInferenceService::NewStub(
+          GetChannel(url, use_ssl, ssl_options)))
 {
 }
 

@@ -60,15 +60,15 @@ std::string ShapeToString(
 
 /// \return true if a TF data-type matches a model configuration
 /// data-type.
-bool CompareDataType(TRTISTF_DataType model_dtype, DataType dtype);
+bool CompareDataType(TRTISTF_DataType model_dtype, inference::DataType dtype);
 
 /// \return the model configuration data-type that corresponds to a
 /// TRTISTF data-type.
-DataType ConvertDataType(TRTISTF_DataType dtype);
+inference::DataType ConvertDataType(TRTISTF_DataType dtype);
 
 /// \return the TRTISTF data-type corresponding to a model
 /// configuration data-type.
-TRTISTF_DataType ConvertDataType(DataType dtype);
+TRTISTF_DataType ConvertDataType(inference::DataType dtype);
 
 // If TRTISTF Error is non-OK, return the equivalent TRTIS status.
 #define RETURN_IF_TRTISTF_ERROR(TFWS)                              \

@@ -132,86 +132,86 @@ ShapeToString(const TRTISTF_Shape* shape, const size_t start_idx)
 }
 
 bool
-CompareDataType(TRTISTF_DataType model_dtype, DataType dtype)
+CompareDataType(TRTISTF_DataType model_dtype, inference::DataType dtype)
 {
-  DataType cdtype = ConvertDataType(model_dtype);
-  if (cdtype == DataType::TYPE_INVALID) {
+  inference::DataType cdtype = ConvertDataType(model_dtype);
+  if (cdtype == inference::DataType::TYPE_INVALID) {
     return false;
   }
 
   return dtype == cdtype;
 }
 
-DataType
+inference::DataType
 ConvertDataType(TRTISTF_DataType dtype)
 {
   switch (dtype) {
     case TRTISTF_DataType::TRTISTF_TYPE_INVALID:
-      return DataType::TYPE_INVALID;
+      return inference::DataType::TYPE_INVALID;
     case TRTISTF_DataType::TRTISTF_TYPE_BOOL:
-      return DataType::TYPE_BOOL;
+      return inference::DataType::TYPE_BOOL;
     case TRTISTF_DataType::TRTISTF_TYPE_UINT8:
-      return DataType::TYPE_UINT8;
+      return inference::DataType::TYPE_UINT8;
     case TRTISTF_DataType::TRTISTF_TYPE_UINT16:
-      return DataType::TYPE_UINT16;
+      return inference::DataType::TYPE_UINT16;
     case TRTISTF_DataType::TRTISTF_TYPE_UINT32:
-      return DataType::TYPE_UINT32;
+      return inference::DataType::TYPE_UINT32;
     case TRTISTF_DataType::TRTISTF_TYPE_UINT64:
-      return DataType::TYPE_UINT64;
+      return inference::DataType::TYPE_UINT64;
     case TRTISTF_DataType::TRTISTF_TYPE_INT8:
-      return DataType::TYPE_INT8;
+      return inference::DataType::TYPE_INT8;
     case TRTISTF_DataType::TRTISTF_TYPE_INT16:
-      return DataType::TYPE_INT16;
+      return inference::DataType::TYPE_INT16;
     case TRTISTF_DataType::TRTISTF_TYPE_INT32:
-      return DataType::TYPE_INT32;
+      return inference::DataType::TYPE_INT32;
     case TRTISTF_DataType::TRTISTF_TYPE_INT64:
-      return DataType::TYPE_INT64;
+      return inference::DataType::TYPE_INT64;
     case TRTISTF_DataType::TRTISTF_TYPE_FP16:
-      return DataType::TYPE_FP16;
+      return inference::DataType::TYPE_FP16;
     case TRTISTF_DataType::TRTISTF_TYPE_FP32:
-      return DataType::TYPE_FP32;
+      return inference::DataType::TYPE_FP32;
     case TRTISTF_DataType::TRTISTF_TYPE_FP64:
-      return DataType::TYPE_FP64;
+      return inference::DataType::TYPE_FP64;
     case TRTISTF_DataType::TRTISTF_TYPE_STRING:
-      return DataType::TYPE_STRING;
+      return inference::DataType::TYPE_STRING;
     default:
       break;
   }
 
-  return DataType::TYPE_INVALID;
+  return inference::DataType::TYPE_INVALID;
 }
 
 TRTISTF_DataType
-ConvertDataType(DataType dtype)
+ConvertDataType(inference::DataType dtype)
 {
   switch (dtype) {
-    case DataType::TYPE_INVALID:
+    case inference::DataType::TYPE_INVALID:
       return TRTISTF_DataType::TRTISTF_TYPE_INVALID;
-    case DataType::TYPE_BOOL:
+    case inference::DataType::TYPE_BOOL:
       return TRTISTF_DataType::TRTISTF_TYPE_BOOL;
-    case DataType::TYPE_UINT8:
+    case inference::DataType::TYPE_UINT8:
       return TRTISTF_DataType::TRTISTF_TYPE_UINT8;
-    case DataType::TYPE_UINT16:
+    case inference::DataType::TYPE_UINT16:
       return TRTISTF_DataType::TRTISTF_TYPE_UINT16;
-    case DataType::TYPE_UINT32:
+    case inference::DataType::TYPE_UINT32:
       return TRTISTF_DataType::TRTISTF_TYPE_UINT32;
-    case DataType::TYPE_UINT64:
+    case inference::DataType::TYPE_UINT64:
       return TRTISTF_DataType::TRTISTF_TYPE_UINT64;
-    case DataType::TYPE_INT8:
+    case inference::DataType::TYPE_INT8:
       return TRTISTF_DataType::TRTISTF_TYPE_INT8;
-    case DataType::TYPE_INT16:
+    case inference::DataType::TYPE_INT16:
       return TRTISTF_DataType::TRTISTF_TYPE_INT16;
-    case DataType::TYPE_INT32:
+    case inference::DataType::TYPE_INT32:
       return TRTISTF_DataType::TRTISTF_TYPE_INT32;
-    case DataType::TYPE_INT64:
+    case inference::DataType::TYPE_INT64:
       return TRTISTF_DataType::TRTISTF_TYPE_INT64;
-    case DataType::TYPE_FP16:
+    case inference::DataType::TYPE_FP16:
       return TRTISTF_DataType::TRTISTF_TYPE_FP16;
-    case DataType::TYPE_FP32:
+    case inference::DataType::TYPE_FP32:
       return TRTISTF_DataType::TRTISTF_TYPE_FP32;
-    case DataType::TYPE_FP64:
+    case inference::DataType::TYPE_FP64:
       return TRTISTF_DataType::TRTISTF_TYPE_FP64;
-    case DataType::TYPE_STRING:
+    case inference::DataType::TYPE_STRING:
       return TRTISTF_DataType::TRTISTF_TYPE_STRING;
     default:
       break;

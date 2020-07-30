@@ -1061,13 +1061,13 @@ main(int argc, char** argv)
             triton_client_wrapper),
         "failed to create model parser");
   } else {
-    ni::ModelMetadataResponse model_metadata;
+    inference::ModelMetadataResponse model_metadata;
     FAIL_IF_ERR(
         triton_client_wrapper->ModelMetadata(
             &model_metadata, model_name, model_version),
         "failed to get model metadata");
 
-    ni::ModelConfigResponse model_config;
+    inference::ModelConfigResponse model_config;
     FAIL_IF_ERR(
         triton_client_wrapper->ModelConfig(
             &model_config, model_name, model_version),

@@ -102,7 +102,7 @@ main(int argc, char** argv)
       nic::InferenceServerGrpcClient::Create(&client, url, verbose),
       "unable to create grpc client");
 
-  ni::RepositoryIndexResponse repository_index;
+  inference::RepositoryIndexResponse repository_index;
   FAIL_IF_ERR(
       client->ModelRepositoryIndex(&repository_index, http_headers),
       "Failed to get repository index");

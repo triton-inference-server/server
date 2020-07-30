@@ -105,7 +105,7 @@ CustomBackend::Context::~Context()
 Status
 CustomBackend::Init(
     const std::string& path, const std::vector<std::string>& server_params,
-    const ModelConfig& config)
+    const inference::ModelConfig& config)
 {
   RETURN_IF_ERROR(InferenceBackend::Init(path, config, kCustomPlatform));
   server_params_ = server_params;
@@ -121,7 +121,7 @@ CustomBackend::CreateExecutionContexts(
   // Create the context for each instance.
   for (const auto& group : Config().instance_group()) {
     for (int c = 0; c < group.count(); c++) {
-      if (group.kind() == ModelInstanceGroup::KIND_CPU) {
+      if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(

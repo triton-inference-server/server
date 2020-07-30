@@ -300,7 +300,7 @@ main(int argc, char** argv)
   }
 
   // Get shared memory regions active/registered within triton
-  ni::CudaSharedMemoryStatusResponse status;
+  inference::CudaSharedMemoryStatusResponse status;
   FAIL_IF_ERR(
       client->CudaSharedMemoryStatus(&status),
       "failed to get shared memory status");

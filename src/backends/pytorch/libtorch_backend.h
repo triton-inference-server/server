@@ -77,14 +77,15 @@ class LibTorchBackend : public InferenceBackend {
     DISALLOW_MOVE(Context);
 
     Status ValidateInputs(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status ValidateOutputs(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
-    Status ValidateControlInputs(const ModelSequenceBatching& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
+            ios);
+    Status ValidateControlInputs(const inference::ModelSequenceBatching& ios);
 
     // Set the meta data of an input from payloads.
     Status SetInputMetaData(
-        const std::string& name, const DataType datatype,
+        const std::string& name, const inference::DataType datatype,
         const std::vector<int64_t>& dims, InputMetaData* meta_data);
 
     // See BackendContext::Run()
@@ -115,8 +116,9 @@ class LibTorchBackend : public InferenceBackend {
 
     Status GetOutputTensor(
         std::vector<torch::Tensor>* outputs_, const int& op_index,
-        const std::string& name, const DataType dtype, const char** content,
-        size_t* byte_size, std::vector<int64_t>* content_shape);
+        const std::string& name, const inference::DataType dtype,
+        const char** content, size_t* byte_size,
+        std::vector<int64_t>* content_shape);
 
     Status Execute(
         std::vector<torch::jit::IValue>* inputs_,

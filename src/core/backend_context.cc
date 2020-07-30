@@ -189,7 +189,7 @@ BackendContext::CompareOutputDims(
 //
 void
 BackendResponder::ProcessTensor(
-    const std::string& name, const DataType datatype,
+    const std::string& name, const inference::DataType datatype,
     std::vector<int64_t>& batchn_shape, const char* buffer,
     const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
 {
@@ -548,7 +548,7 @@ BackendResponder::FlushPendingPinned(
 //
 void
 BackendInputCollector::ProcessTensor(
-    const std::string& name, const DataType datatype,
+    const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& batch1_shape, char* buffer,
     const size_t buffer_byte_size, const TRITONSERVER_MemoryType memory_type,
     const int64_t memory_type_id)

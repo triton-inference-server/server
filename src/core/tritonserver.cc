@@ -410,7 +410,7 @@ TRITONSERVER_DataType
 TRITONSERVER_StringToDataType(const char* dtype)
 {
   const size_t len = strlen(dtype);
-  return DataTypeToTriton(ni::ProtocolStringToDataType(dtype, len));
+  return ni::DataTypeToTriton(ni::ProtocolStringToDataType(dtype, len));
 }
 
 uint32_t
@@ -1436,7 +1436,7 @@ TRITONSERVER_InferenceResponseOutput(
   const ni::InferenceResponse::Output& output = outputs[index];
 
   *name = output.Name().c_str();
-  *datatype = DataTypeToTriton(output.DType());
+  *datatype = ni::DataTypeToTriton(output.DType());
 
   const std::vector<int64_t>& oshape = output.Shape();
   *shape = &oshape[0];
@@ -1919,8 +1919,8 @@ TRITONSERVER_ServerModelConfig(
       lserver->GetInferenceBackend(model_name, model_version, &backend));
 
   std::string model_config_json;
-  RETURN_IF_STATUS_ERROR(
-      ModelConfigToJson(backend->Config(), config_version, &model_config_json));
+  RETURN_IF_STATUS_ERROR(ni::ModelConfigToJson(
+      backend->Config(), config_version, &model_config_json));
 
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new ni::TritonServerMessage(std::move(model_config_json)));

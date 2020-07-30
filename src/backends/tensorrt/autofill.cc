@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -60,16 +60,16 @@ class AutoFillPlanImpl : public AutoFill {
     }
   }
 
-  Status Fix(ModelConfig* config) override;
+  Status Fix(inference::ModelConfig* config) override;
 
  private:
   template <class ModelIO>
   using IOList = ::google::protobuf::RepeatedPtrField<ModelIO>;
   using DimsList = ::google::protobuf::RepeatedField<int64_t>;
 
-  Status Init(ModelConfig* config);
+  Status Init(inference::ModelConfig* config);
 
-  Status FixBatchingSupport(ModelConfig* config);
+  Status FixBatchingSupport(inference::ModelConfig* config);
 
   void InitIOLists();
 
@@ -80,7 +80,7 @@ class AutoFillPlanImpl : public AutoFill {
   Status FixIO(const IOList<IO>& reference_list, IOList<IO>* mutable_list);
 
   const std::string plan_filename_;
-  ModelConfig config_;
+  inference::ModelConfig config_;
   nvinfer1::ICudaEngine* engine_;
   nvinfer1::IRuntime* runtime_;
   int max_batch_size_;
@@ -88,7 +88,7 @@ class AutoFillPlanImpl : public AutoFill {
 };
 
 Status
-AutoFillPlanImpl::Fix(ModelConfig* config)
+AutoFillPlanImpl::Fix(inference::ModelConfig* config)
 {
   config->set_platform(kTensorRTPlanPlatform);
 
@@ -119,7 +119,7 @@ AutoFillPlanImpl::Fix(ModelConfig* config)
 }
 
 Status
-AutoFillPlanImpl::Init(ModelConfig* config)
+AutoFillPlanImpl::Init(inference::ModelConfig* config)
 {
   bool first_dim_variable = true;
   int num_profiles = 0;
@@ -376,7 +376,7 @@ AutoFillPlanImpl::Init(ModelConfig* config)
 }
 
 Status
-AutoFillPlanImpl::FixBatchingSupport(ModelConfig* config)
+AutoFillPlanImpl::FixBatchingSupport(inference::ModelConfig* config)
 {
   if (config->max_batch_size() == 0) {
     config->set_max_batch_size(max_batch_size_);
@@ -401,7 +401,7 @@ AutoFillPlanImpl::InitIOLists()
     nvinfer1::Dims dims = engine_->getBindingDimensions(i);
     bool is_shape_binding = engine_->isShapeBinding(i);
     if (engine_->bindingIsInput(i)) {
-      ModelInput* config_input = config_.add_input();
+      inference::ModelInput* config_input = config_.add_input();
       std::string input_name{engine_->getBindingName(i)};
       config_input->set_name(input_name.substr(0, input_name.find(" ")));
       config_input->set_data_type(
@@ -409,7 +409,7 @@ AutoFillPlanImpl::InitIOLists()
       InitIODims(dims, is_shape_binding, config_input);
       config_input->set_is_shape_tensor(is_shape_binding);
     } else {
-      ModelOutput* config_output = config_.add_output();
+      inference::ModelOutput* config_output = config_.add_output();
       std::string output_name{engine_->getBindingName(i)};
       config_output->set_name(output_name.substr(0, output_name.find(" ")));
       config_output->set_data_type(
@@ -460,7 +460,7 @@ AutoFillPlanImpl::FixIO(
       for (const auto& io_ref : reference_list) {
         if (io.name() == io_ref.name()) {
           // only set type and shape if they are not set
-          if (io.data_type() == DataType::TYPE_INVALID) {
+          if (io.data_type() == inference::DataType::TYPE_INVALID) {
             io.set_data_type(io_ref.data_type());
           }
           if (io.dims_size() == 0) {

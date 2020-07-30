@@ -298,7 +298,7 @@ main(int argc, char** argv)
       batch_size = bs_itr->value.GetInt();
     }
   } else {
-    ni::ModelConfigResponse model_config;
+    inference::ModelConfigResponse model_config;
     err = triton_client.grpc_client_->ModelConfig(&model_config, model_name);
     if (!err.IsOk()) {
       std::cerr << "error: failed to get model config: " << err << std::endl;

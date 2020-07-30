@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -83,17 +83,17 @@ GraphDefBackend::CreateTRTISTFModel(
   // inputs are present in the model
   if (Config().has_sequence_batching()) {
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        inputs, false /* required */));
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
         false /* required */));
     RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
-        false /* required */));
-    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        inputs, false /* required */));
     RETURN_IF_ERROR(ValidateTypedSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, inputs,
-        false /* required */));
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+        inputs, false /* required */));
   }
 
   for (const auto& io : Config().input()) {
@@ -108,7 +108,7 @@ GraphDefBackend::CreateTRTISTFModel(
 
 Status
 GraphDefBackend::ValidateBooleanSequenceControl(
-    const ModelSequenceBatching::Control::Kind control_kind,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
     const TRTISTF_IOList* inputs, bool required)
 {
   std::string tensor_name;
@@ -130,7 +130,7 @@ GraphDefBackend::ValidateBooleanSequenceControl(
 
 Status
 GraphDefBackend::ValidateTypedSequenceControl(
-    const ModelSequenceBatching::Control::Kind control_kind,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
     const TRTISTF_IOList* inputs, bool required)
 {
   std::string tensor_name;

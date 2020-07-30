@@ -47,7 +47,7 @@ SetIOConfig(
   config_io->set_name(name);
 
   // only set type and shape if they are not set
-  if (config_io->data_type() == DataType::TYPE_INVALID) {
+  if (config_io->data_type() == inference::DataType::TYPE_INVALID) {
     config_io->set_data_type(ConvertFromOnnxDataType(info.type_));
   }
 
@@ -74,7 +74,7 @@ ValidateIOInfoType(
   // Validate all tensors are in supported data type
   for (const auto& io_info : infos) {
     if (ConvertFromOnnxDataType(io_info.second.type_) ==
-        DataType::TYPE_INVALID) {
+        inference::DataType::TYPE_INVALID) {
       return Status(
           Status::Code::INTERNAL, "unable to autofill for '" + model_name +
                                       "', unsupported data-type '" +
@@ -95,14 +95,14 @@ class AutoFillOnnxImpl : public AutoFill {
   {
   }
 
-  Status Fix(ModelConfig* config) override;
+  Status Fix(inference::ModelConfig* config) override;
 
   Status SetConfigFromOrtSession(OrtSession* session, OrtAllocator* allocator);
 
  private:
-  Status FixBatchingSupport(ModelConfig* config);
-  Status FixInputConfig(ModelConfig* config);
-  Status FixOutputConfig(ModelConfig* config);
+  Status FixBatchingSupport(inference::ModelConfig* config);
+  Status FixInputConfig(inference::ModelConfig* config);
+  Status FixOutputConfig(inference::ModelConfig* config);
 
   Status SetBatchingSupport();
 
@@ -113,7 +113,7 @@ class AutoFillOnnxImpl : public AutoFill {
 };
 
 Status
-AutoFillOnnxImpl::Fix(ModelConfig* config)
+AutoFillOnnxImpl::Fix(inference::ModelConfig* config)
 {
   config->set_platform(kOnnxRuntimeOnnxPlatform);
 
@@ -141,7 +141,7 @@ AutoFillOnnxImpl::Fix(ModelConfig* config)
 }
 
 Status
-AutoFillOnnxImpl::FixBatchingSupport(ModelConfig* config)
+AutoFillOnnxImpl::FixBatchingSupport(inference::ModelConfig* config)
 {
   if (!model_support_batching_ && (config->max_batch_size() > 0)) {
     return Status(
@@ -214,12 +214,12 @@ AutoFillOnnxImpl::FixBatchingSupport(ModelConfig* config)
 }
 
 Status
-AutoFillOnnxImpl::FixInputConfig(ModelConfig* config)
+AutoFillOnnxImpl::FixInputConfig(inference::ModelConfig* config)
 {
   if (config->input_size() == 0) {
     // fill all corresponding i/o tensors
     for (const auto& io_info : input_infos_) {
-      ModelInput* config_io = config->add_input();
+      inference::ModelInput* config_io = config->add_input();
       SetIOConfig(
           io_info.first, io_info.second, model_support_batching_, config_io);
     }
@@ -235,12 +235,12 @@ AutoFillOnnxImpl::FixInputConfig(ModelConfig* config)
 }
 
 Status
-AutoFillOnnxImpl::FixOutputConfig(ModelConfig* config)
+AutoFillOnnxImpl::FixOutputConfig(inference::ModelConfig* config)
 {
   if (config->output_size() == 0) {
     // fill all corresponding i/o tensors
     for (const auto& io_info : output_infos_) {
-      ModelOutput* config_io = config->add_output();
+      inference::ModelOutput* config_io = config->add_output();
       SetIOConfig(
           io_info.first, io_info.second, model_support_batching_, config_io);
     }

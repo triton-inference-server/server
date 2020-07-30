@@ -306,7 +306,7 @@ main(int argc, char** argv)
   std::cout << "cumulative_receive_time_ns "
             << infer_stat.cumulative_receive_time_ns << std::endl;
 
-  ni::ModelStatisticsResponse model_stat;
+  inference::ModelStatisticsResponse model_stat;
   client->ModelInferenceStatistics(&model_stat, model_name);
   std::cout << "======Model Statistics======" << std::endl;
   std::cout << model_stat.DebugString() << std::endl;
