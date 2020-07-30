@@ -20,7 +20,7 @@ def TimestampToYDMString(timestamp):
 
 
 # timestamp,onnx,libtorch,netdef,custom,savedmodel,graphdef
-def create_timestamp_dataframe(df, label, unique_backends):
+def create_timestamp_dataframe(df, metric, unique_backends):
     x = pandas.DataFrame(columns=['timestamp'] + unique_backends)
     d = dict()
     time_list = []
@@ -31,7 +31,7 @@ def create_timestamp_dataframe(df, label, unique_backends):
             x = x.append(d, ignore_index=True)
             d = dict()
             time_list = []
-        d[row['backend']] = row[label]
+        d[row['backend']] = row[metric]
         time_list.append(StringToDateTime(row['timestamp']).timestamp())
 
     return x
@@ -76,7 +76,7 @@ def create_moving_average_dataframe(df_days, unique_backends, ma_days=7):
 
 
 # Create current moving average
-def current_moving_average_dataframe(label,
+def current_moving_average_dataframe(metric,
                                      value_list,
                                      where_dict,
                                      last_date=None,
@@ -96,10 +96,10 @@ def current_moving_average_dataframe(label,
                             start_date=start_date,
                             end_date=end_date)
     qk.close()
-    df = pandas.DataFrame(rows, columns=[label, 'backend', 'timestamp'])
+    df = pandas.DataFrame(rows, columns=[metric, 'backend', 'timestamp'])
     df = df.sort_values('timestamp')
     unique_backends = list(set(df['backend']))
-    timestamp_df = create_timestamp_dataframe(df, label, unique_backends)
+    timestamp_df = create_timestamp_dataframe(df, metric, unique_backends)
     date_df = create_date_dataframe(timestamp_df, unique_backends)
 
     ma_df = pandas.DataFrame(columns=['days'] + unique_backends)
@@ -119,7 +119,7 @@ def current_moving_average_dataframe(label,
         plt.xticks([0, 1, 2, 3], ma_df.days)
         lgd = plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=4)
         plt.xlabel('Moving average days')
-        plt.ylabel('Inferences / Second')
+        plt.ylabel(metric.capitalize())
         plt.savefig(plot_file, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
     return ma_df
