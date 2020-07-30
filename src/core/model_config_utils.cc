@@ -614,6 +614,10 @@ GetNormalizedModelConfig(
     RETURN_IF_ERROR(ReadTextProto(config_path, config));
   }
 
+  // FIXME need to check other Triton components on how they retrieve model
+  // config. The new workflow will let model backend contains the most updated
+  // config after the model is loaded, in other word, should always retrieve
+  // config with backend.Config().
   // Autofill if requested...
   if (autofill) {
     const std::string model_name(BaseName(path));

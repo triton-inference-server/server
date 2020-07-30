@@ -60,6 +60,7 @@ class TritonModel : public InferenceBackend {
     return localized_model_dir_->Path();
   }
   InferenceServer* Server() { return server_; }
+  bool AutoCompleteConfig() const { return auto_complete_config_; }
   const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
@@ -73,12 +74,15 @@ class TritonModel : public InferenceBackend {
       InferenceServer* server,
       const std::shared_ptr<LocalizedDirectory>& localized_model_dir,
       const std::shared_ptr<TritonBackend>& backend,
-      const double min_compute_capability);
+      const double min_compute_capability, const bool auto_complete_config);
 
   // The server object that owns this model. The model holds this as a
   // raw pointer because the lifetime of the server is guaranteed to
   // be longer than the lifetime of a model owned by the server.
   InferenceServer* server_;
+
+  // Whether the model needs to complete the model config.
+  const bool auto_complete_config_;
 
   // The localized repo directory holding the model. If localization
   // required creation of a temporary local copy then that copy will
