@@ -81,18 +81,6 @@ ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 # Copy patches into container...
 COPY build/onnxruntime /tmp/trtis/build/onnxruntime
 
-# Patch for cudnn.
-RUN patch -i /tmp/trtis/build/onnxruntime/cudnn.patch \
-    /workspace/onnxruntime/onnxruntime/core/providers/cuda/rnn/cudnn_rnn_base.h
-
-# Patch to remove compute_30 support.
-RUN patch -i /tmp/trtis/build/onnxruntime/compute30.patch \
-    /workspace/onnxruntime/cmake/CMakeLists.txt
-
-# Patch build to use the CUDA Runtime version of CUB.
-RUN sed -i 's/${PROJECT_SOURCE_DIR}\/external\/cub//' \
-    /workspace/onnxruntime/cmake/onnxruntime_providers.cmake
-
 RUN sed -i "s/backend-test-tools.*//" ${SCRIPT_DIR}/install_onnx.sh
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
     ${SCRIPT_DIR}/install_ubuntu.sh -p 3.6 -o 18.04 && ${SCRIPT_DIR}/install_deps.sh -p 3.6
