@@ -903,7 +903,7 @@ ModelState::ValidateModelConfig()
   ni::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
   LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
+      TRITONSERVER_LOG_VERBOSE,
       (std::string("model configuration:\n") + buffer.Contents()).c_str());
 
   ni::TritonJson::Value ios;
@@ -972,18 +972,22 @@ class ModelInstanceState : public nib::ModelInstance {
 
  private:
   ModelInstanceState(
-      ModelState* model_state, const std::string& name, const int gpu_device,
-      const int max_batch_size, const bool enable_pinned_input,
-      const bool enable_pinned_output)
+      ModelState* model_state,
+      TRITONBACKEND_ModelInstance* triton_model_instance,
+      const std::string& name, const int gpu_device, const int max_batch_size,
+      const bool enable_pinned_input, const bool enable_pinned_output)
       : nib::ModelInstance(
             name, gpu_device, max_batch_size, enable_pinned_input,
             enable_pinned_output),
-        model_state_(model_state), trtistf_model_(nullptr, TRTISTF_ModelDelete),
+        model_state_(model_state),
+        triton_model_instance_(triton_model_instance),
+        trtistf_model_(nullptr, TRTISTF_ModelDelete),
         input_device_id_(MODEL_DEVICE)
   {
   }
 
   ModelState* model_state_;
+  TRITONBACKEND_ModelInstance* triton_model_instance_;
 
   // Map from configuration name for an input to tensor name for
   // that input in the model.
@@ -1035,7 +1039,7 @@ ModelInstanceState::Create(
   switch (kind) {
     case TRITONSERVER_INSTANCEGROUPKIND_CPU: {
       LOG_MESSAGE(
-          TRITONSERVER_LOG_INFO,
+          TRITONSERVER_LOG_VERBOSE,
           (std::string("Creating instance ") + instance_name +
            " on CPU using " + cc_model_filename)
               .c_str());
@@ -1044,7 +1048,7 @@ ModelInstanceState::Create(
     }
     case TRITONSERVER_INSTANCEGROUPKIND_MODEL: {
       LOG_MESSAGE(
-          TRITONSERVER_LOG_INFO,
+          TRITONSERVER_LOG_VERBOSE,
           (std::string("Creating instance ") + instance_name +
            " on devices using " + cc_model_filename)
               .c_str());
@@ -1073,7 +1077,7 @@ ModelInstanceState::Create(
 
       gpu_device = device_id;
       LOG_MESSAGE(
-          TRITONSERVER_LOG_INFO,
+          TRITONSERVER_LOG_VERBOSE,
           (std::string("Creating instance ") + instance_name + " on GPU " +
            std::to_string(gpu_device) + " (" + cc + ") using " +
            cc_model_filename)
@@ -1117,8 +1121,8 @@ ModelInstanceState::Create(
   }
 
   std::unique_ptr<ModelInstanceState> lstate(new ModelInstanceState(
-      model_state, instance_name, gpu_device, mbs, pinned_input,
-      pinned_output));
+      model_state, triton_model_instance, instance_name, gpu_device, mbs,
+      pinned_input, pinned_output));
   auto instance = lstate.get();
 
   RETURN_IF_ERROR(instance->CreateCudaStream());
@@ -1772,9 +1776,9 @@ ModelInstanceState::ProcessRequests(
     // compute also so that the entire execution time is associated
     // with the inference computation.
     LOG_IF_ERROR(
-        TRITONBACKEND_ModelReportStatistics(
-            model_state_->TritonModel(), request,
-            (responses[r] != nullptr) /* success */, gpu_device_, exec_start_ns,
+        TRITONBACKEND_ModelInstanceReportStatistics(
+            triton_model_instance_, request,
+            (responses[r] != nullptr) /* success */, exec_start_ns,
             compute_start_ns, compute_end_ns, exec_end_ns),
         "failed reporting request statistics");
 
@@ -1786,8 +1790,8 @@ ModelInstanceState::ProcessRequests(
   // Report the entire batch statistics. This backend does not support
   // batching so the total batch size is always 1.
   LOG_IF_ERROR(
-      TRITONBACKEND_ModelReportBatchStatistics(
-          model_state_->TritonModel(), total_batch_size, exec_start_ns,
+      TRITONBACKEND_ModelInstanceReportBatchStatistics(
+          triton_model_instance_, total_batch_size, exec_start_ns,
           compute_start_ns, compute_end_ns, exec_end_ns),
       "failed reporting batch request statistics");
 
@@ -1979,7 +1983,7 @@ TRITONBACKEND_ModelInstanceExecute(
   // another call to TRITONBACKEND_ModelInstanceExecute.
 
   LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
+      TRITONSERVER_LOG_VERBOSE,
       (std::string("model ") + model_state->Name() + ", instance " +
        instance_state->Name() + ", executing " + std::to_string(request_count) +
        " requests")

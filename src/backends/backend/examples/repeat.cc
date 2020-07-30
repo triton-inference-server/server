@@ -754,7 +754,6 @@ TRITONBACKEND_ModelInstanceExecute(
   ModelInstanceState* instance_state;
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(
       instance, reinterpret_cast<void**>(&instance_state)));
-  ModelState* model_state = instance_state->StateForModel();
 
   // This backend specifies BLOCKING execution policy. That means that
   // we should not return from this function until this instance has
@@ -811,10 +810,9 @@ TRITONBACKEND_ModelInstanceExecute(
     // compute also so that the entire execution time is associated
     // with the inference computation.
     LOG_IF_ERROR(
-        TRITONBACKEND_ModelReportStatistics(
-            model_state->TritonModel(), request, true /* success */,
-            TRITONBACKEND_NO_DEVICE, exec_start_ns, exec_start_ns, exec_end_ns,
-            exec_end_ns),
+        TRITONBACKEND_ModelInstanceReportStatistics(
+            instance_state->TritonModelInstance(), request, true /* success */,
+            exec_start_ns, exec_start_ns, exec_end_ns, exec_end_ns),
         "failed reporting request statistics");
 
     LOG_IF_ERROR(
@@ -825,9 +823,9 @@ TRITONBACKEND_ModelInstanceExecute(
   // Report the entire batch statistics. This backend does not support
   // batching so the total batch size is always 1.
   LOG_IF_ERROR(
-      TRITONBACKEND_ModelReportBatchStatistics(
-          model_state->TritonModel(), 1 /*total_batch_size*/, exec_start_ns,
-          exec_start_ns, exec_end_ns, exec_end_ns),
+      TRITONBACKEND_ModelInstanceReportBatchStatistics(
+          instance_state->TritonModelInstance(), 1 /*total_batch_size*/,
+          exec_start_ns, exec_start_ns, exec_end_ns, exec_end_ns),
       "failed reporting batch request statistics");
 
   return nullptr;  // success
