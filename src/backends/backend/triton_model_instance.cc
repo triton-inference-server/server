@@ -28,6 +28,7 @@
 
 #include "src/backends/backend/triton_model.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -38,6 +39,16 @@ TritonModelInstance::TritonModelInstance(
     : model_(model), name_(name), index_(index), kind_(kind),
       device_id_(device_id), state_(nullptr)
 {
+#ifdef TRITON_ENABLE_METRICS
+  if (Metrics::Enabled()) {
+    // Use an ID in the metric only for GPU instances. Otherwise use
+    // -1 to indicate no device should be reported in the metric.
+    const int id =
+        (kind_ == TRITONSERVER_INSTANCEGROUPKIND_GPU) ? device_id_ : -1;
+    reporter_.reset(new MetricModelReporter(
+        model_->Name(), model_->Version(), id, model_->Config().metric_tags()));
+  }
+#endif  // TRITON_ENABLE_METRICS
 }
 
 TritonModelInstance::~TritonModelInstance()
@@ -155,6 +166,40 @@ TRITONBACKEND_ModelInstanceSetState(
 {
   TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
   ti->SetState(state);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceReportStatistics(
+    TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request* request,
+    const bool success, const uint64_t exec_start_ns,
+    const uint64_t compute_start_ns, const uint64_t compute_end_ns,
+    const uint64_t exec_end_ns)
+{
+#ifdef TRITON_ENABLE_STATS
+  TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  tr->ReportStatistics(
+      ti->MetricReporter(), success, exec_start_ns, compute_start_ns,
+      compute_end_ns, exec_end_ns);
+#endif  // TRITON_ENABLE_STATS
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceReportBatchStatistics(
+    TRITONBACKEND_ModelInstance* instance, const uint64_t batch_size,
+    const uint64_t exec_start_ns, const uint64_t compute_start_ns,
+    const uint64_t compute_end_ns, const uint64_t exec_end_ns)
+{
+#ifdef TRITON_ENABLE_STATS
+  TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
+  ti->Model()->MutableStatsAggregator()->UpdateInferBatchStats(
+      ti->MetricReporter(), batch_size, exec_start_ns, compute_start_ns,
+      compute_end_ns, exec_end_ns);
+#endif  // TRITON_ENABLE_STATS
+
   return nullptr;  // success
 }
 

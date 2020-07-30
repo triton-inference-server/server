@@ -31,8 +31,6 @@
 #include "src/backends/backend/tritonbackend.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
-#include "src/core/metric_model_reporter.h"
-#include "src/core/metrics.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_message.h"
 #include "src/core/tritonserver.h"
@@ -315,31 +313,6 @@ TritonModel::~TritonModel()
   }
 }
 
-Status
-TritonModel::MetricReporter(
-    const int device, MetricModelReporter** metric_reporter)
-{
-  *metric_reporter = nullptr;
-
-#ifdef TRITON_ENABLE_METRICS
-  if (Metrics::Enabled()) {
-    std::lock_guard<std::mutex> lk(reporter_mtx_);
-    // Metric reporters vary based on 'device'...
-    const auto& itr = reporters_.find(device);
-    if (itr != reporters_.end()) {
-      *metric_reporter = itr->second.get();
-    } else {
-      auto r = std::unique_ptr<MetricModelReporter>(new MetricModelReporter(
-          Name(), Version(), device, Config().metric_tags()));
-      *metric_reporter = r.get();
-      reporters_[device] = std::move(r);
-    }
-  }
-#endif  // TRITON_ENABLE_METRICS
-
-  return Status::Success;
-}
-
 extern "C" {
 
 //
@@ -424,56 +397,6 @@ TRITONBACKEND_ModelSetState(TRITONBACKEND_Model* model, void* state)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
   tm->SetState(state);
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-TRITONBACKEND_ModelReportStatistics(
-    TRITONBACKEND_Model* model, TRITONBACKEND_Request* request,
-    const bool success, const int device, const uint64_t exec_start_ns,
-    const uint64_t compute_start_ns, const uint64_t compute_end_ns,
-    const uint64_t exec_end_ns)
-{
-#ifdef TRITON_ENABLE_STATS
-  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
-  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
-
-  // If we fail to get the metric reporter then log and error but
-  // continue and update the statistics.
-  MetricModelReporter* metric_reporter;
-  LOG_STATUS_ERROR(
-      tm->MetricReporter(device, &metric_reporter),
-      "failed getting metric reporter");
-
-  tr->ReportStatistics(
-      metric_reporter, success, exec_start_ns, compute_start_ns, compute_end_ns,
-      exec_end_ns);
-#endif  // TRITON_ENABLE_STATS
-
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-TRITONBACKEND_ModelReportBatchStatistics(
-    TRITONBACKEND_Model* model, const uint64_t batch_size,
-    const uint64_t exec_start_ns, const uint64_t compute_start_ns,
-    const uint64_t compute_end_ns, const uint64_t exec_end_ns)
-{
-#ifdef TRITON_ENABLE_STATS
-  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
-
-  // If we fail to get the metric reporter then log and error but
-  // continue and update the statistics.
-  MetricModelReporter* metric_reporter;
-  LOG_STATUS_ERROR(
-      tm->MetricReporter(TRITONBACKEND_NO_DEVICE, &metric_reporter),
-      "failed getting metric reporter");
-
-  tm->MutableStatsAggregator()->UpdateInferBatchStats(
-      metric_reporter, batch_size, exec_start_ns, compute_start_ns,
-      compute_end_ns, exec_end_ns);
-#endif  // TRITON_ENABLE_STATS
-
   return nullptr;  // success
 }
 

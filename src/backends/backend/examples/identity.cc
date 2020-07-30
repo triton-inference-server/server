@@ -856,11 +856,8 @@ TRITONBACKEND_ModelInstanceExecute(
     // using the CPU we don't associate any device with the
     // statistics, otherwise we associate the instance's device.
     LOG_IF_ERROR(
-        TRITONBACKEND_ModelReportStatistics(
-            model_state->TritonModel(), request, true /* success */,
-            (instance_state->Kind() == TRITONSERVER_INSTANCEGROUPKIND_CPU)
-                ? TRITONBACKEND_NO_DEVICE
-                : instance_state->DeviceId(),
+        TRITONBACKEND_ModelInstanceReportStatistics(
+            instance_state->TritonModelInstance(), request, true /* success */,
             exec_start_ns, exec_start_ns, exec_end_ns, exec_end_ns),
         "failed reporting request statistics");
   }
@@ -875,9 +872,10 @@ TRITONBACKEND_ModelInstanceExecute(
   // failure below). Here we report statistics for the entire batch of
   // requests.
   LOG_IF_ERROR(
-      TRITONBACKEND_ModelReportBatchStatistics(
-          model_state->TritonModel(), total_batch_size, min_exec_start_ns,
-          min_exec_start_ns, max_exec_end_ns, max_exec_end_ns),
+      TRITONBACKEND_ModelInstanceReportBatchStatistics(
+          instance_state->TritonModelInstance(), total_batch_size,
+          min_exec_start_ns, min_exec_start_ns, max_exec_end_ns,
+          max_exec_end_ns),
       "failed reporting batch request statistics");
 
   // We could have released each request as soon as we sent the
@@ -893,9 +891,9 @@ TRITONBACKEND_ModelInstanceExecute(
     // case.
     if (responses[r] == nullptr) {
       LOG_IF_ERROR(
-          TRITONBACKEND_ModelReportStatistics(
-              model_state->TritonModel(), request, false /* success */,
-              TRITONBACKEND_NO_DEVICE, 0, 0, 0, 0),
+          TRITONBACKEND_ModelInstanceReportStatistics(
+              instance_state->TritonModelInstance(), request,
+              false /* success */, 0, 0, 0, 0),
           "failed reporting request statistics");
     }
 
