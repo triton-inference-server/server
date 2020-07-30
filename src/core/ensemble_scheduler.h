@@ -82,7 +82,7 @@ class EnsembleScheduler : public Scheduler {
   // to dispatch requests to models in ensemble internally.
   static Status Create(
       InferenceStatsAggregator* const stats_aggregator,
-      InferenceServer* const server, const ModelConfig& config,
+      InferenceServer* const server, const inference::ModelConfig& config,
       std::unique_ptr<Scheduler>* scheduler);
 
   ~EnsembleScheduler();
@@ -93,7 +93,7 @@ class EnsembleScheduler : public Scheduler {
  private:
   EnsembleScheduler(
       InferenceStatsAggregator* const stats_aggregator,
-      InferenceServer* const server, const ModelConfig& config);
+      InferenceServer* const server, const inference::ModelConfig& config);
 
   std::unique_ptr<MetricModelReporter> metric_reporter_;
   InferenceStatsAggregator* const stats_aggregator_;

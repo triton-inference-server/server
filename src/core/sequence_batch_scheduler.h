@@ -56,7 +56,7 @@ class SequenceBatchScheduler : public Scheduler {
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
   static Status Create(
-      const ModelConfig& config, const uint32_t runner_cnt,
+      const inference::ModelConfig& config, const uint32_t runner_cnt,
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
@@ -90,7 +90,7 @@ class SequenceBatchScheduler : public Scheduler {
   void ReaperThread(const int nice);
 
   Status CreateBooleanControlTensors(
-      const ModelConfig& config,
+      const inference::ModelConfig& config,
       std::shared_ptr<ControlInputs>* start_input_overrides,
       std::shared_ptr<ControlInputs>* end_input_overrides,
       std::shared_ptr<ControlInputs>* startend_input_overrides,
@@ -182,7 +182,7 @@ class SequenceBatch {
       std::unique_ptr<InferenceRequest>& request) = 0;
 
  protected:
-  bool CreateCorrelationIDControl(const ModelConfig& config);
+  bool CreateCorrelationIDControl(const inference::ModelConfig& config);
   void SetControlTensors(
       std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
       const uint64_t corr_id, const bool not_ready = false);
@@ -230,7 +230,7 @@ class DirectSequenceBatch : public SequenceBatch {
  public:
   DirectSequenceBatch(
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
-      const size_t seq_slot_cnt, const ModelConfig& config,
+      const size_t seq_slot_cnt, const inference::ModelConfig& config,
       const Scheduler::StandardInitFunc& OnInit,
       const Scheduler::StandardWarmupFunc& OnWarmup,
       const Scheduler::StandardRunFunc& OnSchedule,
@@ -296,7 +296,7 @@ class OldestSequenceBatch : public SequenceBatch {
  public:
   OldestSequenceBatch(
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
-      const size_t seq_slot_cnt, const ModelConfig& config,
+      const size_t seq_slot_cnt, const inference::ModelConfig& config,
       const Scheduler::StandardInitFunc& OnInit,
       const Scheduler::StandardWarmupFunc& OnWarmup,
       const Scheduler::StandardRunFunc& OnSchedule,

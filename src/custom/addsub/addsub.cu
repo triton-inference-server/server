@@ -57,7 +57,7 @@ namespace addsub {
 class Context : public CustomInstance {
  public:
   Context(
-      const std::string& instance_name, const ModelConfig& config,
+      const std::string& instance_name, const inference::ModelConfig& config,
       const int gpu_device);
   ~Context();
 
@@ -92,7 +92,7 @@ class Context : public CustomInstance {
 
   // The data-type of the input and output tensors. Must be either
   // INT32 or FP32.
-  DataType datatype_ = DataType::TYPE_INVALID;
+  inference::DataType datatype_ = inference::DataType::TYPE_INVALID;
 
 #ifdef TRITON_ENABLE_GPU
   // CUDA memory buffers for input and output tensors.
@@ -128,8 +128,8 @@ class Context : public CustomInstance {
 };
 
 Context::Context(
-    const std::string& instance_name, const ModelConfig& model_config,
-    const int gpu_device)
+    const std::string& instance_name,
+    const inference::ModelConfig& model_config, const int gpu_device)
     : CustomInstance(instance_name, model_config, gpu_device)
 #ifdef TRITON_ENABLE_GPU
       ,
@@ -236,8 +236,8 @@ Context::Init()
   }
 
   datatype_ = model_config_.input(0).data_type();
-  if (((datatype_ != DataType::TYPE_INT32) &&
-       (datatype_ != DataType::TYPE_FP32)) ||
+  if (((datatype_ != inference::DataType::TYPE_INT32) &&
+       (datatype_ != inference::DataType::TYPE_FP32)) ||
       (model_config_.input(1).data_type() != datatype_)) {
     return kInputOutputDataType;
   }
@@ -475,7 +475,7 @@ Context::ExecuteCPU(
       }
 
       if (!strncmp(output_name, "OUTPUT0", strlen("OUTPUT0"))) {
-        if (datatype_ == DataType::TYPE_INT32) {
+        if (datatype_ == inference::DataType::TYPE_INT32) {
           AddForType<int32_t>(
               batchn_element_count, &input0[0], &input1[0],
               reinterpret_cast<uint8_t*>(obuffer));
@@ -485,7 +485,7 @@ Context::ExecuteCPU(
               reinterpret_cast<uint8_t*>(obuffer));
         }
       } else {
-        if (datatype_ == DataType::TYPE_INT32) {
+        if (datatype_ == inference::DataType::TYPE_INT32) {
           SubForType<int32_t>(
               batchn_element_count, &input0[0], &input1[0],
               reinterpret_cast<uint8_t*>(obuffer));
@@ -664,7 +664,7 @@ Context::ExecuteGPU(
       int block_size = std::min(batchn_element_count, (uint64_t)1024);
       int grid_size = (batchn_element_count + block_size - 1) / block_size;
       if (!strncmp(output_name, "OUTPUT0", strlen("OUTPUT0"))) {
-        if (datatype_ == DataType::TYPE_INT32) {
+        if (datatype_ == inference::DataType::TYPE_INT32) {
           VecAddInt32<<<grid_size, block_size, 0, stream_>>>(
               reinterpret_cast<int32_t*>(cuda_input0_),
               reinterpret_cast<int32_t*>(cuda_input1_),
@@ -676,7 +676,7 @@ Context::ExecuteGPU(
               reinterpret_cast<float*>(cuda_output_), batchn_element_count);
         }
       } else {
-        if (datatype_ == DataType::TYPE_INT32) {
+        if (datatype_ == inference::DataType::TYPE_INT32) {
           VecSubInt32<<<grid_size, block_size, 0, stream_>>>(
               reinterpret_cast<int32_t*>(cuda_input0_),
               reinterpret_cast<int32_t*>(cuda_input1_),
@@ -743,7 +743,7 @@ Context::Execute(
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,
-    const ModelConfig& model_config, int gpu_device,
+    const inference::ModelConfig& model_config, int gpu_device,
     const CustomInitializeData* data)
 {
   addsub::Context* context =

@@ -59,11 +59,11 @@ class InferenceRequest {
    public:
     Input();
     Input(
-        const std::string& name, const DataType datatype,
+        const std::string& name, const inference::DataType datatype,
         const std::vector<int64_t>& shape);
     Input(
-        const std::string& name, const DataType datatype, const int64_t* shape,
-        const uint64_t dim_count);
+        const std::string& name, const inference::DataType datatype,
+        const int64_t* shape, const uint64_t dim_count);
 
     // The name of the input tensor. There is no mutable operator for
     // the name because it is used in a InferenceRequest map and a
@@ -71,7 +71,7 @@ class InferenceRequest {
     const std::string& Name() const { return name_; }
 
     // Data type of the input tensor.
-    DataType DType() const { return datatype_; }
+    inference::DataType DType() const { return datatype_; }
 
     // The original shape of the input tensor.
     const std::vector<int64_t>& OriginalShape() const
@@ -143,7 +143,7 @@ class InferenceRequest {
         std::ostream& out, const InferenceRequest::Input& input);
 
     std::string name_;
-    DataType datatype_;
+    inference::DataType datatype_;
     std::vector<int64_t> original_shape_;
     std::vector<int64_t> shape_;
     std::vector<int64_t> shape_with_batch_dim_;
@@ -292,10 +292,10 @@ class InferenceRequest {
   // Add an original input to the request. If 'input' is non-null
   // return a pointer to the newly added input.
   Status AddOriginalInput(
-      const std::string& name, const DataType datatype, const int64_t* shape,
-      const uint64_t dim_count, Input** input = nullptr);
+      const std::string& name, const inference::DataType datatype,
+      const int64_t* shape, const uint64_t dim_count, Input** input = nullptr);
   Status AddOriginalInput(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape, Input** input = nullptr);
 
   // Remove a single original input or all inputs.
@@ -309,7 +309,7 @@ class InferenceRequest {
   // backends that implemented w/o backend API (which need correct
   // input.Shape()), but backend API uses input.ShapeWithBatchDim().
   Status AddOverrideInput(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       const int64_t batch_size, const std::vector<int64_t>& shape,
       std::shared_ptr<Input>* input = nullptr);
 

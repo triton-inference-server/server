@@ -58,7 +58,7 @@ class CustomInstance {
   /// \return Error code indicating success or the type of failure
   static int Create(
       CustomInstance** instance, const std::string& name,
-      const ModelConfig& model_config, int gpu_device,
+      const inference::ModelConfig& model_config, int gpu_device,
       const CustomInitializeData* data);
 
   virtual ~CustomInstance() = default;
@@ -114,8 +114,8 @@ class CustomInstance {
   /// \param gpu_device The GPU device ID
   /// \return Error code indicating success or the type of failure
   CustomInstance(
-      const std::string& instance_name, const ModelConfig& model_config,
-      int gpu_device);
+      const std::string& instance_name,
+      const inference::ModelConfig& model_config, int gpu_device);
 
   /// Register a custom error and error message.
   ///
@@ -130,7 +130,7 @@ class CustomInstance {
   const std::string instance_name_;
 
   /// The model configuration
-  const ModelConfig model_config_;
+  const inference::ModelConfig model_config_;
 
   /// The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
   /// execute on CPU.

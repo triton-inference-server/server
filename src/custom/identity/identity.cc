@@ -53,7 +53,7 @@ namespace identity {
 class Context : public CustomInstance {
  public:
   Context(
-      const std::string& instance_name, const ModelConfig& config,
+      const std::string& instance_name, const inference::ModelConfig& config,
       const int gpu_device);
   ~Context() = default;
 
@@ -79,7 +79,7 @@ class Context : public CustomInstance {
 
   struct CopyInfo {
     std::string input_name_;
-    DataType datatype_;
+    inference::DataType datatype_;
   };
 
 #ifdef TRITON_ENABLE_GPU
@@ -108,8 +108,8 @@ class Context : public CustomInstance {
 };
 
 Context::Context(
-    const std::string& instance_name, const ModelConfig& model_config,
-    const int gpu_device)
+    const std::string& instance_name,
+    const inference::ModelConfig& model_config, const int gpu_device)
     : CustomInstance(instance_name, model_config, gpu_device),
       execute_delay_ms_(0)
 {
@@ -235,7 +235,7 @@ Context::Execute(
       }
 
       const std::string& input_name = itr->second.input_name_;
-      const DataType datatype = itr->second.datatype_;
+      const inference::DataType datatype = itr->second.datatype_;
 
       std::vector<int64_t> shape;
       if (model_config_.max_batch_size() != 0) {
@@ -390,7 +390,7 @@ Context::Execute(
       }
 
       const std::string& input_name = itr->second.input_name_;
-      const DataType datatype = itr->second.datatype_;
+      const inference::DataType datatype = itr->second.datatype_;
 
       std::vector<int64_t> shape;
       if (model_config_.max_batch_size() != 0) {
@@ -461,7 +461,7 @@ Context::Execute(
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,
-    const ModelConfig& model_config, int gpu_device,
+    const inference::ModelConfig& model_config, int gpu_device,
     const CustomInitializeData* data)
 {
   identity::Context* ctx =

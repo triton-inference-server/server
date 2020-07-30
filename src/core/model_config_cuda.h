@@ -31,9 +31,10 @@
 namespace nvidia { namespace inferenceserver {
 
 /// Get the CUDA stream priority for a given ModelPriority
-/// \param priority The ModelOptimizationPolicy::ModelPriority priority.
-/// \param cuda_stream_priority Returns the CUDA stream priority.
+/// \param priority The inference::ModelOptimizationPolicy::ModelPriority
+/// priority. \param cuda_stream_priority Returns the CUDA stream priority.
 /// \return The error status.
-int GetCudaStreamPriority(ModelOptimizationPolicy::ModelPriority priority);
+int GetCudaStreamPriority(
+    inference::ModelOptimizationPolicy::ModelPriority priority);
 
 }}  // namespace nvidia::inferenceserver

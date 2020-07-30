@@ -53,16 +53,16 @@ TritonModelInstance::~TritonModelInstance()
 
 Status
 TritonModelInstance::CreateInstances(
-    TritonModel* model, const ModelConfig& model_config,
+    TritonModel* model, const inference::ModelConfig& model_config,
     std::vector<std::unique_ptr<TritonModelInstance>>* instances)
 {
   for (const auto& group : model_config.instance_group()) {
     for (int32_t c = 0; c < group.count(); ++c) {
-      if (group.kind() == ModelInstanceGroup::KIND_CPU) {
+      if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         RETURN_IF_ERROR(CreateInstance(
             model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
             0 /* device_id */, instances));
-      } else if (group.kind() == ModelInstanceGroup::KIND_GPU) {
+      } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           RETURN_IF_ERROR(CreateInstance(
               model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_GPU,

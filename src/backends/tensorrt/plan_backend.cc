@@ -229,7 +229,7 @@ PlanBackend::CreateExecutionContexts(
   // access to the same GPU.
   for (const auto& group : Config().instance_group()) {
     // TensorRT requires that every context have a GPU.
-    if ((group.kind() != ModelInstanceGroup::KIND_GPU) ||
+    if ((group.kind() != inference::ModelInstanceGroup::KIND_GPU) ||
         (group.gpus().size() == 0)) {
       return Status(
           Status::Code::INVALID_ARG,
@@ -655,14 +655,14 @@ PlanBackend::CreateExecutionContext(
 
 Status
 PlanBackend::Context::ValidateInputs(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+    const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios,
     const std::set<std::string>& allowed_shape_tensors)
 {
   for (const auto& io : ios) {
     if (!ConvertDataTypeToTrtType(io.data_type()).first) {
       return Status(
           Status::Code::INTERNAL,
-          "unsupported datatype " + DataType_Name(io.data_type()) +
+          "unsupported datatype " + inference::DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
     }
 
@@ -692,14 +692,14 @@ PlanBackend::Context::ValidateInputs(
 
 Status
 PlanBackend::Context::ValidateOutputs(
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios,
+    const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios,
     const std::set<std::string>& allowed_shape_tensors)
 {
   for (const auto& io : ios) {
     if (!ConvertDataTypeToTrtType(io.data_type()).first) {
       return Status(
           Status::Code::INTERNAL,
-          "unsupported datatype " + DataType_Name(io.data_type()) +
+          "unsupported datatype " + inference::DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
     }
 
@@ -728,7 +728,7 @@ PlanBackend::Context::ValidateOutputs(
 
 Status
 PlanBackend::Context::InitializeShapeInputBinding(
-    const std::string& input_name, const DataType input_datatype,
+    const std::string& input_name, const inference::DataType input_datatype,
     const DimsList& model_config_dims)
 {
   // the maximum byte sizes across all profiles
@@ -766,22 +766,24 @@ PlanBackend::Context::InitializeShapeInputBinding(
     // The presence of shape binding indicates the dynamic model plan
     is_dynamic_ = true;
 
-    if (input_datatype != TYPE_INT32) {
+    if (input_datatype != inference::DataType::TYPE_INT32) {
       return Status(
           Status::Code::INVALID_ARG,
-          "unexpected datatype " + DataType_Name(input_datatype) +
+          "unexpected datatype " + inference::DataType_Name(input_datatype) +
               "  in model configuration for shape input '" + input_name +
-              "', expecting " + DataType_Name(TYPE_INT32) + " for " + name_);
+              "', expecting " +
+              inference::DataType_Name(inference::DataType::TYPE_INT32) +
+              " for " + name_);
     }
 
-    DataType dt =
+    inference::DataType dt =
         ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
     if (dt != input_datatype) {
       return Status(
           Status::Code::INVALID_ARG,
-          "unexpected datatype " + DataType_Name(dt) +
+          "unexpected datatype " + inference::DataType_Name(dt) +
               " in engine for shape input '" + input_name + "', expecting " +
-              DataType_Name(input_datatype) + " for " + name_);
+              inference::DataType_Name(input_datatype) + " for " + name_);
     }
 
     MemoryFormat fmt =
@@ -871,7 +873,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
 
 Status
 PlanBackend::Context::InitializeExecuteInputBinding(
-    const std::string& input_name, const DataType input_datatype,
+    const std::string& input_name, const inference::DataType input_datatype,
     const DimsList& model_config_dims, const bool is_control)
 {
   // the maximum byte sizes across all profiles
@@ -906,14 +908,14 @@ PlanBackend::Context::InitializeExecuteInputBinding(
               "' is expected to be an output in model for " + name_);
     }
 
-    DataType dt =
+    inference::DataType dt =
         ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
     if (dt != input_datatype) {
       return Status(
           Status::Code::INVALID_ARG,
-          "unexpected datatype " + DataType_Name(dt) + " for input '" +
-              input_name + "', expecting " + DataType_Name(input_datatype) +
-              " for " + name_);
+          "unexpected datatype " + inference::DataType_Name(dt) +
+              " for input '" + input_name + "', expecting " +
+              inference::DataType_Name(input_datatype) + " for " + name_);
     }
 
     MemoryFormat fmt =
@@ -1035,20 +1037,20 @@ PlanBackend::Context::InitializeExecuteInputBinding(
 
 Status
 PlanBackend::Context::InitializeSequenceControlInputBindings(
-    const ModelConfig& config)
+    const inference::ModelConfig& config)
 {
   if (config.has_sequence_batching()) {
-    std::vector<ModelSequenceBatching::Control::Kind> boolean_kinds{
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY};
+    std::vector<inference::ModelSequenceBatching::Control::Kind> boolean_kinds{
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY};
 
-    for (const ModelSequenceBatching::Control::Kind control_kind :
+    for (const inference::ModelSequenceBatching::Control::Kind control_kind :
          boolean_kinds) {
       const bool required = false;
 
       std::string tensor_name;
-      DataType tensor_datatype;
+      inference::DataType tensor_datatype;
       RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
           config.sequence_batching(), config.name(), control_kind, required,
           &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
@@ -1062,15 +1064,15 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
       }
     }
 
-    std::vector<ModelSequenceBatching::Control::Kind> typdef_kinds{
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID};
+    std::vector<inference::ModelSequenceBatching::Control::Kind> typdef_kinds{
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID};
 
-    for (const ModelSequenceBatching::Control::Kind control_kind :
+    for (const inference::ModelSequenceBatching::Control::Kind control_kind :
          typdef_kinds) {
       const bool required = false;
 
       std::string tensor_name;
-      DataType tensor_datatype;
+      inference::DataType tensor_datatype;
       RETURN_IF_ERROR(GetTypedSequenceControlProperties(
           config.sequence_batching(), config.name(), control_kind, required,
           &tensor_name, &tensor_datatype));
@@ -1090,7 +1092,7 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
 
 Status
 PlanBackend::Context::InitializeConfigShapeInputBindings(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios)
 {
   for (const auto& io : ios) {
     const DimsList& model_config_dims =
@@ -1104,7 +1106,7 @@ PlanBackend::Context::InitializeConfigShapeInputBindings(
 
 Status
 PlanBackend::Context::InitializeConfigExecuteInputBindings(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios)
 {
   for (const auto& io : ios) {
     const DimsList& model_config_dims =
@@ -1118,7 +1120,7 @@ PlanBackend::Context::InitializeConfigExecuteInputBindings(
 
 Status
 PlanBackend::Context::InitializeConfigShapeOutputBindings(
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios)
 {
   for (const auto& io : ios) {
     // the maximum byte sizes across all profiles
@@ -1155,22 +1157,24 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
                 "' is expected to be an input in model for " + name_);
       }
 
-      if (io.data_type() != TYPE_INT32) {
+      if (io.data_type() != inference::DataType::TYPE_INT32) {
         return Status(
             Status::Code::INVALID_ARG,
-            "unexpected datatype " + DataType_Name(io.data_type()) +
+            "unexpected datatype " + inference::DataType_Name(io.data_type()) +
                 "  in model configuration for shape output '" + io.name() +
-                "', expecting " + DataType_Name(TYPE_INT32) + " for " + name_);
+                "', expecting " +
+                inference::DataType_Name(inference::DataType::TYPE_INT32) +
+                " for " + name_);
       }
 
-      DataType dt =
+      inference::DataType dt =
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
       if (dt != io.data_type()) {
         return Status(
             Status::Code::INVALID_ARG,
-            "unexpected datatype " + DataType_Name(dt) +
+            "unexpected datatype " + inference::DataType_Name(dt) +
                 " for inference output '" + io.name() + "', expecting " +
-                DataType_Name(io.data_type()) + " for " + name_);
+                inference::DataType_Name(io.data_type()) + " for " + name_);
       }
 
       MemoryFormat fmt =
@@ -1233,7 +1237,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
 
 Status
 PlanBackend::Context::InitializeConfigExecuteOutputBindings(
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios)
 {
   for (const auto& io : ios) {
     // the maximum byte sizes across all profiles
@@ -1267,14 +1271,14 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
                 "' is expected to be an input in model for " + name_);
       }
 
-      DataType dt =
+      inference::DataType dt =
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
       if (dt != io.data_type()) {
         return Status(
             Status::Code::INVALID_ARG,
-            "unexpected datatype " + DataType_Name(dt) +
+            "unexpected datatype " + inference::DataType_Name(dt) +
                 " for inference output '" + io.name() + "', expecting " +
-                DataType_Name(io.data_type()) + " for " + name_);
+                inference::DataType_Name(io.data_type()) + " for " + name_);
       }
 
       MemoryFormat fmt =
@@ -1809,7 +1813,7 @@ PlanBackend::Context::Run(
     }
     batchn_shape.insert(
         batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
-    const DataType datatype = repr_input->DType();
+    const inference::DataType datatype = repr_input->DType();
 
     const size_t total_byte_size = GetByteSize(datatype, batchn_shape);
 
@@ -2039,7 +2043,7 @@ PlanBackend::Context::Run(
 
           const size_t tensor_element_cnt = GetElementCount(batchn_shape);
 
-          DataType dt = ConvertTrtTypeToDataType(
+          inference::DataType dt = ConvertTrtTypeToDataType(
               engine_->getBindingDataType(binding_offset + bindex));
 
           // Only need an response tensor for requested outputs.
@@ -2067,7 +2071,7 @@ PlanBackend::Context::Run(
         batchn_shape.push_back(dims.d[i]);
       }
 
-      DataType dt = ConvertTrtTypeToDataType(
+      inference::DataType dt = ConvertTrtTypeToDataType(
           engine_->getBindingDataType(binding_offset + bindex));
 
       size_t batch1_byte_size = GetByteSize(dt, batchn_shape);
@@ -2273,7 +2277,7 @@ PlanBackend::Context::GetRequestShapeValues(
       // Shape tensors datatype is INT32.
       const int64_t element_cnt = GetElementCount(batch1_shape);
       const size_t expected_byte_size =
-          element_cnt * GetDataTypeByteSize(DataType::TYPE_INT32);
+          element_cnt * GetDataTypeByteSize(inference::DataType::TYPE_INT32);
 
       if (expected_byte_size != data_byte_size) {
         return Status(

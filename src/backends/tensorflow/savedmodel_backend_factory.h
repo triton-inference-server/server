@@ -39,7 +39,7 @@ class SavedModelBackendFactory {
       std::unique_ptr<SavedModelBackendFactory>* factory);
 
   Status CreateBackend(
-      const std::string& path, const ModelConfig& model_config,
+      const std::string& path, const inference::ModelConfig& model_config,
       const double min_compute_capability,
       std::unique_ptr<InferenceBackend>* backend);
 

@@ -141,7 +141,7 @@ class BackendResponder {
 
   // Process all responses for a named output tensor.
   void ProcessTensor(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       std::vector<int64_t>& batchn_shape, const char* buffer,
       const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
 
@@ -221,7 +221,7 @@ class BackendInputCollector {
 
   // Process all requests for a named input tensor.
   void ProcessTensor(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& batch1_shape, char* buffer,
       const size_t buffer_byte_size, const TRITONSERVER_MemoryType memory_type,
       const int64_t memory_type_id);

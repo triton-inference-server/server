@@ -41,7 +41,7 @@ class TritonModel;
 class TritonModelInstance {
  public:
   static Status CreateInstances(
-      TritonModel* model, const ModelConfig& model_config,
+      TritonModel* model, const inference::ModelConfig& model_config,
       std::vector<std::unique_ptr<TritonModelInstance>>* instances);
   ~TritonModelInstance();
 

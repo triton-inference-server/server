@@ -60,7 +60,7 @@ enum ErrorCodes {
 class Context : public CustomInstance {
  public:
   Context(
-      const std::string& instance_name, const ModelConfig& config,
+      const std::string& instance_name, const inference::ModelConfig& config,
       const int gpu_device, const size_t server_parameter_cnt,
       const char** server_parameters);
 
@@ -88,9 +88,9 @@ class Context : public CustomInstance {
 };
 
 Context::Context(
-    const std::string& instance_name, const ModelConfig& model_config,
-    const int gpu_device, const size_t server_parameter_cnt,
-    const char** server_parameters)
+    const std::string& instance_name,
+    const inference::ModelConfig& model_config, const int gpu_device,
+    const size_t server_parameter_cnt, const char** server_parameters)
     : CustomInstance(instance_name, model_config, gpu_device)
 {
   // Must make a copy of server_parameters since we don't own those
@@ -118,7 +118,7 @@ Context::Init()
   if (model_config_.input(0).dims(0) != 1) {
     return kInput;
   }
-  if (model_config_.input(0).data_type() != DataType::TYPE_INT32) {
+  if (model_config_.input(0).data_type() != inference::DataType::TYPE_INT32) {
     return kInput;
   }
 
@@ -134,7 +134,7 @@ Context::Init()
     return kOutput;
   }
 
-  if (model_config_.output(0).data_type() != DataType::TYPE_STRING) {
+  if (model_config_.output(0).data_type() != inference::DataType::TYPE_STRING) {
     return kOutput;
   }
 
@@ -189,7 +189,8 @@ Context::Execute(
     // If 'content' returns nullptr or if the content is not the
     // expected size, then something went wrong.
     if ((content == nullptr) ||
-        (content_byte_size != GetDataTypeByteSize(DataType::TYPE_INT32))) {
+        (content_byte_size !=
+         GetDataTypeByteSize(inference::DataType::TYPE_INT32))) {
       return kInputContents;
     }
 
@@ -250,7 +251,7 @@ Context::Execute(
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,
-    const ModelConfig& model_config, int gpu_device,
+    const inference::ModelConfig& model_config, int gpu_device,
     const CustomInitializeData* data)
 {
   param::Context* context = new param::Context(

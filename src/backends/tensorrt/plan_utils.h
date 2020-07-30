@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -54,10 +54,10 @@ MemoryFormat ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt);
 
 const std::string MemoryFormat_Name(MemoryFormat fmt);
 
-DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
+inference::DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
 
 std::pair<bool, nvinfer1::DataType> ConvertDataTypeToTrtType(
-    const DataType& dtype);
+    const inference::DataType& dtype);
 
 bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
 

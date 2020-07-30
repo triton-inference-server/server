@@ -124,7 +124,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error ServerMetadata(
-      ServerMetadataResponse* server_metadata,
+      inference::ServerMetadataResponse* server_metadata,
       const Headers& headers = Headers());
 
   /// Contact the inference server and get the metadata of specified model.
@@ -138,8 +138,8 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error ModelMetadata(
-      ModelMetadataResponse* model_metadata, const std::string& model_name,
-      const std::string& model_version = "",
+      inference::ModelMetadataResponse* model_metadata,
+      const std::string& model_name, const std::string& model_version = "",
       const Headers& headers = Headers());
 
   /// Contact the inference server and get the configuration of specified model.
@@ -153,8 +153,8 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error ModelConfig(
-      ModelConfigResponse* model_config, const std::string& model_name,
-      const std::string& model_version = "",
+      inference::ModelConfigResponse* model_config,
+      const std::string& model_name, const std::string& model_version = "",
       const Headers& headers = Headers());
 
   /// Contact the inference server and get the index of model repository
@@ -165,7 +165,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error ModelRepositoryIndex(
-      RepositoryIndexResponse* repository_index,
+      inference::RepositoryIndexResponse* repository_index,
       const Headers& headers = Headers());
 
   /// Request the inference server to load or reload specified model.
@@ -198,8 +198,8 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error ModelInferenceStatistics(
-      ModelStatisticsResponse* infer_stat, const std::string& model_name = "",
-      const std::string& model_version = "",
+      inference::ModelStatisticsResponse* infer_stat,
+      const std::string& model_name = "", const std::string& model_version = "",
       const Headers& headers = Headers());
 
   /// Contact the inference server and get the status for requested system
@@ -213,7 +213,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error SystemSharedMemoryStatus(
-      SystemSharedMemoryStatusResponse* status,
+      inference::SystemSharedMemoryStatusResponse* status,
       const std::string& region_name = "", const Headers& headers = Headers());
 
   /// Request the server to register a system shared memory with the provided
@@ -253,7 +253,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error CudaSharedMemoryStatus(
-      CudaSharedMemoryStatusResponse* status,
+      inference::CudaSharedMemoryStatusResponse* status,
       const std::string& region_name = "", const Headers& headers = Headers());
 
   /// Request the server to register a CUDA shared memory with the provided
@@ -380,8 +380,8 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   // Required to support the grpc bi-directional streaming API.
   InferenceServerClient::OnCompleteFn stream_callback_;
   std::thread stream_worker_;
-  std::shared_ptr<
-      grpc::ClientReaderWriter<ModelInferRequest, ModelStreamInferResponse>>
+  std::shared_ptr<grpc::ClientReaderWriter<
+      inference::ModelInferRequest, inference::ModelStreamInferResponse>>
       grpc_stream_;
   grpc::ClientContext grpc_context_;
 
@@ -390,10 +390,10 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   std::mutex stream_mutex_;
 
   // GRPC end point.
-  std::unique_ptr<GRPCInferenceService::Stub> stub_;
+  std::unique_ptr<inference::GRPCInferenceService::Stub> stub_;
   // request for GRPC call, one request object can be used for multiple calls
   // since it can be overwritten as soon as the GRPC send finishes.
-  ModelInferRequest infer_request_;
+  inference::ModelInferRequest infer_request_;
 };
 
 

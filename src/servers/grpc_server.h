@@ -99,7 +99,7 @@ class GRPCServer {
   std::unique_ptr<HandlerBase> model_infer_handler_;
   std::unique_ptr<HandlerBase> model_stream_infer_handler_;
 
-  GRPCInferenceService::AsyncService service_;
+  inference::GRPCInferenceService::AsyncService service_;
   bool running_;
 };
 

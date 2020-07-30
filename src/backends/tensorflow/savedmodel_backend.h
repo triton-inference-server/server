@@ -48,10 +48,10 @@ class SavedModelBackend : public BaseBackend {
 
  private:
   Status ValidateBooleanSequenceControl(
-      const ModelSequenceBatching::Control::Kind control_kind,
+      const inference::ModelSequenceBatching::Control::Kind control_kind,
       const TRTISTF_IOList* inputs, bool required, bool* have_control);
   Status ValidateTypedSequenceControl(
-      const ModelSequenceBatching::Control::Kind control_kind,
+      const inference::ModelSequenceBatching::Control::Kind control_kind,
       const TRTISTF_IOList* inputs, bool required, bool* have_control);
 
   DISALLOW_COPY_AND_ASSIGN(SavedModelBackend);
