@@ -75,8 +75,7 @@ fi
 
 # Test a simple app using Triton HTTP API
 g++ http_client.cc -o simple_http_client -Itriton_client/include \
-  -L$(pwd)/triton_client/lib -I/workspace/builddir/grpc/include \
-  -lhttpclient
+  -L$(pwd)/triton_client/lib -lhttpclient
 
 if [ $? -eq 0 ]; then
     if [[ ! -x "./simple_http_client" ]]; then
