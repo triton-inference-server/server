@@ -1,0 +1,108 @@
+#!/bin/bash
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Install the tar file
+rm -fr triton_client
+mkdir triton_client
+(cd triton_client && tar xzvf /workspace/*.tar.gz)
+
+RET=0
+
+# Check image_client and perf_client
+if [[ ! -x "triton_client/bin/image_client" ]]; then
+    echo -e "*** image_client executable not present\n"
+    RET=1
+fi
+
+if [[ ! -x "triton_client/bin/perf_client" ]]; then
+    echo -e "*** perf_client executable not present\n"
+    RET=1
+fi
+
+# Check static libraries
+for l in libgrpcclient.so libgrpcclient_static.a libhttpclient.so libhttpclient_static.a; do
+    if [[ ! -f "triton_client/lib/$l" ]]; then
+        echo -e "*** library $l not present\n"
+        RET=1
+    fi
+done
+
+
+# Test a simple app using Triton gRPC API
+g++ grpc_client.cc -o simple_grpc_client -Itriton_client/include \
+  -L$(pwd)/triton_client/lib -I/workspace/builddir/grpc/include \
+  -I/workspace/builddir/protobuf/include -lgrpcclient
+
+if [ $? -eq 0 ]; then
+    if [[ ! -x "./simple_grpc_client" ]]; then
+        echo -e "*** simple_grpc_client executable not present\n"
+        RET=1
+    else
+        ./simple_grpc_client
+        if [ $? -eq 0 ]; then
+            echo -e "\n***\n*** simple_grpc_client exited with 0 PASSED\n***"
+        else
+            echo -e "\n***\n*** simple_grpc_client exited with non-zero FAILED\n***"
+            RET=1
+        fi
+    fi
+else
+    echo -e "\n***\n*** Client headers build FAILED\n***"
+    RET=1
+fi
+
+# Test a simple app using Triton HTTP API
+g++ http_client.cc -o simple_http_client -Itriton_client/include \
+  -L$(pwd)/triton_client/lib -I/workspace/builddir/grpc/include \
+  -lhttpclient
+
+if [ $? -eq 0 ]; then
+    if [[ ! -x "./simple_http_client" ]]; then
+        echo -e "*** simple_http_client executable not present\n"
+        RET=1
+    else
+        ./simple_http_client
+        if [ $? -eq 0 ]; then
+            echo -e "\n***\n*** simple_http_client exited with 0 PASSED\n***"
+        else
+            echo -e "\n***\n*** simple_http_client exited with non-zero FAILED\n***"
+            RET=1
+        fi
+    fi
+else
+    echo -e "\n***\n*** Client headers build FAILED\n***"
+    RET=1
+fi
+
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET
