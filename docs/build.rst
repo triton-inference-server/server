@@ -57,7 +57,7 @@ to the root of the repo and checkout the release version of the branch
 that you want to build (or the master branch if you want to build the
 under-development version)::
 
-  $ git checkout r20.06
+  $ git checkout r20.07
 
 Then use docker to build::
 
@@ -104,7 +104,7 @@ the root of the repo and checkout the release version of the branch
 that you want to build (or the master branch if you want to build the
 under-development version)::
 
-  $ git checkout r20.06
+  $ git checkout r20.07
 
 Next you must build or install each framework backend you want to
 enable in Triton, configure the build to enable the desired features,
