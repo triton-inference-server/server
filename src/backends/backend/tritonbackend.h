@@ -91,9 +91,6 @@ struct TRITONBACKEND_ModelInstance;
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ApiVersion(
     uint32_t* major, uint32_t* minor);
 
-/// Device number that indicates "no device".
-#define TRITONBACKEND_NO_DEVICE -1
-
 ///
 /// TRITONBACKEND_Input
 ///
@@ -631,90 +628,6 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelState(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelSetState(
     TRITONBACKEND_Model* model, void* state);
 
-/// Record statistics for an inference request.
-///
-/// Set 'success' true to indicate that the inference request
-/// completed successfully. In this case all timestamps should be
-/// non-zero values reported in nanoseconds and should be collected
-/// using clock_gettime(CLOCK_MONOTONIC, &ts) or the equivalent. Set
-/// 'success' to false to indicate that the inference request failed
-/// to complete successfully. In this case all timestamps values are
-/// ignored.
-///
-/// For consistency of measurement across different backends, the
-/// timestamps should be collected at the following points during
-/// TRITONBACKEND_ModelInstanceExecute.
-///
-///   TRITONBACKEND_ModelInstanceExecute()
-///     CAPTURE TIMESPACE (exec_start_ns)
-///     < process input tensors to prepare them for inference
-///       execution, including copying the tensors to/from GPU if
-///       necessary>
-///     CAPTURE TIMESPACE (compute_start_ns)
-///     < perform inference computations to produce outputs >
-///     CAPTURE TIMESPACE (compute_end_ns)
-///     < allocate output buffers and extract output tensors, including
-///       copying the tensors to/from GPU if necessary>
-///     CAPTURE TIMESPACE (exec_end_ns)
-///     return
-///
-/// Note that these statistics are associated with a valid
-/// TRITONBACKEND_Request object and so must be reported before the
-/// request is released. For backends that release the request before
-/// all response(s) are sent, these statistics cannot capture
-/// information about the time required to produce the response.
-///
-/// \param model The model.
-/// \param request The inference request that statistics are being
-/// reported for.
-/// \param success True if the inference request completed
-/// successfully, false if it failed to complete.
-/// \param device The device to associate with the statistics, or
-/// TRITONBACKEND_NO_DEVICE if no device should be associated.
-/// \param exec_start_ns Timestamp for the start of model execution.
-/// \param compute_start_ns Timestamp for the start of execution
-/// computations.
-/// \param compute_end_ns Timestamp for the end of execution
-/// computations.
-/// \param exec_end_ns Timestamp for the end of model execution.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelReportStatistics(
-    TRITONBACKEND_Model* model, TRITONBACKEND_Request* request,
-    const bool success, const int device, const uint64_t exec_start_ns,
-    const uint64_t compute_start_ns, const uint64_t compute_end_ns,
-    const uint64_t exec_end_ns);
-
-/// Record statistics for the execution of an entire batch of
-/// inference requests.
-///
-/// All timestamps should be non-zero values reported in nanoseconds
-/// and should be collected using clock_gettime(CLOCK_MONOTONIC, &ts)
-/// or the equivalent. See TRITONBACKEND_ModelReportStatistics for
-/// more information about the timestamps.
-///
-/// 'batch_size' is the sum of the batch sizes for the individual
-/// requests that were delivered together in the call to
-/// TRITONBACKEND_ModelInstanceExecute. For example, if three requests
-/// are passed to TRITONBACKEND_ModelInstanceExecute and those
-/// requests have batch size 1, 2, and 3; then 'batch_size' should be
-/// set to 6.
-///
-/// \param model The model.
-/// \param batch_size Combined batch size of all the individual
-/// requests executed in the batch.
-/// \param exec_start_ns Timestamp for the start of model execution.
-/// \param compute_start_ns Timestamp for the start of execution
-/// computations.
-/// \param compute_end_ns Timestamp for the end of execution
-/// computations.
-/// \param exec_end_ns Timestamp for the end of model execution.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONBACKEND_EXPORT TRITONSERVER_Error*
-TRITONBACKEND_ModelReportBatchStatistics(
-    TRITONBACKEND_Model* model, const uint64_t batch_size,
-    const uint64_t exec_start_ns, const uint64_t compute_start_ns,
-    const uint64_t compute_end_ns, const uint64_t exec_end_ns);
-
 ///
 /// TRITONBACKEND_ModelInstance
 ///
@@ -776,6 +689,89 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceState(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelInstanceSetState(
     TRITONBACKEND_ModelInstance* instance, void* state);
+
+/// Record statistics for an inference request.
+///
+/// Set 'success' true to indicate that the inference request
+/// completed successfully. In this case all timestamps should be
+/// non-zero values reported in nanoseconds and should be collected
+/// using clock_gettime(CLOCK_MONOTONIC, &ts) or the equivalent. Set
+/// 'success' to false to indicate that the inference request failed
+/// to complete successfully. In this case all timestamps values are
+/// ignored.
+///
+/// For consistency of measurement across different backends, the
+/// timestamps should be collected at the following points during
+/// TRITONBACKEND_ModelInstanceExecute.
+///
+///   TRITONBACKEND_ModelInstanceExecute()
+///     CAPTURE TIMESPACE (exec_start_ns)
+///     < process input tensors to prepare them for inference
+///       execution, including copying the tensors to/from GPU if
+///       necessary>
+///     CAPTURE TIMESPACE (compute_start_ns)
+///     < perform inference computations to produce outputs >
+///     CAPTURE TIMESPACE (compute_end_ns)
+///     < allocate output buffers and extract output tensors, including
+///       copying the tensors to/from GPU if necessary>
+///     CAPTURE TIMESPACE (exec_end_ns)
+///     return
+///
+/// Note that these statistics are associated with a valid
+/// TRITONBACKEND_Request object and so must be reported before the
+/// request is released. For backends that release the request before
+/// all response(s) are sent, these statistics cannot capture
+/// information about the time required to produce the response.
+///
+/// \param instance The model instance.
+/// \param request The inference request that statistics are being
+/// reported for.
+/// \param success True if the inference request completed
+/// successfully, false if it failed to complete.
+/// \param exec_start_ns Timestamp for the start of execution.
+/// \param compute_start_ns Timestamp for the start of execution
+/// computations.
+/// \param compute_end_ns Timestamp for the end of execution
+/// computations.
+/// \param exec_end_ns Timestamp for the end of execution.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceReportStatistics(
+    TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request* request,
+    const bool success, const uint64_t exec_start_ns,
+    const uint64_t compute_start_ns, const uint64_t compute_end_ns,
+    const uint64_t exec_end_ns);
+
+/// Record statistics for the execution of an entire batch of
+/// inference requests.
+///
+/// All timestamps should be non-zero values reported in nanoseconds
+/// and should be collected using clock_gettime(CLOCK_MONOTONIC, &ts)
+/// or the equivalent. See TRITONBACKEND_ModelInstanceReportStatistics
+/// for more information about the timestamps.
+///
+/// 'batch_size' is the sum of the batch sizes for the individual
+/// requests that were delivered together in the call to
+/// TRITONBACKEND_ModelInstanceExecute. For example, if three requests
+/// are passed to TRITONBACKEND_ModelInstanceExecute and those
+/// requests have batch size 1, 2, and 3; then 'batch_size' should be
+/// set to 6.
+///
+/// \param instance The model instance.
+/// \param batch_size Combined batch size of all the individual
+/// requests executed in the batch.
+/// \param exec_start_ns Timestamp for the start of execution.
+/// \param compute_start_ns Timestamp for the start of execution
+/// computations.
+/// \param compute_end_ns Timestamp for the end of execution
+/// computations.
+/// \param exec_end_ns Timestamp for the end of execution.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceReportBatchStatistics(
+    TRITONBACKEND_ModelInstance* instance, const uint64_t batch_size,
+    const uint64_t exec_start_ns, const uint64_t compute_start_ns,
+    const uint64_t compute_end_ns, const uint64_t exec_end_ns);
 
 
 ///

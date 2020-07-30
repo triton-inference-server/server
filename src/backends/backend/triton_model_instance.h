@@ -28,6 +28,7 @@
 #include <memory>
 #include <string>
 #include "src/core/constants.h"
+#include "src/core/metric_model_reporter.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
 
@@ -54,6 +55,8 @@ class TritonModelInstance {
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
+  MetricModelReporter* MetricReporter() const { return reporter_.get(); }
+
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModelInstance);
 
@@ -78,6 +81,9 @@ class TritonModelInstance {
   // GPU device to be used by the instance.
   TRITONSERVER_InstanceGroupKind kind_;
   int32_t device_id_;
+
+  // Reporter for metrics, or nullptr if no metrics should be reported
+  std::unique_ptr<MetricModelReporter> reporter_;
 
   // Opaque state associated with this model instance.
   void* state_;
