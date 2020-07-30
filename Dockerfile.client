@@ -78,6 +78,8 @@ RUN cd install && \
 
 # For CI testing need to install a test script.
 COPY qa/L0_client/test.sh /tmp/test.sh
+COPY qa/L0_client/grpc_client.cc /tmp/grpc_client.cc
+COPY qa/L0_client/http_client.cc /tmp/http_client.cc
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
