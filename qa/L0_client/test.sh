@@ -50,6 +50,52 @@ for l in libgrpcclient.so libgrpcclient_static.a libhttpclient.so libhttpclient_
     fi
 done
 
+# Test a simple app using Triton gRPC API
+g++ grpc_client.cc -o simple_grpc_client -Itriton_client/include \
+  -L$(pwd)/triton_client/lib -I/workspace/builddir/grpc/include \
+  -I/workspace/builddir/protobuf/include -lgrpcclient
+
+if [ $? -eq 0 ]; then
+    if [[ ! -x "./simple_grpc_client" ]]; then
+        echo -e "*** simple_grpc_client executable not present\n"
+        RET=1
+    else
+        ./simple_grpc_client
+        if [ $? -eq 0 ]; then
+            echo -e "\n***\n*** simple_grpc_client exited with 0 PASSED\n***"
+        else
+            echo -e "\n***\n*** simple_grpc_client exited with non-zero FAILED\n***"
+            RET=1
+        fi
+    fi
+else
+    echo -e "\n***\n*** Client headers build FAILED\n***"
+    RET=1
+fi
+
+# Test a simple app using Triton HTTP API
+g++ http_client.cc -o simple_http_client -Itriton_client/include \
+  -L$(pwd)/triton_client/lib -I/workspace/builddir/grpc/include \
+  -lhttpclient
+
+if [ $? -eq 0 ]; then
+    if [[ ! -x "./simple_http_client" ]]; then
+        echo -e "*** simple_http_client executable not present\n"
+        RET=1
+    else
+        ./simple_http_client
+        if [ $? -eq 0 ]; then
+            echo -e "\n***\n*** simple_http_client exited with 0 PASSED\n***"
+        else
+            echo -e "\n***\n*** simple_http_client exited with non-zero FAILED\n***"
+            RET=1
+        fi
+    fi
+else
+    echo -e "\n***\n*** Client headers build FAILED\n***"
+    RET=1
+fi
+
 # Check wheels
 WHLVERSION=`cat /workspace/VERSION | sed 's/dev/\.dev0/'`
 WHLS="tritonclientutils-${WHLVERSION}-py3-none-any.whl \
