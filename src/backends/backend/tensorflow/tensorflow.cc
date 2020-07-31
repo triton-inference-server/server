@@ -824,6 +824,10 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
       triton_model, 1 /* config_version */, &config_message));
 
+  // FIXME remove this debug check
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelSetConfig(triton_model, 1, config_message));
+
   // We can get the model configuration as a json string from
   // config_message, parse it with our favorite json parser to create
   // DOM that we can access when we need to example the
