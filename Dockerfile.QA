@@ -312,9 +312,8 @@ RUN pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six boofuzz
 
 # need protoc-gen-go to generate go specific gRPC modules
-#Disable to avoid broken golang package
-#RUN go get github.com/golang/protobuf/protoc-gen-go && \
-#    go get google.golang.org/grpc
+RUN go get github.com/golang/protobuf/protoc-gen-go && \
+    go get google.golang.org/grpc
 
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
