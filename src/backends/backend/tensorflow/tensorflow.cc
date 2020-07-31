@@ -153,9 +153,32 @@ CreateTRTISTFModel(
     const bool auto_mixed_precision)
 {
   TRTISTF_Model* model = nullptr;
+
+  // Set default backend values. Note that those values should be set during
+  // TRITONBACKEND_Initialize, but for TensorFlow they are set while creating
+  // the model.
+  bool allow_gpu_memory_growth = true;
+  float per_process_gpu_memory_fraction = 0.0;
+  bool allow_soft_placement = true;
+  {
+    ni::TritonJson::Value cmdline;
+    if (backend_config.Find("cmdline", &cmdline)) {
+      ni::TritonJson::Value value;
+      if (cmdline.Find("allow-soft-placement", &value)) {
+        RETURN_IF_ERROR(value.AsBool(&allow_soft_placement));
+      }
+      if (cmdline.Find("gpu-memory-fraction", &value)) {
+        double lvalue;
+        RETURN_IF_ERROR(value.AsDouble(&lvalue));
+        per_process_gpu_memory_fraction = lvalue;
+        allow_gpu_memory_growth = (lvalue == 0.0);
+      }
+    }
+  }
   RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromGraphDef(
       &model, model_name.c_str(), model_path.c_str(), device_id,
-      has_graph_level, graph_level, true, 0, true,
+      has_graph_level, graph_level, allow_gpu_memory_growth,
+      per_process_gpu_memory_fraction, allow_soft_placement,
       std::map<int, std::vector<float>>(), tftrt_config, auto_mixed_precision));
 
   trtistf_model->reset(model);
@@ -316,8 +339,6 @@ CreateTRTISTFModel(
   bool allow_gpu_memory_growth = true;
   float per_process_gpu_memory_fraction = 0.0;
   bool allow_soft_placement = true;
-  // FIXME: vGPU only flag, should be removed
-  std::map<int, std::vector<float>> memory_limit_mb;
   {
     ni::TritonJson::Value cmdline;
     if (backend_config.Find("cmdline", &cmdline)) {
