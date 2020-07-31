@@ -1663,4 +1663,29 @@ ModelConfigToJson(
   return Status::Success;
 }
 
+Status
+JsonToModelConfig(
+    const std::string& json_config, const uint32_t config_version,
+    ModelConfig* protobuf_config)
+{
+  // Currently only support 'config_version' 1, which is the json
+  // representation of the ModelConfig protobuf with the int64 fields
+  // fixes to be actual numbers instead of the string madness done by
+  // protobuf.
+  if (config_version != 1) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        std::string("model configuration version ") +
+            std::to_string(config_version) +
+            " not supported, supported versions are: 1");
+  }
+
+  ::google::protobuf::util::JsonParseOptions options;
+  options.case_insensitive_enum_parsing = true;
+  options.ignore_unknown_fields = false;
+  ::google::protobuf::util::JsonStringToMessage(
+      json_config, protobuf_config, options);
+  return Status::Success;
+}
+
 }}  // namespace nvidia::inferenceserver

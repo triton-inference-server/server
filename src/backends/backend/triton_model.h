@@ -61,6 +61,9 @@ class TritonModel : public InferenceBackend {
   }
   InferenceServer* Server() { return server_; }
   bool AutoCompleteConfig() const { return auto_complete_config_; }
+  Status UpdateModelConfig(
+      const uint32_t config_version,
+      TRITONSERVER_Message* updated_config_message);
   const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
@@ -97,6 +100,9 @@ class TritonModel : public InferenceBackend {
 
   // Opaque state associated with this model.
   void* state_;
+
+  // Whether the model is initialized.
+  bool initialized_;
 };
 
 }}  // namespace nvidia::inferenceserver

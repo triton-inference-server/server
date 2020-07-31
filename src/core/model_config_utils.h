@@ -168,4 +168,16 @@ Status ModelConfigToJson(
     const inference::ModelConfig& config, const uint32_t config_version,
     std::string* json_str);
 
+/// Convert a model configuration JSON to the equivalent protobuf.
+/// \param config The JSON model configuration.
+/// \param config_version The model configuration will be returned in
+/// a format matching this version. If the configuration cannot be
+/// represented in the requested version's format then an error will
+/// be returned.
+/// \param protobuf Returns the equivalent protobuf.
+/// \return The error status.
+Status JsonToModelConfig(
+    const std::string& json_config, const uint32_t config_version,
+    ModelConfig* protobuf_config);
+
 }}  // namespace nvidia::inferenceserver
