@@ -313,7 +313,7 @@ RUN pip3 install --upgrade wheel setuptools && \
 
 # need protoc-gen-go to generate go specific gRPC modules
 RUN go get github.com/golang/protobuf/protoc-gen-go && \
-    go get google.golang.org/grpc
+    go get google.golang.org/grpc@1.30.0
 
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
