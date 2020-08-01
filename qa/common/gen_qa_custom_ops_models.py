@@ -346,14 +346,17 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
+
 # Use Torchvision ops
 def create_visionop_modelfile(models_dir, model_version):
     model_name = "libtorch_visionop"
-    
+
     class CustomVisionNet(nn.Module):
+
         def __init__(self):
             super(CustomVisionNet, self).__init__()
             self.conv2 = ops.misc.ConvTranspose2d(16, 33, (3, 5))
+
         def forward(self, input0):
             return self.conv2(input0)
 
@@ -402,6 +405,7 @@ output [
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
+
 
 def create_zero_out_models(models_dir):
     model_version = 1
