@@ -83,7 +83,10 @@ def _get_inference_request(model_name, inputs, model_version, request_id,
 
 class InferenceServerClient:
     """An InferenceServerClient object is used to perform any kind of
-    communication with the InferenceServer using gRPC protocol.
+    communication with the InferenceServer using gRPC protocol. Most
+    of the methods are thread-safe except start_stream, stop_stream
+    and async_stream_infer. Accessing a client stream with different
+    threads will cause undefined behavior.
 
     Parameters
     ----------

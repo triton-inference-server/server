@@ -60,7 +60,10 @@ struct SslOptions {
 
 //==============================================================================
 /// An InferenceServerGrpcClient object is used to perform any kind of
-/// communication with the InferenceServer using gRPC protocol.
+/// communication with the InferenceServer using gRPC protocol.  Most
+/// of the methods are thread-safe except Infer, AsyncInfer, StartStream
+/// StopStream and AsyncStreamInfer. Calling these functions from different
+/// threads will cause undefined behavior.
 ///
 /// \code
 ///   std::unique_ptr<InferenceServerGrpcClient> client;

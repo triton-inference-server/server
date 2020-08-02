@@ -121,7 +121,11 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
 
 class InferenceServerClient:
     """An InferenceServerClient object is used to perform any kind of
-    communication with the InferenceServer using http protocol.
+    communication with the InferenceServer using http protocol. None
+    of the methods are thread safe. The object is intended to be used
+    by a single thread and simultaneously calling different methods
+    with different threads is not supported and will cause undefined
+    behavior.
 
     Parameters
     ----------
