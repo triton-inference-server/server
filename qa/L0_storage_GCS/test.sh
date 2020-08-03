@@ -43,10 +43,22 @@ EXPECTED_NUM_TESTS="3"
 
 # GCS credentials are necessary for this test. Pass via ENV variables
 export GOOGLE_APPLICATION_CREDENTIALS="file.json"
-# TODO set contents/credentials in json file using ENV variables
+
+echo '{
+  "type": "service_account",
+  "project_id": "triton-285001",
+  "private_key_id": "'$PROJECT_KEY_ID'",
+  "private_key": "'$PROJECT_KEY'",
+  "client_email": "hemantj@triton-285001.iam.gserviceaccount.com",
+  "client_id": "106901301872481149333",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/hemantj%40triton-285001.iam.gserviceaccount.com"
+}' > $GOOGLE_APPLICATION_CREDENTIALS
 
 # Google cloud variables (Point to bucket when testing cloud storage)
-BUCKET_URL="gs://bucket-${CI_PIPELINE_ID}"
+BUCKET_URL="gs://triton-bucket-${CI_PIPELINE_ID}"
 
 # Remove Slash in BUCKET_URL
 BUCKET_URL=${BUCKET_URL%/}
