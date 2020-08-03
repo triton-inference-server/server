@@ -30,10 +30,9 @@
 Building
 ========
 
-The Triton Inference Server, the client libraries and examples, and
-custom backends can each be built using either Docker or CMake. The
-procedure for each is different and is detailed in the corresponding
-sections below.
+The Triton Inference Server and the client libraries and examples can
+be built using either Docker or CMake. The procedure for each is
+different and is detailed in the corresponding sections below.
 
 Building Triton
 ---------------
@@ -368,70 +367,14 @@ Building A Custom Backend
 -------------------------
 
 The source repository contains several example custom backends in the
-`src/custom directory
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/custom>`_.
-These custom backends are built using CMake::
+`src/backends/backend/examples directory
+<https://github.com/NVIDIA/triton-inference-server/tree/master/src/backends/backend/examples>`_.
+These example backends are built as part of the Triton server build described above.
 
-  $ mkdir builddir
-  $ cd builddir
-  $ cmake ../build
-  $ make -j16 custom-backend
+When the build completes the example backends can be found in
+server/install/backends.
 
-When the build completes the custom backend libraries can be found in
-custom-backend/install.
-
-A custom backend is not built-into Triton. Instead it is built as a
-separate shared library that Triton dynamically loads when the model
-repository contains a model that uses that custom backend. There are a
-couple of ways you can build your custom backend into a shared
-library, as described in the following sections.
-
-Build Using CMake
-^^^^^^^^^^^^^^^^^
-
-One way to build your own custom backend is to use Triton's CMake
-build. Simply copy and modify one of the existing example custom
-backends and then build your backend using CMake. You can then use the
-resulting shared library in your model repository as described in
-:ref:`section-custom-backends`.
-
-Build Using Custom Backend SDK
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The custom backend SDK includes all the header files you need to build
-your custom backend as well as a static library which provides all the
-model configuration and protobuf utility functions you will need. You
-can either build the custom backend SDK yourself using
-Dockerfile.custombackend::
-
-  docker build -t tritonserver_cbe -f Dockerfile.custombackend .
-
-Or you can download a pre-build version of the SDK from the `GitHub
-release page
-<https://github.com/NVIDIA/triton-inference-server/releases>`_
-corresponding to the release you are interested in. The custom backend
-SDK is found in the "Assets" section of the release page in a tar file
-named after the version of the release and the OS, for example,
-v1.2.0_ubuntu1604.custombackend.tar.gz.
-
-Once you have the SDK you can use the include/ directory and static
-library when you compile your custom backend source code. For example,
-the SDK includes the source for the *param* custom backend in
-src/param.cc. You can create a custom backend from that source using
-the following command::
-
-  g++ -fpic -shared -std=c++11 -o libparam.so custom-backend-sdk/src/param.cc -Icustom-backend-sdk/include custom-backend-sdk/lib/libcustombackend.a
-
-Using the Custom Instance Wrapper Class
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The custom backend SDK provides a `CustomInstance Class
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/custom/sdk/custom_instance.h>`_.
-The CustomInstance class is a C++ wrapper class that abstracts away the
-backend C-API for ease of use. All of the example custom backends in
-`src/custom directory
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/custom>`_
-derive from the CustomInstance class and can be referenced for usage.
+See :ref:`section-backends` or more information on custom backends.
 
 Building the Client Libraries and Examples
 ------------------------------------------
