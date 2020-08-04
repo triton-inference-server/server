@@ -60,7 +60,7 @@ if(${TRITON_ENABLE_GRPC})
       model-config-library grpc-library proto-library
   )
 
-  # libgrpcclient.a
+  # libgrpcclient_static.a
   add_library(
       grpcclient_static STATIC
       $<TARGET_OBJECTS:grpc-library>
@@ -136,6 +136,17 @@ if(${TRITON_ENABLE_GRPC})
       EXPORT triton-export
       LIBRARY DESTINATION lib
       ARCHIVE DESTINATION lib
+  )
+
+  install(
+      FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib/libcares.a
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgpr.a
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgrpc.a
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgrpc++.a
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libaddress_sorting.a
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/lib/libprotobuf.a
+      DESTINATION lib
   )
 
   set(TRITON_CLIENT_HEADER_FLAT 1)
@@ -262,6 +273,12 @@ if(${TRITON_ENABLE_HTTP})
 
   set(TRITON_CLIENT_HEADER_FLAT 1)
   configure_file(http_client.h.in http_client_flat.h @ONLY)
+
+  install(
+      FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../curl/install/lib/libcurl.a
+      DESTINATION lib
+  )
 
   install(
       FILES
