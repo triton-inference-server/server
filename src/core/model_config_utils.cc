@@ -807,7 +807,7 @@ GetNormalizedModelConfig(
 }
 
 Status
-ValidateModelIOConfig(const ModelConfig& config)
+ValidateModelIOConfig(const inference::ModelConfig& config)
 {
   Status status;
   for (const auto& io : config.input()) {
@@ -1671,7 +1671,7 @@ ModelConfigToJson(
 Status
 JsonToModelConfig(
     const std::string& json_config, const uint32_t config_version,
-    ModelConfig* protobuf_config)
+    inference::ModelConfig* protobuf_config)
 {
   // Currently only support 'config_version' 1, which is the json
   // representation of the ModelConfig protobuf with the int64 fields

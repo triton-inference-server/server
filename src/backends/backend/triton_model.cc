@@ -296,7 +296,7 @@ TritonModel::UpdateModelConfig(
   size_t byte_size;
   RETURN_IF_TRITONSERVER_ERROR(TRITONSERVER_MessageSerializeToJson(
       updated_config_message, &buffer, &byte_size));
-  ModelConfig updated_config;
+  inference::ModelConfig updated_config;
   RETURN_IF_ERROR(
       JsonToModelConfig({buffer, byte_size}, config_version, &updated_config));
   auto config = Config();

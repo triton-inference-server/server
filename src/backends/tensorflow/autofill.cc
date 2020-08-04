@@ -43,7 +43,7 @@ class AutoFillSavedModelImpl : public AutoFill {
   {
   }
 
-  Status Fix(ModelConfig* config) override;
+  Status Fix(inference::ModelConfig* config) override;
 };
 
 Status

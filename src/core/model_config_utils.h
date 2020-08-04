@@ -99,7 +99,7 @@ Status ValidateModelConfig(
 /// \param config The model configuration to validate.
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
-Status ValidateModelIOConfig(const ModelConfig& config);
+Status ValidateModelIOConfig(const inference::ModelConfig& config);
 
 /// Validate that input is specified correctly in a model
 /// configuration.
@@ -186,6 +186,6 @@ Status ModelConfigToJson(
 /// \return The error status.
 Status JsonToModelConfig(
     const std::string& json_config, const uint32_t config_version,
-    ModelConfig* protobuf_config);
+    inference::ModelConfig* protobuf_config);
 
 }}  // namespace nvidia::inferenceserver
