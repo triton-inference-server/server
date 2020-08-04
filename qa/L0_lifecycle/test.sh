@@ -765,7 +765,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_model_control
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel ; do
+for i in onnx ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -807,7 +807,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0
 # Ensemble models in the second repository
-for i in graphdef savedmodel ; do
+for i in plan onnx ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -825,8 +825,8 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
-             --load-model=graphdef_float32_float32_float32 \
-             --load-model=simple_savedmodel_float32_float32_float32"
+             --load-model=plan_float32_float32_float32 \
+             --load-model=simple_onnx_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then

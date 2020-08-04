@@ -76,7 +76,7 @@ struct TRITONBACKEND_ModelInstance;
 ///   }
 ///
 #define TRITONBACKEND_API_VERSION_MAJOR 0
-#define TRITONBACKEND_API_VERSION_MINOR 1
+#define TRITONBACKEND_API_VERSION_MINOR 2
 
 /// Get the TRITONBACKEND API version supported by Triton. This value
 /// can be compared against the TRITONBACKEND_API_VERSION_MAJOR and
@@ -592,6 +592,37 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelRepository(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelConfig(
     TRITONBACKEND_Model* model, const uint32_t config_version,
     TRITONSERVER_Message** model_config);
+
+/// Whether the backend should attempt to auto-complete the model configuration.
+/// If true, the model should fill the inputs, outputs, and max batch size in
+/// the model configuration if incomplete. If the model configuration is
+/// changed,  the new configuration must be reported to Triton using
+/// TRITONBACKEND_ModelSetConfig.
+///
+/// \param model The model.
+/// \param auto_complete_config Returns whether the backend should auto-complete
+/// the model configuration.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelAutoCompleteConfig(
+    TRITONBACKEND_Model* model, bool* auto_complete_config);
+
+/// Set the model configuration in Triton server. Only the inputs, outputs,
+/// and max batch size can be changed. Any other changes to the model
+/// configuration will be ignored by Triton. This function can only be called
+/// from TRITONBACKEND_ModelInitialize, calling in any other context will result
+/// in an error being returned. The function does not take ownership of the
+/// message object and so the caller should call TRITONSERVER_MessageDelete to
+/// release the object once the function returns.
+///
+/// \param model The model.
+/// \param config_version The format version of the model configuration.
+/// If the configuration is not represented in the version's format
+/// then an error will be returned. Currently only version 1 is supported.
+/// \param model_config The updated model configuration as a message.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelSetConfig(
+    TRITONBACKEND_Model* model, const uint32_t config_version,
+    TRITONSERVER_Message* model_config);
 
 /// Get the TRITONSERVER_Server object that this model is being served
 /// by.

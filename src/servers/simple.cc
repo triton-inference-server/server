@@ -531,6 +531,9 @@ main(int argc, char** argv)
       TRITONSERVER_ServerOptionsSetBackendDirectory(
           server_options, "/opt/tritonserver/backends"),
       "setting backend directory");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetStrictModelConfig(server_options, true),
+      "setting strict model configuration");
 #ifdef TRITON_ENABLE_GPU
   double min_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
 #else

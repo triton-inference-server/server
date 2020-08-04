@@ -175,7 +175,13 @@ class TritonServerOptions {
   void SetExitOnError(bool b) { exit_on_error_ = b; }
 
   bool StrictModelConfig() const { return strict_model_config_; }
-  void SetStrictModelConfig(bool b) { strict_model_config_ = b; }
+  void SetStrictModelConfig(bool b)
+  {
+    strict_model_config_ = b;
+    // Note the condition is reverted due to setting name is different
+    AddBackendConfig(
+        std::string(), "auto-complete-config", b ? "false" : "true");
+  }
 
   uint64_t PinnedMemoryPoolByteSize() const { return pinned_memory_pool_size_; }
   void SetPinnedMemoryPoolByteSize(uint64_t s) { pinned_memory_pool_size_ = s; }
@@ -615,6 +621,15 @@ TRITONSERVER_ResponseAllocatorDelete(TRITONSERVER_ResponseAllocator* allocator)
 //
 // TRITONSERVER_Message
 //
+TRITONSERVER_Error*
+TRITONSERVER_MessageNewFromSerializedJson(
+    TRITONSERVER_Message** message, const char* base, size_t byte_size)
+{
+  *message = reinterpret_cast<TRITONSERVER_Message*>(
+      new ni::TritonServerMessage({base, byte_size}));
+  return nullptr;
+}
+
 TRITONSERVER_Error*
 TRITONSERVER_MessageDelete(TRITONSERVER_Message* message)
 {

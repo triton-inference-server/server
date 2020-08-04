@@ -437,6 +437,16 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ResponseAllocatorDelete(
 /// Object representing a Triton Server message.
 ///
 
+/// Create a new message object from serialized JSON string.
+///
+/// \param message The message object.
+/// \param base The base of the serialized JSON.
+/// \param byte_size The size, in bytes, of the serialized message.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_MessageNewFromSerializedJson(
+    TRITONSERVER_Message** message, const char* base, size_t byte_size);
+
 /// Delete a message object.
 ///
 /// \param message The message object.

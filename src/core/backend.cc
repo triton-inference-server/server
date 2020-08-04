@@ -290,6 +290,7 @@ InferenceBackend::Init(
 {
   RETURN_IF_ERROR(
       ValidateModelConfig(config, platform, min_compute_capability_));
+  RETURN_IF_ERROR(ValidateModelIOConfig(config));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
   return Status::Success;

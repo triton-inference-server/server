@@ -143,6 +143,7 @@ class TritonJson {
             std::string(GetParseError_En(document_.GetParseError())) + " at " +
             std::to_string(document_.GetErrorOffset())));
       }
+      allocator_ = &document_.GetAllocator();
       return TRITONJSON_STATUSSUCCESS;
     }
 
