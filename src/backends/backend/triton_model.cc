@@ -202,6 +202,9 @@ TritonModel::Create(
   // If request for auto completion, Init() will be postponed until
   // UpdateModelConfig() is called as Init() assumes the model config
   // is well-formed.
+  // FIXME: the backend never calls SetModelConfig then Init will not be called,
+  // need to revisit this once all backends are moved over and we can get rid of
+  // the InferenceBackend class.
   if (auto_complete_config) {
     RETURN_IF_ERROR(local_model->SetModelConfig(version_path, model_config));
   } else {

@@ -611,8 +611,8 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ModelAutoCompleteConfig(
 /// configuration will be ignored by Triton. This function can only be called
 /// from TRITONBACKEND_ModelInitialize, calling in any other context will result
 /// in an error being returned. The function does not take ownership of the
-/// message object and the caller can call TRITONSERVER_MessageDelete to release
-/// the object once the function returns.
+/// message object and so the caller should call TRITONSERVER_MessageDelete to
+/// release the object once the function returns.
 ///
 /// \param model The model.
 /// \param config_version The format version of the model configuration.

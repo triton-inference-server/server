@@ -1674,9 +1674,8 @@ JsonToModelConfig(
     inference::ModelConfig* protobuf_config)
 {
   // Currently only support 'config_version' 1, which is the json
-  // representation of the ModelConfig protobuf with the int64 fields
-  // fixes to be actual numbers instead of the string madness done by
-  // protobuf.
+  // representation of the ModelConfig protobuf matches the representation in
+  // ModelConfigToJson().
   if (config_version != 1) {
     return Status(
         Status::Code::INVALID_ARG,

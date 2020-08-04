@@ -2101,8 +2101,7 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
   }
 
   // The backend configuration may contain information needed by the
-  // backend, such a command-line arguments. This backend doesn't use
-  // any such configuration but we print whatever is available.
+  // backend, such a command-line arguments.
   TRITONSERVER_Message* backend_config_message;
   RETURN_IF_ERROR(
       TRITONBACKEND_BackendConfig(backend, &backend_config_message));
@@ -2120,9 +2119,6 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
     RETURN_IF_ERROR(backend_config.Parse(buffer, byte_size));
   }
 
-  // Set default backend values. Note that those values should be set during
-  // TRITONBACKEND_Initialize, but for TensorFlow they are set while creating
-  // the model.
   std::unique_ptr<BackendConfig> lconfig(new BackendConfig());
   ni::TritonJson::Value cmdline;
   if (backend_config.Find("cmdline", &cmdline)) {
