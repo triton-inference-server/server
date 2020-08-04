@@ -83,7 +83,7 @@ features:
   decisions are transparent to the client requesting inference.
 
 * `Custom backend support
-  <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/model_repository.html#custom-backends>`_. Triton
+  <https://github.com/NVIDIA/triton-inference-server/blob/master/docs/backend.rst>`_. Triton
   Server allows individual models to be implemented with custom
   backends instead of by a deep-learning framework. With a custom
   backend a model can implement any logic desired, while still

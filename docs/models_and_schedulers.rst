@@ -32,9 +32,9 @@ Models And Schedulers
 
 By incorporating backends for :ref:`multiple frameworks
 <section-framework-model-definition>` and also allowing backends with
-:ref:`custom implementations <section-custom-backends>`, the Triton
-Inference Server supports a wide variety of models. Triton also
-supports multiple :ref:`scheduling and batching configurations
+:ref:`custom implementations <section-backends>`, the Triton Inference
+Server supports a wide variety of models. Triton also supports
+multiple :ref:`scheduling and batching configurations
 <section-scheduling-and-batching>` that further expand the class of
 models that can be handled.
 
