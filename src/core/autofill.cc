@@ -122,19 +122,20 @@ AutoFill::Create(
     defined(TRITON_ENABLE_CAFFE2) || defined(TRITON_ENABLE_ONNXRUNTIME) ||  \
     defined(TRITON_ENABLE_PYTORCH)
   const Platform platform = GetPlatform(config.platform());
+  const BackendType backend_type = GetBackendType(config.backend());
 #endif
 
   Status status;
 
 #ifdef TRITON_ENABLE_TENSORFLOW
   if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
-      (platform == Platform::PLATFORM_UNKNOWN)) {
+      (platform == Platform::PLATFORM_UNKNOWN) ||
+      (backend_type == BackendType::BACKEND_TYPE_TENSORFLOW) ||
+      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
+    // FIXME drop the AutoFillXXX once autofill for all backends is merely
+    // filling platform / backend
     std::unique_ptr<AutoFill> afsm;
     std::shared_ptr<BackendConfig> backend_config;
-    auto it = backend_config_map.find(kTensorFlowSavedModelPlatform);
-    if (it != backend_config_map.end()) {
-      backend_config = it->second;
-    }
     status = AutoFillSavedModel::Create(
         model_name, backend_config, model_path, &afsm);
     LOG_VERBOSE(1) << "TensorFlow SavedModel autofill: " << status.AsString();
@@ -145,7 +146,11 @@ AutoFill::Create(
   }
 
   if ((platform == Platform::PLATFORM_TENSORFLOW_GRAPHDEF) ||
-      (platform == Platform::PLATFORM_UNKNOWN)) {
+      (platform == Platform::PLATFORM_UNKNOWN) ||
+      (backend_type == BackendType::BACKEND_TYPE_TENSORFLOW) ||
+      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
+    // FIXME drop the AutoFillXXX once autofill for all backends is merely
+    // filling platform / backend
     std::unique_ptr<AutoFill> afgd;
     status = AutoFillGraphDef::Create(model_name, model_path, &afgd);
     LOG_VERBOSE(1) << "TensorFlow GraphDef autofill: " << status.AsString();
