@@ -635,14 +635,9 @@ AutoCompleteHelper::FixIOConfig(
     const TRTISTF_IOList* reference_list, const char* key,
     ni::TritonJson::Value* config)
 {
-  // If inputs / outputs are specified in config, only fill those I/O as
-  // user may only want to expose this particular subset of I/O
-  bool config_io_specified = false;
+  // Replace I/O even if inputs / outputs are specified in config.
   ni::TritonJson::Value ios;
   bool found_ios = config->Find(key, &ios);
-  if (found_ios) {
-    config_io_specified = (ios.ArraySize() != 0);
-  }
 
   ni::TritonJson::Value auto_complete_ios(
       *config, ni::TritonJson::ValueType::ARRAY);
@@ -650,75 +645,31 @@ AutoCompleteHelper::FixIOConfig(
        itr = itr->next_) {
     TRTISTF_IO* io = itr->io_;
 
-    ni::TritonJson::Value config_io;
-    if (config_io_specified) {
-      bool not_found = true;
-      for (size_t i = 0; i < ios.ArraySize(); i++) {
-        RETURN_IF_ERROR(ios.IndexAsObject(i, &config_io));
-        std::string io_name;
-        RETURN_IF_ERROR(config_io.MemberAsString("name", &io_name));
-        if (io_name == io->name_) {
-          not_found = false;
-          break;
-        }
-      }
-      if (not_found) {
-        continue;
-      }
-    }
-
-    // Don't auto-complete and use the data type and dims in model config
-    // if specified.
     ni::TritonJson::Value auto_complete_io(
         *config, ni::TritonJson::ValueType::OBJECT);
     RETURN_IF_ERROR(auto_complete_io.AddString("name", io->name_));
-    std::string data_type =
+    RETURN_IF_ERROR(auto_complete_io.AddString(
+        "data_type",
         std::string("TYPE_") +
-        TRITONSERVER_DataTypeString(nib::ConvertDataType(io->data_type_));
-    if (config_io_specified) {
-      ni::TritonJson::Value data_type_value;
-      if (config_io.Find("data_type", &data_type_value)) {
-        std::string config_data_type;
-        RETURN_IF_ERROR(data_type_value.AsString(&config_data_type));
-        if (config_data_type != "TYPE_INVALID") {
-          data_type.swap(config_data_type);
-        }
-      }
-    }
-    RETURN_IF_ERROR(auto_complete_io.AddString("data_type", data_type));
-
+            TRITONSERVER_DataTypeString(nib::ConvertDataType(io->data_type_))));
     ni::TritonJson::Value dims(*config, ni::TritonJson::ValueType::ARRAY);
-    ni::TritonJson::Value config_dims;
-    if (config_io_specified && config_io.Find("dims", &config_dims) &&
-        (config_dims.ArraySize() > 0)) {
-      dims.Swap(config_dims);
-      ni::TritonJson::Value config_reshape;
-      if (config_io.Find("reshape", &config_reshape)) {
-        ni::TritonJson::Value reshape(
-            *config, ni::TritonJson::ValueType::OBJECT);
-        reshape.Swap(config_reshape);
-        RETURN_IF_ERROR(auto_complete_io.Add("reshape", std::move(reshape)));
-      }
-    } else {
-      // The model signature supports batching then the first
-      // dimension is -1 and should not appear in the model
-      // configuration 'dims' that we are creating.
-      for (size_t i = (model_support_batching_ ? 1 : 0); i < io->shape_->rank_;
-           ++i) {
-        RETURN_IF_ERROR(dims.AppendInt(io->shape_->dims_[i]));
-      }
+    // The model signature supports batching then the first
+    // dimension is -1 and should not appear in the model
+    // configuration 'dims' that we are creating.
+    for (size_t i = (model_support_batching_ ? 1 : 0); i < io->shape_->rank_;
+         ++i) {
+      RETURN_IF_ERROR(dims.AppendInt(io->shape_->dims_[i]));
+    }
 
-      // If io dims are empty then must use a reshape for the
-      // io, since 'dims' is not allowed to be empty.
-      if (dims.ArraySize() == 0) {
-        RETURN_IF_ERROR(dims.AppendInt(1));
-        ni::TritonJson::Value reshape(
-            *config, ni::TritonJson::ValueType::OBJECT);
-        ni::TritonJson::Value reshape_dims(
-            *config, ni::TritonJson::ValueType::ARRAY);
-        RETURN_IF_ERROR(reshape.Add("shape", std::move(reshape_dims)));
-        RETURN_IF_ERROR(auto_complete_io.Add("reshape", std::move(reshape)));
-      }
+    // If io dims are empty then must use a reshape for the
+    // io, since 'dims' is not allowed to be empty.
+    if (dims.ArraySize() == 0) {
+      RETURN_IF_ERROR(dims.AppendInt(1));
+      ni::TritonJson::Value reshape(*config, ni::TritonJson::ValueType::OBJECT);
+      ni::TritonJson::Value reshape_dims(
+          *config, ni::TritonJson::ValueType::ARRAY);
+      RETURN_IF_ERROR(reshape.Add("shape", std::move(reshape_dims)));
+      RETURN_IF_ERROR(auto_complete_io.Add("reshape", std::move(reshape)));
     }
     RETURN_IF_ERROR(auto_complete_io.Add("dims", std::move(dims)));
     RETURN_IF_ERROR(auto_complete_ios.Append(std::move(auto_complete_io)));
