@@ -163,7 +163,9 @@ AutoFill::Create(
 
 #ifdef TRITON_ENABLE_PYTORCH
   if ((platform == Platform::PLATFORM_PYTORCH_LIBTORCH) ||
-      (platform == Platform::PLATFORM_UNKNOWN)) {
+      (platform == Platform::PLATFORM_UNKNOWN) ||
+      (backend_type == BackendType::BACKEND_TYPE_PYTORCH) ||
+      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
     std::unique_ptr<AutoFill> afpt;
     status = AutoFillPyTorch::Create(model_name, model_path, &afpt);
     LOG_VERBOSE(1) << "PyTorch autofill: " << status.AsString();
@@ -176,7 +178,8 @@ AutoFill::Create(
 
 #ifdef TRITON_ENABLE_CAFFE2
   if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
-      (platform == Platform::PLATFORM_UNKNOWN)) {
+      (platform == Platform::PLATFORM_UNKNOWN) ||
+      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
     std::unique_ptr<AutoFill> afnd;
     status = AutoFillNetDef::Create(model_name, model_path, &afnd);
     LOG_VERBOSE(1) << "Caffe2 NetDef autofill: " << status.AsString();
@@ -199,7 +202,9 @@ AutoFill::Create(
   // an elegent way to handle passing incorrect model format (i.e. ONNX model)
   // to deserializeCudaEngine()
   if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
-      (platform == Platform::PLATFORM_UNKNOWN)) {
+      (platform == Platform::PLATFORM_UNKNOWN) ||
+      (backend_type == BackendType::BACKEND_TYPE_ONNXRUNTIME) ||
+      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
     std::unique_ptr<AutoFill> afox;
 
     // If model operations is specified, use it to set the session options for
@@ -220,7 +225,9 @@ AutoFill::Create(
 
 #ifdef TRITON_ENABLE_TENSORRT
   if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
-      (platform == Platform::PLATFORM_UNKNOWN)) {
+      (platform == Platform::PLATFORM_UNKNOWN) ||
+      (backend_type == BackendType::BACKEND_TYPE_TENSORRT) ||
+      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
     std::unique_ptr<AutoFill> afp;
     status = AutoFillPlan::Create(model_name, model_path, &afp);
     LOG_VERBOSE(1) << "TensorRT autofill: " << status.AsString();
