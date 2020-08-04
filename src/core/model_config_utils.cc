@@ -807,6 +807,28 @@ GetNormalizedModelConfig(
 }
 
 Status
+ValidateModelIOConfig(const ModelConfig& config)
+{
+  Status status;
+  for (const auto& io : config.input()) {
+    status = ValidateModelInput(io, config.max_batch_size(), config.platform());
+    if (!status.IsOk()) {
+      return Status(
+          status.StatusCode(), status.Message() + " for " + config.name());
+    }
+  }
+  for (const auto& io : config.output()) {
+    status =
+        ValidateModelOutput(io, config.max_batch_size(), config.platform());
+    if (!status.IsOk()) {
+      return Status(
+          status.StatusCode(), status.Message() + " for " + config.name());
+    }
+  }
+  return Status::Success;
+}
+
+Status
 ValidateModelConfig(
     const inference::ModelConfig& config, const std::string& expected_platform,
     const double min_compute_capability)
@@ -875,23 +897,6 @@ ValidateModelConfig(
     return Status(
         Status::Code::INVALID_ARG,
         "must specify 'version policy' for " + config.name());
-  }
-
-  Status status;
-  for (const auto& io : config.input()) {
-    status = ValidateModelInput(io, config.max_batch_size(), config.platform());
-    if (!status.IsOk()) {
-      return Status(
-          status.StatusCode(), status.Message() + " for " + config.name());
-    }
-  }
-  for (const auto& io : config.output()) {
-    status =
-        ValidateModelOutput(io, config.max_batch_size(), config.platform());
-    if (!status.IsOk()) {
-      return Status(
-          status.StatusCode(), status.Message() + " for " + config.name());
-    }
   }
 
   // If dynamic batching is specified make sure the preferred batch

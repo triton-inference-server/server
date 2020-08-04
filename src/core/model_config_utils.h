@@ -81,7 +81,9 @@ Status GetNormalizedModelConfig(
     const bool autofill, const double min_compute_capability,
     inference::ModelConfig* config);
 
-/// Validate that a model is specified correctly.
+/// Validate that a model is specified correctly, except for model inputs
+/// and outputs. ValidateModelIOConfig() should be called to
+/// validate model inputs and outputs.
 /// \param config The model configuration to validate.
 /// \param expected_platform If non-empty the model will be checked
 /// to make sure its platform matches this value.
@@ -92,6 +94,12 @@ Status GetNormalizedModelConfig(
 Status ValidateModelConfig(
     const inference::ModelConfig& config, const std::string& expected_platform,
     const double min_compute_capability);
+
+/// Validate that a model inputs and outputs are specified correctly.
+/// \param config The model configuration to validate.
+/// \return The error status. A non-OK status indicates the configuration
+/// is not valid.
+Status ValidateModelIOConfig(const ModelConfig& config);
 
 /// Validate that input is specified correctly in a model
 /// configuration.

@@ -199,8 +199,15 @@ TritonModel::Create(
   std::unique_ptr<TritonModel> local_model(new TritonModel(
       server, localized_model_dir, backend, min_compute_capability,
       auto_complete_config));
-  RETURN_IF_ERROR(
-      local_model->Init(version_path, model_config, "" /* platform */));
+  // If request for auto completion, Init() will be postponed until
+  // UpdateModelConfig() is called as Init() assumes the model config
+  // is well-formed.
+  if (auto_complete_config) {
+    RETURN_IF_ERROR(local_model->SetModelConfig(version_path, model_config));
+  } else {
+    RETURN_IF_ERROR(
+        local_model->Init(version_path, model_config, "" /* platform */));
+  }
 
   TritonModel* raw_local_model = local_model.get();
 
@@ -292,8 +299,6 @@ TritonModel::UpdateModelConfig(
   ModelConfig updated_config;
   RETURN_IF_ERROR(
       JsonToModelConfig({buffer, byte_size}, config_version, &updated_config));
-  // FIXME code below is convoluted as Init() is called in TritonModel::Create()
-  // can this be simplified?
   auto config = Config();
   config.set_max_batch_size(updated_config.max_batch_size());
 

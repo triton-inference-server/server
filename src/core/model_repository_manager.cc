@@ -1640,6 +1640,9 @@ ModelRepositoryManager::Poll(
           full_path, backend_config_map_, autofill_, min_compute_capability_,
           &model_config);
       if (status.IsOk()) {
+        // Note that the model inputs and outputs are not validated until
+        // the model backend is intialized as they may not be auto-completed
+        // until backend is intialized.
         status = ValidateModelConfig(
             model_config, std::string(), min_compute_capability_);
       }
@@ -1788,6 +1791,11 @@ ModelRepositoryManager::UpdateDependencyGraph(
   }
 
 #ifdef TRITON_ENABLE_ENSEMBLE
+  // FIXME: ensemble config validation will not work with new auto-completion
+  // workflow as the model I/O is completed only after the backend is loaded,
+  // but the validation requires model I/O before attempting to load the models.
+  // Thus the validation needs to be postponed until the ensemble is ready to
+  // be loaded, when all depending models are loaded.
   ValidateEnsembleConfig(&affected_ensembles);
 #endif  // TRITON_ENABLE_ENSEMBLE
 
