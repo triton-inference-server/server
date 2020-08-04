@@ -44,7 +44,7 @@ inferencing using the inputs provided in the request to produce the
 requested outputs. The outputs are then formatted and a response is
 sent.
 
-.. image:: images/arch.png
+.. image:: images/arch.jpg
 
 .. _section-concurrent-model-execution:
 
