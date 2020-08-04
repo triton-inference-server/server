@@ -51,6 +51,10 @@ for l in libgrpcclient.so libgrpcclient_static.a libhttpclient.so libhttpclient_
 done
 
 # Test a simple app using Triton gRPC API
+client_lib=$(pwd)/triton_client/lib
+
+# Test linking against the shared library
+rm simple_grpc_client
 g++ grpc_client.cc -o simple_grpc_client -Itriton_client/include \
   -L$(pwd)/triton_client/lib -I/workspace/builddir/grpc/include \
   -I/workspace/builddir/protobuf/include -lgrpcclient
@@ -73,6 +77,31 @@ else
     RET=1
 fi
 
+static_libs="$client_lib/libgrpcclient_static.a $client_lib/libgrpc++.a $client_lib/libgrpc.a \
+             $client_lib/libgpr.a $client_lib/libcares.a $client_lib/libaddress_sorting.a $client_lib/libprotobuf.a \
+             $client_lib/libcurl.a"
+
+g++ grpc_client.cc $static_libs -o simple_grpc_client_static -Itriton_client/include  -I/workspace/builddir/grpc/include \
+  -I/workspace/builddir/protobuf/include -lz -lssl -lcrypto -lpthread
+
+if [ $? -eq 0 ]; then
+    if [[ ! -x "./simple_grpc_client_static" ]]; then
+        echo -e "*** simple_grpc_client_static executable not present\n"
+        RET=1
+    else
+        ./simple_grpc_client_static
+        if [ $? -eq 0 ]; then
+            echo -e "\n***\n*** simple_grpc_client_static exited with 0 PASSED\n***"
+        else
+            echo -e "\n***\n*** simple_grpc_client_static exited with non-zero FAILED\n***"
+            RET=1
+        fi
+    fi
+else
+    echo -e "\n***\n*** Client headers build FAILED\n***"
+    RET=1
+fi
+
 # Test a simple app using Triton HTTP API
 g++ http_client.cc -o simple_http_client -Itriton_client/include \
   -L$(pwd)/triton_client/lib -lhttpclient
@@ -87,6 +116,27 @@ if [ $? -eq 0 ]; then
             echo -e "\n***\n*** simple_http_client exited with 0 PASSED\n***"
         else
             echo -e "\n***\n*** simple_http_client exited with non-zero FAILED\n***"
+            RET=1
+        fi
+    fi
+else
+    echo -e "\n***\n*** Client headers build FAILED\n***"
+    RET=1
+fi
+
+g++ http_client.cc $client_lib/libhttpclient_static.a $client_lib/libcurl.a -o simple_http_client_static \
+  -Itriton_client/include -lz -lssl -lcrypto -lpthread
+
+if [ $? -eq 0 ]; then
+    if [[ ! -x "./simple_http_client_static" ]]; then
+        echo -e "*** simple_http_client executable not present\n"
+        RET=1
+    else
+        ./simple_http_client_static
+        if [ $? -eq 0 ]; then
+            echo -e "\n***\n*** simple_http_client_static exited with 0 PASSED\n***"
+        else
+            echo -e "\n***\n*** simple_http_client_static exited with non-zero FAILED\n***"
             RET=1
         fi
     fi
