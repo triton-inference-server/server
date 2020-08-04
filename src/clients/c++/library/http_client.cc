@@ -53,6 +53,8 @@ namespace nvidia { namespace inferenceserver { namespace client {
 
 namespace {
 
+constexpr char kContentLengthHTTPHeader[] = "Content-Length";
+
 //==============================================================================
 
 // Global initialization for libcurl. Libcurl requires global
@@ -1201,6 +1203,7 @@ InferenceServerHttpClient::InferResponseHeaderHandler(
   size_t byte_size = size * nmemb;
 
   size_t idx = strlen(kInferHeaderContentLengthHTTPHeader);
+  size_t length_idx = strlen(kContentLengthHTTPHeader);
   if ((idx < byte_size) &&
       !strncasecmp(buf, kInferHeaderContentLengthHTTPHeader, idx)) {
     while ((idx < byte_size) && (buf[idx] != ':')) {
@@ -1210,6 +1213,17 @@ InferenceServerHttpClient::InferResponseHeaderHandler(
     if (idx < byte_size) {
       std::string hdr(buf + idx + 1, byte_size - idx - 1);
       request->response_json_size_ = std::stoi(hdr);
+    }
+  } else if (
+      (length_idx < byte_size) &&
+      !strncasecmp(buf, kContentLengthHTTPHeader, length_idx)) {
+    while ((length_idx < byte_size) && (buf[length_idx] != ':')) {
+      ++length_idx;
+    }
+
+    if (length_idx < byte_size) {
+      std::string hdr(buf + length_idx + 1, byte_size - length_idx - 1);
+      request->infer_response_buffer_->reserve(std::stoi(hdr));
     }
   }
 
@@ -1226,13 +1240,11 @@ InferenceServerHttpClient::InferResponseHandler(
     request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
   }
 
-  uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
+  char* buf = reinterpret_cast<char*>(contents);
   size_t result_bytes = size * nmemb;
-  std::copy(
-      buf, buf + result_bytes,
-      std::back_inserter(*request->infer_response_buffer_));
+  request->infer_response_buffer_->append(buf, result_bytes);
 
-  // ResponseHandler may be called multiple times so we overwrite
+  // InferResponseHandler may be called multiple times so we overwrite
   // RECV_END so that we always have the time of the last.
   request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
 
