@@ -28,9 +28,9 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:20.07-py3
-ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.07-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:20.07-tf1-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:20.08-py3
+ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.08-py3
+ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:20.08-tf1-py3
 
 ############################################################################
 ## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
