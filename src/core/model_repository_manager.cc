@@ -1645,6 +1645,9 @@ ModelRepositoryManager::Poll(
         // until backend is intialized.
         status = ValidateModelConfig(
             model_config, std::string(), min_compute_capability_);
+        if (status.IsOk() && (!autofill_)) {
+          status = ValidateModelIOConfig(model_config);
+        }
       }
       if (status.IsOk()) {
         model_info->platform_ = GetPlatform(model_config.platform());
