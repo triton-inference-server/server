@@ -1265,14 +1265,14 @@ class LifeCycleTest(tu.TestResultCollector):
 
     def test_model_control(self):
         model_shape = (1, 16)
-        savedmodel_name = tu.get_model_name('savedmodel', np.float32,
+        onnx_name = tu.get_model_name('onnx', np.float32,
                                             np.float32, np.float32)
 
         ensemble_prefix = "simple_"
-        ensemble_name = ensemble_prefix + savedmodel_name
+        ensemble_name = ensemble_prefix + onnx_name
 
         # Make sure no models are loaded
-        for model_name in (savedmodel_name, ensemble_name):
+        for model_name in (onnx_name, ensemble_name):
             try:
                 for triton_client in (httpclient.InferenceServerClient(
                         "localhost:8000", verbose=True),
@@ -1308,31 +1308,31 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models([
-            "savedmodel",
+            "onnx",
         ], (1, 3), model_shape)
         self._infer_success_models([
-            "simple_savedmodel",
+            "simple_onnx",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
 
-        # Delete model configuration for savedmodel, which will cause
+        # Delete model configuration for onnx, which will cause
         # the autofiller to use the latest version policy so that only
         # version 3 will be available if the models are re-loaded
-        for model_name in (savedmodel_name,):
+        for model_name in (onnx_name,):
             os.remove("models/" + model_name + "/config.pbtxt")
 
         self._infer_success_models([
-            "savedmodel",
+            "onnx",
         ], (1, 3), model_shape)
         self._infer_success_models([
-            "simple_savedmodel",
+            "simple_onnx",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
 
-        # Reload models, only version 3 should be available for savedmodel
-        for model_name in (savedmodel_name, ensemble_name):
+        # Reload models, only version 3 should be available for onnx
+        for model_name in (onnx_name, ensemble_name):
             try:
                 triton_client = grpcclient.InferenceServerClient(
                     "localhost:8001", verbose=True)
@@ -1341,15 +1341,15 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models([
-            "savedmodel",
+            "onnx",
         ], (3,), model_shape)
         self._infer_success_models([
-            "simple_savedmodel",
+            "simple_onnx",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
 
-        for model_name in (savedmodel_name,):
+        for model_name in (onnx_name,):
             try:
                 for triton_client in (httpclient.InferenceServerClient(
                         "localhost:8000", verbose=True),
@@ -1377,11 +1377,11 @@ class LifeCycleTest(tu.TestResultCollector):
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
-            triton_client.unload_model(savedmodel_name)
+            triton_client.unload_model(onnx_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        for model_name in (savedmodel_name, ensemble_name):
+        for model_name in (onnx_name, ensemble_name):
             try:
                 for triton_client in (httpclient.InferenceServerClient(
                         "localhost:8000", verbose=True),
@@ -1403,12 +1403,12 @@ class LifeCycleTest(tu.TestResultCollector):
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
             triton_client.unload_model(ensemble_name)
-            triton_client.load_model(savedmodel_name)
+            triton_client.load_model(onnx_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models([
-            "savedmodel",
+            "onnx",
         ], (3,), model_shape)
 
         try:
@@ -1427,14 +1427,14 @@ class LifeCycleTest(tu.TestResultCollector):
 
     def test_multiple_model_repository_control_startup_models(self):
         model_shape = (1, 16)
-        savedmodel_name = tu.get_model_name('savedmodel', np.float32,
+        onnx_name = tu.get_model_name('onnx', np.float32,
                                             np.float32, np.float32)
-        graphdef_name = tu.get_model_name('graphdef', np.float32, np.float32,
+        plan_name = tu.get_model_name('plan', np.float32, np.float32,
                                           np.float32)
 
         ensemble_prefix = "simple_"
-        savedmodel_ensemble_name = ensemble_prefix + savedmodel_name
-        graphdef_ensemble_name = ensemble_prefix + graphdef_name
+        onnx_ensemble_name = ensemble_prefix + onnx_name
+        plan_ensemble_name = ensemble_prefix + plan_name
 
         # Make sure unloaded models are not in the status
         for base in ("netdef",):
@@ -1456,15 +1456,15 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # And loaded models work properly
         self._infer_success_models([
-            "savedmodel",
+            "onnx",
         ], (1, 3), model_shape)
         self._infer_success_models([
-            "simple_savedmodel",
+            "simple_onnx",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
         self._infer_success_models([
-            "graphdef",
+            "plan",
         ], (1, 3), model_shape)
 
         # Load non-existing model
@@ -1479,20 +1479,20 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(ex.message().startswith(
                     "failed to load 'unknown_model', no version is available"))
 
-        # Load graphdef ensemble model, the dependent model is already
+        # Load plan ensemble model, the dependent model is already
         # loaded via command-line
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
-            triton_client.load_model(graphdef_ensemble_name)
+            triton_client.load_model(plan_ensemble_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models([
-            "graphdef",
+            "plan",
         ], (1, 3), model_shape)
         self._infer_success_models([
-            "simple_graphdef",
+            "simple_plan",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
@@ -1500,30 +1500,30 @@ class LifeCycleTest(tu.TestResultCollector):
         # Delete model configuration, which will cause the autofiller
         # to use the latest version policy so that only version 3 will
         # be available if the models are re-loaded
-        os.remove("models/" + savedmodel_name + "/config.pbtxt")
+        os.remove("models/" + onnx_name + "/config.pbtxt")
 
         self._infer_success_models([
-            "graphdef",
+            "plan",
         ], (1, 3), model_shape)
         self._infer_success_models([
-            "simple_graphdef",
+            "simple_plan",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
 
-        # Reload savedmodel, only version 3 should be available
+        # Reload onnx, only version 3 should be available
         try:
             triton_client = grpcclient.InferenceServerClient("localhost:8001",
                                                              verbose=True)
-            triton_client.load_model(savedmodel_name)
+            triton_client.load_model(onnx_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models([
-            "savedmodel",
+            "onnx",
         ], (3,), model_shape)
         self._infer_success_models([
-            "simple_savedmodel",
+            "simple_onnx",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
@@ -1536,7 +1536,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(
-                    triton_client.is_model_ready(savedmodel_name, "1"))
+                    triton_client.is_model_ready(onnx_name, "1"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1550,16 +1550,16 @@ class LifeCycleTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Unload the savedmodel, as side effect, the ensemble model
+        # Unload the onnx, as side effect, the ensemble model
         # will be forced to be unloaded
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
-            triton_client.unload_model(savedmodel_name)
+            triton_client.unload_model(onnx_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        for model_name in [savedmodel_name, savedmodel_ensemble_name]:
+        for model_name in [onnx_name, onnx_ensemble_name]:
             try:
                 for triton_client in (httpclient.InferenceServerClient(
                         "localhost:8000", verbose=True),
@@ -1574,25 +1574,25 @@ class LifeCycleTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Explicitly unload the savedmodel ensemble and load the
+        # Explicitly unload the onnx ensemble and load the
         # depending model. The ensemble model should not be reloaded
         # because it was explicitly unloaded.
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
-            triton_client.unload_model(savedmodel_ensemble_name)
-            triton_client.load_model(savedmodel_name)
+            triton_client.unload_model(onnx_ensemble_name)
+            triton_client.load_model(onnx_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models([
-            "savedmodel",
+            "onnx",
         ], (3,), model_shape)
         self._infer_success_models([
-            "graphdef",
+            "plan",
         ], (1, 3), model_shape)
         self._infer_success_models([
-            "simple_graphdef",
+            "simple_plan",
         ], (1, 3),
                                    model_shape,
                                    swap=True)
@@ -1605,9 +1605,9 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(
-                    triton_client.is_model_ready(savedmodel_ensemble_name, "1"))
+                    triton_client.is_model_ready(onnx_ensemble_name, "1"))
                 self.assertFalse(
-                    triton_client.is_model_ready(savedmodel_ensemble_name, "3"))
+                    triton_client.is_model_ready(onnx_ensemble_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 

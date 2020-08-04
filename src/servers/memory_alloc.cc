@@ -501,6 +501,9 @@ main(int argc, char** argv)
           server_options, "/opt/tritonserver/backends"),
       "setting backend directory");
   FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetStrictModelConfig(server_options, true),
+      "setting strict model configuration");
+  FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
           server_options, TRITON_MIN_COMPUTE_CAPABILITY),
       "setting minimum supported CUDA compute capability");

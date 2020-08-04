@@ -72,6 +72,25 @@ ParseStringToDouble(const std::string& str, double* val)
   return Status::Success;
 }
 
+Status
+ParseStringToBool(const std::string& str, bool* val)
+{
+  try {
+    std::string lowercase_str{str};
+    std::transform(
+        lowercase_str.begin(), lowercase_str.end(), lowercase_str.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+    *val = (lowercase_str == "true");
+  }
+  catch (...) {
+    return Status(
+        Status::Code::INTERNAL,
+        "unable to parse common backend configuration as bool");
+  }
+
+  return Status::Success;
+}
+
 }  // namespace
 
 Status
@@ -91,6 +110,7 @@ TritonModel::Create(
 #else
   double min_compute_capability = 0;
 #endif  // TRITON_ENABLE_GPU
+  bool auto_complete_config = false;
   {
     const auto& itr = backend_cmdline_config_map.find(std::string());
     if (itr == backend_cmdline_config_map.end()) {
@@ -107,6 +127,12 @@ TritonModel::Create(
         itr->second, "min-compute-capability", &min_compute_capability_str));
     RETURN_IF_ERROR(ParseStringToDouble(
         min_compute_capability_str, &min_compute_capability));
+
+    std::string auto_complete_config_str;
+    RETURN_IF_ERROR(BackendConfiguration(
+        itr->second, "auto-complete-config", &auto_complete_config_str));
+    RETURN_IF_ERROR(
+        ParseStringToBool(auto_complete_config_str, &auto_complete_config));
   }
 
   // The model configuration must specify a backend. The name of the
@@ -171,9 +197,20 @@ TritonModel::Create(
 
   // Create and initialize the model.
   std::unique_ptr<TritonModel> local_model(new TritonModel(
-      server, localized_model_dir, backend, min_compute_capability));
-  RETURN_IF_ERROR(
-      local_model->Init(version_path, model_config, "" /* platform */));
+      server, localized_model_dir, backend, min_compute_capability,
+      auto_complete_config));
+  // If request for auto completion, Init() will be postponed until
+  // UpdateModelConfig() is called as Init() assumes the model config
+  // is well-formed.
+  // FIXME: the backend never calls SetModelConfig then Init will not be called,
+  // need to revisit this once all backends are moved over and we can get rid of
+  // the InferenceBackend class.
+  if (auto_complete_config) {
+    RETURN_IF_ERROR(local_model->SetModelConfig(version_path, model_config));
+  } else {
+    RETURN_IF_ERROR(
+        local_model->Init(version_path, model_config, "" /* platform */));
+  }
 
   TritonModel* raw_local_model = local_model.get();
 
@@ -183,6 +220,7 @@ TritonModel::Create(
     RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(
         reinterpret_cast<TRITONBACKEND_Model*>(raw_local_model)));
   }
+  local_model->initialized_ = true;
 
   // Create and initialize the model instances for this model.
   RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
@@ -248,6 +286,36 @@ TritonModel::Create(
   return Status::Success;
 }
 
+Status
+TritonModel::UpdateModelConfig(
+    const uint32_t config_version, TRITONSERVER_Message* updated_config_message)
+{
+  if (initialized_) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "model config can not be set once model is initialized");
+  }
+  const char* buffer;
+  size_t byte_size;
+  RETURN_IF_TRITONSERVER_ERROR(TRITONSERVER_MessageSerializeToJson(
+      updated_config_message, &buffer, &byte_size));
+  inference::ModelConfig updated_config;
+  RETURN_IF_ERROR(
+      JsonToModelConfig({buffer, byte_size}, config_version, &updated_config));
+  auto config = Config();
+  config.set_max_batch_size(updated_config.max_batch_size());
+
+  auto inputs_config = config.mutable_input();
+  *inputs_config = updated_config.input();
+  auto outputs_config = config.mutable_output();
+  *outputs_config = updated_config.output();
+
+  RETURN_IF_ERROR(Init(
+      JoinPath({LocalizedModelPath(), std::to_string(Version())}), config,
+      "" /* platform */));
+  return Status::Success;
+}
+
 void
 TritonModel::WarmUp(uint32_t runner_idx, WarmupData& sample)
 {
@@ -291,10 +359,11 @@ TritonModel::TritonModel(
     InferenceServer* server,
     const std::shared_ptr<LocalizedDirectory>& localized_model_dir,
     const std::shared_ptr<TritonBackend>& backend,
-    const double min_compute_capability)
+    const double min_compute_capability, const bool auto_complete_config)
     : InferenceBackend(min_compute_capability), server_(server),
+      auto_complete_config_(auto_complete_config),
       localized_model_dir_(localized_model_dir), backend_(backend),
-      state_(nullptr)
+      state_(nullptr), initialized_(false)
 {
 }
 
@@ -363,6 +432,29 @@ TRITONBACKEND_ModelConfig(
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(std::move(model_config_json)));
 
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelAutoCompleteConfig(
+    TRITONBACKEND_Model* model, bool* auto_complete_config)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *auto_complete_config = tm->AutoCompleteConfig();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelSetConfig(
+    TRITONBACKEND_Model* model, const uint32_t config_version,
+    TRITONSERVER_Message* model_config)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  Status status = tm->UpdateModelConfig(config_version, model_config);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
   return nullptr;  // success
 }
 

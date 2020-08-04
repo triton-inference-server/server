@@ -614,6 +614,10 @@ GetNormalizedModelConfig(
     RETURN_IF_ERROR(ReadTextProto(config_path, config));
   }
 
+  // FIXME need to check other Triton components on how they retrieve model
+  // config. The new workflow will let model backend contains the most updated
+  // config after the model is loaded, in other word, should always retrieve
+  // config with backend.Config().
   // Autofill if requested...
   if (autofill) {
     const std::string model_name(BaseName(path));
@@ -803,6 +807,28 @@ GetNormalizedModelConfig(
 }
 
 Status
+ValidateModelIOConfig(const inference::ModelConfig& config)
+{
+  Status status;
+  for (const auto& io : config.input()) {
+    status = ValidateModelInput(io, config.max_batch_size(), config.platform());
+    if (!status.IsOk()) {
+      return Status(
+          status.StatusCode(), status.Message() + " for " + config.name());
+    }
+  }
+  for (const auto& io : config.output()) {
+    status =
+        ValidateModelOutput(io, config.max_batch_size(), config.platform());
+    if (!status.IsOk()) {
+      return Status(
+          status.StatusCode(), status.Message() + " for " + config.name());
+    }
+  }
+  return Status::Success;
+}
+
+Status
 ValidateModelConfig(
     const inference::ModelConfig& config, const std::string& expected_platform,
     const double min_compute_capability)
@@ -871,23 +897,6 @@ ValidateModelConfig(
     return Status(
         Status::Code::INVALID_ARG,
         "must specify 'version policy' for " + config.name());
-  }
-
-  Status status;
-  for (const auto& io : config.input()) {
-    status = ValidateModelInput(io, config.max_batch_size(), config.platform());
-    if (!status.IsOk()) {
-      return Status(
-          status.StatusCode(), status.Message() + " for " + config.name());
-    }
-  }
-  for (const auto& io : config.output()) {
-    status =
-        ValidateModelOutput(io, config.max_batch_size(), config.platform());
-    if (!status.IsOk()) {
-      return Status(
-          status.StatusCode(), status.Message() + " for " + config.name());
-    }
   }
 
   // If dynamic batching is specified make sure the preferred batch
@@ -1656,6 +1665,30 @@ ModelConfigToJson(
   config_json.Write(&buffer);
   *json_str = std::move(buffer.MutableContents());
 
+  return Status::Success;
+}
+
+Status
+JsonToModelConfig(
+    const std::string& json_config, const uint32_t config_version,
+    inference::ModelConfig* protobuf_config)
+{
+  // Currently only support 'config_version' 1, which is the json
+  // representation of the ModelConfig protobuf matches the representation in
+  // ModelConfigToJson().
+  if (config_version != 1) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        std::string("model configuration version ") +
+            std::to_string(config_version) +
+            " not supported, supported versions are: 1");
+  }
+
+  ::google::protobuf::util::JsonParseOptions options;
+  options.case_insensitive_enum_parsing = true;
+  options.ignore_unknown_fields = false;
+  ::google::protobuf::util::JsonStringToMessage(
+      json_config, protobuf_config, options);
   return Status::Success;
 }
 
