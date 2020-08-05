@@ -58,7 +58,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../../lib/tensorflow"
+    INSTALL_RPATH "$\{ORIGIN\}/../../backends/tensorflow1"
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
     LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
 )
@@ -71,7 +71,7 @@ target_link_libraries(
 install(
   TARGETS
     triton_tensorflow1
-  LIBRARY DESTINATION backends
+  LIBRARY DESTINATION backends/tensorflow1
 )
 
 add_library(
@@ -88,20 +88,21 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../../lib/tensorflow"
+    INSTALL_RPATH "$\{ORIGIN\}/../../backends/tensorflow2"
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
     LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
 )
-# FIXME currently linking against Triton-TF 1 library for successful build,
-# should change to '-ltensorflow_trtis' once Triton-TF 2 library is available
+# FIXME currently not linking against Triton-TF 2 library for successful build,
+# the symbols are undefined, should uncomment it once Triton-TF 2 library is
+# available
 target_link_libraries(
   triton_tensorflow2
   PUBLIC ${TRITON_EXTRA_LDFLAGS}
-  PUBLIC -ltensorflow_trtis
+  #PUBLIC -ltensorflow_triton
 )
 
 install(
   TARGETS
     triton_tensorflow2
-  LIBRARY DESTINATION backends
+  LIBRARY DESTINATION backends/tensorflow2
 )
