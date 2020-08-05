@@ -215,27 +215,24 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# copy contents of /models into S3 bucket and wait for them to be loaded.
+# copy contents of /models into GCS bucket and wait for them to be loaded.
 gsutil -m cp -r models/ "$BUCKET_URL_SLASH"
 sleep 120
 
 set +e
 
-# python unittest seems to swallow ImportError and still return 0
-# exit code. So need to explicitly check CLIENT_LOG to make sure
-# we see some running tests
 python $INFER_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
-fi
-
-grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 
 set -e
