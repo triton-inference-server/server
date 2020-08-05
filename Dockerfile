@@ -324,16 +324,17 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                   -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
-                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
+                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
                   ../build && \
             make -j16 server && \
             mkdir -p /opt/tritonserver/include && \
             cp -r server/install/bin /opt/tritonserver/. && \
             cp -r server/install/lib /opt/tritonserver/. && \
+            cp -r server/install/backends /opt/tritonserver/. && \
             cp -r server/install/include /opt/tritonserver/include/tritonserver) && \
     (cd /opt/tritonserver && ln -sf /workspace/qa qa) && \
     (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/backends/tensorflow1 && chmod ugo-w+rx *) && \
+    (cd /opt/tritonserver/backends && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/pytorch && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/onnx && chmod ugo-w+rx *)
 

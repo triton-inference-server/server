@@ -58,7 +58,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../../backends/tensorflow1"
+    INSTALL_RPATH "$\{ORIGIN\}"
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
     LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
 )
@@ -88,7 +88,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../../backends/tensorflow2"
+    INSTALL_RPATH "$\{ORIGIN\}"
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
     LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
 )
