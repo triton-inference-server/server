@@ -59,10 +59,6 @@
 #ifdef TRITON_ENABLE_PYTORCH
 #include "src/backends/pytorch/libtorch_backend_factory.h"
 #endif  // TRITON_ENABLE_PYTORCH
-#ifdef TRITON_ENABLE_TENSORFLOW
-#include "src/backends/tensorflow/graphdef_backend_factory.h"
-#include "src/backends/tensorflow/savedmodel_backend_factory.h"
-#endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
 #include "src/backends/tensorrt/plan_backend_factory.h"
 #endif  // TRITON_ENABLE_TENSORRT
@@ -107,40 +103,6 @@ BuildBackendConfigMap(
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     BackendConfigMap* backend_configs)
 {
-#ifdef TRITON_ENABLE_TENSORFLOW
-  //// Tensorflow GraphDef and SavedModel
-  {
-    auto graphdef_config = std::make_shared<GraphDefBackendFactory::Config>();
-    graphdef_config->autofill = !strict_model_config;
-
-    if (tf_gpu_memory_fraction == 0.0) {
-      graphdef_config->allow_gpu_memory_growth = true;
-    } else {
-      graphdef_config->allow_gpu_memory_growth = false;
-      graphdef_config->per_process_gpu_memory_fraction = tf_gpu_memory_fraction;
-    }
-
-#ifdef TRITON_ENABLE_GPU
-    int device_cnt = 0;
-    cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
-    if ((cuerr == cudaErrorNoDevice) ||
-        (cuerr == cudaErrorInsufficientDriver)) {
-      device_cnt = 0;
-    } else if (cuerr != cudaSuccess) {
-      LOG_ERROR << "unable to get number of CUDA devices while building "
-                   "BackendConfigMap: ("
-                << cuerr << ") " << cudaGetErrorString(cuerr);
-      device_cnt = 0;
-    }
-#endif  // TRITON_ENABLE_GPU
-
-    graphdef_config->allow_soft_placement = tf_allow_soft_placement;
-
-    (*backend_configs)[kTensorFlowGraphDefPlatform] = graphdef_config;
-    (*backend_configs)[kTensorFlowSavedModelPlatform] = graphdef_config;
-  }
-#endif  // TRITON_ENABLE_TENSORFLOW
-
 #ifdef TRITON_ENABLE_CAFFE2
   //// Caffe NetDef
   {
@@ -408,10 +370,6 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::unique_ptr<TritonBackendFactory> triton_backend_factory_;
   std::unique_ptr<CustomBackendFactory> custom_factory_;
 #endif  // TRITON_ENABLE_CUSTOM
-#ifdef TRITON_ENABLE_TENSORFLOW
-  std::unique_ptr<GraphDefBackendFactory> graphdef_factory_;
-  std::unique_ptr<SavedModelBackendFactory> savedmodel_factory_;
-#endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
   std::unique_ptr<PlanBackendFactory> plan_factory_;
 #endif  // TRITON_ENABLE_TENSORRT
@@ -435,21 +393,6 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
       new BackendLifeCycle(min_compute_capability));
-
-#ifdef TRITON_ENABLE_TENSORFLOW
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_config_map.find(kTensorFlowGraphDefPlatform)->second;
-    RETURN_IF_ERROR(GraphDefBackendFactory::Create(
-        config, &(local_life_cycle->graphdef_factory_)));
-  }
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_config_map.find(kTensorFlowSavedModelPlatform)->second;
-    RETURN_IF_ERROR(SavedModelBackendFactory::Create(
-        config, &(local_life_cycle->savedmodel_factory_)));
-  }
-#endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_CAFFE2
   {
     const std::shared_ptr<BackendConfig>& config =
@@ -870,16 +813,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 #endif  // TRITON_ENABLE_CUSTOM
   {
     switch (backend_info->platform_) {
-#ifdef TRITON_ENABLE_TENSORFLOW
-      case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
-        status = graphdef_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        break;
-      case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
-        status = savedmodel_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        break;
-#endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
       case Platform::PLATFORM_TENSORRT_PLAN:
         status = plan_factory_->CreateBackend(

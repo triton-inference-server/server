@@ -54,11 +54,18 @@ if(${TRITON_ENABLE_GPU})
 endif() # TRITON_ENABLE_GPU
 set_target_properties(
   triton_tensorflow
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}/../../lib/tensorflow"
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
 )
-set_target_properties(
+target_link_libraries(
   triton_tensorflow
-  PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
+  PUBLIC ${TRITON_EXTRA_LDFLAGS}
+  PUBLIC -ltensorflow_trtis
 )
 
 install(
