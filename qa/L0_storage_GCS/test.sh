@@ -55,8 +55,20 @@ echo '"token_uri": "https://oauth2.googleapis.com/token",' >> $GOOGLE_APPLICATIO
 echo '"auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",' >> $GOOGLE_APPLICATION_CREDENTIALS
 echo '"client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/hemantj%40triton-285001.iam.gserviceaccount.com"}' >> $GOOGLE_APPLICATION_CREDENTIALS 
 
-# Google cloud variables (Point to bucket when testing cloud storage)
+# Create .boto file (Needed to configure gsutil/google-cloud-sdk)
+echo '[Credentials]' >> /root/.boto
+echo -e 'gs_service_key_file = '$PWD'/'$GOOGLE_APPLICATION_CREDENTIALS >> /root/.boto
+echo '[Boto]' >> /root/.boto
+echo 'https_validate_certificates = True' >> /root/.boto
+echo '[GSUtil]' >> /root/.boto
+echo 'content_language = en' >> /root/.boto
+echo 'default_api_version = 2' >> /root/.boto
+echo 'default_project_id = triton-285001' >> /root/.boto
+
 BUCKET_URL="gs://triton-bucket-${CI_PIPELINE_ID}"
+
+# Make test bucket
+gsutil mb "${BUCKET_URL}"
 
 # Remove Slash in BUCKET_URL
 BUCKET_URL=${BUCKET_URL%/}
