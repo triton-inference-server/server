@@ -115,7 +115,7 @@ for MAYBE_SLASH in "" "/"; do
 
     # run with a non-root empty model repo
     touch models/dummy
-    gsutil cp -r models/ "$BUCKET_URL_SLASH"
+    gsutil -m cp -r models/ "$BUCKET_URL_SLASH"
 
     SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120 "
 
@@ -216,8 +216,8 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 # copy contents of /models into S3 bucket and wait for them to be loaded.
-gsutil cp -r models/ "$BUCKET_URL_SLASH"
-sleep 60
+gsutil -m cp -r models/ "$BUCKET_URL_SLASH"
+sleep 120
 
 set +e
 
@@ -244,7 +244,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Delete all contents of bucket and bucket itself
-gsutil rm -r "${BUCKET_URL}"
+gsutil -m rm -r "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
