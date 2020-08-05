@@ -27,7 +27,7 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# libtriton_tensorflow.so
+# libtriton_tensorflow1.so and libtriton_tensorflow2.so
 #
 configure_file(libtriton_tensorflow.ldscript libtriton_tensorflow.ldscript COPYONLY)
 
@@ -45,15 +45,15 @@ set(
 )
 
 add_library(
-  triton_tensorflow SHARED
+  triton_tensorflow1 SHARED
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
   $<TARGET_OBJECTS:backend-utils-library>
 )
 if(${TRITON_ENABLE_GPU})
-  target_include_directories(triton_tensorflow PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(triton_tensorflow1 PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
 set_target_properties(
-  triton_tensorflow
+  triton_tensorflow1
   PROPERTIES
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
@@ -63,13 +63,45 @@ set_target_properties(
     LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
 )
 target_link_libraries(
-  triton_tensorflow
+  triton_tensorflow1
   PUBLIC ${TRITON_EXTRA_LDFLAGS}
   PUBLIC -ltensorflow_trtis
 )
 
 install(
   TARGETS
-    triton_tensorflow
+    triton_tensorflow1
+  LIBRARY DESTINATION backends
+)
+
+add_library(
+  triton_tensorflow2 SHARED
+  ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
+  $<TARGET_OBJECTS:backend-utils-library>
+)
+if(${TRITON_ENABLE_GPU})
+  target_include_directories(triton_tensorflow2 PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRITON_ENABLE_GPU
+set_target_properties(
+  triton_tensorflow2
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}/../../lib/tensorflow"
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
+)
+# FIXME currently linking against Triton-TF 1 library for successful build,
+# should change to '-ltensorflow_trtis' once Triton-TF 2 library is available
+target_link_libraries(
+  triton_tensorflow2
+  PUBLIC ${TRITON_EXTRA_LDFLAGS}
+  PUBLIC -ltensorflow_trtis
+)
+
+install(
+  TARGETS
+    triton_tensorflow2
   LIBRARY DESTINATION backends
 )

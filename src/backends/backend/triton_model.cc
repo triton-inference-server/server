@@ -150,8 +150,25 @@ TritonModel::Create(
   RETURN_IF_ERROR(LocalizeDirectory(
       JoinPath({model_repository_path, model_name}), &localized_model_dir));
 
-  const std::string backend_libname =
-      "libtriton_" + model_config.backend() + ".so";
+  std::string backend_libname = "libtriton_" + model_config.backend() + ".so";
+  if (model_config.backend() == "tensorflow") {
+    backend_libname = "libtriton_" + model_config.backend() + "1.so";
+    const auto& itr = backend_cmdline_config_map.find(model_config.backend());
+    if (itr != backend_cmdline_config_map.end()) {
+      std::string tf_version_str;
+      if (BackendConfiguration(itr->second, "version", &tf_version_str)
+              .IsOk()) {
+        if ((tf_version_str != "1") && (tf_version_str != "2")) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "unexpected TensorFlow library version '" + tf_version_str +
+                  "', expects 1 or 2.");
+        }
+        backend_libname =
+            "libtriton_" + model_config.backend() + tf_version_str + ".so";
+      }
+    }
+  }
 
   // Get the path to the backend shared library. Search path is
   // version directory, model directory, global backend directory.

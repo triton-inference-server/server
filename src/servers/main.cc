@@ -639,6 +639,13 @@ Usage()
             "allocate all of GPU memory.",
             0)
      << std::endl;
+  ss << "  --backend-config=tensorflow,version=<int>" << std::endl;
+  ss << "\t"
+     << FormatUsageMessage(
+            "Select the version of the TensorFlow library to be used, "
+            "available version is 1 and 2. Default TensorFlow version is 1.",
+            0)
+     << std::endl;
 
   return ss.str();
 }

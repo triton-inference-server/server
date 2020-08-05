@@ -331,7 +331,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cp -r server/install/bin /opt/tritonserver/. && \
             cp -r server/install/lib /opt/tritonserver/. && \
             mkdir -p /opt/tritonserver/backends/tensorflow && \
-            cp -r server/install/backends/libtriton_tensorflow.so /opt/tritonserver/backends/tensorflow/. && \
+            cp -r server/install/backends/libtriton_tensorflow*.so /opt/tritonserver/backends/tensorflow/. && \
             cp -r server/install/include /opt/tritonserver/include/tritonserver) && \
     (cd /opt/tritonserver && ln -sf /workspace/qa qa) && \
     (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
