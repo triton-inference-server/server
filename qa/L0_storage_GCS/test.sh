@@ -206,7 +206,7 @@ for MAYBE_SLASH in "" "/"; do
 done 
 
 # Test with polling enabled
-SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --model-control-mode=poll"
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120 --model-control-mode=poll"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -216,7 +216,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 # copy contents of /models into GCS bucket and wait for them to be loaded.
-gsutil -m cp -r models/ "$BUCKET_URL_SLASH"
+gsutil -m cp -r models/* "$BUCKET_URL_SLASH"
 sleep 120
 
 set +e
