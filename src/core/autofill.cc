@@ -123,15 +123,16 @@ AutoFill::Create(
     defined(TRITON_ENABLE_PYTORCH)
   const Platform platform = GetPlatform(config.platform());
   const BackendType backend_type = GetBackendType(config.backend());
+  bool unknown_model =
+      ((platform == Platform::PLATFORM_UNKNOWN) &&
+       (backend_type == BackendType::BACKEND_TYPE_UNKNOWN));
 #endif
 
   Status status;
 
 #ifdef TRITON_ENABLE_TENSORFLOW
   if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
-      (platform == Platform::PLATFORM_UNKNOWN) ||
-      (backend_type == BackendType::BACKEND_TYPE_TENSORFLOW) ||
-      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
+      (backend_type == BackendType::BACKEND_TYPE_TENSORFLOW) || unknown_model) {
     // FIXME drop the AutoFillXXX once autofill for all backends is merely
     // filling platform / backend
     std::unique_ptr<AutoFill> afsm;
@@ -146,9 +147,7 @@ AutoFill::Create(
   }
 
   if ((platform == Platform::PLATFORM_TENSORFLOW_GRAPHDEF) ||
-      (platform == Platform::PLATFORM_UNKNOWN) ||
-      (backend_type == BackendType::BACKEND_TYPE_TENSORFLOW) ||
-      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
+      (backend_type == BackendType::BACKEND_TYPE_TENSORFLOW) || unknown_model) {
     // FIXME drop the AutoFillXXX once autofill for all backends is merely
     // filling platform / backend
     std::unique_ptr<AutoFill> afgd;
@@ -163,9 +162,7 @@ AutoFill::Create(
 
 #ifdef TRITON_ENABLE_PYTORCH
   if ((platform == Platform::PLATFORM_PYTORCH_LIBTORCH) ||
-      (platform == Platform::PLATFORM_UNKNOWN) ||
-      (backend_type == BackendType::BACKEND_TYPE_PYTORCH) ||
-      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
+      (backend_type == BackendType::BACKEND_TYPE_PYTORCH) || unknown_model) {
     std::unique_ptr<AutoFill> afpt;
     status = AutoFillPyTorch::Create(model_name, model_path, &afpt);
     LOG_VERBOSE(1) << "PyTorch autofill: " << status.AsString();
@@ -177,9 +174,7 @@ AutoFill::Create(
 #endif  // TRITON_ENABLE_PYTORCH
 
 #ifdef TRITON_ENABLE_CAFFE2
-  if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
-      (platform == Platform::PLATFORM_UNKNOWN) ||
-      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
+  if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) || unknown_model) {
     std::unique_ptr<AutoFill> afnd;
     status = AutoFillNetDef::Create(model_name, model_path, &afnd);
     LOG_VERBOSE(1) << "Caffe2 NetDef autofill: " << status.AsString();
@@ -202,9 +197,8 @@ AutoFill::Create(
   // an elegent way to handle passing incorrect model format (i.e. ONNX model)
   // to deserializeCudaEngine()
   if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
-      (platform == Platform::PLATFORM_UNKNOWN) ||
       (backend_type == BackendType::BACKEND_TYPE_ONNXRUNTIME) ||
-      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
+      unknown_model) {
     std::unique_ptr<AutoFill> afox;
 
     // If model operations is specified, use it to set the session options for
@@ -225,9 +219,7 @@ AutoFill::Create(
 
 #ifdef TRITON_ENABLE_TENSORRT
   if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
-      (platform == Platform::PLATFORM_UNKNOWN) ||
-      (backend_type == BackendType::BACKEND_TYPE_TENSORRT) ||
-      (backend_type == BackendType::BACKEND_TYPE_UNKNOWN)) {
+      (backend_type == BackendType::BACKEND_TYPE_TENSORRT) || unknown_model) {
     std::unique_ptr<AutoFill> afp;
     status = AutoFillPlan::Create(model_name, model_path, &afp);
     LOG_VERBOSE(1) << "TensorRT autofill: " << status.AsString();
