@@ -125,3 +125,5 @@ string(REPLACE "../../../../" "../../../../../../../../../"  PROTO_FIX_PY ${PROT
 
 install(FILES ${protocol_core_py} ${PROTO_FIX_PY} ${protocol_grpc_py} resources/startup.py
        DESTINATION lib/python/runtime)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/utils.py
+       DESTINATION lib/python/runtime)

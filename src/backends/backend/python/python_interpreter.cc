@@ -321,8 +321,8 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
   for (int i = 0; i < conn_attempts; ++i) {
     grpc::ClientContext context;
     ni::Empty null_msg;
-    const auto err = stub->Init(&context, *initialization_params, &null_msg);
-    if (err.ok()) {
+    const auto status = stub->Init(&context, *initialization_params, &null_msg);
+    if (status.ok()) {
       return nullptr;
     } else {
       std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -565,15 +565,20 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
 
   std::unique_ptr<BackendState> backend_state(new BackendState());
   ni::TritonJson::Value cmdline;
+  bool found_py_runtime_config = false;
   if (backend_config.Find("cmdline", &cmdline)) {
     ni::TritonJson::Value value;
     if (cmdline.Find("python-runtime", &value)) {
       RETURN_IF_ERROR(value.AsString(&backend_state->python_runtime));
-    } else {
-      // Set the default path for python runtime
-      backend_state->python_runtime = "/opt/tritonserver/lib/python/runtime";
+      found_py_runtime_config = true;
     }
   }
+
+  // Set the default path for python runtime
+  if (!found_py_runtime_config) {
+    backend_state->python_runtime = "/opt/tritonserver/lib/python/runtime";
+  }
+
   RETURN_IF_ERROR(TRITONBACKEND_BackendSetState(
       backend, reinterpret_cast<void*>(backend_state.get())));
 
@@ -662,7 +667,7 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
   RETURN_ERROR_IF_FALSE(
       instance_state->Kind() == TRITONSERVER_INSTANCEGROUPKIND_CPU,
       TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("'python_interpreter' backend only supports CPU instances"));
+      std::string("python backend only supports CPU instances"));
 
   RETURN_IF_ERROR(instance_state->CreatePythonInterpreter());
 
@@ -744,8 +749,21 @@ TRITONBACKEND_ModelInstanceExecute(
   ni::ExecuteResponse execute_response;
 
   // Perform inference on the Python side
-  const auto err = instance_state->stub->Execute(
+  const auto status = instance_state->stub->Execute(
       &context, execute_request, &execute_response);
+
+  if (!status.ok()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        ("Exucte GRPC Failed, message: " + std::string(status.error_message()))
+            .c_str());
+  }
+
+  if ((unsigned)execute_response.responses().size() != request_count) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Python response size does not match the number of requests");
+  }
 
   for (uint32_t r = 0; r < request_count; ++r) {
     TRITONBACKEND_Response* response = responses[r];
