@@ -236,10 +236,10 @@ def create_plugin_models(models_dir):
     model_version = 1
 
     # default CustomGeluPluginDynamic plugin
-    create_plan_modelconfig(models_dir, 1, model_version,
+    create_plan_modelconfig(models_dir, 0, model_version,
                             "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),
                             np.float32, np.float32)
-    create_plan_modelfile(models_dir, 1, model_version,
+    create_plan_modelfile(models_dir, 0, model_version,
                           "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),
                           np.float32, np.float32)
 
