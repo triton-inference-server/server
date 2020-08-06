@@ -765,7 +765,6 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype,
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, input_shapes[0],
                                       input_shapes[0], input_shapes[0]):
         return
-
     onnx_dtype = np_to_onnx_dtype(dtype)
     io_cnt = len(input_shapes)
 
@@ -1069,6 +1068,9 @@ if __name__ == '__main__':
 
     # TensorRT and LibTorch must be handled separately since it doesn't support
     # zero-sized tensors.
+    create_models(FLAGS.models_dir,
+                  np_dtype_string, ([1],), ([],),
+                  no_batch=False)
     create_models(FLAGS.models_dir, np.float32, ([1],), ([],), no_batch=False)
     create_models(FLAGS.models_dir,
                   np.float32, ([1], [8]), ([], [4, 1, 2]),

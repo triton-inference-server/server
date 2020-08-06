@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 INFER_TEST=infer_reshape_test.py
-EXPECTED_NUM_TESTS="7"
+EXPECTED_NUM_TESTS="8"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
