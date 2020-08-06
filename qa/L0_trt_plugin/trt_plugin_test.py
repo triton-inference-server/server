@@ -75,7 +75,7 @@ class PluginModelTest(tu.TestResultCollector):
             self.assertTrue(np.isclose(output0_data, test_output).all())
 
     def test_raw_fff_gelu(self):
-        self._full_exact('plan_float32_float32_float32',
+        self._full_exact('plan_nobatch_float32_float32_float32',
                          'CustomGeluPluginDynamic', (16, 1, 1))
 
     def test_raw_fff_norm(self):
