@@ -146,7 +146,6 @@ TRITONSERVER_Error* ParseShape(
     ni::TritonJson::Value& io, const std::string& name,
     std::vector<int64_t>* shape);
 
-
 TRITONSERVER_Error*
 ParseShape(
     ni::TritonJson::Value& io, const std::string& name,
@@ -160,7 +159,7 @@ ParseShape(
     shape->push_back(d);
   }
 
-  return nullptr;  // success
+  return nullptr;
 }
 
 }}}  // namespace nvidia::inferenceserver::backend
@@ -207,9 +206,7 @@ namespace nib = nvidia::inferenceserver::backend;
     }                                                                   \
   } while (false)
 
-
 class ModelState;
-class ModelInstanceState;
 
 class ModelInstanceState {
  public:
@@ -217,12 +214,12 @@ class ModelInstanceState {
       ModelState* model_state, TRITONBACKEND_ModelInstance* model_instance,
       ModelInstanceState** model_instance_state);
 
-  // Get the name, kind and device ID of the instance.
+  /// Get the name, kind and device ID of the instance.
   const std::string& Name() const { return name_; }
   TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
   int32_t DeviceId() const { return device_id_; }
 
-  // Get the state of the model that corresponds to this instance.
+  /// Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
 
   ~ModelInstanceState();
@@ -231,14 +228,7 @@ class ModelInstanceState {
       TRITONBACKEND_Request** requests, const uint32_t request_count,
       std::vector<TRITONBACKEND_Response*> responses);
 
-  /**
-   * @brief Create a Python Interpreter object. Forks process which will be
-   * python interpreter. Parent process connects to it.
-   *
-   * @param module_path /full/path/to/your/_version_no_/python_backend.py
-   * In given path should be startup.py with additional python files,
-   * env folder with python virtual env.
-   */
+  /// Create a python child process running startup.py
   void CreatePythonInterpreter();
 
   int GetInputTensor(
@@ -260,7 +250,6 @@ class ModelInstanceState {
 
 
   std::string pymodule_path_;
-  std::string pylib_path_;
   std::string pyinterpreter_;
   ModelState* model_state_;
   std::string domain_socket_;
@@ -308,7 +297,6 @@ void
 ModelInstanceState::CreatePythonInterpreter()
 {
   std::string module_path;
-  TRITON_MSG_LOG("CreatePythonInterpreter: instance_name " + name_ + '\n');
 
   const char* subinterpreter_commandline[] = {
       nullptr, nullptr,           "--socket", nullptr, "--model_path",
@@ -317,7 +305,7 @@ ModelInstanceState::CreatePythonInterpreter()
   constexpr int max_tmpfile_name = 255;
   char tmp_socket_name[max_tmpfile_name], full_socket_name[max_tmpfile_name];
   if (!tmpnam(tmp_socket_name)) {
-    TRITON_MSG_LOG("Cannot create temp name for local socket.");
+    TRITON_MSG_LOG("Failed to create a temporary socket name");
   } else {
     snprintf(full_socket_name, max_tmpfile_name, "unix://%s", tmp_socket_name);
     subinterpreter_commandline[3] = full_socket_name;
@@ -457,10 +445,6 @@ ModelInstanceState::Create(
   RETURN_IF_ERROR(
       TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
 
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      (std::string("config is: ") + buffer).c_str());
-
   ni::TritonJson::Value model_config;
 
   TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
@@ -524,9 +508,6 @@ ModelInstanceState::GetInputTensor(
   if (iidx == 0) {
     batch_size = input_shape[0];
   }
-  // @warning
-  // Is it always guaranteed that model_config.proto::DataType ==
-  // TRITONSERVER_DataType?
 
   // Update input_tensor.
   input_tensor->set_name(input_name);
@@ -565,10 +546,6 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   size_t byte_size;
   RETURN_IF_ERROR(
       TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
-
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      (std::string("config is: ") + buffer).c_str());
 
   ni::TritonJson::Value model_config;
   TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
@@ -628,7 +605,7 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
       TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor));
 
   TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
       (std::string("'") + name + "' TRITONBACKEND API version: " +
        std::to_string(TRITONBACKEND_API_VERSION_MAJOR) + "." +
        std::to_string(TRITONBACKEND_API_VERSION_MINOR))
@@ -641,10 +618,6 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
         TRITONSERVER_ERROR_UNSUPPORTED,
         "Triton backend API version does not support this backend");
   }
-
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
-      (std::string("") + name).c_str());
 
   return nullptr;
 }
@@ -665,20 +638,6 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
        std::to_string(version) + ")")
           .c_str());
 
-  TRITONBACKEND_ModelArtifactType artifact_type;
-  const char* clocation;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelRepository(model, &artifact_type, &clocation));
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("Repository location: ") + clocation).c_str());
-
-  std::string dir(clocation);
-
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      (std::string("Repository path: ") + dir).c_str());
-
   TRITONBACKEND_Backend* backend;
   RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(model, &backend));
 
@@ -696,10 +655,6 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
   ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
-
-  TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
-      "TRITONBACKEND_ModelFinalize: delete model state");
 
   delete model_state;
 
@@ -835,12 +790,11 @@ TRITONBACKEND_ModelInstanceExecute(
             responses, r,
             TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_UNSUPPORTED,
-                "failed to create output buffer in CPU memory"));
+                "can't create response in GPU memory."));
         TRITONSERVER_LogMessage(
             TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
             (std::string("request ") + std::to_string(r) +
-             ": failed to create output buffer in CPU memory, error response "
-             "sent")
+             ": failed to create output buffer in CPU memory.")
                 .c_str());
         continue;
       }
@@ -853,13 +807,8 @@ TRITONBACKEND_ModelInstanceExecute(
       if (output_itr == result_batch.tensors().end()) {
         LOG_ERROR << "can't find output tensor with name " << out_name << '\n';
       }
-      TRITON_MSG_LOG(
-          "Copying results to output buffer: " +
-          std::to_string(std::distance(
-              output_itr->raw_data().begin(), output_itr->raw_data().end())) +
-          " bytes");
 
-      // Copy python results into output buffers.
+      // Copy Python output to Triton output buffers
       std::copy(
           output_itr->raw_data().begin(), output_itr->raw_data().end(),
           (char*)output_buffer);
@@ -868,8 +817,8 @@ TRITONBACKEND_ModelInstanceExecute(
     if (responses[r] == nullptr) {
       TRITONSERVER_LogMessage(
           TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
-          (std::string("request ") + std::to_string(r) +
-           ": failed to create response output, error response sent")
+          (std::string("Request ") + std::to_string(r) +
+           ": failed to create output response")
               .c_str());
       continue;
     }
