@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
-EXPECTED_NUM_TESTS="1"
+EXPECTED_NUM_TESTS="2"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
 
