@@ -28,6 +28,37 @@ cmake_minimum_required (VERSION 3.5)
 
 find_package(Threads REQUIRED)
 
+function(EXTRACT_STATIC_LIBRARY LIB_NAME)
+  string(REPLACE "/" ";" LIB_NAME_MODIFIED ${LIB_NAME})
+  list(GET LIB_NAME_MODIFIED -1 CUSTOM_TARGET_NAME)
+  add_custom_target(${CUSTOM_TARGET_NAME}-t ALL
+                    COMMAND rm -rf ${CUSTOM_TARGET_NAME}-dir
+                    COMMAND mkdir ${CUSTOM_TARGET_NAME}-dir
+                    COMMAND cp ${LIB_NAME} ${CUSTOM_TARGET_NAME}-dir
+                    COMMAND cd ${CUSTOM_TARGET_NAME}-dir && ar -x ${LIB_NAME}
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+endfunction()
+
+function(COMBINE_STATIC_LIBRARIES LIBRARY_LOCATIONS LIBRARY_NAME GRPCCLIENT_STATIC_OBJS)
+  set(MODIFIED_LIB_ROUTES "")
+
+  foreach(LIBRARY_LOC IN ITEMS ${LIBRARY_LOCATIONS})
+    string(REPLACE "/" ";" LIB_NAME_MODIFIED ${LIBRARY_LOC})
+    list(GET LIB_NAME_MODIFIED -1 CUSTOM_TARGET_NAME)
+    list(APPEND MODIFIED_LIB_ROUTES "${CUSTOM_TARGET_NAME}-dir/*.o")
+    EXTRACT_STATIC_LIBRARY(${LIBRARY_LOC})
+  endforeach()
+  message("loc value is ${MODIFIED_LIB_ROUTES}")
+
+  add_custom_target(grpcclient_static_combined ALL
+      COMMAND ${CMAKE_AR} -qcs ${LIBRARY_NAME} ${MODIFIED_LIB_ROUTES} ${GRPCCLIENT_STATIC_OBJS}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      DEPENDS grpc-library model-config-library proto-library grpc-client-library triton-json-library
+      COMMAND_EXPAND_LISTS
+  )
+endfunction()
+
 if(${TRITON_ENABLE_GRPC})
   #
   # libgrpcclient.so and libgrpcclient_static.a
@@ -60,35 +91,40 @@ if(${TRITON_ENABLE_GRPC})
       model-config-library grpc-library proto-library
   )
 
+  set(GRPCCLIENT_STATIC_LIB ${CMAKE_CURRENT_BINARY_DIR}/libgrpcclient_static.a)
+  set(GRPCCLIENT_STATIC_OBJS $<TARGET_OBJECTS:grpc-library> $<TARGET_OBJECTS:model-config-library>
+      $<TARGET_OBJECTS:proto-library> $<TARGET_OBJECTS:triton-json-library> $<TARGET_OBJECTS:grpc-client-library>)
+
+  get_target_property(PROTOBUF_LOC protobuf::libprotobuf LOCATION)
+  get_target_property(GRPC_LOC gRPC::grpc LOCATION)
+  get_target_property(GRPCPP_LOC gRPC::grpc++ LOCATION)
+
+  set(LIBRARY_LOCATIONS ${PROTOBUF_LOC} ${GRPC_LOC} ${GRPCPP_LOC})
+
   # libgrpcclient_static.a
-  add_library(
-      grpcclient_static STATIC
-      $<TARGET_OBJECTS:grpc-library>
-      $<TARGET_OBJECTS:model-config-library>
-      $<TARGET_OBJECTS:proto-library>
-      $<TARGET_OBJECTS:grpc-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
-  )
+  COMBINE_STATIC_LIBRARIES("${LIBRARY_LOCATIONS}" "${GRPCCLIENT_STATIC_LIB}" "${GRPCCLIENT_STATIC_OBJS}")
+
+  add_library(grpcclient_static STATIC IMPORTED GLOBAL)
+  add_dependencies(grpcclient_static grpcclient_static_combined)
+  set_target_properties(grpcclient_static PROPERTIES IMPORTED_LOCATION ${GRPCCLIENT_STATIC_LIB})
+
+  message("Location ${GRPCCLIENT_STATIC_LIB}")
+  message("Target Objects $<TARGET_OBJECTS:grpc-library>")
   add_library(
       TRITON::grpcclient_static ALIAS grpcclient_static
   )
-  if(${TRITON_ENABLE_GPU})
-    target_include_directories(grpcclient_static PUBLIC ${CUDA_INCLUDE_DIRS})
-    target_link_libraries(grpcclient_static PRIVATE ${CUDA_LIBRARIES})
-  endif() # TRITON_ENABLE_GPU
   target_include_directories(
       grpcclient_static
-      PUBLIC
+      INTERFACE
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
   )
-  target_link_libraries(
-      grpcclient_static
-      PRIVATE gRPC::grpc++
-      PRIVATE gRPC::grpc
-      PUBLIC protobuf::libprotobuf
-      PUBLIC Threads::Threads
-  )
+
+
+  if(${TRITON_ENABLE_GPU})
+    target_include_directories(grpcclient_static INTERFACE ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(grpcclient_static INTERFACE ${CUDA_LIBRARIES})
+  endif() # TRITON_ENABLE_GPU
 
   # libgrpcclient.so
   add_library(
@@ -130,12 +166,15 @@ if(${TRITON_ENABLE_GRPC})
   )
 
   install(
+      FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/libgrpcclient_static.a
+      DESTINATION lib
+  )
+
+  install(
       TARGETS
         grpcclient
-        grpcclient_static
-      EXPORT triton-export
       LIBRARY DESTINATION lib
-      ARCHIVE DESTINATION lib
   )
 
   install(
