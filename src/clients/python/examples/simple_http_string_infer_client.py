@@ -127,12 +127,10 @@ if __name__ == '__main__':
     output1_data = results.as_numpy('OUTPUT1')
 
     for i in range(16):
-        print(
-            str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
-            str(output0_data[0][i]))
-        print(
-            str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
-            str(output1_data[0][i]))
+        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
+              str(output0_data[0][i]))
+        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
+              str(output1_data[0][i]))
 
         # Convert result from string to int to check result
         r0 = int(output0_data[0][i])

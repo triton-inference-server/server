@@ -110,12 +110,10 @@ if __name__ == '__main__':
         sys.exit(1)
 
     for i in range(16):
-        print(
-            str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
-            str(output_results[0][0][i]))
-        print(
-            str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
-            str(output_results[1][0][i]))
+        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
+              str(output_results[0][0][i]))
+        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
+              str(output_results[1][0][i]))
         if (input0_data[i] + input1_data[i]) != output_results[0][0][i]:
             print("sync infer error: incorrect sum")
             sys.exit(1)

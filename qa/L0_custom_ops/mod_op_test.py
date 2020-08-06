@@ -101,9 +101,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     for i in range(elements):
-        print(
-            str(i) + ": " + str(input_data[0][i]) + " % " +
-            str(input_data[1][i]) + " = " + str(output_data[i]))
+        print(str(i) + ": " + str(input_data[0][i]) + " % " +
+              str(input_data[1][i]) + " = " + str(output_data[i]))
         if ((input_data[0][i] % input_data[1][i]) != output_data[i]):
             print("error: incorrect value")
             sys.exit(1)
