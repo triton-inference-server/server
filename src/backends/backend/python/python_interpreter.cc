@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
   return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
@@ -60,10 +59,10 @@
 #include <vector>
 
 // Fix include path for protobuf
-#include "/workspace/builddir/custom-backend/src/custom/python/python_host.grpc.pb.h"
+#include "python_host.grpc.pb.h"
 #include "src/backends/backend/tritonbackend.h"
-#include "src/core/model_config.h"
 #include "src/core/json.h"
+#include "src/core/model_config.h"
 
 namespace nic = nvidia::inferenceserver::custom;
 namespace ni = nvidia::inferenceserver;
@@ -214,9 +213,9 @@ class ModelInstanceState;
 
 class ModelInstanceState {
  public:
-
-  static TRITONSERVER_Error*
-  Create(ModelState* model_state, TRITONBACKEND_ModelInstance* model_instance, ModelInstanceState** model_instance_state);
+  static TRITONSERVER_Error* Create(
+      ModelState* model_state, TRITONBACKEND_ModelInstance* model_instance,
+      ModelInstanceState** model_instance_state);
 
   // Get the name, kind and device ID of the instance.
   const std::string& Name() const { return name_; }
@@ -229,7 +228,8 @@ class ModelInstanceState {
   ~ModelInstanceState();
 
   TRITONSERVER_Error* ProcessRequests(
-      TRITONBACKEND_Request** requests, const uint32_t request_count, std::vector<TRITONBACKEND_Response*> responses);
+      TRITONBACKEND_Request** requests, const uint32_t request_count,
+      std::vector<TRITONBACKEND_Response*> responses);
 
   /**
    * @brief Create a Python Interpreter object. Forks process which will be
@@ -252,9 +252,9 @@ class ModelInstanceState {
 
  private:
   ModelInstanceState(
-    ModelState* model_state, TRITONBACKEND_ModelInstance* model_instance,
-    const char* name, const TRITONSERVER_InstanceGroupKind kind,
-    const int32_t device_id, ni::TritonJson::Value&& model_config);
+      ModelState* model_state, TRITONBACKEND_ModelInstance* model_instance,
+      const char* name, const TRITONSERVER_InstanceGroupKind kind,
+      const int32_t device_id, ni::TritonJson::Value&& model_config);
 
   int ConnectPythonInterpreter(const std::string& module_path);
 
@@ -268,11 +268,12 @@ class ModelInstanceState {
   const std::string name_;
   const TRITONSERVER_InstanceGroupKind kind_;
   const int32_t device_id_;
+
  public:
   ni::TritonJson::Value model_config;
+
  private:
   pid_t interpreter_pid_;
-
 };
 
 class ModelState {
@@ -307,8 +308,7 @@ void
 ModelInstanceState::CreatePythonInterpreter()
 {
   std::string module_path;
-  TRITON_MSG_LOG(
-      "CreatePythonInterpreter: instance_name " + name_ + '\n');
+  TRITON_MSG_LOG("CreatePythonInterpreter: instance_name " + name_ + '\n');
 
   const char* subinterpreter_commandline[] = {
       nullptr, nullptr,           "--socket", nullptr, "--model_path",
@@ -342,17 +342,18 @@ ModelInstanceState::CreatePythonInterpreter()
   if (interpreter_pid_ == 0) {
     // Use the python available in $PATH
     // TODO: Make this overridable by config
-    std::string python_interpreter_path = "/workspace/src/custom/python/install/env/bin/python";
-    std::string python_interpreter_startup = "/workspace/src/custom/python/install/startup.py";
+    std::string python_interpreter_path =
+        "/workspace/src/custom/python/install/env/bin/python";
+    std::string python_interpreter_startup =
+        "/workspace/src/custom/python/install/startup.py";
 
     subinterpreter_commandline[0] = python_interpreter_path.c_str();
     subinterpreter_commandline[1] = python_interpreter_startup.c_str();
     subinterpreter_commandline[5] = pymodule_path_.c_str();
     subinterpreter_commandline[7] = name_.c_str();
     if (execve(
-            subinterpreter_commandline[0], (char **)subinterpreter_commandline,
-            nullptr) == -1)
-    {
+            subinterpreter_commandline[0], (char**)subinterpreter_commandline,
+            nullptr) == -1) {
       LOG_ERROR << "Cannot run interpreter host. Errno = " << errno << '\n'
                 << "python_interpreter_path: " << python_interpreter_path
                 << '\n'
@@ -420,14 +421,17 @@ ModelInstanceState::ModelInstanceState(
     const char* name, const TRITONSERVER_InstanceGroupKind kind,
     const int32_t device_id, ni::TritonJson::Value&& model_config)
     : model_state_(model_state), triton_model_instance_(triton_model_instance),
-      name_(name), kind_(kind), device_id_(device_id), model_config(std::move(model_config))
+      name_(name), kind_(kind), device_id_(device_id),
+      model_config(std::move(model_config))
 {
 }
 
 TRITONSERVER_Error*
-ModelInstanceState::Create(ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance, ModelInstanceState** state)
+ModelInstanceState::Create(
+    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
+    ModelInstanceState** state)
 {
-  const char *instance_name;
+  const char* instance_name;
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelInstanceName(triton_model_instance, &instance_name));
 
@@ -479,7 +483,8 @@ ModelInstanceState::~ModelInstanceState()
 
   const auto err = stub->InterpreterShutdown(&context, null_msg, &result);
   if (!err.ok() || result.code() != 0) {
-    LOG_ERROR << "Cannot shutdown interpreter gracefully: " << err.error_message()  << std::endl;
+    LOG_ERROR << "Cannot shutdown interpreter gracefully: "
+              << err.error_message() << std::endl;
   }
 
   int status;
@@ -606,7 +611,7 @@ ModelState::SupportsFirstDimBatching(bool* supports)
   return nullptr;  // success
 }
 
-}
+}  // namespace
 
 extern "C" {
 
@@ -619,18 +624,19 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
 
   // Check backend version to ensure compatibility
   uint32_t api_version_major, api_version_minor;
-  RETURN_IF_ERROR(TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor));
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor));
 
   TRITONSERVER_LogMessage(
       TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
       (std::string("'") + name + "' TRITONBACKEND API version: " +
        std::to_string(TRITONBACKEND_API_VERSION_MAJOR) + "." +
-       std::to_string(TRITONBACKEND_API_VERSION_MINOR)).c_str());
-  
+       std::to_string(TRITONBACKEND_API_VERSION_MINOR))
+          .c_str());
+
   TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor);
   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
-      (api_version_minor < TRITONBACKEND_API_VERSION_MINOR))
-  {
+      (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
         "Triton backend API version does not support this backend");
@@ -706,8 +712,8 @@ TRITONBACKEND_ModelInstanceExecute(
     const uint32_t request_count)
 {
   ModelInstanceState* instance_state;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceState(instance, reinterpret_cast<void**>(&instance_state)));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(
+      instance, reinterpret_cast<void**>(&instance_state)));
 
   std::vector<TRITONBACKEND_Response*> responses;
   responses.reserve(request_count);
@@ -765,9 +771,9 @@ TRITONBACKEND_ModelInstanceExecute(
     // Inference request
     grpc::ClientContext context;
     ni::InferenceBatch result_batch;
-    
-    const auto err =
-        instance_state->stub->InferenceRequest(&context, input_batch, &result_batch);
+
+    const auto err = instance_state->stub->InferenceRequest(
+        &context, input_batch, &result_batch);
 
     if (!err.ok()) {
       LOG_ERROR << "something went wrong with interfere request\n"
@@ -786,15 +792,14 @@ TRITONBACKEND_ModelInstanceExecute(
       ni::TritonJson::Value out;
       LOG_IF_ERROR(outputs.IndexAsObject(j, &out), "can't get out");
       std::string out_name, out_dtype;
-      LOG_IF_ERROR(
-          out.MemberAsString("name", &out_name), "can't get out name");
+      LOG_IF_ERROR(out.MemberAsString("name", &out_name), "can't get out name");
       std::vector<int64_t> out_shape;
       LOG_IF_ERROR(
           nib::ParseShape(out, "dims", &out_shape), "can't get out shape");
       LOG_IF_ERROR(
           out.MemberAsString("data_type", &out_dtype),
           "can't get out data type");
-      
+
       // Remove TYPE_ from the datatype
       out_dtype = out_dtype.substr(5);
       out_shape.insert(out_shape.begin(), batch_size);
@@ -804,9 +809,8 @@ TRITONBACKEND_ModelInstanceExecute(
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_ResponseOutput(
-              response, &output, out_name.data(),
-              ni::DataTypeToTriton(out_dt), out_shape.data(),
-              out_shape.size()));
+              response, &output, out_name.data(), ni::DataTypeToTriton(out_dt),
+              out_shape.data(), out_shape.size()));
 
       uint64_t acc = std::accumulate(
           out_shape.begin(), out_shape.end(), 1,
@@ -847,8 +851,7 @@ TRITONBACKEND_ModelInstanceExecute(
           });
 
       if (output_itr == result_batch.tensors().end()) {
-        LOG_ERROR << "can't find output tensor with name " << out_name
-                  << '\n';
+        LOG_ERROR << "can't find output tensor with name " << out_name << '\n';
       }
       TRITON_MSG_LOG(
           "Copying results to output buffer: " +
@@ -890,8 +893,7 @@ TRITONBACKEND_ModelInstanceExecute(
     // }
 
     LOG_IF_ERROR(
-        TRITONBACKEND_RequestRelease(
-            request, TRITONSERVER_REQUEST_RELEASE_ALL),
+        TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
         "failed releasing request");
   }
 
