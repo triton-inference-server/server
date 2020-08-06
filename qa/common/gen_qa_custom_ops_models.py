@@ -451,6 +451,14 @@ def create_modulo_op_models(models_dir):
         create_moduloop_modelfile(models_dir, model_version)
 
 
+def create_vision_op_models(models_dir):
+    model_version = 1
+
+    if FLAGS.libtorch:
+        create_visionop_modelconfig(models_dir, model_version)
+        create_visionop_modelfile(models_dir, model_version)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--models_dir',
@@ -499,3 +507,4 @@ if __name__ == '__main__':
         from torchvision import ops
         import torch.utils.cpp_extension
         create_modulo_op_models(FLAGS.models_dir)
+        create_vision_op_models(FLAGS.models_dir)
