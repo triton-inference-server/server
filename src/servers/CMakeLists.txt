@@ -360,7 +360,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/tensorflow:$\{ORIGIN\}/pytorch:$\{ORIGIN\}/onnx"
+    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch:$\{ORIGIN\}/onnx"
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonserver.ldscript
     LINK_FLAGS "-Wl,--version-script libtritonserver.ldscript"
 )
@@ -378,14 +378,6 @@ if(${TRITON_ENABLE_TENSORRT})
     PUBLIC -lnvinfer_plugin
   )
 endif() # TRITON_ENABLE_TENSORRT
-
-if(${TRITON_ENABLE_TENSORFLOW})
-  target_link_libraries(
-    tritonserver
-    PUBLIC ${TRITON_EXTRA_LDFLAGS}
-    PUBLIC -ltensorflow_trtis
-  )
-endif() # TRITON_ENABLE_TENSORFLOW
 
 if(${TRITON_ENABLE_CAFFE2} OR ${TRITON_ENABLE_PYTORCH})
   target_link_libraries(

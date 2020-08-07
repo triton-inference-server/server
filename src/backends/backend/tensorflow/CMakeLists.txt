@@ -27,7 +27,7 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# libtriton_tensorflow.so
+# libtriton_tensorflow1.so and libtriton_tensorflow2.so
 #
 configure_file(libtriton_tensorflow.ldscript libtriton_tensorflow.ldscript COPYONLY)
 
@@ -45,24 +45,64 @@ set(
 )
 
 add_library(
-  triton_tensorflow SHARED
+  triton_tensorflow1 SHARED
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
   $<TARGET_OBJECTS:backend-utils-library>
 )
 if(${TRITON_ENABLE_GPU})
-  target_include_directories(triton_tensorflow PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(triton_tensorflow1 PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
 set_target_properties(
-  triton_tensorflow
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
+  triton_tensorflow1
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}"
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
 )
-set_target_properties(
-  triton_tensorflow
-  PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
+target_link_libraries(
+  triton_tensorflow1
+  PUBLIC ${TRITON_EXTRA_LDFLAGS}
+  PUBLIC -ltensorflow_trtis
 )
 
 install(
   TARGETS
-    triton_tensorflow
-  LIBRARY DESTINATION backends
+    triton_tensorflow1
+  LIBRARY DESTINATION backends/tensorflow1
+)
+
+add_library(
+  triton_tensorflow2 SHARED
+  ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
+  $<TARGET_OBJECTS:backend-utils-library>
+)
+if(${TRITON_ENABLE_GPU})
+  target_include_directories(triton_tensorflow2 PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRITON_ENABLE_GPU
+set_target_properties(
+  triton_tensorflow2
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}"
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
+)
+# FIXME currently not linking against Triton-TF 2 library for successful build,
+# the symbols are undefined, should uncomment it once Triton-TF 2 library is
+# available
+target_link_libraries(
+  triton_tensorflow2
+  PUBLIC ${TRITON_EXTRA_LDFLAGS}
+  #PUBLIC -ltensorflow_triton
+)
+
+install(
+  TARGETS
+    triton_tensorflow2
+  LIBRARY DESTINATION backends/tensorflow2
 )

@@ -30,7 +30,7 @@
 
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:20.07-py3
 ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.07-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:20.07-tf1-py3
+ARG TENSORFLOW1_IMAGE=nvcr.io/nvidia/tensorflow:20.07-tf1-py3
 
 ############################################################################
 ## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
@@ -137,7 +137,7 @@ RUN echo "import onnx; print(onnx.__version__)" | python3 > /workspace/ort_onnx_
 ############################################################################
 ## TensorFlow stage: Use TensorFlow container
 ############################################################################
-FROM ${TENSORFLOW_IMAGE} AS tritonserver_tf
+FROM ${TENSORFLOW1_IMAGE} AS tritonserver_tf1
 
 ############################################################################
 ## Build stage: Build inference server
@@ -185,10 +185,10 @@ RUN apt-get update && \
 # libtensorflow_cc.so.  Custom TF operations link against
 # libtensorflow_framework.so so it must be present (and that
 # functionality is provided by libtensorflow_trtis.so).
-COPY --from=tritonserver_tf \
+COPY --from=tritonserver_tf1 \
      /usr/local/lib/tensorflow/libtensorflow_trtis.so.1 \
-     /opt/tritonserver/lib/tensorflow/
-RUN cd /opt/tritonserver/lib/tensorflow && \
+     /opt/tritonserver/backends/tensorflow1/
+RUN cd /opt/tritonserver/backends/tensorflow1 && \
     patchelf --set-rpath '$ORIGIN' libtensorflow_trtis.so.1 && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_trtis.so && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so.1 && \
@@ -324,18 +324,17 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                   -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
-                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
+                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
                   ../build && \
             make -j16 server && \
             mkdir -p /opt/tritonserver/include && \
             cp -r server/install/bin /opt/tritonserver/. && \
             cp -r server/install/lib /opt/tritonserver/. && \
-            mkdir -p /opt/tritonserver/backends/tensorflow && \
-            cp -r server/install/backends/libtriton_tensorflow.so /opt/tritonserver/backends/tensorflow/. && \
+            cp -r server/install/backends /opt/tritonserver/. && \
             cp -r server/install/include /opt/tritonserver/include/tritonserver) && \
     (cd /opt/tritonserver && ln -sf /workspace/qa qa) && \
     (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/lib/tensorflow && chmod ugo-w+rx *) && \
+    (cd /opt/tritonserver/backends && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/pytorch && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/onnx && chmod ugo-w+rx *)
 
@@ -415,7 +414,8 @@ RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 LICENSE .
 COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/LICENSE LICENSE.openvino
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
-COPY --chown=1000:1000 --from=tritonserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
+# TF1 and TF2 use the same license
+COPY --chown=1000:1000 --from=tritonserver_tf1 /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
 COPY --chown=1000:1000 --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib lib
