@@ -338,6 +338,9 @@ class InferReshapeTest(tu.TestResultCollector):
     def test_ii3(self):
         self._full_reshape(np.int32, input_shapes=([1, 4, 1], [8], [2, 2, 3]))
 
+    def test_oo1(self):
+        self._full_reshape(np.object, input_shapes=([1],), no_batch=False)
+
 
 if __name__ == '__main__':
     unittest.main()

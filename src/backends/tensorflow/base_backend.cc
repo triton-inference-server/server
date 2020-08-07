@@ -769,14 +769,10 @@ BaseBackend::Context::Run(
       // Custom handling for string/bytes tensor...
       if (datatype == inference::DataType::TYPE_STRING) {
         size_t tensor_offset = 0;
-        const size_t batch1_element_cnt = GetElementCount(batch1_shape);
 
         for (size_t idx = 0; idx < requests.size(); idx++) {
           auto& request = requests[idx];
           auto& response = responses[idx];
-
-          const size_t request_element_cnt =
-              std::max(1U, request->BatchSize()) * batch1_element_cnt;
 
           const InferenceRequest::Input* request_input;
           Status status = request->ImmutableInput(input_name, &request_input);
@@ -785,6 +781,9 @@ BaseBackend::Context::Run(
                 std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
                 status);
           }
+
+          const size_t request_element_cnt =
+              GetElementCount(request_input->ShapeWithBatchDim());
 
           cuda_copy |= SetStringInputTensor(
               tensor, request_input, request_element_cnt, tensor_offset,
