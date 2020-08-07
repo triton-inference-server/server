@@ -247,7 +247,7 @@ fi
 
 # copy contents of /models into S3 bucket and wait for them to be loaded.
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
-sleep 60
+sleep 120
 
 set +e
 

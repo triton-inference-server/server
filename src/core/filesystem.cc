@@ -443,9 +443,8 @@ GCSFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 Status
 GCSFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
 {
-  // We don't need to worry about the case when this is a GCS directory
+  // We don't need to worry about the case when this is a directory
   bool is_dir;
-
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
     return Status::Success;
@@ -864,9 +863,8 @@ S3FileSystem::IsDirectory(const std::string& path, bool* is_dir)
 Status
 S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
 {
-  // We don't need to worry about the case when this is a GCS directory
+  // We don't need to worry about the case when this is a directory
   bool is_dir;
-
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
     return Status::Success;
