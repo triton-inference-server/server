@@ -793,16 +793,12 @@ OnnxBackend::Context::SetInputTensors(
           0);
     } else {
       // For String input, we need to obtain tensor info differently
-      size_t batch1_element_cnt = GetElementCount(batch1_shape);
       size_t total_byte_size = 0;
       std::vector<size_t> expected_byte_sizes;
       std::vector<size_t> expected_element_cnts;
       expected_byte_sizes.reserve(requests.size());
       expected_element_cnts.reserve(requests.size());
       for (size_t ridx = 0; ridx < requests.size(); ++ridx) {
-        expected_element_cnts.push_back(
-            std::max(1U, requests[ridx]->BatchSize()) * batch1_element_cnt);
-
         const InferenceRequest::Input* in;
         auto status = requests[ridx]->ImmutableInput(name, &in);
         // Skip input in this request if failed to retrieve it
@@ -813,7 +809,10 @@ OnnxBackend::Context::SetInputTensors(
                 TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
           }
           expected_byte_sizes.push_back(0);
+          expected_element_cnts.push_back(0);
         } else {
+          expected_element_cnts.push_back(
+              GetElementCount(in->ShapeWithBatchDim()));
           expected_byte_sizes.push_back(in->Data()->TotalByteSize());
         }
         total_byte_size += expected_byte_sizes.back();
