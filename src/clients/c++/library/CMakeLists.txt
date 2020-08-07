@@ -140,7 +140,6 @@ if(${TRITON_ENABLE_GRPC})
 
   install(
       FILES
-      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib/libcares.a
       ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgpr.a
       ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgrpc.a
       ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgrpc++.a
@@ -148,6 +147,20 @@ if(${TRITON_ENABLE_GRPC})
       ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/lib/libprotobuf.a
       DESTINATION lib
   )
+
+  if (NOT WIN32)
+     install(
+         FILES
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib/libcares.a
+         DESTINATION lib
+     )
+  else()
+     install(
+         FILES
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib/cares.lib
+         DESTINATION lib
+     )
+  endif() # NOT WIN32
 
   set(TRITON_CLIENT_HEADER_FLAT 1)
   configure_file(grpc_client.h.in grpc_client_flat.h @ONLY)
