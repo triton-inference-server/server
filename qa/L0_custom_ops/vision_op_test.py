@@ -79,24 +79,29 @@ if __name__ == '__main__':
     # Create the inference context for the model.
     client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
 
-    # Create the data for one input tensor.
-    input_data = np.random.rand(1, 16, 10, 10).astype(np.float32)
+    # Create the data for the input tensors.
+    input_data = np.random.rand(1, 3, 10, 10).astype(np.float32)
+    box_data = np.array([[1, 1, 2, 3, 4]]).astype(np.float32)
 
     inputs = []
     inputs.append(
         client_util.InferInput("INPUT__0", input_data.shape,
                                np_to_triton_dtype(input_data.dtype)))
     inputs[0].set_data_from_numpy(input_data)
+    inputs.append(
+        client_util.InferInput("INPUT__1", box_data.shape,
+                               np_to_triton_dtype(box_data.dtype)))
+    inputs[1].set_data_from_numpy(box_data)
 
     results = client.infer(model_name, inputs)
 
-    # We expect 1 result of shape [1, 33, 12, 14].
+    # We expect 1 result of shape [1, 3, 5, 5].
     output_data = results.as_numpy('OUTPUT__0')
     if output_data is None:
         print("error: expected 'OUTPUT__0'")
         sys.exit(1)
 
-    if (output_data.shape != (1, 33, 12, 14)):
+    if (output_data.shape != (1, 3, 5, 5)):
         print("error: incorrect shape " + str(output_data.shape) +
               "for 'OUTPUT__0'")
         sys.exit(1)
