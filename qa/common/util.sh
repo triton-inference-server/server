@@ -234,6 +234,46 @@ function run_server_nowait () {
     SERVER_PID=$!
 }
 
+# Run inference server inside a memory management tool like Valgrind/ASAN. 
+# Return once server's health endpoint shows ready or timeout expires. Sets 
+# SERVER_PID to pid of SERVER, or 0 if error (including expired timeout)
+function run_server_leakcheck () {
+    SERVER_PID=0
+
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
+    if [ -z "$LEAKCHECK" ]; then
+        echo "=== LEAKCHECK must be defined"
+        return
+    fi
+
+    if [ ! -f "$SERVER" ]; then
+        echo "=== $SERVER does not exist"
+        return
+    fi
+
+    if [ -z "$SERVER_LD_PRELOAD" ]; then
+      echo "=== Running $SERVER $SERVER_ARGS"
+    else
+      echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
+    fi
+
+    LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    SERVER_PID=$!
+
+    wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
+    
+    kill $SERVER_PID
+    wait $SERVER_PID
+    
+    if [ "$WAIT_RET" != "0" ]; then
+        SERVER_PID=0
+    fi
+}
+
 # Run nvidia-smi to monitor GPU utilization.
 # Writes utilization into MONITOR_LOG. If MONITOR_ID is specified only
 # that GPU PCI bus ID is monitored.
