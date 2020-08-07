@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "trtis/tensorflow_backend_tf.h"
+#include "triton/tensorflow_backend_tf.h"
 
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
@@ -40,6 +40,7 @@
 #include "tensorflow/core/grappler/utils.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/platform/tstring.h"
 #include "tensorflow/core/protobuf/meta_graph.pb.h"
 #include "tensorflow/core/protobuf/rewriter_config.pb.h"
 #include "tensorflow/core/public/session.h"
@@ -418,14 +419,14 @@ TensorImpl::Init()
 const std::string&
 TensorImpl::String(size_t idx) const
 {
-  auto flat = tftensor_.flat<std::string>();
+  auto flat = tftensor_.flat<tensorflow::tstring>();
   return flat(idx);
 }
 
 void
 TensorImpl::SetString(size_t idx, const std::string& str)
 {
-  auto flat = tftensor_.flat<std::string>();
+  auto flat = tftensor_.flat<tensorflow::tstring>();
   flat(idx) = str;
 }
 
