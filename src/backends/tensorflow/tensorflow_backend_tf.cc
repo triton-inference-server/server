@@ -262,13 +262,16 @@ NewSessionOptions(
 
   // TF-TRT optimization. Parameters that are not specified in 'tftrt_config'
   // are specified based on:
-  // https://github.com/tensorflow/tensorflow/blob/r1.13/tensorflow/contrib/tensorrt/test/test_tftrt.py#L238
+  // https://github.com/tensorflow/tensorflow/blob/v1.15.2/tensorflow/python/compiler/tensorrt/trt_convert.py#L241
   if (tftrt_config != nullptr) {
     auto opt_config = session_options->config.mutable_graph_options()
                           ->mutable_rewrite_options();
     opt_config->set_meta_optimizer_iterations(tensorflow::RewriterConfig::ONE);
     opt_config->add_optimizers("constfold");
     opt_config->add_optimizers("layout");
+    // Layout optimizer may add Const nodes followed by Reshape nodes,
+    // thus we need to run constant folding again.
+    opt_config->add_optimizers("constfold");
     auto trt_optimizer = opt_config->add_custom_optimizers();
     trt_optimizer->set_name("TensorRTOptimizer");
 
@@ -283,6 +286,9 @@ NewSessionOptions(
         tftrt_config->max_workspace_size_bytes_);
     (*trt_parameter_map)["max_cached_engines"].set_i(
         tftrt_config->max_cached_engines_);
+    auto custom_optimizer = opt_config->add_custom_optimizers();
+    // Add a constfold optimizer to cleanup the unused Const nodes.
+    custom_optimizer->set_name("constfold");
   }
 
   if (auto_mixed_precision) {
@@ -405,8 +411,7 @@ TensorImpl::Init()
     cudaPointerAttributes attributes;
     cudaError_t err = cudaPointerGetAttributes(&attributes, nonstring_base_);
     gpu_tensor_ =
-        ((err == cudaSuccess) &&
-         (attributes.memoryType == cudaMemoryTypeDevice));
+        ((err == cudaSuccess) && (attributes.type == cudaMemoryTypeDevice));
   }
 }
 
