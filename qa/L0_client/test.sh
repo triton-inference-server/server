@@ -80,11 +80,7 @@ fi
 # Test linking against static library
 #
 
-static_libs="$client_lib/libgrpcclient_static.a $client_lib/libgrpc++.a $client_lib/libgrpc.a \
-             $client_lib/libgpr.a $client_lib/libcares.a $client_lib/libaddress_sorting.a $client_lib/libprotobuf.a \
-             $client_lib/libcurl.a"
-
-g++ grpc_test.cc $static_libs -o grpc_test_static -I$client_inc  -I/workspace/builddir/grpc/include \
+g++ grpc_test.cc $client_lib/libgrpcclient_static.a -o grpc_test_static -I$client_inc  -I/workspace/builddir/grpc/include \
   -I/workspace/builddir/protobuf/include -lz -lssl -lcrypto -lpthread
 
 if [ $? -eq 0 ]; then
@@ -130,7 +126,7 @@ else
     RET=1
 fi
 
-g++ http_test.cc $client_lib/libhttpclient_static.a $client_lib/libcurl.a -o http_test_static \
+g++ http_test.cc $client_lib/libhttpclient_static.a -o http_test_static \
   -I$client_inc -lz -lssl -lcrypto -lpthread
 
 if [ $? -eq 0 ]; then
