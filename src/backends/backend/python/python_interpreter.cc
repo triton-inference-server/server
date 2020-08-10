@@ -229,7 +229,7 @@ class ModelInstanceState {
       std::vector<TRITONBACKEND_Response*> responses);
 
   /// Create a python child process running startup.py
-  void CreatePythonInterpreter();
+  TRITONSERVER_Error* CreatePythonInterpreter();
 
   int GetInputTensor(
       const uint32_t iidx, TRITONBACKEND_Request* request,
@@ -293,7 +293,7 @@ class ModelState {
   ni::TritonJson::Value model_config_;
 };
 
-void
+TRITONSERVER_Error*
 ModelInstanceState::CreatePythonInterpreter()
 {
   std::string module_path;
@@ -330,7 +330,7 @@ ModelInstanceState::CreatePythonInterpreter()
   if (interpreter_pid_ == 0) {
     // Use the python available in $PATH
     // TODO: Make this overridable by config
-    std::string python_interpreter_path = "python";
+    std::string python_interpreter_path = "/usr/bin/python3";
     std::string python_interpreter_startup =
         "/workspace/builddir/server/install/lib/python/runtime/startup.py";
 
@@ -348,10 +348,16 @@ ModelInstanceState::CreatePythonInterpreter()
                 << '\n'
                 << "pymodule_path_: " << pymodule_path_ << '\n'
                 << "instance_name: " << name_ << '\n';
+
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("Failed to initialize model instance ") + name_).c_str());
     }
   } else {
     ConnectPythonInterpreter(module_path);
   }
+
+  return nullptr;
 }
 
 int
@@ -662,6 +668,45 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
+{
+  const char* cname;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceName(instance, &cname));
+  std::string name(cname);
+
+  int32_t device_id;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id));
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_INFO,
+      (std::string("TRITONBACKEND_ModelInstanceInitialize: ") + name +
+       " (device " + std::to_string(device_id) + ")")
+          .c_str());
+
+  TRITONBACKEND_Model* model;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceModel(instance, &model));
+
+  void* vmodelstate;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vmodelstate));
+  ModelState* model_state = reinterpret_cast<ModelState*>(vmodelstate);
+
+  ModelInstanceState* instance_state;
+  RETURN_IF_ERROR(
+      ModelInstanceState::Create(model_state, instance, &instance_state));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceSetState(
+      instance, reinterpret_cast<void*>(instance_state)));
+
+  RETURN_ERROR_IF_FALSE(
+      instance_state->Kind() == TRITONSERVER_INSTANCEGROUPKIND_CPU,
+      TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("'python_interpreter' backend only supports CPU instances"));
+
+  RETURN_IF_ERROR(instance_state->CreatePythonInterpreter());
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_ModelInstanceExecute(
     TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request** requests,
     const uint32_t request_count)
@@ -847,44 +892,6 @@ TRITONBACKEND_ModelInstanceExecute(
   return nullptr;
 }
 
-TRITONSERVER_Error*
-TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
-{
-  const char* cname;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceName(instance, &cname));
-  std::string name(cname);
-
-  int32_t device_id;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id));
-
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_ModelInstanceInitialize: ") + name +
-       " (device " + std::to_string(device_id) + ")")
-          .c_str());
-
-  TRITONBACKEND_Model* model;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceModel(instance, &model));
-
-  void* vmodelstate;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vmodelstate));
-  ModelState* model_state = reinterpret_cast<ModelState*>(vmodelstate);
-
-  ModelInstanceState* instance_state;
-  RETURN_IF_ERROR(
-      ModelInstanceState::Create(model_state, instance, &instance_state));
-  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceSetState(
-      instance, reinterpret_cast<void*>(instance_state)));
-
-  RETURN_ERROR_IF_FALSE(
-      instance_state->Kind() == TRITONSERVER_INSTANCEGROUPKIND_CPU,
-      TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("'python_interpreter' backend only supports CPU instances"));
-
-  instance_state->CreatePythonInterpreter();
-
-  return nullptr;  // success
-}
 
 TRITONSERVER_Error*
 TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance)

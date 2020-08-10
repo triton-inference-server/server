@@ -77,21 +77,23 @@ add_custom_target(
         python_libs ALL 
         DEPENDS ${PROTO_CORE_PY} ${PROTO_HOST_PY} ${protocol_grpc_py})
 
-FILE(GLOB PROTBUF_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/*.cc)
-FILE(GLOB PROTBUF_SRCS ${CMAKE_CURRENT_BINARY_DIR}/*.h)
-message("GRPC sources ${protocol_grpc_srcs}")
-message("GRPC headers ${protocol_grpc_hdrs}")
+FILE(GLOB PROTOBUF_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/*.cc)
+FILE(GLOB PROTOBUF_SRCS ${CMAKE_CURRENT_BINARY_DIR}/*.h)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 
 add_library(
   triton_python SHARED
   python_interpreter.cc
   ${PROTOBUF_HEADERS}
   ${PROTOBUF_SRCS}
+  $<TARGET_OBJECTS:model-config-library>
 
   ${protocol_grpc_hdrs}
   ${protocol_grpc_srcs})
+
+add_dependencies(triton_python model-config-library)
 
 set_target_properties(
   triton_python
@@ -128,7 +130,7 @@ endif() # TRTIS_ENABLE_GPU
 
 install(
   TARGETS triton_python
-  LIBRARY DESTINATION backends
+  LIBRARY DESTINATION backends/python
 )
 # TODO: fix installing ${PROTO_HOST_PY}
 install(FILES ${protocol_core_py} ${protocol_grpc_py} resources/startup.py
