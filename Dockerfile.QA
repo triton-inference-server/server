@@ -305,7 +305,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # CI/QA for memcheck requires valgrind
-RUN apt-get update && apt-get install valgrind
+RUN apt-get update && apt-get install -y valgrind
 
 # CI/QA expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \

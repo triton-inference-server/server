@@ -57,6 +57,9 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+kill $SERVER_PID
+wait $SERVER_PID
+
 RET=0
 
 BYTES_LOST=$(tac $TEST_LOG | awk '/definitely lost/{print $4; exit}')

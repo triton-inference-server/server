@@ -264,12 +264,9 @@ function run_server_leakcheck () {
     LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
-    wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
-    
-    kill $SERVER_PID
-    wait $SERVER_PID
-    
+    wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT  
     if [ "$WAIT_RET" != "0" ]; then
+        kill $SERVER_PID || true
         SERVER_PID=0
     fi
 }
