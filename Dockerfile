@@ -31,6 +31,7 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:20.08-py3
 ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.08-py3
 ARG TENSORFLOW1_IMAGE=nvcr.io/nvidia/tensorflow:20.08-tf1-py3
+ARG TENSORFLOW2_IMAGE=nvcr.io/nvidia/tensorflow:20.08-tf2-py3
 
 ############################################################################
 ## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
@@ -138,6 +139,7 @@ RUN echo "import onnx; print(onnx.__version__)" | python3 > /workspace/ort_onnx_
 ## TensorFlow stage: Use TensorFlow container
 ############################################################################
 FROM ${TENSORFLOW1_IMAGE} AS tritonserver_tf1
+FROM ${TENSORFLOW2_IMAGE} AS tritonserver_tf2
 
 ############################################################################
 ## Build stage: Build inference server
@@ -202,6 +204,17 @@ RUN cd /opt/tritonserver/backends/tensorflow1 && \
     ln -sf libtensorflow_framework.so.1 libtensorflow_framework.so && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_cc.so.1 && \
     ln -sf libtensorflow_cc.so.1 libtensorflow_cc.so
+
+COPY --from=tritonserver_tf2 \
+     /usr/local/lib/tensorflow/libtensorflow_triton.so.2 \
+     /opt/tritonserver/backends/tensorflow2/
+RUN cd /opt/tritonserver/backends/tensorflow2 && \
+    patchelf --set-rpath '$ORIGIN' libtensorflow_triton.so.2 && \
+    ln -sf libtensorflow_triton.so.2 libtensorflow_triton.so && \
+    ln -sf libtensorflow_triton.so.2 libtensorflow_framework.so.2 && \
+    ln -sf libtensorflow_framework.so.2 libtensorflow_framework.so && \
+    ln -sf libtensorflow_triton.so.2 libtensorflow_cc.so.2 && \
+    ln -sf libtensorflow_cc.so.2 libtensorflow_cc.so
 
 # Caffe2 libraries
 COPY --from=tritonserver_pytorch \
@@ -333,7 +346,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                   -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
-                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/lib/pytorch;/opt/tritonserver/backends/onnxruntime" \
+                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/backends/tensorflow2;/opt/tritonserver/lib/pytorch;/opt/tritonserver/backends/onnxruntime" \
                   ../build && \
             make -j16 server && \
             mkdir -p /opt/tritonserver/include && \
