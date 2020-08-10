@@ -195,8 +195,6 @@ if(${TRITON_ENABLE_GRPC})
       DESTINATION include
   )
 
-  message("Hi ${CMAKE_CURRENT_BINARY_DIR}")
-
 endif() # TRITON_ENABLE_GRPC
 
 if(${TRITON_ENABLE_HTTP})
