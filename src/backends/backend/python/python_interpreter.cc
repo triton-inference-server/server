@@ -351,7 +351,8 @@ ModelInstanceState::CreatePythonInterpreter()
 
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          (std::string("Failed to initialize model instance ") + name_).c_str());
+          (std::string("Failed to initialize model instance ") + name_)
+              .c_str());
     }
   } else {
     ConnectPythonInterpreter(module_path);
@@ -442,8 +443,7 @@ ModelInstanceState::Create(
 
   // TODO: Remove version 1
   TRITONSERVER_Message* config_message;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
-      triton_model, 1, &config_message));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(triton_model, 1, &config_message));
 
   // Parse JSON config
   const char* buffer;
@@ -546,8 +546,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 {
   TRITONSERVER_Message* config_message;
   // TODO: Make this work with every version
-  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
-      triton_model, 1, &config_message));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(triton_model, 1, &config_message));
 
   const char* buffer;
   size_t byte_size;
@@ -589,8 +588,7 @@ ModelState::SupportsFirstDimBatching(bool* supports)
 {
   uint32_t flags = 0;
   RETURN_IF_ERROR(TRITONSERVER_ServerModelBatchProperties(
-      triton_server_, model_name_.c_str(), model_version_, &flags,
-      nullptr));
+      triton_server_, model_name_.c_str(), model_version_, &flags, nullptr));
   *supports = ((flags & TRITONSERVER_BATCH_FIRST_DIM) != 0);
   return nullptr;
 }
@@ -870,8 +868,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
     LOG_IF_ERROR(
         TRITONBACKEND_ResponseSend(
-            responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-            nullptr),
+            responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL, nullptr),
         "failed sending response");
   }
 

@@ -26,7 +26,6 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-
 #
 # libpython_interpreter.so
 #
@@ -34,7 +33,6 @@ configure_file(libtriton_python.ldscript libtriton_python.ldscript COPYONLY)
 
 find_package(gRPC CONFIG REQUIRED)
 find_package(Protobuf CONFIG REQUIRED)
-
 
 set(gRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 
@@ -81,7 +79,6 @@ FILE(GLOB PROTOBUF_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/*.cc)
 FILE(GLOB PROTOBUF_SRCS ${CMAKE_CURRENT_BINARY_DIR}/*.h)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
 
 add_library(
   triton_python SHARED
