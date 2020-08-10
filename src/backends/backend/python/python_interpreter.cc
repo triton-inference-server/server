@@ -330,10 +330,9 @@ ModelInstanceState::CreatePythonInterpreter()
   if (interpreter_pid_ == 0) {
     // Use the python available in $PATH
     // TODO: Make this overridable by config
-    std::string python_interpreter_path =
-        "/workspace/src/custom/python/install/env/bin/python";
+    std::string python_interpreter_path = "python";
     std::string python_interpreter_startup =
-        "/workspace/src/custom/python/install/startup.py";
+        "/workspace/builddir/server/install/lib/python/runtime/startup.py";
 
     subinterpreter_commandline[0] = python_interpreter_path.c_str();
     subinterpreter_commandline[1] = python_interpreter_startup.c_str();
@@ -646,6 +645,7 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelSetState(model, reinterpret_cast<void*>(model_state)));
 
+
   return nullptr;
 }
 
@@ -682,8 +682,6 @@ TRITONBACKEND_ModelInstanceExecute(
   }
 
   ModelState* model_state = instance_state->StateForModel();
-
-  instance_state->CreatePythonInterpreter();
 
   bool supports_batching_initialized = false;
   bool supports_batching = false;
@@ -882,6 +880,8 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
       instance_state->Kind() == TRITONSERVER_INSTANCEGROUPKIND_CPU,
       TRITONSERVER_ERROR_INVALID_ARG,
       std::string("'python_interpreter' backend only supports CPU instances"));
+
+  instance_state->CreatePythonInterpreter();
 
   return nullptr;  // success
 }
