@@ -92,13 +92,10 @@ set_target_properties(
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_tensorflow.ldscript
     LINK_FLAGS "-Wl,--version-script libtriton_tensorflow.ldscript"
 )
-# FIXME currently not linking against Triton-TF 2 library for successful build,
-# the symbols are undefined, should uncomment it once Triton-TF 2 library is
-# available
 target_link_libraries(
   triton_tensorflow2
   PUBLIC ${TRITON_EXTRA_LDFLAGS}
-  #PUBLIC -ltensorflow_triton
+  PUBLIC -ltensorflow_triton
 )
 
 install(
