@@ -440,9 +440,10 @@ ModelInstanceState::Create(
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelInstanceModel(triton_model_instance, &triton_model));
 
+  // TODO: Remove version 1
   TRITONSERVER_Message* config_message;
   RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
-      triton_model, 1 /* config_version */, &config_message));
+      triton_model, 1, &config_message));
 
   // Parse JSON config
   const char* buffer;
@@ -544,8 +545,9 @@ TRITONSERVER_Error*
 ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 {
   TRITONSERVER_Message* config_message;
+  // TODO: Make this work with every version
   RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
-      triton_model, 1 /* config_version */, &config_message));
+      triton_model, 1, &config_message));
 
   const char* buffer;
   size_t byte_size;
@@ -569,7 +571,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   *state = new ModelState(
       triton_server, triton_model, model_name, model_version,
       std::move(model_config));
-  return nullptr;  // success
+  return nullptr;
 }
 
 ModelState::ModelState(
@@ -588,9 +590,9 @@ ModelState::SupportsFirstDimBatching(bool* supports)
   uint32_t flags = 0;
   RETURN_IF_ERROR(TRITONSERVER_ServerModelBatchProperties(
       triton_server_, model_name_.c_str(), model_version_, &flags,
-      nullptr /* voidp */));
+      nullptr));
   *supports = ((flags & TRITONSERVER_BATCH_FIRST_DIM) != 0);
-  return nullptr;  // success
+  return nullptr;
 }
 
 }  // namespace
@@ -638,7 +640,7 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(model, &version));
 
   TRITONSERVER_LogMessage(
-      TRITONSERVER_LOG_INFO, __FILE__, __LINE__,
+      TRITONSERVER_LOG_VERBOSE, __FILE__, __LINE__,
       (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
        std::to_string(version) + ")")
           .c_str());
@@ -678,7 +680,7 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id));
 
   LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
+      TRITONSERVER_LOG_VERBOSE,
       (std::string("TRITONBACKEND_ModelInstanceInitialize: ") + name +
        " (device " + std::to_string(device_id) + ")")
           .c_str());
@@ -869,20 +871,14 @@ TRITONBACKEND_ModelInstanceExecute(
     LOG_IF_ERROR(
         TRITONBACKEND_ResponseSend(
             responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-            nullptr /* success */),
+            nullptr),
         "failed sending response");
   }
 
   for (uint32_t r = 0; r < request_count; ++r) {
     TRITONBACKEND_Request* request = requests[r];
 
-    // if (responses[r] == nullptr) {
-    //   LOG_IF_ERROR(
-    //       TRITONBACKEND_ModelReportStatistics(
-    //           model_state->TritonModel(), request, false /* success */,
-    //           TRITONBACKEND_NO_DEVICE, 0, 0, 0, 0),
-    //       "failed reporting request statistics");
-    // }
+    // TODO: Add resposne/request statistics
 
     LOG_IF_ERROR(
         TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
@@ -900,10 +896,6 @@ TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance)
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(instance, &vstate));
   ModelInstanceState* instance_state =
       reinterpret_cast<ModelInstanceState*>(vstate);
-
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      "TRITONBACKEND_ModelInstanceFinalize: delete instance state");
 
   delete instance_state;
 

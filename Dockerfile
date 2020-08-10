@@ -150,6 +150,7 @@ ARG TRITON_CONTAINER_VERSION=20.09dev
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
+# python3-pip is needed by python backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -166,6 +167,7 @@ RUN apt-get update && \
             libb64-dev \
             patchelf \
             python3-dev \
+            python3-pip \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
@@ -179,6 +181,9 @@ RUN apt-get update && \
         exit 1; \
     fi && \
     rm -rf /var/lib/apt/lists/*
+
+# Install dependencies for protobuf code generation in Python
+RUN pip3 install grpcio-tools
 
 # TensorFlow libraries. Install the monolithic libtensorflow_trtis and
 # create links from libtensorflow_framework.so and
