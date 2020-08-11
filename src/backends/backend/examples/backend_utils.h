@@ -313,8 +313,19 @@ TRITONSERVER_Error* CopyBuffer(
 /// the path to the content.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_Error* ModelPaths(
-    const char* model_repository_path, uint64_t version,
+    const std::string& model_repository_path, uint64_t version,
     const bool ignore_directories, const bool ignore_files,
     std::unordered_map<std::string, std::string>* model_paths);
+
+/// Create a CUDA stream appropriate for GPU<->CPU data transfer
+/// operations for a given GPU device. The caller takes ownership of
+/// the stream. 'stream' returns nullptr if GPU support is disabled.
+///
+/// \param device_id The ID of the GPU.
+/// \param priority The stream priority. Use 0 for normal priority.
+/// \param stream Returns the created stream.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* CreateCudaStream(
+    const int device_id, const int cuda_stream_priority, cudaStream_t* stream);
 
 }}}  // namespace nvidia::inferenceserver::backend

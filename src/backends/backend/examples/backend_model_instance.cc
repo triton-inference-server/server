@@ -27,6 +27,7 @@
 #include "src/backends/backend/examples/backend_model_instance.h"
 
 #include <vector>
+#include "src/backends/backend/examples/backend_model.h"
 #include "src/backends/backend/examples/backend_utils.h"
 
 namespace nvidia { namespace inferenceserver { namespace backend {
@@ -34,16 +35,117 @@ namespace nvidia { namespace inferenceserver { namespace backend {
 //
 // BackendModelInstance
 //
-BackendModelInstance::BackendModelInstance(
-    const std::string& name, const int gpu_device, const int max_batch_size,
-    const bool enable_pinned_input, const bool enable_pinned_output)
-    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
-      enable_pinned_input_(enable_pinned_input),
-      enable_pinned_output_(enable_pinned_output)
+TRITONSERVER_Error*
+BackendModelInstance::Create(
+    BackendModel* backend_model,
+    TRITONBACKEND_ModelInstance* triton_model_instance,
+    BackendModelInstance** backend_model_instance)
 {
+  const char* instance_name;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceName(triton_model_instance, &instance_name));
+
+  TRITONSERVER_InstanceGroupKind instance_kind;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceKind(triton_model_instance, &instance_kind));
+
+  int32_t instance_id;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &instance_id));
+
+  TritonJson::Value& model_config = backend_model->ModelConfig();
+
+  // If the model configuration specifies a 'default_model_filename'
+  // and/or specifies 'cc_model_filenames' then determine the
+  // appropriate 'artifact_filename' value. If model configuration
+  // does not specify then just leave 'artifact_filename' empty and
+  // the backend can then provide its own logic for determine the
+  // filename if that is appropriate.
+  std::string cc_model_filename;
+  RETURN_IF_ERROR(model_config.MemberAsString(
+      "default_model_filename", &cc_model_filename));
+
+  switch (instance_kind) {
+    case TRITONSERVER_INSTANCEGROUPKIND_CPU: {
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_VERBOSE,
+          (std::string("Creating instance ") + instance_name +
+           " on CPU using artifact '" + cc_model_filename + "'")
+              .c_str());
+      break;
+    }
+    case TRITONSERVER_INSTANCEGROUPKIND_MODEL: {
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_VERBOSE,
+          (std::string("Creating instance ") + instance_name +
+           " on model-specified devices using artifact '" + cc_model_filename +
+           "'")
+              .c_str());
+      break;
+    }
+    case TRITONSERVER_INSTANCEGROUPKIND_GPU: {
 #ifdef TRITON_ENABLE_GPU
-  stream_ = nullptr;
+      cudaDeviceProp cuprops;
+      cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, instance_id);
+      if (cuerr != cudaSuccess) {
+        RETURN_ERROR_IF_FALSE(
+            false, TRITONSERVER_ERROR_INTERNAL,
+            std::string("unable to get CUDA device properties for ") +
+                instance_name + ": " + cudaGetErrorString(cuerr));
+      }
+
+      const std::string cc =
+          std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
+      TritonJson::Value cc_names;
+      TritonJson::Value cc_name;
+      if ((model_config.Find("cc_model_filenames", &cc_names)) &&
+          (cc_names.Find(cc.c_str(), &cc_name))) {
+        cc_name.AsString(&cc_model_filename);
+      }
+
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_VERBOSE,
+          (std::string("Creating instance ") + instance_name + " on GPU " +
+           std::to_string(instance_id) + " (" + cc + ") using artifact '" +
+           cc_model_filename + "'")
+              .c_str());
+#else
+      RETURN_ERROR_IF_FALSE(
+          false, TRITONSERVER_ERROR_INTERNAL,
+          std::string("GPU instances not supported"));
 #endif  // TRITON_ENABLE_GPU
+      break;
+    }
+    default: {
+      RETURN_ERROR_IF_FALSE(
+          false, TRITONSERVER_ERROR_INTERNAL,
+          std::string("unexpected instance kind for ") + instance_name);
+    }
+  }
+
+  cudaStream_t stream = nullptr;
+  if (instance_kind == TRITONSERVER_INSTANCEGROUPKIND_GPU) {
+    RETURN_IF_ERROR(
+        CreateCudaStream(instance_id, 0 /* cuda_stream_priority */, &stream));
+  }
+
+  *backend_model_instance = new BackendModelInstance(
+      backend_model, triton_model_instance, instance_name, instance_kind,
+      instance_id, cc_model_filename, stream);
+  return nullptr;  // success
+}
+
+
+BackendModelInstance::BackendModelInstance(
+    BackendModel* backend_model,
+    TRITONBACKEND_ModelInstance* triton_model_instance, const char* name,
+    const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
+    const std::string& artifact_filename, cudaStream_t stream)
+    : backend_model_(backend_model),
+      triton_model_instance_(triton_model_instance), name_(name), kind_(kind),
+      device_id_(device_id), artifact_filename_(artifact_filename),
+      stream_(stream)
+{
 }
 
 BackendModelInstance::~BackendModelInstance()
@@ -54,54 +156,13 @@ BackendModelInstance::~BackendModelInstance()
     if (err != cudaSuccess) {
       TRITONSERVER_LogMessage(
           TRITONSERVER_LOG_ERROR, __FILE__, __LINE__,
-          (std::string("~BackendModelInstance: model ") + name_ +
+          (std::string("~BackendModelInstance: ") + name_ +
            " failed to destroy cuda stream: " + cudaGetErrorString(err))
               .c_str());
     }
     stream_ = nullptr;
   }
 #endif  // TRITON_ENABLE_GPU
-}
-
-TRITONSERVER_Error*
-BackendModelInstance::CreateCudaStream(
-    const int cuda_stream_priority, cudaStream_t* stream)
-{
-#ifdef TRITON_ENABLE_GPU
-  if (gpu_device_ != NO_GPU_DEVICE) {
-    // Make sure that correct device is set before creating stream and
-    // then restore the device to what was set by the caller.
-    int current_device;
-    auto cuerr = cudaGetDevice(&current_device);
-    bool overridden = false;
-    if (cuerr == cudaSuccess) {
-      overridden = (current_device != gpu_device_);
-      if (overridden) {
-        cuerr = cudaSetDevice(gpu_device_);
-      }
-    }
-
-    if (cuerr == cudaSuccess) {
-      cudaStream_t* s = (stream == nullptr) ? &stream_ : stream;
-      cuerr = cudaStreamCreateWithPriority(
-          s, cudaStreamDefault, cuda_stream_priority);
-    }
-
-    if (overridden) {
-      cudaSetDevice(current_device);
-    }
-
-    if (cuerr != cudaSuccess) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          (std::string("unable to create stream for ") + name_ + ": " +
-           cudaGetErrorString(cuerr))
-              .c_str());
-    }
-  }
-#endif  // TRITON_ENABLE_GPU
-
-  return nullptr;  // success
 }
 
 }}}  // namespace nvidia::inferenceserver::backend

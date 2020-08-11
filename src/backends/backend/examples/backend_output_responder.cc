@@ -26,6 +26,7 @@
 
 #include "src/backends/backend/examples/backend_output_responder.h"
 
+#include "src/backends/backend/examples/backend_model.h"
 #include "src/backends/backend/examples/backend_model_instance.h"
 #include "src/backends/backend/examples/backend_utils.h"
 
@@ -78,7 +79,7 @@ BackendOutputResponder::ProcessTensor(
     }
 
     // Override shape to be correct for this response.
-    if (max_batch_size_ != BackendModelInstance::NO_BATCHING) {
+    if (max_batch_size_ != BackendModel::NO_BATCHING) {
       const char* name;
       TRITONBACKEND_RequestInputName(request, 0, &name);
       TRITONBACKEND_Input* input;

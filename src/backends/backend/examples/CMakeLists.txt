@@ -32,6 +32,7 @@ cmake_minimum_required (VERSION 3.5)
 add_library(
   backend-library EXCLUDE_FROM_ALL OBJECT
   backend_utils.cc backend_utils.h
+  backend_model.cc backend_model.h
   backend_model_instance.cc backend_model_instance.h
   backend_input_collector.cc backend_input_collector.h
   backend_output_responder.cc backend_output_responder.h
