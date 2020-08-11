@@ -187,6 +187,14 @@ if(${TRITON_ENABLE_GRPC})
       ${CMAKE_CURRENT_BINARY_DIR}/../../../core/grpc_service.pb.h
       DESTINATION include
   )
+
+  install(
+      DIRECTORY
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/include/
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/include/
+      DESTINATION include
+  )
+
 endif() # TRITON_ENABLE_GRPC
 
 if(${TRITON_ENABLE_HTTP})
