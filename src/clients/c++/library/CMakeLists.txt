@@ -201,7 +201,11 @@ if(${TRITON_ENABLE_HTTP})
   #
   # libhttpclient.so and libhttpclient_static.a
   #
-  find_package(CURL CONFIG REQUIRED)
+  if(${TRITON_CURL_WITHOUT_CONFIG})
+    find_package(CURL REQUIRED)
+  else()
+    find_package(CURL CONFIG REQUIRED)
+  endif() # TRITON_CURL_WITHOUT_CONFIG
   message(STATUS "Using curl ${CURL_VERSION}")
   add_definitions(-DCURL_STATICLIB)
 
