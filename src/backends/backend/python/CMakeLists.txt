@@ -36,20 +36,16 @@ find_package(Protobuf CONFIG REQUIRED)
 
 set(gRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../../../core/model_config.proto DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/python_host.proto DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 set(Protobuf_SRC_ROOT_FOLDER ${CMAKE_CURRENT_BINARY_DIR})
 
-protobuf_generate_cpp(PROTO_CORE_SRCS PROTO_CORE_HDRS ${CMAKE_CURRENT_BINARY_DIR}/model_config.proto)
-protobuf_generate_cpp(PROTO_HOST_SRCS PROTO_HOST_HDRS ${CMAKE_CURRENT_BINARY_DIR}/python_host.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HOST_HDRS ${CMAKE_CURRENT_BINARY_DIR}/python_host.proto)
 
-protobuf_generate_python(PROTO_CORE_PY ${CMAKE_CURRENT_BINARY_DIR}/model_config.proto)
-protobuf_generate_python(PROTO_HOST_PY ${CMAKE_CURRENT_BINARY_DIR}/python_host.proto)
+protobuf_generate_python(PROTO_PY ${CMAKE_CURRENT_BINARY_DIR}/python_host.proto)
 
 set (protocol_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/python_host.grpc.pb.cc")
 set (protocol_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/python_host.grpc.pb.h")
 set (protocol_grpc_py "${CMAKE_CURRENT_BINARY_DIR}/python_host_pb2_grpc.py")
-set (protocol_core_py "${CMAKE_CURRENT_BINARY_DIR}/model_config_pb2.py")
 
 add_custom_command(
       OUTPUT "${protocol_grpc_srcs}" "${protocol_grpc_hdrs}"
@@ -59,7 +55,7 @@ add_custom_command(
         --plugin=protoc-gen-grpc="${gRPC_CPP_PLUGIN_EXECUTABLE}"
         -I "${CMAKE_CURRENT_BINARY_DIR}"
         "python_host.proto"
-        DEPENDS "${PROTO_CORE_SRCS}")
+        DEPENDS "${PROTO_SRCS}")
 
 add_custom_command(
         OUTPUT "${protocol_grpc_py}"
@@ -69,11 +65,11 @@ add_custom_command(
         --grpc_python_out "${CMAKE_CURRENT_BINARY_DIR}"
         -I "${CMAKE_CURRENT_BINARY_DIR}"
         "python_host.proto"
-        DEPENDS "${PROTO_CORE_SRCS}")
+        DEPENDS "${PROTO_SRCS}")
 
 add_custom_target(
         python_libs ALL 
-        DEPENDS ${PROTO_CORE_PY} ${PROTO_HOST_PY} ${protocol_grpc_py})
+        DEPENDS ${PROTO_PY} ${protocol_grpc_py})
 
 FILE(GLOB PROTOBUF_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/*.cc)
 FILE(GLOB PROTOBUF_SRCS ${CMAKE_CURRENT_BINARY_DIR}/*.h)
@@ -129,6 +125,6 @@ install(
   TARGETS triton_python
   LIBRARY DESTINATION backends/python
 )
-# TODO: fix installing ${PROTO_HOST_PY}
+# TODO: fix installing ${PROTO_PY}
 install(FILES ${protocol_core_py} ${protocol_grpc_py} resources/startup.py
        DESTINATION lib/python/runtime)

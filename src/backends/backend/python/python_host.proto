@@ -26,9 +26,7 @@
 
 syntax = "proto3";
 
-import "model_config.proto";
 package nvidia.inferenceserver;
-
 
 message InitializationCommand
 {
@@ -41,30 +39,43 @@ message InitializationCommand
   repeated ValuePair model_command = 1;
 }
 
-message InferenceData
+message Tensor
 {
   string name = 1;
-  inference.DataType dtype = 2;
+  int32 dtype = 2;
   repeated int64 dims = 3;
   bytes raw_data = 5;
 }
 
-message InferenceBatch
+message InferenceRequest
 {
-  int64 batch_size = 1;
-  repeated InferenceData tensors = 2;
+  string id = 1;
+  uint64 correlation_id = 2;
+  repeated Tensor inputs = 3;
+  repeated string requested_output_names = 4;
 }
 
-message StatusCode
+message InferenceResponse
 {
-  int64 code = 1;
+  string name = 1;
+  repeated Tensor inputs = 2;
+}
+
+message ExecuteResponse
+{
+  repeated InferenceResponse responses = 1;
+}
+
+message ExecuteRequest
+{
+  repeated InferenceRequest requests = 1;
 }
 
 message Empty {}
 
 service PythonInterpreter
 {
-  rpc InterpreterInit(InitializationCommand) returns (StatusCode) {}
-  rpc InterpreterShutdown(Empty) returns (StatusCode) {}
-  rpc InferenceRequest(InferenceBatch) returns (InferenceBatch) {}
+  rpc Init(InitializationCommand) returns (Empty) {}
+  rpc Fini(Empty) returns (Empty) {}
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse) {}
 }
