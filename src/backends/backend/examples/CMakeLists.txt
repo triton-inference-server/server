@@ -30,11 +30,14 @@ cmake_minimum_required (VERSION 3.5)
 # Backend utilities
 #
 add_library(
-  backend-utils-library EXCLUDE_FROM_ALL OBJECT
+  backend-library EXCLUDE_FROM_ALL OBJECT
   backend_utils.cc backend_utils.h
+  backend_model_instance.cc backend_model_instance.h
+  backend_input_collector.cc backend_input_collector.h
+  backend_output_responder.cc backend_output_responder.h
 )
 if(${TRITON_ENABLE_GPU})
-  target_include_directories(backend-utils-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
 
 #
@@ -45,7 +48,7 @@ configure_file(libtriton_identity.ldscript libtriton_identity.ldscript COPYONLY)
 add_library(
   triton_identity SHARED
   identity.cc
-  $<TARGET_OBJECTS:backend-utils-library>
+  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_identity PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -67,7 +70,7 @@ configure_file(libtriton_repeat.ldscript libtriton_repeat.ldscript COPYONLY)
 add_library(
   triton_repeat SHARED
   repeat.cc
-  $<TARGET_OBJECTS:backend-utils-library>
+  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_repeat PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -89,7 +92,7 @@ configure_file(libtriton_square.ldscript libtriton_square.ldscript COPYONLY)
 add_library(
   triton_square SHARED
   square.cc
-  $<TARGET_OBJECTS:backend-utils-library>
+  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_square PRIVATE ${CUDA_INCLUDE_DIRS})
