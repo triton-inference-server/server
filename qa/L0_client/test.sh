@@ -54,9 +54,7 @@ client_lib=$(pwd)/triton_client/lib
 client_inc=$(pwd)/triton_client/include
 
 # Test linking against the shared library
-g++ grpc_test.cc -o grpc_test -I$client_inc -L$client_lib \
-  -I/workspace/builddir/grpc/include \
-  -I/workspace/builddir/protobuf/include -lgrpcclient
+g++ grpc_test.cc -o grpc_test -I$client_inc -L$client_lib -lgrpcclient
 
 if [ $? -eq 0 ]; then
     if [[ ! -x "./grpc_test" ]]; then
@@ -84,8 +82,7 @@ static_libs="$client_lib/libgrpcclient_static.a $client_lib/libgrpc++.a $client_
              $client_lib/libgpr.a $client_lib/libcares.a $client_lib/libaddress_sorting.a $client_lib/libprotobuf.a \
              $client_lib/libcurl.a"
 
-g++ grpc_test.cc $static_libs -o grpc_test_static -I$client_inc  -I/workspace/builddir/grpc/include \
-  -I/workspace/builddir/protobuf/include -lz -lssl -lcrypto -lpthread
+g++ grpc_test.cc $static_libs -o grpc_test_static -I$client_inc -lz -lssl -lcrypto -lpthread
 
 if [ $? -eq 0 ]; then
     if [[ ! -x "./grpc_test_static" ]]; then
