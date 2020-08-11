@@ -36,7 +36,11 @@ if(NOT GRPC_FOUND AND NOT gRPC_FOUND)
 endif()
 
 if(NOT CURL_FOUND)
-  find_package(CURL CONFIG REQUIRED)
+  if(${TRITON_CURL_WITHOUT_CONFIG})
+    find_package(CURL REQUIRED)
+  else()
+    find_package(CURL CONFIG REQUIRED)
+  endif() # TRITON_CURL_WITHOUT_CONFIG
 endif()
 
 if(NOT Threads_FOUND)
