@@ -27,9 +27,9 @@
 
 #include <onnxruntime_c_api.h>
 #include <mutex>
-#include "src/core/status.h"
+#include "src/backends/backend/tritonbackend.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace backend { namespace onnxruntime {
 
 /// A singleton to load Onnx model because loading models requires
 /// Onnx Runtime environment which is unique per process
@@ -38,28 +38,29 @@ class OnnxLoader {
   ~OnnxLoader();
 
   /// Initialize loader with default environment settings
-  static Status Init();
+  static TRITONSERVER_Error* Init();
 
   /// Stop loader, and once all Onnx sessions are unloaded via UnloadSession()
   /// the resource it allocated will be released
-  static Status Stop();
+  static TRITONSERVER_Error* Stop();
 
   /// Load a Onnx model from a path and return the corresponding
   /// OrtSession.
   ///
-  /// \param model_data The Onnx model or path to the directory
-  /// holding the onnx model
+  /// \param bool is_path If true 'model' is a path to the model file,
+  /// if false 'model' is the serialized model.
+  /// \param model The Onnx model or path to the model.
   /// \param session_options The options to use when creating the session
   /// \param session Returns the Onnx model session
   /// \return Error status.
-  static Status LoadSession(
-      const std::pair<bool, std::string>& model_data,
+  static TRITONSERVER_Error* LoadSession(
+      const bool is_path, const std::string& model,
       const OrtSessionOptions* session_options, OrtSession** session);
 
   /// Unload a Onnx model session
   ///
   /// \param session The Onnx model session to be unloaded
-  static Status UnloadSession(OrtSession* session);
+  static TRITONSERVER_Error* UnloadSession(OrtSession* session);
 
  private:
   OnnxLoader(OrtEnv* env) : env_(env), live_session_cnt_(0), closing_(false) {}
@@ -79,4 +80,4 @@ class OnnxLoader {
   bool closing_;
 };
 
-}}  // namespace nvidia::inferenceserver
+}}}  // namespace triton::backend::onnxruntime

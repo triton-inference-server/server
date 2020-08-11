@@ -183,6 +183,9 @@ class InferenceBackend {
 
   std::vector<std::unique_ptr<BackendContext>> contexts_;
 
+  // The scheduler to use for this backend.
+  std::unique_ptr<Scheduler> scheduler_;
+
  private:
   // Generate warmup data
   Status GenerateWarmupData(std::vector<WarmupData>* samples);
@@ -201,9 +204,6 @@ class InferenceBackend {
 
   // Label provider for this model.
   std::shared_ptr<LabelProvider> label_provider_;
-
-  // The scheduler to use for this backend.
-  std::unique_ptr<Scheduler> scheduler_;
 
   // Map from input name to the model configuration for that input.
   std::unordered_map<std::string, inference::ModelInput> input_map_;

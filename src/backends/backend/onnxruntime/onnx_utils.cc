@@ -24,9 +24,13 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/onnx/onnx_utils.h"
+#include "src/backends/backend/onnxruntime/onnx_utils.h"
 
-namespace nvidia { namespace inferenceserver {
+#include "src/backends/backend/examples/backend_utils.h"
+
+namespace nib = nvidia::inferenceserver::backend;
+
+namespace triton { namespace backend { namespace onnxruntime {
 
 const OrtApi* ort_api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
 
@@ -54,7 +58,7 @@ OnnxTypeName(ONNXType onnx_type)
   return "ONNX_TYPE_UNKNOWN";
 }
 
-Status
+TRITONSERVER_Error*
 InputOutputNames(
     OrtSession* session, bool is_input, std::set<std::string>& names)
 {
@@ -88,10 +92,10 @@ InputOutputNames(
   }
   RETURN_IF_ORT_ERROR(onnx_status);
 
-  return Status::Success;
+  return nullptr;  // success
 }
 
-Status
+TRITONSERVER_Error*
 InputOutputInfos(
     OrtSession* session, OrtAllocator* allocator, bool is_input,
     OnnxTensorInfoMap& infos)
@@ -125,17 +129,15 @@ InputOutputInfos(
           ort_api->SessionGetOutputTypeInfo(session, i, &typeinfo));
     }
 
-    OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(
-        typeinfo, ort_api->ReleaseTypeInfo);
+    std::unique_ptr<OrtTypeInfo, TypeInfoDeleter> typeinfo_wrapper(typeinfo);
 
     ONNXType onnx_type;
     RETURN_IF_ORT_ERROR(ort_api->GetOnnxTypeFromTypeInfo(typeinfo, &onnx_type));
-    if (onnx_type != ONNX_TYPE_TENSOR) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "Unsupported ONNX Type '" + OnnxTypeName(onnx_type) + "' for I/O '" +
-              name + "', expected '" + OnnxTypeName(ONNX_TYPE_TENSOR) + "'.");
-    }
+    RETURN_ERROR_IF_TRUE(
+        onnx_type != ONNX_TYPE_TENSOR, TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string("Unsupported ONNX Type '") + OnnxTypeName(onnx_type) +
+            "' for I/O '" + name + "', expected '" +
+            OnnxTypeName(ONNX_TYPE_TENSOR) + "'.");
 
     const OrtTensorTypeAndShapeInfo* tensor_info;
     RETURN_IF_ORT_ERROR(
@@ -154,7 +156,7 @@ InputOutputInfos(
     infos.emplace(name, OnnxTensorInfo(type, dims));
   }
 
-  return Status::Success;
+  return nullptr;  // success
 }
 
 }  // namespace
@@ -203,38 +205,38 @@ OnnxDataTypeName(ONNXTensorElementDataType onnx_type)
   return "UNDEFINED";
 }
 
-inference::DataType
+TRITONSERVER_DataType
 ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type)
 {
   switch (onnx_type) {
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:
       // maps to c type float (4 bytes)
-      return inference::DataType::TYPE_FP32;
+      return TRITONSERVER_TYPE_FP32;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8:
-      return inference::DataType::TYPE_UINT8;
+      return TRITONSERVER_TYPE_UINT8;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8:
-      return inference::DataType::TYPE_INT8;
+      return TRITONSERVER_TYPE_INT8;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16:
-      return inference::DataType::TYPE_UINT16;
+      return TRITONSERVER_TYPE_UINT16;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16:
-      return inference::DataType::TYPE_INT16;
+      return TRITONSERVER_TYPE_INT16;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32:
-      return inference::DataType::TYPE_INT32;
+      return TRITONSERVER_TYPE_INT32;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64:
-      return inference::DataType::TYPE_INT64;
+      return TRITONSERVER_TYPE_INT64;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING:
-      return inference::DataType::TYPE_STRING;
+      return TRITONSERVER_TYPE_BYTES;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL:
-      return inference::DataType::TYPE_BOOL;
+      return TRITONSERVER_TYPE_BOOL;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16:
-      return inference::DataType::TYPE_FP16;
+      return TRITONSERVER_TYPE_FP16;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE:
       // maps to c type double (8 bytes)
-      return inference::DataType::TYPE_FP64;
+      return TRITONSERVER_TYPE_FP64;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32:
-      return inference::DataType::TYPE_UINT32;
+      return TRITONSERVER_TYPE_UINT32;
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64:
-      return inference::DataType::TYPE_UINT64;
+      return TRITONSERVER_TYPE_UINT64;
     // The following types are not supported:
     // complex with float32 real and imaginary components
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64:
@@ -247,38 +249,38 @@ ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type)
       break;
   }
 
-  return inference::DataType::TYPE_INVALID;
+  return TRITONSERVER_TYPE_INVALID;
 }
 
 ONNXTensorElementDataType
-ConvertToOnnxDataType(inference::DataType data_type)
+ConvertToOnnxDataType(TRITONSERVER_DataType data_type)
 {
   switch (data_type) {
-    case inference::DataType::TYPE_UINT8:
+    case TRITONSERVER_TYPE_UINT8:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8;
-    case inference::DataType::TYPE_UINT16:
+    case TRITONSERVER_TYPE_UINT16:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16;
-    case inference::DataType::TYPE_UINT32:
+    case TRITONSERVER_TYPE_UINT32:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32;
-    case inference::DataType::TYPE_UINT64:
+    case TRITONSERVER_TYPE_UINT64:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64;
-    case inference::DataType::TYPE_INT8:
+    case TRITONSERVER_TYPE_INT8:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8;
-    case inference::DataType::TYPE_INT16:
+    case TRITONSERVER_TYPE_INT16:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16;
-    case inference::DataType::TYPE_INT32:
+    case TRITONSERVER_TYPE_INT32:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32;
-    case inference::DataType::TYPE_INT64:
+    case TRITONSERVER_TYPE_INT64:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64;
-    case inference::DataType::TYPE_FP16:
+    case TRITONSERVER_TYPE_FP16:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16;
-    case inference::DataType::TYPE_FP32:
+    case TRITONSERVER_TYPE_FP32:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;
-    case inference::DataType::TYPE_FP64:
+    case TRITONSERVER_TYPE_FP64:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE;
-    case inference::DataType::TYPE_STRING:
+    case TRITONSERVER_TYPE_BYTES:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING;
-    case inference::DataType::TYPE_BOOL:
+    case TRITONSERVER_TYPE_BOOL:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL;
     default:
       break;
@@ -287,61 +289,108 @@ ConvertToOnnxDataType(inference::DataType data_type)
   return ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 }
 
-Status
+ONNXTensorElementDataType
+ConvertToOnnxDataType(const std::string& data_type_str)
+{
+  TRITONSERVER_DataType data_type =
+      TRITONSERVER_StringToDataType(data_type_str.c_str());
+  return ConvertToOnnxDataType(data_type);
+}
+
+ONNXTensorElementDataType
+ModelConfigDataTypeToOnnxDataType(const std::string& data_type_str)
+{
+  // Must start with "TYPE_".
+  if (data_type_str.rfind("TYPE_", 0) != 0) {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+  }
+
+  const std::string dtype = data_type_str.substr(strlen("TYPE_"));
+
+  if (dtype == "BOOL") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL;
+  } else if (dtype == "UINT8") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8;
+  } else if (dtype == "UINT16") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16;
+  } else if (dtype == "UINT32") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32;
+  } else if (dtype == "UINT64") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64;
+  } else if (dtype == "INT8") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8;
+  } else if (dtype == "INT16") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16;
+  } else if (dtype == "INT32") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32;
+  } else if (dtype == "INT64") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64;
+  } else if (dtype == "FP16") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16;
+  } else if (dtype == "FP32") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;
+  } else if (dtype == "FP64") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE;
+  } else if (dtype == "STRING") {
+    return ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING;
+  }
+
+  return ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+}
+
+TRITONSERVER_Error*
 InputNames(OrtSession* session, std::set<std::string>& names)
 {
   return InputOutputNames(session, true, names);
 }
 
-Status
+TRITONSERVER_Error*
 OutputNames(OrtSession* session, std::set<std::string>& names)
 {
   return InputOutputNames(session, false, names);
 }
 
-Status
+TRITONSERVER_Error*
 InputInfos(
     OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos)
 {
   return InputOutputInfos(session, allocator, true, infos);
 }
 
-Status
+TRITONSERVER_Error*
 OutputInfos(
     OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos)
 {
   return InputOutputInfos(session, allocator, false, infos);
 }
 
-Status
+TRITONSERVER_Error*
 CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
-    const std::vector<int64_t>& model_shape, const DimsList& dims,
+    const std::vector<int64_t>& model_shape, const std::vector<int64_t>& dims,
     const int max_batch_size, const bool compare_exact)
 {
   // If the model configuration expects batching support in the model,
   // then the onnx shape first dimension must be -1.
   const bool supports_batching = (max_batch_size > 0);
   if (supports_batching) {
-    if ((model_shape.size() == 0) || (model_shape[0] != -1)) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "model '" + model_name + "', tensor '" + tensor_name +
-              "': for the model to support batching the shape should have at "
-              "least 1 dimension and the first dimension must be -1; but shape "
-              "expected by the model is " +
-              DimsListToString(model_shape));
-    }
+    RETURN_ERROR_IF_TRUE(
+        (model_shape.size() == 0) || (model_shape[0] != -1),
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("model '") + model_name + "', tensor '" + tensor_name +
+            "': for the model to support batching the shape should have at "
+            "least 1 dimension and the first dimension must be -1; but shape "
+            "expected by the model is " +
+            nib::ShapeToString(model_shape));
 
-    DimsList full_dims;
-    full_dims.Add(-1);
-    for (int i = 0; i < dims.size(); ++i) {
-      full_dims.Add(dims[i]);
-    }
+    std::vector<int64_t> full_dims;
+    full_dims.reserve(1 + dims.size());
+    full_dims.push_back(-1);
+    full_dims.insert(full_dims.end(), dims.begin(), dims.end());
 
     bool succ = (model_shape.size() == (size_t)full_dims.size());
     if (succ) {
-      for (int i = 0; i < full_dims.size(); ++i) {
+      for (size_t i = 0; i < full_dims.size(); ++i) {
         const int64_t model_dim = model_shape[i];
         if (compare_exact || (model_dim != -1)) {
           succ &= (model_dim == full_dims[i]);
@@ -349,24 +398,22 @@ CompareDimsSupported(
       }
     }
 
-    if (!succ) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "model '" + model_name + "', tensor '" + tensor_name +
-              "': the model expects " + std::to_string(model_shape.size()) +
-              " dimensions (shape " + DimsListToString(model_shape) +
-              ") but the model configuration specifies " +
-              std::to_string(full_dims.size()) +
-              " dimensions (an initial batch dimension because max_batch_size "
-              "> 0 followed by the explicit tensor shape, making complete "
-              "shape " +
-              DimsListToString(full_dims) + ")");
-    }
+    RETURN_ERROR_IF_TRUE(
+        !succ, TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("model '") + model_name + "', tensor '" + tensor_name +
+            "': the model expects " + std::to_string(model_shape.size()) +
+            " dimensions (shape " + nib::ShapeToString(model_shape) +
+            ") but the model configuration specifies " +
+            std::to_string(full_dims.size()) +
+            " dimensions (an initial batch dimension because max_batch_size "
+            "> 0 followed by the explicit tensor shape, making complete "
+            "shape " +
+            nib::ShapeToString(full_dims) + ")");
   } else {
     // ! supports_batching
-    bool succ = (model_shape.size() == (size_t)dims.size());
+    bool succ = (model_shape.size() == dims.size());
     if (succ) {
-      for (int i = 0; i < dims.size(); ++i) {
+      for (size_t i = 0; i < dims.size(); ++i) {
         const int64_t model_dim = model_shape[i];
         if (compare_exact || (model_dim != -1)) {
           succ &= (model_dim == dims[i]);
@@ -374,19 +421,17 @@ CompareDimsSupported(
       }
     }
 
-    if (!succ) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "model '" + model_name + "', tensor '" + tensor_name +
-              "': the model expects " + std::to_string(model_shape.size()) +
-              " dimensions (shape " + DimsListToString(model_shape) +
-              ") but the model configuration specifies " +
-              std::to_string(dims.size()) + " dimensions (shape " +
-              DimsListToString(dims) + ")");
-    }
+    RETURN_ERROR_IF_TRUE(
+        !succ, TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("model '") + model_name + "', tensor '" + tensor_name +
+            "': the model expects " + std::to_string(model_shape.size()) +
+            " dimensions (shape " + nib::ShapeToString(model_shape) +
+            ") but the model configuration specifies " +
+            std::to_string(dims.size()) + " dimensions (shape " +
+            nib::ShapeToString(dims) + ")");
   }
 
-  return Status::Success;
+  return nullptr;  // success
 }
 
-}}  // namespace nvidia::inferenceserver
+}}}  // namespace triton::backend::onnxruntime

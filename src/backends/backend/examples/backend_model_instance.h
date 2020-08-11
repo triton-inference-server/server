@@ -103,4 +103,13 @@ struct BackendModelInstanceException {
   TRITONSERVER_Error* err_;
 };
 
+#define THROW_IF_BACKEND_INSTANCE_ERROR(X)                                   \
+  do {                                                                       \
+    TRITONSERVER_Error* tie_err__ = (X);                                     \
+    if (tie_err__ != nullptr) {                                              \
+      throw nvidia::inferenceserver::backend::BackendModelInstanceException( \
+          tie_err__);                                                        \
+    }                                                                        \
+  } while (false)
+
 }}}  // namespace nvidia::inferenceserver::backend

@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,47 +27,61 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# Triton generic backend
+# ONNXRuntime backend
 #
+configure_file(libtriton_onnxruntime.ldscript libtriton_onnxruntime.ldscript COPYONLY)
+
 set(
-  BACKEND_SRCS
-  triton_backend_manager.cc
-  triton_model.cc
-  triton_model_instance.cc
+  ONNXRUNTIME_SRCS
+  loader.cc
+  onnxruntime.cc
+  onnx_utils.cc
 )
 
 set(
-  BACKEND_HDRS
-  backend_factory.h
-  tritonbackend.h
-  triton_backend_manager.h
-  triton_model.h
-  triton_model_instance.h
+  ONNXRUNTIME_HDRS
+  loader.h
+  onnx_utils.h
 )
 
 add_library(
-  triton-backend-library EXCLUDE_FROM_ALL OBJECT
-  ${BACKEND_SRCS} ${BACKEND_HDRS}
+ triton_onnxruntime SHARED
+  ${ONNXRUNTIME_SRCS} ${ONNXRUNTIME_HDRS}
+  $<TARGET_OBJECTS:backend-library>
 )
-add_dependencies(triton-backend-library proto-library)
 
+target_include_directories(triton_onnxruntime PRIVATE ${TRITON_ONNXRUNTIME_INCLUDE_PATHS})
 if(${TRITON_ENABLE_GPU})
-  target_include_directories(triton-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(triton_onnxruntime PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
-if(${TRITON_ENABLE_METRICS})
-  target_include_directories(
-    triton-backend-library
-    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-endif() # TRITON_ENABLE_METRICS
 
-add_subdirectory(examples src/backends/backend/examples)
-if(${TRITON_ENABLE_ONNXRUNTIME})
-  add_subdirectory(onnxruntime src/backends/backend/onnxruntime)
-endif() # TRITON_ENABLE_ONNXRUNTIME
-if(${TRITON_ENABLE_TENSORFLOW})
-  add_subdirectory(tensorflow src/backends/backend/tensorflow)
-endif() # TRITON_ENABLE_TENSORFLOW
-if(${TRITON_ENABLE_PYTHON})
-  add_subdirectory(python src/backends/backend/python)
-endif() # TRITON_ENABLE_PYTHON
+set_target_properties(
+  triton_onnxruntime
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}"
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_onnxruntime.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_onnxruntime.ldscript"
+)
+
+target_link_libraries(
+  triton_onnxruntime
+  PUBLIC ${TRITON_EXTRA_LDFLAGS}
+  PUBLIC -lonnxruntime
+)
+if(${TRITON_ENABLE_ONNXRUNTIME_OPENVINO})
+  target_link_libraries(
+    triton_onnxruntime
+    PUBLIC ${TRITON_EXTRA_LDFLAGS}
+    PUBLIC -ltbb
+    PUBLIC -linference_engine
+  )
+endif() # TRITON_ENABLE_ONNXRUNTIME_OPENVINO
+
+install(
+  TARGETS
+    triton_onnxruntime
+  LIBRARY DESTINATION backends/onnxruntime
+)

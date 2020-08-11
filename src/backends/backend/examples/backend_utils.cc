@@ -28,6 +28,8 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <cerrno>
 
 namespace nvidia { namespace inferenceserver { namespace backend {
 
@@ -467,7 +469,57 @@ GetTypedSequenceControlProperties(
   return nullptr;  // success
 }
 
-namespace {
+void
+RequestsRespondWithError(
+    TRITONBACKEND_Request** requests, const uint32_t request_count,
+    TRITONSERVER_Error* response_err, const bool release_request)
+{
+  for (size_t i = 0; i < request_count; i++) {
+    TRITONBACKEND_Response* response;
+    auto err = TRITONBACKEND_ResponseNew(&response, requests[i]);
+    if (err != nullptr) {
+      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "fail to create response");
+      TRITONSERVER_ErrorDelete(err);
+    } else {
+      std::unique_ptr<
+          TRITONBACKEND_Response, decltype(&TRITONBACKEND_ResponseDelete)>
+          response_handle(response, TRITONBACKEND_ResponseDelete);
+      LOG_IF_ERROR(
+          TRITONBACKEND_ResponseSend(
+              response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, response_err),
+          "fail to send error response");
+    }
+
+    if (release_request) {
+      LOG_IF_ERROR(
+          TRITONBACKEND_RequestRelease(
+              requests[i], TRITONSERVER_REQUEST_RELEASE_ALL),
+          "fail to release request");
+    }
+  }
+
+  TRITONSERVER_ErrorDelete(response_err);
+}
+
+void
+SendErrorForResponses(
+    std::vector<TRITONBACKEND_Response*>* responses,
+    const uint32_t response_count, TRITONSERVER_Error* response_err)
+{
+  for (size_t i = 0; i < response_count; i++) {
+    TRITONBACKEND_Response* response = (*responses)[i];
+    if (response != nullptr) {
+      LOG_IF_ERROR(
+          TRITONBACKEND_ResponseSend(
+              response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, response_err),
+          "fail to send error response");
+      (*responses)[i] = nullptr;
+    }
+  }
+
+  TRITONSERVER_ErrorDelete(response_err);
+}
+
 #ifdef TRITON_ENABLE_GPU
 #define RETURN_IF_CUDA_ERR(X, MSG)                                        \
   do {                                                                    \
@@ -479,7 +531,6 @@ namespace {
     }                                                                     \
   } while (false)
 #endif  // TRITON_ENABLE_GPU
-}  // namespace
 
 TRITONSERVER_Error*
 CopyBuffer(
@@ -556,6 +607,15 @@ GetDirectoryContents(const std::string& path, std::set<std::string>* contents)
   return nullptr;  // success
 }
 
+}  // namespace
+
+TRITONSERVER_Error*
+FileExists(const std::string& path, bool* exists)
+{
+  *exists = (access(path.c_str(), F_OK) == 0);
+  return nullptr;  // success
+}
+
 TRITONSERVER_Error*
 IsDirectory(const std::string& path, bool* is_dir)
 {
@@ -596,8 +656,6 @@ JoinPath(std::initializer_list<std::string> segments)
 
   return joined;
 }
-
-}  // namespace
 
 TRITONSERVER_Error*
 ModelPaths(
@@ -640,6 +698,7 @@ ModelPaths(
         std::piecewise_construct, std::make_tuple(filename),
         std::make_tuple(model_path));
   }
+
   return nullptr;  // success
 }
 

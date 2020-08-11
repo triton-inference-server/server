@@ -637,15 +637,28 @@ GetNormalizedModelConfig(
       config->set_backend(kTensorFlowBackend);
     }
 #endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+    if (config->platform() == kOnnxRuntimeOnnxPlatform) {
+      config->set_backend(kOnnxRuntimeBackend);
+    }
+#endif  // TRITON_ENABLE_ONNXRUNTIME
     // FIXME: "else if ()" other supported frameworks once they are ported
     // to use backend API.
   }
+
   // FIXME: Add other supported frameworks once they are ported
   // to use backend API.
   // // Fill platform if backend is set for non-custom backend
   // if (!config->backend().empty() && config->platform().empty()) {
   //   // tensorflow can't be filled as platform is not unique
   // }
+  if (!config->backend().empty() && config->platform().empty()) {
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+    if (config->backend() == kOnnxRuntimeBackend) {
+      config->set_platform(kOnnxRuntimeOnnxPlatform);
+    }
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+  }
 
   // If 'default_model_filename' is not specified set it appropriately
   // based upon 'platform'.
