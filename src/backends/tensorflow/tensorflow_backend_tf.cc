@@ -346,7 +346,7 @@ class TensorImpl {
   size_t ByteSize() const { return nonstring_byte_size_; }
   bool IsGPUTensor() const { return gpu_tensor_; }
 
-  const std::string& String(size_t idx) const;
+  const tensorflow::tstring& String(size_t idx) const;
   void SetString(size_t idx, const std::string& str);
 
  private:
@@ -416,7 +416,7 @@ TensorImpl::Init()
   }
 }
 
-const std::string&
+const tensorflow::tstring&
 TensorImpl::String(size_t idx) const
 {
   auto flat = tftensor_.flat<tensorflow::tstring>();
@@ -790,7 +790,7 @@ const char*
 TRTISTF_TensorString(TRTISTF_Tensor* tensor, size_t idx, size_t* length)
 {
   TensorImpl* t = reinterpret_cast<TensorImpl*>(tensor);
-  const std::string& str = t->String(idx);
+  const tensorflow::tstring& str = t->String(idx);
   *length = str.length();
   return str.c_str();
 }
