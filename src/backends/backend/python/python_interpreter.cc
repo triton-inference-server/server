@@ -60,8 +60,8 @@
 
 // Fix include path for protobuf
 #include "python_host.grpc.pb.h"
-#include "src/backends/backend/tritonbackend.h"
 #include "src/backends/backend/examples/backend_utils.h"
+#include "src/backends/backend/tritonbackend.h"
 #include "src/core/json.h"
 #include "src/core/tritonserver.h"
 
@@ -79,7 +79,6 @@ namespace nvidia { namespace inferenceserver { namespace backend {
         TRITONSERVER_LOG_INFO, __FILE__, __LINE__, \
         std::string(MSG + '\n').c_str());          \
   } while (false)
-
 
 
 #define RETURN_IF_ERROR(X)               \
@@ -130,7 +129,6 @@ namespace nvidia { namespace inferenceserver { namespace backend {
       }                                                                 \
       return rarie_err__;                                               \
     }                                                                   \
-    return nullptr;                                                     \
   } while (false)
 
 }}}  // namespace nvidia::inferenceserver::backend
@@ -174,18 +172,13 @@ class ModelInstanceState {
 
   ~ModelInstanceState();
 
-  TRITONSERVER_Error* ProcessRequests(
-      TRITONBACKEND_Request** requests, const uint32_t request_count,
-      std::vector<TRITONBACKEND_Response*> responses);
-
   /// Create a python child process running startup.py
   TRITONSERVER_Error* CreatePythonInterpreter();
 
   TRITONSERVER_Error* GetInputTensor(
       const uint32_t iidx, TRITONBACKEND_Request* request,
-      ni::Tensor* input_tensor,
-      std::vector<TRITONBACKEND_Response*>& responses, size_t r,
-      uint32_t& batch_size);
+      ni::Tensor* input_tensor, std::vector<TRITONBACKEND_Response*>& responses,
+      size_t r, uint32_t& batch_size);
 
   // TODO: Create getter and setters
   std::unique_ptr<ni::PythonInterpreter::Stub> stub;
@@ -336,8 +329,7 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
   for (int i = 0; i < conn_attempts; ++i) {
     grpc::ClientContext context;
     ni::Empty null_msg;
-    const auto err =
-        stub->Init(&context, *initialization_params, &null_msg);
+    const auto err = stub->Init(&context, *initialization_params, &null_msg);
     if (err.ok()) {
       return nullptr;
     } else {
@@ -422,9 +414,8 @@ ModelInstanceState::~ModelInstanceState()
 TRITONSERVER_Error*
 ModelInstanceState::GetInputTensor(
     const uint32_t iidx, TRITONBACKEND_Request* request,
-    ni::Tensor* input_tensor,
-    std::vector<TRITONBACKEND_Response*>& responses, size_t r,
-    uint32_t& batch_size)
+    ni::Tensor* input_tensor, std::vector<TRITONBACKEND_Response*>& responses,
+    size_t r, uint32_t& batch_size)
 {
   const char* input_name;
   // Load iidx'th input name
@@ -468,6 +459,14 @@ ModelInstanceState::GetInputTensor(
         TRITONBACKEND_InputBuffer(
             in, j, &input_buffer, &buffer_byte_size, &input_memory_type,
             &input_memory_type_id));
+    if ((responses[iidx] == nullptr) ||
+        (input_memory_type == TRITONSERVER_MEMORY_GPU)) {
+      GUARDED_RESPOND_IF_ERROR(
+          responses, r,
+          TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "failed to get input buffer in CPU memory"));
+    }
     data_buffer->append((const char*)input_buffer, buffer_byte_size);
   }
 
@@ -573,7 +572,6 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelSetState(model, reinterpret_cast<void*>(model_state)));
 
-
   return nullptr;
 }
 
@@ -625,7 +623,7 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
 
   RETURN_IF_ERROR(instance_state->CreatePythonInterpreter());
 
-  return nullptr;  // success
+  return nullptr;
 }
 
 TRITONSERVER_Error*
@@ -641,10 +639,10 @@ TRITONBACKEND_ModelInstanceExecute(
   responses.reserve(request_count);
 
   for (uint32_t r = 0; r < request_count; ++r) {
-    TRITONBACKEND_Request* request = requests[r];
+    TRITONBACKEND_Request* req = requests[r];
 
     TRITONBACKEND_Response* response;
-    RETURN_IF_ERROR(TRITONBACKEND_ResponseNew(&response, request));
+    RETURN_IF_ERROR(TRITONBACKEND_ResponseNew(&response, req));
     responses.push_back(response);
   }
 
@@ -680,7 +678,8 @@ TRITONBACKEND_ModelInstanceExecute(
       const char* requested_output_name;
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
-          TRITONBACKEND_RequestOutputName(request, iidx, &requested_output_name));
+          TRITONBACKEND_RequestOutputName(
+              request, iidx, &requested_output_name));
 
       inference_request->add_requested_output_names(requested_output_name);
     }
@@ -709,16 +708,25 @@ TRITONBACKEND_ModelInstanceExecute(
       // Prepare output buffers.
       const ni::Tensor output_tensor = inference_response.inputs(j);
       TRITONBACKEND_Output* output;
-      TRITONSERVER_DataType triton_dt = static_cast<TRITONSERVER_DataType>(output_tensor.dtype());
+      TRITONSERVER_DataType triton_dt =
+          static_cast<TRITONSERVER_DataType>(output_tensor.dtype());
 
       auto output_tensor_dims = output_tensor.dims();
       const std::string output_tensor_name = output_tensor.name();
+      int64_t output_shape[output_tensor_dims.size()];
+
+      for (int i = 0; i < output_tensor_dims.size(); i++)
+      {
+        output_shape[i] = output_tensor_dims.data()[i];
+      }
+
+      uint32_t dims_count = output_tensor_dims.size();
 
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_ResponseOutput(
               response, &output, output_tensor.name().c_str(), triton_dt,
-              output_tensor_dims.data(), output_tensor.dims_size()));
+              output_shape, dims_count));
 
       uint64_t total_output_size = std::accumulate(
           output_tensor_dims.begin(), output_tensor_dims.end(), 1,
@@ -733,8 +741,8 @@ TRITONBACKEND_ModelInstanceExecute(
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_OutputBuffer(
-              output, &output_buffer, type_size * total_output_size, &output_memory_type,
-              &output_memory_type_id));
+              output, &output_buffer, type_size * total_output_size,
+              &output_memory_type, &output_memory_type_id));
 
       if ((responses[r] == nullptr) ||
           (output_memory_type == TRITONSERVER_MEMORY_GPU)) {
@@ -754,22 +762,24 @@ TRITONBACKEND_ModelInstanceExecute(
       // Try to find the matching output name we don't use indexing here because
       // the output inference batch may be missing from the response
       auto output_response_tensor = std::find_if(
-          inference_response.inputs().begin(), inference_response.inputs().end(),
+          inference_response.inputs().begin(),
+          inference_response.inputs().end(),
           [&output_tensor_name](const ni::Tensor& itr) {
             return itr.name() == output_tensor_name;
-      });
+          });
 
       // Continue to the next inference batch if the corresponding output
       // response can't be found
       if (output_response_tensor == inference_response.inputs().end()) {
-        LOG_ERROR << "can't find output tensor with name " << output_tensor_name << '\n';
+        LOG_ERROR << "can't find output tensor with name " << output_tensor_name
+                  << '\n';
         continue;
       }
 
       // Copy Python output to Triton output buffers
       std::copy(
-          output_response_tensor->raw_data().begin(), output_response_tensor->raw_data().end(),
-          (char*) output_buffer);
+          output_response_tensor->raw_data().begin(),
+          output_response_tensor->raw_data().end(), (char*)output_buffer);
     }
 
     if (responses[r] == nullptr) {
@@ -791,11 +801,11 @@ TRITONBACKEND_ModelInstanceExecute(
       // TODO: Add resposne/request statistics
 
       LOG_IF_ERROR(
-          TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
+          TRITONBACKEND_RequestRelease(
+              request, TRITONSERVER_REQUEST_RELEASE_ALL),
           "failed releasing request");
     }
   }
-
 
 
   return nullptr;

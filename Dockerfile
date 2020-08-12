@@ -168,6 +168,7 @@ RUN apt-get update && \
             patchelf \
             python3-dev \
             python3-pip \
+            python3-setuptools \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \

@@ -8,23 +8,35 @@ import numpy as np
 
 from python_host_pb2 import *
 from python_host_pb2_grpc import PythonInterpreterServicer, add_PythonInterpreterServicer_to_server
-from model_config_pb2 import DataType
 import grpc
 
 _TYPE_MAPPING_DICTIONARY = {
-    DataType.TYPE_BOOL: np.bool,
-    DataType.TYPE_UINT8: np.uint8,
-    DataType.TYPE_UINT16: np.uint16,
-    DataType.TYPE_UINT32: np.uint32,
-    DataType.TYPE_UINT64: np.uint64,
-    DataType.TYPE_INT8: np.int8,
-    DataType.TYPE_INT16: np.int16,
-    DataType.TYPE_INT32: np.int32,
-    DataType.TYPE_INT64: np.int64,
-    DataType.TYPE_FP16: np.float16,
-    DataType.TYPE_FP32: np.float32,
-    DataType.TYPE_FP64: np.float64,
-    DataType.TYPE_STRING: np.bytes_
+    # TRITONSERVER_TYPE_BOOL
+    1: np.bool,
+    # TRITONSERVER_TYPE_UINT8
+    2: np.uint8,
+    # TRITONSERVER_TYPE_UINT16
+    3: np.uint16,
+    # TRITONSERVER_TYPE_UINT32
+    4: np.uint32,
+    # TRITONSERVER_TYPE_UINT64
+    5: np.uint64,
+    # TRITONSERVER_TYPE_INT8
+    6: np.int8,
+    # TRITONSERVER_TYPE_INT16
+    7: np.int16,
+    # TRITONSERVER_TYPE_INT32
+    8: np.int32,
+    # TRITONSERVER_TYPE_INT64
+    9: np.int64,
+    # TRITONSERVER_TYPE_FP16
+    10: np.float16,
+    # TRITONSERVER_TYPE_FP32
+    11: np.float32,
+    # TRITONSERVER_TYPE_FP64
+    12: np.float64,
+    # TRITONSERVER_TYPE_BYTES
+    13: np.bytes_
 }
 
 
@@ -38,7 +50,7 @@ def numpy_to_protobuf_type(data_type):
 
 def parse_startup_arguments():
     parser = argparse.ArgumentParser(
-        description="TensorRT-Inference-Server Python Host")
+        description="Triton Python Host")
     parser.add_argument("--socket",
                         default=None,
                         required=True,
@@ -53,7 +65,7 @@ def parse_startup_arguments():
                         default=None,
                         required=True,
                         type=str,
-                        help="TRTIS instance name")
+                        help="Triton instance name")
     return parser.parse_args()
 
 
@@ -80,12 +92,12 @@ class PythonHost(PythonInterpreterServicer):
             self.initializer_func = None
         self.model = None
 
-    def InterpreterInit(self, request, context):
-        if self.model:
-            return StatusCode(code=0)
+    def Init(self, request, context):
+        # if self.model:
+        #     return StatusCode(code=0)
 
-        if not self.initializer_func:
-            return StatusCode(code=1)
+        # if not self.initializer_func:
+        #     return StatusCode(code=1)
 
         args = argparse.Namespace(
             **{x.key: x.value for x in request.model_command})
@@ -94,39 +106,44 @@ class PythonHost(PythonInterpreterServicer):
         if not self.model:
             return StatusCode(code=2)
 
-        return StatusCode(code=0)
+        # return StatusCode(code=0)
 
-    def InterpreterShutdown(self, request, context):
+    def Fini(self, request, context):
         if hasattr(self.model, "shutdown"):
             self.model.shutdown()
 
         del self.model
         with cv:
             cv.notify()
-        return StatusCode(code=0)
+        # return StatusCode(code=0)
 
-    def InferenceRequest(self, request, context):
-        input_dictionary = {
-            x.name:
-            np.frombuffer(x.raw_data,
-                          dtype=protobuf_to_numpy_type(x.dtype)).reshape(x.dims)
-            for x in request.tensors
-        }
-        if not all([(request.batch_size == x.shape[0])
-                    for x in input_dictionary.values()]):
-            return InferenceBatch(batch_size=-1, tensors=[])
+    def Execute(self, request, context):
 
-        output_dictionary = self.model(input_dictionary)
-        output_tensors = [
-            InferenceData(name=name,
-                          dims=array.shape,
-                          dtype=numpy_to_protobuf_type(array.dtype.type),
-                          raw_data=array.tobytes())
-            for name, array in output_dictionary.items()
-        ]
+        requests = request.requests
+        np_requests = []
+        for request in requests:
+            request_inputs = {}
+            for request_input in request.inputs:
+                x = request_input
+                request_inputs[x.name] = np.frombuffer(x.raw_data, dtype=protobuf_to_numpy_type(x.dtype)).reshape(x.dims)
+            np_requests.append({
+                'inputs': request_inputs,
+                'id': request.id,
+                'correlation_id': request.correlation_id,
+                'requested_output_names': request.requested_output_names
+                })
+        responses = self.model(np_requests)
+        exec_responses = []
+        for response in responses:
+            tensors = []
+            for response_name, response_value in response.items():
+                name = response_name
+                tensor = Tensor(name=name, dtype=numpy_to_protobuf_type(response_value.dtype.type), dims=response_value.shape, raw_data=response_value.tobytes())
+                tensors.append(tensor)
+            exec_responses.append(InferenceResponse(inputs=tensors))
+        execute_response = ExecuteResponse(responses=exec_responses)
 
-        return InferenceBatch(batch_size=request.batch_size,
-                              tensors=output_tensors)
+        return execute_response
 
 
 if __name__ == "__main__":
