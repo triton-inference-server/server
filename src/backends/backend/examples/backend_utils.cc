@@ -643,5 +643,4 @@ ModelPaths(
   return nullptr;  // success
 }
 
-
 }}}  // namespace nvidia::inferenceserver::backend
