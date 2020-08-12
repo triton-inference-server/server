@@ -26,7 +26,6 @@
 #pragma once
 
 #include <list>
-#include <memory>
 #include <string>
 #include <vector>
 #include "src/backends/backend/tritonbackend.h"
@@ -43,158 +42,13 @@ using cudaEvent_t = void*;
 #endif  // !TRITON_ENABLE_GPU
 
 //
-// ModelInstance
+// BackendInputCollector
 //
-class ModelInstance {
- public:
-  // GPU device number that indicates that no gpu is available for a
-  // context (which is an invalid state since TensorRT requires a
-  // GPU).
-  static constexpr int NO_GPU_DEVICE = -1;
-
-  // Max batch size value that indicates batching is not supported.
-  static constexpr int NO_BATCHING = 0;
-
-  ModelInstance(
-      const std::string& name, const int gpu_device, const int max_batch_size,
-      const bool enable_pinned_input, const bool enable_pinned_output);
-
-  virtual ~ModelInstance();
-
-  // Create the CUDA stream for data transfer operations. If 'stream' is
-  // nullptr, the stream will be created on 'stream_'. Have no effect if GPU
-  // support is disabled.
-  TRITONSERVER_Error* CreateCudaStream(
-      const int cuda_stream_priority = 0, cudaStream_t* stream = nullptr);
-
-  // Name of the model instance
-  std::string name_;
-
-  // The GPU index active when this context was created.
-  const int gpu_device_;
-
-  // Maximum batch size to allow. This is the minimum of what is
-  // supported by the model and what is requested in the
-  // configuration.
-  const int max_batch_size_;
-
-  // Whether to use indirect pinned buffer for the corresponding data copy type.
-  const bool enable_pinned_input_;
-  const bool enable_pinned_output_;
-
-  // The stream that executes data transfer operations.
-  cudaStream_t stream_;
-};
-
-//
-// ModelResponder
-//
-class ModelResponder {
+class BackendInputCollector {
  public:
   // The caller can optionally provide 'event' for internal synchronization
   // instead of using 'stream'.
-  explicit ModelResponder(
-      TRITONBACKEND_Request** requests, const uint32_t request_count,
-      std::vector<TRITONBACKEND_Response*>* responses, const int max_batch_size,
-      const bool pinned_enabled, cudaStream_t stream,
-      cudaEvent_t event = nullptr)
-      : need_sync_(false), requests_(requests), request_count_(request_count),
-        responses_(responses), max_batch_size_(max_batch_size),
-        pinned_enabled_(pinned_enabled), stream_(stream), event_(event),
-        pending_pinned_byte_size_(0)
-  {
-  }
-
-  ~ModelResponder();
-
-  // Process all responses for a named output tensor.
-  void ProcessTensor(
-      const std::string& name, const TRITONSERVER_DataType datatype,
-      std::vector<int64_t>& batchn_shape, const char* buffer,
-      const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
-
-  // Finalize processing of all responses for all output
-  // tensors. Return true if cudaMemcpyAsync is called, and the caller
-  // should call cudaStreamSynchronize (or cudaEventSynchronize on 'event')
-  // before using the data.
-  bool Finalize();
-
- private:
-  bool FlushPendingPinned(
-      const char* tensor_buffer,
-      const TRITONSERVER_MemoryType tensor_memory_type,
-      const int64_t tensor_memory_type_id);
-  bool SetFixedSizeOutputBuffer(
-      TRITONBACKEND_Response** response, TRITONBACKEND_Output* response_output,
-      const std::string& output_name, const size_t tensor_byte_size,
-      const size_t tensor_offset, const char* tensor_buffer,
-      const TRITONSERVER_MemoryType tensor_memory_type,
-      const int64_t tensor_memory_type_id,
-      const TRITONSERVER_MemoryType use_pinned_memory_type);
-
-  struct OutputData {
-    OutputData(
-        const std::string& name, void* buffer, const size_t buffer_byte_size,
-        const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
-        : name_(name), buffer_(buffer), buffer_byte_size_(buffer_byte_size),
-          memory_type_(memory_type), memory_type_id_(memory_type_id)
-    {
-    }
-    const std::string name_;
-    void* buffer_;
-    const size_t buffer_byte_size_;
-    const TRITONSERVER_MemoryType memory_type_;
-    const int64_t memory_type_id_;
-  };
-
-  bool need_sync_;
-  TRITONBACKEND_Request** requests_;
-  const uint32_t request_count_;
-  std::vector<TRITONBACKEND_Response*>* responses_;
-  const int max_batch_size_;
-  const bool pinned_enabled_;
-  cudaStream_t stream_;
-  cudaEvent_t event_;
-
-  using ResponsesList =
-      std::list<std::pair<TRITONBACKEND_Response**, OutputData>>;
-
-  size_t pending_pinned_byte_size_;
-  size_t pending_pinned_offset_;
-  ResponsesList pending_pinned_outputs_;
-
-  // Pinned memories that need to live over the lifetime of this
-  // ModelResponder object.
-  std::list<char*> pinned_memories_;
-
-  // Pinned memory buffers and the corresponding response outputs
-  // where the final copy to the response is deferred until Finalize()
-  // after waiting for all in-flight copies.
-  struct DeferredPinned {
-    DeferredPinned(
-        char* pinned_memory, const size_t pinned_memory_size,
-        ResponsesList&& responses)
-        : pinned_memory_(pinned_memory),
-          pinned_memory_size_(pinned_memory_size),
-          responses_(std::move(responses))
-    {
-    }
-    char* pinned_memory_;
-    const size_t pinned_memory_size_;
-    ResponsesList responses_;
-  };
-
-  std::list<DeferredPinned> deferred_pinned_;
-};
-
-//
-// ModelInputCollector
-//
-class ModelInputCollector {
- public:
-  // The caller can optionally provide 'event' for internal synchronization
-  // instead of using 'stream'.
-  explicit ModelInputCollector(
+  explicit BackendInputCollector(
       TRITONBACKEND_Request** requests, const uint32_t request_count,
       std::vector<TRITONBACKEND_Response*>* responses,
       const bool pinned_enabled, cudaStream_t stream,
@@ -205,7 +59,7 @@ class ModelInputCollector {
   {
   }
 
-  ~ModelInputCollector();
+  ~BackendInputCollector();
 
   // Process all requests for a named input tensor.
   void ProcessTensor(
@@ -248,7 +102,7 @@ class ModelInputCollector {
 
   // FIXME provide memory utilities to avoid calls to CUDA memory functions
   // Pinned memories that need to live over the lifetime of this
-  // ModelInputCollector object.
+  // BackendInputCollector object.
   std::list<char*> pinned_memories_;
 
   // Pinned memory buffers and the corresponding request_inputs where
@@ -270,7 +124,7 @@ class ModelInputCollector {
     }
 
     // Holding reference to the pinned memory buffer, which is managed
-    // by ModelInputCollector as 'pinned_memory'
+    // by BackendInputCollector as 'pinned_memory'
     char* pinned_memory_;
     const size_t pinned_memory_size_;
     char* tensor_buffer_;

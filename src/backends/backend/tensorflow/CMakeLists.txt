@@ -33,21 +33,19 @@ configure_file(libtriton_tensorflow.ldscript libtriton_tensorflow.ldscript COPYO
 
 set(
   TENSORFLOW_SRCS
-  model_instance.cc
   tensorflow.cc
   tf_utils.cc
 )
 
 set(
   TENSORFLOW_HDRS
-  model_instance.h
   tf_utils.h
 )
 
 add_library(
   triton_tensorflow1 SHARED
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
-  $<TARGET_OBJECTS:backend-utils-library>
+  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_tensorflow1 PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -77,7 +75,7 @@ install(
 add_library(
   triton_tensorflow2 SHARED
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
-  $<TARGET_OBJECTS:backend-utils-library>
+  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_tensorflow2 PRIVATE ${CUDA_INCLUDE_DIRS})

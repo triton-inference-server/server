@@ -24,8 +24,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "src/backends/backend/examples/backend_input_collector.h"
+#include "src/backends/backend/examples/backend_model_instance.h"
+#include "src/backends/backend/examples/backend_output_responder.h"
 #include "src/backends/backend/examples/backend_utils.h"
-#include "src/backends/backend/tensorflow/model_instance.h"
 #include "src/backends/backend/tensorflow/tf_utils.h"
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
 
@@ -1185,7 +1187,7 @@ ModelState::ValidateModelConfig()
 // State associated with a model instance. An object of this class is
 // created and associated with each TRITONBACKEND_ModelInstance.
 //
-class ModelInstanceState : public nib::ModelInstance {
+class ModelInstanceState : public nib::BackendModelInstance {
  public:
   // GPU device number that indicates model will be loaded on GPUs
   // as specified in model graph
@@ -1212,7 +1214,7 @@ class ModelInstanceState : public nib::ModelInstance {
       TRITONBACKEND_ModelInstance* triton_model_instance,
       const std::string& name, const int gpu_device, const int max_batch_size,
       const bool enable_pinned_input, const bool enable_pinned_output)
-      : nib::ModelInstance(
+      : nib::BackendModelInstance(
             name, gpu_device, max_batch_size, enable_pinned_input,
             enable_pinned_output),
         model_state_(model_state),
@@ -1691,7 +1693,7 @@ ModelInstanceState::ProcessRequests(
   // must use TF-specific string tensor APIs.
   bool cuda_copy = false;
 
-  nib::ModelInputCollector collector(
+  nib::BackendInputCollector collector(
       requests, request_count, &responses, enable_pinned_input_, stream_);
   {
     // All requests must have equally-sized input tensors so use the first
@@ -1909,7 +1911,7 @@ ModelInstanceState::ProcessRequests(
   cuda_copy = false;
   // The serialized string buffer must be valid until output copies are done
   std::vector<std::unique_ptr<std::string>> string_buffer;
-  nib::ModelResponder responder(
+  nib::BackendOutputResponder responder(
       requests, request_count, &responses, max_batch_size_,
       enable_pinned_output_, stream_);
   {
