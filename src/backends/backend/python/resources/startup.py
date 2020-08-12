@@ -79,13 +79,13 @@ class PythonHost(PythonInterpreterServicer):
 
     def __init__(self, module_path, *args, **kwargs):
         super(PythonInterpreterServicer, self).__init__(*args, **kwargs)
-        spec = importlib.util.spec_from_file_location("trtis", module_path)
+        spec = importlib.util.spec_from_file_location("triton", module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
         if hasattr(module, "initialize_model"):
             self.initializer_func = module.initialize_model
-        elif hasattr(module, "trtis"):
+        elif hasattr(module, "triton"):
             self.initializer_func = module.trtis
         else:
             self.initializer_func = None

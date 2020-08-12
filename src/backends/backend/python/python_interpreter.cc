@@ -685,11 +685,15 @@ TRITONBACKEND_ModelInstanceExecute(
     }
 
     const char* id;
-    TRITONBACKEND_RequestId(request, &id);
+    GUARDED_RESPOND_IF_ERROR(
+        responses, r,
+        TRITONBACKEND_RequestId(request, &id));
     inference_request->set_id(id);
 
     uint64_t correlation_id;
-    TRITONBACKEND_RequestCorrelationId(request, &correlation_id);
+    GUARDED_RESPOND_IF_ERROR(
+        responses, r,
+        TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
     inference_request->set_correlation_id(correlation_id);
   }
 
