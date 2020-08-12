@@ -49,23 +49,21 @@ class BackendModel;
 //
 class BackendModelInstance {
  public:
-  static TRITONSERVER_Error* Create(
+  BackendModelInstance(
       BackendModel* backend_model,
-      TRITONBACKEND_ModelInstance* triton_model_instance,
-      BackendModelInstance** backend_model_instance);
-
+      TRITONBACKEND_ModelInstance* triton_model_instance);
   virtual ~BackendModelInstance();
+
+  // Get the name, kind and device ID of the instance.
+  const std::string& Name() const { return name_; }
+  TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
+  int32_t DeviceId() const { return device_id_; }
 
   // Get the handle to the TRITONBACKEND model instance.
   TRITONBACKEND_ModelInstance* TritonModelInstance()
   {
     return triton_model_instance_;
   }
-
-  // Get the name, kind and device ID of the instance.
-  const std::string& Name() const { return name_; }
-  TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
-  int32_t DeviceId() const { return device_id_; }
 
   // Get the BackendModel representing the model that corresponds to
   // this instance.
@@ -83,20 +81,26 @@ class BackendModelInstance {
   cudaStream_t CudaStream() { return stream_; }
 
  protected:
-  BackendModelInstance(
-      BackendModel* backend_model,
-      TRITONBACKEND_ModelInstance* triton_model_instance, const char* name,
-      const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-      const std::string& artifact_filename, cudaStream_t stream);
-
   BackendModel* backend_model_;
   TRITONBACKEND_ModelInstance* triton_model_instance_;
-  const std::string name_;
-  const TRITONSERVER_InstanceGroupKind kind_;
-  const int32_t device_id_;
+
+  std::string name_;
+  TRITONSERVER_InstanceGroupKind kind_;
+  int32_t device_id_;
 
   std::string artifact_filename_;
   cudaStream_t stream_;
+};
+
+//
+// BackendModelInstanceException
+//
+// Exception thrown if error occurs while constructing an
+// BackendModelInstance.
+//
+struct BackendModelInstanceException {
+  BackendModelInstanceException(TRITONSERVER_Error* err) : err_(err) {}
+  TRITONSERVER_Error* err_;
 };
 
 }}}  // namespace nvidia::inferenceserver::backend

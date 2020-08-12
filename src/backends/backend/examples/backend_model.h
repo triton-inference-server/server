@@ -44,10 +44,8 @@ class BackendModel {
   // this model.
   static constexpr int NO_BATCHING = 0;
 
-  static TRITONSERVER_Error* Create(
-      TRITONBACKEND_Model* triton_model, BackendModel** backend_model);
-
-  virtual ~BackendModel();
+  BackendModel(TRITONBACKEND_Model* triton_model);
+  virtual ~BackendModel() = default;
 
   // Get the handle to the TRITONBACKEND server hosting this model.
   TRITONSERVER_Server* TritonServer() { return triton_server_; }
@@ -78,12 +76,6 @@ class BackendModel {
   bool EnablePinnedOutput() const { return enable_pinned_output_; }
 
  protected:
-  BackendModel(
-      TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
-      const char* name, const uint64_t version,
-      const std::string& repository_path, const bool enable_pinned_input,
-      const bool enable_pinned_output, TritonJson::Value&& model_config);
-
   TRITONSERVER_Server* triton_server_;
   TRITONBACKEND_Model* triton_model_;
   std::string name_;
@@ -98,6 +90,17 @@ class BackendModel {
   // Does this model support batching in the first dimension.
   bool supports_batching_initialized_;
   bool supports_batching_;
+};
+
+//
+// BackendModelException
+//
+// Exception thrown if error occurs while constructing an
+// BackendModel.
+//
+struct BackendModelException {
+  BackendModelException(TRITONSERVER_Error* err) : err_(err) {}
+  TRITONSERVER_Error* err_;
 };
 
 }}}  // namespace nvidia::inferenceserver::backend

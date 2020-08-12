@@ -30,15 +30,23 @@
 
 namespace nvidia { namespace inferenceserver { namespace backend {
 
+#define THROW_IF_ERROR(X)                     \
+  do {                                        \
+    TRITONSERVER_Error* tie_err__ = (X);      \
+    if (tie_err__ != nullptr) {               \
+      throw BackendModelException(tie_err__); \
+    }                                         \
+  } while (false)
+
 //
 // BackendModel
 //
-TRITONSERVER_Error*
-BackendModel::Create(
-    TRITONBACKEND_Model* triton_model, BackendModel** backend_model)
+BackendModel::BackendModel(TRITONBACKEND_Model* triton_model)
+    : triton_model_(triton_model), supports_batching_initialized_(false),
+      supports_batching_(false)
 {
   TRITONSERVER_Message* config_message;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
+  THROW_IF_ERROR(TRITONBACKEND_ModelConfig(
       triton_model, 1 /* config_version */, &config_message));
 
   // Get the model configuration as a json string from
@@ -47,68 +55,54 @@ BackendModel::Create(
   // rapidjson... but others could be added).
   const char* buffer;
   size_t byte_size;
-  RETURN_IF_ERROR(
+  THROW_IF_ERROR(
       TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
 
-  TritonJson::Value model_config;
-  TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
-  RETURN_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
-  RETURN_IF_ERROR(err);
+  TRITONSERVER_Error* err = model_config_.Parse(buffer, byte_size);
+  THROW_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
+  THROW_IF_ERROR(err);
 
   const char* model_name;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelName(triton_model, &model_name));
+  THROW_IF_ERROR(TRITONBACKEND_ModelName(triton_model, &model_name));
+  name_ = model_name;
 
-  uint64_t model_version;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model, &model_version));
+  THROW_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model, &version_));
+
+  int64_t mbs = 0;
+  THROW_IF_ERROR(model_config_.MemberAsInt("max_batch_size", &mbs));
+  max_batch_size_ = mbs;
 
   const char* repository_path = nullptr;
   TRITONBACKEND_ModelArtifactType repository_artifact_type;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelRepository(
+  THROW_IF_ERROR(TRITONBACKEND_ModelRepository(
       triton_model, &repository_artifact_type, &repository_path));
   if (repository_artifact_type != TRITONBACKEND_ARTIFACT_FILESYSTEM) {
-    return TRITONSERVER_ErrorNew(
+    throw BackendModelException(TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
         (std::string("unsupported repository artifact type for model '") +
          model_name + "'")
-            .c_str());
+            .c_str()));
   }
+  repository_path_ = repository_path;
 
-  TRITONSERVER_Server* triton_server;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelServer(triton_model, &triton_server));
+  THROW_IF_ERROR(TRITONBACKEND_ModelServer(triton_model, &triton_server_));
 
-  bool pinned_input = false;
-  bool pinned_output = false;
+  enable_pinned_input_ = false;
+  enable_pinned_output_ = false;
   {
     TritonJson::Value optimization;
-    if (model_config.Find("optimization", &optimization)) {
+    if (model_config_.Find("optimization", &optimization)) {
       TritonJson::Value pinned_memory;
-      if (model_config.Find("input_pinned_memory", &pinned_memory)) {
-        RETURN_IF_ERROR(pinned_memory.MemberAsBool("enable", &pinned_input));
+      if (model_config_.Find("input_pinned_memory", &pinned_memory)) {
+        THROW_IF_ERROR(
+            pinned_memory.MemberAsBool("enable", &enable_pinned_input_));
       }
-      if (model_config.Find("output_pinned_memory", &pinned_memory)) {
-        RETURN_IF_ERROR(pinned_memory.MemberAsBool("enable", &pinned_output));
+      if (model_config_.Find("output_pinned_memory", &pinned_memory)) {
+        THROW_IF_ERROR(
+            pinned_memory.MemberAsBool("enable", &enable_pinned_output_));
       }
     }
   }
-
-  *backend_model = new BackendModel(
-      triton_server, triton_model, model_name, model_version, repository_path,
-      pinned_input, pinned_output, std::move(model_config));
-  return nullptr;  // success
-}
-
-BackendModel::BackendModel(
-    TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
-    const char* name, const uint64_t version,
-    const std::string& repository_path, const bool enable_pinned_input,
-    const bool enable_pinned_output, TritonJson::Value&& model_config)
-    : triton_server_(triton_server), triton_model_(triton_model), name_(name),
-      version_(version), repository_path_(repository_path),
-      model_config_(std::move(model_config)),
-      enable_pinned_input_(enable_pinned_input),
-      enable_pinned_output_(enable_pinned_output),
-      supports_batching_initialized_(false), supports_batching_(false)
-{
 }
 
 TRITONSERVER_Error*
