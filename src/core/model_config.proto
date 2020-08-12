@@ -715,7 +715,7 @@ message ModelDynamicBatching
 {
   //@@  .. cpp:var:: message BatchInput
   //@@
-  //@@     A batch input is an additional input of the requests in the batch
+  //@@     A batch input is an additional input for the requests in the batch
   //@@     which describes the property of the request in the batch.
   //@@
   message BatchInput
@@ -754,6 +754,15 @@ message ModelDynamicBatching
       //@@         type as ragged input.
       //@@
       BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO = 2;
+
+      //@@      .. cpp:enumerator:: Kind::BATCH_MAX_ELEMENT_COUNT = 3
+      //@@
+      //@@         Among the requests in the batch, the max element count of the
+      //@@         'target_input' will be added as input with shape
+      //@@         [max_element_count] for the first request in the batch.
+      //@@         For other requests, such input will be with shape [0].
+      //@@
+      BATCH_MAX_ELEMENT_COUNT_AS_SHAPE = 3;
     }
 
     //@@    .. cpp:var:: Kind kind
