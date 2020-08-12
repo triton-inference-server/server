@@ -184,7 +184,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install dependencies for protobuf code generation in Python
-RUN pip3 install grpcio-tools
+RUN pip3 install --upgrade setuptools grpcio-tools
 
 # TensorFlow libraries. Install the monolithic libtensorflow_trtis and
 # create links from libtensorflow_framework.so and
