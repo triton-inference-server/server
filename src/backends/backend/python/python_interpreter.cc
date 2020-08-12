@@ -316,13 +316,17 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
   std::string val;
 
   const auto insert_model_param =
-      [&initialization_params](const std::string& val, const std::string& key) {
-        auto* value_pair = initialization_params->add_model_command();
+      [&initialization_params](const std::string& key, const std::string& val) {
+        auto* value_pair = initialization_params->add_args();
         value_pair->set_key(key);
         value_pair->set_value(val);
       };
 
   insert_model_param("module_path", module_path);
+
+  ni::TritonJson::WriteBuffer buffer;
+  model_config.Write(&buffer);
+  insert_model_param("model_config", std::move(buffer.MutableContents()));
 
   // Attempting to connect to the python runtime
   constexpr uint8_t conn_attempts = 5;
@@ -686,8 +690,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
     const char* id;
     GUARDED_RESPOND_IF_ERROR(
-        responses, r,
-        TRITONBACKEND_RequestId(request, &id));
+        responses, r, TRITONBACKEND_RequestId(request, &id));
     inference_request->set_id(id);
 
     uint64_t correlation_id;

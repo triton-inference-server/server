@@ -86,7 +86,7 @@ class PythonHost(PythonInterpreterServicer):
         if hasattr(module, "initialize_model"):
             self.initializer_func = module.initialize_model
         elif hasattr(module, "triton"):
-            self.initializer_func = module.trtis
+            self.initializer_func = module.triton
         else:
             self.initializer_func = None
         self.model = None
@@ -97,13 +97,11 @@ class PythonHost(PythonInterpreterServicer):
 
         # if not self.initializer_func:
         #     return StatusCode(code=1)
-
-        args = argparse.Namespace(
-            **{x.key: x.value for x in request.model_command})
+        args = {x.key: x.value for x in request.model_command}
         self.model = self.initializer_func(args)
 
-        if not self.model:
-            return StatusCode(code=2)
+        # if not self.model:
+        #     return StatusCode(code=2)
 
         # return StatusCode(code=0)
 

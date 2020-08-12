@@ -36,7 +36,7 @@ message InitializationCommand
     string value = 2;
   }
 
-  repeated ValuePair model_command = 1;
+  repeated ValuePair args = 1;
 }
 
 message Tensor
