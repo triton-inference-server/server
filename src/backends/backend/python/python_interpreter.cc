@@ -673,6 +673,7 @@ TRITONBACKEND_ModelInstanceExecute(
       }
     }
 
+    // Append the list of requested outputs to the inference_request
     for (size_t iidx = 0; iidx < requested_output_count; ++iidx) {
       const char* requested_output_name;
       GUARDED_RESPOND_IF_ERROR(
@@ -683,7 +684,7 @@ TRITONBACKEND_ModelInstanceExecute(
       inference_request->add_requested_output_names(requested_output_name);
     }
 
-    const char *id;
+    const char* id;
     TRITONBACKEND_RequestId(request, &id);
     inference_request->set_id(id);
 
@@ -801,18 +802,17 @@ TRITONBACKEND_ModelInstanceExecute(
         TRITONBACKEND_ResponseSend(
             responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL, nullptr),
         "failed sending response");
-    for (uint32_t r = 0; r < request_count; ++r) {
-      TRITONBACKEND_Request* request = requests[r];
-
-      // TODO: Add resposne/request statistics
-
-      LOG_IF_ERROR(
-          TRITONBACKEND_RequestRelease(
-              request, TRITONSERVER_REQUEST_RELEASE_ALL),
-          "failed releasing request");
-    }
   }
 
+  for (uint32_t r = 0; r < request_count; ++r) {
+    TRITONBACKEND_Request* request = requests[r];
+
+    // TODO: Add resposne/request statistics
+
+    LOG_IF_ERROR(
+        TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
+        "failed releasing request");
+  }
 
   return nullptr;
 }
