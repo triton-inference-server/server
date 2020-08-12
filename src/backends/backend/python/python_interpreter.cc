@@ -175,6 +175,7 @@ class ModelInstanceState {
   /// Create a python child process running startup.py
   TRITONSERVER_Error* CreatePythonInterpreter();
 
+  /// Load Triton inputs to the appropriate Protobufs
   TRITONSERVER_Error* GetInputTensor(
       const uint32_t iidx, TRITONBACKEND_Request* request,
       ni::Tensor* input_tensor, std::vector<TRITONBACKEND_Response*>& responses,
@@ -192,7 +193,6 @@ class ModelInstanceState {
   TRITONSERVER_Error* ConnectPythonInterpreter(const std::string& module_path);
 
   std::string pymodule_path_;
-  std::string pyinterpreter_;
   ModelState* model_state_;
   std::string domain_socket_;
   TRITONBACKEND_ModelInstance* triton_model_instance_;
@@ -663,7 +663,6 @@ TRITONBACKEND_ModelInstanceExecute(
         responses, r,
         TRITONBACKEND_RequestOutputCount(request, &requested_output_count));
 
-    // Batching all the inputs in a single request
     uint32_t batch_size = 0;
     for (size_t iidx = 0; iidx < requested_input_count; ++iidx) {
       ni::Tensor* input_tensor = inference_request->add_inputs();
@@ -683,6 +682,14 @@ TRITONBACKEND_ModelInstanceExecute(
 
       inference_request->add_requested_output_names(requested_output_name);
     }
+
+    const char *id;
+    TRITONBACKEND_RequestId(request, &id);
+    inference_request->set_id(id);
+
+    uint64_t correlation_id;
+    TRITONBACKEND_RequestCorrelationId(request, &correlation_id);
+    inference_request->set_correlation_id(correlation_id);
   }
 
   // ExecuteResponse
@@ -715,8 +722,7 @@ TRITONBACKEND_ModelInstanceExecute(
       const std::string output_tensor_name = output_tensor.name();
       int64_t output_shape[output_tensor_dims.size()];
 
-      for (int i = 0; i < output_tensor_dims.size(); i++)
-      {
+      for (int i = 0; i < output_tensor_dims.size(); i++) {
         output_shape[i] = output_tensor_dims.data()[i];
       }
 

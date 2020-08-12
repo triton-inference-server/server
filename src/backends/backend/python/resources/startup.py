@@ -49,8 +49,7 @@ def numpy_to_protobuf_type(data_type):
 
 
 def parse_startup_arguments():
-    parser = argparse.ArgumentParser(
-        description="Triton Python Host")
+    parser = argparse.ArgumentParser(description="Triton Python Host")
     parser.add_argument("--socket",
                         default=None,
                         required=True,
@@ -125,20 +124,26 @@ class PythonHost(PythonInterpreterServicer):
             request_inputs = {}
             for request_input in request.inputs:
                 x = request_input
-                request_inputs[x.name] = np.frombuffer(x.raw_data, dtype=protobuf_to_numpy_type(x.dtype)).reshape(x.dims)
+                request_inputs[x.name] = np.frombuffer(
+                    x.raw_data,
+                    dtype=protobuf_to_numpy_type(x.dtype)).reshape(x.dims)
             np_requests.append({
                 'inputs': request_inputs,
                 'id': request.id,
                 'correlation_id': request.correlation_id,
                 'requested_output_names': request.requested_output_names
-                })
+            })
         responses = self.model(np_requests)
         exec_responses = []
         for response in responses:
             tensors = []
             for response_name, response_value in response.items():
                 name = response_name
-                tensor = Tensor(name=name, dtype=numpy_to_protobuf_type(response_value.dtype.type), dims=response_value.shape, raw_data=response_value.tobytes())
+                tensor = Tensor(name=name,
+                                dtype=numpy_to_protobuf_type(
+                                    response_value.dtype.type),
+                                dims=response_value.shape,
+                                raw_data=response_value.tobytes())
                 tensors.append(tensor)
             exec_responses.append(InferenceResponse(inputs=tensors))
         execute_response = ExecuteResponse(responses=exec_responses)
