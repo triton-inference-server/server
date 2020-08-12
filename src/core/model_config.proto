@@ -726,34 +726,34 @@ message ModelDynamicBatching
     //@@       The kind of the batch input.
     //@@
     enum Kind {
-      //@@      .. cpp:enumerator:: Kind::BATCH_SEQUENCE_LENGTHS = 0
+      //@@      .. cpp:enumerator:: Kind::BATCH_ELEMENT_COUNT = 0
       //@@
-      //@@         The length of the sequence will be added as input with
-      //@@         shape [1].
+      //@@         The element count of the 'target_input' will be added as
+      //@@         input with shape [1].
       //@@
-      BATCH_SEQUENCE_LENGTHS = 0;
+      BATCH_ELEMENT_COUNT = 0;
 
       //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_READY = 1
       //@@
-      //@@         The accumulated length of the sequence will be added as
-      //@@         input with shape [1]. For example, if there is a batch of
-      //@@         two request, each with sequence length 2, an input of value
+      //@@         The accumulated element count of the 'target_input' will be
+      //@@         added as input with shape [1]. For example, if there is a
+      //@@         batch of two request, each with 2 elements, an input of value
       //@@         2 will be added to the first request, and an input of value
       //@@         4 will be added to the second request.
       //@@
-      BATCH_ACCUMULATED_SEQUENCE_LENGTHS = 1;
+      BATCH_ACCUMULATED_ELEMENT_COUNT = 1;
 
-      //@@      .. cpp:enumerator:: Kind::BATCH_ACCUMULATED_SEQUENCE_LENGTHS_WITH_ZERO = 2
+      //@@      .. cpp:enumerator:: Kind::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO = 2
       //@@
-      //@@         The accumulated length of the sequence will be added as
-      //@@         input with shape [1], except for the first request in the
-      //@@         batch. For the first request in the batch, the input will
-      //@@         have shape [2] where the first element is value 0. Note that
-      //@@         the shape is different for different requests in the batch,
-      //@@         so the backend should recognize batch input with this type as
-      //@@         ragged input.
+      //@@         The accumulated element count of the 'target_input' will be
+      //@@         added as input with shape [1], except for the first request
+      //@@         in the batch. For the first request in the batch, the input
+      //@@         will have shape [2] where the first element is value 0. Note
+      //@@         that the shape is different for different requests in the
+      //@@         batch, so the backend should recognize batch input with this
+      //@@         type as ragged input.
       //@@
-      BATCH_ACCUMULATED_SEQUENCE_LENGTHS_WITH_ZERO = 2;
+      BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO = 2;
     }
 
     //@@    .. cpp:var:: Kind kind
@@ -774,12 +774,12 @@ message ModelDynamicBatching
     //@@
     DataType data_type = 3;
 
-    //@@    .. cpp:var:: string target_name (repeated)
+    //@@    .. cpp:var:: string target_input (repeated)
     //@@
     //@@       The names of the model inputs that are used to populate
     //@@       batch input value.
     //@@
-    repeat string target_name = 4;
+    repeat string target_input = 4;
   }
 
   //@@  .. cpp:var:: int32 preferred_batch_size (repeated)
