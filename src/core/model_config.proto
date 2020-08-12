@@ -713,6 +713,75 @@ message ModelQueuePolicy
 //@@
 message ModelDynamicBatching
 {
+  //@@  .. cpp:var:: message BatchInput
+  //@@
+  //@@     A batch input is an additional input of the requests in the batch
+  //@@     which describes the property of the request in the batch.
+  //@@
+  message BatchInput
+  {
+    //@@
+    //@@    .. cpp:enum:: Kind
+    //@@
+    //@@       The kind of the batch input.
+    //@@
+    enum Kind {
+      //@@      .. cpp:enumerator:: Kind::BATCH_SEQUENCE_LENGTHS = 0
+      //@@
+      //@@         The length of the sequence will be added as input with
+      //@@         shape [1].
+      //@@
+      BATCH_SEQUENCE_LENGTHS = 0;
+
+      //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_READY = 1
+      //@@
+      //@@         The accumulated length of the sequence will be added as
+      //@@         input with shape [1]. For example, if there is a batch of
+      //@@         two request, each with sequence length 2, an input of value
+      //@@         2 will be added to the first request, and an input of value
+      //@@         4 will be added to the second request.
+      //@@
+      BATCH_ACCUMULATED_SEQUENCE_LENGTHS = 1;
+
+      //@@      .. cpp:enumerator:: Kind::BATCH_ACCUMULATED_SEQUENCE_LENGTHS_WITH_ZERO = 2
+      //@@
+      //@@         The accumulated length of the sequence will be added as
+      //@@         input with shape [1], except for the first request in the
+      //@@         batch. For the first request in the batch, the input will
+      //@@         have shape [2] where the first element is value 0. Note that
+      //@@         the shape is different for different requests in the batch,
+      //@@         so the backend should recognize batch input with this type as
+      //@@         ragged input.
+      //@@
+      BATCH_ACCUMULATED_SEQUENCE_LENGTHS_WITH_ZERO = 2;
+    }
+
+    //@@    .. cpp:var:: Kind kind
+    //@@
+    //@@       The kind of this batch input.
+    //@@
+    Kind kind = 1;
+
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name of the model input.
+    //@@
+    string name = 2;
+
+    //@@    .. cpp:var:: DataType data_type
+    //@@
+    //@@       The input's datatype.
+    //@@
+    DataType data_type = 3;
+
+    //@@    .. cpp:var:: string target_name (repeated)
+    //@@
+    //@@       The names of the model inputs that are used to populate
+    //@@       batch input value.
+    //@@
+    repeat string target_name = 4;
+  }
+
   //@@  .. cpp:var:: int32 preferred_batch_size (repeated)
   //@@
   //@@     Preferred batch sizes for dynamic batching. If a batch of one of
@@ -778,6 +847,13 @@ message ModelDynamicBatching
   //@@     policy.
   //@@
   map<uint32, ModelQueuePolicy> priority_queue_policy = 7;
+
+  //@@  .. cpp:var:: BatchInput batch_input (repeated)
+  //@@
+  //@@     The model input(s) that the server should use to communicate
+  //@@     batch related values to the model.
+  //@@
+  repeated BatchInput batch_input = 8;
 }
 
 //@@
