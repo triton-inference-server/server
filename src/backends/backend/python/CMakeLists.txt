@@ -83,7 +83,8 @@ add_library(
   ${PROTOBUF_SRCS}
 
   ${protocol_grpc_hdrs}
-  ${protocol_grpc_srcs})
+  ${protocol_grpc_srcs}
+  $<TARGET_OBJECTS:backend-utils-library>)
 
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_python PRIVATE ${CUDA_INCLUDE_DIRS})

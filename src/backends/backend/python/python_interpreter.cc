@@ -25,11 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
-#define TRITONJSON_STATUSRETURN(M) \
-  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
-#define TRITONJSON_STATUSSUCCESS nullptr
-
 #include <grpc/grpc.h>
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -58,7 +53,6 @@
 #include <unordered_map>
 #include <vector>
 
-// Fix include path for protobuf
 #include "python_host.grpc.pb.h"
 #include "src/backends/backend/examples/backend_utils.h"
 #include "src/backends/backend/tritonbackend.h"
@@ -69,17 +63,7 @@ namespace ni = nvidia::inferenceserver;
 
 namespace {
 
-#define SHOW_INPUT_JSON_PYTHON_BACKEND 0
-
 namespace nvidia { namespace inferenceserver { namespace backend {
-
-#define TRITON_MSG_LOG(MSG)                        \
-  do {                                             \
-    TRITONSERVER_LogMessage(                       \
-        TRITONSERVER_LOG_INFO, __FILE__, __LINE__, \
-        std::string(MSG + '\n').c_str());          \
-  } while (false)
-
 
 #define RETURN_IF_ERROR(X)               \
   do {                                   \
@@ -95,22 +79,6 @@ namespace nvidia { namespace inferenceserver { namespace backend {
         TRITONSERVER_LogMessage(LEVEL, __FILE__, __LINE__, MSG), \
         ("failed to log message: "));                            \
   } while (false)
-
-#ifdef TRITON_ENABLE_STATS
-#define TIMESPEC_TO_NANOS(TS) ((TS).tv_sec * 1000000000 + (TS).tv_nsec)
-#define SET_TIMESTAMP(TS_NS)             \
-  {                                      \
-    struct timespec ts;                  \
-    clock_gettime(CLOCK_MONOTONIC, &ts); \
-    TS_NS = TIMESPEC_TO_NANOS(ts);       \
-  }
-#define DECL_TIMESTAMP(TS_NS) \
-  uint64_t TS_NS;             \
-  SET_TIMESTAMP(TS_NS);
-#else
-#define DECL_TIMESTAMP(TS_NS)
-#define SET_TIMESTAMP(TS_NS)
-#endif  // TRITON_ENABLE_STATS
 
 #define RESPOND_AND_RETURN_IF_ERROR(REQUEST, X)                         \
   do {                                                                  \
@@ -244,9 +212,12 @@ ModelInstanceState::CreatePythonInterpreter()
       nullptr, "--instance_name", nullptr,    nullptr};
 
   constexpr int max_tmpfile_name = 255;
-  char tmp_socket_name[max_tmpfile_name], full_socket_name[max_tmpfile_name];
-  if (!tmpnam(tmp_socket_name)) {
-    TRITON_MSG_LOG("Failed to create a temporary socket name");
+  char tmp_socket_name[max_tmpfile_name] = "/tmp/XXXXXX";
+  char full_socket_name[max_tmpfile_name];
+  mktemp(tmp_socket_name);
+
+  if (strcmp(tmp_socket_name, "") == 0) {
+    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Failed to create a temporary socket name");
   } else {
     snprintf(full_socket_name, max_tmpfile_name, "unix://%s", tmp_socket_name);
     subinterpreter_commandline[3] = full_socket_name;
@@ -574,6 +545,9 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
       (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
        std::to_string(version) + ")")
           .c_str());
+
+  TRITONBACKEND_Backend* backend;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(model, &backend));
 
   ModelState* model_state;
   RETURN_IF_ERROR(ModelState::Create(model, &model_state));
