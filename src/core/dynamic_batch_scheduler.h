@@ -45,6 +45,7 @@ namespace nvidia { namespace inferenceserver {
 // Scheduler that implements dynamic batching.
 class DynamicBatchScheduler : public Scheduler {
  public:
+  using BatchInputs = std::vector<std::shared_ptr<InferenceRequest::Input>>;
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
   static Status Create(
@@ -65,12 +66,7 @@ class DynamicBatchScheduler : public Scheduler {
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-      const bool preserve_ordering,
-      const std::set<int32_t>& preferred_batch_sizes,
-      const uint64_t max_queue_delay_microseconds,
-      const inference::ModelQueuePolicy& default_queue_policy,
-      const uint32_t priority_level,
-      const ModelQueuePolicyMap& queue_policy_map,
+      const inference::ModelDynamicBatching& batcher_config,
       std::unique_ptr<Scheduler>* scheduler);
 
   ~DynamicBatchScheduler();
@@ -92,6 +88,8 @@ class DynamicBatchScheduler : public Scheduler {
       const ModelQueuePolicyMap& queue_policy_map);
   void SchedulerThread(
       const uint32_t runner_id, const int nice,
+      const ::google::protobuf::RepeatedPtrField<
+          inference::ModelDynamicBatching::BatchInput>& batch_input_config,
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
       std::promise<bool>* is_initialized);
   uint64_t GetDynamicBatch(const int64_t runner_id);
