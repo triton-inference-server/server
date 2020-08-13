@@ -299,6 +299,8 @@ class PlanBackend : public InferenceBackend {
     std::vector<uint64_t> byte_sizes_;
     std::vector<void*> buffers_;
     std::vector<bool> buffer_is_ragged_;
+    // WAR for ragged output, pair of input name to look up and output shape
+    std::vector<std::pair<std::string, std::vector<int64_t>>> io_shape_mapping_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
     // engine. This is used to match the TensorRT context execution declaration

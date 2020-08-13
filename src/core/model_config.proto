@@ -327,6 +327,15 @@ message ModelOutput
   //@@     model.
   //@@
   bool is_shape_tensor = 6;
+
+  //@@  .. cpp:var:: string scatter_with_input_shape
+  //@@
+  //@@     (unstable) User can specify an input name if the output has no
+  //@@     explicit batch dimension, and the output should be scattered
+  //@@     according to a the input's shape. The dynamic dimension of the
+  //@@     output will be set to the value of the same dimension in the input.
+  //@@
+  string scatter_with_input_shape = 7;
 }
 
 //@@

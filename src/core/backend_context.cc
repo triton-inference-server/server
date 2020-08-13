@@ -248,6 +248,77 @@ BackendResponder::ProcessTensor(
 #endif  // TRITON_ENABLE_GPU
 }
 
+void
+BackendResponder::ProcessTensor(
+    const std::string& name, const std::string& input_name,
+    const inference::DataType datatype,
+    const std::vector<int64_t>& batchn_shape, const char* buffer,
+    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
+{
+  // A value of CPU_PINNED indicates that pinned memory buffer is not
+  // needed for this tensor. Any other value indicates that a pinned
+  // memory buffer is needed when the target memory type matches
+  // 'use_pinned_memory_type'.
+  TRITONSERVER_MemoryType use_pinned_memory_type =
+      TRITONSERVER_MEMORY_CPU_PINNED;
+  if (pinned_enabled_) {
+    use_pinned_memory_type = GetUsePinnedMemoryType(memory_type);
+  }
+
+  size_t tensor_offset = 0;
+
+  for (size_t idx = 0; idx < responses_->size(); idx++) {
+    auto& request = requests_[idx];
+    auto& response = (*responses_)[idx];
+
+    // If then pending copies are from tensor buffer that is not
+    // contiguous with 'response's part of that buffer, then need to
+    // go ahead and perform the pending copies so that can start a
+    // new contiguous region if necessary.
+    if ((pending_pinned_byte_size_ > 0) &&
+        (tensor_offset !=
+         (pending_pinned_byte_size_ + pending_pinned_offset_))) {
+      need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
+    }
+
+    // Override shape to be correct for this response, with a naive assumption
+    // that the dynamic dimension in output is mapped to the same dimension
+    // in the input
+    const InferenceRequest::Input* input = nullptr;
+    request->ImmutableInput(input_name, &input);
+    const auto& input_batchn_shape = input->ShapeWithBatchDim();
+    auto output_batchn_shape = batchn_shape;
+    for (size_t dim_idx = 0; dim_idx < output_batchn_shape.size(); dim_idx++) {
+      if (output_batchn_shape[dim_idx] == -1) {
+        output_batchn_shape[dim_idx] = input_batchn_shape[dim_idx];
+      }
+    }
+
+    const size_t tensor_byte_size = GetByteSize(datatype, output_batchn_shape);
+
+    InferenceResponse::Output* response_output = nullptr;
+    if ((response != nullptr) &&
+        (request->ImmutableRequestedOutputs().find(name) !=
+         request->ImmutableRequestedOutputs().end())) {
+      response->AddOutput(
+          name, datatype, output_batchn_shape, &response_output);
+      need_sync_ |= SetFixedSizeOutputBuffer(
+          &response, response_output, tensor_byte_size, tensor_offset, buffer,
+          memory_type, memory_type_id, use_pinned_memory_type);
+    }
+
+    tensor_offset += tensor_byte_size;
+  }
+
+  // Done with the tensor, flush any pending pinned copies.
+  need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
+#ifdef TRITON_ENABLE_GPU
+  if (need_sync_ && (event_ != nullptr)) {
+    cudaEventRecord(event_, stream_);
+  }
+#endif  // TRITON_ENABLE_GPU
+}
+
 bool
 BackendResponder::Finalize()
 {

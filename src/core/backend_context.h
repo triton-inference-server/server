@@ -145,6 +145,15 @@ class BackendResponder {
       std::vector<int64_t>& batchn_shape, const char* buffer,
       const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
 
+  // (unstable) Process all responses for a named output tensor corresponding
+  // an input tensor's shape. 'batchn_shape' is the model config shape with
+  // batch dimension.
+  void ProcessTensor(
+      const std::string& name, const std::string& input_name,
+      const inference::DataType datatype,
+      const std::vector<int64_t>& batchn_shape, const char* buffer,
+      const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
+
   // Finalize processing of all responses for all output
   // tensors. Return true if cudaMemcpyAsync is called, and the caller
   // should call cudaStreamSynchronize (or cudaEventSynchronize on 'event')
