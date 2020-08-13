@@ -84,10 +84,16 @@ add_library(
 
   ${protocol_grpc_hdrs}
   ${protocol_grpc_srcs}
-  $<TARGET_OBJECTS:backend-utils-library>)
+  $<TARGET_OBJECTS:backend-library>)
 
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_python PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(
+    triton_python
+    PUBLIC -L/usr/local/cuda/lib64/stubs
+    PUBLIC -lnvidia-ml
+    PRIVATE ${CUDA_LIBRARIES}
+  )
 endif() # TRITON_ENABLE_GPU
 
 set_target_properties(
@@ -108,20 +114,6 @@ target_link_libraries(
   triton_python
   PRIVATE gRPC::grpc++
 )
-
-if(${TRTIS_ENABLE_GPU})
-target_include_directories(
-        triton_python
-        PRIVATE ${CUDA_INCLUDE_DIRS}
-)
-
-target_link_libraries(
-  triton_python
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
-  PRIVATE ${CUDA_LIBRARIES}
-)
-endif() # TRTIS_ENABLE_GPU
 
 install(
   TARGETS triton_python

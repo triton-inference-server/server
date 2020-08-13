@@ -121,7 +121,7 @@ class PythonHost(PythonInterpreterServicer):
 
     def Init(self, request, context):
         # TODO: Add error handling and returning correct status codes
-        args = {x.key: x.value for x in request.model_command}
+        args = {x.key: x.value for x in request.args}
         self.model = self.initializer_func(args)
 
     def Fini(self, request, context):
