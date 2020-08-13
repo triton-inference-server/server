@@ -716,7 +716,11 @@ message ModelDynamicBatching
   //@@  .. cpp:var:: message BatchInput
   //@@
   //@@     A batch input is an additional input for the requests in the batch
-  //@@     which describes the property of the request in the batch.
+  //@@     which describes the property of the request in the batch. The backend
+  //@@     should recognize batch input as ragged input.
+  //@@     FIXME: It seems inefficient to add the input into individual requests
+  //@@     while the batch input can be formed as one batched tensor that
+  //@@     describes the whole batch.
   //@@
   message BatchInput
   {
@@ -733,7 +737,7 @@ message ModelDynamicBatching
       //@@
       BATCH_ELEMENT_COUNT = 0;
 
-      //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_READY = 1
+      //@@      .. cpp:enumerator:: Kind::BATCH_ACCUMULATED_ELEMENT_COUNT = 1
       //@@
       //@@         The accumulated element count of the 'target_input' will be
       //@@         added as input with shape [1]. For example, if there is a
@@ -743,24 +747,23 @@ message ModelDynamicBatching
       //@@
       BATCH_ACCUMULATED_ELEMENT_COUNT = 1;
 
-      //@@      .. cpp:enumerator:: Kind::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO = 2
+      //@@      .. cpp:enumerator::
+      //@@         Kind::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO = 2
       //@@
       //@@         The accumulated element count of the 'target_input' will be
       //@@         added as input with shape [1], except for the first request
       //@@         in the batch. For the first request in the batch, the input
-      //@@         will have shape [2] where the first element is value 0. Note
-      //@@         that the shape is different for different requests in the
-      //@@         batch, so the backend should recognize batch input with this
-      //@@         type as ragged input.
+      //@@         will have shape [2] where the first element is value 0.
       //@@
       BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO = 2;
 
-      //@@      .. cpp:enumerator:: Kind::BATCH_MAX_ELEMENT_COUNT = 3
+      //@@      .. cpp:enumerator:: Kind::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE = 3
       //@@
       //@@         Among the requests in the batch, the max element count of the
       //@@         'target_input' will be added as input with shape
       //@@         [max_element_count] for the first request in the batch.
       //@@         For other requests, such input will be with shape [0].
+      //@@         The data of the tensor will be dummy data.
       //@@
       BATCH_MAX_ELEMENT_COUNT_AS_SHAPE = 3;
     }
@@ -779,16 +782,17 @@ message ModelDynamicBatching
 
     //@@    .. cpp:var:: DataType data_type
     //@@
-    //@@       The input's datatype.
+    //@@       The input's datatype. The data type can be TYPE_INT32 or
+    //@@       TYPE_FP32.
     //@@
     DataType data_type = 3;
 
-    //@@    .. cpp:var:: string target_input (repeated)
+    //@@    .. cpp:var:: string target_input
     //@@
-    //@@       The names of the model inputs that are used to populate
+    //@@       The name of the model input that are used to populate
     //@@       batch input value.
     //@@
-    repeat string target_input = 4;
+    string target_input = 4;
   }
 
   //@@  .. cpp:var:: int32 preferred_batch_size (repeated)
