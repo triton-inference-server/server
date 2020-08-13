@@ -217,7 +217,8 @@ ModelInstanceState::CreatePythonInterpreter()
   mktemp(tmp_socket_name);
 
   if (strcmp(tmp_socket_name, "") == 0) {
-    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Failed to create a temporary socket name");
+    LOG_MESSAGE(
+        TRITONSERVER_LOG_ERROR, "Failed to create a temporary socket name");
   } else {
     snprintf(full_socket_name, max_tmpfile_name, "unix://%s", tmp_socket_name);
     subinterpreter_commandline[3] = full_socket_name;
