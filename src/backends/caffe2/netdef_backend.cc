@@ -446,8 +446,7 @@ NetDefBackend::Context::SetInputTensors(
     auto total_byte_size = input_buffers->back()->TotalByteSize();
 
     collector->ProcessTensor(
-        name, datatype, batch1_shape, input_buffer, total_byte_size, mem_type,
-        0);
+        name, datatype, input_buffer, total_byte_size, mem_type, 0);
 
     Caffe2Workspace::Error err = workspace_->SetInputTensor(
         name, batchn_shape, dtype, static_cast<const char*>(input_buffer),

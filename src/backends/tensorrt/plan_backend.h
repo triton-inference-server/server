@@ -94,11 +94,14 @@ class PlanBackend : public InferenceBackend {
 
     Status InitializeExecuteInputBinding(
         const std::string& input_name, const inference::DataType input_datatype,
-        const DimsList& input_dims, const bool is_control = false);
+        const DimsList& input_dims, const bool is_control = false,
+        const bool is_ragged = false);
     Status InitializeShapeInputBinding(
         const std::string& input_name, const inference::DataType input_datatype,
         const DimsList& input_dims);
     Status InitializeSequenceControlInputBindings(
+        const inference::ModelConfig& config);
+    Status InitializeDynamicBatchInputBindings(
         const inference::ModelConfig& config);
     Status InitializeConfigExecuteInputBindings(
         const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
@@ -212,7 +215,8 @@ class PlanBackend : public InferenceBackend {
         std::map<int, std::vector<int32_t>>* request_shape_values);
 
     std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
-        size_t total_batch_size, const InferenceRequest& input_request,
+        size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
         const std::map<int, std::vector<int32_t>>& request_shape_values);
 
     // The engine used for the context. If the model uses dynamic shape, then
@@ -294,6 +298,7 @@ class PlanBackend : public InferenceBackend {
     // profile. The array sizes are equal to Context::num_expected_bindings_
     std::vector<uint64_t> byte_sizes_;
     std::vector<void*> buffers_;
+    std::vector<bool> buffer_is_ragged_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
     // engine. This is used to match the TensorRT context execution declaration

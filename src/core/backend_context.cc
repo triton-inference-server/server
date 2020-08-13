@@ -548,8 +548,7 @@ BackendResponder::FlushPendingPinned(
 //
 void
 BackendInputCollector::ProcessTensor(
-    const std::string& name, const inference::DataType datatype,
-    const std::vector<int64_t>& batch1_shape, char* buffer,
+    const std::string& name, const inference::DataType datatype, char* buffer,
     const size_t buffer_byte_size, const TRITONSERVER_MemoryType memory_type,
     const int64_t memory_type_id)
 {
@@ -563,7 +562,6 @@ BackendInputCollector::ProcessTensor(
     use_pinned_memory_type = GetUsePinnedMemoryType(memory_type);
   }
 
-  const size_t batch1_byte_size = GetByteSize(datatype, batch1_shape);
   size_t buffer_offset = 0;
 
   for (size_t idx = 0; idx < requests_.size(); idx++) {
@@ -581,11 +579,10 @@ BackendInputCollector::ProcessTensor(
           buffer, buffer_byte_size, memory_type, memory_type_id);
     }
 
-    const size_t request_byte_size =
-        batch1_byte_size * std::max(1U, request->BatchSize());
-
     const InferenceRequest::Input* request_input;
     Status status = request->ImmutableInput(name, &request_input);
+    const size_t request_byte_size =
+        GetByteSize(datatype, request_input->ShapeWithBatchDim());
     if (!status.IsOk() && (response != nullptr)) {
       InferenceResponse::SendWithStatus(
           std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
