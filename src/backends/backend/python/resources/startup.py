@@ -10,7 +10,7 @@ from python_host_pb2 import *
 from python_host_pb2_grpc import PythonInterpreterServicer, add_PythonInterpreterServicer_to_server
 import grpc
 
-_TYPE_MAPPING_DICTIONARY = {
+TRITION_TO_NUMPY_TYPE = {
     # TRITONSERVER_TYPE_BOOL
     1: np.bool,
     # TRITONSERVER_TYPE_UINT8
@@ -39,13 +39,15 @@ _TYPE_MAPPING_DICTIONARY = {
     13: np.bytes_
 }
 
+NUMPY_TO_TRITION_TYPE = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
+
 
 def protobuf_to_numpy_type(data_type):
-    return _TYPE_MAPPING_DICTIONARY[data_type]
+    return TRITION_TO_NUMPY_TYPE[data_type]
 
 
 def numpy_to_protobuf_type(data_type):
-    return {v: k for k, v in _TYPE_MAPPING_DICTIONARY.items()}[data_type]
+    return NUMPY_TO_TRITION_TYPE[data_type]
 
 
 def parse_startup_arguments():
@@ -92,27 +94,18 @@ class PythonHost(PythonInterpreterServicer):
         self.model = None
 
     def Init(self, request, context):
-        # if self.model:
-        #     return StatusCode(code=0)
-
-        # if not self.initializer_func:
-        #     return StatusCode(code=1)
+        # TODO: Add error handling and returning correct status codes
         args = {x.key: x.value for x in request.model_command}
         self.model = self.initializer_func(args)
 
-        # if not self.model:
-        #     return StatusCode(code=2)
-
-        # return StatusCode(code=0)
-
     def Fini(self, request, context):
+        # TODO: Add error handling and returning correct status codes
         if hasattr(self.model, "shutdown"):
             self.model.shutdown()
 
         del self.model
         with cv:
             cv.notify()
-        # return StatusCode(code=0)
 
     def Execute(self, request, context):
 

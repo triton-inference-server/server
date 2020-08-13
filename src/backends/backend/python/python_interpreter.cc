@@ -172,7 +172,7 @@ class ModelInstanceState {
 
   ~ModelInstanceState();
 
-  /// Create a python child process running startup.py
+  /// Creates a python child process running startup.py
   TRITONSERVER_Error* CreatePythonInterpreter();
 
   /// Load Triton inputs to the appropriate Protobufs
@@ -188,7 +188,8 @@ class ModelInstanceState {
   ModelInstanceState(
       ModelState* model_state, TRITONBACKEND_ModelInstance* model_instance,
       const char* name, const TRITONSERVER_InstanceGroupKind kind,
-      const int32_t device_id, ni::TritonJson::Value&& model_config);
+      const int32_t device_id, ni::TritonJson::Value&& model_config,
+      TRITONBACKEND_Model* trition_model);
 
   TRITONSERVER_Error* ConnectPythonInterpreter(const std::string& module_path);
 
@@ -204,6 +205,7 @@ class ModelInstanceState {
   ni::TritonJson::Value model_config;
 
  private:
+  TRITONBACKEND_Model* triton_model_;
   pid_t interpreter_pid_;
 };
 
@@ -251,19 +253,23 @@ ModelInstanceState::CreatePythonInterpreter()
     domain_socket_ = std::string(full_socket_name);
   }
 
-  ni::TritonJson::Value param_json, module_path_json;
-  LOG_IF_ERROR(
-      model_config.MemberAsObject("parameters", &param_json),
-      "can't get param json value");
-  LOG_IF_ERROR(
-      param_json.MemberAsObject("module_path", &module_path_json),
-      "can't get module path json value");
+  const char* path = nullptr;
+  TRITONBACKEND_ModelArtifactType artifact_type;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelRepository(triton_model_, &artifact_type, &path));
+  if (artifact_type != TRITONBACKEND_ARTIFACT_FILESYSTEM) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        (std::string("unsupported artifact type for model '") + name_ + "'")
+            .c_str());
+  }
+  uint64_t version;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model_, &version));
 
-  LOG_IF_ERROR(
-      module_path_json.MemberAsString("string_value", &module_path),
-      "can't get module path");
-
-  pymodule_path_ = module_path;
+  std::stringstream ss;
+  // Use <path>/version/model.py as the model location
+  ss << path << "/" << version << "/model.py";
+  pymodule_path_ = ss.str();
   interpreter_pid_ = fork();
 
   if (interpreter_pid_ == 0) {
@@ -348,10 +354,11 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
 ModelInstanceState::ModelInstanceState(
     ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
     const char* name, const TRITONSERVER_InstanceGroupKind kind,
-    const int32_t device_id, ni::TritonJson::Value&& model_config)
+    const int32_t device_id, ni::TritonJson::Value&& model_config,
+    TRITONBACKEND_Model* triton_model)
     : model_state_(model_state), triton_model_instance_(triton_model_instance),
       name_(name), kind_(kind), device_id_(device_id),
-      model_config(std::move(model_config))
+      model_config(std::move(model_config)), triton_model_(triton_model)
 {
 }
 
@@ -393,7 +400,7 @@ ModelInstanceState::Create(
 
   *state = new ModelInstanceState(
       model_state, triton_model_instance, instance_name, instance_kind,
-      instance_id, std::move(model_config));
+      instance_id, std::move(model_config), triton_model);
 
   return nullptr;
 }
@@ -567,9 +574,6 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
       (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
        std::to_string(version) + ")")
           .c_str());
-
-  TRITONBACKEND_Backend* backend;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(model, &backend));
 
   ModelState* model_state;
   RETURN_IF_ERROR(ModelState::Create(model, &model_state));

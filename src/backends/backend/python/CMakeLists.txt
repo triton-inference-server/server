@@ -81,7 +81,6 @@ add_library(
   python_interpreter.cc
   ${PROTOBUF_HEADERS}
   ${PROTOBUF_SRCS}
-  $<TARGET_OBJECTS:model-config-library>
 
   ${protocol_grpc_hdrs}
   ${protocol_grpc_srcs})
@@ -89,8 +88,6 @@ add_library(
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_python PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
-
-add_dependencies(triton_python model-config-library)
 
 set_target_properties(
   triton_python
