@@ -198,6 +198,8 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_infer_cudashm && \
     cp -r qa/L0_infer/. qa/L0_infer_cudashm && \
+    mkdir -p qa/L0_infer_valgrind && \
+    cp -r qa/L0_infer/. qa/L0_infer_valgrind && \
     mkdir -p qa/L0_trt_shape_tensors_shm && \
     cp -r qa/L0_trt_shape_tensors/. qa/L0_trt_shape_tensors_shm && \
     mkdir -p qa/L0_trt_shape_tensors_cudashm && \
@@ -206,10 +208,14 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     cp -r qa/L0_batcher/. qa/L0_batcher_shm && \
     mkdir -p qa/L0_batcher_cudashm && \
     cp -r qa/L0_batcher/. qa/L0_batcher_cudashm && \
+    mkdir -p qa/L0_batcher_valgrind && \
+    cp -r qa/L0_batcher/. qa/L0_batcher_valgrind && \
     mkdir -p qa/L0_sequence_batcher_shm && \
     cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_shm && \
     mkdir -p qa/L0_sequence_batcher_cudashm && \
     cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_cudashm && \
+    mkdir -p qa/L0_sequence_batcher_valgrind && \
+    cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_valgrind && \
     mkdir -p qa/L0_perf_nomodel_shm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_shm && \
     mkdir -p qa/L0_perf_nomodel_cudashm && \
@@ -288,7 +294,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
         exit 1; \
     fi
 
-# go client requires golang
+# go client requires golang and CI/QA for memcheck requires valgrind
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               libopencv-dev \
@@ -301,11 +307,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               swig \
                               golang-go \
                               nginx \
-                              protobuf-compiler && \
+                              protobuf-compiler \
+                              valgrind && \
     rm -rf /var/lib/apt/lists/*
-
-# CI/QA for memcheck requires valgrind
-RUN apt-get update && apt-get install -y valgrind
 
 # CI/QA expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \

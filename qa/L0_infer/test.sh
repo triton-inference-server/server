@@ -49,6 +49,16 @@ if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
     TEST_CUDA_SHARED_MEMORY="0"
 fi
 
+if [ -z "$TEST_VALGRIND" ]; then
+    TEST_VALGRIND="0"
+else
+    LEAKCHECK_LOG_BASE="./valgrind_test"
+    LEAKCHECK=/usr/bin/valgrind
+    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
+    SERVER_TIMEOUT=1200
+    rm -f $LEAKCHECK_LOG_BASE*
+fi
+
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
     EXPECTED_NUM_TESTS="29"
 fi
@@ -173,7 +183,15 @@ for TARGET in cpu gpu; do
               sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
     fi
 
-    run_server
+    # Check if running a memory leak check
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.log
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else  
+        run_server
+    fi
+
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
@@ -185,7 +203,6 @@ for TARGET in cpu gpu; do
     python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
         RET=1
     else
         check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
@@ -201,10 +218,21 @@ for TARGET in cpu gpu; do
 
     kill $SERVER_PID
     wait $SERVER_PID
+
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        check_valgrind_log $LEAKCHECK_LOG 
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
 done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET
