@@ -124,6 +124,10 @@ namespace nib = nvidia::inferenceserver::backend;
 
 class ModelState;
 
+struct BackendState {
+  std::string python_runtime;
+};
+
 class ModelInstanceState {
  public:
   static TRITONSERVER_Error* Create(
@@ -189,17 +193,21 @@ class ModelState {
   const std::string& ModelName() const { return model_name_; }
   uint64_t ModelVersion() const { return model_version_; }
 
+  // Get backend state
+  ::BackendState* BackendState() { return backend_state_; }
+
  private:
   ModelState(
       TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
       const char* model_name, const uint64_t model_version,
-      ni::TritonJson::Value&& model_config);
+      ni::TritonJson::Value&& model_config, ::BackendState* backend_state);
 
   TRITONSERVER_Server* triton_server_;
   TRITONBACKEND_Model* triton_model_;
   const std::string model_name_;
   const uint64_t model_version_;
   ni::TritonJson::Value model_config_;
+  ::BackendState* backend_state_;
 };
 
 TRITONSERVER_Error*
@@ -248,8 +256,10 @@ ModelInstanceState::CreatePythonInterpreter()
     // Use the python available in $PATH
     // TODO: Make this overridable by config
     std::string python_interpreter_path = "/usr/bin/python3";
-    std::string python_interpreter_startup =
-        "/workspace/builddir/server/install/lib/python/runtime/startup.py";
+
+    std::stringstream ss;
+    ss << model_state_->BackendState()->python_runtime << "/startup.py";
+    std::string python_interpreter_startup = ss.str();
 
     subinterpreter_commandline[0] = python_interpreter_path.c_str();
     subinterpreter_commandline[1] = python_interpreter_startup.c_str();
@@ -481,19 +491,27 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   TRITONSERVER_Server* triton_server;
   RETURN_IF_ERROR(TRITONBACKEND_ModelServer(triton_model, &triton_server));
 
+  TRITONBACKEND_Backend* backend;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(triton_model, &backend));
+
+  void* bstate;
+  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &bstate));
+  ::BackendState* backend_state = reinterpret_cast<::BackendState*>(bstate);
+
   *state = new ModelState(
       triton_server, triton_model, model_name, model_version,
-      std::move(model_config));
+      std::move(model_config), backend_state);
+
   return nullptr;
 }
 
 ModelState::ModelState(
     TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
     const char* model_name, const uint64_t model_version,
-    ni::TritonJson::Value&& model_config)
+    ni::TritonJson::Value&& model_config, ::BackendState* backend_state)
     : triton_server_(triton_server), triton_model_(triton_model),
       model_name_(model_name), model_version_(model_version),
-      model_config_(std::move(model_config))
+      model_config_(std::move(model_config)), backend_state_(backend_state)
 {
 }
 
@@ -528,7 +546,49 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
         "Triton backend API version does not support this backend");
   }
 
+  TRITONSERVER_Message* backend_config_message;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_BackendConfig(backend, &backend_config_message));
+
+  const char* buffer;
+  size_t byte_size;
+  RETURN_IF_ERROR(TRITONSERVER_MessageSerializeToJson(
+      backend_config_message, &buffer, &byte_size));
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_VERBOSE,
+      (std::string("backend configuration:\n") + buffer).c_str());
+
+  ni::TritonJson::Value backend_config;
+  if (byte_size != 0) {
+    RETURN_IF_ERROR(backend_config.Parse(buffer, byte_size));
+  }
+
+  std::unique_ptr<BackendState> backend_state(new BackendState());
+  ni::TritonJson::Value cmdline;
+  if (backend_config.Find("cmdline", &cmdline)) {
+    ni::TritonJson::Value value;
+    if (cmdline.Find("python-runtime", &value)) {
+      RETURN_IF_ERROR(value.AsString(&backend_state->python_runtime));
+    } else {
+      // Set the default path for python runtime
+      backend_state->python_runtime = "/opt/tritonserver/lib/python/runtime";
+    }
+  }
+  RETURN_IF_ERROR(TRITONBACKEND_BackendSetState(
+      backend, reinterpret_cast<void*>(backend_state.get())));
+
+  backend_state.release();
   return nullptr;
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
+{
+  void* vstate;
+  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
+  auto backend_state = reinterpret_cast<BackendState*>(vstate);
+  delete backend_state;
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error*

@@ -111,10 +111,8 @@ class PythonHost(PythonInterpreterServicer):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        if hasattr(module, "initialize_model"):
-            self.initializer_func = module.initialize_model
-        elif hasattr(module, "triton"):
-            self.initializer_func = module.triton
+        if hasattr(module, "TritonPythonBackend"):
+            self.initializer_func = module.TritonPythonBackend
         else:
             self.initializer_func = None
         self.model = None
