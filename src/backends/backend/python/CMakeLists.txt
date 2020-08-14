@@ -119,6 +119,9 @@ install(
   TARGETS triton_python
   LIBRARY DESTINATION backends/python
 )
-# TODO: fix installing ${PROTO_PY}
-install(FILES ${protocol_core_py} ${protocol_grpc_py} resources/startup.py
+
+# TODO: Fix PROTO_PY
+string(REPLACE "../../../../" "../../../../../../../../../"  PROTO_FIX_PY ${PROTO_PY})
+
+install(FILES ${protocol_core_py} ${PROTO_FIX_PY} ${protocol_grpc_py} resources/startup.py
        DESTINATION lib/python/runtime)
