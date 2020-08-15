@@ -65,6 +65,11 @@ class BackendModel {
   // indicates that the model does not support batching.
   int MaxBatchSize() const { return max_batch_size_; }
 
+  // Set the max batch size for the model. When a backend
+  // auto-completes a configuration it may set or change the maximum
+  // batch size.
+  void SetMaxBatchSize(const int b) { max_batch_size_ = b; }
+
   // Does this model support batching in the first dimension. If
   // called before the model is completely loaded this function will
   // return an error.
