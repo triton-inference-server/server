@@ -531,8 +531,7 @@ DynamicBatchScheduler::SchedulerThread(
                 *(reinterpret_cast<float*>(batch_input_buffer[idx].data()) +
                   req_idx) = GetElementCount(target_input->ShapeWithBatchDim());
               } else {
-                *(reinterpret_cast<int32_t*>(
-                      batch_input_buffer[idx].data()) +
+                *(reinterpret_cast<int32_t*>(batch_input_buffer[idx].data()) +
                   req_idx) = GetElementCount(target_input->ShapeWithBatchDim());
               }
               requests[req_idx]->AddOverrideInput(
@@ -554,8 +553,7 @@ DynamicBatchScheduler::SchedulerThread(
                 *(reinterpret_cast<float*>(batch_input_buffer[idx].data()) +
                   req_idx) = accumulated_element_count;
               } else {
-                *(reinterpret_cast<int32_t*>(
-                      batch_input_buffer[idx].data()) +
+                *(reinterpret_cast<int32_t*>(batch_input_buffer[idx].data()) +
                   req_idx) = accumulated_element_count;
               }
               requests[req_idx]->AddOverrideInput(
@@ -574,11 +572,10 @@ DynamicBatchScheduler::SchedulerThread(
                   GetElementCount(target_input->ShapeWithBatchDim());
               if (batch_inputs[idx].second.data_type() ==
                   inference::TYPE_FP32) {
-                *(reinterpret_cast<float*>(batch_input_buffer[idx].data()) +
-                  1 + req_idx) = accumulated_element_count;
+                *(reinterpret_cast<float*>(batch_input_buffer[idx].data()) + 1 +
+                  req_idx) = accumulated_element_count;
               } else {
-                *(reinterpret_cast<int32_t*>(
-                      batch_input_buffer[idx].data()) +
+                *(reinterpret_cast<int32_t*>(batch_input_buffer[idx].data()) +
                   1 + req_idx) = accumulated_element_count;
               }
               requests[req_idx]->AddOverrideInput(

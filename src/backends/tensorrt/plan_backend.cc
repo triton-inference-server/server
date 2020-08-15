@@ -1359,9 +1359,9 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
 
       // FIXME whether output with 'scatter_with_input_shape' can be validated
       if (io.scatter_with_input_shape().empty()) {
-      RETURN_IF_ERROR(CompareDimsSupported(
-          name_, io.name(), engine_dims, model_config_dims, support_batching_,
-          is_dynamic_, false /* compare_exact */));
+        RETURN_IF_ERROR(CompareDimsSupported(
+            name_, io.name(), engine_dims, model_config_dims, support_batching_,
+            is_dynamic_, false /* compare_exact */));
       }
 
       int64_t byte_size;
@@ -1787,7 +1787,7 @@ PlanBackend::Context::Run(
   }
 
   auto citr = GetMostOptimizedProfile(
-      payload_->total_batch_size_, requests, request_shape_values);
+      payload_->total_batch_size_, payload_->requests_, request_shape_values);
 
   int binding_offset = citr->first * num_expected_bindings_;
 
@@ -1863,7 +1863,8 @@ PlanBackend::Context::Run(
     if (buffer_is_ragged_[io_index]) {
       std::vector<int64_t> ragged_shape{0};
       inference::DataType datatype;
-      for (size_t req_idx = 0; req_idx < payload_->requests_.size(); req_idx++) {
+      for (size_t req_idx = 0; req_idx < payload_->requests_.size();
+           req_idx++) {
         const InferenceRequest::Input* repr_input;
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
