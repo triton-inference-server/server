@@ -38,6 +38,8 @@ namespace nvidia { namespace inferenceserver { namespace backend {
 using cudaStream_t = void*;
 #endif  // !TRITON_ENABLE_GPU
 
+class BackendModel;
+
 //
 // BackendModelInstance
 //
@@ -47,44 +49,58 @@ using cudaStream_t = void*;
 //
 class BackendModelInstance {
  public:
-  // GPU device number that indicates that no gpu is available for a
-  // context (which is an invalid state since TensorRT requires a
-  // GPU).
-  static constexpr int NO_GPU_DEVICE = -1;
-
-  // Max batch size value that indicates batching is not supported for
-  // this model.
-  static constexpr int NO_BATCHING = 0;
-
   BackendModelInstance(
-      const std::string& name, const int gpu_device, const int max_batch_size,
-      const bool enable_pinned_input, const bool enable_pinned_output);
-
+      BackendModel* backend_model,
+      TRITONBACKEND_ModelInstance* triton_model_instance);
   virtual ~BackendModelInstance();
 
-  // Create the CUDA stream for data transfer operations. If 'stream' is
-  // nullptr, the stream will be created on 'stream_'. Have no effect if GPU
-  // support is disabled.
-  TRITONSERVER_Error* CreateCudaStream(
-      const int cuda_stream_priority = 0, cudaStream_t* stream = nullptr);
+  // Get the name, kind and device ID of the instance.
+  const std::string& Name() const { return name_; }
+  TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
+  int32_t DeviceId() const { return device_id_; }
 
-  // Name of the model instance
+  // Get the handle to the TRITONBACKEND model instance.
+  TRITONBACKEND_ModelInstance* TritonModelInstance()
+  {
+    return triton_model_instance_;
+  }
+
+  // Get the BackendModel representing the model that corresponds to
+  // this instance.
+  BackendModel* Model() const { return backend_model_; }
+
+  // The model configuration 'default_model_filename' value, or the
+  // value in model configuration 'cc_model_filenames' for the GPU
+  // targeted by this instance. If neither are specified in the model
+  // configuration, the return empty string.
+  const std::string& ArtifactFilename() const { return artifact_filename_; }
+
+  // Returns the stream associated with this instance that can be used
+  // for GPU<->CPU memory transfers. Returns nullptr if GPU support is
+  // disabled or if this instance is not executing on a GPU.
+  cudaStream_t CudaStream() { return stream_; }
+
+ protected:
+  BackendModel* backend_model_;
+  TRITONBACKEND_ModelInstance* triton_model_instance_;
+
   std::string name_;
+  TRITONSERVER_InstanceGroupKind kind_;
+  int32_t device_id_;
 
-  // The GPU index active when this context was created.
-  const int gpu_device_;
-
-  // Maximum batch size to allow. This is the minimum of what is
-  // supported by the model and what is requested in the
-  // configuration.
-  const int max_batch_size_;
-
-  // Whether to use indirect pinned buffer for the corresponding data copy type.
-  const bool enable_pinned_input_;
-  const bool enable_pinned_output_;
-
-  // The stream that executes data transfer operations.
+  std::string artifact_filename_;
   cudaStream_t stream_;
+};
+
+//
+// BackendModelInstanceException
+//
+// Exception thrown if error occurs while constructing an
+// BackendModelInstance.
+//
+struct BackendModelInstanceException {
+  BackendModelInstanceException(TRITONSERVER_Error* err) : err_(err) {}
+  TRITONSERVER_Error* err_;
 };
 
 }}}  // namespace nvidia::inferenceserver::backend
