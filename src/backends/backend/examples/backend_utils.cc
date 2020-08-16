@@ -601,7 +601,7 @@ JoinPath(std::initializer_list<std::string> segments)
 
 TRITONSERVER_Error*
 ModelPaths(
-    const char* model_repository_path, uint64_t version,
+    const std::string& model_repository_path, uint64_t version,
     const bool ignore_directories, const bool ignore_files,
     std::unordered_map<std::string, std::string>* model_paths)
 {
@@ -640,6 +640,46 @@ ModelPaths(
         std::piecewise_construct, std::make_tuple(filename),
         std::make_tuple(model_path));
   }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+CreateCudaStream(
+    const int device_id, const int cuda_stream_priority, cudaStream_t* stream)
+{
+  *stream = nullptr;
+
+#ifdef TRITON_ENABLE_GPU
+  // Make sure that correct device is set before creating stream and
+  // then restore the device to what was set by the caller.
+  int current_device;
+  auto cuerr = cudaGetDevice(&current_device);
+  bool overridden = false;
+  if (cuerr == cudaSuccess) {
+    overridden = (current_device != device_id);
+    if (overridden) {
+      cuerr = cudaSetDevice(device_id);
+    }
+  }
+
+  if (cuerr == cudaSuccess) {
+    cuerr = cudaStreamCreateWithPriority(
+        stream, cudaStreamDefault, cuda_stream_priority);
+  }
+
+  if (overridden) {
+    cudaSetDevice(current_device);
+  }
+
+  if (cuerr != cudaSuccess) {
+    *stream = nullptr;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        (std::string("unable to create stream: ") + cudaGetErrorString(cuerr))
+            .c_str());
+  }
+#endif  // TRITON_ENABLE_GPU
+
   return nullptr;  // success
 }
 

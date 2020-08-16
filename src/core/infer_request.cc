@@ -359,8 +359,6 @@ InferenceRequest::AddOriginalInput(
         "input '" + name + "' already exists in request");
   }
 
-  LOG_VERBOSE(1) << "add original input: " << *this;
-
   if (input != nullptr) {
     *input = std::addressof(pr.first->second);
   }
@@ -865,6 +863,7 @@ operator<<(std::ostream& out, const InferenceRequest::Input& input)
   out << "input: " << input.Name()
       << ", type: " << DataTypeToProtocolString(input.DType())
       << ", original shape: " << DimsListToString(input.OriginalShape())
+      << ", batch + shape: " << DimsListToString(input.ShapeWithBatchDim())
       << ", shape: " << DimsListToString(input.Shape());
   if (input.IsShapeTensor()) {
     out << ", is_shape_tensor: True";
