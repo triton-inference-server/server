@@ -39,7 +39,7 @@ set(gRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/python_host.proto DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 set(Protobuf_SRC_ROOT_FOLDER ${CMAKE_CURRENT_BINARY_DIR})
 
-protobuf_generate_cpp(PROTO_SRCS PROTO_HOST_HDRS ${CMAKE_CURRENT_BINARY_DIR}/python_host.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_BINARY_DIR}/python_host.proto)
 
 protobuf_generate_python(PROTO_PY ${CMAKE_CURRENT_BINARY_DIR}/python_host.proto)
 
@@ -71,10 +71,14 @@ add_custom_target(
         python_libs ALL 
         DEPENDS ${PROTO_PY} ${protocol_grpc_py})
 
-FILE(GLOB PROTOBUF_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/*.cc)
-FILE(GLOB PROTOBUF_SRCS ${CMAKE_CURRENT_BINARY_DIR}/*.h)
-
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
+# TODO: Fix Protobuf paths
+string(REPLACE "../../../../" "../../../../../../../../../"  PROTOBUF_HEADERS ${PROTO_HDRS})
+string(REPLACE "../../../../" "../../../../../../../../../"  PROTOBUF_SRCS ${PROTO_SRCS})
+
+set_source_files_properties(${PROTOBUF_HEADERS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${PROTOBUF_SRCS} PROPERTIES GENERATED TRUE)
 
 add_library(
   triton_python SHARED
