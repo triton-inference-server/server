@@ -115,17 +115,15 @@ DynamicBatchScheduler::Create(
 
   // Create one scheduler thread for each requested runner. Associate
   // each scheduler thread with a runner.
-  const auto& batch_input_config = batcher_config.batch_input();
   for (uint32_t c = 0; c < sched->scheduler_thread_cnt_; ++c) {
     const uint32_t runner_id = runner_id_start + c;
     std::promise<bool> init_state;
     auto thread_exit = std::make_shared<std::atomic<bool>>(false);
     sched->scheduler_threads_exit_.emplace_back(thread_exit);
-    sched->scheduler_threads_.emplace_back(
-        new std::thread([dyna_sched, runner_id, nice, &batch_input_config,
-                         thread_exit, &init_state]() {
+    sched->scheduler_threads_.emplace_back(new std::thread(
+        [dyna_sched, runner_id, nice, thread_exit, &init_state]() {
           dyna_sched->SchedulerThread(
-              runner_id, nice, batch_input_config, thread_exit, &init_state);
+              runner_id, nice, thread_exit, &init_state);
         }));
     if (!init_state.get_future().get()) {
       if (sched->scheduler_threads_.back()->joinable()) {
@@ -220,8 +218,6 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 void
 DynamicBatchScheduler::SchedulerThread(
     const uint32_t runner_id, const int nice,
-    const ::google::protobuf::RepeatedPtrField<
-        inference::ModelDynamicBatching::BatchInput>& batch_input_config,
     const std::shared_ptr<std::atomic<bool>>& rthread_exit,
     std::promise<bool>* is_initialized)
 {
@@ -232,104 +228,6 @@ DynamicBatchScheduler::SchedulerThread(
     LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
                    << " at default nice (requested nice " << nice
                    << " failed)...";
-  }
-
-  if (batch_input_config.size() > 0) {
-    LOG_VERBOSE(1) << "Specified " << batch_input_config.size()
-                   << " batch inputs";
-  }
-
-  // pair of batch inputs and their target input
-  std::vector<
-      std::pair<BatchInputs, inference::ModelDynamicBatching::BatchInput>>
-      batch_inputs;
-  std::vector<std::vector<char>> batch_input_buffer;
-  for (const auto& bic : batch_input_config) {
-    auto batch_input =
-        std::make_pair(BatchInputs(max_preferred_batch_size_), bic);
-    switch (bic.kind()) {
-      case inference::ModelDynamicBatching::BatchInput::BATCH_ELEMENT_COUNT:
-      case inference::ModelDynamicBatching::BatchInput::
-          BATCH_ACCUMULATED_ELEMENT_COUNT: {
-        std::vector<int64_t> shape{1};
-        auto input_byte_size = GetDataTypeByteSize(bic.data_type());
-        const size_t input_buffer_size =
-            max_preferred_batch_size_ * input_byte_size;
-        batch_input_buffer.emplace_back(std::vector<char>(input_buffer_size));
-        size_t offset = 0;
-        const char* buffer_ptr = batch_input_buffer.back().data();
-        for (auto& bi : batch_input.first) {
-          bi = std::make_shared<InferenceRequest::Input>(
-              bic.name(), bic.data_type(), shape);
-          *bi->MutableShape() = bi->OriginalShape();
-          *bi->MutableShapeWithBatchDim() = bi->OriginalShape();
-          bi->AppendData(
-              buffer_ptr + offset, input_byte_size, TRITONSERVER_MEMORY_CPU, 0);
-          offset += input_byte_size;
-        }
-        batch_inputs.emplace_back(std::move(batch_input));
-        break;
-      }
-      case inference::ModelDynamicBatching::BatchInput::
-          BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
-        std::vector<int64_t> shape{1};
-        auto input_byte_size = GetDataTypeByteSize(bic.data_type());
-        const size_t input_buffer_size =
-            (max_preferred_batch_size_ + 1) * input_byte_size;
-        batch_input_buffer.emplace_back(std::vector<char>(input_buffer_size));
-        size_t offset = input_byte_size;
-        char* buffer_ptr = batch_input_buffer.back().data();
-        if (bic.data_type() == inference::TYPE_FP32) {
-          *reinterpret_cast<float*>(buffer_ptr) = 0;
-        } else {
-          *reinterpret_cast<int32_t*>(buffer_ptr) = 0;
-        }
-
-        for (auto& bi : batch_input.first) {
-          bi = std::make_shared<InferenceRequest::Input>(
-              bic.name(), bic.data_type(), shape);
-          *bi->MutableShape() = bi->OriginalShape();
-          *bi->MutableShapeWithBatchDim() = bi->OriginalShape();
-          bi->AppendData(
-              buffer_ptr + offset, input_byte_size, TRITONSERVER_MEMORY_CPU, 0);
-          offset += input_byte_size;
-        }
-        shape[0] = 2;
-        batch_input.first.front() = std::make_shared<InferenceRequest::Input>(
-            bic.name(), bic.data_type(), shape);
-        batch_input.first.front()->RemoveAllData();
-        batch_input.first.front()->AppendData(
-            buffer_ptr, input_byte_size * 2, TRITONSERVER_MEMORY_CPU, 0);
-
-        *batch_input.first.front()->MutableShape() =
-            batch_input.first.front()->OriginalShape();
-        *batch_input.first.front()->MutableShapeWithBatchDim() =
-            batch_input.first.front()->OriginalShape();
-
-        batch_inputs.emplace_back(std::move(batch_input));
-        break;
-      }
-      case inference::ModelDynamicBatching::BatchInput::
-          BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
-        std::vector<int64_t> shape{0};
-        // Allocate some buffer so that it is safe to access the data, but the
-        // backend shouldn't read this as the information is presented as shape
-        const size_t input_buffer_size = 1024 * 1024;
-        batch_input_buffer.emplace_back(std::vector<char>(input_buffer_size));
-        const char* buffer_ptr = batch_input_buffer.back().data();
-        for (auto& bi : batch_input.first) {
-          bi = std::make_shared<InferenceRequest::Input>(
-              bic.name(), bic.data_type(), shape);
-          *bi->MutableShape() = bi->OriginalShape();
-          *bi->MutableShapeWithBatchDim() = bi->OriginalShape();
-          bi->AppendData(buffer_ptr, 0, TRITONSERVER_MEMORY_CPU, 0);
-        }
-        batch_inputs.emplace_back(std::move(batch_input));
-        break;
-      }
-      default:
-        break;
-    }
   }
 
   // Initialize using the thread. If error then just exit this thread
@@ -516,94 +414,6 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     if (!requests.empty()) {
-      // FIXME inefficient as looping in this way may iterate the same
-      // target_input multiple times
-      for (size_t idx = 0; idx < batch_inputs.size(); idx++) {
-        switch (batch_inputs[idx].second.kind()) {
-          case inference::ModelDynamicBatching::BatchInput::
-              BATCH_ELEMENT_COUNT: {
-            for (size_t req_idx = 0; req_idx < requests.size(); req_idx++) {
-              const InferenceRequest::Input* target_input;
-              requests[req_idx]->ImmutableInput(
-                  batch_inputs[idx].second.target_input(), &target_input);
-              if (batch_inputs[idx].second.data_type() ==
-                  inference::TYPE_FP32) {
-                *(reinterpret_cast<float*>(batch_input_buffer[idx].data()) +
-                  req_idx) = GetElementCount(target_input->ShapeWithBatchDim());
-              } else {
-                *(reinterpret_cast<int32_t*>(batch_input_buffer[idx].data()) +
-                  req_idx) = GetElementCount(target_input->ShapeWithBatchDim());
-              }
-              requests[req_idx]->AddOverrideInput(
-                  batch_inputs[idx].first[req_idx]);
-            }
-            break;
-          }
-          case inference::ModelDynamicBatching::BatchInput::
-              BATCH_ACCUMULATED_ELEMENT_COUNT: {
-            size_t accumulated_element_count = 0;
-            for (size_t req_idx = 0; req_idx < requests.size(); req_idx++) {
-              const InferenceRequest::Input* target_input;
-              requests[req_idx]->ImmutableInput(
-                  batch_inputs[idx].second.target_input(), &target_input);
-              accumulated_element_count +=
-                  GetElementCount(target_input->ShapeWithBatchDim());
-              if (batch_inputs[idx].second.data_type() ==
-                  inference::TYPE_FP32) {
-                *(reinterpret_cast<float*>(batch_input_buffer[idx].data()) +
-                  req_idx) = accumulated_element_count;
-              } else {
-                *(reinterpret_cast<int32_t*>(batch_input_buffer[idx].data()) +
-                  req_idx) = accumulated_element_count;
-              }
-              requests[req_idx]->AddOverrideInput(
-                  batch_inputs[idx].first[req_idx]);
-            }
-            break;
-          }
-          case inference::ModelDynamicBatching::BatchInput::
-              BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
-            size_t accumulated_element_count = 0;
-            for (size_t req_idx = 0; req_idx < requests.size(); req_idx++) {
-              const InferenceRequest::Input* target_input;
-              requests[req_idx]->ImmutableInput(
-                  batch_inputs[idx].second.target_input(), &target_input);
-              accumulated_element_count +=
-                  GetElementCount(target_input->ShapeWithBatchDim());
-              if (batch_inputs[idx].second.data_type() ==
-                  inference::TYPE_FP32) {
-                *(reinterpret_cast<float*>(batch_input_buffer[idx].data()) + 1 +
-                  req_idx) = accumulated_element_count;
-              } else {
-                *(reinterpret_cast<int32_t*>(batch_input_buffer[idx].data()) +
-                  1 + req_idx) = accumulated_element_count;
-              }
-              requests[req_idx]->AddOverrideInput(
-                  batch_inputs[idx].first[req_idx]);
-            }
-            break;
-          }
-          case inference::ModelDynamicBatching::BatchInput::
-              BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
-            std::vector<int64_t> shape{0};
-            for (size_t req_idx = 0; req_idx < requests.size(); req_idx++) {
-              const InferenceRequest::Input* target_input;
-              requests[req_idx]->ImmutableInput(
-                  batch_inputs[idx].second.target_input(), &target_input);
-              shape[0] = std::max(
-                  shape[0], GetElementCount(target_input->ShapeWithBatchDim()));
-              requests[req_idx]->AddOverrideInput(
-                  batch_inputs[idx].first[req_idx]);
-            }
-
-            *batch_inputs[idx].first[0]->MutableShape() = shape;
-            *batch_inputs[idx].first[0]->MutableShapeWithBatchDim() = shape;
-            break;
-          }
-          default:
-            break;
-        }
-      }
       OnSchedule_(runner_id, std::move(requests));
 
       // For testing we introduce a delay here to make the

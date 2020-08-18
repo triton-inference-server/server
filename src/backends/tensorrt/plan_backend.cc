@@ -531,6 +531,9 @@ PlanBackend::CreateExecutionContext(
       std::vector<void*>(context->num_expected_bindings_, nullptr);
   context->buffer_is_ragged_ =
       std::vector<bool>(context->num_expected_bindings_, false);
+  context->batch_inputs_ =
+      std::vector<std::shared_ptr<Context::BatchInputData>>(
+          context->num_expected_bindings_, nullptr);
   context->io_shape_mapping_ =
       std::vector<std::pair<std::string, std::vector<int64_t>>>(
           context->num_expected_bindings_);
@@ -1130,6 +1133,12 @@ PlanBackend::Context::InitializeDynamicBatchInputBindings(
 
       RETURN_IF_ERROR(InitializeExecuteInputBinding(
           tensor_name, tensor_datatype, dims, false, true));
+
+      int io_index = engine_->getBindingIndex(tensor_name.c_str());
+      batch_inputs_[io_index].reset(new BatchInputData(
+          batch_input,
+          new AllocatedMemory(
+              byte_sizes_[io_index], TRITONSERVER_MEMORY_CPU_PINNED, 0)));
     }
   }
 
@@ -1860,61 +1869,227 @@ PlanBackend::Context::Run(
       continue;
     }
 
-    if (buffer_is_ragged_[io_index]) {
+    if (buffer_is_ragged_[bindex]) {
       std::vector<int64_t> ragged_shape{0};
       inference::DataType datatype;
-      for (size_t req_idx = 0; req_idx < payload_->requests_.size();
-           req_idx++) {
-        const InferenceRequest::Input* repr_input;
-        FAIL_ALL_AND_RETURN_IF_ERROR(
-            payload_->requests_, payload_->responses_, metric_reporter_.get(),
-            payload_->requests_[req_idx]->ImmutableInput(name, &repr_input),
-            "failed to obtain the input '" + name + "'");
-        ragged_shape[0] += GetElementCount(repr_input->ShapeWithBatchDim());
-        if (req_idx == 0) {
-          datatype = repr_input->DType();
+      // FIXME inefficient as looping in this way may iterate the same
+      // target_input multiple times
+      if (batch_inputs_[bindex] != nullptr) {
+        const auto& batch_input = batch_inputs_[bindex]->first;
+        auto& allocated_memory = batch_inputs_[bindex]->second;
+        TRITONSERVER_MemoryType mem_type;
+        int64_t mem_type_id;
+        char* input_buffer =
+            allocated_memory->MutableBuffer(&mem_type, &mem_type_id);
+        datatype = batch_input.data_type();
+        const auto& target_input = batch_input.target_input();
+        switch (batch_input.kind()) {
+          case inference::ModelDynamicBatching::BatchInput::
+              BATCH_ELEMENT_COUNT: {
+            ragged_shape[0] = payload_->requests_.size();
+            for (size_t req_idx = 0; req_idx < payload_->requests_.size();
+                 req_idx++) {
+              const InferenceRequest::Input* repr_input;
+              FAIL_ALL_AND_RETURN_IF_ERROR(
+                  payload_->requests_, payload_->responses_,
+                  metric_reporter_.get(),
+                  payload_->requests_[req_idx]->ImmutableInput(
+                      target_input, &repr_input),
+                  "failed to obtain the input '" + target_input + "'");
+              if (datatype == inference::TYPE_FP32) {
+                *(reinterpret_cast<float*>(input_buffer) + req_idx) =
+                    GetElementCount(repr_input->ShapeWithBatchDim());
+              } else {
+                *(reinterpret_cast<int32_t*>(input_buffer) + req_idx) =
+                    GetElementCount(repr_input->ShapeWithBatchDim());
+              }
+            }
+            break;
+          }
+          case inference::ModelDynamicBatching::BatchInput::
+              BATCH_ACCUMULATED_ELEMENT_COUNT: {
+            ragged_shape[0] = payload_->requests_.size();
+            size_t accumulated_element_count = 0;
+            for (size_t req_idx = 0; req_idx < payload_->requests_.size();
+                 req_idx++) {
+              const InferenceRequest::Input* repr_input;
+              FAIL_ALL_AND_RETURN_IF_ERROR(
+                  payload_->requests_, payload_->responses_,
+                  metric_reporter_.get(),
+                  payload_->requests_[req_idx]->ImmutableInput(
+                      target_input, &repr_input),
+                  "failed to obtain the input '" + target_input + "'");
+              accumulated_element_count +=
+                  GetElementCount(repr_input->ShapeWithBatchDim());
+              if (datatype == inference::TYPE_FP32) {
+                *(reinterpret_cast<float*>(input_buffer) + req_idx) =
+                    accumulated_element_count;
+              } else {
+                *(reinterpret_cast<int32_t*>(input_buffer) + req_idx) =
+                    accumulated_element_count;
+              }
+            }
+            break;
+          }
+          case inference::ModelDynamicBatching::BatchInput::
+              BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
+            ragged_shape[0] = payload_->requests_.size() + 1;
+            size_t accumulated_element_count = 0;
+            if (datatype == inference::TYPE_FP32) {
+              *reinterpret_cast<float*>(input_buffer) =
+                  accumulated_element_count;
+            } else {
+              *reinterpret_cast<int32_t*>(input_buffer) =
+                  accumulated_element_count;
+            }
+            for (size_t req_idx = 0; req_idx < payload_->requests_.size();
+                 req_idx++) {
+              const InferenceRequest::Input* repr_input;
+              FAIL_ALL_AND_RETURN_IF_ERROR(
+                  payload_->requests_, payload_->responses_,
+                  metric_reporter_.get(),
+                  payload_->requests_[req_idx]->ImmutableInput(
+                      target_input, &repr_input),
+                  "failed to obtain the input '" + target_input + "'");
+              accumulated_element_count +=
+                  GetElementCount(repr_input->ShapeWithBatchDim());
+              if (datatype == inference::TYPE_FP32) {
+                *(reinterpret_cast<float*>(input_buffer) + 1 + req_idx) =
+                    accumulated_element_count;
+              } else {
+                *(reinterpret_cast<int32_t*>(input_buffer) + 1 + req_idx) =
+                    accumulated_element_count;
+              }
+            }
+            break;
+          }
+          case inference::ModelDynamicBatching::BatchInput::
+              BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
+            for (size_t req_idx = 0; req_idx < payload_->requests_.size();
+                 req_idx++) {
+              const InferenceRequest::Input* repr_input;
+              FAIL_ALL_AND_RETURN_IF_ERROR(
+                  payload_->requests_, payload_->responses_,
+                  metric_reporter_.get(),
+                  payload_->requests_[req_idx]->ImmutableInput(
+                      target_input, &repr_input),
+                  "failed to obtain the input '" + target_input + "'");
+              ragged_shape[0] = std::max(
+                  ragged_shape[0],
+                  GetElementCount(repr_input->ShapeWithBatchDim()));
+            }
+            break;
+          }
+          default:
+            break;
         }
-      }
+        const size_t total_byte_size = GetByteSize(datatype, ragged_shape);
 
-      const size_t total_byte_size = GetByteSize(datatype, ragged_shape);
+        // Set the binding dimension so that output dimensions can be obtained
+        nvinfer1::Dims this_dim;
+        if (!DimVecToDims(ragged_shape, &this_dim)) {
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              Status(
+                  Status::Code::INTERNAL, "failed to create dims object for " +
+                                              DimsListToString(ragged_shape) +
+                                              " for input '" + name + "' for " +
+                                              name_ + "."),
+              "error setting the binding dimension");
+        }
+        status = ValidateDimension(
+            this_dim, citr->second.min_dims_[bindex],
+            citr->second.max_dims_[bindex], false);
+        if (!status.IsOk()) {
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              Status(
+                  Status::Code::INTERNAL,
+                  "request specifies invalid shape for input '" + name +
+                      "' for " + name_ +
+                      ". Error details: " + status.Message()),
+              "error setting the binding dimension");
+        }
+        if (!citr->second.context_->setBindingDimensions(io_index, this_dim)) {
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              Status(
+                  Status::Code::INTERNAL,
+                  "trt failed to set binding dimension to " +
+                      DimsDebugString(this_dim) + " for input '" + name +
+                      "' for " + name_),
+              "error setting the binding dimension");
+        }
+        if (batch_input.kind() != inference::ModelDynamicBatching::BatchInput::
+                                      BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) {
+          bool cuda_used = false;
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              CopyBuffer(
+                  name, mem_type, mem_type_id, TRITONSERVER_MEMORY_GPU,
+                  gpu_device_, total_byte_size, input_buffer, buffers_[bindex],
+                  input_copy_stream_, &cuda_used),
+              "error copying the batch input buffer");
+          if (cuda_used) {
+            cudaEventRecord(
+                events_[next_set_].input_ready_, input_copy_stream_);
+          }
+        }
+      } else {
+        for (size_t req_idx = 0; req_idx < payload_->requests_.size();
+             req_idx++) {
+          const InferenceRequest::Input* repr_input;
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              payload_->requests_[req_idx]->ImmutableInput(name, &repr_input),
+              "failed to obtain the input '" + name + "'");
+          ragged_shape[0] += GetElementCount(repr_input->ShapeWithBatchDim());
+          if (req_idx == 0) {
+            datatype = repr_input->DType();
+          }
+        }
 
-      // Set the binding dimension so that output dimensions can be obtained
-      nvinfer1::Dims this_dim;
-      if (!DimVecToDims(ragged_shape, &this_dim)) {
-        FAIL_ALL_AND_RETURN_IF_ERROR(
-            payload_->requests_, payload_->responses_, metric_reporter_.get(),
-            Status(
-                Status::Code::INTERNAL, "failed to create dims object for " +
-                                            DimsListToString(ragged_shape) +
-                                            " for input '" + name + "' for " +
-                                            name_ + "."),
-            "error setting the binding dimension");
+        const size_t total_byte_size = GetByteSize(datatype, ragged_shape);
+
+        // Set the binding dimension so that output dimensions can be obtained
+        nvinfer1::Dims this_dim;
+        if (!DimVecToDims(ragged_shape, &this_dim)) {
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              Status(
+                  Status::Code::INTERNAL, "failed to create dims object for " +
+                                              DimsListToString(ragged_shape) +
+                                              " for input '" + name + "' for " +
+                                              name_ + "."),
+              "error setting the binding dimension");
+        }
+        status = ValidateDimension(
+            this_dim, citr->second.min_dims_[bindex],
+            citr->second.max_dims_[bindex], false);
+        if (!status.IsOk()) {
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              Status(
+                  Status::Code::INTERNAL,
+                  "request specifies invalid shape for input '" + name +
+                      "' for " + name_ +
+                      ". Error details: " + status.Message()),
+              "error setting the binding dimension");
+        }
+        if (!citr->second.context_->setBindingDimensions(io_index, this_dim)) {
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              Status(
+                  Status::Code::INTERNAL,
+                  "trt failed to set binding dimension to " +
+                      DimsDebugString(this_dim) + " for input '" + name +
+                      "' for " + name_),
+              "error setting the binding dimension");
+        }
+        collector.ProcessTensor(
+            name, datatype, static_cast<char*>(buffers_[bindex]),
+            total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
       }
-      status = ValidateDimension(
-          this_dim, citr->second.min_dims_[bindex],
-          citr->second.max_dims_[bindex], false);
-      if (!status.IsOk()) {
-        FAIL_ALL_AND_RETURN_IF_ERROR(
-            payload_->requests_, payload_->responses_, metric_reporter_.get(),
-            Status(
-                Status::Code::INTERNAL,
-                "request specifies invalid shape for input '" + name +
-                    "' for " + name_ + ". Error details: " + status.Message()),
-            "error setting the binding dimension");
-      }
-      if (!citr->second.context_->setBindingDimensions(io_index, this_dim)) {
-        FAIL_ALL_AND_RETURN_IF_ERROR(
-            payload_->requests_, payload_->responses_, metric_reporter_.get(),
-            Status(
-                Status::Code::INTERNAL,
-                "trt failed to set binding dimension to " +
-                    DimsDebugString(this_dim) + " for input '" + name +
-                    "' for " + name_),
-            "error setting the binding dimension");
-      }
-      collector.ProcessTensor(
-          name, datatype, static_cast<char*>(buffers_[bindex]), total_byte_size,
-          TRITONSERVER_MEMORY_GPU, gpu_device_);
     } else {
       const InferenceRequest::Input* repr_input;
       FAIL_ALL_AND_RETURN_IF_ERROR(

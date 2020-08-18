@@ -299,6 +299,12 @@ class PlanBackend : public InferenceBackend {
     std::vector<uint64_t> byte_sizes_;
     std::vector<void*> buffers_;
     std::vector<bool> buffer_is_ragged_;
+    // Instructions on constructing the batch input and the CPU buffer for
+    // storing mutable data
+    using BatchInputData = std::pair<
+        inference::ModelDynamicBatching::BatchInput,
+        std::unique_ptr<AllocatedMemory>>;
+    std::vector<std::shared_ptr<BatchInputData>> batch_inputs_;
     // WAR for ragged output, pair of input name to look up and output shape
     std::vector<std::pair<std::string, std::vector<int64_t>>> io_shape_mapping_;
 
