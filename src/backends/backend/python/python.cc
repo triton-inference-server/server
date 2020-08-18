@@ -756,11 +756,26 @@ TRITONBACKEND_ModelInstanceExecute(
   uint64_t compute_end_ns = 0;
   SET_TIMESTAMP(compute_end_ns);
 
-  // If inference fails, release all the requests and send an empty response
+  // If inference fails, release all the requests and send an error response
   if (!status.ok()) {
     for (uint32_t r = 0; r < request_count; ++r) {
-      TRITONBACKEND_Request* request = requests[r];
+      if (responses[r] == nullptr) {
+        continue;
+      }
+      TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL, ("GRPC Execute Failed, message: " +
+                                        std::string(status.error_message()))
+                                           .c_str());
+      LOG_IF_ERROR(
+          TRITONBACKEND_ResponseSend(
+              responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
+          "failed sending response");
+      responses[r] = nullptr;
+      TRITONSERVER_ErrorDelete(err);
+    }
 
+    for (uint32_t r = 0; r < request_count; ++r) {
+      TRITONBACKEND_Request* request = requests[r];
       LOG_IF_ERROR(
           TRITONBACKEND_ModelInstanceReportStatistics(
               instance, request, false /* success */, exec_start_ns,
@@ -772,11 +787,11 @@ TRITONBACKEND_ModelInstanceExecute(
               request, TRITONSERVER_REQUEST_RELEASE_ALL),
           "failed releasing request");
     }
-
-    return TRITONSERVER_ErrorNew(
+    TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
-        ("Execute GRPC Failed, message: " + std::string(status.error_message()))
+        ("GRPC Execute Failed, message: " + std::string(status.error_message()))
             .c_str());
+    return err;
   }
 
   for (uint32_t r = 0; r < request_count; ++r) {
