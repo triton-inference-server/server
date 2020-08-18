@@ -327,15 +327,6 @@ message ModelOutput
   //@@     model.
   //@@
   bool is_shape_tensor = 6;
-
-  //@@  .. cpp:var:: string scatter_with_input_shape
-  //@@
-  //@@     (unstable) User can specify an input name if the output has no
-  //@@     explicit batch dimension, and the output should be scattered
-  //@@     according to a the input's shape. The dynamic dimension of the
-  //@@     output will be set to the value of the same dimension in the input.
-  //@@
-  string scatter_with_input_shape = 7;
 }
 
 //@@
@@ -727,9 +718,6 @@ message ModelDynamicBatching
   //@@     A batch input is an additional input for the requests in the batch
   //@@     which describes the property of the request in the batch. The backend
   //@@     should recognize batch input as ragged input.
-  //@@     FIXME: It seems inefficient to add the input into individual requests
-  //@@     while the batch input can be formed as one batched tensor that
-  //@@     describes the whole batch.
   //@@
   message BatchInput
   {

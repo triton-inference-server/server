@@ -534,9 +534,6 @@ PlanBackend::CreateExecutionContext(
   context->batch_inputs_ =
       std::vector<std::shared_ptr<Context::BatchInputData>>(
           context->num_expected_bindings_, nullptr);
-  context->io_shape_mapping_ =
-      std::vector<std::pair<std::string, std::vector<int64_t>>>(
-          context->num_expected_bindings_);
   context->buffer_bindings_ =
       std::vector<void*>(context->total_bindings_, nullptr);
 
@@ -1366,12 +1363,9 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
                 io.name() + "' is a wildcard.");
       }
 
-      // FIXME whether output with 'scatter_with_input_shape' can be validated
-      if (io.scatter_with_input_shape().empty()) {
-        RETURN_IF_ERROR(CompareDimsSupported(
-            name_, io.name(), engine_dims, model_config_dims, support_batching_,
-            is_dynamic_, false /* compare_exact */));
-      }
+      RETURN_IF_ERROR(CompareDimsSupported(
+          name_, io.name(), engine_dims, model_config_dims, support_batching_,
+          is_dynamic_, false /* compare_exact */));
 
       int64_t byte_size;
       if (!is_dynamic_) {
@@ -1406,22 +1400,6 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
 
     byte_sizes_[io_index] = max_byte_size;
     buffers_[io_index] = buffer;
-    // Whether the output needs to be scattered based on input
-    if (!io.scatter_with_input_shape().empty()) {
-      buffer_is_ragged_[io_index] = true;
-
-      std::vector<int64_t> output_shape;
-      const DimsList& model_config_dims =
-          (io.has_reshape()) ? io.reshape().shape() : io.dims();
-      if (support_batching_) {
-        output_shape.push_back(-1);
-      }
-      for (const auto& dim : model_config_dims) {
-        output_shape.push_back(dim);
-      }
-      io_shape_mapping_[io_index] =
-          std::make_pair(io.scatter_with_input_shape(), output_shape);
-    }
 
     // Set buffer bindings of all optimization profile since buffer is allocated
     for (auto& trt_context : trt_contexts_) {
@@ -2360,15 +2338,6 @@ PlanBackend::Context::Run(
 
         free(shape_value_ptr);
       }
-    } else if (buffer_is_ragged_[bindex]) {
-      // FIXME add correctness checking like below
-      inference::DataType dt = ConvertTrtTypeToDataType(
-          engine_->getBindingDataType(binding_offset + bindex));
-      payload_->responder_->ProcessTensor(
-          name, io_shape_mapping_[bindex].first, dt,
-          io_shape_mapping_[bindex].second,
-          static_cast<const char*>(buffers_[bindex]), TRITONSERVER_MEMORY_GPU,
-          gpu_device_);
     } else {
       std::vector<int64_t> batchn_shape;
 

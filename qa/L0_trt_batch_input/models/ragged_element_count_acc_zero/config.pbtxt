@@ -24,12 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "ragged_element_count_acc"
+name: "ragged_element_count_acc_zero"
 platform: "tensorrt_plan"
 max_batch_size: 4
 input [
   {
-    name: "INPUT0"
+    name: "RAGGED_INPUT"
     data_type: TYPE_FP32
     dims: [ -1 ]
     allow_ragged_batch: true
@@ -37,26 +37,23 @@ input [
 ]
 output [
   {
-    name: "OUTPUT0"
+    name: "RAGGED_OUTPUT"
     data_type: TYPE_FP32
     dims: [ -1 ]
-    scatter_with_input_shape: "INPUT0"
   }
 ]
 output [
   {
-    name: "OUTPUT1"
+    name: "BATCH_AND_SIZE_OUTPUT"
     data_type: TYPE_FP32
-    dims: [ 1 ]
-    scatter_with_input_shape: "INPUT1"
+    dims: [ -1 ]
   }
 ]
 output [
   {
-    name: "OUTPUT2"
+    name: "BATCH_OUTPUT"
     data_type: TYPE_FP32
-    dims: [ 1 ]
-    scatter_with_input_shape: "INPUT2"
+    dims: [ -1 ]
   }
 ]
 dynamic_batching {
@@ -64,15 +61,15 @@ dynamic_batching {
   batch_input [
     {
       kind: BATCH_ELEMENT_COUNT
-      name: "INPUT1"
+      name: "BATCH_AND_SIZE_INPUT"
       data_type: TYPE_FP32
-      target_input: "INPUT0"
+      target_input: "RAGGED_INPUT"
     },
     {
-      kind: BATCH_ACCUMULATED_ELEMENT_COUNT
-      name: "INPUT2"
+      kind: BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO
+      name: "BATCH_INPUT"
       data_type: TYPE_FP32
-      target_input: "INPUT0"
+      target_input: "RAGGED_INPUT"
     }
   ]
 }

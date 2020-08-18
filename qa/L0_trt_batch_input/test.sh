@@ -41,7 +41,7 @@ CLIENT_LOG="./client.log"
 BATCH_INPUT_TEST=trt_batch_input_test.py
 EXPECTED_NUM_TESTS="5"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_model_repository
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --exit-timeout-secs=120"
@@ -52,10 +52,10 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 # Use nobatch model to showcase ragged input, identity model to verify
 # batch input is generated properly
-mkdir -p models/ragged_acc_zero_shape/1 &&
-    cp $DATADIR/plan_nobatch_zero_3_float32/1/model.plan models/ragged_acc_zero_shape/1/.
-mkdir -p models/ragged_element_count_acc/1 &&
-    cp $DATADIR/plan_nobatch_zero_3_float32/1/model.plan models/ragged_element_count_acc/1/.
+mkdir -p models/ragged_acc_shape/1 &&
+    cp $DATADIR/plan_batch_input/1/model.plan models/ragged_acc_shape/1/.
+mkdir -p models/ragged_element_count_acc_zero/1 &&
+    cp $DATADIR/plan_batch_input/1/model.plan models/ragged_element_count_acc_zero/1/.
 
 RET=0
 
