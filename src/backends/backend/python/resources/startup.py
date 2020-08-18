@@ -113,7 +113,8 @@ class PythonHost(PythonInterpreterServicer):
         if hasattr(module, 'TritonPythonBackend'):
             self.initializer_func = module.TritonPythonBackend
         else:
-            raise NotImplementedError('TritonPythonBackend class doesn\'t exist in ' + module_path)
+            raise NotImplementedError(
+                'TritonPythonBackend class doesn\'t exist in ' + module_path)
         self.backend = None
 
     def Init(self, request, context):
@@ -122,13 +123,14 @@ class PythonHost(PythonInterpreterServicer):
         containing the model configuration. This paramter is passed by
         default to every ModelInstance.
         """
-        if not hasattr('args', request):
+        if not hasattr(request, 'args'):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('request objects does\'nt have args attribute')
-            return
+            return Empty()
 
         args = {x.key: x.value for x in request.args}
         self.backend = self.initializer_func(args)
+        return Empty()
 
     def Fini(self, request, context):
         """Fini is called on TRITONBACKEND_ModelInstanceFinalize. Model
@@ -138,6 +140,7 @@ class PythonHost(PythonInterpreterServicer):
             self.backend.finalize()
 
         del self.backend
+        return Empty()
 
     def Execute(self, request, context):
         """Execute is called on TRITONBACKEND_ModelInstanceExecute. Inference
@@ -168,10 +171,9 @@ class PythonHost(PythonInterpreterServicer):
             request_id = request.id
             correlation_id = request.correlation_id
             requested_output_names = request.requested_output_names
-            inference_request = tpb_utils.InferenceRequest(input_tensors,
-                                                       request_id,
-                                                       correlation_id,
-                                                       requested_output_names)
+            inference_request = tpb_utils.InferenceRequest(
+                input_tensors, request_id, correlation_id,
+                requested_output_names)
             inference_requests.append(inference_request)
 
         # Execute inference on the Python backend
@@ -181,7 +183,10 @@ class PythonHost(PythonInterpreterServicer):
         # Make sure that number of InferenceResponse and InferenceRequest objects match
         if len(inference_requests) != len(responses):
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details('Number of inference responses and requests don\'t match ( requests=' + len(inference_requests) + ' != responses=' + len(responses) + ')')
+            context.set_details(
+                'Number of inference responses and requests don\'t match ( requests='
+                + len(inference_requests) + ' != responses=' + len(responses) +
+                ')')
             return ExecuteResponse()
 
         exec_responses = []

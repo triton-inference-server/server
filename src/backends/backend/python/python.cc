@@ -59,6 +59,7 @@
 #include "src/core/tritonserver.h"
 
 namespace ni = nvidia::inferenceserver;
+namespace nib = nvidia::inferenceserver::backend;
 
 namespace nvidia { namespace inferenceserver { namespace backend {
 
@@ -84,8 +85,6 @@ namespace nvidia { namespace inferenceserver { namespace backend {
 }}}  // namespace nvidia::inferenceserver::backend
 
 namespace {
-
-namespace nib = nvidia::inferenceserver::backend;
 
 #define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
   do {                                                                  \
@@ -195,8 +194,6 @@ class ModelState {
 TRITONSERVER_Error*
 ModelInstanceState::CreatePythonInterpreter()
 {
-  std::string module_path;
-
   const char* subinterpreter_commandline[] = {
       nullptr, nullptr,           "--socket", nullptr, "--model_path",
       nullptr, "--instance_name", nullptr,    nullptr};
@@ -252,12 +249,10 @@ ModelInstanceState::CreatePythonInterpreter()
             nullptr) == -1) {
       std::stringstream ss;
       ss << "Cannot run interpreter host. Errno = " << errno << '\n'
-                << "python_interpreter_path: " << python_interpreter_path
-                << '\n'
-                << "python_interpreter_startup: " << python_interpreter_startup
-                << '\n'
-                << "pymodule_path_: " << pymodule_path_ << '\n'
-                << "instance_name: " << name_ << '\n';
+         << "python_interpreter_path: " << python_interpreter_path << '\n'
+         << "python_interpreter_startup: " << python_interpreter_startup << '\n'
+         << "pymodule_path_: " << pymodule_path_ << '\n'
+         << "instance_name: " << name_ << '\n';
       std::string log_message = ss.str();
       LOG_MESSAGE(TRITONSERVER_LOG_ERROR, log_message.c_str());
 
@@ -267,7 +262,7 @@ ModelInstanceState::CreatePythonInterpreter()
               .c_str());
     }
   } else {
-    RETURN_IF_ERROR(ConnectPythonInterpreter(module_path));
+    RETURN_IF_ERROR(ConnectPythonInterpreter(pymodule_path_));
   }
 
   return nullptr;
@@ -308,12 +303,17 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
     ni::Empty null_msg;
     const auto status = stub->Init(&context, *initialization_params, &null_msg);
     if (status.ok()) {
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_VERBOSE,
+          (std::string("Succesfully connected to GRPC ") + module_path)
+              .c_str());
       connected_ = true;
       return nullptr;
     } else {
-      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
   }
+  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "Returned error");
 
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_INTERNAL, "failed to initialize grpc stub");
@@ -660,6 +660,12 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
 
   RETURN_IF_ERROR(instance_state->CreatePythonInterpreter());
 
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_VERBOSE,
+      (std::string("TRITONBACKEND_ModelInstanceInitialize: instance initialization successful ") + name +
+       " (device " + std::to_string(device_id) + ")")
+          .c_str());
+
   return nullptr;
 }
 
@@ -760,8 +766,8 @@ TRITONBACKEND_ModelInstanceExecute(
 
       LOG_IF_ERROR(
           TRITONBACKEND_ModelInstanceReportStatistics(
-              instance, request, false /* success */,
-              exec_start_ns, compute_start_ns, compute_end_ns, compute_end_ns),
+              instance, request, false /* success */, exec_start_ns,
+              compute_start_ns, compute_end_ns, compute_end_ns),
           "failed reporting request statistics");
 
       LOG_IF_ERROR(
@@ -895,9 +901,8 @@ TRITONBACKEND_ModelInstanceExecute(
     // with the inference computation.
     LOG_IF_ERROR(
         TRITONBACKEND_ModelInstanceReportStatistics(
-            instance, request,
-            (responses[r] != nullptr) /* success */, exec_start_ns,
-            compute_start_ns, compute_end_ns, exec_end_ns),
+            instance, request, (responses[r] != nullptr) /* success */,
+            exec_start_ns, compute_start_ns, compute_end_ns, exec_end_ns),
         "failed reporting request statistics");
 
     LOG_IF_ERROR(
@@ -909,15 +914,16 @@ TRITONBACKEND_ModelInstanceExecute(
   // batching so the total batch size is always 1.
   LOG_IF_ERROR(
       TRITONBACKEND_ModelInstanceReportBatchStatistics(
-          instance, 1, exec_start_ns,
-          compute_start_ns, compute_end_ns, exec_end_ns),
+          instance, 1, exec_start_ns, compute_start_ns, compute_end_ns,
+          exec_end_ns),
       "failed reporting batch request statistics");
 
 
   LOG_MESSAGE(
       TRITONSERVER_LOG_VERBOSE,
-      (std::string("TRITONBACKEND_ModelInstanceExecute: model instance name ") + instance_state->Name() +
-       " released " + std::to_string(request_count) + " requests")
+      (std::string("TRITONBACKEND_ModelInstanceExecute: model instance name ") +
+       instance_state->Name() + " released " + std::to_string(request_count) +
+       " requests")
           .c_str());
 
   return nullptr;
