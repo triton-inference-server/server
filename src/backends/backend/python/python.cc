@@ -662,8 +662,9 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
 
   LOG_MESSAGE(
       TRITONSERVER_LOG_VERBOSE,
-      (std::string("TRITONBACKEND_ModelInstanceInitialize: instance initialization successful ") + name +
-       " (device " + std::to_string(device_id) + ")")
+      (std::string("TRITONBACKEND_ModelInstanceInitialize: instance "
+                   "initialization successful ") +
+       name + " (device " + std::to_string(device_id) + ")")
           .c_str());
 
   return nullptr;
@@ -759,10 +760,6 @@ TRITONBACKEND_ModelInstanceExecute(
   if (!status.ok()) {
     for (uint32_t r = 0; r < request_count; ++r) {
       TRITONBACKEND_Request* request = requests[r];
-      LOG_IF_ERROR(
-          TRITONBACKEND_ResponseSend(
-              responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL, nullptr),
-          "failed sending response");
 
       LOG_IF_ERROR(
           TRITONBACKEND_ModelInstanceReportStatistics(
