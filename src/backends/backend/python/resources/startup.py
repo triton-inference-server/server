@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import utils
+import triton_python_backend_utils as tpb_utils
 
 import argparse
 import concurrent.futures as futures
@@ -105,41 +105,45 @@ class PythonHost(PythonInterpreterServicer):
 
     def __init__(self, module_path, *args, **kwargs):
         super(PythonInterpreterServicer, self).__init__(*args, **kwargs)
-        spec = importlib.util.spec_from_file_location("TritonPythonBackend",
+        spec = importlib.util.spec_from_file_location('TritonPythonBackend',
                                                       module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        if hasattr(module, "TritonPythonBackend"):
+        if hasattr(module, 'TritonPythonBackend'):
             self.initializer_func = module.TritonPythonBackend
         else:
-            self.initializer_func = None
-        self.model = None
+            raise NotImplementedError('TritonPythonBackend class doesn\'t exist in ' + module_path)
+        self.backend = None
 
     def Init(self, request, context):
         """Init is called on TRITONBACKEND_ModelInstanceInitialize. `request`
-        object contains an args which includes a `model_config` key
+        object contains an args key which includes a `model_config` key
         containing the model configuration. This paramter is passed by
         default to every ModelInstance.
         """
-        # TODO: Add error handling and returning correct status codes
+        if not hasattr('args', request):
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('request objects does\'nt have args attribute')
+            return
+
         args = {x.key: x.value for x in request.args}
-        self.model = self.initializer_func(args)
+        self.backend = self.initializer_func(args)
 
     def Fini(self, request, context):
         """Fini is called on TRITONBACKEND_ModelInstanceFinalize. Model
         can perform any necessary clean up in the `shutdown` function.
         """
-        # TODO: Add error handling and returning correct status codes
-        if hasattr(self.model, "shutdown"):
-            self.model.shutdown()
+        if hasattr(self.backend, 'finalize'):
+            self.backend.finalize()
 
-        del self.model
+        del self.backend
 
     def Execute(self, request, context):
         """Execute is called on TRITONBACKEND_ModelInstanceExecute. Inference
-        happens in this function. This function mainly converts gRPC protobufs
-        to the utils.InferenceRequest and utils.InferenceResponse.
+        happens in this function. This function mainly converts gRPC
+        protobufs to the triton_python_backend_utils.InferenceRequest and
+        triton_python_backend_utils.InferenceResponse.
 
         Parameters
         ----------
@@ -150,11 +154,11 @@ class PythonHost(PythonInterpreterServicer):
         requests = request.requests
         inference_requests = []
         for request in requests:
-            # This object contains a list of utils.Tensor
+            # This object contains a list of tpb_utils.Tensor
             input_tensors = []
             for request_input in request.inputs:
                 x = request_input
-                tensor = utils.Tensor(
+                tensor = tpb_utils.Tensor(
                     x.name,
                     np.frombuffer(x.raw_data,
                                   dtype=protobuf_to_numpy_type(
@@ -164,15 +168,21 @@ class PythonHost(PythonInterpreterServicer):
             request_id = request.id
             correlation_id = request.correlation_id
             requested_output_names = request.requested_output_names
-            inference_request = utils.InferenceRequest(input_tensors,
+            inference_request = tpb_utils.InferenceRequest(input_tensors,
                                                        request_id,
                                                        correlation_id,
                                                        requested_output_names)
             inference_requests.append(inference_request)
 
-        # Execute inference on the Python model
-        # responses contains a list of utils.InferenceResponse
-        responses = self.model(inference_requests)
+        # Execute inference on the Python backend
+        # responses contains a list of triton_python_backend_utils.InferenceResponse
+        responses = self.backend(inference_requests)
+
+        # Make sure that number of InferenceResponse and InferenceRequest objects match
+        if len(inference_requests) != len(responses):
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('Number of inference responses and requests don\'t match ( requests=' + len(inference_requests) + ' != responses=' + len(responses) + ')')
+            return ExecuteResponse()
 
         exec_responses = []
         for response in responses:
@@ -187,7 +197,7 @@ class PythonHost(PythonInterpreterServicer):
                                 dims=output_np_array.shape,
                                 raw_data=output_np_array.tobytes())
                 response_tensors.append(tensor)
-            exec_responses.append(InferenceResponse(inputs=response_tensors))
+            exec_responses.append(InferenceResponse(outputs=response_tensors))
         execute_response = ExecuteResponse(responses=exec_responses)
 
         return execute_response
@@ -196,8 +206,8 @@ class PythonHost(PythonInterpreterServicer):
 if __name__ == "__main__":
     FLAGS = parse_startup_arguments()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
-    add_PythonInterpreterServicer_to_server(
-        PythonHost(module_path=FLAGS.model_path), server)
+    python_host = PythonHost(module_path=FLAGS.model_path)
+    add_PythonInterpreterServicer_to_server(python_host, server)
 
     server.add_insecure_port(FLAGS.socket)
     server.start()

@@ -28,10 +28,8 @@ import numpy as np
 
 
 class InferenceRequest:
-    """An InfrenceRequest object is used to represent Protobufs coming from
-    the Python backend. The object is intended to be used by a single thread
-    and simultaneously calling different methods with different threads is
-    not supported and will cause undefined behavior.
+    """InferenceRequest represents a request for inference for a model that
+    executes using this backend.
 
     Parameters
     ----------
@@ -39,15 +37,14 @@ class InferenceRequest:
         A list of Tensor objects, each describing data for an input tensor
         required by the model
     request_id : str
-        Optional identifier for the request. If specified will be returned
-        in the response. Default value is an empty string which means no
-        request_id will be used.
+        ID assoiciated with this request, or empty string if no ID is
+        associated with the request.
     correlation_id : str
-        Optional identifier for the request. If specified will be returned
-        in the response. Default value is an empty string which means no
-        request_id will be used.
+        Correlation ID associated with this request, or empty string if no
+        correlation ID is associated with the request.
     requested_output_name : list
-        A list of strings, each describing the requested output.
+        The names of the output tensors that should be calculated and
+        returned for this request.
     """
 
     def __init__(self, inputs, request_id, correlation_id,
@@ -96,9 +93,7 @@ class InferenceRequest:
 
 class InferenceResponse:
     """An InfrenceResponse object is used to represent the response to an
-    inference request. The object is intended to be used by a single thread
-    and simultaneously calling different methods with different threads is
-    not supported and will cause undefined behavior.
+    inference request.
 
     Parameters
     ----------

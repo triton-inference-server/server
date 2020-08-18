@@ -82,7 +82,7 @@ set_source_files_properties(${PROTOBUF_SRCS} PROPERTIES GENERATED TRUE)
 
 add_library(
   triton_python SHARED
-  python_interpreter.cc
+  python.cc
   ${PROTOBUF_HEADERS}
   ${PROTOBUF_SRCS}
 
@@ -129,5 +129,5 @@ string(REPLACE "../../../../" "../../../../../../../../../"  PROTO_FIX_PY ${PROT
 
 install(FILES ${protocol_core_py} ${PROTO_FIX_PY} ${protocol_grpc_py} resources/startup.py
        DESTINATION lib/python/runtime)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/utils.py
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/triton_python_backend_utils.py
        DESTINATION lib/python/runtime)
