@@ -57,7 +57,7 @@ message InferenceRequest
 
 message InferenceResponse
 {
-  repeated Tensor inputs = 2;
+  repeated Tensor outputs = 1;
 }
 
 message ExecuteResponse
