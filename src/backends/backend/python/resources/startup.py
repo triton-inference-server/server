@@ -39,6 +39,9 @@ from python_host_pb2 import *
 from python_host_pb2_grpc import PythonInterpreterServicer, add_PythonInterpreterServicer_to_server
 import grpc
 
+lock = threading.Lock()
+cv = threading.Condition(lock)
+
 TRITION_TO_NUMPY_TYPE = {
     # TRITONSERVER_TYPE_BOOL
     1: np.bool,
@@ -134,10 +137,13 @@ class PythonHost(PythonInterpreterServicer):
 
     def Fini(self, request, context):
         """Fini is called on TRITONBACKEND_ModelInstanceFinalize. Model
-        can perform any necessary clean up in the `shutdown` function.
+        can perform any necessary clean up in the `finalize` function.
         """
         if hasattr(self.backend, 'finalize'):
             self.backend.finalize()
+
+        with cv:
+            cv.notify()
 
         del self.backend
         return Empty()
@@ -176,11 +182,12 @@ class PythonHost(PythonInterpreterServicer):
                 requested_output_names)
             inference_requests.append(inference_request)
 
-        # Execute inference on the Python backend
-        # responses contains a list of triton_python_backend_utils.InferenceResponse
+        # Execute inference on the Python backend responses contains a list of
+        # triton_python_backend_utils.InferenceResponse
         responses = self.backend(inference_requests)
 
-        # Make sure that number of InferenceResponse and InferenceRequest objects match
+        # Make sure that number of InferenceResponse and InferenceRequest
+        # objects match
         if len(inference_requests) != len(responses):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(
@@ -218,11 +225,9 @@ if __name__ == "__main__":
     server.start()
 
     def signal_handler(signal, frame):
-        server.stop(5)
-        sys.exit(0)
+        with cv:
+            cv.wait()
+        server.stop(grace=5)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.pause()
-
-    server.start()
-    server.wait_for_termination()
