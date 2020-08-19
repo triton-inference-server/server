@@ -30,6 +30,7 @@
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/nvtx.h"
+#include "src/core/sync_queue.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -341,7 +342,8 @@ BackendResponder::Finalize()
     char* pinned_buffer = def.pinned_memory_->MutableBuffer(
         &pinned_memory_type, &pinned_memory_id);
 
-    size_t offset = 0;
+    SyncQueue<std::tuple<Status, bool, void*>> completion_queue;
+    size_t offset = 0, async_task_count = 0;
     for (auto& pr : def.responses_) {
       std::unique_ptr<InferenceResponse>* response = pr.first;
       InferenceResponse::Output* response_output = pr.second;
@@ -362,24 +364,50 @@ BackendResponder::Finalize()
                 status),
             "error sending TensorFlow response");
       } else {
-        bool cuda_used = false;
-        status = CopyBuffer(
-            response_output->Name(), pinned_memory_type, pinned_memory_id,
-            response_memory_type, response_memory_type_id, response_byte_size,
-            pinned_buffer + offset, const_cast<void*>(response_buffer), stream_,
-            &cuda_used);
-        need_sync_ |= cuda_used;
+        // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
+        if (use_async_cpu_copy_) {
+          AsyncWorkQueue::AddTask(std::move(std::bind(
+              CopyBufferHandler, response_output->Name(), pinned_memory_type,
+              pinned_memory_id, response_memory_type, response_memory_type_id,
+              response_byte_size, pinned_buffer + offset,
+              const_cast<void*>(response_buffer), stream_,
+              reinterpret_cast<void*>(response), &completion_queue)));
+          async_task_count++;
+        } else {
+          bool cuda_used = false;
+          status = CopyBuffer(
+              response_output->Name(), pinned_memory_type, pinned_memory_id,
+              response_memory_type, response_memory_type_id, response_byte_size,
+              pinned_buffer + offset, const_cast<void*>(response_buffer),
+              stream_, &cuda_used);
+          need_sync_ |= cuda_used;
 
-        if (!status.IsOk()) {
-          LOG_STATUS_ERROR(
-              InferenceResponse::SendWithStatus(
-                  std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                  status),
-              "error sending TensorFlow response");
+          if (!status.IsOk()) {
+            LOG_STATUS_ERROR(
+                InferenceResponse::SendWithStatus(
+                    std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                    status),
+                "error sending TensorFlow response");
+          }
         }
       }
 
       offset += response_byte_size;
+    }
+
+    for (size_t i = 0; i < async_task_count; i++) {
+      auto completed_item = completion_queue.Get();
+      auto completed_status = std::get<0>(completed_item);
+      need_sync_ |= std::get<1>(completed_item);
+      if (!completed_status.IsOk()) {
+        auto response = reinterpret_cast<std::unique_ptr<InferenceResponse>*>(
+            std::get<2>(completed_item));
+        LOG_STATUS_ERROR(
+            InferenceResponse::SendWithStatus(
+                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                completed_status),
+            "error sending TensorFlow response");
+      }
     }
   }
 
@@ -834,6 +862,29 @@ BackendInputCollector::SetAccumulatedElementCount(
 bool
 BackendInputCollector::Finalize()
 {
+  // Sync previous async tasks if any.
+  for (size_t i = 0; i < async_task_count_; i++) {
+    auto completed_item = completion_queue_.Get();
+    auto completed_status = std::get<0>(completed_item);
+    need_sync_ |= std::get<1>(completed_item);
+
+    // If something goes wrong with the copy all the pending
+    // responses fail...
+    if (!completed_status.IsOk()) {
+      auto response = reinterpret_cast<std::unique_ptr<InferenceResponse>*>(
+          std::get<2>(completed_item));
+
+      if (*response != nullptr) {
+        LOG_STATUS_ERROR(
+            InferenceResponse::SendWithStatus(
+                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                completed_status),
+            "error setting TensorFlow input tensor");
+      }
+    }
+  }
+  async_task_count_ = 0;
+
 #ifdef TRITON_ENABLE_GPU
   if ((!deferred_pinned_.empty()) && need_sync_) {
     if (event_ != nullptr) {
@@ -845,6 +896,7 @@ BackendInputCollector::Finalize()
   }
 #endif  // TRITON_ENABLE_GPU
 
+
   // After the above sync all the GPU->pinned copies are complete. Any
   // deferred copies of pinned->CPU can now be done.
   for (auto& def : deferred_pinned_) {
@@ -853,24 +905,59 @@ BackendInputCollector::Finalize()
     char* pinned_buffer = def.pinned_memory_->MutableBuffer(
         &pinned_memory_type, &pinned_memory_id);
 
-    bool cuda_used = false;
-    Status status = CopyBuffer(
-        "pinned buffer", pinned_memory_type, pinned_memory_id,
-        def.tensor_memory_type_, def.tensor_memory_id_,
-        def.pinned_memory_->TotalByteSize(), pinned_buffer,
-        def.tensor_buffer_ + def.tensor_buffer_offset_, stream_, &cuda_used);
-    need_sync_ |= cuda_used;
+    // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
+    if (use_async_cpu_copy_) {
+      AsyncWorkQueue::AddTask(std::move(std::bind(
+          CopyBufferHandler, "pinned buffer", pinned_memory_type,
+          pinned_memory_id, def.tensor_memory_type_, def.tensor_memory_id_,
+          def.pinned_memory_->TotalByteSize(), pinned_buffer,
+          def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
+          reinterpret_cast<void*>(&def.requests_), &completion_queue_)));
+      async_task_count_++;
+    } else {
+      bool cuda_used = false;
+      Status status = CopyBuffer(
+          "pinned buffer", pinned_memory_type, pinned_memory_id,
+          def.tensor_memory_type_, def.tensor_memory_id_,
+          def.pinned_memory_->TotalByteSize(), pinned_buffer,
+          def.tensor_buffer_ + def.tensor_buffer_offset_, stream_, &cuda_used);
+      need_sync_ |= cuda_used;
+
+      // If something goes wrong with the copy all the pending
+      // responses fail...
+      if (!status.IsOk()) {
+        for (auto& pr : def.requests_) {
+          std::unique_ptr<InferenceResponse>* response = pr.first;
+          if (*response != nullptr) {
+            LOG_STATUS_ERROR(
+                InferenceResponse::SendWithStatus(
+                    std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                    status),
+                "error setting TensorFlow input tensor");
+          }
+        }
+      }
+    }
+  }
+
+  for (size_t i = 0; i < async_task_count_; i++) {
+    auto completed_item = completion_queue_.Get();
+    auto completed_status = std::get<0>(completed_item);
+    need_sync_ |= std::get<1>(completed_item);
 
     // If something goes wrong with the copy all the pending
     // responses fail...
-    if (!status.IsOk()) {
-      for (auto& pr : def.requests_) {
+    if (!completed_status.IsOk()) {
+      auto requests =
+          reinterpret_cast<RequestsList*>(std::get<2>(completed_item));
+
+      for (auto& pr : *requests) {
         std::unique_ptr<InferenceResponse>* response = pr.first;
         if (*response != nullptr) {
           LOG_STATUS_ERROR(
               InferenceResponse::SendWithStatus(
                   std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                  status),
+                  completed_status),
               "error setting TensorFlow input tensor");
         }
       }
@@ -954,21 +1041,36 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 
     // Direct copy without intermediate pinned memory.
-    bool cuda_used = false;
-    status = CopyBuffer(
-        request_input->Name(), src_memory_type, src_memory_type_id,
-        tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
-        tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-        &cuda_used);
-    cuda_copy |= cuda_used;
+    //
+    // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1,
+    // it is the caller's responsibility to sync the tasks and handle error
+    // properly.
+    if (use_async_cpu_copy_ && (src_memory_type != TRITONSERVER_MEMORY_GPU) &&
+        (tensor_memory_type != TRITONSERVER_MEMORY_GPU)) {
+      AsyncWorkQueue::AddTask(std::move(std::bind(
+          CopyBufferHandler, "async CPU-CPU copy", src_memory_type,
+          src_memory_type_id, tensor_memory_type, tensor_memory_type_id,
+          src_byte_size, src_buffer,
+          tensor_buffer + tensor_buffer_offset + input_offset, stream_,
+          reinterpret_cast<void*>(response), &completion_queue_)));
+      async_task_count_++;
+    } else {
+      bool cuda_used = false;
+      status = CopyBuffer(
+          request_input->Name(), src_memory_type, src_memory_type_id,
+          tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
+          tensor_buffer + tensor_buffer_offset + input_offset, stream_,
+          &cuda_used);
+      cuda_copy |= cuda_used;
 
-    if (!status.IsOk()) {
-      LOG_STATUS_ERROR(
-          InferenceResponse::SendWithStatus(
-              std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-              status),
-          "error setting TensorFlow input tensor");
-      return cuda_copy;
+      if (!status.IsOk()) {
+        LOG_STATUS_ERROR(
+            InferenceResponse::SendWithStatus(
+                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                status),
+            "error setting TensorFlow input tensor");
+        return cuda_copy;
+      }
     }
 
     input_offset += src_byte_size;
@@ -1031,6 +1133,32 @@ BackendInputCollector::FlushPendingPinned(
     }
 
     cuda_copy |= cuda_used;
+
+    // Sync previous async tasks if any. This sync is require because the below
+    // CPU-PINNED to GPU copy.
+    // FIXME: Can the CPU-PINNED to GPU copy be deferred to Finalize() and
+    // remove this sync?
+    for (size_t i = 0; i < async_task_count_; i++) {
+      auto completed_item = completion_queue_.Get();
+      auto completed_status = std::get<0>(completed_item);
+      cuda_copy |= std::get<1>(completed_item);
+
+      // If something goes wrong with the copy all the pending
+      // responses fail...
+      if (!completed_status.IsOk()) {
+        auto response = reinterpret_cast<std::unique_ptr<InferenceResponse>*>(
+            std::get<2>(completed_item));
+
+        if (*response != nullptr) {
+          LOG_STATUS_ERROR(
+              InferenceResponse::SendWithStatus(
+                  std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                  completed_status),
+              "error setting TensorFlow input tensor");
+        }
+      }
+    }
+    async_task_count_ = 0;
 
     // If the copy was not async (i.e. if request input was in CPU so
     // a CPU->CPU-PINNED copy was performed above), then the pinned

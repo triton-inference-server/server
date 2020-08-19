@@ -27,6 +27,7 @@
 
 #include <set>
 #include "src/core/status.h"
+#include "src/core/sync_queue.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -107,5 +108,15 @@ Status GetSupportedGPUs(
 /// not supported.
 Status SupportsIntegratedZeroCopy(const int gpu_id, bool* zero_copy_support);
 #endif
+
+// Helper around CopyBuffer that updates the completion queue with the returned
+// status and cuda_used flag.
+void CopyBufferHandler(
+    const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
+    const int64_t src_memory_type_id,
+    const TRITONSERVER_MemoryType dst_memory_type,
+    const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
+    void* dst, cudaStream_t cuda_stream, void* response_ptr,
+    SyncQueue<std::tuple<Status, bool, void*>>* completion_queue);
 
 }}  // namespace nvidia::inferenceserver
