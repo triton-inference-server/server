@@ -34,9 +34,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
-WorkerThreadPool::~WorkerThreadPool()
+CopyBufferThreadPool::~CopyBufferThreadPool()
 {
-  cv_.notify_all();
   for (auto& worker_thread : worker_threads_) {
     if (worker_thread.joinable()) {
       worker_thread.join();
@@ -45,7 +44,7 @@ WorkerThreadPool::~WorkerThreadPool()
 }
 
 Status
-WorkerThreadPool::AwaitCompletion()
+CopyBufferThreadPool::AwaitCompletion()
 {
   for (size_t i = 0; i < worker_threads_.size(); i++) {
     if (worker_threads_[i].joinable()) {
@@ -57,7 +56,7 @@ WorkerThreadPool::AwaitCompletion()
 }
 
 Status
-WorkerThreadPool::GetNextAvailableId(int* worker_id)
+CopyBufferThreadPool::GetNextAvailableId(int* worker_id)
 {
   *worker_id = -1;
   for (size_t i = 0; i < worker_threads_.size(); i++) {
@@ -67,13 +66,14 @@ WorkerThreadPool::GetNextAvailableId(int* worker_id)
   }
   if (*worker_id == -1) {
     RETURN_IF_ERROR(AwaitCompletion());
+    *worker_id = 0;
   }
 
   return Status::Success;
 }
 
 void
-WorkerThreadPool::CopyBufferHandler(CopyBufferData* data)
+CopyBufferThreadPool::CopyBufferHandler(CopyBufferData* data)
 {
   data->status_.set_value(CopyBuffer(
       data->msg_, data->src_memory_type_, data->src_memory_type_id_,
@@ -82,7 +82,7 @@ WorkerThreadPool::CopyBufferHandler(CopyBufferData* data)
 }
 
 Status
-WorkerThreadPool::AddTask(
+CopyBufferThreadPool::AddTask(
     const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
     const int64_t src_memory_type_id,
     const TRITONSERVER_MemoryType dst_memory_type,
@@ -96,7 +96,7 @@ WorkerThreadPool::AddTask(
 }
 
 Status
-WorkerThreadPool::ProcessQueue()
+CopyBufferThreadPool::ProcessQueue()
 {
   while (!queue_.Empty()) {
     auto task_data = std::move(queue_.Get());
@@ -106,7 +106,6 @@ WorkerThreadPool::ProcessQueue()
     worker_threads_[worker_id] =
         std::thread(CopyBufferHandler, task_data.get());
   }
-  cv_.notify_all();
   RETURN_IF_ERROR(AwaitCompletion());
 
   return Status::Success;

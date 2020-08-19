@@ -917,6 +917,8 @@ BackendInputCollector::SetFixedSizeInputTensor(
     return cuda_copy;
   }
 
+  std::vector<bool> cuda_used(request_input->DataBufferCount(), false);
+
   // Request input tensor data may be in multiple non-contiguous
   // buffers.
   size_t input_offset = 0;
@@ -956,24 +958,25 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 
     // Direct copy without intermediate pinned memory.
-    bool cuda_used = false;
-    status = CopyBuffer(
+    worker_pool_.AddTask(
         request_input->Name(), src_memory_type, src_memory_type_id,
         tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
         tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-        &cuda_used);
-    cuda_copy |= cuda_used;
-
-    if (!status.IsOk()) {
-      LOG_STATUS_ERROR(
-          InferenceResponse::SendWithStatus(
-              std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-              status),
-          "error setting TensorFlow input tensor");
-      return cuda_copy;
-    }
+        &cuda_used[idx]);
 
     input_offset += src_byte_size;
+  }
+
+  Status status = worker_pool_.ProcessQueue();
+  for (const auto& cuda_use : cuda_used) {
+    cuda_copy |= cuda_use;
+  }
+
+  if (!status.IsOk()) {
+    LOG_STATUS_ERROR(
+        InferenceResponse::SendWithStatus(
+            std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
+        "error setting TensorFlow input tensor");
   }
 
   return cuda_copy;

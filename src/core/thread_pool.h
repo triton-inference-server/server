@@ -38,22 +38,15 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class WorkerThreadPool {
+class CopyBufferThreadPool {
  public:
-  WorkerThreadPool(int thread_count) : thread_count_(thread_count)
+  CopyBufferThreadPool(int thread_count) : thread_count_(thread_count)
   {
     worker_threads_.reserve(thread_count);
     futures_.reserve(thread_count);
   }
 
-  ~WorkerThreadPool();
-
-  // Wait for all pending worker threads to finish.
-  Status AwaitCompletion();
-
-  // Get Id of next available worker thread. If all workers are occupied then
-  // wait for them to finish and start from the beginning.
-  Status GetNextAvailableId(int* worker_id);
+  ~CopyBufferThreadPool();
 
   // Add CopyBuffer task to queue
   Status AddTask(
@@ -68,6 +61,13 @@ class WorkerThreadPool {
   Status ProcessQueue();
 
  private:
+  // Wait for all pending worker threads to finish.
+  Status AwaitCompletion();
+
+  // Get Id of next available worker thread. If all workers are occupied then
+  // wait for them to finish and start from the beginning.
+  Status GetNextAvailableId(int* worker_id);
+
   /// A struct that stores the parameters for the CopyBuffer operation.
   struct CopyBufferData {
     CopyBufferData(
@@ -103,7 +103,6 @@ class WorkerThreadPool {
   int thread_count_;
   std::vector<std::thread> worker_threads_;
   std::vector<std::future<Status>> futures_;
-  std::condition_variable cv_;
   SyncQueue<std::unique_ptr<CopyBufferData>> queue_;
 };
 
