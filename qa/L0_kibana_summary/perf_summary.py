@@ -38,7 +38,7 @@ import glob
 
 def send_email(subject, html, suffix):
     FROM = "hemantj@nvidia.com"
-    TO = 'hemantj@nvidia.com, davidg@nvidia.com'
+    TO = 'sw-dl-triton@exchange.nvidia.com'
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = FROM
