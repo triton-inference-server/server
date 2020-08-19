@@ -198,6 +198,30 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestId(
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestCorrelationId(
     TRITONBACKEND_Request* request, uint64_t* id);
 
+/// Check whether the request marks the start of a new sequence.
+///
+/// \param request The inference request.
+/// \param starts_seq Returns whether or not the request starts a new sequence.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestStartsSequence(
+    TRITONBACKEND_Request* request, bool* starts_seq);
+
+/// Check whether the request marks the end of a sequence.
+///
+/// \param request The inference request.
+/// \param ends_seq Returns whether or not the request ends a sequence.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestEndsSequence(
+    TRITONBACKEND_Request* request, bool* ends_seq);
+
+/// Get the batch size of the request.
+///
+/// \param request The inference request.
+/// \param batch_size Returns the batch size.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestBatchSize(
+    TRITONBACKEND_Request* request, uint32_t* batch_size);
+
 /// Get the number of input tensors specified in the request.
 ///
 /// \param request The inference request.

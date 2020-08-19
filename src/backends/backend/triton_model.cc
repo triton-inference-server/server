@@ -528,6 +528,33 @@ TRITONBACKEND_RequestCorrelationId(TRITONBACKEND_Request* request, uint64_t* id)
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_RequestStartsSequence(
+    TRITONBACKEND_Request* request, bool* starts_seq)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *starts_seq = tr->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestEndsSequence(
+    TRITONBACKEND_Request* request, bool* ends_seq)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *ends_seq = tr->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestBatchSize(
+    TRITONBACKEND_Request* request, uint32_t* batch_size)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *batch_size = tr->BatchSize();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_RequestInputCount(TRITONBACKEND_Request* request, uint32_t* count)
 {
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
