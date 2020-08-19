@@ -117,9 +117,7 @@ class InferenceResponse:
 
 class Tensor:
     """A Tensor object is used to represent inputs and output data for an
-    InferenceRequest or InferenceResponse. The object is intended to be used
-    by a single thread and simultaneously calling different methods with
-    different threads is not supported and will cause undefined behavior.
+    InferenceRequest or InferenceResponse.
 
     Parameters
     ----------

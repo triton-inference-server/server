@@ -787,11 +787,8 @@ TRITONBACKEND_ModelInstanceExecute(
               request, TRITONSERVER_REQUEST_RELEASE_ALL),
           "failed releasing request");
     }
-    TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        ("GRPC Execute Failed, message: " + std::string(status.error_message()))
-            .c_str());
-    return err;
+
+    return nullptr;
   }
 
   for (uint32_t r = 0; r < request_count; ++r) {
