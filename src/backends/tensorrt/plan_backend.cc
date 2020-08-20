@@ -1425,6 +1425,9 @@ PlanBackend::Context::BuildCudaGraph(
               << cudaGetErrorString(cuerr);
     captured = false;
   } else {
+    // FIXME involve CUDA event
+    // FIXME support dynamic shape (need dummy run to avoid capturing cudamemcpy)
+    // FIXME model specific tuning (hard-code for now)
     auto context = trt_context->context_;
     if (!context->enqueue(
             batch_size, buffer_bindings_.data(), stream_, nullptr)) {
