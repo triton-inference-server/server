@@ -112,7 +112,11 @@ class PlanBackend : public InferenceBackend {
     Status InitializeConfigShapeOutputBindings(
         const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
             ios);
+#ifdef TRITON_ENABLE_CUDA_GRAPH
     bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
+    bool BuildCudaGraphDynamic(
+        TensorRTContext* trt_context, const int batch_size);
+#endif
 
     Status InitOptimizationProfiles(
         const ::google::protobuf::RepeatedPtrField<std::string>& profile_names);
@@ -166,8 +170,8 @@ class PlanBackend : public InferenceBackend {
 
       // The CUDA graphs captured for the model for different
       // batch-sizes.
-      std::unordered_map<int, cudaGraph_t> cuda_graphs_;
-      std::unordered_map<int, cudaGraphExec_t> cuda_graph_execs_;
+      std::vector<std::unordered_map<int, cudaGraph_t>> cuda_graphs_;
+      std::vector<std::unordered_map<int, cudaGraphExec_t>> cuda_graph_execs_;
 
       // Min Dimensions per bindings
       std::vector<nvinfer1::Dims> min_dims_;

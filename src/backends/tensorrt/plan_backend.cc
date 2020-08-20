@@ -163,20 +163,24 @@ PlanBackend::Context::~Context()
   }
 
   for (auto& trt_context : trt_contexts_) {
-    for (const auto& pr : trt_context.second.cuda_graph_execs_) {
-      cudaError_t err = cudaGraphExecDestroy(pr.second);
-      if (err != cudaSuccess) {
-        LOG_ERROR << "Failed to destroy cuda graph exec: "
-                  << cudaGetErrorString(err);
+    for (const auto& cuda_graph_execs : trt_context.second.cuda_graph_execs_) {
+      for (const auto& pr : cuda_graph_execs) {
+        cudaError_t err = cudaGraphExecDestroy(pr.second);
+        if (err != cudaSuccess) {
+          LOG_ERROR << "Failed to destroy cuda graph exec: "
+                    << cudaGetErrorString(err);
+        }
       }
     }
     trt_context.second.cuda_graph_execs_.clear();
 
-    for (const auto& pr : trt_context.second.cuda_graphs_) {
-      cudaError_t err = cudaGraphDestroy(pr.second);
-      if (err != cudaSuccess) {
-        LOG_ERROR << "Failed to destroy cuda graph exec: "
-                  << cudaGetErrorString(err);
+    for (const auto& cuda_graphs : trt_context.second.cuda_graphs_) {
+      for (const auto& pr : cuda_graphs) {
+        cudaError_t err = cudaGraphDestroy(pr.second);
+        if (err != cudaSuccess) {
+          LOG_ERROR << "Failed to destroy cuda graph exec: "
+                    << cudaGetErrorString(err);
+        }
       }
     }
     trt_context.second.cuda_graphs_.clear();
@@ -1425,34 +1429,105 @@ PlanBackend::Context::BuildCudaGraph(
               << cudaGetErrorString(cuerr);
     captured = false;
   } else {
-    // FIXME involve CUDA event
-    // FIXME support dynamic shape (need dummy run to avoid capturing cudamemcpy)
-    // FIXME model specific tuning (hard-code for now)
     auto context = trt_context->context_;
-    if (!context->enqueue(
-            batch_size, buffer_bindings_.data(), stream_, nullptr)) {
-      LOG_WARNING << "unable to record CUDA graph for " << name_;
-      captured = false;
-    }
+    trt_context->cuda_graphs_ =
+        std::vector<std::unordered_map<int, cudaGraph_t>>(EVENT_SET_COUNT);
+    trt_context->cuda_graph_execs_ =
+        std::vector<std::unordered_map<int, cudaGraphExec_t>>(EVENT_SET_COUNT);
+    for (int set_idx = 0; set_idx < EVENT_SET_COUNT; set_idx++) {
+      if (!context->enqueue(
+              batch_size, buffer_bindings_.data(), stream_,
+              &events_[set_idx].ready_for_input_)) {
+        LOG_WARNING << "unable to record CUDA graph for " << name_;
+        captured = false;
+      }
 
-    cuerr = cudaStreamEndCapture(stream_, &graph);
-    if (cuerr != cudaSuccess) {
-      LOG_ERROR << "unable to finish CUDA graph for " << name_ << ": "
-                << cudaGetErrorString(cuerr);
-      captured = false;
-    }
-
-    if (captured) {
-      cudaGraphExec_t graph_exec;
-      cuerr = cudaGraphInstantiate(&graph_exec, graph, NULL, NULL, 0);
+      cuerr = cudaStreamEndCapture(stream_, &graph);
       if (cuerr != cudaSuccess) {
-        LOG_ERROR << "unable to instantiate CUDA graph for " << name_ << ": "
+        LOG_ERROR << "unable to finish CUDA graph for " << name_ << ": "
                   << cudaGetErrorString(cuerr);
         captured = false;
-      } else {
-        trt_context->cuda_graphs_.insert(std::make_pair(batch_size, graph));
-        trt_context->cuda_graph_execs_.insert(
-            std::make_pair(batch_size, graph_exec));
+      }
+
+      if (captured) {
+        cudaGraphExec_t graph_exec;
+        cuerr = cudaGraphInstantiate(&graph_exec, graph, NULL, NULL, 0);
+        if (cuerr != cudaSuccess) {
+          LOG_ERROR << "unable to instantiate CUDA graph for " << name_ << ": "
+                    << cudaGetErrorString(cuerr);
+          captured = false;
+        } else {
+          trt_context->cuda_graphs_[set_idx].insert(
+              std::make_pair(batch_size, graph));
+          trt_context->cuda_graph_execs_[set_idx].insert(
+              std::make_pair(batch_size, graph_exec));
+        }
+      }
+    }
+  }
+
+  if (captured) {
+    LOG_VERBOSE(1) << "captured CUDA graph for " << name_ << ", batch size "
+                   << batch_size;
+  }
+
+  return captured;
+}
+
+bool
+PlanBackend::Context::BuildCudaGraphDynamic(
+    TensorRTContext* trt_context, const int batch_size)
+{
+  // FIXME currently only capture for opt profile
+  // FIXME in dynamic shape we requires exact matching for using CUDA graph,
+  // we may relax this constraint with model config option if the dummy padding
+  // data doesn't affect model outputs (not likely to be true..)
+
+  bool captured = true;
+
+  cudaGraph_t graph;
+  auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
+              << cudaGetErrorString(cuerr);
+    captured = false;
+  } else {
+    // FIXME support dynamic shape (need dummy run to avoid capturing
+    // cudamemcpy)
+    // FIXME model specific tuning (hard-code for now)
+    auto context = trt_context->context_;
+    trt_context->cuda_graphs_ =
+        std::vector<std::unordered_map<int, cudaGraph_t>>(EVENT_SET_COUNT);
+    trt_context->cuda_graph_execs_ =
+        std::vector<std::unordered_map<int, cudaGraphExec_t>>(EVENT_SET_COUNT);
+    for (int set_idx = 0; set_idx < EVENT_SET_COUNT; set_idx++) {
+      if (!context->enqueue(
+              batch_size, buffer_bindings_.data(), stream_,
+              &events_[set_idx].ready_for_input_)) {
+        LOG_WARNING << "unable to record CUDA graph for " << name_;
+        captured = false;
+      }
+
+      cuerr = cudaStreamEndCapture(stream_, &graph);
+      if (cuerr != cudaSuccess) {
+        LOG_ERROR << "unable to finish CUDA graph for " << name_ << ": "
+                  << cudaGetErrorString(cuerr);
+        captured = false;
+      }
+
+      if (captured) {
+        cudaGraphExec_t graph_exec;
+        cuerr = cudaGraphInstantiate(&graph_exec, graph, NULL, NULL, 0);
+        if (cuerr != cudaSuccess) {
+          LOG_ERROR << "unable to instantiate CUDA graph for " << name_ << ": "
+                    << cudaGetErrorString(cuerr);
+          captured = false;
+        } else {
+          trt_context->cuda_graphs_[set_idx].insert(
+              std::make_pair(batch_size, graph));
+          trt_context->cuda_graph_execs_[set_idx].insert(
+              std::make_pair(batch_size, graph_exec));
+        }
       }
     }
   }
@@ -1993,8 +2068,9 @@ PlanBackend::Context::Run(
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
-  auto itr = citr->second.cuda_graph_execs_.find(payload_->total_batch_size_);
-  if (itr != citr->second.cuda_graph_execs_.end()) {
+  auto itr = citr->second.cuda_graph_execs_[next_set_].find(
+      payload_->total_batch_size_);
+  if (itr != citr->second.cuda_graph_execs_[next_set_].end()) {
     cudaError_t err = cudaGraphLaunch(itr->second, stream_);
     if (err != cudaSuccess) {
       cudaStreamSynchronize(stream_);
@@ -2006,10 +2082,6 @@ PlanBackend::Context::Run(
                                           cudaGetErrorString(err)),
           "failed to run TRT inference");
     }
-    // CUDA graph doesn't know when input is consumed, need to record
-    // the event at the end
-    // [TODO] can we include event record when capturing the graph?
-    cudaEventRecord(events_[next_set_].ready_for_input_, stream_);
   } else {
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
                    << " [" << std::to_string(citr->first)
