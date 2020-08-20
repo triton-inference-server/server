@@ -189,22 +189,22 @@ output [
     dims: [ -1 ]
    }}
 ]
+batch_input [
+  {{
+    kind: BATCH_ELEMENT_COUNT
+    name: "BATCH_AND_SIZE_INPUT"
+    data_type: {data_type}
+    target_input: "RAGGED_INPUT"
+  }},
+  {{
+    kind: BATCH_ACCUMULATED_ELEMENT_COUNT
+    name: "BATCH_INPUT"
+    data_type: {data_type}
+    target_input: "RAGGED_INPUT"
+  }}
+]
 dynamic_batching {{
   max_queue_delay_microseconds: 1000000
-  batch_input [
-    {{
-      kind: BATCH_ELEMENT_COUNT
-      name: "BATCH_AND_SIZE_INPUT"
-      data_type: {data_type}
-      target_input: "RAGGED_INPUT"
-    }},
-    {{
-      kind: BATCH_ACCUMULATED_ELEMENT_COUNT
-      name: "BATCH_INPUT"
-      data_type: {data_type}
-      target_input: "RAGGED_INPUT"
-    }}
-  ]
 }}
 '''.format(model_name,
            max_batch,

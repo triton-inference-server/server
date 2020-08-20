@@ -607,24 +607,20 @@ BackendInputCollector::ProcessTensor(
 
 Status
 BackendInputCollector::BatchInputShape(
-    const inference::ModelDynamicBatching::BatchInput& batch_input,
-    std::vector<int64_t>* shape)
+    const inference::BatchInput& batch_input, std::vector<int64_t>* shape)
 {
   *shape = std::vector<int64_t>{0};
   switch (batch_input.kind()) {
-    case inference::ModelDynamicBatching::BatchInput::BATCH_ELEMENT_COUNT:
-    case inference::ModelDynamicBatching::BatchInput::
-        BATCH_ACCUMULATED_ELEMENT_COUNT: {
+    case inference::BatchInput::BATCH_ELEMENT_COUNT:
+    case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT: {
       (*shape)[0] = requests_.size();
       break;
     }
-    case inference::ModelDynamicBatching::BatchInput::
-        BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
+    case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
       (*shape)[0] = requests_.size() + 1;
       break;
     }
-    case inference::ModelDynamicBatching::BatchInput::
-        BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
+    case inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
       const auto& target_input = batch_input.target_input(0);
       for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
         const InferenceRequest::Input* repr_input;
@@ -643,9 +639,9 @@ BackendInputCollector::BatchInputShape(
 
 Status
 BackendInputCollector::ProcessBatchInput(
-    const inference::ModelDynamicBatching::BatchInput& batch_input,
-    char* buffer, const size_t buffer_byte_size,
-    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
+    const inference::BatchInput& batch_input, char* buffer,
+    const size_t buffer_byte_size, const TRITONSERVER_MemoryType memory_type,
+    const int64_t memory_type_id)
 {
   char* input_buffer = buffer;
   std::unique_ptr<AllocatedMemory> internal_buffer;
@@ -657,7 +653,7 @@ BackendInputCollector::ProcessBatchInput(
   }
   const auto& data_type = batch_input.data_type();
   switch (batch_input.kind()) {
-    case inference::ModelDynamicBatching::BatchInput::BATCH_ELEMENT_COUNT: {
+    case inference::BatchInput::BATCH_ELEMENT_COUNT: {
       const auto& target_input = batch_input.target_input(0);
       if (data_type == inference::TYPE_FP32) {
         SetElementCount<float>(target_input, input_buffer, buffer_byte_size);
@@ -666,8 +662,7 @@ BackendInputCollector::ProcessBatchInput(
       }
       break;
     }
-    case inference::ModelDynamicBatching::BatchInput::
-        BATCH_ACCUMULATED_ELEMENT_COUNT: {
+    case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT: {
       const auto& target_input = batch_input.target_input(0);
       if (data_type == inference::TYPE_FP32) {
         SetAccumulatedElementCount<float>(
@@ -678,8 +673,7 @@ BackendInputCollector::ProcessBatchInput(
       }
       break;
     }
-    case inference::ModelDynamicBatching::BatchInput::
-        BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
+    case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
       const auto& target_input = batch_input.target_input(0);
       if (data_type == inference::TYPE_FP32) {
         *reinterpret_cast<float*>(input_buffer) = 0;
@@ -694,8 +688,7 @@ BackendInputCollector::ProcessBatchInput(
       }
       break;
     }
-    case inference::ModelDynamicBatching::BatchInput::
-        BATCH_MAX_ELEMENT_COUNT_AS_SHAPE:
+    case inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE:
     default:
       return Status::Success;
   }

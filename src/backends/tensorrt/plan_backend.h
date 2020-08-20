@@ -101,8 +101,7 @@ class PlanBackend : public InferenceBackend {
         const DimsList& input_dims);
     Status InitializeSequenceControlInputBindings(
         const inference::ModelConfig& config);
-    Status InitializeDynamicBatchInputBindings(
-        const inference::ModelConfig& config);
+    Status InitializeBatchInputBindings(const inference::ModelConfig& config);
     Status InitializeConfigExecuteInputBindings(
         const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status InitializeConfigShapeInputBindings(
@@ -306,9 +305,8 @@ class PlanBackend : public InferenceBackend {
     std::vector<bool> buffer_is_ragged_;
     // Instructions on constructing the batch input and the CPU buffer for
     // storing mutable data
-    using BatchInputData = std::pair<
-        inference::ModelDynamicBatching::BatchInput,
-        std::unique_ptr<AllocatedMemory>>;
+    using BatchInputData =
+        std::pair<inference::BatchInput, std::unique_ptr<AllocatedMemory>>;
     std::vector<std::shared_ptr<BatchInputData>> batch_inputs_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT

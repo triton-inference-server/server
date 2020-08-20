@@ -542,7 +542,7 @@ PlanBackend::CreateExecutionContext(
   RETURN_IF_ERROR(
       context->InitializeConfigExecuteInputBindings(Config().input()));
   RETURN_IF_ERROR(context->InitializeSequenceControlInputBindings(Config()));
-  RETURN_IF_ERROR(context->InitializeDynamicBatchInputBindings(Config()));
+  RETURN_IF_ERROR(context->InitializeBatchInputBindings(Config()));
   for (const auto& trt_context : context->trt_contexts_) {
     if (!trt_context.second.context_->allInputDimensionsSpecified()) {
       return Status(
@@ -1116,27 +1116,25 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
 }
 
 Status
-PlanBackend::Context::InitializeDynamicBatchInputBindings(
+PlanBackend::Context::InitializeBatchInputBindings(
     const inference::ModelConfig& config)
 {
-  if (config.has_dynamic_batching()) {
-    for (const auto& batch_input : config.dynamic_batching().batch_input()) {
-      std::string tensor_name = batch_input.name();
-      inference::DataType tensor_datatype = batch_input.data_type();
-      // Batch inputs are ragged inputs which will be concatenated and flatten,
-      // so expecting dims to be [-1]
-      DimsList dims;
-      dims.Add(-1);
+  for (const auto& batch_input : config.batch_input()) {
+    std::string tensor_name = batch_input.name();
+    inference::DataType tensor_datatype = batch_input.data_type();
+    // Batch inputs are ragged inputs which will be concatenated and flatten,
+    // so expecting dims to be [-1]
+    DimsList dims;
+    dims.Add(-1);
 
-      RETURN_IF_ERROR(InitializeExecuteInputBinding(
-          tensor_name, tensor_datatype, dims, false, true));
+    RETURN_IF_ERROR(InitializeExecuteInputBinding(
+        tensor_name, tensor_datatype, dims, false, true));
 
-      int io_index = engine_->getBindingIndex(tensor_name.c_str());
-      batch_inputs_[io_index].reset(new BatchInputData(
-          batch_input,
-          new AllocatedMemory(
-              byte_sizes_[io_index], TRITONSERVER_MEMORY_CPU_PINNED, 0)));
-    }
+    int io_index = engine_->getBindingIndex(tensor_name.c_str());
+    batch_inputs_[io_index].reset(new BatchInputData(
+        batch_input,
+        new AllocatedMemory(
+            byte_sizes_[io_index], TRITONSERVER_MEMORY_CPU_PINNED, 0)));
   }
 
   return Status::Success;
@@ -1880,8 +1878,8 @@ PlanBackend::Context::Run(
                 name, ragged_shape, citr->second, bindex, io_index),
             "error setting the binding dimension");
 
-        if (batch_input.kind() != inference::ModelDynamicBatching::BatchInput::
-                                      BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) {
+        if (batch_input.kind() !=
+            inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) {
           bool cuda_used = false;
           FAIL_ALL_AND_RETURN_IF_ERROR(
               payload_->requests_, payload_->responses_, metric_reporter_.get(),

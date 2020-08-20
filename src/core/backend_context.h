@@ -229,16 +229,15 @@ class BackendInputCollector {
   // that the batch input can't be formed properly and the caller should abort
   // the whole batch.
   Status BatchInputShape(
-      const inference::ModelDynamicBatching::BatchInput& batch_input,
-      std::vector<int64_t>* shape);
+      const inference::BatchInput& batch_input, std::vector<int64_t>* shape);
 
   // Process the batch input and derive its value into 'buffer'. Returning
   // error indicates that the batch input can't be formed properly and
   // the caller should abort the whole batch.
   Status ProcessBatchInput(
-      const inference::ModelDynamicBatching::BatchInput& batch_input,
-      char* buffer, const size_t buffer_byte_size,
-      const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
+      const inference::BatchInput& batch_input, char* buffer,
+      const size_t buffer_byte_size, const TRITONSERVER_MemoryType memory_type,
+      const int64_t memory_type_id);
 
   // Finalize processing of all requests for all input tensors. Return
   // true if cudaMemcpyAsync is called, and the caller should call
