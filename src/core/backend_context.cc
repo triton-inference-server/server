@@ -605,6 +605,160 @@ BackendInputCollector::ProcessTensor(
 #endif  // TRITON_ENABLE_GPU
 }
 
+Status
+BackendInputCollector::BatchInputShape(
+    const inference::ModelDynamicBatching::BatchInput& batch_input,
+    std::vector<int64_t>* shape)
+{
+  *shape = std::vector<int64_t>{0};
+  switch (batch_input.kind()) {
+    case inference::ModelDynamicBatching::BatchInput::BATCH_ELEMENT_COUNT:
+    case inference::ModelDynamicBatching::BatchInput::
+        BATCH_ACCUMULATED_ELEMENT_COUNT: {
+      (*shape)[0] = requests_.size();
+      break;
+    }
+    case inference::ModelDynamicBatching::BatchInput::
+        BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
+      (*shape)[0] = requests_.size() + 1;
+      break;
+    }
+    case inference::ModelDynamicBatching::BatchInput::
+        BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
+      const auto& target_input = batch_input.target_input(0);
+      for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
+        const InferenceRequest::Input* repr_input;
+        RETURN_IF_ERROR(
+            requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+        (*shape)[0] = std::max(
+            (*shape)[0], GetElementCount(repr_input->ShapeWithBatchDim()));
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  return Status::Success;
+}
+
+Status
+BackendInputCollector::ProcessBatchInput(
+    const inference::ModelDynamicBatching::BatchInput& batch_input,
+    char* buffer, const size_t buffer_byte_size,
+    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
+{
+  char* input_buffer = buffer;
+  std::unique_ptr<AllocatedMemory> internal_buffer;
+  // Need a CPU buffer for modifying the value
+  if (memory_type == TRITONSERVER_MEMORY_GPU) {
+    internal_buffer.reset(new AllocatedMemory(
+        buffer_byte_size, TRITONSERVER_MEMORY_CPU_PINNED, 0));
+    input_buffer = internal_buffer->MutableBuffer();
+  }
+  const auto& data_type = batch_input.data_type();
+  switch (batch_input.kind()) {
+    case inference::ModelDynamicBatching::BatchInput::BATCH_ELEMENT_COUNT: {
+      const auto& target_input = batch_input.target_input(0);
+      if (data_type == inference::TYPE_FP32) {
+        SetElementCount<float>(target_input, input_buffer, buffer_byte_size);
+      } else {
+        SetElementCount<int32_t>(target_input, input_buffer, buffer_byte_size);
+      }
+      break;
+    }
+    case inference::ModelDynamicBatching::BatchInput::
+        BATCH_ACCUMULATED_ELEMENT_COUNT: {
+      const auto& target_input = batch_input.target_input(0);
+      if (data_type == inference::TYPE_FP32) {
+        SetAccumulatedElementCount<float>(
+            target_input, input_buffer, buffer_byte_size);
+      } else {
+        SetAccumulatedElementCount<int32_t>(
+            target_input, input_buffer, buffer_byte_size);
+      }
+      break;
+    }
+    case inference::ModelDynamicBatching::BatchInput::
+        BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
+      const auto& target_input = batch_input.target_input(0);
+      if (data_type == inference::TYPE_FP32) {
+        *reinterpret_cast<float*>(input_buffer) = 0;
+        SetAccumulatedElementCount<float>(
+            target_input, input_buffer + sizeof(float),
+            buffer_byte_size - sizeof(float));
+      } else {
+        *reinterpret_cast<int32_t*>(input_buffer) = 0;
+        SetAccumulatedElementCount<int32_t>(
+            target_input, input_buffer + sizeof(int32_t),
+            buffer_byte_size - sizeof(int32_t));
+      }
+      break;
+    }
+    case inference::ModelDynamicBatching::BatchInput::
+        BATCH_MAX_ELEMENT_COUNT_AS_SHAPE:
+    default:
+      return Status::Success;
+  }
+  if (memory_type == TRITONSERVER_MEMORY_GPU) {
+    TRITONSERVER_MemoryType src_mem_type;
+    int64_t src_mem_id;
+    input_buffer = internal_buffer->MutableBuffer(&src_mem_type, &src_mem_id);
+    bool cuda_used;
+    RETURN_IF_ERROR(CopyBuffer(
+        "batch input buffer", src_mem_type, src_mem_id, memory_type,
+        memory_type_id, buffer_byte_size, input_buffer, buffer, stream_,
+        &cuda_used));
+    need_sync_ |= cuda_used;
+  }
+  return Status::Success;
+}
+
+template <typename T>
+Status
+BackendInputCollector::SetElementCount(
+    const std::string& target_input, char* buffer,
+    const size_t buffer_byte_size)
+{
+  size_t buffer_offset = 0;
+  for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
+    const InferenceRequest::Input* repr_input;
+    RETURN_IF_ERROR(
+        requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+    if (buffer_offset + sizeof(T) > buffer_byte_size) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "unexpected total byte size for batch input");
+    }
+    *(reinterpret_cast<T*>(buffer) + req_idx) =
+        GetElementCount(repr_input->ShapeWithBatchDim());
+  }
+  return Status::Success;
+}
+
+template <typename T>
+Status
+BackendInputCollector::SetAccumulatedElementCount(
+    const std::string& target_input, char* buffer,
+    const size_t buffer_byte_size)
+{
+  size_t accumulated_element_count = 0;
+  size_t buffer_offset = 0;
+  for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
+    const InferenceRequest::Input* repr_input;
+    RETURN_IF_ERROR(
+        requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+    if (buffer_offset + sizeof(T) > buffer_byte_size) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "unexpected total byte size for batch input");
+    }
+    accumulated_element_count +=
+        GetElementCount(repr_input->ShapeWithBatchDim());
+    *(reinterpret_cast<T*>(buffer) + req_idx) = accumulated_element_count;
+  }
+  return Status::Success;
+}
+
 bool
 BackendInputCollector::Finalize()
 {

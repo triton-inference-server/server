@@ -219,6 +219,11 @@ class PlanBackend : public InferenceBackend {
         const std::vector<std::unique_ptr<InferenceRequest>>& requests,
         const std::map<int, std::vector<int32_t>>& request_shape_values);
 
+    Status SetBindingDimensions(
+        const std::string& input_name, const std::vector<int64_t>& shape,
+        const TensorRTContext& trt_context, const size_t binding_idx,
+        const size_t io_idx);
+
     // The engine used for the context. If the model uses dynamic shape, then
     // the CUDA engine is owned by the context. Otherwise, the engine is shared
     // across all contexts and it must not be destroyed by the contexts.

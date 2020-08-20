@@ -41,7 +41,7 @@ CLIENT_LOG="./client.log"
 BATCH_INPUT_TEST=trt_batch_input_test.py
 EXPECTED_NUM_TESTS="5"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_model_repository
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_ragged_model_repository
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --exit-timeout-secs=120"

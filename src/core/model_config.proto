@@ -715,9 +715,8 @@ message ModelDynamicBatching
 {
   //@@  .. cpp:var:: message BatchInput
   //@@
-  //@@     A batch input is an additional input for the requests in the batch
-  //@@     which describes the property of the request in the batch. The backend
-  //@@     should recognize batch input as ragged input.
+  //@@     A batch input is an additional input that must be added by
+  //@@     the backend based on all the requests in a batch.
   //@@
   message BatchInput
   {
@@ -760,7 +759,7 @@ message ModelDynamicBatching
       //@@         'target_input' will be added as input with shape
       //@@         [max_element_count] for the first request in the batch.
       //@@         For other requests, such input will be with shape [0].
-      //@@         The data of the tensor will be dummy data.
+      //@@         The data of the tensor will be uninitialized.
       //@@
       BATCH_MAX_ELEMENT_COUNT_AS_SHAPE = 3;
     }
@@ -773,7 +772,8 @@ message ModelDynamicBatching
 
     //@@    .. cpp:var:: string name
     //@@
-    //@@       The name of the model input.
+    //@@       The name of the model input that the backend will create
+    //@@       for this batch input.
     //@@
     string name = 2;
 
@@ -784,12 +784,13 @@ message ModelDynamicBatching
     //@@
     DataType data_type = 3;
 
-    //@@    .. cpp:var:: string target_input
+    //@@    .. cpp:var:: string target_input (repeated)
     //@@
-    //@@       The name of the model input that are used to populate
-    //@@       batch input value.
+    //@@       The backend derives the value for each batch input from one or
+    //@@       more other inputs. 'target_input' gives the names of those
+    //@@       inputs.
     //@@
-    string target_input = 4;
+    repeated string target_input = 4;
   }
 
   //@@  .. cpp:var:: int32 preferred_batch_size (repeated)

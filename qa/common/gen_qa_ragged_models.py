@@ -30,12 +30,6 @@ import os
 import sys
 
 import numpy as np
-import tensorrt as trt
-
-TRT_LOGGER = trt.Logger()
-
-trt.init_libnvinfer_plugins(TRT_LOGGER, '')
-PLUGIN_CREATORS = trt.get_plugin_registry().plugin_creator_list
 
 
 def np_to_model_dtype(np_dtype):
@@ -228,8 +222,9 @@ dynamic_batching {{
 
 def create_batch_input_models(models_dir):
     model_version = 1
-    create_plan_modelconfig(models_dir, 8, model_version, np.float32)
-    create_plan_modelfile(models_dir, model_version, np.float32)
+    if FLAGS.tensorrt:
+        create_plan_modelconfig(models_dir, 8, model_version, np.float32)
+        create_plan_modelfile(models_dir, model_version, np.float32)
 
 
 if __name__ == '__main__':
@@ -238,8 +233,14 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='Top-level model directory')
+    parser.add_argument('--tensorrt',
+                        required=False,
+                        action='store_true',
+                        help='Generate TensorRT PLAN models')
     FLAGS, unparsed = parser.parse_known_args()
 
     import test_util as tu
+    if FLAGS.tensorrt:
+        import tensorrt as trt
 
     create_batch_input_models(FLAGS.models_dir)
