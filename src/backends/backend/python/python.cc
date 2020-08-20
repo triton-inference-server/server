@@ -812,33 +812,25 @@ TRITONBACKEND_ModelInstanceExecute(
         TRITONBACKEND_RequestOutputCount(request, &requested_output_count));
     for (size_t j = 0; j < requested_output_count; ++j) {
       // Prepare output buffers.
-      const ni::Tensor output_tensor = inference_response.outputs(j);
-      TRITONBACKEND_Output* output;
+      const ni::Tensor python_output_result = inference_response.outputs(j);
+      TRITONBACKEND_Output* triton_output;
       TRITONSERVER_DataType triton_dt =
-          static_cast<TRITONSERVER_DataType>(output_tensor.dtype());
+          static_cast<TRITONSERVER_DataType>(python_output_result.dtype());
 
-      auto output_tensor_dims = output_tensor.dims();
-      const std::string output_tensor_name = output_tensor.name();
-      int64_t output_shape[output_tensor_dims.size()];
+      auto python_output_dims = python_output_result.dims();
+      const std::string output_tensor_name = python_output_result.name();
 
-      for (int i = 0; i < output_tensor_dims.size(); i++) {
-        output_shape[i] = output_tensor_dims.data()[i];
-      }
-
-      uint32_t dims_count = output_tensor_dims.size();
+      uint32_t dims_count = python_output_dims.size();
 
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_ResponseOutput(
-              response, &output, output_tensor.name().c_str(), triton_dt,
-              output_shape, dims_count));
+              response, &triton_output, python_output_result.name().c_str(), triton_dt,
+              python_output_dims.data(), dims_count));
 
-      uint64_t total_output_size = std::accumulate(
-          output_tensor_dims.begin(), output_tensor_dims.end(), 1,
-          [](uint64_t acc, const int64_t& val) { return acc * val; });
-
-      size_t type_size = TRITONSERVER_DataTypeByteSize(triton_dt);
-
+      std::vector<int64_t> output_dims(
+          python_output_dims.begin(), python_output_dims.end());
+      int64_t output_byte_size = nib::GetByteSize(triton_dt, output_dims);
       void* output_buffer;
 
       TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
@@ -846,7 +838,7 @@ TRITONBACKEND_ModelInstanceExecute(
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_OutputBuffer(
-              output, &output_buffer, type_size * total_output_size,
+              triton_output, &output_buffer, output_byte_size,
               &output_memory_type, &output_memory_type_id));
 
       if ((responses[r] == nullptr) ||
