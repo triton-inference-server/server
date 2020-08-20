@@ -32,6 +32,8 @@ int
 main(int argc, char* argv[])
 {
   std::unique_ptr<nvic::InferenceServerGrpcClient> client;
+  // Add a symbol from protobufs to verify correct linking
+  inference::ModelConfigResponse model_config;
   nvic::InferenceServerGrpcClient::Create(&client, "localhost:8001");
   bool live;
   client->IsServerLive(&live);
