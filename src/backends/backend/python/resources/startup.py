@@ -40,9 +40,6 @@ from python_host_pb2 import *
 from python_host_pb2_grpc import PythonInterpreterServicer, add_PythonInterpreterServicer_to_server
 import grpc
 
-lock = threading.Lock()
-cv = threading.Condition(lock)
-
 TRITION_TO_NUMPY_TYPE = {
     # TRITONSERVER_TYPE_BOOL
     1: np.bool,
@@ -107,12 +104,14 @@ class PythonHost(PythonInterpreterServicer):
     """This class handles inference request for python script.
     """
 
-    def __init__(self, module_path, *args, **kwargs):
+    def __init__(self, module_path, event, *args, **kwargs):
         super(PythonInterpreterServicer, self).__init__(*args, **kwargs)
         spec = importlib.util.spec_from_file_location('TritonPythonModel',
                                                       module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+        self.module_path = module_path
+        self.event = event
 
         if hasattr(module, 'TritonPythonModel'):
             self.backend = module.TritonPythonModel()
@@ -155,6 +154,8 @@ class PythonHost(PythonInterpreterServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(e.message())
 
+        del self.backend
+        self.event.set()
         return Empty()
 
     def Execute(self, request, context):
@@ -243,9 +244,12 @@ if __name__ == "__main__":
     signal_received = False
     FLAGS = parse_startup_arguments()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
-    python_host = PythonHost(module_path=FLAGS.model_path)
+    # Create an Event to keep the GRPC server running
+    event = threading.Event()
+    python_host = PythonHost(module_path=FLAGS.model_path, event=event)
     add_PythonInterpreterServicer_to_server(python_host, server)
 
+<<<<<<< HEAD
     def interrupt_handler(signum, frame):
         pass
 
@@ -260,8 +264,18 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, sigterm_handler)
+=======
+    # Ignore interrupt signal. GRPC server will exit when `Fini` is called
+    def interrupt_handler(signum, frame):
+        pass
+
+    signal.signal(signal.SIGINT, interrupt_handler)
+>>>>>>> Improve python backend shutdown
 
     server.add_insecure_port(FLAGS.socket)
     server.start()
     event.wait()
+<<<<<<< HEAD
     server.stop(grace=5)
+=======
+>>>>>>> Improve python backend shutdown

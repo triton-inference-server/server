@@ -894,8 +894,8 @@ TRITONBACKEND_ModelInstanceExecute(
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_ResponseOutput(
-              response, &triton_output, python_output_result.name().c_str(),
-              triton_dt, python_output_dims.data(), dims_count));
+              response, &triton_output, python_output_result.name().c_str(), triton_dt,
+              python_output_dims.data(), dims_count));
 
       std::vector<int64_t> output_dims(
           python_output_dims.begin(), python_output_dims.end());
