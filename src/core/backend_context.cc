@@ -27,6 +27,7 @@
 #include "src/core/backend_context.h"
 
 #include "src/core/cuda_utils.h"
+#include "src/core/thread_pool.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/nvtx.h"
@@ -900,6 +901,8 @@ BackendInputCollector::SetFixedSizeInputTensor(
     const TRITONSERVER_MemoryType use_pinned_memory_type,
     std::unique_ptr<InferenceResponse>* response)
 {
+  ThreadPool<CopyBuffer, CopyBufferData> worker_pool_(4);
+
   bool cuda_copy = false;
 
   if ((tensor_buffer_offset + request_input->Data()->TotalByteSize()) >
@@ -917,7 +920,8 @@ BackendInputCollector::SetFixedSizeInputTensor(
     return cuda_copy;
   }
 
-  std::vector<bool> cuda_used(request_input->DataBufferCount(), false);
+  // Deque instead of vector<bool> which is a special standard container
+  std::deque<bool> cuda_used(request_input->DataBufferCount(), false);
 
   // Request input tensor data may be in multiple non-contiguous
   // buffers.
@@ -958,16 +962,17 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 
     // Direct copy without intermediate pinned memory.
-    worker_pool_.AddTask(
+    std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
         request_input->Name(), src_memory_type, src_memory_type_id,
         tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
         tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-        &cuda_used[idx]);
+        &cuda_used[idx]));
+    worker_pool_.AddTask(task_data);
 
     input_offset += src_byte_size;
   }
 
-  Status status = worker_pool_.ProcessQueue();
+  Status status = worker_pool_.CompleteQueue();
   for (const auto& cuda_use : cuda_used) {
     cuda_copy |= cuda_use;
   }

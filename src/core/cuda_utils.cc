@@ -122,6 +122,15 @@ CopyBuffer(
   return Status::Success;
 }
 
+void
+CopyBufferHandler(CopyBufferData* data)
+{
+  data->status_.set_value(CopyBuffer(
+      data->msg_, data->src_memory_type_, data->src_memory_type_id_,
+      data->dst_memory_type_, data->dst_memory_type_id_, data->byte_size_,
+      data->src_, data->dst_, data->cuda_stream_, data->cuda_used_));
+}
+
 #ifdef TRITON_ENABLE_GPU
 Status
 CheckGPUCompatibility(const int gpu_id, const double min_compute_capability)
