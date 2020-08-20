@@ -65,12 +65,7 @@ class DynamicBatchScheduler : public Scheduler {
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-      const bool preserve_ordering,
-      const std::set<int32_t>& preferred_batch_sizes,
-      const uint64_t max_queue_delay_microseconds,
-      const inference::ModelQueuePolicy& default_queue_policy,
-      const uint32_t priority_level,
-      const ModelQueuePolicyMap& queue_policy_map,
+      const inference::ModelDynamicBatching& batcher_config,
       std::unique_ptr<Scheduler>* scheduler);
 
   ~DynamicBatchScheduler();

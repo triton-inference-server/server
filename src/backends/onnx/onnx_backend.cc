@@ -789,8 +789,7 @@ OnnxBackend::Context::SetInputTensors(
           ConvertToOnnxDataType(datatype), &input_tensors_.back()));
 
       collector->ProcessTensor(
-          name, datatype, batch1_shape, input_buffer, total_byte_size, mem_type,
-          0);
+          name, datatype, input_buffer, total_byte_size, mem_type, 0);
     } else {
       // For String input, we need to obtain tensor info differently
       size_t total_byte_size = 0;

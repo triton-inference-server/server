@@ -432,8 +432,8 @@ LibTorchBackend::Context::SetInputTensors(
         input_buffers->back()->MutableBuffer(&memory_type, &memory_type_id);
 
     collector->ProcessTensor(
-        input_name, datatype, batch1_shape, input_buffer, total_byte_size,
-        memory_type, memory_type_id);
+        input_name, datatype, input_buffer, total_byte_size, memory_type,
+        memory_type_id);
 
     torch::TensorOptions options{torch_dtype.second};
     auto updated_options = (memory_type == TRITONSERVER_MEMORY_GPU)
