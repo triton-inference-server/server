@@ -267,8 +267,8 @@ done
 for TRIAL in $TRIALS; do
     # Run all tests that require no autofill but that add the platform
     # to the model config before running the test. These are tested on
-    # all platforms except custom
-    if [ $TRIAL == "custom" ]; then
+    # all platforms except custom and TensorRT plan
+    if [ $TRIAL == "custom" ] || [ $TRIAL == "tensorrt_plan" ]; then
         continue
     fi
 

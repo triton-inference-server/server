@@ -1220,10 +1220,14 @@ ValidateModelInput(
 #ifdef TRITON_ENABLE_CUSTOM
       (platform != kCustomPlatform) &&
 #endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_TENSORRT
+      (platform != kTensorRTPlanPlatform) &&
+#endif  // TRITON_ENABLE_TENSORRT
       io.allow_ragged_batch()) {
     return Status(
         Status::Code::INVALID_ARG,
-        "ragged-batch input tensors are only supported for custom platform");
+        "ragged-batch input tensors are only supported for custom platform"
+        " and TensorRT platform");
   }
 
   return Status::Success;

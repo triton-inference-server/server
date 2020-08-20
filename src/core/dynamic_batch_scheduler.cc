@@ -77,11 +77,17 @@ DynamicBatchScheduler::Create(
     const uint64_t max_queue_delay_microseconds,
     std::unique_ptr<Scheduler>* scheduler)
 {
+  inference::ModelDynamicBatching batcher_config;
+  batcher_config.set_preserve_ordering(preserve_ordering);
+  for (const auto& bs : preferred_batch_sizes) {
+    batcher_config.add_preferred_batch_size(bs);
+  }
+  batcher_config.set_max_queue_delay_microseconds(max_queue_delay_microseconds);
+
   return Create(
       runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
-      preferred_batch_sizes, max_queue_delay_microseconds,
-      inference::ModelQueuePolicy(), 0, ModelQueuePolicyMap(), scheduler);
+      dynamic_batching_enabled, enforce_equal_shape_tensors, batcher_config,
+      scheduler);
 }
 
 Status
@@ -90,18 +96,21 @@ DynamicBatchScheduler::Create(
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
     const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const bool preserve_ordering,
-    const std::set<int32_t>& preferred_batch_sizes,
-    const uint64_t max_queue_delay_microseconds,
-    const inference::ModelQueuePolicy& default_queue_policy,
-    const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map,
+    const inference::ModelDynamicBatching& batcher_config,
     std::unique_ptr<Scheduler>* scheduler)
 {
+  std::set<int32_t> preferred_batch_sizes;
+  for (const auto size : batcher_config.preferred_batch_size()) {
+    preferred_batch_sizes.insert(size);
+  }
+
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
       runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
-      preferred_batch_sizes, max_queue_delay_microseconds, default_queue_policy,
-      priority_levels, queue_policy_map);
+      dynamic_batching_enabled, enforce_equal_shape_tensors,
+      batcher_config.preserve_ordering(), preferred_batch_sizes,
+      batcher_config.max_queue_delay_microseconds(),
+      batcher_config.default_queue_policy(), batcher_config.priority_levels(),
+      batcher_config.priority_queue_policy());
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
   // Create one scheduler thread for each requested runner. Associate
