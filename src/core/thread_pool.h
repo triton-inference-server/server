@@ -38,17 +38,18 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class CopyBufferThreadPool {
+template <typename TaskFunction, typename TaskData>
+class ThreadPool {
  public:
-  CopyBufferThreadPool(int thread_count) : thread_count_(thread_count)
+  ThreadPool(int thread_count) : thread_count_(thread_count)
   {
     worker_threads_.reserve(thread_count);
     futures_.reserve(thread_count);
   }
 
-  ~CopyBufferThreadPool();
+  ~ThreadPool();
 
-  // Add CopyBuffer task to queue
+  // Add <TaskData> to queue
   Status AddTask(
       const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
       const int64_t src_memory_type_id,
@@ -56,9 +57,9 @@ class CopyBufferThreadPool {
       const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
       void* dst, cudaStream_t cuda_stream, bool* cuda_used);
 
-  // Run CopyBuffer on the worker threads. Must add to queue using AddTask
-  // before calling ProcessQueue.
-  Status ProcessQueue();
+  // Run <TaskFunction> on the worker threads. Must add <TaskData> to queue using
+  // AddTask before calling CompleteQueue.
+  Status CompleteQueue();
 
  private:
   // Wait for all pending worker threads to finish.
@@ -66,7 +67,7 @@ class CopyBufferThreadPool {
 
   // Get Id of next available worker thread. If all workers are occupied then
   // wait for them to finish and start from the beginning.
-  Status GetNextAvailableId(int* worker_id);
+  Status GetNextAvailableId(int* worker_id, bool await_available);
 
   /// A struct that stores the parameters for the CopyBuffer operation.
   struct CopyBufferData {

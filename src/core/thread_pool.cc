@@ -34,7 +34,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-CopyBufferThreadPool::~CopyBufferThreadPool()
+ThreadPool::~ThreadPool()
 {
   for (auto& worker_thread : worker_threads_) {
     if (worker_thread.joinable()) {
@@ -44,7 +44,7 @@ CopyBufferThreadPool::~CopyBufferThreadPool()
 }
 
 Status
-CopyBufferThreadPool::AwaitCompletion()
+ThreadPool::AwaitCompletion()
 {
   for (size_t i = 0; i < worker_threads_.size(); i++) {
     if (worker_threads_[i].joinable()) {
@@ -56,7 +56,7 @@ CopyBufferThreadPool::AwaitCompletion()
 }
 
 Status
-CopyBufferThreadPool::GetNextAvailableId(int* worker_id)
+ThreadPool::GetNextAvailableId(int* worker_id, bool await_available)
 {
   *worker_id = -1;
   for (size_t i = 0; i < worker_threads_.size(); i++) {
@@ -64,7 +64,7 @@ CopyBufferThreadPool::GetNextAvailableId(int* worker_id)
       *worker_id = i;
     }
   }
-  if (*worker_id == -1) {
+  if ((*worker_id == -1) && await_available) {
     RETURN_IF_ERROR(AwaitCompletion());
     *worker_id = 0;
   }
@@ -73,7 +73,7 @@ CopyBufferThreadPool::GetNextAvailableId(int* worker_id)
 }
 
 void
-CopyBufferThreadPool::CopyBufferHandler(CopyBufferData* data)
+ThreadPool::CopyBufferHandler(CopyBufferData* data)
 {
   data->status_.set_value(CopyBuffer(
       data->msg_, data->src_memory_type_, data->src_memory_type_id_,
@@ -82,26 +82,36 @@ CopyBufferThreadPool::CopyBufferHandler(CopyBufferData* data)
 }
 
 Status
-CopyBufferThreadPool::AddTask(
+ThreadPool::AddTask(
     const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
     const int64_t src_memory_type_id,
     const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, bool* cuda_used)
 {
-  queue_.Put(std::unique_ptr<CopyBufferData>(new CopyBufferData(
-      msg, src_memory_type, src_memory_type_id, dst_memory_type,
-      dst_memory_type_id, byte_size, src, dst, cuda_stream, cuda_used)));
+  int worker_id;
+  RETURN_IF_ERROR(GetNextAvailableId(&worker_id, false));
+  if (worker_id == -1) {
+    queue_.Put(std::unique_ptr<CopyBufferData>(new CopyBufferData(
+        msg, src_memory_type, src_memory_type_id, dst_memory_type,
+        dst_memory_type_id, byte_size, src, dst, cuda_stream, cuda_used)));
+  } else {
+    std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
+          msg, src_memory_type, src_memory_type_id, dst_memory_type,
+          dst_memory_type_id, byte_size, src, dst, cuda_stream, cuda_used));
+    futures_[worker_id] = task_data->status_.get_future();
+    worker_threads_[worker_id] = std::thread(CopyBufferHandler, task_data.get());
+  }
   return Status::Success;
 }
 
 Status
-CopyBufferThreadPool::ProcessQueue()
+ThreadPool::CompleteQueue()
 {
   while (!queue_.Empty()) {
     auto task_data = std::move(queue_.Get());
     int worker_id;
-    RETURN_IF_ERROR(GetNextAvailableId(&worker_id));
+    RETURN_IF_ERROR(GetNextAvailableId(&worker_id, true));
     futures_[worker_id] = task_data->status_.get_future();
     worker_threads_[worker_id] =
         std::thread(CopyBufferHandler, task_data.get());
