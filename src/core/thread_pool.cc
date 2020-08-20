@@ -34,37 +34,33 @@
 
 namespace nvidia { namespace inferenceserver {
 
-template <typename TaskFunction, typename TaskData>
-ThreadPool<TaskFunction, TaskData>::~ThreadPool()
+ThreadPool::~ThreadPool()
 {
   for (auto& worker_thread : worker_threads_) {
-    if (worker_thread.joinable()) {
-      worker_thread.join();
+    if (worker_thread->joinable()) {
+      worker_thread->join();
     }
   }
 }
 
-template <typename TaskFunction, typename TaskData>
 Status
-ThreadPool<TaskFunction, TaskData>::AwaitCompletion()
+ThreadPool::AwaitCompletion()
 {
   for (size_t i = 0; i < worker_threads_.size(); i++) {
-    if (worker_threads_[i].joinable()) {
-      worker_threads_[i].join();
+    if (worker_threads_[i]->joinable()) {
+      worker_threads_[i]->join();
       RETURN_IF_ERROR(futures_[i].get());
     }
   }
   return Status::Success;
 }
 
-template <typename TaskFunction, typename TaskData>
 Status
-ThreadPool<TaskFunction, TaskData>::GetNextAvailableId(
-    int* worker_id, bool await_available)
+ThreadPool::GetNextAvailableId(int* worker_id, bool await_available)
 {
   *worker_id = -1;
   for (size_t i = 0; i < worker_threads_.size(); i++) {
-    if (!worker_threads_[i].joinable()) {
+    if (!worker_threads_[i]->joinable()) {
       *worker_id = i;
     }
   }
@@ -76,31 +72,31 @@ ThreadPool<TaskFunction, TaskData>::GetNextAvailableId(
   return Status::Success;
 }
 
-template <typename TaskFunction, typename TaskData>
 Status
-ThreadPool<TaskFunction, TaskData>::AddTask(std::unique_ptr<TaskData> task_data)
+ThreadPool::AddTask(std::thread task_data, std::promise<Status> promise)
 {
   int worker_id;
   RETURN_IF_ERROR(GetNextAvailableId(&worker_id, false));
   if (worker_id == -1) {
-    queue_.Put(task_data);
+    queue_.Put(std::move(task_data));
+    promises_.Put(std::move(promise));
   } else {
-    futures_[worker_id] = task_data->status_.get_future();
-    worker_threads_[worker_id] = std::thread(&TaskFunction, task_data.get());
+    futures_[worker_id] = promise.get_future();
+    worker_threads_[worker_id].reset(&task_data);
   }
   return Status::Success;
 }
 
-template <typename TaskFunction, typename TaskData>
 Status
-ThreadPool<TaskFunction, TaskData>::CompleteQueue()
+ThreadPool::CompleteQueue()
 {
   while (!queue_.Empty()) {
     auto task_data = std::move(queue_.Get());
+    auto promise = promises_.Get();
     int worker_id;
     RETURN_IF_ERROR(GetNextAvailableId(&worker_id, true));
-    futures_[worker_id] = task_data->status_.get_future();
-    worker_threads_[worker_id] = std::thread(&TaskFunction, task_data.get());
+    futures_[worker_id] = promise.get_future();
+    worker_threads_[worker_id].reset(&task_data);
   }
   RETURN_IF_ERROR(AwaitCompletion());
 

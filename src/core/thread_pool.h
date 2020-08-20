@@ -37,7 +37,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-template <typename TaskFunction, typename TaskData>
 class ThreadPool {
  public:
   ThreadPool(int thread_count) : thread_count_(thread_count)
@@ -48,11 +47,10 @@ class ThreadPool {
 
   ~ThreadPool();
 
-  // Add <TaskData> to queue
-  Status AddTask(std::unique_ptr<TaskData> task_data);
+  // Add task thread to queue.
+  Status AddTask(std::thread task_data, std::promise<Status> promise);
 
-  // Run <TaskFunction> on the worker threads. Must add <TaskData> to queue using
-  // AddTask before calling CompleteQueue.
+  // Run task threads remaining in queue on the worker threads.
   Status CompleteQueue();
 
  private:
@@ -64,9 +62,10 @@ class ThreadPool {
   Status GetNextAvailableId(int* worker_id, bool await_available);
 
   int thread_count_;
-  std::vector<std::thread> worker_threads_;
+  std::vector<std::unique_ptr<std::thread>> worker_threads_;
   std::vector<std::future<Status>> futures_;
-  SyncQueue<std::unique_ptr<TaskData>> queue_;
+  SyncQueue<std::promise<Status>> promises_;
+  SyncQueue<std::thread> queue_;
 };
 
 }}  // namespace nvidia::inferenceserver

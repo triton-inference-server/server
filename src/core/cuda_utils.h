@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <future>
 #include <set>
 #include "src/core/status.h"
-#include <future>
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>

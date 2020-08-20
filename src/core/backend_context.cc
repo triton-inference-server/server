@@ -27,10 +27,10 @@
 #include "src/core/backend_context.h"
 
 #include "src/core/cuda_utils.h"
-#include "src/core/thread_pool.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/nvtx.h"
+#include "src/core/thread_pool.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -901,7 +901,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
     const TRITONSERVER_MemoryType use_pinned_memory_type,
     std::unique_ptr<InferenceResponse>* response)
 {
-  ThreadPool<CopyBuffer, CopyBufferData> worker_pool_(4);
+  ThreadPool worker_pool_(4);
 
   bool cuda_copy = false;
 
@@ -962,12 +962,14 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 
     // Direct copy without intermediate pinned memory.
-    std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
+    std::unique_ptr<CopyBufferData> data(new CopyBufferData(
         request_input->Name(), src_memory_type, src_memory_type_id,
         tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
         tensor_buffer + tensor_buffer_offset + input_offset, stream_,
         &cuda_used[idx]));
-    worker_pool_.AddTask(task_data);
+    std::thread task([&] { CopyBufferHandler(std::move(data.get())); });
+    // std::thread task(CopyBufferHandler, data.get());
+    worker_pool_.AddTask(std::move(task), std::move(data->status_));
 
     input_offset += src_byte_size;
   }
