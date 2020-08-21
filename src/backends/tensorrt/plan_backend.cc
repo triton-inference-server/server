@@ -1425,7 +1425,16 @@ bool
 PlanBackend::Context::BuildCudaGraph(
     TensorRTContext* trt_context, const int batch_size)
 {
-  // FIXME handle shape tensor properly
+  // FIXME handle shape tensor properly, for now if model uses shape tensor
+  // then cuda graph is not captured
+  for (int i = 0; i < num_expected_bindings_; ++i) {
+    if (engine_->isShapeBinding(i)) {
+      LOG_WARNING << "Detected shape tensor, CUDA graph is not captured for "
+                  << name_;
+      return false;
+    }
+  }
+
   bool captured = true;
   for (int set_idx = 0; set_idx < EVENT_SET_COUNT; set_idx++) {
     cudaGraph_t graph;
@@ -1479,7 +1488,16 @@ bool
 PlanBackend::Context::BuildCudaGraphDynamic(
     TensorRTContext* trt_context, const int batch_size)
 {
-  // FIXME handle shape tensor properly
+  // FIXME handle shape tensor properly, for now if model uses shape tensor
+  // then cuda graph is not captured
+  for (int i = 0; i < num_expected_bindings_; ++i) {
+    if (engine_->isShapeBinding(i)) {
+      LOG_WARNING << "Detected shape tensor, CUDA graph is not captured for "
+                  << name_;
+      return false;
+    }
+  }
+
   // FIXME currently only capture for opt profile with different batch size
   // can add model specific tuning for particular use case (hard-code for now)
   SetCudaGraphShape(trt_context, batch_size);
@@ -1573,13 +1591,11 @@ PlanBackend::Context::SetCudaGraphShape(
     if (!engine_->bindingIsInput(io_index)) {
       continue;
     }
-    if (!trt_context->context_->setBindingDimensions(
-            io_index, shape)) {
+    if (!trt_context->context_->setBindingDimensions(io_index, shape)) {
       return Status(
-          Status::Code::INTERNAL, "trt failed to set binding dimension to " +
-                                      DimsDebugString(shape) + " for binding " +
-                                      std::to_string(io_index) +
-                                      " for " + name_);
+          Status::Code::INTERNAL,
+          "trt failed to set binding dimension to " + DimsDebugString(shape) +
+              " for binding " + std::to_string(io_index) + " for " + name_);
     }
   }
   return Status::Success;
@@ -2024,7 +2040,8 @@ PlanBackend::Context::Run(
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             SetBindingDimensions(
-                name, ragged_shape, citr->second, bindex, io_index, &input_dims),
+                name, ragged_shape, citr->second, bindex, io_index,
+                &input_dims),
             "error setting the binding dimension");
 
         if (batch_input.kind() !=
@@ -2061,7 +2078,8 @@ PlanBackend::Context::Run(
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             SetBindingDimensions(
-                name, ragged_shape, citr->second, bindex, io_index, &input_dims),
+                name, ragged_shape, citr->second, bindex, io_index,
+                &input_dims),
             "error setting the binding dimension");
 
         collector.ProcessTensor(
@@ -2097,7 +2115,8 @@ PlanBackend::Context::Run(
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             SetBindingDimensions(
-                name, batchn_shape, citr->second, bindex, io_index, &input_dims),
+                name, batchn_shape, citr->second, bindex, io_index,
+                &input_dims),
             "error setting the binding dimension");
       }
 
