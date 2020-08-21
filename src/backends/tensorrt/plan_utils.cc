@@ -133,6 +133,22 @@ CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
   return true;
 }
 
+bool
+CompareDims(const nvinfer1::Dims& ldims, const nvinfer1::Dims& rdims)
+{
+  if (ldims.nbDims != rdims.nbDims) {
+    return false;
+  }
+
+  for (int i = 0; i < ldims.nbDims; ++i) {
+    if (ldims.d[i] != rdims.d[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 Status
 CompareDimsSupported(
     const std::string& model_name, const std::string& binding_name,

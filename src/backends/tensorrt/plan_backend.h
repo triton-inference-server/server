@@ -158,14 +158,19 @@ class PlanBackend : public InferenceBackend {
     // context can have multiple of this struct if multiple optimization
     // profiles is specified.
     struct TensorRTContext {
-      TensorRTContext(const std::string& profile_name, int binding_cnts)
-          : profile_name_(profile_name), context_(nullptr),
-            min_dims_(binding_cnts), max_dims_(binding_cnts),
-            opt_dims_(binding_cnts), min_shapes_(binding_cnts),
-            max_shapes_(binding_cnts), opt_shapes_(binding_cnts)
+      TensorRTContext(
+          const std::string& profile_name, const int profile_idx,
+          const int binding_cnts, const int event_set_cnts)
+          : profile_name_(profile_name), profile_idx_(profile_idx),
+            context_(nullptr), cuda_graphs_(event_set_cnts),
+            cuda_graph_execs_(event_set_cnts), min_dims_(binding_cnts),
+            max_dims_(binding_cnts), opt_dims_(binding_cnts),
+            min_shapes_(binding_cnts), max_shapes_(binding_cnts),
+            opt_shapes_(binding_cnts)
       {
       }
       std::string profile_name_;
+      int profile_idx_;
       nvinfer1::IExecutionContext* context_;
 
       // The CUDA graphs captured for the model for different
@@ -225,7 +230,13 @@ class PlanBackend : public InferenceBackend {
     Status SetBindingDimensions(
         const std::string& input_name, const std::vector<int64_t>& shape,
         const TensorRTContext& trt_context, const size_t binding_idx,
-        const size_t io_idx);
+        const size_t io_idx, std::vector<nvinfer1::Dims>* input_dims);
+    Status SetCudaGraphShape(
+        TensorRTContext* trt_context, const int batch_size);
+    bool FindClosestCudaGraph(
+        const TensorRTContext& trt_context, const size_t total_batch_size,
+        const std::vector<nvinfer1::Dims>& input_dims,
+        cudaGraphExec_t* cuda_graph_exec);
 
     // The engine used for the context. If the model uses dynamic shape, then
     // the CUDA engine is owned by the context. Otherwise, the engine is shared

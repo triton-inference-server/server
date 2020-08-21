@@ -60,6 +60,7 @@ std::pair<bool, nvinfer1::DataType> ConvertDataTypeToTrtType(
     const inference::DataType& dtype);
 
 bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
+bool CompareDims(const nvinfer1::Dims& ldims, const nvinfer1::Dims& rdims);
 
 Status ValidateDimension(
     const nvinfer1::Dims& this_dims, const nvinfer1::Dims& min_dims,
