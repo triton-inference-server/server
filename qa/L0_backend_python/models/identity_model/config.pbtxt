@@ -1,0 +1,19 @@
+name: "identity_model"
+backend: "python"
+platform: "custom"
+
+input [
+  {
+    name: "IN"
+    data_type: TYPE_UINT32
+    dims: [ 16 ]
+  }
+]
+
+output [
+  {
+    name: "OUT"
+    data_type: TYPE_UINT32
+    dims: [ 16 ]
+  }
+]
