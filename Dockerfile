@@ -329,6 +329,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON \
                   -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON \
                   -DTRITON_ENABLE_PYTORCH=ON \
+                  -DTRITON_ENABLE_PYTHON=ON \
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                   -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
