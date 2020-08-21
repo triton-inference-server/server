@@ -136,8 +136,7 @@ class BackendResponder {
       cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), responses_(responses),
         max_batch_size_(max_batch_size), pinned_enabled_(pinned_enabled),
-        stream_(stream), event_(event), pending_pinned_byte_size_(0),
-        worker_pool_(2)
+        stream_(stream), event_(event), pending_pinned_byte_size_(0)
   {
   }
 
@@ -190,9 +189,6 @@ class BackendResponder {
   size_t pending_pinned_offset_;
   ResponsesList pending_pinned_outputs_;
 
-  // Dedicated worker thread pool for output copies
-  ThreadPool worker_pool_;
-
   // Pinned memories that need to live over the lifetime of this
   // BackendResponder object.
   std::list<std::unique_ptr<AllocatedMemory>> pinned_memories_;
@@ -229,7 +225,7 @@ class BackendInputCollector {
       cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled), stream_(stream), event_(event),
-        pending_pinned_byte_size_(0), worker_pool_(4)
+        pending_pinned_byte_size_(0)
   {
   }
 
@@ -294,9 +290,6 @@ class BackendInputCollector {
   size_t pending_pinned_byte_size_;
   size_t pending_pinned_offset_;
   RequestsList pending_pinned_inputs_;
-
-  // Dedicated worker thread pool for input copies
-  ThreadPool worker_pool_;
 
   // Pinned memories that need to live over the lifetime of this
   // BackendResponder object.

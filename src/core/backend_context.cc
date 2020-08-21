@@ -371,7 +371,7 @@ BackendResponder::Finalize()
             &cuda_used_vec[idx]));
         std::thread task(
             [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
-        worker_pool_.AddTask(
+        ThreadPool::AddTask(
             std::move(task), std::move(copy_buffer_data->status_));
       }
 
@@ -379,7 +379,7 @@ BackendResponder::Finalize()
       idx++;
     }
 
-    Status status = worker_pool_.CompleteQueue();
+    Status status = ThreadPool::CompleteQueue();
     for (size_t i = 0; i < cuda_used_vec.size(); i++) {
       need_sync_ |= cuda_used_vec[i];
     }
@@ -520,7 +520,7 @@ BackendResponder::FlushPendingPinned(
             const_cast<void*>(response_buffer), stream_, &cuda_used_vec[idx]));
         std::thread task(
             [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
-        worker_pool_.AddTask(
+        ThreadPool::AddTask(
             std::move(task), std::move(copy_buffer_data->status_));
       }
 
@@ -528,7 +528,7 @@ BackendResponder::FlushPendingPinned(
       idx++;
     }
 
-    Status status = worker_pool_.CompleteQueue();
+    Status status = ThreadPool::CompleteQueue();
     for (size_t i = 0; i < cuda_used_vec.size(); i++) {
       cuda_copy |= cuda_used_vec[i];
     }
@@ -608,7 +608,7 @@ BackendResponder::FlushPendingPinned(
               stream_, &cuda_used_vec[idx]));
           std::thread task(
               [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
-          worker_pool_.AddTask(
+          ThreadPool::AddTask(
               std::move(task), std::move(copy_buffer_data->status_));
         }
 
@@ -616,7 +616,7 @@ BackendResponder::FlushPendingPinned(
         idx++;
       }
 
-      status = worker_pool_.CompleteQueue();
+      status = ThreadPool::CompleteQueue();
       for (size_t i = 0; i < cuda_used_vec.size(); i++) {
         cuda_copy |= cuda_used_vec[i];
       }
@@ -905,12 +905,12 @@ BackendInputCollector::Finalize()
         &cuda_used_vec[idx]));
     std::thread task(
         [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
-    worker_pool_.AddTask(std::move(task), std::move(copy_buffer_data->status_));
+    ThreadPool::AddTask(std::move(task), std::move(copy_buffer_data->status_));
 
     idx++;
   }
 
-  Status status = worker_pool_.CompleteQueue();
+  Status status = ThreadPool::CompleteQueue();
   for (size_t i = 0; i < cuda_used_vec.size(); i++) {
     need_sync_ |= cuda_used_vec[i];
   }
@@ -1019,12 +1019,12 @@ BackendInputCollector::SetFixedSizeInputTensor(
         &cuda_used_vec[idx]));
     std::thread task(
         [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
-    worker_pool_.AddTask(std::move(task), std::move(copy_buffer_data->status_));
+    ThreadPool::AddTask(std::move(task), std::move(copy_buffer_data->status_));
 
     input_offset += src_byte_size;
   }
 
-  Status status = worker_pool_.CompleteQueue();
+  Status status = ThreadPool::CompleteQueue();
   for (const auto& cuda_used : cuda_used_vec) {
     cuda_copy |= cuda_used;
   }
