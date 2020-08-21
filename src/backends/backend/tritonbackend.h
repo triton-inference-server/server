@@ -107,7 +107,12 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ApiVersion(
 /// \param shape If non-nullptr, returns the tensor shape.
 /// \param dim_count If non-nullptr, returns the number of dimensions
 /// in the tensor shape.
-/// \param byte_size If non-nullptr, returns the size of the tensor, in bytes.
+/// \param byte_size If non-nullptr, returns the size of the available
+/// data for the tensor, in bytes. This size reflects the actual data
+/// available, and does not necessarily match what is
+/// expected/required for the tensor given its shape and datatype. It
+/// is the responsibility of the backend to handle mismatches in these
+/// sizes appropriately.
 /// \param buffer_count If non-nullptr, returns the number of buffers
 /// holding the contents of the tensor. These buffers are accessed
 /// using TRITONBACKEND_InputBuffer.
