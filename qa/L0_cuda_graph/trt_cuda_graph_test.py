@@ -62,9 +62,10 @@ class TrtCudaGraphTest(tu.TestResultCollector):
         self._check_infer(tensor_shape, 5)
 
     def test_dynamic_shape(self):
-        tensor_shape = (20,)
+        tensor_shape = (16,)
         self._check_infer(tensor_shape)
         # Inference that should not have CUDA graph captured
+        self._check_infer((20,))
         self._check_infer(tensor_shape, 5)
 
 
