@@ -1427,16 +1427,15 @@ PlanBackend::Context::BuildCudaGraph(
 {
   // FIXME handle shape tensor properly
   bool captured = true;
-
-  cudaGraph_t graph;
-  auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
-  if (cuerr != cudaSuccess) {
-    LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
-              << cudaGetErrorString(cuerr);
-    captured = false;
-  } else {
-    auto context = trt_context->context_;
-    for (int set_idx = 0; set_idx < EVENT_SET_COUNT; set_idx++) {
+  for (int set_idx = 0; set_idx < EVENT_SET_COUNT; set_idx++) {
+    cudaGraph_t graph;
+    auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
+                << cudaGetErrorString(cuerr);
+      captured = false;
+    } else {
+      auto context = trt_context->context_;
       if (!context->enqueue(
               batch_size, buffer_bindings_.data(), stream_,
               &events_[set_idx].ready_for_input_)) {
@@ -1502,15 +1501,15 @@ PlanBackend::Context::BuildCudaGraphDynamic(
 
   bool captured = true;
 
-  cudaGraph_t graph;
-  auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
-  if (cuerr != cudaSuccess) {
-    LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
-              << cudaGetErrorString(cuerr);
-    captured = false;
-  } else {
-    auto context = trt_context->context_;
-    for (int set_idx = 0; set_idx < EVENT_SET_COUNT; set_idx++) {
+  for (int set_idx = 0; set_idx < EVENT_SET_COUNT; set_idx++) {
+    cudaGraph_t graph;
+    auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
+                << cudaGetErrorString(cuerr);
+      captured = false;
+    } else {
+      auto context = trt_context->context_;
       if (engine_->hasImplicitBatchDimension()) {
         if (!context->enqueue(
                 batch_size, buffer_bindings_.data(), stream_,
@@ -1568,14 +1567,18 @@ PlanBackend::Context::SetCudaGraphShape(
 {
   int binding_offset = trt_context->profile_idx_ * num_expected_bindings_;
   for (int bindex = 0; bindex < num_expected_bindings_; bindex++) {
+    auto io_index = binding_offset + bindex;
     auto shape = trt_context->opt_dims_[bindex];
     shape.d[0] = batch_size;
+    if (!engine_->bindingIsInput(io_index)) {
+      continue;
+    }
     if (!trt_context->context_->setBindingDimensions(
-            binding_offset + bindex, shape)) {
+            io_index, shape)) {
       return Status(
           Status::Code::INTERNAL, "trt failed to set binding dimension to " +
                                       DimsDebugString(shape) + " for binding " +
-                                      std::to_string(binding_offset + bindex) +
+                                      std::to_string(io_index) +
                                       " for " + name_);
     }
   }
