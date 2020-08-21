@@ -841,7 +841,7 @@ TRITONBACKEND_InputProperties(
     *dims_count = ti->ShapeWithBatchDim().size();
   }
   if (byte_size != nullptr) {
-    *byte_size = GetByteSize(ti->DType(), ti->ShapeWithBatchDim());
+    *byte_size = ti->Data()->TotalByteSize();
   }
   if (buffer_count != nullptr) {
     *buffer_count = ti->DataBufferCount();
