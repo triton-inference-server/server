@@ -149,7 +149,7 @@ if [ `grep -c "Context with profile 0 \[0\] is being executed for " $SERVER_LOG`
     RET=1
 fi
 
-if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "0" ]; then
+if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "6" ]; then
     echo -e "\n***\n*** Failed. Expected no CUDA graphs are captured\n***"
     RET=1
 fi
