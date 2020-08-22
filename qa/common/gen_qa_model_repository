@@ -117,7 +117,7 @@ cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
 cp ./gen_qa_dyna_sequence_models.py $HOST_SRCDIR/.
 cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
-cp ./gen_qa_trt_models.py $HOST_SRCDIR/.
+cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
