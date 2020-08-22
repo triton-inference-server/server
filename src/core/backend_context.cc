@@ -364,34 +364,36 @@ BackendResponder::Finalize()
                 status),
             "error sending TensorFlow response");
       } else {
-        std::unique_ptr<CopyBufferData> copy_buffer_data(new CopyBufferData(
+        std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
             response_output->Name(), pinned_memory_type, pinned_memory_id,
             response_memory_type, response_memory_type_id, response_byte_size,
             pinned_buffer + offset, const_cast<void*>(response_buffer), stream_,
             &cuda_used_vec[idx]));
-        std::thread task(
-            [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
         ThreadPool::AddTask(
-            std::move(task), std::move(copy_buffer_data->status_));
+            CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
+        idx++;
       }
 
       offset += response_byte_size;
-      idx++;
     }
 
-    Status status = ThreadPool::CompleteQueue();
+    std::vector<Status> status_queue;
+    ThreadPool::GetResults(&status_queue);
     for (size_t i = 0; i < cuda_used_vec.size(); i++) {
       need_sync_ |= cuda_used_vec[i];
     }
 
-    if (!status.IsOk()) {
-      for (auto& pr : def.responses_) {
-        std::unique_ptr<InferenceResponse>* response = pr.first;
-        LOG_STATUS_ERROR(
-            InferenceResponse::SendWithStatus(
-                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                status),
-            "error sending TensorFlow response");
+    idx = 0;
+    for (auto& pr : def.responses_) {
+      if (idx < status_queue.size()) {
+        if (!status_queue[idx].IsOk()) {
+          std::unique_ptr<InferenceResponse>* response = pr.first;
+          LOG_STATUS_ERROR(
+              InferenceResponse::SendWithStatus(
+                  std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                  status_queue[idx]),
+              "error sending TensorFlow response");
+        }
       }
     }
   }
@@ -513,35 +515,36 @@ BackendResponder::FlushPendingPinned(
                 status),
             "error sending TensorFlow response");
       } else {
-        std::unique_ptr<CopyBufferData> copy_buffer_data(new CopyBufferData(
+        std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
             response_output->Name(), tensor_memory_type, tensor_memory_type_id,
             response_memory_type, response_memory_type_id, response_byte_size,
             tensor_buffer + pending_pinned_offset_ + offset,
             const_cast<void*>(response_buffer), stream_, &cuda_used_vec[idx]));
-        std::thread task(
-            [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
         ThreadPool::AddTask(
-            std::move(task), std::move(copy_buffer_data->status_));
+            CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
+        idx++;
       }
 
       offset += response_byte_size;
-      idx++;
     }
 
-    Status status = ThreadPool::CompleteQueue();
+    std::vector<Status> status_queue;
+    ThreadPool::GetResults(&status_queue);
     for (size_t i = 0; i < cuda_used_vec.size(); i++) {
-      cuda_copy |= cuda_used_vec[i];
+      need_sync_ |= cuda_used_vec[i];
     }
 
-    // If any copy fails, assume all fail.
-    if (!status.IsOk()) {
-      for (auto& pr : pending_pinned_outputs_) {
-        std::unique_ptr<InferenceResponse>* response = pr.first;
-        LOG_STATUS_ERROR(
-            InferenceResponse::SendWithStatus(
-                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                status),
-            "error sending TensorFlow response");
+    idx = 0;
+    for (auto& pr : pending_pinned_outputs_) {
+      if (idx < status_queue.size()) {
+        if (!status_queue[idx].IsOk()) {
+          std::unique_ptr<InferenceResponse>* response = pr.first;
+          LOG_STATUS_ERROR(
+              InferenceResponse::SendWithStatus(
+                  std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                  status_queue[idx]),
+              "error sending TensorFlow response");
+        }
       }
     }
   }
@@ -601,35 +604,36 @@ BackendResponder::FlushPendingPinned(
                   status),
               "error sending TensorFlow response");
         } else {
-          std::unique_ptr<CopyBufferData> copy_buffer_data(new CopyBufferData(
+          std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
               response_output->Name(), pinned_memory_type, pinned_memory_id,
               response_memory_type, response_memory_type_id, response_byte_size,
               pinned_buffer + offset, const_cast<void*>(response_buffer),
               stream_, &cuda_used_vec[idx]));
-          std::thread task(
-              [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
           ThreadPool::AddTask(
-              std::move(task), std::move(copy_buffer_data->status_));
+              CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
+          idx++;
         }
 
         offset += response_byte_size;
-        idx++;
       }
 
-      status = ThreadPool::CompleteQueue();
+      std::vector<Status> status_queue;
+      ThreadPool::GetResults(&status_queue);
       for (size_t i = 0; i < cuda_used_vec.size(); i++) {
-        cuda_copy |= cuda_used_vec[i];
+        need_sync_ |= cuda_used_vec[i];
       }
 
-      // If any copy fails, assume all fail.
-      if (!status.IsOk()) {
-        for (auto& pr : pending_pinned_outputs_) {
-          std::unique_ptr<InferenceResponse>* response = pr.first;
-          LOG_STATUS_ERROR(
-              InferenceResponse::SendWithStatus(
-                  std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                  status),
-              "error sending TensorFlow response");
+      idx = 0;
+      for (auto& pr : pending_pinned_outputs_) {
+        if (idx < status_queue.size()) {
+          if (!status_queue[idx].IsOk()) {
+            std::unique_ptr<InferenceResponse>* response = pr.first;
+            LOG_STATUS_ERROR(
+                InferenceResponse::SendWithStatus(
+                    std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                    status_queue[idx]),
+                "error sending TensorFlow response");
+          }
         }
       }
     } else {
@@ -897,36 +901,38 @@ BackendInputCollector::Finalize()
     char* pinned_buffer = def.pinned_memory_->MutableBuffer(
         &pinned_memory_type, &pinned_memory_id);
 
-    std::unique_ptr<CopyBufferData> copy_buffer_data(new CopyBufferData(
+    std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
         "pinned buffer", pinned_memory_type, pinned_memory_id,
         def.tensor_memory_type_, def.tensor_memory_id_,
         def.pinned_memory_->TotalByteSize(), pinned_buffer,
         def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
         &cuda_used_vec[idx]));
-    std::thread task(
-        [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
-    ThreadPool::AddTask(std::move(task), std::move(copy_buffer_data->status_));
-
+    ThreadPool::AddTask(
+        CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
     idx++;
   }
 
-  Status status = ThreadPool::CompleteQueue();
+  std::vector<Status> status_queue;
+  ThreadPool::GetResults(&status_queue);
   for (size_t i = 0; i < cuda_used_vec.size(); i++) {
     need_sync_ |= cuda_used_vec[i];
   }
 
-  // If something goes wrong with the copy all the pending
-  // responses fail...
-  if (!status.IsOk()) {
-    for (auto& def : deferred_pinned_) {
-      for (auto& pr : def.requests_) {
-        std::unique_ptr<InferenceResponse>* response = pr.first;
-        if (*response != nullptr) {
-          LOG_STATUS_ERROR(
-              InferenceResponse::SendWithStatus(
-                  std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                  status),
-              "error setting TensorFlow input tensor");
+  idx = 0;
+  for (auto& def : deferred_pinned_) {
+    // If something goes wrong with the copy all the pending
+    // responses fail...
+    if (idx < status_queue.size()) {
+      if (!status_queue[idx].IsOk()) {
+        for (auto& pr : def.requests_) {
+          std::unique_ptr<InferenceResponse>* response = pr.first;
+          if (*response != nullptr) {
+            LOG_STATUS_ERROR(
+                InferenceResponse::SendWithStatus(
+                    std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                    status_queue[idx]),
+                "error setting TensorFlow input tensor");
+          }
         }
       }
     }
@@ -1012,28 +1018,33 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 
     // Direct copy without intermediate pinned memory.
-    std::unique_ptr<CopyBufferData> copy_buffer_data(new CopyBufferData(
+    std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
         request_input->Name(), src_memory_type, src_memory_type_id,
         tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
         tensor_buffer + tensor_buffer_offset + input_offset, stream_,
         &cuda_used_vec[idx]));
-    std::thread task(
-        [&] { CopyBufferHandler(std::move(copy_buffer_data.get())); });
-    ThreadPool::AddTask(std::move(task), std::move(copy_buffer_data->status_));
+    ThreadPool::AddTask(
+        CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
+
 
     input_offset += src_byte_size;
   }
 
-  Status status = ThreadPool::CompleteQueue();
-  for (const auto& cuda_used : cuda_used_vec) {
-    cuda_copy |= cuda_used;
+  std::vector<Status> status_queue;
+  ThreadPool::GetResults(&status_queue);
+  for (size_t i = 0; i < cuda_used_vec.size(); i++) {
+    cuda_copy |= cuda_used_vec[i];
   }
 
-  if (!status.IsOk()) {
-    LOG_STATUS_ERROR(
-        InferenceResponse::SendWithStatus(
-            std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
-        "error setting TensorFlow input tensor");
+  for (size_t idx = 0; idx < status_queue.size(); ++idx) {
+    if (!status_queue[idx].IsOk()) {
+      LOG_STATUS_ERROR(
+          InferenceResponse::SendWithStatus(
+              std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+              status_queue[idx]),
+          "error sending TensorFlow response");
+      break;
+    }
   }
 
   return cuda_copy;

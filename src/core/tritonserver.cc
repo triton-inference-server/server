@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
+#include "src/core/cuda_utils.h"
 #include "src/core/infer_parameter.h"
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
@@ -1523,6 +1524,7 @@ TRITONSERVER_ServerNew(
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
+  ni::ThreadPool::SetWorkerCount(4);
 
   // FIXME these should be removed once all backends use
   // BackendConfig.

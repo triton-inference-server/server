@@ -124,6 +124,6 @@ struct CopyBufferData {
 };
 
 // Helper around CopyBuffer
-void CopyBufferHandler(CopyBufferData* data);
+Status CopyBufferHandler(void* data);
 
 }}  // namespace nvidia::inferenceserver

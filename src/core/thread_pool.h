@@ -35,92 +35,96 @@
 #include "src/core/status.h"
 #include "src/core/sync_queue.h"
 
-#define WORKER_COUNT 4
-
 namespace nvidia { namespace inferenceserver {
 
 class ThreadPool {
  public:
-  ThreadPool(int thread_count) : thread_count_(thread_count)
+  // Should only be called once to set the number of worker threads.
+  static void SetWorkerCount(size_t thread_count)
   {
-    worker_threads_.reserve(thread_count);
-    futures_.reserve(thread_count);
+    GetSingleton()->exit_ = false;
+    for (size_t id = 0; id < thread_count; id++)
+      GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
+          new std::thread([id] { Initialize(id); })));
   }
-  virtual ~ThreadPool();
 
   // Add task thread to queue.
-  static Status AddTask(std::thread task_data, std::promise<Status> promise)
+  static void AddTask(const std::function<Status(void*)> task, void* task_data)
   {
-    int worker_id;
-    RETURN_IF_ERROR(GetNextAvailableId(&worker_id, false));
-    if (worker_id == -1) {
-      GetSingleton()->queue_.Put(std::move(task_data));
-      GetSingleton()->promises_.Put(std::move(promise));
-    } else {
-      GetSingleton()->futures_[worker_id] = promise.get_future();
-      GetSingleton()->worker_threads_[worker_id].reset(&task_data);
-    }
-    return Status::Success;
+    std::lock_guard<std::mutex> lock(GetSingleton()->mutex_);
+    GetSingleton()->task_queue_.Put(task);
+    GetSingleton()->data_queue_.Put(task_data);
+    GetSingleton()->queue_pending.notify_one();
   }
 
-  // Run task threads remaining in queue on the worker threads.
-  static Status CompleteQueue()
+  // Wait till queue is empty and return vector of status
+  static void GetResults(std::vector<Status>* status_queue)
   {
-    while (!GetSingleton()->queue_.Empty()) {
-      auto task_data = std::move(GetSingleton()->queue_.Get());
-      auto promise = GetSingleton()->promises_.Get();
-      int worker_id;
-      RETURN_IF_ERROR(GetNextAvailableId(&worker_id, true));
-      GetSingleton()->futures_[worker_id] = promise.get_future();
-      GetSingleton()->worker_threads_[worker_id].reset(&task_data);
+    while (!GetSingleton()->task_queue_.Empty()) {
     }
-    RETURN_IF_ERROR(AwaitCompletion());
 
-    return Status::Success;
+    GetSingleton()->queue_pending.notify_one();
+    std::lock_guard<std::mutex> lock(GetSingleton()->mutex_);
+
+    while (!GetSingleton()->status_queue_.Empty()) {
+      auto status = std::move(GetSingleton()->status_queue_.Get());
+      status_queue->push_back(status);
+    }
   }
 
  private:
+  ThreadPool(){};
+  ~ThreadPool()
+  {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      exit_ = true;
+      queue_pending.notify_one();
+    }
+
+    for (auto& worker_thread : worker_threads_) {
+      if (worker_thread->joinable()) {
+        worker_thread->join();
+      }
+    }
+  }
+
   static ThreadPool* GetSingleton()
   {
-    static ThreadPool singleton(WORKER_COUNT);
+    static ThreadPool singleton;
     return &singleton;
   }
 
-  // Wait for all pending worker threads to finish.
-  static Status AwaitCompletion()
+  static void Initialize(size_t worker_id)
   {
-    for (size_t i = 0; i < GetSingleton()->worker_threads_.size(); i++) {
-      if (GetSingleton()->worker_threads_[i]->joinable()) {
-        GetSingleton()->worker_threads_[i]->join();
-        RETURN_IF_ERROR(GetSingleton()->futures_[i].get());
+    std::function<Status(void*)> task;
+    void* task_data;
+
+    while (true) {
+      {
+        std::unique_lock<std::mutex> lock(GetSingleton()->mutex_);
+        GetSingleton()->queue_pending.wait(lock, [&]() {
+          return GetSingleton()->exit_ || !GetSingleton()->task_queue_.Empty();
+        });
+
+        if (GetSingleton()->exit_)
+          return;
+
+        task = GetSingleton()->task_queue_.Get();
+        task_data = GetSingleton()->data_queue_.Get();
       }
+      Status status = task(task_data);
+      GetSingleton()->status_queue_.Put(status);
     }
-    return Status::Success;
   }
 
-  // Get Id of next available worker thread. If all workers are occupied then
-  // wait for them to finish and start from the beginning.
-  static Status GetNextAvailableId(int* worker_id, bool await_available)
-  {
-    *worker_id = -1;
-    for (size_t i = 0; i < GetSingleton()->worker_threads_.size(); i++) {
-      if (!GetSingleton()->worker_threads_[i]->joinable()) {
-        *worker_id = i;
-      }
-    }
-    if ((*worker_id == -1) && await_available) {
-      RETURN_IF_ERROR(AwaitCompletion());
-      *worker_id = 0;
-    }
-
-    return Status::Success;
-  }
-
-  int thread_count_;
   std::vector<std::unique_ptr<std::thread>> worker_threads_;
-  std::vector<std::future<Status>> futures_;
-  SyncQueue<std::promise<Status>> promises_;
-  SyncQueue<std::thread> queue_;
+  SyncQueue<Status> status_queue_;
+  SyncQueue<std::function<Status(void*)>> task_queue_;
+  SyncQueue<void*> data_queue_;
+  std::condition_variable queue_pending;
+  std::mutex mutex_;
+  bool exit_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -122,13 +122,14 @@ CopyBuffer(
   return Status::Success;
 }
 
-void
-CopyBufferHandler(CopyBufferData* data)
+Status
+CopyBufferHandler(void* task_data)
 {
-  data->status_.set_value(CopyBuffer(
+  CopyBufferData* data = reinterpret_cast<CopyBufferData*>(task_data);
+  return CopyBuffer(
       data->msg_, data->src_memory_type_, data->src_memory_type_id_,
       data->dst_memory_type_, data->dst_memory_type_id_, data->byte_size_,
-      data->src_, data->dst_, data->cuda_stream_, data->cuda_used_));
+      data->src_, data->dst_, data->cuda_stream_, data->cuda_used_);
 }
 
 #ifdef TRITON_ENABLE_GPU

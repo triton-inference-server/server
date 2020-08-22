@@ -34,73 +34,20 @@
 
 namespace nvidia { namespace inferenceserver {
 
-ThreadPool::~ThreadPool()
-{
-  for (auto& worker_thread : worker_threads_) {
-    if (worker_thread->joinable()) {
-      worker_thread->join();
-    }
-  }
-}
-
-// static Status
-// ThreadPool::AwaitCompletion()
+// template <typename T>
+// ThreadPool<T>::~ThreadPool()
 // {
-//   for (size_t i = 0; i < worker_threads_.size(); i++) {
-//     if (worker_threads_[i]->joinable()) {
-//       worker_threads_[i]->join();
-//       RETURN_IF_ERROR(futures_[i].get());
+//   {
+//     std::lock_guard<std::mutex> lock(mutex_);
+//     exit_ = true;
+//     queuePending.notify_one();
+//   }
+
+//   for (auto& worker_thread : worker_threads_) {
+//     if (worker_thread->joinable()) {
+//       worker_thread->join();
 //     }
 //   }
-//   return Status::Success;
-// }
-
-// Status
-// ThreadPool::GetNextAvailableId(int* worker_id, bool await_available)
-// {
-//   *worker_id = -1;
-//   for (size_t i = 0; i < worker_threads_.size(); i++) {
-//     if (!worker_threads_[i]->joinable()) {
-//       *worker_id = i;
-//     }
-//   }
-//   if ((*worker_id == -1) && await_available) {
-//     RETURN_IF_ERROR(AwaitCompletion());
-//     *worker_id = 0;
-//   }
-
-//   return Status::Success;
-// }
-
-// Status
-// ThreadPool::AddTask(std::thread task_data, std::promise<Status> promise)
-// {
-//   int worker_id;
-//   RETURN_IF_ERROR(GetNextAvailableId(&worker_id, false));
-//   if (worker_id == -1) {
-//     queue_.Put(std::move(task_data));
-//     promises_.Put(std::move(promise));
-//   } else {
-//     futures_[worker_id] = promise.get_future();
-//     worker_threads_[worker_id].reset(&task_data);
-//   }
-//   return Status::Success;
-// }
-
-// Status
-// ThreadPool::CompleteQueue()
-// {
-//   while (!queue_.Empty()) {
-//     auto task_data = std::move(queue_.Get());
-//     auto promise = promises_.Get();
-//     int worker_id;
-//     RETURN_IF_ERROR(GetNextAvailableId(&worker_id, true));
-//     futures_[worker_id] = promise.get_future();
-//     worker_threads_[worker_id].reset(&task_data);
-//   }
-//   RETURN_IF_ERROR(AwaitCompletion());
-
-//   return Status::Success;
 // }
 
 }}  // namespace nvidia::inferenceserver
