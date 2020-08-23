@@ -85,7 +85,7 @@ if __name__ == '__main__':
             input_datas = []
             requests = []
             for i in range(request_parallelism):
-                input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
+                input_data = (16384 * np.random.randn(*shape)).astype(np.float32)
                 input_datas.append(input_data)
                 inputs = [
                     client_util.InferInput("INPUT0", input_data.shape,
