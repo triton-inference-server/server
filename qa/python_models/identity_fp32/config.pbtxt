@@ -1,11 +1,11 @@
-name: "identity_model"
+name: "identity_fp32"
 backend: "python"
 platform: "custom"
 
 input [
   {
     name: "IN"
-    data_type: TYPE_UINT32
+    data_type: TYPE_FP32
     dims: [ 16 ]
   }
 ]
@@ -13,7 +13,7 @@ input [
 output [
   {
     name: "OUT"
-    data_type: TYPE_UINT32
+    data_type: TYPE_FP32
     dims: [ 16 ]
   }
 ]
