@@ -1208,11 +1208,6 @@ ModelInstanceState::Create(
       break;
   }
 
-  // Max batch size. A value of 0 in the config becomes NO_BATCHING.
-  const int mbs = (model_state->MaxBatchSize() <= 0)
-                      ? nib::BackendModel::NO_BATCHING
-                      : model_state->MaxBatchSize();
-
   TRTISTF_TFTRTConfig* tftrt_config_ptr = nullptr;
   TRTISTF_TFTRTConfig tftrt_config;
   bool auto_mixed_precision = false;
@@ -1235,7 +1230,7 @@ ModelInstanceState::Create(
         tftrt_config.minimum_segment_size_ = 3;
         tftrt_config.max_workspace_size_bytes_ = 1 << 30;
         tftrt_config.max_cached_engines_ = 100;
-        tftrt_config.max_batch_size_ = std::max(mbs, 1);
+        tftrt_config.max_batch_size_ = std::max(model_state->MaxBatchSize(), 1);
         tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
         tftrt_config.is_dynamic_op_ = true;
 
@@ -1578,7 +1573,7 @@ ModelInstanceState::ProcessRequests(
 
       // The shape for the entire input patch, [total_batch_size, ...]
       std::vector<int64_t> batchn_shape(shape, shape + dims_count);
-      if (max_batch_size != nib::BackendModel::NO_BATCHING) {
+      if (max_batch_size != 0) {
         batchn_shape[0] = total_batch_size;
       }
 
@@ -1805,7 +1800,7 @@ ModelInstanceState::ProcessRequests(
           auto& request = requests[idx];
           auto& response = responses[idx];
 
-          if (max_batch_size != nib::BackendModel::NO_BATCHING) {
+          if (max_batch_size != 0) {
             // [TODO] remember some input properties on the first call
             const char* name;
             TRITONBACKEND_RequestInputName(request, 0, &name);
