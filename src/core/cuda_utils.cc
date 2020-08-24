@@ -122,14 +122,19 @@ CopyBuffer(
   return Status::Success;
 }
 
-Status
-CopyBufferHandler(void* task_data)
+void
+CopyBufferHandler(
+    const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
+    const int64_t src_memory_type_id,
+    const TRITONSERVER_MemoryType dst_memory_type,
+    const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
+    void* dst, cudaStream_t cuda_stream, const bool* cuda_used,
+    SyncQueue<Status>* completion_queue)
 {
-  CopyBufferData* data = reinterpret_cast<CopyBufferData*>(task_data);
-  return CopyBuffer(
-      data->msg_, data->src_memory_type_, data->src_memory_type_id_,
-      data->dst_memory_type_, data->dst_memory_type_id_, data->byte_size_,
-      data->src_, data->dst_, data->cuda_stream_, data->cuda_used_);
+  completion_queue->Put(CopyBuffer(
+      msg, src_memory_type, src_memory_type_id, dst_memory_type,
+      dst_memory_type_id, byte_size, src, dst, cuda_stream,
+      const_cast<bool*>(cuda_used)));
 }
 
 #ifdef TRITON_ENABLE_GPU

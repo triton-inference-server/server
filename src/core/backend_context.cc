@@ -30,6 +30,7 @@
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/nvtx.h"
+#include "src/core/sync_queue.h"
 #include "src/core/thread_pool.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -343,7 +344,8 @@ BackendResponder::Finalize()
         &pinned_memory_type, &pinned_memory_id);
 
     std::deque<bool> cuda_used_vec(def.responses_.size(), false);
-    size_t offset = 0, idx = 0;
+    SyncQueue<Status> completion_queue;
+    size_t offset = 0, count = 0;
     for (auto& pr : def.responses_) {
       std::unique_ptr<InferenceResponse>* response = pr.first;
       InferenceResponse::Output* response_output = pr.second;
@@ -364,37 +366,54 @@ BackendResponder::Finalize()
                 status),
             "error sending TensorFlow response");
       } else {
-        std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
-            response_output->Name(), pinned_memory_type, pinned_memory_id,
-            response_memory_type, response_memory_type_id, response_byte_size,
-            pinned_buffer + offset, const_cast<void*>(response_buffer), stream_,
-            &cuda_used_vec[idx]));
-        AsyncWorkQueue::AddTask(
-            CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
-        idx++;
+        // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
+        if ((AsyncWorkQueue::GetWorkerCount() < 1) &&
+            (response_memory_type != TRITONSERVER_MEMORY_CPU)) {
+          status = CopyBuffer(
+              response_output->Name(), pinned_memory_type, pinned_memory_id,
+              response_memory_type, response_memory_type_id, response_byte_size,
+              pinned_buffer + offset, const_cast<void*>(response_buffer),
+              stream_, &cuda_used_vec[count]);
+
+          if (!status.IsOk()) {
+            LOG_STATUS_ERROR(
+                InferenceResponse::SendWithStatus(
+                    std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                    status),
+                "error sending TensorFlow response");
+          }
+        } else {
+          AsyncWorkQueue::AddTask(std::bind(
+              CopyBufferHandler, response_output->Name(), pinned_memory_type,
+              pinned_memory_id, response_memory_type, response_memory_type_id,
+              response_byte_size, pinned_buffer + offset,
+              const_cast<void*>(response_buffer), stream_,
+              &cuda_used_vec[count], &completion_queue));
+          count++;
+        }
       }
 
       offset += response_byte_size;
     }
 
-    std::vector<Status> status_queue;
-    AsyncWorkQueue::GetResults(&status_queue);
     for (size_t i = 0; i < cuda_used_vec.size(); i++) {
       need_sync_ |= cuda_used_vec[i];
     }
 
-    idx = 0;
+    size_t index = 0;
     for (auto& pr : def.responses_) {
-      if (idx < status_queue.size()) {
-        if (!status_queue[idx].IsOk()) {
+      if (index < count) {
+        auto completed_status = completion_queue.Get();
+        if (!completed_status.IsOk()) {
           std::unique_ptr<InferenceResponse>* response = pr.first;
           LOG_STATUS_ERROR(
               InferenceResponse::SendWithStatus(
                   std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                  status_queue[idx]),
+                  completed_status),
               "error sending TensorFlow response");
         }
       }
+      index++;
     }
   }
 
@@ -520,8 +539,8 @@ BackendResponder::FlushPendingPinned(
             response_memory_type, response_memory_type_id, response_byte_size,
             tensor_buffer + pending_pinned_offset_ + offset,
             const_cast<void*>(response_buffer), stream_, &cuda_used_vec[idx]));
-        AsyncWorkQueue::AddTask(
-            CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
+        // AsyncWorkQueue::AddTask(
+        //     CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
         idx++;
       }
 
@@ -529,7 +548,7 @@ BackendResponder::FlushPendingPinned(
     }
 
     std::vector<Status> status_queue;
-    AsyncWorkQueue::GetResults(&status_queue);
+    // AsyncWorkQueue::GetResults(&status_queue);
     for (size_t i = 0; i < cuda_used_vec.size(); i++) {
       need_sync_ |= cuda_used_vec[i];
     }
@@ -609,8 +628,8 @@ BackendResponder::FlushPendingPinned(
               response_memory_type, response_memory_type_id, response_byte_size,
               pinned_buffer + offset, const_cast<void*>(response_buffer),
               stream_, &cuda_used_vec[idx]));
-          AsyncWorkQueue::AddTask(
-              CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
+          // AsyncWorkQueue::AddTask(
+          //     CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
           idx++;
         }
 
@@ -618,7 +637,7 @@ BackendResponder::FlushPendingPinned(
       }
 
       std::vector<Status> status_queue;
-      AsyncWorkQueue::GetResults(&status_queue);
+      // AsyncWorkQueue::GetResults(&status_queue);
       for (size_t i = 0; i < cuda_used_vec.size(); i++) {
         need_sync_ |= cuda_used_vec[i];
       }
@@ -907,13 +926,13 @@ BackendInputCollector::Finalize()
         def.pinned_memory_->TotalByteSize(), pinned_buffer,
         def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
         &cuda_used_vec[idx]));
-    AsyncWorkQueue::AddTask(
-        CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
+    // AsyncWorkQueue::AddTask(
+    //     CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
     idx++;
   }
 
   std::vector<Status> status_queue;
-  AsyncWorkQueue::GetResults(&status_queue);
+  // AsyncWorkQueue::GetResults(&status_queue);
   for (size_t i = 0; i < cuda_used_vec.size(); i++) {
     need_sync_ |= cuda_used_vec[i];
   }
@@ -1017,21 +1036,21 @@ BackendInputCollector::SetFixedSizeInputTensor(
       return cuda_copy;
     }
 
-    // Direct copy without intermediate pinned memory.
-    std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
-        request_input->Name(), src_memory_type, src_memory_type_id,
-        tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
-        tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-        &cuda_used_vec[idx]));
-    AsyncWorkQueue::AddTask(
-        CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
+    // // Direct copy without intermediate pinned memory.
+    // std::unique_ptr<CopyBufferData> task_data(new CopyBufferData(
+    //     request_input->Name(), src_memory_type, src_memory_type_id,
+    //     tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
+    //     tensor_buffer + tensor_buffer_offset + input_offset, stream_,
+    //     &cuda_used_vec[idx]));
+    // AsyncWorkQueue::AddTask(
+    //     CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
 
 
     input_offset += src_byte_size;
   }
 
   std::vector<Status> status_queue;
-  AsyncWorkQueue::GetResults(&status_queue);
+  // AsyncWorkQueue::GetResults(&status_queue);
   for (size_t i = 0; i < cuda_used_vec.size(); i++) {
     cuda_copy |= cuda_used_vec[i];
   }

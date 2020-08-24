@@ -52,27 +52,11 @@ class AsyncWorkQueue {
   static size_t GetWorkerCount() { return GetSingleton()->thread_count_; }
 
   // Add task thread to queue.
-  static void AddTask(const std::function<Status(void*)> task, void* task_data)
+  static void AddTask(const std::function<void(void)> task)
   {
     std::lock_guard<std::mutex> lock(GetSingleton()->mutex_);
     GetSingleton()->task_queue_.Put(task);
-    GetSingleton()->data_queue_.Put(task_data);
     GetSingleton()->queue_pending.notify_one();
-  }
-
-  // Wait till queue is empty and return vector of status
-  static void GetResults(std::vector<Status>* status_queue)
-  {
-    while (!GetSingleton()->task_queue_.Empty()) {
-    }
-
-    GetSingleton()->queue_pending.notify_one();
-    std::lock_guard<std::mutex> lock(GetSingleton()->mutex_);
-
-    while (!GetSingleton()->status_queue_.Empty()) {
-      auto status = std::move(GetSingleton()->status_queue_.Get());
-      status_queue->push_back(status);
-    }
   }
 
  private:
@@ -100,8 +84,8 @@ class AsyncWorkQueue {
 
   static void Initialize(size_t worker_id)
   {
-    std::function<Status(void*)> task;
-    void* task_data;
+    std::function<void(void)> task;
+    // void* task_data;
 
     while (true) {
       {
@@ -114,18 +98,14 @@ class AsyncWorkQueue {
           return;
 
         task = GetSingleton()->task_queue_.Get();
-        task_data = GetSingleton()->data_queue_.Get();
       }
-      Status status = task(task_data);
-      GetSingleton()->status_queue_.Put(status);
+      task();
     }
   }
 
   size_t thread_count_;
   std::vector<std::unique_ptr<std::thread>> worker_threads_;
-  SyncQueue<Status> status_queue_;
-  SyncQueue<std::function<Status(void*)>> task_queue_;
-  SyncQueue<void*> data_queue_;
+  SyncQueue<std::function<void(void)>> task_queue_;
   std::condition_variable queue_pending;
   std::mutex mutex_;
   bool exit_;

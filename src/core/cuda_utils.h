@@ -33,6 +33,8 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
+#include "src/core/sync_queue.h"
+
 namespace nvidia { namespace inferenceserver {
 
 #ifdef TRITON_ENABLE_GPU
@@ -124,6 +126,12 @@ struct CopyBufferData {
 };
 
 // Helper around CopyBuffer
-Status CopyBufferHandler(void* data);
+void CopyBufferHandler(
+    const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
+    const int64_t src_memory_type_id,
+    const TRITONSERVER_MemoryType dst_memory_type,
+    const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
+    void* dst, cudaStream_t cuda_stream, const bool* cuda_used,
+    SyncQueue<Status>* completion_queue);
 
 }}  // namespace nvidia::inferenceserver
