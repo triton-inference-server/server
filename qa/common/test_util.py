@@ -238,7 +238,7 @@ class TestResultCollector(unittest.TestCase):
     # TestResultCollector stores test result and prints it to stdout. In order
     # to use this class, unit tests must inherit this class. Use
     # `check_test_results` bash function from `common/util.sh` to verify the
-    # expected number tests produced by this class
+    # expected number of tests produced by this class
 
     @classmethod
     def setResult(cls, total, errors, failures):
