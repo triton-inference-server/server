@@ -214,6 +214,9 @@ class TritonServerOptions {
   unsigned int ExitTimeout() const { return exit_timeout_; }
   void SetExitTimeout(unsigned int t) { exit_timeout_ = t; }
 
+  unsigned int AsyncWorkerCount() const { return async_worker_count_; }
+  void SetAsyncWorkerCount(unsigned int c) { async_worker_count_ = c; }
+
   bool Metrics() const { return metrics_; }
   void SetMetrics(bool b) { metrics_ = b; }
 
@@ -256,6 +259,7 @@ class TritonServerOptions {
   bool metrics_;
   bool gpu_metrics_;
   unsigned int exit_timeout_;
+  unsigned int async_worker_count_;
   uint64_t pinned_memory_pool_size_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_compute_capability_;
@@ -966,6 +970,16 @@ TRITONSERVER_ServerOptionsSetExitTimeout(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_ServerOptionsSetAsyncWorkerCount(
+    TRITONSERVER_ServerOptions* options, unsigned int worker_count)
+{
+  TritonServerOptions* loptions =
+      reinterpret_cast<TritonServerOptions*>(options);
+  loptions->SetAsyncWorkerCount(worker_count);
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetLogInfo(
     TRITONSERVER_ServerOptions* options, bool log)
 {
@@ -1524,7 +1538,7 @@ TRITONSERVER_ServerNew(
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
-  ni::AsyncWorkQueue::SetWorkerCount(4);
+  ni::AsyncWorkQueue::SetWorkerCount(loptions->AsyncWorkerCount());
 
   // FIXME these should be removed once all backends use
   // BackendConfig.

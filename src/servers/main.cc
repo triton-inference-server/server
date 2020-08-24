@@ -163,6 +163,7 @@ enum OptionId {
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_BACKEND_DIR,
+  OPTION_ASYNC_WORKER_COUNT,
   OPTION_BACKEND_CONFIG
 };
 
@@ -324,6 +325,9 @@ std::vector<Option> options_
       {OPTION_BACKEND_DIR, "backend-directory", Option::ArgStr,
        "The global directory searched for backend shared libraries. Default is "
        "'/opt/tritonserver/backends'."},
+      {OPTION_ASYNC_WORKER_COUNT, "async-worker-count", Option::ArgInt,
+       "Number of async worker threads. Utilizes async worker threads only "
+       "when set to > 1. Default is 0."},
   {
     OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
         "Specify a backend-specific configuration setting. The format of this "
@@ -807,6 +811,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
+  int32_t async_worker_count = 0;
 
   std::string backend_dir = "/opt/tritonserver/backends";
   std::vector<std::tuple<std::string, std::string, std::string>>
@@ -993,6 +998,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_BACKEND_DIR:
         backend_dir = optarg;
         break;
+      case OPTION_ASYNC_WORKER_COUNT:
+        async_worker_count = ParseIntOption(optarg);
+        break;
       case OPTION_BACKEND_CONFIG:
         backend_config_settings.push_back(ParseBackendConfigOption(optarg));
         break;
@@ -1094,6 +1102,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetExitTimeout(
           loptions, std::max(0, exit_timeout_secs)),
+      "setting exit timeout");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetAsyncWorkerCount(
+          loptions, std::max(0, async_worker_count)),
       "setting exit timeout");
 
 #ifdef TRITON_ENABLE_LOGGING

@@ -42,11 +42,14 @@ class AsyncWorkQueue {
   // Should only be called once to set the number of worker threads.
   static void SetWorkerCount(size_t thread_count)
   {
+    GetSingleton()->thread_count_ = thread_count;
     GetSingleton()->exit_ = false;
     for (size_t id = 0; id < thread_count; id++)
       GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
           new std::thread([id] { Initialize(id); })));
   }
+
+  static size_t GetWorkerCount() { return GetSingleton()->thread_count_; }
 
   // Add task thread to queue.
   static void AddTask(const std::function<Status(void*)> task, void* task_data)
@@ -118,6 +121,7 @@ class AsyncWorkQueue {
     }
   }
 
+  size_t thread_count_;
   std::vector<std::unique_ptr<std::thread>> worker_threads_;
   SyncQueue<Status> status_queue_;
   SyncQueue<std::function<Status(void*)>> task_queue_;
