@@ -707,10 +707,6 @@ class ModelState : public nib::BackendModel {
   virtual ~ModelState() = default;
 
   ::BackendConfig* BackendConfig() const { return backend_config_; }
-  const std::unordered_map<std::string, std::string>& ModelPaths() const
-  {
-    return model_paths_;
-  }
   bool IsGraphdef() const { return is_graphdef_; }
 
  private:
@@ -723,7 +719,6 @@ class ModelState : public nib::BackendModel {
   TRITONSERVER_Error* ValidateModelConfig();
 
   ::BackendConfig* backend_config_;
-  std::unordered_map<std::string, std::string> model_paths_;
   bool is_graphdef_;
 };
 
@@ -788,9 +783,6 @@ ModelState::ModelState(TRITONBACKEND_Model* triton_model)
                                          Name() + "'")
                                             .c_str()));
   }
-
-  THROW_IF_BACKEND_MODEL_ERROR(nib::ModelPaths(
-      RepositoryPath(), Version(), is_graphdef_, !is_graphdef_, &model_paths_));
 }
 
 // FIXME, where should just be methods in ModelState
@@ -1010,40 +1002,23 @@ ModelState::AutoCompleteConfig()
       default_model_filename = "model.savedmodel";
     }
 
+    auto model_path = nib::JoinPath(
+        {RepositoryPath(), std::to_string(Version()), default_model_filename});
+
     TRTISTF_Model* trtistf_model = nullptr;
     TRTISTF_Error* err = nullptr;
-    auto it = model_paths_.find(default_model_filename);
-    if (it != model_paths_.end()) {
+
+    bool exists;
+    RETURN_IF_ERROR(nib::FileExists(model_path, &exists));
+    if (exists) {
       err = TRTISTF_ModelCreateFromSavedModel(
-          &trtistf_model, Name().c_str(), it->second.c_str(),
+          &trtistf_model, Name().c_str(), model_path.c_str(),
           TRTISTF_NO_GPU_DEVICE, false /* have_graph */, 0 /* graph_level */,
           backend_config_->allow_gpu_memory_growth_,
           backend_config_->per_process_gpu_memory_fraction_,
           backend_config_->allow_soft_placement_,
           backend_config_->memory_limit_mb_, nullptr /* tftrt_config */,
           false /* auto_mixed precision */);
-    }
-
-    // If 'default_model_filename' fails, traverse all possible model files
-    if (err != nullptr) {
-      for (it = model_paths_.begin(); it != model_paths_.end(); it++) {
-        if (it->first == default_model_filename) {
-          continue;
-        }
-        // Release previous error
-        TRTISTF_ErrorDelete(err);
-        err = TRTISTF_ModelCreateFromSavedModel(
-            &trtistf_model, Name().c_str(), it->second.c_str(),
-            TRTISTF_NO_GPU_DEVICE, false /* have_graph */, 0 /* graph_level */,
-            backend_config_->allow_gpu_memory_growth_,
-            backend_config_->per_process_gpu_memory_fraction_,
-            backend_config_->allow_soft_placement_,
-            backend_config_->memory_limit_mb_, nullptr /* tftrt_config */,
-            false /* auto_mixed precision */);
-        if (err == nullptr) {
-          break;
-        }
-      }
     }
 
     if (err != nullptr) {
@@ -1187,12 +1162,17 @@ ModelInstanceState::Create(
     }
   }
 
-  const auto& gdp_itr = model_state->ModelPaths().find(cc_model_filename);
-  if (gdp_itr == model_state->ModelPaths().end()) {
+  auto model_path = nib::JoinPath({model_state->RepositoryPath(),
+                                   std::to_string(model_state->Version()),
+                                   cc_model_filename});
+
+  {
+    bool exists;
+    RETURN_IF_ERROR(nib::FileExists(model_path, &exists));
     RETURN_ERROR_IF_FALSE(
-        false, TRITONSERVER_ERROR_INTERNAL,
-        (std::string("unable to find model '") + cc_model_filename + "' for " +
-         (*state)->Name()));
+        exists, TRITONSERVER_ERROR_UNAVAILABLE,
+        std::string("unable to find '") + model_path +
+            "' for model instance '" + (*state)->Name() + "'");
   }
 
   int gpu_device;
@@ -1341,8 +1321,8 @@ ModelInstanceState::Create(
   TRTISTF_Model* model = nullptr;
   if (model_state->IsGraphdef()) {
     RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromGraphDef(
-        &model, model_state->Name().c_str(), gdp_itr->second.c_str(),
-        gpu_device, has_graph_level, graph_level,
+        &model, model_state->Name().c_str(), model_path.c_str(), gpu_device,
+        has_graph_level, graph_level,
         model_state->BackendConfig()->allow_gpu_memory_growth_,
         model_state->BackendConfig()->per_process_gpu_memory_fraction_,
         model_state->BackendConfig()->allow_soft_placement_,
@@ -1354,8 +1334,8 @@ ModelInstanceState::Create(
         model_state->Name(), model_state->ModelConfig(), model));
   } else {
     RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromSavedModel(
-        &model, model_state->Name().c_str(), gdp_itr->second.c_str(),
-        gpu_device, has_graph_level, graph_level,
+        &model, model_state->Name().c_str(), model_path.c_str(), gpu_device,
+        has_graph_level, graph_level,
         model_state->BackendConfig()->allow_gpu_memory_growth_,
         model_state->BackendConfig()->per_process_gpu_memory_fraction_,
         model_state->BackendConfig()->allow_soft_placement_,
