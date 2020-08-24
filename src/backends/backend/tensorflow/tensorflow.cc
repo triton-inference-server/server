@@ -1437,14 +1437,9 @@ ModelInstanceState::ProcessRequests(
     if (max_batch_size > 0) {
       // Retrieve the batch size from one of the inputs,
       // if the model support batching, the first dimension size is batch size
-      //
-      // FIXME A backend API to get input by index would be must faster here
-      const char* name;
-      auto err = TRITONBACKEND_RequestInputName(requests[i], 0, &name);
       TRITONBACKEND_Input* input;
-      if (err == nullptr) {
-        err = TRITONBACKEND_RequestInput(requests[i], name, &input);
-      }
+      auto err =
+          TRITONBACKEND_RequestInputByIndex(requests[i], 0 /* index */, &input);
       if (err == nullptr) {
         const int64_t* shape;
         err = TRITONBACKEND_InputProperties(
@@ -1539,17 +1534,15 @@ ModelInstanceState::ProcessRequests(
     uint32_t input_count;
     TRITONBACKEND_RequestInputCount(requests[0], &input_count);
     for (uint32_t input_idx = 0; input_idx < input_count; input_idx++) {
-      const char* name;
-      TRITONBACKEND_RequestInputName(requests[0], input_idx, &name);
       TRITONBACKEND_Input* input;
-      TRITONBACKEND_RequestInput(requests[0], name, &input);
+      TRITONBACKEND_RequestInputByIndex(requests[0], input_idx, &input);
+      const char* name;
       TRITONSERVER_DataType datatype;
       const int64_t* shape;
       uint32_t dims_count;
       uint32_t buffer_count;
       TRITONBACKEND_InputProperties(
-          input, nullptr, &datatype, &shape, &dims_count, nullptr,
-          &buffer_count);
+          input, &name, &datatype, &shape, &dims_count, nullptr, &buffer_count);
 
       // The shape for the entire input patch, [total_batch_size, ...]
       std::vector<int64_t> batchn_shape(shape, shape + dims_count);
@@ -1782,10 +1775,8 @@ ModelInstanceState::ProcessRequests(
 
           if (max_batch_size != 0) {
             // [TODO] remember some input properties on the first call
-            const char* name;
-            TRITONBACKEND_RequestInputName(request, 0, &name);
             TRITONBACKEND_Input* input;
-            TRITONBACKEND_RequestInput(request, name, &input);
+            TRITONBACKEND_RequestInputByIndex(request, 0 /* index*/, &input);
             const int64_t* shape;
             TRITONBACKEND_InputProperties(
                 input, nullptr, nullptr, &shape, nullptr, nullptr, nullptr);
