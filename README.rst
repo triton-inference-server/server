@@ -42,9 +42,7 @@ NVIDIA Triton Inference Server
     changes during the transition from V1 to V2. A legacy V1 version
     of Triton will be released from the master-v1 branch. The V1
     version of Triton is deprecated and no releases beyond 20.07 are
-    planned. More information on the V1 and V2 transition is available
-    in** `Roadmap
-    <https://github.com/NVIDIA/triton-inference-server/blob/master/README.rst#roadmap>`_.
+    planned.**
 
 .. overview-begin-marker-do-not-remove
 
@@ -62,9 +60,10 @@ features:
   server can manage any number and mix of models (limited by system
   disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
   TensorFlow SavedModel, ONNX, PyTorch, and Caffe2 NetDef model
-  formats. Also supports TensorFlow-TensorRT and ONNX-TensorRT
-  integrated models. Variable-size input and output tensors are
-  allowed if supported by the framework. See `Capabilities
+  formats. Both TensorFlow 1.x and TensorFlow 2.x are supported. Also
+  supports TensorFlow-TensorRT and ONNX-TensorRT integrated
+  models. Variable-size input and output tensors are allowed if
+  supported by the framework. See `Capabilities
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/capabilities.html#capabilities>`_
   for detailed support information for each framework.
 
@@ -187,51 +186,6 @@ transitioning from version 1 to version 2:
 * In the Docker containers the environment variables indicating the
   Triton version have changed to have a TRITON prefix, for example,
   TRITON_SERVER_VERSION.
-
-Roadmap
--------
-
-The 20.03.1 release of Triton consists of a single server/container
-that supports both the existing version 1 APIs and protocols and the
-new version 2 APIs and protocols. For version 2 the release is beta
-quality and includes the new `HTTP/REST and GRPC protocols
-<https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2>`_
-and corresponding new C++ and Python client libraries. Version 2 also
-includes a beta release of the new server C API defined in
-tritionserver.h.
-
-The upcoming 20.06 release of Triton will include two separate server
-containers:
-
-* A legacy V1 version of Triton will be released from the master-v1
-  branch. The NGC container for the V1 version of Triton will be
-  called tritonserver:20.06-v1-py3. The V1 version of Triton is
-  deprecated and no releases beyond 20.06 are planned. The V1 version
-  of Triton maintains backwards compatibility with prior V1 versions
-  in both the server APIs and in the C++ and Python libraries. See the
-  `master-v1 branch README
-  <https://github.com/NVIDIA/triton-inference-server/tree/master-v1>`_
-  for more information.
-
-* The new V2 version of Triton will be released from the master branch
-  and will include the new GRPC and HTTP protocols based on `inference
-  protocols
-  <https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2>`_
-  that have been proposed by the `KFServing project
-  <https://github.com/kubeflow/kfserving>`_. Version 2 of Triton will
-  also have a new C API and new C++ and Python client libraries. The
-  NGC container for version 2 of Triton will be called
-  tritonserver:20.06-py3.
-
-For both V1 and V2 the model repository struture and custom backend
-APIs will remain unchanged so that any existing model repository and
-custom backends will continue to work with Triton Server.
-
-In the 20.06 V2 release there will be some changes to the tritonserver
-command-line executable arguments to remove deprecated arguments and
-adjust defaults. The changes will be detailed as part of the 20.06
-release. It will be necessary to revisit and possibly adjust
-invocations of tritonserver executable.
 
 Documentation
 -------------
