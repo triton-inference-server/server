@@ -146,8 +146,8 @@ FROM ${TENSORFLOW2_IMAGE} AS tritonserver_tf2
 ############################################################################
 FROM ${BASE_IMAGE} AS tritonserver_build
 
-ARG TRITON_VERSION=2.2.0dev
-ARG TRITON_CONTAINER_VERSION=20.08dev
+ARG TRITON_VERSION=2.2.0
+ARG TRITON_CONTAINER_VERSION=20.08
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
@@ -366,8 +366,8 @@ ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRITON_VERSION=2.2.0dev
-ARG TRITON_CONTAINER_VERSION=20.08dev
+ARG TRITON_VERSION=2.2.0
+ARG TRITON_CONTAINER_VERSION=20.08
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -377,7 +377,7 @@ LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
 
-# Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom 
+# Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom
 # ops from that path
 ENV LD_LIBRARY_PATH /opt/tritonserver/lib/pytorch/:$LD_LIBRARY_PATH
 
