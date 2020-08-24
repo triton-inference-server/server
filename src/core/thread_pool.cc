@@ -35,7 +35,7 @@
 namespace nvidia { namespace inferenceserver {
 
 // template <typename T>
-// ThreadPool<T>::~ThreadPool()
+// AsyncWorkQueue<T>::~AsyncWorkQueue()
 // {
 //   {
 //     std::lock_guard<std::mutex> lock(mutex_);

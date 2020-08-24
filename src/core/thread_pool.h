@@ -37,7 +37,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class ThreadPool {
+class AsyncWorkQueue {
  public:
   // Should only be called once to set the number of worker threads.
   static void SetWorkerCount(size_t thread_count)
@@ -73,8 +73,8 @@ class ThreadPool {
   }
 
  private:
-  ThreadPool(){};
-  ~ThreadPool()
+  AsyncWorkQueue(){};
+  ~AsyncWorkQueue()
   {
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -89,9 +89,9 @@ class ThreadPool {
     }
   }
 
-  static ThreadPool* GetSingleton()
+  static AsyncWorkQueue* GetSingleton()
   {
-    static ThreadPool singleton;
+    static AsyncWorkQueue singleton;
     return &singleton;
   }
 

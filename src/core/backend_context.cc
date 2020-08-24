@@ -369,7 +369,7 @@ BackendResponder::Finalize()
             response_memory_type, response_memory_type_id, response_byte_size,
             pinned_buffer + offset, const_cast<void*>(response_buffer), stream_,
             &cuda_used_vec[idx]));
-        ThreadPool::AddTask(
+        AsyncWorkQueue::AddTask(
             CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
         idx++;
       }
@@ -378,7 +378,7 @@ BackendResponder::Finalize()
     }
 
     std::vector<Status> status_queue;
-    ThreadPool::GetResults(&status_queue);
+    AsyncWorkQueue::GetResults(&status_queue);
     for (size_t i = 0; i < cuda_used_vec.size(); i++) {
       need_sync_ |= cuda_used_vec[i];
     }
@@ -520,7 +520,7 @@ BackendResponder::FlushPendingPinned(
             response_memory_type, response_memory_type_id, response_byte_size,
             tensor_buffer + pending_pinned_offset_ + offset,
             const_cast<void*>(response_buffer), stream_, &cuda_used_vec[idx]));
-        ThreadPool::AddTask(
+        AsyncWorkQueue::AddTask(
             CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
         idx++;
       }
@@ -529,7 +529,7 @@ BackendResponder::FlushPendingPinned(
     }
 
     std::vector<Status> status_queue;
-    ThreadPool::GetResults(&status_queue);
+    AsyncWorkQueue::GetResults(&status_queue);
     for (size_t i = 0; i < cuda_used_vec.size(); i++) {
       need_sync_ |= cuda_used_vec[i];
     }
@@ -609,7 +609,7 @@ BackendResponder::FlushPendingPinned(
               response_memory_type, response_memory_type_id, response_byte_size,
               pinned_buffer + offset, const_cast<void*>(response_buffer),
               stream_, &cuda_used_vec[idx]));
-          ThreadPool::AddTask(
+          AsyncWorkQueue::AddTask(
               CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
           idx++;
         }
@@ -618,7 +618,7 @@ BackendResponder::FlushPendingPinned(
       }
 
       std::vector<Status> status_queue;
-      ThreadPool::GetResults(&status_queue);
+      AsyncWorkQueue::GetResults(&status_queue);
       for (size_t i = 0; i < cuda_used_vec.size(); i++) {
         need_sync_ |= cuda_used_vec[i];
       }
@@ -907,13 +907,13 @@ BackendInputCollector::Finalize()
         def.pinned_memory_->TotalByteSize(), pinned_buffer,
         def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
         &cuda_used_vec[idx]));
-    ThreadPool::AddTask(
+    AsyncWorkQueue::AddTask(
         CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
     idx++;
   }
 
   std::vector<Status> status_queue;
-  ThreadPool::GetResults(&status_queue);
+  AsyncWorkQueue::GetResults(&status_queue);
   for (size_t i = 0; i < cuda_used_vec.size(); i++) {
     need_sync_ |= cuda_used_vec[i];
   }
@@ -1023,7 +1023,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
         tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
         tensor_buffer + tensor_buffer_offset + input_offset, stream_,
         &cuda_used_vec[idx]));
-    ThreadPool::AddTask(
+    AsyncWorkQueue::AddTask(
         CopyBufferHandler, reinterpret_cast<void*>(task_data.get()));
 
 
@@ -1031,7 +1031,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
   }
 
   std::vector<Status> status_queue;
-  ThreadPool::GetResults(&status_queue);
+  AsyncWorkQueue::GetResults(&status_queue);
   for (size_t i = 0; i < cuda_used_vec.size(); i++) {
     cuda_copy |= cuda_used_vec[i];
   }
