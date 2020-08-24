@@ -374,7 +374,7 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
     if (c == 1) {
       sample_final = sample_type - cv::Scalar(128);
     } else {
-      sample_final = sample_type - cv::Scalar(104, 117, 123);
+      sample_final = sample_type - cv::Scalar(123, 117, 104);
     }
   } else if (scaling_ == ScaleType::ONE255) {
     if (c == 1) {
