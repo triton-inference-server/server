@@ -40,10 +40,6 @@ namespace nvidia { namespace inferenceserver { namespace backend {
 //
 class BackendModel {
  public:
-  // Max batch size value that indicates batching is not supported for
-  // this model.
-  static constexpr int NO_BATCHING = 0;
-
   BackendModel(TRITONBACKEND_Model* triton_model);
   virtual ~BackendModel() = default;
 
@@ -61,7 +57,7 @@ class BackendModel {
   // The model configuration.
   TritonJson::Value& ModelConfig() { return model_config_; }
 
-  // Maximum batch size supported by the model. A value of NO_BATCHING
+  // Maximum batch size supported by the model. A value of 0
   // indicates that the model does not support batching.
   int MaxBatchSize() const { return max_batch_size_; }
 

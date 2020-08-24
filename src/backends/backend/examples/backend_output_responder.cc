@@ -79,7 +79,7 @@ BackendOutputResponder::ProcessTensor(
     }
 
     // Override shape to be correct for this response.
-    if (max_batch_size_ != BackendModel::NO_BATCHING) {
+    if (max_batch_size_ != 0) {
       const char* name;
       TRITONBACKEND_RequestInputName(request, 0, &name);
       TRITONBACKEND_Input* input;
