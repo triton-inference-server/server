@@ -78,8 +78,12 @@ MINIO_PID=$!
 export AWS_ACCESS_KEY_ID=minio && \
     export AWS_SECRET_ACCESS_KEY=miniostorage
 
-# Force version to 0.7 to prevent failures due to version changes. 
+# Force version to 0.7 to prevent failures due to version changes
 python -m pip install awscli-local==0.07
+
+# Cleanup bucket if exists
+awslocal s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
+    awslocal s3 rb s3://demo-bucket1.0 || true
 
 # Create and add data to bucket
 awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket1.0 && \
@@ -171,7 +175,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Cleanup old bucket if exists.
+# Destroy bucket
 awslocal s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
     awslocal s3 rb s3://demo-bucket1.0
 
