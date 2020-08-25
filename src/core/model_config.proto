@@ -600,7 +600,7 @@ message ModelOptimizationPolicy
       //@@
       //@@         Specification of tensor dimension.
       //@@
-      message Dims {
+      message Shape {
         //@@        .. cpp:var:: int64 dim (repeated)
         //@@
         //@@           The dimension.
@@ -610,15 +610,18 @@ message ModelOptimizationPolicy
 
       //@@      .. cpp:var:: int32 batch_size
       //@@
-      //@@         The batch size of the CUDA graph.
+      //@@         The batch size of the CUDA graph. If 'max_batch_size' is 0,
+      //@@         'batch_size' must be set to 0. Otherwise, 'batch_size' must
+      //@@         be set to value between 1 and 'max_batch_size'.
       //@@
       int32 batch_size = 1;
 
-      //@@      .. cpp:var:: map<string, Dims> input
+      //@@      .. cpp:var:: map<string, Shape> input
       //@@
-      //@@         The specification of the inputs.
+      //@@         The specification of the inputs. 'Shape' is the shape of the
+      //@@         input without batching dimension.
       //@@
-      map<string, Dims> input = 2;
+      map<string, Shape> input = 2;
     }
 
     //@@    .. cpp:var:: bool graphs
