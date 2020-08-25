@@ -367,9 +367,17 @@ BackendResponder::Finalize()
             "error sending TensorFlow response");
       } else {
         // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-        if ((AsyncWorkQueue::GetWorkerCount() < 1) &&
-            !((response_memory_type == TRITONSERVER_MEMORY_CPU) &&
-              (pinned_memory_type == TRITONSERVER_MEMORY_CPU))) {
+        if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+            (response_memory_type == TRITONSERVER_MEMORY_CPU) &&
+            (pinned_memory_type == TRITONSERVER_MEMORY_CPU)) {
+          AsyncWorkQueue::AddTask(std::bind(
+              CopyBufferHandler, response_output->Name(), pinned_memory_type,
+              pinned_memory_id, response_memory_type, response_memory_type_id,
+              response_byte_size, pinned_buffer + offset,
+              const_cast<void*>(response_buffer), stream_,
+              &cuda_used_vec[count], &completion_queue));
+          count++;
+        } else {
           status = CopyBuffer(
               response_output->Name(), pinned_memory_type, pinned_memory_id,
               response_memory_type, response_memory_type_id, response_byte_size,
@@ -383,14 +391,6 @@ BackendResponder::Finalize()
                     status),
                 "error sending TensorFlow response");
           }
-        } else {
-          AsyncWorkQueue::AddTask(std::bind(
-              CopyBufferHandler, response_output->Name(), pinned_memory_type,
-              pinned_memory_id, response_memory_type, response_memory_type_id,
-              response_byte_size, pinned_buffer + offset,
-              const_cast<void*>(response_buffer), stream_,
-              &cuda_used_vec[count], &completion_queue));
-          count++;
         }
       }
 
@@ -537,9 +537,18 @@ BackendResponder::FlushPendingPinned(
             "error sending TensorFlow response");
       } else {
         // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-        if ((AsyncWorkQueue::GetWorkerCount() < 1) &&
-            !((response_memory_type == TRITONSERVER_MEMORY_CPU) &&
-              (tensor_memory_type == TRITONSERVER_MEMORY_CPU))) {
+        if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+            (response_memory_type == TRITONSERVER_MEMORY_CPU) &&
+            (tensor_memory_type == TRITONSERVER_MEMORY_CPU)) {
+          AsyncWorkQueue::AddTask(std::bind(
+              CopyBufferHandler, response_output->Name(), tensor_memory_type,
+              tensor_memory_type_id, response_memory_type,
+              response_memory_type_id, response_byte_size,
+              tensor_buffer + pending_pinned_offset_ + offset,
+              const_cast<void*>(response_buffer), stream_,
+              &cuda_used_vec[count], &completion_queue));
+          count++;
+        } else {
           status = CopyBuffer(
               response_output->Name(), tensor_memory_type,
               tensor_memory_type_id, response_memory_type,
@@ -555,15 +564,6 @@ BackendResponder::FlushPendingPinned(
                     status),
                 "error sending TensorFlow response");
           }
-        } else {
-          AsyncWorkQueue::AddTask(std::bind(
-              CopyBufferHandler, response_output->Name(), tensor_memory_type,
-              tensor_memory_type_id, response_memory_type,
-              response_memory_type_id, response_byte_size,
-              tensor_buffer + pending_pinned_offset_ + offset,
-              const_cast<void*>(response_buffer), stream_,
-              &cuda_used_vec[count], &completion_queue));
-          count++;
         }
       }
 
@@ -648,9 +648,17 @@ BackendResponder::FlushPendingPinned(
               "error sending TensorFlow response");
         } else {
           // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-          if ((AsyncWorkQueue::GetWorkerCount() < 1) &&
-              !((response_memory_type == TRITONSERVER_MEMORY_CPU) &&
-                (pinned_memory_type == TRITONSERVER_MEMORY_CPU))) {
+          if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+              (response_memory_type == TRITONSERVER_MEMORY_CPU) &&
+              (pinned_memory_type == TRITONSERVER_MEMORY_CPU)) {
+            AsyncWorkQueue::AddTask(std::bind(
+                CopyBufferHandler, response_output->Name(), pinned_memory_type,
+                pinned_memory_id, response_memory_type, response_memory_type_id,
+                response_byte_size, pinned_buffer + offset,
+                const_cast<void*>(response_buffer), stream_,
+                &cuda_used_vec[count], &completion_queue));
+            count++;
+          } else {
             status = CopyBuffer(
                 response_output->Name(), pinned_memory_type, pinned_memory_id,
                 response_memory_type, response_memory_type_id,
@@ -665,14 +673,6 @@ BackendResponder::FlushPendingPinned(
                       TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
                   "error sending TensorFlow response");
             }
-          } else {
-            AsyncWorkQueue::AddTask(std::bind(
-                CopyBufferHandler, response_output->Name(), pinned_memory_type,
-                pinned_memory_id, response_memory_type, response_memory_type_id,
-                response_byte_size, pinned_buffer + offset,
-                const_cast<void*>(response_buffer), stream_,
-                &cuda_used_vec[count], &completion_queue));
-            count++;
           }
         }
 
@@ -965,9 +965,17 @@ BackendInputCollector::Finalize()
         &pinned_memory_type, &pinned_memory_id);
 
     // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-    if ((AsyncWorkQueue::GetWorkerCount() < 1) &&
-        !((pinned_memory_type == TRITONSERVER_MEMORY_CPU) &&
-          (def.tensor_memory_type_ == TRITONSERVER_MEMORY_CPU))) {
+    if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+        ((pinned_memory_type == TRITONSERVER_MEMORY_CPU) &&
+         (def.tensor_memory_type_ == TRITONSERVER_MEMORY_CPU))) {
+      AsyncWorkQueue::AddTask(std::bind(
+          CopyBufferHandler, "pinned buffer", pinned_memory_type,
+          pinned_memory_id, def.tensor_memory_type_, def.tensor_memory_id_,
+          def.pinned_memory_->TotalByteSize(), pinned_buffer,
+          def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
+          &cuda_used_vec[count], &completion_queue));
+      count++;
+    } else {
       Status status = CopyBuffer(
           "pinned buffer", pinned_memory_type, pinned_memory_id,
           def.tensor_memory_type_, def.tensor_memory_id_,
@@ -989,14 +997,6 @@ BackendInputCollector::Finalize()
           }
         }
       }
-    } else {
-      AsyncWorkQueue::AddTask(std::bind(
-          CopyBufferHandler, "pinned buffer", pinned_memory_type,
-          pinned_memory_id, def.tensor_memory_type_, def.tensor_memory_id_,
-          def.pinned_memory_->TotalByteSize(), pinned_buffer,
-          def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
-          &cuda_used_vec[count], &completion_queue));
-      count++;
     }
   }
 
@@ -1070,7 +1070,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
 
   // Request input tensor data may be in multiple non-contiguous
   // buffers.
-  size_t input_offset = 0, count=0;
+  size_t input_offset = 0, count = 0;
   for (size_t idx = 0; idx < request_input->DataBufferCount(); ++idx) {
     const void* src_buffer;
     size_t src_byte_size;
@@ -1108,9 +1108,17 @@ BackendInputCollector::SetFixedSizeInputTensor(
 
     // Direct copy without intermediate pinned memory.
     // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-    if ((AsyncWorkQueue::GetWorkerCount() < 1) &&
-        !((src_memory_type == TRITONSERVER_MEMORY_CPU) &&
-          (tensor_memory_type == TRITONSERVER_MEMORY_CPU))) {
+    if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+        (src_memory_type == TRITONSERVER_MEMORY_CPU) &&
+        (tensor_memory_type == TRITONSERVER_MEMORY_CPU)) {
+      AsyncWorkQueue::AddTask(std::bind(
+          CopyBufferHandler, request_input->Name(), src_memory_type,
+          src_memory_type_id, tensor_memory_type, tensor_memory_type_id,
+          src_byte_size, src_buffer,
+          tensor_buffer + tensor_buffer_offset + input_offset, stream_,
+          &cuda_used_vec[count], &completion_queue));
+      count++;
+    } else {
       Status status = CopyBuffer(
           request_input->Name(), src_memory_type, src_memory_type_id,
           tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
@@ -1125,14 +1133,6 @@ BackendInputCollector::SetFixedSizeInputTensor(
             "error setting TensorFlow input tensor");
         return cuda_used_vec[count];
       }
-    } else {
-      AsyncWorkQueue::AddTask(std::bind(
-          CopyBufferHandler, request_input->Name(), src_memory_type,
-          src_memory_type_id, tensor_memory_type, tensor_memory_type_id,
-          src_byte_size, src_buffer,
-          tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-          &cuda_used_vec[count], &completion_queue));
-      count++;
     }
 
     input_offset += src_byte_size;
