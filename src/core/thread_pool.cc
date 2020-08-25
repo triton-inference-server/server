@@ -34,20 +34,74 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// template <typename T>
-// AsyncWorkQueue<T>::~AsyncWorkQueue()
-// {
-//   {
-//     std::lock_guard<std::mutex> lock(mutex_);
-//     exit_ = true;
-//     queuePending.notify_one();
-//   }
+AsyncWorkQueue::~AsyncWorkQueue()
+{
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    exit_ = true;
+    queue_pending.notify_one();
+  }
 
-//   for (auto& worker_thread : worker_threads_) {
-//     if (worker_thread->joinable()) {
-//       worker_thread->join();
-//     }
-//   }
-// }
+  for (auto& worker_thread : worker_threads_) {
+    if (worker_thread->joinable()) {
+      worker_thread->join();
+    }
+  }
+}
+
+AsyncWorkQueue*
+AsyncWorkQueue::GetSingleton()
+{
+  static AsyncWorkQueue singleton;
+  return &singleton;
+}
+
+void
+AsyncWorkQueue::SetWorkerCount(size_t thread_count)
+{
+  GetSingleton()->thread_count_ = thread_count;
+  if (thread_count > 1) {
+    GetSingleton()->exit_ = false;
+    for (size_t id = 0; id < thread_count; id++) {
+      GetSingleton()->worker_threads_.push_back(
+          std::unique_ptr<std::thread>(new std::thread([] { Initialize(); })));
+    }
+  }
+}
+
+size_t
+AsyncWorkQueue::GetWorkerCount()
+{
+  return GetSingleton()->thread_count_;
+}
+
+void
+AsyncWorkQueue::AddTask(const std::function<void(void)> task)
+{
+  std::lock_guard<std::mutex> lock(GetSingleton()->mutex_);
+  GetSingleton()->task_queue_.Put(task);
+  GetSingleton()->queue_pending.notify_one();
+}
+
+void
+AsyncWorkQueue::Initialize()
+{
+  std::function<void(void)> task;
+
+  while (true) {
+    {
+      std::unique_lock<std::mutex> lock(GetSingleton()->mutex_);
+      GetSingleton()->queue_pending.wait(lock, [&]() {
+        return GetSingleton()->exit_ || !GetSingleton()->task_queue_.Empty();
+      });
+
+      if (GetSingleton()->exit_)
+        return;
+
+      task = GetSingleton()->task_queue_.Get();
+    }
+    task();
+  }
+}
 
 }}  // namespace nvidia::inferenceserver

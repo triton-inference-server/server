@@ -40,68 +40,19 @@ namespace nvidia { namespace inferenceserver {
 class AsyncWorkQueue {
  public:
   // Should only be called once to set the number of worker threads.
-  static void SetWorkerCount(size_t thread_count)
-  {
-    GetSingleton()->thread_count_ = thread_count;
-    GetSingleton()->exit_ = false;
-    for (size_t id = 0; id < thread_count; id++)
-      GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
-          new std::thread([id] { Initialize(id); })));
-  }
+  static void SetWorkerCount(size_t thread_count);
 
-  static size_t GetWorkerCount() { return GetSingleton()->thread_count_; }
+  // Get the number of worker threads.
+  static size_t GetWorkerCount();
 
-  // Add task thread to queue.
-  static void AddTask(const std::function<void(void)> task)
-  {
-    std::lock_guard<std::mutex> lock(GetSingleton()->mutex_);
-    GetSingleton()->task_queue_.Put(task);
-    GetSingleton()->queue_pending.notify_one();
-  }
+  // Add a task to the queue.
+  static void AddTask(const std::function<void(void)> task);
 
  private:
-  AsyncWorkQueue(){};
-  ~AsyncWorkQueue()
-  {
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      exit_ = true;
-      queue_pending.notify_one();
-    }
-
-    for (auto& worker_thread : worker_threads_) {
-      if (worker_thread->joinable()) {
-        worker_thread->join();
-      }
-    }
-  }
-
-  static AsyncWorkQueue* GetSingleton()
-  {
-    static AsyncWorkQueue singleton;
-    return &singleton;
-  }
-
-  static void Initialize(size_t worker_id)
-  {
-    std::function<void(void)> task;
-    // void* task_data;
-
-    while (true) {
-      {
-        std::unique_lock<std::mutex> lock(GetSingleton()->mutex_);
-        GetSingleton()->queue_pending.wait(lock, [&]() {
-          return GetSingleton()->exit_ || !GetSingleton()->task_queue_.Empty();
-        });
-
-        if (GetSingleton()->exit_)
-          return;
-
-        task = GetSingleton()->task_queue_.Get();
-      }
-      task();
-    }
-  }
+  AsyncWorkQueue() = default;
+  ~AsyncWorkQueue();
+  static AsyncWorkQueue* GetSingleton();
+  static void Initialize();
 
   size_t thread_count_;
   std::vector<std::unique_ptr<std::thread>> worker_threads_;
