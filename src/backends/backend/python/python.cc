@@ -25,11 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <grpc/grpc.h>
+#include <grpc/support/time.h>
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
-#include <grpc/support/time.h>
 #include <stdio.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -378,8 +378,10 @@ ModelInstanceState::Create(
 
 ModelInstanceState::~ModelInstanceState()
 {
-  // Close python interpreter.
+  // Intentional empty scope, without this empty scope
+  // GRPC will NOT shutdown gracefully
   {
+    // Close python interpreter.
     grpc::ClientContext context;
     ni::Empty null_msg;
 
@@ -410,16 +412,16 @@ ModelInstanceState::~ModelInstanceState()
 
   gpr_timespec deadline = gpr_time_add(
       gpr_now(GPR_CLOCK_MONOTONIC),
-      gpr_time_from_millis(
-          static_cast<int64_t>(1e3) * 10,
-          GPR_TIMESPAN));
+      gpr_time_from_millis(static_cast<int64_t>(1e3) * 10, GPR_TIMESPAN));
 
   while (grpc_is_initialized()) {
     grpc_maybe_wait_for_async_shutdown();
-    gpr_sleep_until(gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
-                                 gpr_time_from_millis(1, GPR_TIMESPAN)));
+    gpr_sleep_until(gpr_time_add(
+        gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_millis(1, GPR_TIMESPAN)));
     if (gpr_time_cmp(gpr_now(GPR_CLOCK_MONOTONIC), deadline) > 0) {
-      LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "Time out occured while trying to shutdown the GRPC client");
+      LOG_MESSAGE(
+          TRITONSERVER_LOG_VERBOSE,
+          "Time out occured while trying to shutdown the GRPC client");
       grpc_shutdown_blocking();
       break;
     }
@@ -613,12 +615,12 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
 TRITONSERVER_Error*
 TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
 {
-  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "TRITONBACKEND_Finalize: Start" );
+  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "TRITONBACKEND_Finalize: Start");
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
   auto backend_state = reinterpret_cast<BackendState*>(vstate);
   delete backend_state;
-  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "TRITONBACKEND_Finalize: End" );
+  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "TRITONBACKEND_Finalize: End");
   return nullptr;  // success
 }
 
