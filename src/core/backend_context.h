@@ -34,7 +34,6 @@
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
-#include "src/core/thread_pool.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>

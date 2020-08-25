@@ -25,12 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <condition_variable>
 #include <deque>
-#include <future>
 #include <mutex>
 #include <thread>
 #include <vector>
 
-#include "src/core/thread_pool.h"
+#include "src/core/async_work_queue.h"
 
 namespace nvidia { namespace inferenceserver {
 

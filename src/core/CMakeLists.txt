@@ -137,7 +137,7 @@ set(
   backend.cc
   backend_context.cc
   cuda_utils.cc
-  thread_pool.cc
+  async_work_queue.cc
   dynamic_batch_scheduler.cc
   ensemble_scheduler.cc
   ensemble_utils.cc
@@ -169,7 +169,7 @@ set(
   backend_context.h
   constants.h
   cuda_utils.h
-  thread_pool.h
+  async_work_queue.h
   dynamic_batch_scheduler.h
   ensemble_scheduler.h
   ensemble_utils.h

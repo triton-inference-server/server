@@ -28,12 +28,12 @@
 #include <future>
 #include <set>
 #include "src/core/status.h"
+#include "src/core/sync_queue.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
-#include "src/core/sync_queue.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -96,7 +96,8 @@ Status GetSupportedGPUs(
     std::set<int>* supported_gpus, const double min_compute_capability);
 #endif
 
-// Helper around CopyBuffer that updates the completion queue with the returned status. 
+// Helper around CopyBuffer that updates the completion queue with the returned
+// status.
 void CopyBufferHandler(
     const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
     const int64_t src_memory_type_id,

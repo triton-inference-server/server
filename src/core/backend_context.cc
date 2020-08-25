@@ -26,12 +26,12 @@
 
 #include "src/core/backend_context.h"
 
+#include "src/core/async_work_queue.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/nvtx.h"
 #include "src/core/sync_queue.h"
-#include "src/core/thread_pool.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -345,7 +345,7 @@ BackendResponder::Finalize()
 
     std::deque<bool> cuda_used_vec(def.responses_.size(), false);
     SyncQueue<Status> completion_queue;
-    size_t offset = 0, count = 0;
+    size_t offset = 0, async_task_count = 0;
     for (auto& pr : def.responses_) {
       std::unique_ptr<InferenceResponse>* response = pr.first;
       InferenceResponse::Output* response_output = pr.second;
@@ -375,14 +375,14 @@ BackendResponder::Finalize()
               pinned_memory_id, response_memory_type, response_memory_type_id,
               response_byte_size, pinned_buffer + offset,
               const_cast<void*>(response_buffer), stream_,
-              &cuda_used_vec[count], &completion_queue));
-          count++;
+              &cuda_used_vec[async_task_count], &completion_queue));
+          async_task_count++;
         } else {
           status = CopyBuffer(
               response_output->Name(), pinned_memory_type, pinned_memory_id,
               response_memory_type, response_memory_type_id, response_byte_size,
               pinned_buffer + offset, const_cast<void*>(response_buffer),
-              stream_, &cuda_used_vec[count]);
+              stream_, &cuda_used_vec[async_task_count]);
 
           if (!status.IsOk()) {
             LOG_STATUS_ERROR(
@@ -403,7 +403,7 @@ BackendResponder::Finalize()
 
     size_t index = 0;
     for (auto& pr : def.responses_) {
-      if (index < count) {
+      if (index < async_task_count) {
         auto completed_status = completion_queue.Get();
         if (!completed_status.IsOk()) {
           std::unique_ptr<InferenceResponse>* response = pr.first;
@@ -515,7 +515,7 @@ BackendResponder::FlushPendingPinned(
 
     std::deque<bool> cuda_used_vec(pending_pinned_outputs_.size(), false);
     SyncQueue<Status> completion_queue;
-    size_t offset = 0, count = 0;
+    size_t offset = 0, async_task_count = 0;
     for (auto& pr : pending_pinned_outputs_) {
       std::unique_ptr<InferenceResponse>* response = pr.first;
       InferenceResponse::Output* response_output = pr.second;
@@ -546,8 +546,8 @@ BackendResponder::FlushPendingPinned(
               response_memory_type_id, response_byte_size,
               tensor_buffer + pending_pinned_offset_ + offset,
               const_cast<void*>(response_buffer), stream_,
-              &cuda_used_vec[count], &completion_queue));
-          count++;
+              &cuda_used_vec[async_task_count], &completion_queue));
+          async_task_count++;
         } else {
           status = CopyBuffer(
               response_output->Name(), tensor_memory_type,
@@ -555,7 +555,7 @@ BackendResponder::FlushPendingPinned(
               response_memory_type_id, response_byte_size,
               tensor_buffer + pending_pinned_offset_ + offset,
               const_cast<void*>(response_buffer), stream_,
-              &cuda_used_vec[count]);
+              &cuda_used_vec[async_task_count]);
 
           if (!status.IsOk()) {
             LOG_STATUS_ERROR(
@@ -576,7 +576,7 @@ BackendResponder::FlushPendingPinned(
 
     size_t index = 0;
     for (auto& pr : pending_pinned_outputs_) {
-      if (index < count) {
+      if (index < async_task_count) {
         auto completed_status = completion_queue.Get();
         if (!completed_status.IsOk()) {
           std::unique_ptr<InferenceResponse>* response = pr.first;
@@ -626,7 +626,7 @@ BackendResponder::FlushPendingPinned(
     if (!cuda_used) {
       std::deque<bool> cuda_used_vec(pending_pinned_outputs_.size(), false);
       SyncQueue<Status> completion_queue;
-      size_t offset = 0, count = 0;
+      size_t offset = 0, async_task_count = 0;
       for (auto& pr : pending_pinned_outputs_) {
         std::unique_ptr<InferenceResponse>* response = pr.first;
         InferenceResponse::Output* response_output = pr.second;
@@ -656,15 +656,15 @@ BackendResponder::FlushPendingPinned(
                 pinned_memory_id, response_memory_type, response_memory_type_id,
                 response_byte_size, pinned_buffer + offset,
                 const_cast<void*>(response_buffer), stream_,
-                &cuda_used_vec[count], &completion_queue));
-            count++;
+                &cuda_used_vec[async_task_count], &completion_queue));
+            async_task_count++;
           } else {
             status = CopyBuffer(
                 response_output->Name(), pinned_memory_type, pinned_memory_id,
                 response_memory_type, response_memory_type_id,
                 response_byte_size, pinned_buffer + offset,
                 const_cast<void*>(response_buffer), stream_,
-                &cuda_used_vec[count]);
+                &cuda_used_vec[async_task_count]);
 
             if (!status.IsOk()) {
               LOG_STATUS_ERROR(
@@ -685,7 +685,7 @@ BackendResponder::FlushPendingPinned(
 
       size_t index = 0;
       for (auto& pr : pending_pinned_outputs_) {
-        if (index < count) {
+        if (index < async_task_count) {
           auto completed_status = completion_queue.Get();
           if (!completed_status.IsOk()) {
             std::unique_ptr<InferenceResponse>* response = pr.first;
@@ -957,7 +957,7 @@ BackendInputCollector::Finalize()
 
   std::deque<bool> cuda_used_vec(deferred_pinned_.size(), false);
   SyncQueue<Status> completion_queue;
-  size_t count = 0;
+  size_t async_task_count = 0;
   for (auto& def : deferred_pinned_) {
     auto pinned_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
     int64_t pinned_memory_id = 0;
@@ -973,15 +973,15 @@ BackendInputCollector::Finalize()
           pinned_memory_id, def.tensor_memory_type_, def.tensor_memory_id_,
           def.pinned_memory_->TotalByteSize(), pinned_buffer,
           def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
-          &cuda_used_vec[count], &completion_queue));
-      count++;
+          &cuda_used_vec[async_task_count], &completion_queue));
+      async_task_count++;
     } else {
       Status status = CopyBuffer(
           "pinned buffer", pinned_memory_type, pinned_memory_id,
           def.tensor_memory_type_, def.tensor_memory_id_,
           def.pinned_memory_->TotalByteSize(), pinned_buffer,
           def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
-          &cuda_used_vec[count]);
+          &cuda_used_vec[async_task_count]);
 
       // If something goes wrong with the copy all the pending
       // responses fail...
@@ -1008,7 +1008,7 @@ BackendInputCollector::Finalize()
   for (auto& def : deferred_pinned_) {
     // If something goes wrong with the copy all the pending
     // responses fail...
-    if (index < count) {
+    if (index < async_task_count) {
       auto completed_status = completion_queue.Get();
       if (!completed_status.IsOk()) {
         for (auto& pr : def.requests_) {
@@ -1070,7 +1070,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
 
   // Request input tensor data may be in multiple non-contiguous
   // buffers.
-  size_t input_offset = 0, count = 0;
+  size_t input_offset = 0, async_task_count = 0;
   for (size_t idx = 0; idx < request_input->DataBufferCount(); ++idx) {
     const void* src_buffer;
     size_t src_byte_size;
@@ -1116,14 +1116,14 @@ BackendInputCollector::SetFixedSizeInputTensor(
           src_memory_type_id, tensor_memory_type, tensor_memory_type_id,
           src_byte_size, src_buffer,
           tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-          &cuda_used_vec[count], &completion_queue));
-      count++;
+          &cuda_used_vec[async_task_count], &completion_queue));
+      async_task_count++;
     } else {
       Status status = CopyBuffer(
           request_input->Name(), src_memory_type, src_memory_type_id,
           tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
           tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-          &cuda_used_vec[count]);
+          &cuda_used_vec[async_task_count]);
 
       if (!status.IsOk()) {
         LOG_STATUS_ERROR(
@@ -1131,14 +1131,14 @@ BackendInputCollector::SetFixedSizeInputTensor(
                 std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
                 status),
             "error setting TensorFlow input tensor");
-        return cuda_used_vec[count];
+        return cuda_used_vec[async_task_count];
       }
     }
 
     input_offset += src_byte_size;
   }
 
-  for (size_t idx = 0; idx < count; ++idx) {
+  for (size_t idx = 0; idx < async_task_count; ++idx) {
     cuda_copy |= cuda_used_vec[idx];
     auto completed_status = completion_queue.Get();
     if (!completed_status.IsOk()) {
