@@ -23,24 +23,19 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#include "src/core/async_work_queue.h"
+
 #include <condition_variable>
 #include <deque>
 #include <mutex>
 #include <thread>
 #include <vector>
 
-#include "src/core/async_work_queue.h"
-
 namespace nvidia { namespace inferenceserver {
 
 AsyncWorkQueue::~AsyncWorkQueue()
 {
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    exit_ = true;
-    queue_pending.notify_one();
-  }
-
   for (auto& worker_thread : worker_threads_) {
     if (worker_thread->joinable()) {
       worker_thread->join();
@@ -56,14 +51,12 @@ AsyncWorkQueue::GetSingleton()
 }
 
 void
-AsyncWorkQueue::SetWorkerCount(size_t thread_count)
+AsyncWorkQueue::Initialize(size_t thread_count)
 {
-  GetSingleton()->thread_count_ = thread_count;
   if (thread_count > 1) {
-    GetSingleton()->exit_ = false;
     for (size_t id = 0; id < thread_count; id++) {
-      GetSingleton()->worker_threads_.push_back(
-          std::unique_ptr<std::thread>(new std::thread([] { Initialize(); })));
+      GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
+          new std::thread([] { InitializeThread(); })));
     }
   }
 }
@@ -71,34 +64,23 @@ AsyncWorkQueue::SetWorkerCount(size_t thread_count)
 size_t
 AsyncWorkQueue::GetWorkerCount()
 {
-  return GetSingleton()->thread_count_;
+  return GetSingleton()->worker_threads_.size();
 }
 
 void
 AsyncWorkQueue::AddTask(const std::function<void(void)> task)
 {
-  std::lock_guard<std::mutex> lock(GetSingleton()->mutex_);
   GetSingleton()->task_queue_.Put(task);
-  GetSingleton()->queue_pending.notify_one();
 }
 
 void
-AsyncWorkQueue::Initialize()
+AsyncWorkQueue::InitializeThread()
 {
   std::function<void(void)> task;
-
   while (true) {
-    {
-      std::unique_lock<std::mutex> lock(GetSingleton()->mutex_);
-      GetSingleton()->queue_pending.wait(lock, [&]() {
-        return GetSingleton()->exit_ || !GetSingleton()->task_queue_.Empty();
-      });
-
-      if (GetSingleton()->exit_)
-        return;
-
-      task = GetSingleton()->task_queue_.Get();
-    }
+    task = GetSingleton()->task_queue_.Get();
+    if (task == nullptr)
+      break;
     task();
   }
 }

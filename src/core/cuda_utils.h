@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <future>
 #include <set>
 #include "src/core/status.h"
 #include "src/core/sync_queue.h"
@@ -33,7 +32,6 @@
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
-
 
 namespace nvidia { namespace inferenceserver {
 

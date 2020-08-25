@@ -1539,7 +1539,7 @@ TRITONSERVER_ServerNew(
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
-  ni::AsyncWorkQueue::SetWorkerCount(loptions->BufferManagerThreadCount());
+  ni::AsyncWorkQueue::Initialize(loptions->BufferManagerThreadCount());
 
   // FIXME these should be removed once all backends use
   // BackendConfig.

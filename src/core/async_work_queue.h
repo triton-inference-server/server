@@ -27,7 +27,7 @@
 
 #include <condition_variable>
 #include <deque>
-#include <future>
+#include <functional>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -39,8 +39,8 @@ namespace nvidia { namespace inferenceserver {
 
 class AsyncWorkQueue {
  public:
-  // Should only be called once to set the number of worker threads.
-  static void SetWorkerCount(size_t thread_count);
+  // Start 'thread_count' number of worker threads.
+  static void Initialize(size_t thread_count);
 
   // Get the number of worker threads.
   static size_t GetWorkerCount();
@@ -52,14 +52,10 @@ class AsyncWorkQueue {
   AsyncWorkQueue() = default;
   ~AsyncWorkQueue();
   static AsyncWorkQueue* GetSingleton();
-  static void Initialize();
+  static void InitializeThread();
 
-  size_t thread_count_;
   std::vector<std::unique_ptr<std::thread>> worker_threads_;
   SyncQueue<std::function<void(void)>> task_queue_;
-  std::condition_variable queue_pending;
-  std::mutex mutex_;
-  bool exit_;
 };
 
 }}  // namespace nvidia::inferenceserver
