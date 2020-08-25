@@ -57,6 +57,11 @@ namespace nib = nvidia::inferenceserver::backend;
 
 namespace triton { namespace backend { namespace onnxruntime {
 
+/// Deleter for OrtSession.
+struct SessionDeleter {
+  void operator()(OrtSession* f) { OnnxLoader::UnloadSession(f); }
+};
+
 //
 // ModelState
 //
@@ -72,7 +77,7 @@ class ModelState : public nib::BackendModel {
 
   // Load an ONNX model using 'artifact_name' as the name for the ONNX
   // file/directory. If 'instance_group_kind' is not
-  // TRITONSERVER_INSTANCEGROUPKIND_AUTO then use it an
+  // TRITONSERVER_INSTANCEGROUPKIND_AUTO then use it and
   // 'instance_group_device_id' to initialize the appropriate
   // execution providers. Return in 'model_path' the full path to the
   // onnx file, return in 'session' and 'allocator' the ORT session
@@ -212,11 +217,54 @@ ModelState::LoadModel(
 
   bool need_lock = false;
 
-  // Execution providers if they are requested...
+  // Execution providers if they are requested... kind == AUTO if used
+  // to indicate that execution providers should not be added (this is
+  // just a local convention to this function, not the standard
+  // interpretation of AUTO).
   if (instance_group_kind != TRITONSERVER_INSTANCEGROUPKIND_AUTO) {
-    // Default GPU execution provider.
+    // Don't need to ensure uniqueness of the providers, ONNX Runtime
+    // will check it.
+
+    // GPU execution providers
 #ifdef TRITON_ENABLE_GPU
     if (instance_group_kind == TRITONSERVER_INSTANCEGROUPKIND_GPU) {
+      ni::TritonJson::Value optimization;
+      if (model_config_.Find("optimization", &optimization)) {
+        ni::TritonJson::Value eas;
+        if (optimization.Find("execution_accelerators", &eas)) {
+          ni::TritonJson::Value gpu_eas;
+          if (eas.Find("gpu_execution_accelerator", &gpu_eas)) {
+            for (size_t ea_idx = 0; ea_idx < gpu_eas.ArraySize(); ea_idx++) {
+              ni::TritonJson::Value ea;
+              RETURN_IF_ERROR(gpu_eas.IndexAsObject(ea_idx, &ea));
+              std::string name;
+              RETURN_IF_ERROR(ea.MemberAsString("name", &name));
+#ifdef TRITON_ENABLE_ONNXRUNTIME_TENSORRT
+              if (name == nib::kTensorRTExecutionAccelerator) {
+                RETURN_IF_ORT_ERROR(
+                    OrtSessionOptionsAppendExecutionProvider_Tensorrt(
+                        soptions, instance_group_device_id));
+                LOG_MESSAGE(
+                    TRITONSERVER_LOG_VERBOSE,
+                    (std::string(
+                         "TensorRT Execution Accelerator is set for '") +
+                     Name() + "' on device " +
+                     std::to_string(instance_group_device_id))
+                        .c_str());
+                continue;
+              }
+#endif  // TRITON_ENABLE_ONNXRUNTIME_TENSORRT
+              return TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("unknown Execution Accelerator '") + name +
+                   "' is requested")
+                      .c_str());
+            }
+          }
+        }
+      }
+
+      // Default GPU execution provider.
       RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_CUDA(
           soptions, instance_group_device_id));
       LOG_MESSAGE(
@@ -227,47 +275,12 @@ ModelState::LoadModel(
     }
 #endif  // TRITON_ENABLE_GPU
 
+    // CPU execution providers
     {
-      // Don't need to ensure uniqueness of the providers, ONNX Runtime
-      // will check it.
       ni::TritonJson::Value optimization;
       if (model_config_.Find("optimization", &optimization)) {
         ni::TritonJson::Value eas;
         if (optimization.Find("execution_accelerators", &eas)) {
-          if (instance_group_kind == TRITONSERVER_INSTANCEGROUPKIND_GPU) {
-            ni::TritonJson::Value gpu_eas;
-            if (eas.Find("gpu_execution_accelerator", &gpu_eas)) {
-              // GPU execution providers
-              for (size_t ea_idx = 0; ea_idx < gpu_eas.ArraySize(); ea_idx++) {
-                ni::TritonJson::Value ea;
-                RETURN_IF_ERROR(gpu_eas.IndexAsObject(ea_idx, &ea));
-                std::string name;
-                RETURN_IF_ERROR(ea.MemberAsString("name", &name));
-#ifdef TRITON_ENABLE_ONNXRUNTIME_TENSORRT
-                if (name == nib::kTensorRTExecutionAccelerator) {
-                  RETURN_IF_ORT_ERROR(
-                      OrtSessionOptionsAppendExecutionProvider_Tensorrt(
-                          soptions, instance_group_device_id));
-                  LOG_MESSAGE(
-                      TRITONSERVER_LOG_VERBOSE,
-                      (std::string(
-                           "TensorRT Execution Accelerator is set for '") +
-                       Name() + "' on device " +
-                       std::to_string(instance_group_device_id))
-                          .c_str());
-                  continue;
-                }
-#endif  // TRITON_ENABLE_ONNXRUNTIME_TENSORRT
-                return TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_INVALID_ARG,
-                    (std::string("unknown Execution Accelerator '") + name +
-                     "' is requested")
-                        .c_str());
-              }
-            }
-          }
-
-          // GPU execution providers
           ni::TritonJson::Value cpu_eas;
           if (eas.Find("cpu_execution_accelerator", &cpu_eas)) {
             for (size_t ea_idx = 0; ea_idx < cpu_eas.ArraySize(); ea_idx++) {
@@ -302,14 +315,6 @@ ModelState::LoadModel(
     }
   }
 
-  // ONNX session creation with OpenVINO is not thread-safe,
-  // so multiple creations are serialized with a global lock.
-  static std::mutex global_context_mu;
-  std::unique_lock<std::mutex> glock(global_context_mu, std::defer_lock);
-  if (need_lock) {
-    glock.lock();
-  }
-
   // Register all op libraries that contain custom operations.
   {
     ni::TritonJson::Value model_ops;
@@ -321,12 +326,20 @@ ModelState::LoadModel(
           std::string op_filename;
           RETURN_IF_ERROR(
               op_library_filenames.IndexAsString(op_idx, &op_filename));
-          void* library_handle = nullptr;  // leak this, no harm.
+          void* library_handle = nullptr;
           RETURN_IF_ORT_ERROR(ort_api->RegisterCustomOpsLibrary(
               soptions, op_filename.c_str(), &library_handle));
         }
       }
     }
+  }
+
+  // ONNX session creation with OpenVINO is not thread-safe,
+  // so multiple creations are serialized with a global lock.
+  static std::mutex global_context_mu;
+  std::unique_lock<std::mutex> glock(global_context_mu, std::defer_lock);
+  if (need_lock) {
+    glock.lock();
   }
 
   RETURN_IF_ERROR(OnnxLoader::LoadSession(
@@ -367,29 +380,28 @@ ModelState::AutoCompleteConfig()
   RETURN_IF_ERROR(
       ModelConfig().MemberAsString("default_model_filename", &artifact_name));
 
-  std::string model_path;
-  OrtSession* session;
+  // Must cleanup 'session'.  'allocator' is default allocator which
+  // is managed by ONNX Runtime so don't need to free/release
+  std::unique_ptr<OrtSession, SessionDeleter> session;
   OrtAllocator* allocator;
-  // FIXME no early return, must unload session
-  RETURN_IF_ERROR(LoadModel(
-      artifact_name, TRITONSERVER_INSTANCEGROUPKIND_AUTO, 0, &model_path,
-      &session, &allocator));
+  std::string model_path;
+  {
+    OrtSession* sptr = nullptr;
+    RETURN_IF_ERROR(LoadModel(
+        artifact_name, TRITONSERVER_INSTANCEGROUPKIND_AUTO, 0, &model_path,
+        &sptr, &allocator));
+    session.reset(sptr);
+  }
 
   OnnxTensorInfoMap input_tensor_infos;
-  RETURN_IF_ERROR(InputInfos(session, allocator, input_tensor_infos));
+  RETURN_IF_ERROR(InputInfos(session.get(), allocator, input_tensor_infos));
   OnnxTensorInfoMap output_tensor_infos;
-  RETURN_IF_ERROR(OutputInfos(session, allocator, output_tensor_infos));
+  RETURN_IF_ERROR(OutputInfos(session.get(), allocator, output_tensor_infos));
 
   RETURN_IF_ERROR(
       AutoCompleteMaxBatch(input_tensor_infos, output_tensor_infos));
   RETURN_IF_ERROR(AutoCompleteIO("input", input_tensor_infos));
   RETURN_IF_ERROR(AutoCompleteIO("output", output_tensor_infos));
-
-  if (session != nullptr) {
-    OnnxLoader::UnloadSession(session);
-  }
-  // 'allocator' is default allocator which is managed by ONNX Runtime
-  // so don't need to free/release
 
   if (TRITONSERVER_LogIsEnabled(TRITONSERVER_LOG_VERBOSE)) {
     ni::TritonJson::WriteBuffer buffer;
