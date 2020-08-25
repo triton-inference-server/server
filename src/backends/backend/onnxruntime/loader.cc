@@ -24,16 +24,13 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/onnx/loader.h"
+#include "src/backends/backend/onnxruntime/loader.h"
 
 #include <future>
 #include <thread>
-#include "src/backends/onnx/onnx_utils.h"
-#include "src/core/constants.h"
-#include "src/core/filesystem.h"
-#include "src/core/logging.h"
+#include "src/backends/backend/onnxruntime/onnx_utils.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace backend { namespace onnxruntime {
 
 OnnxLoader* OnnxLoader::loader = nullptr;
 
@@ -44,7 +41,7 @@ OnnxLoader::~OnnxLoader()
   }
 }
 
-Status
+TRITONSERVER_Error*
 OnnxLoader::Init()
 {
   if (loader == nullptr) {
@@ -52,9 +49,9 @@ OnnxLoader::Init()
     // If needed, provide custom logger with
     // ort_api->CreateEnvWithCustomLogger()
     OrtStatus* status;
-    if (LOG_VERBOSE_IS_ON(2)) {
+    if (TRITONSERVER_LogIsEnabled(TRITONSERVER_LOG_VERBOSE)) {
       status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_VERBOSE, "log", &env);
-    } else if (LOG_VERBOSE_IS_ON(1)) {
+    } else if (TRITONSERVER_LogIsEnabled(TRITONSERVER_LOG_WARN)) {
       status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &env);
     } else {
       status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_ERROR, "log", &env);
@@ -63,11 +60,12 @@ OnnxLoader::Init()
     loader = new OnnxLoader(env);
     RETURN_IF_ORT_ERROR(status);
   } else {
-    return Status(
-        Status::Code::ALREADY_EXISTS,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_ALREADY_EXISTS,
         "OnnxLoader singleton already initialized");
   }
-  return Status::Success;
+
+  return nullptr;  // success
 }
 
 void
@@ -84,45 +82,44 @@ OnnxLoader::TryRelease(bool decrement_session_cnt)
   }
 }
 
-Status
+TRITONSERVER_Error*
 OnnxLoader::Stop()
 {
   if (loader != nullptr) {
     loader->closing_ = true;
     TryRelease(false);
   } else {
-    return Status(
-        Status::Code::UNAVAILABLE,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE,
         "OnnxLoader singleton has not been initialized");
   }
-  return Status::Success;
+
+  return nullptr;  // success
 }
 
-Status
+TRITONSERVER_Error*
 OnnxLoader::LoadSession(
-    const std::pair<bool, std::string>& model_data,
+    const bool is_path, const std::string& model,
     const OrtSessionOptions* session_options, OrtSession** session)
 {
   if (loader != nullptr) {
     {
       std::lock_guard<std::mutex> lk(loader->mu_);
       if (loader->closing_) {
-        return Status(Status::Code::UNAVAILABLE, "OnnxLoader has been stopped");
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNAVAILABLE, "OnnxLoader has been stopped");
       } else {
         loader->live_session_cnt_++;
       }
     }
 
     OrtStatus* status = nullptr;
-    if (model_data.first) {
+    if (!is_path) {
       status = ort_api->CreateSessionFromArray(
-          loader->env_, model_data.second.c_str(), model_data.second.size(),
-          session_options, session);
+          loader->env_, model.c_str(), model.size(), session_options, session);
     } else {
-      std::string path =
-          JoinPath({model_data.second, kOnnxRuntimeOnnxFilename});
       status = ort_api->CreateSession(
-          loader->env_, path.c_str(), session_options, session);
+          loader->env_, model.c_str(), session_options, session);
     }
 
     if (status != nullptr) {
@@ -130,25 +127,27 @@ OnnxLoader::LoadSession(
     }
     RETURN_IF_ORT_ERROR(status);
   } else {
-    return Status(
-        Status::Code::UNAVAILABLE,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE,
         "OnnxLoader singleton has not been initialized");
   }
-  return Status::Success;
+
+  return nullptr;  // success
 }
 
-Status
+TRITONSERVER_Error*
 OnnxLoader::UnloadSession(OrtSession* session)
 {
   if (loader != nullptr) {
     ort_api->ReleaseSession(session);
     TryRelease(true);
   } else {
-    return Status(
-        Status::Code::UNAVAILABLE,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE,
         "OnnxLoader singleton has not been initialized");
   }
-  return Status::Success;
+
+  return nullptr;  // success
 }
 
-}}  // namespace nvidia::inferenceserver
+}}}  // namespace triton::backend::onnxruntime

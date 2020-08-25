@@ -32,14 +32,6 @@
 
 namespace nvidia { namespace inferenceserver { namespace backend {
 
-#define THROW_IF_ERROR(X)                             \
-  do {                                                \
-    TRITONSERVER_Error* tie_err__ = (X);              \
-    if (tie_err__ != nullptr) {                       \
-      throw BackendModelInstanceException(tie_err__); \
-    }                                                 \
-  } while (false)
-
 //
 // BackendModelInstance
 //
@@ -50,14 +42,14 @@ BackendModelInstance::BackendModelInstance(
       triton_model_instance_(triton_model_instance)
 {
   const char* instance_name;
-  THROW_IF_ERROR(
+  THROW_IF_BACKEND_INSTANCE_ERROR(
       TRITONBACKEND_ModelInstanceName(triton_model_instance, &instance_name));
   name_ = instance_name;
 
-  THROW_IF_ERROR(
+  THROW_IF_BACKEND_INSTANCE_ERROR(
       TRITONBACKEND_ModelInstanceKind(triton_model_instance, &kind_));
 
-  THROW_IF_ERROR(
+  THROW_IF_BACKEND_INSTANCE_ERROR(
       TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &device_id_));
 
   TritonJson::Value& model_config = backend_model->ModelConfig();
@@ -68,7 +60,7 @@ BackendModelInstance::BackendModelInstance(
   // does not specify then just leave 'artifact_filename' empty and
   // the backend can then provide its own logic for determine the
   // filename if that is appropriate.
-  THROW_IF_ERROR(model_config.MemberAsString(
+  THROW_IF_BACKEND_INSTANCE_ERROR(model_config.MemberAsString(
       "default_model_filename", &artifact_filename_));
 
   switch (kind_) {
@@ -131,7 +123,7 @@ BackendModelInstance::BackendModelInstance(
 
   stream_ = nullptr;
   if (kind_ == TRITONSERVER_INSTANCEGROUPKIND_GPU) {
-    THROW_IF_ERROR(
+    THROW_IF_BACKEND_INSTANCE_ERROR(
         CreateCudaStream(device_id_, 0 /* cuda_stream_priority */, &stream_));
   }
 }

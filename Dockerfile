@@ -256,32 +256,32 @@ COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/pr
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
-     /opt/tritonserver/lib/onnx/
-RUN cd /opt/tritonserver/lib/onnx && \
+     /opt/tritonserver/backends/onnxruntime/
+RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
 ARG OPENVINO_VERSION=2020.2
 COPY --from=tritonserver_onnx /workspace/build/Release/external/ngraph/lib/libovep_ngraph.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libngraph.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/plugins.xml \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_lp_transformations.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
-     /opt/tritonserver/lib/onnx/
-RUN cd /opt/tritonserver/lib/onnx && \
+     /opt/tritonserver/backends/onnxruntime/
+RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libtbb.so.2 libtbb.so && \
     for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
@@ -333,7 +333,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                   -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
-                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
+                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/lib/pytorch;/opt/tritonserver/backends/onnxruntime" \
                   ../build && \
             make -j16 server && \
             mkdir -p /opt/tritonserver/include && \
@@ -345,7 +345,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/backends && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/pytorch && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/lib/onnx && chmod ugo-w+rx *)
+    (cd /opt/tritonserver/backends/onnxruntime && chmod ugo-w+rx *)
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -372,7 +372,7 @@ LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
 
-# Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom 
+# Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom
 # ops from that path
 ENV LD_LIBRARY_PATH /opt/tritonserver/lib/pytorch/:$LD_LIBRARY_PATH
 

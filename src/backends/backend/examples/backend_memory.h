@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,44 +25,41 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/constants.h"
-#include "src/core/model_config.h"
-#include "src/core/status.h"
+#include <string>
+#include "src/core/tritonserver.h"
 
-class OrtEnv;
+namespace nvidia { namespace inferenceserver { namespace backend {
 
-namespace nvidia { namespace inferenceserver {
-
-class InferenceBackend;
-
-class OnnxBackendFactory {
+//
+// BackendMemory
+//
+// Utility class for allocating and deallocating memory.
+//
+class BackendMemory {
  public:
-  struct Config : public BackendConfig {
-    // Autofill missing required model configuration settings based on
-    // model definition file.
-    bool autofill;
-  };
+  // Create a memory allocation using the preferred memory type if
+  // possible. If not possible allocate memory using the next most
+  // appropriate memory type.
+  static TRITONSERVER_Error* Create(
+      const TRITONSERVER_MemoryType preferred_memtype, const size_t byte_size,
+      BackendMemory** mem);
+  ~BackendMemory();
 
-  static Status Create(
-      const std::shared_ptr<BackendConfig>& backend_config,
-      std::unique_ptr<OnnxBackendFactory>* factory);
-
-  Status CreateBackend(
-      const std::string& path, const inference::ModelConfig& model_config,
-      const double min_compute_capability,
-      std::unique_ptr<InferenceBackend>* backend);
-
-  ~OnnxBackendFactory();
+  TRITONSERVER_MemoryType MemoryType() const { return memtype_; }
+  char* MemoryPtr() { return buffer_; }
+  size_t ByteSize() const { return byte_size_; }
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(OnnxBackendFactory);
-
-  OnnxBackendFactory(const std::shared_ptr<Config>& backend_config)
-      : backend_config_(backend_config)
+  BackendMemory(
+      const TRITONSERVER_MemoryType memtype, char* buffer,
+      const size_t byte_size)
+      : memtype_(memtype), buffer_(buffer), byte_size_(byte_size)
   {
   }
 
-  const std::shared_ptr<Config> backend_config_;
+  TRITONSERVER_MemoryType memtype_;
+  char* buffer_;
+  size_t byte_size_;
 };
 
-}}  // namespace nvidia::inferenceserver
+}}}  // namespace nvidia::inferenceserver::backend

@@ -53,9 +53,6 @@
 #ifdef TRITON_ENABLE_ENSEMBLE
 #include "src/backends/ensemble/ensemble_backend_factory.h"
 #endif  // TRITON_ENABLE_ENSEMBLE
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-#include "src/backends/onnx/onnx_backend_factory.h"
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
 #include "src/backends/pytorch/libtorch_backend_factory.h"
 #endif  // TRITON_ENABLE_PYTORCH
@@ -120,15 +117,6 @@ BuildBackendConfigMap(
     (*backend_configs)[kTensorRTPlanPlatform] = plan_config;
   }
 #endif  // TRITON_ENABLE_TENSORRT
-
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-  //// OnnxRuntime Onnx
-  {
-    auto onnx_config = std::make_shared<OnnxBackendFactory::Config>();
-    onnx_config->autofill = !strict_model_config;
-    (*backend_configs)[kOnnxRuntimeOnnxPlatform] = onnx_config;
-  }
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 
 #ifdef TRITON_ENABLE_PYTORCH
   //// PyTorch LibTorch
@@ -373,9 +361,6 @@ class ModelRepositoryManager::BackendLifeCycle {
 #ifdef TRITON_ENABLE_TENSORRT
   std::unique_ptr<PlanBackendFactory> plan_factory_;
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-  std::unique_ptr<OnnxBackendFactory> onnx_factory_;
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
   std::unique_ptr<LibTorchBackendFactory> libtorch_factory_;
 #endif  // TRITON_ENABLE_PYTORCH
@@ -409,14 +394,6 @@ ModelRepositoryManager::BackendLifeCycle::Create(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_config_map.find(kOnnxRuntimeOnnxPlatform)->second;
-    RETURN_IF_ERROR(
-        OnnxBackendFactory::Create(config, &(local_life_cycle->onnx_factory_)));
-  }
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
   {
     const std::shared_ptr<BackendConfig>& config =
@@ -825,12 +802,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             version_path, model_config, min_compute_capability_, &is);
         break;
 #endif  // TRITON_ENABLE_CAFFE2
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-      case Platform::PLATFORM_ONNXRUNTIME_ONNX:
-        status = onnx_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        break;
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
       case Platform::PLATFORM_PYTORCH_LIBTORCH:
         status = libtorch_factory_->CreateBackend(

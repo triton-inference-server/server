@@ -1,1 +1,0 @@
-unable to load model 'bad_output_type, unexpected datatype TYPE_INT8 for output 'OUTPUT0', expecting TYPE_INT16

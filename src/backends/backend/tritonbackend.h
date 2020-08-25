@@ -76,7 +76,7 @@ struct TRITONBACKEND_ModelInstance;
 ///   }
 ///
 #define TRITONBACKEND_API_VERSION_MAJOR 0
-#define TRITONBACKEND_API_VERSION_MINOR 2
+#define TRITONBACKEND_API_VERSION_MINOR 3
 
 /// Get the TRITONBACKEND API version supported by Triton. This value
 /// can be compared against the TRITONBACKEND_API_VERSION_MAJOR and
@@ -226,9 +226,9 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInputName(
     TRITONBACKEND_Request* request, const uint32_t index,
     const char** input_name);
 
-/// Get a request input. The lifetime of the returned input object
-/// matches that of the request and so the input object should not be
-/// accessed after the request object is released.
+/// Get a named request input. The lifetime of the returned input
+/// object matches that of the request and so the input object should
+/// not be accessed after the request object is released.
 ///
 /// \param request The inference request.
 /// \param name The name of the input.
@@ -236,6 +236,26 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInputName(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInput(
     TRITONBACKEND_Request* request, const char* name,
+    TRITONBACKEND_Input** input);
+
+/// Get a request input by index. The order of inputs in a given
+/// request is not necessarily consistent with other requests, even if
+/// the requests are in the same batch. As a result, you can not
+/// assume that an index obtained from one request will point to the
+/// same input in a different request.
+///
+/// The lifetime of the returned input object matches that of the
+/// request and so the input object should not be accessed after the
+/// request object is released.
+///
+/// \param request The inference request.
+/// \param index The index of the input tensor. Must be 0 <= index <
+/// count, where count is the value returned by
+/// TRITONBACKEND_RequestInputCount.
+/// \param input Returns the input corresponding to the index.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_RequestInputByIndex(
+    TRITONBACKEND_Request* request, const uint32_t index,
     TRITONBACKEND_Input** input);
 
 /// Get the number of output tensors requested to be returned in the
