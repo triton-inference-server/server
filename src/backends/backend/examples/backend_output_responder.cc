@@ -114,6 +114,8 @@ BackendOutputResponder::ProcessTensor(
                   tensor_offset, buffer, memory_type, memory_type_id,
                   use_pinned_memory_type);
             }
+
+            break;
           }
         }
       }

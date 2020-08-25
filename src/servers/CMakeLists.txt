@@ -360,7 +360,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch:$\{ORIGIN\}/onnx"
+    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch"
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonserver.ldscript
     LINK_FLAGS "-Wl,--version-script libtritonserver.ldscript"
 )
@@ -400,22 +400,6 @@ if(${TRITON_ENABLE_CAFFE2} OR ${TRITON_ENABLE_PYTORCH})
     PUBLIC -lmkl_vml_def
   )
 endif() # TRITON_ENABLE_CAFFE2 || TRITON_ENABLE_PYTORCH
-
-if(${TRITON_ENABLE_ONNXRUNTIME})
-  target_link_libraries(
-    tritonserver
-    PUBLIC ${TRITON_EXTRA_LDFLAGS}
-    PUBLIC -lonnxruntime
-  )
-endif() # TRITON_ENABLE_ONNXRUNTIME
-if(${TRITON_ENABLE_ONNXRUNTIME_OPENVINO})
-  target_link_libraries(
-    tritonserver
-    PUBLIC ${TRITON_EXTRA_LDFLAGS}
-    PUBLIC -ltbb
-    PUBLIC -linference_engine
-  )
-endif() # TRITON_ENABLE_ONNXRUNTIME_OPENVINO
 
 if(${TRITON_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)

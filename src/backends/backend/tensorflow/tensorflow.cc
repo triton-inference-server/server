@@ -52,15 +52,6 @@ namespace nib = nvidia::inferenceserver::backend;
 
 namespace {
 
-#define THROW_IF_BACKEND_MODEL_ERROR(X)            \
-  do {                                             \
-    TRITONSERVER_Error* tie_err__ = (X);           \
-    if (tie_err__ != nullptr) {                    \
-      throw nib::BackendModelException(tie_err__); \
-    }                                              \
-  } while (false)
-
-
 #ifndef TRITON_ENABLE_GPU
 using cudaStream_t = void*;
 #endif  // !TRITON_ENABLE_GPU
@@ -85,38 +76,6 @@ ParseLongLongParameter(
   }
 
   return nullptr;  // success
-}
-
-void
-RequestsRespondIfError(
-    TRITONBACKEND_Request** requests, const uint32_t request_count,
-    TRITONSERVER_Error* response_err)
-{
-  for (size_t i = 0; i < request_count; i++) {
-    TRITONBACKEND_Response* response;
-    auto err = TRITONBACKEND_ResponseNew(&response, requests[i]);
-    if (err != nullptr) {
-      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Fail to create response");
-      TRITONSERVER_ErrorDelete(err);
-    } else {
-      std::unique_ptr<
-          TRITONBACKEND_Response, decltype(&TRITONBACKEND_ResponseDelete)>
-          response_handle(response, TRITONBACKEND_ResponseDelete);
-      err = TRITONBACKEND_ResponseSend(
-          response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, response_err);
-      if (err != nullptr) {
-        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Fail to send response");
-        TRITONSERVER_ErrorDelete(err);
-      }
-    }
-    err = TRITONBACKEND_RequestRelease(
-        requests[i], TRITONSERVER_REQUEST_RELEASE_ALL);
-    if (err != nullptr) {
-      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Fail to release request");
-      TRITONSERVER_ErrorDelete(err);
-    }
-  }
-  TRITONSERVER_ErrorDelete(response_err);
 }
 
 // BackendConfig
@@ -1489,12 +1448,12 @@ ModelInstanceState::ProcessRequests(
     // If we get a nullptr request then something is badly wrong. Fail
     // and release all requests.
     if (requests[i] == nullptr) {
-      RequestsRespondIfError(
+      nib::RequestsRespondWithError(
           requests, request_count,
           TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
               std::string(
-                  "null request given to TensorFlow runner for '" + Name() +
+                  "null request given to TensorFlow backend for '" + Name() +
                   "'")
                   .c_str()));
       return;
@@ -1518,7 +1477,7 @@ ModelInstanceState::ProcessRequests(
         total_batch_size += shape[0];
       }
       if (err != nullptr) {
-        RequestsRespondIfError(requests, request_count, err);
+        nib::RequestsRespondWithError(requests, request_count, err);
         return;
       }
     } else {
@@ -1539,14 +1498,13 @@ ModelInstanceState::ProcessRequests(
   // scheduler has done something badly wrong so fail and release all
   // requests.
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size)) {
-    RequestsRespondIfError(
+    nib::RequestsRespondWithError(
         requests, request_count,
         TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
             std::string(
-                "dynamic batch size " + std::to_string(total_batch_size) +
-                " for '" + Name() + "', max allowed is " +
-                std::to_string(max_batch_size))
+                "batch size " + std::to_string(total_batch_size) + " for '" +
+                Name() + "', max allowed is " + std::to_string(max_batch_size))
                 .c_str()));
     return;
   }
@@ -1915,7 +1873,8 @@ ModelInstanceState::ProcessRequests(
 
   // Send all the responses that haven't already been sent because of
   // an earlier error. Note that the responses are not set to nullptr
-  // for later checking.
+  // here as we need that indication below to determine if the request
+  // we successful or not.
   for (auto& response : responses) {
     if (response != nullptr) {
       LOG_IF_ERROR(
@@ -1925,14 +1884,9 @@ ModelInstanceState::ProcessRequests(
     }
   }
 
+  // Report statistics for each request.
   for (uint32_t r = 0; r < request_count; ++r) {
     auto& request = requests[r];
-    // Report statistics for the request. Note that there could
-    // still be responses that have not yet been sent but those
-    // cannot be captured in the statistics as they reflect only the
-    // request object. We use the execution start/end time for
-    // compute also so that the entire execution time is associated
-    // with the inference computation.
     LOG_IF_ERROR(
         TRITONBACKEND_ModelInstanceReportStatistics(
             TritonModelInstance(), request,
@@ -1945,8 +1899,7 @@ ModelInstanceState::ProcessRequests(
         "failed releasing request");
   }
 
-  // Report the entire batch statistics. This backend does not support
-  // batching so the total batch size is always 1.
+  // Report the entire batch statistics.
   LOG_IF_ERROR(
       TRITONBACKEND_ModelInstanceReportBatchStatistics(
           TritonModelInstance(), total_batch_size, exec_start_ns,
@@ -2202,12 +2155,6 @@ TRITONBACKEND_ModelInstanceExecute(
   // this function. If something does go wrong in processing a
   // particular request then we send an error response just for the
   // specific request.
-
-  // Note that access to 'requests' will be invalidated once
-  // TRITONBACKEND_ModelInstanceExecute returns. If requests need to be
-  // referred after TRITONBACKEND_ModelInstanceExecute returns, i.e. in
-  // non-blocking model, the request array must be copied to a instance
-  // owned buffer.
   instance_state->ProcessRequests(requests, request_count);
 
   return nullptr;  // success
