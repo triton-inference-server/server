@@ -44,7 +44,9 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbt
 cp -r ./models/identity_fp32 ./models/identity_uint8
 (cd models/identity_uint8 && \
           sed -i "s/^name:.*/name: \"identity_uint8\"/" config.pbtxt && \
-          sed -i "s/TYPE_FP32/TYPE_UINT8/g" config.pbtxt)
+          sed -i "s/TYPE_FP32/TYPE_UINT8/g" config.pbtxt && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+          echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 12000000 }" >> config.pbtxt)
 
 cp -r ./models/identity_fp32 ./models/identity_uint32
 (cd models/identity_uint32 && \

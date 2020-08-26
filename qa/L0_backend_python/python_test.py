@@ -76,9 +76,9 @@ if __name__ == '__main__':
     # correctly. We use just HTTP for this since we are not testing the
     # protocol anyway.
     if FLAGS.protocol == "http":
-        model_name = "identity_fp32"
+        model_name = "identity_uint8"
         request_parallelism = 4
-        shape = [16]
+        shape = [2, 2]
         with client_util.InferenceServerClient(FLAGS.url,
                                                concurrency=request_parallelism,
                                                verbose=FLAGS.verbose) as client:
@@ -86,7 +86,7 @@ if __name__ == '__main__':
             requests = []
             for i in range(request_parallelism):
                 input_data = (16384 * np.random.randn(*shape)).astype(
-                    np.float32)
+                    np.uint8)
                 input_datas.append(input_data)
                 inputs = [
                     client_util.InferInput("IN", input_data.shape,
@@ -110,3 +110,49 @@ if __name__ == '__main__':
                     print("error: expected output {} to match input {}".format(
                         output_data, input_datas[i]))
                     sys.exit(1)
+
+            # Make sure the requests ran in parallel.
+            stats = client.get_inference_statistics(model_name)
+            if (len(stats['model_stats']) !=
+                    1) or (stats['model_stats'][0]['name'] != model_name):
+                print("error: expected statistics for {}".format(model_name))
+                sys.exit(1)
+
+            stat = stats['model_stats'][0]
+            if (stat['inference_count'] != 8) or (stat['execution_count'] != 1):
+                print(
+                    "error: expected execution_count == 1 and inference_count == 8, got {} and {}"
+                    .format(stat['execution_count'], stat['inference_count']))
+                sys.exit(1)
+
+            # Check metrics to make sure they are reported correctly
+            metrics = httpreq.get('http://localhost:8002/metrics')
+            print(metrics.text)
+
+            success_str = 'nv_inference_request_success{model="identity_uint32",version="1"}'
+            infer_count_str = 'nv_inference_count{model="identity_uint32",version="1"}'
+            infer_exec_str = 'nv_inference_exec_count{model="identity_uint32",version="1"}'
+
+            success_val = None
+            infer_count_val = None
+            infer_exec_val = None
+            for line in metrics.text.splitlines():
+                if line.startswith(success_str):
+                    success_val = float(line[len(success_str):])
+                if line.startswith(infer_count_str):
+                    infer_count_val = float(line[len(infer_count_str):])
+                if line.startswith(infer_exec_str):
+                    infer_exec_val = float(line[len(infer_exec_str):])
+
+            if success_val != 4:
+                print("error: expected metric {} == 4, got {}".format(
+                    success_str, success_val))
+                sys.exit(1)
+            if infer_count_val != 8:
+                print("error: expected metric {} == 8, got {}".format(
+                    infer_count_str, infer_count_val))
+                sys.exit(1)
+            if infer_exec_val != 1:
+                print("error: expected metric {} == 1, got {}".format(
+                    infer_exec_str, infer_exec_val))
+                sys.exit(1)
