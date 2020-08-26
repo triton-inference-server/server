@@ -1373,8 +1373,8 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
                 io.name() + "' is a wildcard.");
       }
 
-      // FIXME whether output with 'scatter_with_input_shape' can be validated
-      if (io.scatter_with_input_shape().empty()) {
+      // FIXME whether output with 'batch_output' can be validated
+      if (!io.has_batch_output()) {
         RETURN_IF_ERROR(CompareDimsSupported(
             name_, io.name(), engine_dims, model_config_dims, support_batching_,
             is_dynamic_, false /* compare_exact */));
@@ -1414,7 +1414,12 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
     byte_sizes_[io_index] = max_byte_size;
     buffers_[io_index] = buffer;
     // Whether the output needs to be scattered based on input
-    if (!io.scatter_with_input_shape().empty()) {
+    if (io.has_batch_output()) {
+      if (io.batch_output().kind() !=
+          inference::ModelOutput::BatchOutput::BATCH_SCATTER_WITH_INPUT_SHAPE) {
+            return Status(Status::Code::INVALID_ARG, "batch output kind other than"
+              "BATCH_SCATTER_WITH_INPUT_SHAPE is not supported for " + name_);
+      }
       buffer_is_ragged_[io_index] = true;
 
       std::vector<int64_t> output_shape;
@@ -1427,7 +1432,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
         output_shape.push_back(dim);
       }
       io_shape_mapping_[io_index] =
-          std::make_pair(io.scatter_with_input_shape(), output_shape);
+          std::make_pair(io.batch_output().target_input(0), output_shape);
     }
 
     // Set buffer bindings of all optimization profile since buffer is allocated

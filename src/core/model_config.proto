@@ -284,6 +284,42 @@ message ModelInput
 //@@
 message ModelOutput
 {
+  //@@  .. cpp:var:: message BatchOutput
+  //@@
+  //@@     A batch output is an output that must be handled differently by
+  //@@     the backend based on all the requests in a batch.
+  //@@
+  message BatchOutput
+  {
+    //@@
+    //@@    .. cpp:enum:: Kind
+    //@@
+    //@@       The kind of the batch output.
+    //@@
+    enum Kind {
+      //@@      .. cpp:enumerator:: Kind::BATCH_SCATTER_WITH_INPUT_SHAPE = 0
+      //@@
+      //@@         The output should be scattered according to the shape of
+      //@@         'target_input'. The dynamic dimension of the output will
+      //@@         be set to the value of the same dimension in the input.
+      //@@
+      BATCH_SCATTER_WITH_INPUT_SHAPE = 0;
+    }
+
+    //@@    .. cpp:var:: Kind kind
+    //@@
+    //@@       The kind of this batch output.
+    //@@
+    Kind kind = 1;
+
+    //@@    .. cpp:var:: string target_input (repeated)
+    //@@
+    //@@       The backend derives each batch output from one or more inputs.
+    //@@       'target_input' gives the names of those inputs.
+    //@@
+    repeated string target_input = 2;
+  }
+
   //@@  .. cpp:var:: string name
   //@@
   //@@     The name of the output.
@@ -328,13 +364,12 @@ message ModelOutput
   //@@
   bool is_shape_tensor = 6;
 
-  //@@  .. cpp:var:: string scatter_with_input_shape
+  //@@  .. cpp:var:: BatchOutput batch_output
   //@@
-  //@@     This field can be specified if the output  should be scattered
-  //@@     according to a the input's shape. The dynamic dimension of the
-  //@@     output will be set to the value of the same dimension in the input.
+  //@@     Instruction for output that requires special handling by the model
+  //@@     backend.
   //@@
-  string scatter_with_input_shape = 7;
+  BatchOutput batch_output = 7;
 }
 
 //@@  .. cpp:var:: message BatchInput

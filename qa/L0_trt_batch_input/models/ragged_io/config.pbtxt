@@ -40,7 +40,11 @@ output [
     name: "OUTPUT0"
     data_type: TYPE_FP32
     dims: [ -1 ]
-    scatter_with_input_shape: "INPUT0"
+    batch_output
+    {
+      kind: BATCH_SCATTER_WITH_INPUT_SHAPE
+      target_input: "INPUT0"
+    }
   }
 ]
 dynamic_batching {
