@@ -85,8 +85,7 @@ if __name__ == '__main__':
             input_datas = []
             requests = []
             for i in range(request_parallelism):
-                input_data = (16384 * np.random.randn(*shape)).astype(
-                    np.uint8)
+                input_data = (16384 * np.random.randn(*shape)).astype(np.uint8)
                 input_datas.append(input_data)
                 inputs = [
                     client_util.InferInput("IN", input_data.shape,
@@ -129,9 +128,9 @@ if __name__ == '__main__':
             metrics = httpreq.get('http://localhost:8002/metrics')
             print(metrics.text)
 
-            success_str = 'nv_inference_request_success{model="identity_uint32",version="1"}'
-            infer_count_str = 'nv_inference_count{model="identity_uint32",version="1"}'
-            infer_exec_str = 'nv_inference_exec_count{model="identity_uint32",version="1"}'
+            success_str = 'nv_inference_request_success{model="identity_uint8",version="1"}'
+            infer_count_str = 'nv_inference_count{model="identity_uint8",version="1"}'
+            infer_exec_str = 'nv_inference_exec_count{model="identity_uint8",version="1"}'
 
             success_val = None
             infer_count_val = None
