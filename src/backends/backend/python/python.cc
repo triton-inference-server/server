@@ -58,9 +58,6 @@
 #include "src/core/json.h"
 #include "src/core/tritonserver.h"
 
-#include "src/core/lib/surface/init.h"
-#include "test/core/util/test_config.h"
-
 namespace ni = nvidia::inferenceserver;
 namespace nib = nvidia::inferenceserver::backend;
 
@@ -409,24 +406,7 @@ ModelInstanceState::~ModelInstanceState()
   // https://github.com/grpc/grpc/issues/22479 the clean up thread may continue
   // to live after resources have been deallocated an cause a segfault. This is
   // a workaround to do a blocking shutdown of the GRPC client
-
-  gpr_timespec deadline = gpr_time_add(
-      gpr_now(GPR_CLOCK_MONOTONIC),
-      gpr_time_from_millis(static_cast<int64_t>(1e3) * 10, GPR_TIMESPAN));
-
-  while (grpc_is_initialized()) {
-    grpc_maybe_wait_for_async_shutdown();
-    gpr_sleep_until(gpr_time_add(
-        gpr_now(GPR_CLOCK_REALTIME), gpr_time_from_millis(1, GPR_TIMESPAN)));
-    if (gpr_time_cmp(gpr_now(GPR_CLOCK_MONOTONIC), deadline) > 0) {
-      LOG_MESSAGE(
-          TRITONSERVER_LOG_VERBOSE,
-          "Time out occured while trying to shutdown the GRPC client");
-      grpc_shutdown_blocking();
-      break;
-    }
-  }
-
+  grpc_shutdown_blocking();
 
   LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "GRPC shutdown complete");
 }
