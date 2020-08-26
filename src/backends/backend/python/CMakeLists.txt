@@ -113,7 +113,8 @@ set_target_properties(
 
 target_include_directories(
         triton_python
-        PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+        PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/../../../../../../../../grpc-repo/src/grpc/)
 
 target_link_libraries(
   triton_python
