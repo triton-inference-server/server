@@ -43,6 +43,16 @@ CLIENT_LOG="./client.log"
 BATCHER_TEST=batcher_test.py
 VERIFY_TIMESTAMPS=verify_timestamps.py
 
+# Add valgrind flag check
+if [ -z "$TEST_VALGRIND" ]; then
+    TEST_VALGRIND="0"
+else
+    LEAKCHECK=/usr/bin/valgrind
+    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
+    SERVER_TIMEOUT=3600
+    rm -f *.valgrind.log
+fi
+
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 SERVER=${OPTDIR}/tritonserver/bin/tritonserver
@@ -124,7 +134,15 @@ for model_type in FIXED VARIABLE; do
             test_multi_different_output_order ; do
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH"
         SERVER_LOG="./$i.$model_type.serverlog"
-        run_server
+        
+        if [ "$TEST_VALGRIND" -eq 1 ]; then
+            LEAKCHECK_LOG="./$i.$model_type.valgrind.log"
+            LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+            run_server_leakcheck
+        else  
+            run_server
+        fi
+        
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
             cat $SERVER_LOG
@@ -150,6 +168,15 @@ for model_type in FIXED VARIABLE; do
 
         kill $SERVER_PID
         wait $SERVER_PID
+
+        set +e
+        if [ "$TEST_VALGRIND" -eq 1 ]; then
+            check_valgrind_log $LEAKCHECK_LOG 
+            if [ $? -ne 0 ]; then
+                RET=1
+            fi
+        fi
+        set -e
     done
 
     # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
@@ -163,7 +190,15 @@ for model_type in FIXED VARIABLE; do
             [[ "$i" != "test_multi_batch_use_best_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=2
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH"
         SERVER_LOG="./$i.$model_type.serverlog"
-        run_server
+        
+        if [ "$TEST_VALGRIND" -eq 1 ]; then
+            LEAKCHECK_LOG="./$i.$model_type.valgrind.log"
+            LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+            run_server_leakcheck
+        else  
+            run_server
+        fi
+        
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
             cat $SERVER_LOG
@@ -190,6 +225,15 @@ for model_type in FIXED VARIABLE; do
         unset TRITONSERVER_DELAY_SCHEDULER
         kill $SERVER_PID
         wait $SERVER_PID
+
+        set +e
+        if [ "$TEST_VALGRIND" -eq 1 ]; then
+            check_valgrind_log $LEAKCHECK_LOG 
+            if [ $? -ne 0 ]; then
+                RET=1
+            fi
+        fi
+        set -e
     done
 done
 
@@ -201,7 +245,15 @@ for i in \
         test_multi_batch_different_shape ; do
     SERVER_ARGS="--model-repository=`pwd`/var_models"
     SERVER_LOG="./$i.VARIABLE.serverlog"
-    run_server
+    
+    if [ "$TEST_VALGRIND" -eq 1 ]; then        
+        LEAKCHECK_LOG="./$i.VARIABLE.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else  
+        run_server
+    fi
+    
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
@@ -227,6 +279,15 @@ for i in \
 
     kill $SERVER_PID
     wait $SERVER_PID
+
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        check_valgrind_log $LEAKCHECK_LOG 
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
 done
 
 # Tests that run only on the variable-size tensor models and that
@@ -238,7 +299,15 @@ for i in \
     export TRITONSERVER_DELAY_SCHEDULER=4
     SERVER_ARGS="--model-repository=`pwd`/var_models"
     SERVER_LOG="./$i.VARIABLE.serverlog"
-    run_server
+    
+    if [ "$TEST_VALGRIND" -eq 1 ]; then      
+        LEAKCHECK_LOG="./$i.VARIABLE.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else  
+        run_server
+    fi
+    
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
@@ -265,6 +334,15 @@ for i in \
     unset TRITONSERVER_DELAY_SCHEDULER
     kill $SERVER_PID
     wait $SERVER_PID
+
+    set +e 
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        check_valgrind_log $LEAKCHECK_LOG 
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
 done
 
 # Test that verify the 'preserve_ordering' option in dynamic batcher
@@ -302,7 +380,15 @@ if [[ $BACKENDS == *"custom"* ]]; then
     # not preserve
     SERVER_ARGS="--trace-file=not_preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"
     SERVER_LOG="./not_preserve.serverlog"
-    run_server
+    
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG="./not_preserve.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else  
+        run_server
+    fi
+
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
@@ -328,8 +414,15 @@ if [[ $BACKENDS == *"custom"* ]]; then
 
     kill $SERVER_PID
     wait $SERVER_PID
+    
+    set +e 
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        check_valgrind_log $LEAKCHECK_LOG 
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
 
-    set +e
     python $VERIFY_TIMESTAMPS not_preserve.log
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test Failed\n***"
@@ -343,7 +436,15 @@ if [[ $BACKENDS == *"custom"* ]]; then
 
     SERVER_ARGS="--trace-file=preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"
     SERVER_LOG="./preserve.serverlog"
-    run_server
+
+    if [ "$TEST_VALGRIND" -eq 1 ]; then     
+        LEAKCHECK_LOG="./preserve.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else  
+        run_server
+    fi
+
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
@@ -371,6 +472,13 @@ if [[ $BACKENDS == *"custom"* ]]; then
     wait $SERVER_PID
 
     set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        check_valgrind_log $LEAKCHECK_LOG 
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+
     python $VERIFY_TIMESTAMPS -p preserve.log
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test Failed\n***"
