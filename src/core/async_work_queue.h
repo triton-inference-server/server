@@ -37,6 +37,11 @@
 
 namespace nvidia { namespace inferenceserver {
 
+// Manager for asynchronous worker threads. Use to accelerate copies and
+// other such operations by running them in parallel.
+// Call Initialize to start the worker threads (once) and AddTask to tasks to
+// the queue.
+
 class AsyncWorkQueue {
  public:
   // Start 'thread_count' number of worker threads.

@@ -972,11 +972,11 @@ TRITONSERVER_ServerOptionsSetExitTimeout(
 
 TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetBufferManagerThreadCount(
-    TRITONSERVER_ServerOptions* options, unsigned int worker_count)
+    TRITONSERVER_ServerOptions* options, unsigned int thread_count)
 {
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
-  loptions->SetBufferManagerThreadCount(worker_count);
+  loptions->SetBufferManagerThreadCount(thread_count);
   return nullptr;  // Success
 }
 

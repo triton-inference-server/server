@@ -95,7 +95,7 @@ Status GetSupportedGPUs(
 #endif
 
 // Helper around CopyBuffer that updates the completion queue with the returned
-// status.
+// status and cuda_used flag.
 void CopyBufferHandler(
     const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
     const int64_t src_memory_type_id,

@@ -1287,14 +1287,14 @@ TRITONSERVER_EXPORT TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetExitTimeout(
     TRITONSERVER_ServerOptions* options, unsigned int timeout);
 
-/// Set the number of async worker threads.
+/// Set the number of buffer manager threads.
 ///
 /// \param options The server options object.
-/// \param worker_count The number of async worker threads.
+/// \param worker_count The number of buffer manager threads.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetBufferManagerThreadCount(
-    TRITONSERVER_ServerOptions* options, unsigned int worker_count);
+    TRITONSERVER_ServerOptions* options, unsigned int thread_count);
 
 /// Enable or disable info level logging.
 ///
