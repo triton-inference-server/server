@@ -73,7 +73,8 @@ add_custom_target(
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-# TODO: Fix Protobuf paths
+# FIXME The relative paths created by the protobuf_generate_cpp and
+# protobuf_generate_python are incorrect
 string(REPLACE "../../../../" "../../../../../../../../../"  PROTOBUF_HEADERS ${PROTO_HDRS})
 string(REPLACE "../../../../" "../../../../../../../../../"  PROTOBUF_SRCS ${PROTO_SRCS})
 
@@ -112,7 +113,8 @@ set_target_properties(
 
 target_include_directories(
         triton_python
-        PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+        PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/../../../../../../../../grpc-repo/src/grpc/)
 
 target_link_libraries(
   triton_python
@@ -124,7 +126,8 @@ install(
   LIBRARY DESTINATION backends/python
 )
 
-# TODO: Fix PROTO_PY
+# FIXME The relative paths created by the protobuf_generate_cpp and
+# protobuf_generate_python are incorrect
 string(REPLACE "../../../../" "../../../../../../../../../"  PROTO_FIX_PY ${PROTO_PY})
 
 install(FILES ${protocol_core_py} ${PROTO_FIX_PY} ${protocol_grpc_py} resources/startup.py
