@@ -105,6 +105,7 @@ namespace {
 class ModelState;
 
 struct BackendState {
+  std::string python_lib;
   std::string python_runtime;
 };
 
@@ -233,18 +234,18 @@ ModelInstanceState::CreatePythonInterpreter()
 
   if (interpreter_pid_ == 0) {
     // Use the python available in $PATH
-    // TODO: Make this overridable by config
-    std::string python_interpreter_path = "/usr/bin/python3";
+    std::string python_interpreter_path =
+        model_state_->BackendState()->python_runtime;
 
     std::stringstream ss;
-    ss << model_state_->BackendState()->python_runtime << "/startup.py";
+    ss << model_state_->BackendState()->python_lib << "/startup.py";
     std::string python_interpreter_startup = ss.str();
 
     subinterpreter_commandline[0] = python_interpreter_path.c_str();
     subinterpreter_commandline[1] = python_interpreter_startup.c_str();
     subinterpreter_commandline[5] = pymodule_path_.c_str();
     subinterpreter_commandline[7] = name_.c_str();
-    if (execve(
+    if (execvpe(
             subinterpreter_commandline[0], (char**)subinterpreter_commandline,
             nullptr) == -1) {
       std::stringstream ss;
@@ -313,7 +314,6 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
       std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
   }
-  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "Returned error");
 
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_INTERNAL, "failed to initialize grpc stub");
@@ -571,19 +571,32 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
 
   std::unique_ptr<BackendState> backend_state(new BackendState());
   ni::TritonJson::Value cmdline;
+  bool found_py_lib_config = false;
   bool found_py_runtime_config = false;
+
   if (backend_config.Find("cmdline", &cmdline)) {
-    ni::TritonJson::Value value;
-    if (cmdline.Find("python-lib", &value)) {
-      RETURN_IF_ERROR(value.AsString(&backend_state->python_runtime));
+    ni::TritonJson::Value python_lib;
+    if (cmdline.Find("python-lib", &python_lib)) {
+      RETURN_IF_ERROR(python_lib.AsString(&backend_state->python_lib));
+      found_py_lib_config = true;
+    }
+
+    ni::TritonJson::Value python_runtime;
+    if (cmdline.Find("python-runtime", &python_runtime)) {
+      RETURN_IF_ERROR(python_runtime.AsString(&backend_state->python_runtime));
       found_py_runtime_config = true;
     }
   }
 
-  // Set the default path for python runtime
-  if (!found_py_runtime_config) {
-    backend_state->python_runtime = "/opt/tritonserver/lib/python/runtime";
+  // Set the default path for python runtime and library
+  if (!found_py_lib_config) {
+    backend_state->python_lib = "/opt/tritonserver/lib/python/runtime";
   }
+
+  if (!found_py_runtime_config) {
+    backend_state->python_runtime = "python3";
+  }
+
 
   RETURN_IF_ERROR(TRITONBACKEND_BackendSetState(
       backend, reinterpret_cast<void*>(backend_state.get())));
