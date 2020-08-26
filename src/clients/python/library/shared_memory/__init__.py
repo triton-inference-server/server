@@ -49,7 +49,7 @@ class _utf8(object):
 
 import os
 _cshm_lib = "cshm" if os.name == 'nt' else 'libcshm.so'
-_cshm_path = pkg_resources.resource_filename('tritonshmutils.shared_memory',
+_cshm_path = pkg_resources.resource_filename('tritonclient.shared_memory',
                                              _cshm_lib)
 _cshm = cdll.LoadLibrary(_cshm_path)
 

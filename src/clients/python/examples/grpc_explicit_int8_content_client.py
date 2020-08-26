@@ -29,8 +29,8 @@ import argparse
 import numpy as np
 
 import grpc
-from tritongrpcclient import grpc_service_pb2
-from tritongrpcclient import grpc_service_pb2_grpc
+from tritonclient.grpcclient import grpc_service_pb2
+from tritonclient.grpcclient import grpc_service_pb2_grpc
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

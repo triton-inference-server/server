@@ -30,8 +30,8 @@ import numpy as np
 import sys
 import queue
 
-import tritongrpcclient
-from tritonclientutils import InferenceServerException
+from tritonclient import grpcclient
+from tritonclient.utils import InferenceServerException
 
 FLAGS = None
 
@@ -52,12 +52,11 @@ def sync_send(triton_client, result_list, values, batch_size, sequence_id,
                              fill_value=value,
                              dtype=np.int32)
         inputs = []
-        inputs.append(
-            tritongrpcclient.InferInput('INPUT', value_data.shape, "INT32"))
+        inputs.append(grpcclient.InferInput('INPUT', value_data.shape, "INT32"))
         # Initialize the data
         inputs[0].set_data_from_numpy(value_data)
         outputs = []
-        outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT'))
+        outputs.append(grpcclient.InferRequestedOutput('OUTPUT'))
         # Issue the synchronous sequence inference.
         result = triton_client.infer(model_name=model_name,
                                      inputs=inputs,
@@ -101,8 +100,8 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
 
     try:
-        triton_client = tritongrpcclient.InferenceServerClient(
-            url=FLAGS.url, verbose=FLAGS.verbose)
+        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()

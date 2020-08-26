@@ -27,13 +27,15 @@
 import os
 from setuptools import find_packages
 from setuptools import setup
+from itertools import chain
+
+if os.name != 'posix':
+    raise Exception('needs to run on linux systems')
 
 if 'VERSION' not in os.environ:
     raise Exception('envvar VERSION must be specified')
 
 VERSION = os.environ['VERSION']
-
-REQUIRED = ['numpy']
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -45,22 +47,56 @@ try:
             self.root_is_pure = False
 
         def get_tag(self):
-            pyver, abi, plat = 'py3', 'none', 'any'
+            pyver, abi, plat = 'py3', 'none', 'manylinux1_x86_64'
             return pyver, abi, plat
 except ImportError:
     bdist_wheel = None
 
+this_directory = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
+def req_file(filename, folder="requirements"):
+    with open(os.path.join(folder, filename)) as f:
+        content = f.readlines()
+    # you may also want to remove whitespace characters
+    # Example: `\n` at the end of each line
+    return [x.strip() for x in content]
+
+
+install_requires = req_file("requirements.txt")
+extras_require = {
+    'grpc': req_file("requirements_grpc.txt"),
+    'http': req_file("requirements_http.txt"),
+}
+
+extras_require['all'] = list(chain(extras_require.values()))
+
+platform_package_data = ['libcshm.so']
+if bool(os.environ.get('CUDA_VERSION', 0)):
+    platform_package_data += ['libccudashm.so']
+
 setup(
-    name='tritonclientutils',
+    name='tritonclient',
     version=VERSION,
     author='NVIDIA Inc.',
-    author_email='tanmayv@nvidia.com',
-    description='Python utils library for NVIDIA Triton Inference Server client',
+    author_email='sw-dl-triton@nvidia.com',
+    description=
+    'Python client library and utilities for communicating with Triton Inference Server',
+    long_description=long_description,
     license='BSD',
     url='http://nvidia.com',
-    keywords='triton tensorrt inference server utils client',
+    keywords=[
+        'grpc', 'http', 'triton', 'tensorrt', 'inference', 'server', 'service',
+        'client'
+    ],
+    install_requires=install_requires,
+    extras_require=extras_require,
     packages=find_packages(),
-    install_requires=REQUIRED,
+    package_data={
+        '': platform_package_data,
+    },
     zip_safe=False,
     cmdclass={'bdist_wheel': bdist_wheel},
+    data_files=[("", ["LICENSE.txt"]), ("bin", ["perf_client"])],
 )

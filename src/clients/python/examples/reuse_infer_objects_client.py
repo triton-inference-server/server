@@ -29,10 +29,10 @@ import argparse
 import numpy as np
 import sys
 from builtins import range
-import tritonhttpclient
-import tritongrpcclient
-import tritonshmutils.shared_memory as shm
-import tritonclientutils as utils
+from tritonclient import httpclient
+from tritonclient import grpcclient
+from tritonclient import utils
+import tritonclient.shared_memory as shm
 
 FLAGS = None
 
@@ -147,11 +147,11 @@ if __name__ == '__main__':
     try:
         if protocol == "grpc":
             # Create gRPC client for communicating with the server
-            triton_client = tritongrpcclient.InferenceServerClient(
+            triton_client = grpcclient.InferenceServerClient(
                 url=FLAGS.url, verbose=FLAGS.verbose)
         else:
             # Create HTTP client for communicating with the server
-            triton_client = tritonhttpclient.InferenceServerClient(
+            triton_client = httpclient.InferenceServerClient(
                 url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
         print("client creation failed: " + str(e))
@@ -214,21 +214,21 @@ if __name__ == '__main__':
     # Set the parameters to use data from shared memory
     inputs = []
     if protocol == "grpc":
-        inputs.append(tritongrpcclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "INT32"))
 
-        inputs.append(tritongrpcclient.InferInput('INPUT1', [1, 16], "INT32"))
+        inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "INT32"))
     else:
-        inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
 
-        inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
 
     outputs = []
     if protocol == "grpc":
-        outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
-        outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+        outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
+        outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
     else:
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1'))
+        outputs.append(httpclient.InferRequestedOutput('OUTPUT0'))
+        outputs.append(httpclient.InferRequestedOutput('OUTPUT1'))
 
     # Use shared memory
     infer_and_validata(True, input0_data, input1_data)

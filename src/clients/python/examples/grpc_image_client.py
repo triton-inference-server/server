@@ -33,8 +33,9 @@ import sys
 import struct
 
 import grpc
-from tritongrpcclient import grpc_service_pb2, grpc_service_pb2_grpc
-import tritongrpcclient.model_config_pb2 as mc
+
+from tritonclient.grpcclient import grpc_service_pb2, grpc_service_pb2_grpc
+import tritonclient.grpcclient.model_config_pb2 as mc
 
 FLAGS = None
 
