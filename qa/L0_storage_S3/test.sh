@@ -49,7 +49,11 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 # S3 bucket path (Point to bucket when testing cloud storage)
 BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
 
-# Make test bucket
+# Cleanup S3 test bucket if exists (due to test failure)
+aws s3 rm $BUCKET_URL --recursive --include "*" && \
+    aws s3 rb $BUCKET_URL || true
+
+# Make S3 test bucket
 aws s3 mb "${BUCKET_URL}"
 
 # Remove Slash in BUCKET_URL
