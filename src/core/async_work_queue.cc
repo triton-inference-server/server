@@ -36,10 +36,9 @@ namespace nvidia { namespace inferenceserver {
 
 AsyncWorkQueue::~AsyncWorkQueue()
 {
-  for (auto& worker_thread : worker_threads_) {
-    if (worker_thread->joinable()) {
-      worker_thread->join();
-    }
+  for (size_t id = 0; id < worker_threads_.size(); id++) {
+    GetSingleton()->task_queue_.Put(nullptr);
+    worker_threads_[id]->join();
   }
 }
 

@@ -325,7 +325,7 @@ std::vector<Option> options_
       {OPTION_BACKEND_DIR, "backend-directory", Option::ArgStr,
        "The global directory searched for backend shared libraries. Default is "
        "'/opt/tritonserver/backends'."},
-      {OPTION_BUFFER_MANAGER_THREAD_COUNT, "--buffer-manager-thread-count",
+      {OPTION_BUFFER_MANAGER_THREAD_COUNT, "buffer-manager-thread-count",
        Option::ArgInt,
        "The number of threads used to accelerate copies and other operations "
        "required to manage input and output tensor contents. Default is 1."},
