@@ -32,6 +32,7 @@ import importlib.util
 import sys
 import threading
 import signal
+import time
 
 import numpy as np
 
@@ -141,8 +142,6 @@ class PythonHost(PythonInterpreterServicer):
         if hasattr(self.backend, 'finalize'):
             self.backend.finalize()
 
-        del self.backend
-        self.event.set()
         return Empty()
 
     def Execute(self, request, context):
@@ -213,6 +212,7 @@ class PythonHost(PythonInterpreterServicer):
 
 
 if __name__ == "__main__":
+    signal_received = False
     FLAGS = parse_startup_arguments()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
     # Create an Event to keep the GRPC server running
@@ -220,12 +220,22 @@ if __name__ == "__main__":
     python_host = PythonHost(module_path=FLAGS.model_path, event=event)
     add_PythonInterpreterServicer_to_server(python_host, server)
 
-    # Ignore interrupt signal. GRPC server will exit when `Fini` is called
     def interrupt_handler(signum, frame):
         pass
 
+    def sigterm_handler(signum, frame):
+        global signal_received
+        if not signal_received:
+            signal_received = True
+        else:
+            return
+
+        event.set()
+
     signal.signal(signal.SIGINT, interrupt_handler)
+    signal.signal(signal.SIGTERM, sigterm_handler)
 
     server.add_insecure_port(FLAGS.socket)
     server.start()
     event.wait()
+    server.stop(grace=5)
