@@ -24,19 +24,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import base64
-import numpy as np
-import grpc
-import rapidjson as json
-import threading
-import queue
-import struct
+try:
+    from google.protobuf.json_format import MessageToJson
+    import grpc
+    import base64
+    import numpy as np
+    import rapidjson as json
+    import threading
+    import queue
+    import struct
+except ModuleNotFoundError as error:
+    raise RuntimeError(
+        'The installation does not include grpc support. Specify \'grpc\' or \'all\' while installing the tritonclient package to include the support'
+    ) from error
 
-from google.protobuf.json_format import MessageToJson
-
-from tritongrpcclient import grpc_service_pb2
-from tritongrpcclient import grpc_service_pb2_grpc
-from tritonclientutils import *
+import tritonclient.grpcclient.grpc_service_pb2
+import tritonclient.grpcclient.grpc_service_pb2_grpc
+from tritonclient.utils import *
 
 # Should be kept consistent with the value specified in
 # src/core/constants.h, which specifies MAX_GRPC_MESSAGE_SIZE

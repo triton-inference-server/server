@@ -28,8 +28,8 @@
 set -e
 
 function main() {
-  if [[ $# -lt 1 ]] ; then
-    echo "usage: $0 <destination dir>"
+  if [[ $# -lt 2 ]] ; then
+    echo "usage: $0 <destination dir> <linux-specific> <perf-client-binary>"
     exit 1
   fi
 
@@ -43,30 +43,78 @@ function main() {
   WHLDIR="$DEST/wheel"
 
   echo $(date) : "=== Using builddir: ${WHLDIR}"
-  mkdir -p ${WHLDIR}/tritonshmutils/
 
-  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
-    mkdir -p ${WHLDIR}/tritonshmutils/shared_memory
-    cp libcshm.so \
-      "${WHLDIR}/tritonshmutils/shared_memory/."
-    cp shared_memory/__init__.py \
-      "${WHLDIR}/tritonshmutils/shared_memory/."
+  echo "Adding package files"
+  mkdir -p ${WHLDIR}/tritonclient/
+  touch ${WHLDIR}/tritonclient/__init__.py
 
-    if [ -f libccudashm.so ] && [ -f cuda_shared_memory/__init__.py ]; then
-      mkdir -p ${WHLDIR}/tritonshmutils/cuda_shared_memory
-      cp libccudashm.so \
-        "${WHLDIR}/tritonshmutils/cuda_shared_memory/."
-      cp cuda_shared_memory/__init__.py \
-        "${WHLDIR}/tritonshmutils/cuda_shared_memory/."
-    fi
+  # grpcclient module
+  if [ -f grpcclient.py ]; then
+    mkdir -p ${WHLDIR}/tritonclient/grpcclient
+    cp ../../../core/*_pb2.py \
+      "${WHLDIR}/tritonclient/grpcclient/."
+    cp ../../../core/*_grpc.py \
+      "${WHLDIR}/tritonclient/grpcclient/."
+    cp grpcclient.py \
+      "${WHLDIR}/tritonclient/grpcclient/__init__.py"
+    # Use 'sed' command to fix protoc compiled imports (see
+    # https://github.com/google/protobuf/issues/1491).
+    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient.grpcclient import \1_pb2 as \2/" \
+      ${WHLDIR}/tritonclient/grpcclient/*_pb2.py
+    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient.grpcclient import \1_pb2 as \2/" \
+     ${WHLDIR}/tritonclient/grpcclient/*_pb2_grpc.py
   fi
 
-  cp shm_utils_setup.py "${WHLDIR}"
-  touch ${WHLDIR}/tritonshmutils/__init__.py
+  # httpclient module
+  if [ -f httpclient.py ]; then
+    mkdir -p ${WHLDIR}/tritonclient/httpclient
+    cp httpclient.py \
+      "${WHLDIR}/tritonclient/httpclient/__init__.py"
+  fi
+
+  # utility module
+  mkdir -p ${WHLDIR}/tritonclient/utils
+  cp utils.py \
+   "${WHLDIR}/tritonclient/utils/__init__.py"
+
+  if [ "$2" = true ] ; then
+    # shared_memory
+    mkdir -p ${WHLDIR}/tritonclient/shared_memory
+    cp libcshm.so \
+      "${WHLDIR}/tritonclient/shared_memory/."
+    cp shared_memory/__init__.py \
+      "${WHLDIR}/tritonclient/shared_memory/."
+
+    if [ -f libccudashm.so ] && [ -f cuda_shared_memory/__init__.py ]; then
+      mkdir -p ${WHLDIR}/tritonclient/cuda_shared_memory
+      cp libccudashm.so \
+        "${WHLDIR}/tritonclient/cuda_shared_memory/."
+      cp cuda_shared_memory/__init__.py \
+        "${WHLDIR}/tritonclient/cuda_shared_memory/."
+    fi
+
+    # Copies the pre-compiled perf_client binary
+    if [ -f $3 ]; then
+      cp $3 "${WHLDIR}"
+    fi
+  fi
+  
+  cp LICENSE.txt "${WHLDIR}"
+  cp README.md "${WHLDIR}"
+  cp -r requirements "${WHLDIR}"
+  if [ "$2" = true ] ; then
+    cp x86_linux_setup.py "${WHLDIR}"
+  else
+    cp setup.py "${WHLDIR}"
+  fi
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
-  VERSION=$VERSION python${PYVER} shm_utils_setup.py bdist_wheel
+  if [ "$2" = true ] ; then
+    VERSION=$VERSION python${PYVER} x86_linux_setup.py bdist_wheel
+  else
+    VERSION=$VERSION python${PYVER} setup.py bdist_wheel
+  fi
   mkdir -p "${DEST}"
   cp dist/* "${DEST}"
   popd

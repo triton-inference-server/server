@@ -30,9 +30,9 @@ import numpy as np
 import os
 import sys
 from builtins import range
-import tritongrpcclient
-import tritonshmutils.cuda_shared_memory as cudashm
-import tritonclientutils as utils
+from tritonclient import grpcclient
+from tritonclient import utils
+import tritonclient.cuda_shared_memory as cudashm
 from ctypes import *
 
 FLAGS = None
@@ -55,8 +55,8 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
 
     try:
-        triton_client = tritongrpcclient.InferenceServerClient(
-            url=FLAGS.url, verbose=FLAGS.verbose)
+        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit(1)
@@ -115,17 +115,17 @@ if __name__ == '__main__':
 
     # Set the parameters to use data from shared memory
     inputs = []
-    inputs.append(tritongrpcclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "INT32"))
     inputs[-1].set_shared_memory("input0_data", input_byte_size)
 
-    inputs.append(tritongrpcclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "INT32"))
     inputs[-1].set_shared_memory("input1_data", input_byte_size)
 
     outputs = []
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
     outputs[-1].set_shared_memory("output0_data", output_byte_size)
 
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
     outputs[-1].set_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,

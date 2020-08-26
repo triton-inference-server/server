@@ -28,7 +28,7 @@
 import argparse
 import numpy as np
 
-import tritongrpcclient
+from tritonclient import grpcclient
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -47,8 +47,8 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = tritongrpcclient.InferenceServerClient(
-            url=FLAGS.url, verbose=FLAGS.verbose)
+        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -57,8 +57,8 @@ if __name__ == '__main__':
 
     inputs = []
     outputs = []
-    inputs.append(tritongrpcclient.InferInput('INPUT0', [1, 16], "BYTES"))
-    inputs.append(tritongrpcclient.InferInput('INPUT1', [1, 16], "BYTES"))
+    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "BYTES"))
+    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "BYTES"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -77,8 +77,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data)
     inputs[1].set_data_from_numpy(input1_data)
 
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
