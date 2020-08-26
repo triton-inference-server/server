@@ -43,19 +43,17 @@ provided explicitly.
 Minimal Model Configuration
 ---------------------------
 
-A minimal model configuration must specify :cpp:var:`name
-<nvidia::inferenceserver::ModelConfig::name>`, :cpp:var:`platform
+A minimal model configuration must specify :cpp:var:`platform
 <nvidia::inferenceserver::ModelConfig::platform>`,
 :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>`,
 :cpp:var:`input <nvidia::inferenceserver::ModelConfig::input>`, and
 :cpp:var:`output <nvidia::inferenceserver::ModelConfig::output>`.
 
-As an example consider a TensorRT model called *mymodel* that has two
-inputs, *input0* and *input1*, and one output, *output0*, all of which
-are 16 entry float32 tensors. The minimal configuration is::
+As an example consider a TensorRT model that has two inputs, *input0*
+and *input1*, and one output, *output0*, all of which are 16 entry
+float32 tensors. The minimal configuration is::
 
-  name: "mymodel"
   platform: "tensorrt_plan"
   max_batch_size: 8
   input [
@@ -81,12 +79,16 @@ are 16 entry float32 tensors. The minimal configuration is::
 Name and Platform
 ^^^^^^^^^^^^^^^^^
 
-The name of the model must match the :cpp:var:`name
-<nvidia::inferenceserver::ModelConfig::name>` of the model repository
-directory containing the model. The :cpp:var:`platform
+If the name of the model is not specified in the configuration it is
+assumed to be the basename of the model repository directory
+containing the model. If :cpp:var:`name
+<nvidia::inferenceserver::ModelConfig::name>` is specified it must
+match the basename of the model repository directory containing the
+model. The :cpp:var:`platform
 <nvidia::inferenceserver::ModelConfig::platform>` must be one of
 **tensorrt_plan**, **tensorflow_graphdef**, **tensorflow_savedmodel**,
-**caffe2_netdef**, **onnxruntime_onnx**, **pytorch_libtorch** or **custom**.
+**caffe2_netdef**, **onnxruntime_onnx**, **pytorch_libtorch** or
+**custom**.
 
 Maximum Batch Size
 ^^^^^^^^^^^^^^^^^^
@@ -146,7 +148,6 @@ where <dims> is the shape specified by by :cpp:var:`input dims
 example, for the following configuration the shape of "input0" is [
 -1, 16 ] and the shape of "output0" is [ -1, 4 ]::
 
-  name: "mymodel"
   platform: "tensorrt_plan"
   max_batch_size: 8
   input [
@@ -167,7 +168,6 @@ example, for the following configuration the shape of "input0" is [
 For a configuration that is identical except that *max_batch_size* ==
 0, the shape of "input0" is [ 16 ] and the shape of "output0" is [ 4 ]::
 
-  name: "mymodel"
   platform: "tensorrt_plan"
   max_batch_size: 0
   input [
@@ -230,13 +230,7 @@ configuration above. Specifically:
 
 * :ref:`ONNX Runtime ONNX <section-onnx-models>` models do not require
   a model configuration file because Triton can derive all the
-  required settings automatically. However, if the model supports
-  batching, the initial batch dimension must be variable-size for all
-  inputs and outputs.
-
-* :ref:`PyTorch TorchScript <section-pytorch-models>` models have an optional
-  output configuration in the model configuration file to support cases where
-  there are variable number and/or datatypes of output.
+  required settings automatically.
 
 When using -\\-strict-model-config=false you can see the model
 configuration that was generated for a model by using the
@@ -468,7 +462,6 @@ inference requests.
 The following configuration specifies that all versions of the model
 will be available from the server::
 
-  name: "mymodel"
   platform: "tensorrt_plan"
   max_batch_size: 8
   input [
