@@ -28,8 +28,8 @@
 import argparse
 
 import grpc
-from tritongrpcclient import grpc_service_pb2
-from tritongrpcclient import grpc_service_pb2_grpc
+from tritonclient.grpcclient import grpc_service_pb2
+from tritonclient.grpcclient import grpc_service_pb2_grpc
 
 FLAGS = None
 

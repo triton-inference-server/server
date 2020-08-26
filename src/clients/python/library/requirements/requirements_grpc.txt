@@ -1,0 +1,4 @@
+protobuf>=3.5.0
+grpcio>=1.31.0
+numpy>=1.19.1
+python-rapidjson>=0.9.1
