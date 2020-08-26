@@ -26,62 +26,29 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import argparse
-import numpy as np
-import os
-import re
 import sys
+sys.path.append("../common")
+
+import unittest
+import numpy as np
+import infer_util as iu
+import test_util as tu
+import os
 import requests as httpreq
-from builtins import range
+
+from tritonclientutils import *
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
-from tritonclientutils import np_to_triton_dtype
 
-FLAGS = None
+class PythonTest(tu.TestResultCollector):
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-v',
-                        '--verbose',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        help='Inference server URL.')
-    parser.add_argument(
-        '-i',
-        '--protocol',
-        type=str,
-        required=False,
-        default='http',
-        help='Protocol ("http"/"grpc") used to ' +
-        'communicate with inference service. Default is "http".')
-
-    FLAGS = parser.parse_args()
-    if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
-        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
-            FLAGS.protocol))
-        exit(1)
-
-    client_util = httpclient if FLAGS.protocol == "http" else grpcclient
-
-    if FLAGS.url is None:
-        FLAGS.url = "localhost:8000" if FLAGS.protocol == "http" else "localhost:8001"
-
-    # Run async requests to make sure backend handles request batches
-    # correctly. We use just HTTP for this since we are not testing the
-    # protocol anyway.
-    if FLAGS.protocol == "http":
+    def test_async_infer(self):
+        client_util = httpclient
         model_name = "identity_uint8"
         request_parallelism = 4
         shape = [2, 2]
-        with client_util.InferenceServerClient(FLAGS.url,
-                                               concurrency=request_parallelism,
-                                               verbose=FLAGS.verbose) as client:
+        with client_util.InferenceServerClient("localhost:8000",
+                                               concurrency=request_parallelism) as client:
             input_datas = []
             requests = []
             for i in range(request_parallelism):
@@ -101,28 +68,16 @@ if __name__ == '__main__':
                 print(results)
 
                 output_data = results.as_numpy("OUT")
-                if output_data is None:
-                    print("error: expected 'OUT'")
-                    sys.exit(1)
-
-                if not np.array_equal(output_data, input_datas[i]):
-                    print("error: expected output {} to match input {}".format(
-                        output_data, input_datas[i]))
-                    sys.exit(1)
+                self.assertIsNotNone(output_data, "error: expected 'OUT'")
+                self.assertTrue(np.array_equal(output_data, input_datas[i]), "error: expected output {} to match input {}".format(output_data, input_datas[i]))
 
             # Make sure the requests ran in parallel.
             stats = client.get_inference_statistics(model_name)
-            if (len(stats['model_stats']) !=
-                    1) or (stats['model_stats'][0]['name'] != model_name):
-                print("error: expected statistics for {}".format(model_name))
-                sys.exit(1)
+            test_cond = (len(stats['model_stats']) != 1) or (stats['model_stats'][0]['name'] != model_name)
+            self.assertFalse(test_cond, "error: expected statistics for {}".format(model_name))
 
             stat = stats['model_stats'][0]
-            if (stat['inference_count'] != 8) or (stat['execution_count'] != 1):
-                print(
-                    "error: expected execution_count == 1 and inference_count == 8, got {} and {}"
-                    .format(stat['execution_count'], stat['inference_count']))
-                sys.exit(1)
+            self.assertFalse((stat['inference_count'] != 8) or (stat['execution_count'] != 1), "error: expected execution_count == 1 and inference_count == 8, got {} and {}".format(stat['execution_count'], stat['inference_count']))
 
             # Check metrics to make sure they are reported correctly
             metrics = httpreq.get('http://localhost:8002/metrics')
@@ -143,15 +98,12 @@ if __name__ == '__main__':
                 if line.startswith(infer_exec_str):
                     infer_exec_val = float(line[len(infer_exec_str):])
 
-            if success_val != 4:
-                print("error: expected metric {} == 4, got {}".format(
+            self.assertFalse(success_val != 4, "error: expected metric {} == 4, got {}".format(
                     success_str, success_val))
-                sys.exit(1)
-            if infer_count_val != 8:
-                print("error: expected metric {} == 8, got {}".format(
+            self.assertFalse(infer_count_val != 8, "error: expected metric {} == 8, got {}".format(
                     infer_count_str, infer_count_val))
-                sys.exit(1)
-            if infer_exec_val != 1:
-                print("error: expected metric {} == 1, got {}".format(
+            self.assertFalse(infer_exec_val != 1, "error: expected metric {} == 1, got {}".format(
                     infer_exec_str, infer_exec_val))
-                sys.exit(1)
+
+if __name__ == '__main__':
+    unittest.main()

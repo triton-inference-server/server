@@ -62,14 +62,12 @@ fi
 
 RET=0
 
-for PROTOCOL in http grpc; do
-    set +e
-    python $CLIENT_PY -i $PROTOCOL -v >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-    set -e
-done
+set +e
+python $CLIENT_PY >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
