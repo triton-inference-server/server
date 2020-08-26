@@ -154,8 +154,6 @@ class PythonHost(PythonInterpreterServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(e.message())
 
-        del self.backend
-        self.event.set()
         return Empty()
 
     def Execute(self, request, context):
@@ -249,7 +247,6 @@ if __name__ == "__main__":
     python_host = PythonHost(module_path=FLAGS.model_path, event=event)
     add_PythonInterpreterServicer_to_server(python_host, server)
 
-<<<<<<< HEAD
     def interrupt_handler(signum, frame):
         pass
 
@@ -264,18 +261,8 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, sigterm_handler)
-=======
-    # Ignore interrupt signal. GRPC server will exit when `Fini` is called
-    def interrupt_handler(signum, frame):
-        pass
-
-    signal.signal(signal.SIGINT, interrupt_handler)
->>>>>>> Improve python backend shutdown
 
     server.add_insecure_port(FLAGS.socket)
     server.start()
     event.wait()
-<<<<<<< HEAD
     server.stop(grace=5)
-=======
->>>>>>> Improve python backend shutdown
