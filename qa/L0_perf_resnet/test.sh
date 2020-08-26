@@ -59,6 +59,7 @@ TFAMP_MODEL_NAME="resnet50v1.5_fp16_savedmodel_amp"
 #
 STATIC_BATCH=1
 INSTANCE_CNT=1
+CONCURRENCY=1
 MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME} ${NETDEF_MODEL_NAME}"
 OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME} ${TFAMP_MODEL_NAME}"
 
@@ -105,6 +106,7 @@ for MODEL_NAME in $MODEL_NAMES; do
                 STATIC_BATCH=${STATIC_BATCH} \
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
+                CONCURRENCY=${CONCURRENCY} \
                 bash -x run_test.sh
     done
 done
@@ -120,6 +122,7 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
                 STATIC_BATCH=${STATIC_BATCH} \
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
+                CONCURRENCY=${CONCURRENCY} \
                 bash -x run_test.sh
     done
 done
@@ -127,11 +130,9 @@ done
 #
 # Test large static batch = 128 w/ 2 instances
 #
-# Can't test ONNX since model only supports batch-size 1 (can fix this
-# if we find a RN50 onnx that supports batching).
-#
 STATIC_BATCH=128
 INSTANCE_CNT=2
+CONCURRENCY=4
 MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME}"
 OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME} ${TFAMP_MODEL_NAME}"
 
@@ -156,6 +157,7 @@ for MODEL_NAME in $MODEL_NAMES; do
                 STATIC_BATCH=${STATIC_BATCH} \
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
+                CONCURRENCY=${CONCURRENCY} \
                 bash -x run_test.sh
     done
 done
@@ -170,6 +172,7 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
                 STATIC_BATCH=${STATIC_BATCH} \
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
+                CONCURRENCY=${CONCURRENCY} \
                 bash -x run_test.sh
     done
 done

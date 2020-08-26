@@ -47,6 +47,7 @@ rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 #
 STATIC_BATCH=1
 INSTANCE_CNT=1
+CONCURRENCY=1
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
@@ -95,6 +96,7 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
                 DYNAMIC_BATCH_SIZES=1 \
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_COUNTS=${INSTANCE_CNT} \
+                CONCURRENCY=${CONCURRENCY} \
                 bash -x run_test.sh
     done
 done
@@ -104,6 +106,7 @@ done
 #
 STATIC_BATCH=256
 INSTANCE_CNT=2
+CONCURRENCY=4
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
@@ -136,6 +139,7 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
                 DYNAMIC_BATCH_SIZES=1 \
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_COUNTS=${INSTANCE_CNT} \
+                CONCURRENCY=${CONCURRENCY} \
                 bash -x run_test.sh
     done
 done
