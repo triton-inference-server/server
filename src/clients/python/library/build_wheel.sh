@@ -102,16 +102,13 @@ function main() {
   cp LICENSE.txt "${WHLDIR}"
   cp README.md "${WHLDIR}"
   cp -r requirements "${WHLDIR}"
-  if [ "$2" = true ] ; then
-    cp x86_linux_setup.py "${WHLDIR}"
-  else
-    cp setup.py "${WHLDIR}"
+  cp setup.py "${WHLDIR}"
   fi
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
   if [ "$2" = true ] ; then
-    VERSION=$VERSION python${PYVER} x86_linux_setup.py bdist_wheel
+    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name=manylinux1_x86_64
   else
     VERSION=$VERSION python${PYVER} setup.py bdist_wheel
   fi
