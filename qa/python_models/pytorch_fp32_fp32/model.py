@@ -63,7 +63,7 @@ class Net(nn.Module):
         return output
 
 
-class TritonPythonBackend:
+class TritonPythonModel:
 
     def initialize(self, args):
         torch.manual_seed(0)
