@@ -1040,8 +1040,8 @@ ModelInstanceState::ProcessRequests(
   std::vector<const char*> input_names;
   bool cuda_copy = false;
   nib::BackendInputCollector collector(
-      requests, request_count, &responses, model_state_->EnablePinnedInput(),
-      CudaStream());
+      requests, request_count, &responses, model_state_->TritonMemoryManager(),
+      model_state_->EnablePinnedInput(), CudaStream());
   SetInputTensors(
       total_batch_size, requests, request_count, &responses, &collector,
       &input_names, &cuda_copy);
@@ -1210,17 +1210,26 @@ ModelInstanceState::SetInputTensors(
     // [TODO] currently ONNX Runtime only recognize input data on CPU
     // https://github.com/microsoft/onnxruntime/issues/1621
     if (input_datatype != TRITONSERVER_TYPE_BYTES) {
-      // Allocate the tensor buffer in pinned memory if possible.
-      // [TODO] should be smarter about re-using the memory buffers
-      // instead of reallocating them every time.
+      // The input must be in contiguous CPU memory. Use a pinned
+      // memory if possible for the case where the inputs are being
+      // provided in GPU memory.
+      //
+      // [TODO] a couple of optimizations are possible here. 1) if we
+      // know that all data for this input across all requests was not
+      // in GPU memory, then we could just use regular CPU memory and
+      // not pinned memory. 2) if there is a single request and for
+      // this input the data is already in contiguous CPU memory then
+      // we don't need to copy at all.
       const int64_t batchn_byte_size =
           nib::GetByteSize(input_datatype, batchn_shape);
 
       nib::BackendMemory* input_memory;
       RESPOND_ALL_AND_RETURN_IF_ERROR(
           responses, request_count,
-          nib::BackendMemory::Create(
-              TRITONSERVER_MEMORY_CPU_PINNED, batchn_byte_size, &input_memory));
+          nib::BackendMemory::CreateWithFallback(
+              model_state_->TritonMemoryManager(),
+              TRITONSERVER_MEMORY_CPU_PINNED, 0 /* memory_type_id */,
+              batchn_byte_size, &input_memory));
       input_tensor_memories_.push_back(input_memory);
 
       TRITONSERVER_MemoryType input_memtype = input_memory->MemoryType();
@@ -1317,8 +1326,9 @@ ModelInstanceState::SetStringInputTensor(
   nib::BackendMemory* input_memory;
   RESPOND_ALL_AND_RETURN_IF_ERROR(
       responses, request_count,
-      nib::BackendMemory::Create(
-          TRITONSERVER_MEMORY_CPU_PINNED, total_byte_size + 1, &input_memory));
+      nib::BackendMemory::CreateWithFallback(
+          model_state_->TritonMemoryManager(), TRITONSERVER_MEMORY_CPU_PINNED,
+          0 /* memory_type_id */, total_byte_size + 1, &input_memory));
   input_tensor_memories_.push_back(input_memory);
 
   const TRITONSERVER_MemoryType mem_type = input_memory->MemoryType();
@@ -1481,7 +1491,8 @@ ModelInstanceState::ReadOutputTensors(
 {
   nib::BackendOutputResponder responder(
       requests, request_count, responses, model_state_->MaxBatchSize(),
-      model_state_->EnablePinnedInput(), CudaStream());
+      model_state_->TritonMemoryManager(), model_state_->EnablePinnedInput(),
+      CudaStream());
 
   // Use to hold string output contents
   bool cuda_copy = false;

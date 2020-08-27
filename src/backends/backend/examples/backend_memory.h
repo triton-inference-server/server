@@ -26,6 +26,7 @@
 #pragma once
 
 #include <string>
+#include "src/backends/backend/tritonbackend.h"
 #include "src/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver { namespace backend {
@@ -33,31 +34,49 @@ namespace nvidia { namespace inferenceserver { namespace backend {
 //
 // BackendMemory
 //
-// Utility class for allocating and deallocating memory.
+// Utility class for allocating and deallocating memory using
+// TRITONBACKEND_MemoryManager.
 //
 class BackendMemory {
  public:
-  // Create a memory allocation using the preferred memory type if
-  // possible. If not possible allocate memory using the next most
-  // appropriate memory type.
+  // Create a memory allocation using the specified memory type. See
+  // TRITONBACKEND_MemoryManagerAllocate for explanation of the
+  // returned error codes.
   static TRITONSERVER_Error* Create(
-      const TRITONSERVER_MemoryType preferred_memtype, const size_t byte_size,
+      TRITONBACKEND_MemoryManager* manager,
+      const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id,
+      const size_t byte_size, BackendMemory** mem);
+
+  // Create a memory allocation using the preferred memory type if
+  // possible. If not possible fallback to allocate memory using CPU
+  // memory. See TRITONBACKEND_MemoryManagerAllocate for explanation
+  // of the returned error codes.
+  static TRITONSERVER_Error* CreateWithFallback(
+      TRITONBACKEND_MemoryManager* manager,
+      const TRITONSERVER_MemoryType preferred_memory_type,
+      const int64_t memory_type_id, const size_t byte_size,
       BackendMemory** mem);
+
   ~BackendMemory();
 
   TRITONSERVER_MemoryType MemoryType() const { return memtype_; }
+  int64_t MemoryTypeId() const { return memtype_id_; }
   char* MemoryPtr() { return buffer_; }
   size_t ByteSize() const { return byte_size_; }
 
  private:
   BackendMemory(
-      const TRITONSERVER_MemoryType memtype, char* buffer,
-      const size_t byte_size)
-      : memtype_(memtype), buffer_(buffer), byte_size_(byte_size)
+      TRITONBACKEND_MemoryManager* manager,
+      const TRITONSERVER_MemoryType memtype, const int64_t memtype_id,
+      char* buffer, const size_t byte_size)
+      : manager_(manager), memtype_(memtype), memtype_id_(memtype_id),
+        buffer_(buffer), byte_size_(byte_size)
   {
   }
 
+  TRITONBACKEND_MemoryManager* manager_;
   TRITONSERVER_MemoryType memtype_;
+  int64_t memtype_id_;
   char* buffer_;
   size_t byte_size_;
 };

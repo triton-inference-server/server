@@ -94,6 +94,9 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
         memset(&device, 0, sizeof(device));
         device.device = gpu;
         device.size = it->second;
+
+        LOG_INFO << "CUDA memory pool is created on device " << device.device
+                 << " with size " << device.size;
       }
     }
 

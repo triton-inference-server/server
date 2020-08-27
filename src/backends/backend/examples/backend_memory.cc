@@ -28,66 +28,60 @@
 
 #include "src/backends/backend/examples/backend_utils.h"
 
-#ifdef TRITON_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRITON_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver { namespace backend {
 
 TRITONSERVER_Error*
 BackendMemory::Create(
-    const TRITONSERVER_MemoryType preferred_memtype, const size_t byte_size,
-    BackendMemory** mem)
+    TRITONBACKEND_MemoryManager* manager,
+    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id,
+    const size_t byte_size, BackendMemory** mem)
 {
   *mem = nullptr;
 
-  char* ptr = nullptr;
-  TRITONSERVER_MemoryType memtype = preferred_memtype;
+  void* ptr = nullptr;
+  RETURN_IF_ERROR(TRITONBACKEND_MemoryManagerAllocate(
+      manager, &ptr, memory_type, memory_type_id, byte_size));
 
-  // For now only CPU memory types are supported...
-  RETURN_ERROR_IF_FALSE(
-      (memtype == TRITONSERVER_MEMORY_CPU) ||
-          (memtype == TRITONSERVER_MEMORY_CPU_PINNED),
-      TRITONSERVER_ERROR_INTERNAL,
-      std::string("BackendMemory only supports CPU and CPU_PINNED memory"));
+  *mem = new BackendMemory(
+      manager, memory_type, memory_type_id, reinterpret_cast<char*>(ptr),
+      byte_size);
 
-  // If PINNED memory is preferred and GPU is enabled then attempt
-  // that memory first.
-#ifdef TRITON_ENABLE_GPU
-  if (memtype == TRITONSERVER_MEMORY_CPU_PINNED) {
-    auto cuerr = cudaHostAlloc((void**)&ptr, byte_size, cudaHostAllocPortable);
-    if (cuerr != cudaSuccess) {
-      ptr = nullptr;
-    }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+BackendMemory::CreateWithFallback(
+    TRITONBACKEND_MemoryManager* manager,
+    const TRITONSERVER_MemoryType preferred_memory_type,
+    const int64_t memory_type_id, const size_t byte_size, BackendMemory** mem)
+{
+  *mem = nullptr;
+
+  TRITONSERVER_MemoryType memory_type = preferred_memory_type;
+  void* ptr = nullptr;
+  TRITONSERVER_Error* err = TRITONBACKEND_MemoryManagerAllocate(
+      manager, &ptr, memory_type, memory_type_id, byte_size);
+  if (err != nullptr) {
+    TRITONSERVER_ErrorDelete(err);
+
+    // Fallback to CPU memory...
+    memory_type = TRITONSERVER_MEMORY_CPU;
+    RETURN_IF_ERROR(TRITONBACKEND_MemoryManagerAllocate(
+        manager, &ptr, memory_type, 0 /* memory_type_id */, byte_size));
   }
-#endif  // TRITON_ENABLE_GPU
 
-  // Fall-back is non-pinned CPU memory.
-  if (ptr == nullptr) {
-    memtype = TRITONSERVER_MEMORY_CPU;
-    ptr = reinterpret_cast<char*>(malloc(byte_size));
-  }
-
-  RETURN_ERROR_IF_TRUE(
-      ptr == nullptr, TRITONSERVER_ERROR_INTERNAL,
-      std::string("BackendMemory failed to allocate ") +
-          std::to_string(byte_size) + " bytes of " +
-          TRITONSERVER_MemoryTypeString(memtype));
-
-  *mem = new BackendMemory(memtype, ptr, byte_size);
+  *mem = new BackendMemory(
+      manager, memory_type, memory_type_id, reinterpret_cast<char*>(ptr),
+      byte_size);
 
   return nullptr;  // success
 }
 
 BackendMemory::~BackendMemory()
 {
-  if (memtype_ == TRITONSERVER_MEMORY_CPU) {
-    free(buffer_);
-  } else if (memtype_ == TRITONSERVER_MEMORY_CPU_PINNED) {
-#ifdef TRITON_ENABLE_GPU
-    cudaFreeHost(buffer_);
-#endif  // TRITON_ENABLE_GPU
-  }
+  LOG_IF_ERROR(
+      TRITONBACKEND_MemoryManagerFree(manager_, buffer_, memtype_, memtype_id_),
+      "failed to free memory buffer");
 }
 
 }}}  // namespace nvidia::inferenceserver::backend

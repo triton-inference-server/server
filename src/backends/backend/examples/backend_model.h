@@ -46,6 +46,12 @@ class BackendModel {
   // Get the handle to the TRITONBACKEND server hosting this model.
   TRITONSERVER_Server* TritonServer() { return triton_server_; }
 
+  // Get the handle to the memory manager for this model.
+  TRITONBACKEND_MemoryManager* TritonMemoryManager()
+  {
+    return triton_memory_manager_;
+  }
+
   // Get the handle to the TRITONBACKEND model.
   TRITONBACKEND_Model* TritonModel() { return triton_model_; }
 
@@ -78,6 +84,7 @@ class BackendModel {
 
  protected:
   TRITONSERVER_Server* triton_server_;
+  TRITONBACKEND_MemoryManager* triton_memory_manager_;
   TRITONBACKEND_Model* triton_model_;
   std::string name_;
   uint64_t version_;

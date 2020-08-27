@@ -47,8 +47,9 @@ TRITONBACKEND_MemoryManagerAllocate(
     const uint64_t byte_size)
 {
   switch (memory_type) {
+    case TRITONSERVER_MEMORY_GPU:
 #ifdef TRITON_ENABLE_GPU
-    case TRITONSERVER_MEMORY_GPU: {
+    {
       auto status = CudaMemoryManager::Alloc(buffer, byte_size, memory_type_id);
       if (!status.IsOk()) {
         return TRITONSERVER_ErrorNew(
@@ -57,12 +58,14 @@ TRITONBACKEND_MemoryManagerAllocate(
       break;
     }
 #else
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNSUPPORTED, "GPU memory allocation not supported");
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "GPU memory allocation not supported");
 #endif  // TRITON_ENABLE_GPU
 
-    case TRITONSERVER_MEMORY_CPU_PINNED: {
+    case TRITONSERVER_MEMORY_CPU_PINNED:
 #ifdef TRITON_ENABLE_GPU
+    {
       TRITONSERVER_MemoryType mt = memory_type;
       auto status = PinnedMemoryManager::Alloc(buffer, byte_size, &mt, false);
       if (!status.IsOk()) {
