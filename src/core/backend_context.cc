@@ -367,7 +367,7 @@ BackendResponder::Finalize()
             "error sending TensorFlow response");
       } else {
         // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-        if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+        if ((AsyncWorkQueue::WorkerCount() > 1) &&
             (response_memory_type == TRITONSERVER_MEMORY_CPU) &&
             (pinned_memory_type == TRITONSERVER_MEMORY_CPU)) {
           AsyncWorkQueue::AddTask(std::bind(
@@ -538,7 +538,7 @@ BackendResponder::FlushPendingPinned(
             "error sending TensorFlow response");
       } else {
         // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-        if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+        if ((AsyncWorkQueue::WorkerCount() > 1) &&
             (response_memory_type == TRITONSERVER_MEMORY_CPU) &&
             (tensor_memory_type == TRITONSERVER_MEMORY_CPU)) {
           AsyncWorkQueue::AddTask(std::bind(
@@ -649,7 +649,7 @@ BackendResponder::FlushPendingPinned(
               "error sending TensorFlow response");
         } else {
           // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-          if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+          if ((AsyncWorkQueue::WorkerCount() > 1) &&
               (response_memory_type == TRITONSERVER_MEMORY_CPU) &&
               (pinned_memory_type == TRITONSERVER_MEMORY_CPU)) {
             AsyncWorkQueue::AddTask(std::bind(
@@ -967,7 +967,7 @@ BackendInputCollector::Finalize()
         &pinned_memory_type, &pinned_memory_id);
 
     // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-    if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+    if ((AsyncWorkQueue::WorkerCount() > 1) &&
         ((pinned_memory_type == TRITONSERVER_MEMORY_CPU) &&
          (def.tensor_memory_type_ == TRITONSERVER_MEMORY_CPU))) {
       AsyncWorkQueue::AddTask(std::bind(
@@ -1112,7 +1112,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
 
     // Direct copy without intermediate pinned memory.
     // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-    if ((AsyncWorkQueue::GetWorkerCount() > 1) &&
+    if ((AsyncWorkQueue::WorkerCount() > 1) &&
         (src_memory_type == TRITONSERVER_MEMORY_CPU) &&
         (tensor_memory_type == TRITONSERVER_MEMORY_CPU)) {
       AsyncWorkQueue::AddTask(std::bind(

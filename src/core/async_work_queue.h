@@ -44,14 +44,14 @@ namespace nvidia { namespace inferenceserver {
 
 class AsyncWorkQueue {
  public:
-  // Start 'thread_count' number of worker threads.
-  static void Initialize(size_t thread_count);
+  // Start 'worker_count' number of worker threads.
+  static void Initialize(size_t worker_count);
 
   // Get the number of worker threads.
-  static size_t GetWorkerCount();
+  static size_t WorkerCount();
 
   // Add a task to the queue.
-  static void AddTask(const std::function<void(void)> task);
+  static void AddTask(const std::function<void(void)>&& task);
 
  private:
   AsyncWorkQueue() = default;

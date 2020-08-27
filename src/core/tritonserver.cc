@@ -28,7 +28,6 @@
 
 #include <string>
 #include <vector>
-#include "src/core/async_work_queue.h"
 #include "src/core/backend.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/infer_parameter.h"
@@ -215,8 +214,14 @@ class TritonServerOptions {
   unsigned int ExitTimeout() const { return exit_timeout_; }
   void SetExitTimeout(unsigned int t) { exit_timeout_ = t; }
 
-  unsigned int BufferManagerThreadCount() const { return async_worker_count_; }
-  void SetBufferManagerThreadCount(unsigned int c) { async_worker_count_ = c; }
+  unsigned int BufferManagerThreadCount() const
+  {
+    return buffer_manager_thread_count_;
+  }
+  void SetBufferManagerThreadCount(unsigned int c)
+  {
+    buffer_manager_thread_count_ = c;
+  }
 
   bool Metrics() const { return metrics_; }
   void SetMetrics(bool b) { metrics_ = b; }
@@ -260,7 +265,7 @@ class TritonServerOptions {
   bool metrics_;
   bool gpu_metrics_;
   unsigned int exit_timeout_;
-  unsigned int async_worker_count_;
+  unsigned int buffer_manager_thread_count_;
   uint64_t pinned_memory_pool_size_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_compute_capability_;
@@ -1539,7 +1544,7 @@ TRITONSERVER_ServerNew(
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
-  ni::AsyncWorkQueue::Initialize(loptions->BufferManagerThreadCount());
+  lserver->SetBufferManagerThreadCount(loptions->BufferManagerThreadCount());
 
   // FIXME these should be removed once all backends use
   // BackendConfig.

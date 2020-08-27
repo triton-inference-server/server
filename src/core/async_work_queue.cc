@@ -36,9 +36,9 @@ namespace nvidia { namespace inferenceserver {
 
 AsyncWorkQueue::~AsyncWorkQueue()
 {
-  for (size_t id = 0; id < worker_threads_.size(); id++) {
+  for (const auto& worker_thread : worker_threads_) {
     GetSingleton()->task_queue_.Put(nullptr);
-    worker_threads_[id]->join();
+    worker_thread->join();
   }
 }
 
@@ -50,34 +50,31 @@ AsyncWorkQueue::GetSingleton()
 }
 
 void
-AsyncWorkQueue::Initialize(size_t thread_count)
+AsyncWorkQueue::Initialize(size_t worker_count)
 {
-  if (thread_count > 1) {
-    for (size_t id = 0; id < thread_count; id++) {
-      GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
-          new std::thread([] { InitializeThread(); })));
-    }
+  for (size_t id = 0; id < worker_count; id++) {
+    GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
+        new std::thread([] { InitializeThread(); })));
   }
 }
 
 size_t
-AsyncWorkQueue::GetWorkerCount()
+AsyncWorkQueue::WorkerCount()
 {
   return GetSingleton()->worker_threads_.size();
 }
 
 void
-AsyncWorkQueue::AddTask(const std::function<void(void)> task)
+AsyncWorkQueue::AddTask(const std::function<void(void)>&& task)
 {
-  GetSingleton()->task_queue_.Put(task);
+  GetSingleton()->task_queue_.Put(std::move(task));
 }
 
 void
 AsyncWorkQueue::InitializeThread()
 {
-  std::function<void(void)> task;
   while (true) {
-    task = GetSingleton()->task_queue_.Get();
+    auto task = GetSingleton()->task_queue_.Get();
     if (task == nullptr)
       break;
     task();

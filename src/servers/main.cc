@@ -812,7 +812,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
-  int32_t buffer_manager_thread_count = 0;
+  int32_t buffer_manager_thread_count = 1;
 
   std::string backend_dir = "/opt/tritonserver/backends";
   std::vector<std::tuple<std::string, std::string, std::string>>

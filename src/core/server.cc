@@ -134,6 +134,8 @@ InferenceServer::Init()
         Status::Code::INVALID_ARG, "--model-repository must be specified");
   }
 
+  AsyncWorkQueue::Initialize(buffer_manager_thread_count_);
+
   PinnedMemoryManager::Options options(pinned_memory_pool_size_);
   status = PinnedMemoryManager::Create(options);
   if (!status.IsOk()) {
