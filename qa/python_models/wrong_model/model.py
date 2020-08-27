@@ -24,22 +24,30 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "pytorch_model"
-backend: "python"
-platform: "custom"
+import numpy as np
+import sys
 
-input [
-  {
-    name: "IN"
-    data_type: TYPE_FP32
-    dims: [ 1, 1, 28, 28 ]
-  }
-]
+sys.path.append('../../')
+import triton_python_backend_utils as utils
 
-output [
-  {
-    name: "OUT"
-    data_type: TYPE_FP32
-    dims: [ 1, 10 ]
-  }
-]
+
+class TritonPythonBackend:
+
+    def initialize(self, args):
+        self.model_config = args['model_config']
+
+    def execute(self, requests):
+        """ This function is called on inference request.
+        """
+        responses = []
+        for request in requests:
+            input_tensors = request.inputs()
+            in_all = input_tensors[0].numpy_array()
+
+            out_tensor = utils.Tensor("OUT", in_all)
+            lorem_ipsum
+            responses.append(utils.InferenceResponse([out_tensor]))
+        return responses
+
+    def finalize(self):
+        pass

@@ -37,6 +37,7 @@ import triton_python_backend_utils as utils
 
 
 class Net(nn.Module):
+
     def __init__(self):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
@@ -64,13 +65,13 @@ class Net(nn.Module):
 
 class TritonPythonBackend:
 
-    def __init__(self, args):
+    def initialize(self, args):
         torch.manual_seed(0)
         self.model_config = args['model_config']
         self.model = Net()
         self.model.eval()
 
-    def __call__(self, requests):
+    def execute(self, requests):
         """ This function is called on inference request.
         """
         responses = []
@@ -83,6 +84,5 @@ class TritonPythonBackend:
             print(result.shape)
 
             out_tensor = utils.Tensor("OUT", result.detach().numpy())
-            responses.append(
-                utils.InferenceResponse([out_tensor]))
+            responses.append(utils.InferenceResponse([out_tensor]))
         return responses

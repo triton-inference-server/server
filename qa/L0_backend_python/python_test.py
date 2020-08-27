@@ -40,6 +40,7 @@ from tritonclientutils import *
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 
+
 class PythonTest(tu.TestResultCollector):
 
     def test_async_infer(self):
@@ -47,8 +48,8 @@ class PythonTest(tu.TestResultCollector):
         model_name = "identity_uint8"
         request_parallelism = 4
         shape = [2, 2]
-        with client_util.InferenceServerClient("localhost:8000",
-                                               concurrency=request_parallelism) as client:
+        with client_util.InferenceServerClient(
+                "localhost:8000", concurrency=request_parallelism) as client:
             input_datas = []
             requests = []
             for i in range(request_parallelism):
@@ -69,15 +70,25 @@ class PythonTest(tu.TestResultCollector):
 
                 output_data = results.as_numpy("OUT")
                 self.assertIsNotNone(output_data, "error: expected 'OUT'")
-                self.assertTrue(np.array_equal(output_data, input_datas[i]), "error: expected output {} to match input {}".format(output_data, input_datas[i]))
+                self.assertTrue(
+                    np.array_equal(output_data, input_datas[i]),
+                    "error: expected output {} to match input {}".format(
+                        output_data, input_datas[i]))
 
             # Make sure the requests ran in parallel.
             stats = client.get_inference_statistics(model_name)
-            test_cond = (len(stats['model_stats']) != 1) or (stats['model_stats'][0]['name'] != model_name)
-            self.assertFalse(test_cond, "error: expected statistics for {}".format(model_name))
+            test_cond = (len(stats['model_stats']) !=
+                         1) or (stats['model_stats'][0]['name'] != model_name)
+            self.assertFalse(
+                test_cond,
+                "error: expected statistics for {}".format(model_name))
 
             stat = stats['model_stats'][0]
-            self.assertFalse((stat['inference_count'] != 8) or (stat['execution_count'] != 1), "error: expected execution_count == 1 and inference_count == 8, got {} and {}".format(stat['execution_count'], stat['inference_count']))
+            self.assertFalse((stat['inference_count'] != 8) or (
+                stat['execution_count'] != 1
+            ), "error: expected execution_count == 1 and inference_count == 8, got {} and {}"
+                             .format(stat['execution_count'],
+                                     stat['inference_count']))
 
             # Check metrics to make sure they are reported correctly
             metrics = httpreq.get('http://localhost:8002/metrics')
@@ -98,12 +109,63 @@ class PythonTest(tu.TestResultCollector):
                 if line.startswith(infer_exec_str):
                     infer_exec_val = float(line[len(infer_exec_str):])
 
-            self.assertFalse(success_val != 4, "error: expected metric {} == 4, got {}".format(
+            self.assertFalse(
+                success_val != 4,
+                "error: expected metric {} == 4, got {}".format(
                     success_str, success_val))
-            self.assertFalse(infer_count_val != 8, "error: expected metric {} == 8, got {}".format(
+            self.assertFalse(
+                infer_count_val != 8,
+                "error: expected metric {} == 8, got {}".format(
                     infer_count_str, infer_count_val))
-            self.assertFalse(infer_exec_val != 1, "error: expected metric {} == 1, got {}".format(
+            self.assertFalse(
+                infer_exec_val != 1,
+                "error: expected metric {} == 1, got {}".format(
                     infer_exec_str, infer_exec_val))
+
+    def test_infer_pymodel_error(self):
+        client_util = httpclient
+        model_name = "wrong_model"
+        shape = [2, 2]
+        with client_util.InferenceServerClient("localhost:8000") as client:
+            input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
+            inputs = [
+                client_util.InferInput("IN", input_data.shape,
+                                       np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            try:
+                response = client.infer(model_name, inputs)
+            except InferenceServerException as e:
+                self.assertTrue(
+                    e.message().startswith("GRPC Execute Failed, message:"),
+                    "Exception message is not correct")
+            else:
+                self.assertTrue(
+                    False, "Wrong exception raised or exception did not raise")
+
+    def test_infer_pytorch(self):
+        client_util = httpclient
+        model_name = "pytorch_fp32_fp32"
+        shape = [1, 1, 28, 28]
+        with client_util.InferenceServerClient("localhost:8000") as client:
+            input_data = np.zeros(shape, dtype=np.float32)
+            inputs = [
+                client_util.InferInput("IN", input_data.shape,
+                                       np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            result = client.infer(model_name, inputs)
+            output_data = result.as_numpy('OUT')
+            self.assertIsNotNone(output_data, "error: expected 'OUT'")
+
+            # expected inference resposne from a zero tensor
+            expected_result = [
+                -2.2377274, -2.3976364, -2.2464046, -2.2790744, -2.3828976,
+                -2.2940576, -2.2928185, -2.340665, -2.275219, -2.292135
+            ]
+            self.assertTrue(np.allclose(output_data[0], expected_result),
+                            'Inference result is not correct')
+
 
 if __name__ == '__main__':
     unittest.main()
