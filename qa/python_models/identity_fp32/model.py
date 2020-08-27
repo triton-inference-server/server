@@ -33,10 +33,10 @@ import triton_python_backend_utils as utils
 
 class TritonPythonBackend:
 
-    def __init__(self, args):
+    def initialize(self, args):
         self.model_config = args['model_config']
 
-    def __call__(self, requests):
+    def execute(self, requests):
         """ This function is called on inference request.
         """
         responses = []
@@ -45,6 +45,5 @@ class TritonPythonBackend:
             in_all = input_tensors[0].numpy_array()
 
             out_tensor = utils.Tensor("OUT", in_all)
-            responses.append(
-                utils.InferenceResponse([out_tensor]))
+            responses.append(utils.InferenceResponse([out_tensor]))
         return responses

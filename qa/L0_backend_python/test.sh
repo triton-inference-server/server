@@ -53,6 +53,19 @@ cp -r ./models/identity_fp32 ./models/identity_uint32
           sed -i "s/^name:.*/name: \"identity_uint32\"/" config.pbtxt && \
           sed -i "s/TYPE_FP32/TYPE_UINT32/g" config.pbtxt)
 
+mkdir -p models/wrong_model/1/
+cp ../python_models/wrong_model/model.py ./models/wrong_model/1/
+cp ../python_models/wrong_model/config.pbtxt ./models/wrong_model/
+(cd models/wrong_model && \
+          sed -i "s/^name:.*/name: \"wrong_model\"/" config.pbtxt && \
+          sed -i "s/TYPE_FP32/TYPE_UINT32/g" config.pbtxt)
+
+mkdir -p models/pytorch_fp32_fp32/1/
+cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
+cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
+(cd models/pytorch_fp32_fp32 && \
+          sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
