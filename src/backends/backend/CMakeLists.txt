@@ -31,6 +31,7 @@ cmake_minimum_required (VERSION 3.5)
 #
 set(
   BACKEND_SRCS
+  triton_memory_manager.cc
   triton_backend_manager.cc
   triton_model.cc
   triton_model_instance.cc
@@ -40,6 +41,7 @@ set(
   BACKEND_HDRS
   backend_factory.h
   tritonbackend.h
+  triton_memory_manager.h
   triton_backend_manager.h
   triton_model.h
   triton_model_instance.h
