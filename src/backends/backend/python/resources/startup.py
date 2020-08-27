@@ -135,7 +135,12 @@ class PythonHost(PythonInterpreterServicer):
 
         if hasattr(backend, 'initialize'):
             args = {x.key: x.value for x in request.args}
-            self.backend.initialize(args)
+            try:
+                self.backend.initialize(args)
+            except tpb_utils.PythonModelException as e:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(e.message())
+
 
         return Empty()
 
@@ -144,7 +149,11 @@ class PythonHost(PythonInterpreterServicer):
         can perform any necessary clean up in the `finalize` function.
         """
         if hasattr(self.backend, 'finalize'):
-            self.backend.finalize()
+            try:
+                self.backend.finalize()
+            except tpb_utils.PythonModelException as e:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(e.message())
 
         return Empty()
 
@@ -204,6 +213,13 @@ class PythonHost(PythonInterpreterServicer):
 
         exec_responses = []
         for response in responses:
+            # If there is an error do not look into output_tensors
+            if response.has_error():
+                error = Error(message=response.error().message())
+                inference_response = InferenceResponse(outputs=[], error=error, failed=True)
+                exec_responses.append(inference_response)
+                continue
+
             output_tensors = response.output_tensors()
             response_tensors = []
 
