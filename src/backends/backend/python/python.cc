@@ -144,7 +144,7 @@ class ModelInstanceState {
       const int32_t device_id, ni::TritonJson::Value&& model_config,
       TRITONBACKEND_Model* trition_model);
 
-  TRITONSERVER_Error* ConnectPythonInterpreter(const std::string& module_path);
+  TRITONSERVER_Error* ConnectPythonInterpreter();
 
   std::string pymodule_path_;
   ModelState* model_state_;
@@ -178,11 +178,14 @@ class ModelState {
   // Get backend state
   ::BackendState* BackendState() { return backend_state_; }
 
+  // Get Model Path
+  const char* ModelPath() { return model_path_; }
+
  private:
   ModelState(
       TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
       const char* model_name, const uint64_t model_version,
-      ni::TritonJson::Value&& model_config, ::BackendState* backend_state);
+      ni::TritonJson::Value&& model_config, ::BackendState* backend_state, const char* model_path);
 
   TRITONSERVER_Server* triton_server_;
   TRITONBACKEND_Model* triton_model_;
@@ -190,14 +193,15 @@ class ModelState {
   const uint64_t model_version_;
   ni::TritonJson::Value model_config_;
   ::BackendState* backend_state_;
+  const char* model_path_;
 };
 
 TRITONSERVER_Error*
 ModelInstanceState::CreatePythonInterpreter()
 {
   const char* subinterpreter_commandline[] = {
-      nullptr, nullptr,           "--socket", nullptr, "--model_path",
-      nullptr, "--instance_name", nullptr,    nullptr};
+      nullptr, nullptr,           "--socket", nullptr, "--model-path",
+      nullptr, "--instance-name", nullptr,    nullptr};
 
   constexpr int max_tmpfile_name = 255;
   char tmp_socket_name[max_tmpfile_name] = "/tmp/XXXXXX";
@@ -213,22 +217,12 @@ ModelInstanceState::CreatePythonInterpreter()
     domain_socket_ = std::string(full_socket_name);
   }
 
-  const char* path = nullptr;
-  TRITONBACKEND_ModelArtifactType artifact_type;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelRepository(triton_model_, &artifact_type, &path));
-  if (artifact_type != TRITONBACKEND_ARTIFACT_FILESYSTEM) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNSUPPORTED,
-        (std::string("unsupported artifact type for model '") + name_ + "'")
-            .c_str());
-  }
-  uint64_t version;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model_, &version));
+  uint64_t model_version = model_state_->ModelVersion();
+  const char* model_path = model_state_->ModelPath();
 
   std::stringstream ss;
   // Use <path>/version/model.py as the model location
-  ss << path << "/" << version << "/model.py";
+  ss << model_path << "/" << model_version << "/model.py";
   pymodule_path_ = ss.str();
   interpreter_pid_ = fork();
 
@@ -263,14 +257,14 @@ ModelInstanceState::CreatePythonInterpreter()
               .c_str());
     }
   } else {
-    RETURN_IF_ERROR(ConnectPythonInterpreter(pymodule_path_));
+    RETURN_IF_ERROR(ConnectPythonInterpreter());
   }
 
   return nullptr;
 }
 
 TRITONSERVER_Error*
-ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
+ModelInstanceState::ConnectPythonInterpreter()
 {
   auto grpc_channel =
       grpc::CreateChannel(domain_socket_, grpc::InsecureChannelCredentials());
@@ -291,11 +285,16 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
         value_pair->set_value(val);
       };
 
-  insert_model_param("module_path", module_path);
-
   ni::TritonJson::WriteBuffer buffer;
   model_config.Write(&buffer);
+
   insert_model_param("model_config", std::move(buffer.MutableContents()));
+  insert_model_param("model_instance_kind", TRITONSERVER_InstanceGroupKindString(kind_));
+  insert_model_param("model_instance_name", name_);
+  insert_model_param("model_instance_device_id", std::to_string(device_id_));
+  insert_model_param("model_repository", model_state_->ModelPath());
+  insert_model_param("model_version", std::to_string(model_state_->ModelVersion()));
+  insert_model_param("model_name", model_state_->ModelName());
 
   // Attempting to connect to the python runtime
   constexpr uint8_t conn_attempts = 5;
@@ -306,7 +305,8 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
     if (status.ok()) {
       LOG_MESSAGE(
           TRITONSERVER_LOG_VERBOSE,
-          (std::string("Succesfully connected to GRPC ") + module_path)
+          (std::string("GRPC connection was successful ") +
+          name_ + " (device " + std::to_string(device_id_) + ")")
               .c_str());
       connected_ = true;
       return nullptr;
@@ -383,15 +383,15 @@ ModelInstanceState::~ModelInstanceState()
     ni::Empty null_msg;
 
     if (connected_) {
-      const auto err = stub->Fini(&context, null_msg, &null_msg);
+      auto err = stub->Fini(&context, null_msg, &null_msg);
       if (!err.ok()) {
         LOG_MESSAGE(
             TRITONSERVER_LOG_ERROR,
             ("Cannot shutdown interpreter gracefully: " + err.error_message())
                 .c_str());
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
+
   }
 
   stub.reset();
@@ -505,9 +505,21 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &bstate));
   ::BackendState* backend_state = reinterpret_cast<::BackendState*>(bstate);
 
+  const char* path = nullptr;
+  TRITONBACKEND_ModelArtifactType artifact_type;
+  RETURN_IF_ERROR(
+      TRITONBACKEND_ModelRepository(triton_model, &artifact_type, &path));
+
+  if (artifact_type != TRITONBACKEND_ARTIFACT_FILESYSTEM) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        (std::string("unsupported artifact type for model '") + model_name + "'")
+            .c_str());
+  }
+
   *state = new ModelState(
       triton_server, triton_model, model_name, model_version,
-      std::move(model_config), backend_state);
+      std::move(model_config), backend_state, path);
 
   return nullptr;
 }
@@ -515,10 +527,11 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 ModelState::ModelState(
     TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
     const char* model_name, const uint64_t model_version,
-    ni::TritonJson::Value&& model_config, ::BackendState* backend_state)
+    ni::TritonJson::Value&& model_config, ::BackendState* backend_state, const char* model_path)
     : triton_server_(triton_server), triton_model_(triton_model),
       model_name_(model_name), model_version_(model_version),
-      model_config_(std::move(model_config)), backend_state_(backend_state)
+      model_config_(std::move(model_config)), backend_state_(backend_state),
+      model_path_(model_path)
 {
 }
 
@@ -650,6 +663,10 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
   ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_VERBOSE,
+      "TRITONBACKEND_ModelFinalize: delete model state");
 
   delete model_state;
 
@@ -788,7 +805,8 @@ TRITONBACKEND_ModelInstanceExecute(
   uint64_t compute_end_ns = 0;
   SET_TIMESTAMP(compute_end_ns);
 
-  // If inference fails, release all the requests and send an error response
+  // If inference fails, release all the requests and send an error response If
+  // inference fails at this stage, it usually indicates a bug in the model code
   if (!status.ok()) {
     for (uint32_t r = 0; r < request_count; ++r) {
       if (responses[r] == nullptr) {
@@ -830,6 +848,21 @@ TRITONBACKEND_ModelInstanceExecute(
 
     // Get response r
     ni::InferenceResponse inference_response = execute_response.responses(r);
+
+    if (inference_response.failed()) {
+      TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL, (inference_response.error().message()).c_str());
+      LOG_IF_ERROR(
+          TRITONBACKEND_ResponseSend(
+              responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
+          "failed sending response");
+      responses[r] = nullptr;
+      TRITONSERVER_ErrorDelete(err);
+
+      // If has_error is true, we do not look at the response even if the response
+      // is set.
+      continue;
+    }
 
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
@@ -970,6 +1003,10 @@ TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance)
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(instance, &vstate));
   ModelInstanceState* instance_state =
       reinterpret_cast<ModelInstanceState*>(vstate);
+
+  LOG_MESSAGE(
+      TRITONSERVER_LOG_VERBOSE,
+      "TRITONBACKEND_ModelInstanceFinalize: delete instance state");
 
   delete instance_state;
 
