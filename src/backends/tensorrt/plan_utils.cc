@@ -131,28 +131,6 @@ MemoryFormat_VectorSize(MemoryFormat fmt)
   return vector_size;
 }
 
-int
-MemoryFormat_VectorDim(MemoryFormat fmt)
-{
-  int vector_dim = -1;
-  switch (fmt) {
-    case MemoryFormat::LINEAR:
-      vector_dim = -1;
-      break;
-    case MemoryFormat::CHW2:
-    case MemoryFormat::CHW4:
-    case MemoryFormat::HWC8:
-    case MemoryFormat::CHW16:
-    case MemoryFormat::CHW32:
-      vector_dim = 3;
-      break;
-    default:
-      vector_dim = -1;  // In the default case, assume LINEAR
-      break;
-  }
-  return vector_dim;
-}
-
 std::pair<bool, nvinfer1::DataType>
 ConvertDataTypeToTrtType(const inference::DataType& dtype)
 {
@@ -216,7 +194,7 @@ CompareDimsSupported(
     const std::string& model_name, const std::string& binding_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
     const bool supports_batching, const bool contains_explicit_batch,
-    const bool compare_exact, const std::pair<int, int64_t>& padding)
+    const bool compare_exact)
 {
   // If the model configuration expects batching support in the model,
   // then the first dimension must be -1.
@@ -239,12 +217,8 @@ CompareDimsSupported(
     bool succ = (model_dims.nbDims == full_dims.size());
     if (succ) {
       for (int i = 0; i < full_dims.size(); ++i) {
-        int64_t model_dim = model_dims.d[i];
+        const int64_t model_dim = model_dims.d[i];
         if (compare_exact || ((model_dim != -1) && (full_dims[i] != -1))) {
-          // Pad channel dimension if necessary.
-          if (i == padding.first) {
-            model_dim += padding.second;
-          }
           succ &= (model_dim == full_dims[i]);
         }
       }
@@ -268,12 +242,8 @@ CompareDimsSupported(
     bool succ = (model_dims.nbDims == dims.size());
     if (succ) {
       for (int i = 0; i < dims.size(); ++i) {
-        int64_t model_dim = model_dims.d[i];
+        const int64_t model_dim = model_dims.d[i];
         if (compare_exact || ((model_dim != -1) && (dims[i] != -1))) {
-          // Pad channel dimension if necessary.
-          if (i == padding.first) {
-            model_dim += padding.second;
-          }
           succ &= (model_dim == dims[i]);
         }
       }
@@ -335,7 +305,7 @@ Status
 MaximumDims(
     const nvinfer1::Dims& max_profile_dims, const DimsList& dims,
     const bool support_batching, const int max_batch_size,
-    const std::pair<int, int64_t>& padding, std::vector<int64_t>* max_dims)
+    std::vector<int64_t>* max_dims)
 {
   const int nonbatch_start_idx = (support_batching ? 1 : 0);
   if (max_profile_dims.nbDims != (dims.size() + nonbatch_start_idx)) {
@@ -356,18 +326,14 @@ MaximumDims(
     if (dims[i] == WILDCARD_DIM) {
       max_dims->emplace_back(max_profile_dims.d[i + nonbatch_start_idx]);
     } else {
-      auto max_profile_dim = max_profile_dims.d[i + nonbatch_start_idx];
-      if (i + nonbatch_start_idx == padding.first) {
-        max_profile_dim += padding.second;
-      }
-      if (dims[i] <= max_profile_dim) {
+      if (dims[i] <= max_profile_dims.d[i + nonbatch_start_idx]) {
         max_dims->emplace_back(dims[i]);
       } else {
         return Status(
             Status::Code::INVALID_ARG,
             "can not maximize dimension " + DimsListToString(dims) + " to " +
                 DimsDebugString(max_profile_dims) +
-                " (without padding) due to incompatibility.");
+                " due to incompatibility.");
       }
     }
   }
@@ -459,20 +425,17 @@ ValidateShapeValues(
 
 void
 DimsToDimVec(
-    const nvinfer1::Dims& model_dims, const std::pair<int, int64_t>& padding,
-    std::vector<int64_t>* dims)
+    const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims)
 {
   dims->clear();
   for (int i = 0; i < model_dims.nbDims; ++i) {
     dims->emplace_back(model_dims.d[i]);
   }
-  (*dims)[padding.first] += padding.second;
 }
 
 bool
 DimVecToDims(
-    const std::vector<int64_t>& dim_vec, const std::pair<int, int64_t>& padding,
-    nvinfer1::Dims* dims)
+    const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims)
 {
   if (dim_vec.size() > dims->MAX_DIMS) {
     return false;
@@ -481,9 +444,18 @@ DimVecToDims(
     for (int i = 0; i < dims->nbDims; ++i) {
       dims->d[i] = (int)dim_vec[i];
     }
-    dims->d[padding.first] -= padding.second;
   }
   return true;
+}
+
+int64_t
+GetElementCount(const nvinfer1::Dims& dims)
+{
+  int64_t count = 1;
+  for (int i = 0; i < dims.nbDims; ++i) {
+    count *= dims.d[i];
+  }
+  return count;
 }
 
 bool

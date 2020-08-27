@@ -357,6 +357,7 @@ class PlanBackend : public InferenceBackend {
     std::vector<uint64_t> byte_sizes_;
     std::vector<void*> buffers_;
     std::vector<bool> buffer_is_ragged_;
+    std::vector<bool> is_linear_format_;
     // Instructions on constructing the batch input and the CPU buffer for
     // storing mutable data
     using BatchInputData =

@@ -778,17 +778,9 @@ PlanBackend::Context::InitializeShapeInputBinding(
               inference::DataType_Name(input_datatype) + " for " + name_);
     }
 
-    MemoryFormat fmt =
-        ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
-    if (fmt != MemoryFormat::LINEAR) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "unexpected tensor format " + MemoryFormat_Name(fmt) +
-              " for input '" + input_name +
-              "'. Only LINEAR memory format is supported at present.");
-    }
-    // placeholder that does nothing
-    padding_info_[binding_index] = std::make_pair(0, 0);
+    is_linear_format_[io_index] =
+        (engine_->getBindingFormat(binding_index) ==
+         nvinfer1::TensorFormat::kLINEAR);
 
     nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
     if (ContainsWildcard(engine_dims)) {
@@ -830,8 +822,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
     if (engine_->isExecutionBinding(binding_index)) {
       std::vector<int64_t> dim_vec;
       DimsToDimVec(
-          context.context_->getBindingDimensions(binding_index),
-          padding_info_[binding_index], &dim_vec);
+          context.context_->getBindingDimensions(binding_index), &dim_vec);
       int64_t byte_size = GetByteSize(dt, dim_vec);
       max_byte_size = std::max(max_byte_size, byte_size);
     }
@@ -921,18 +912,9 @@ PlanBackend::Context::InitializeExecuteInputBinding(
                                          " for input '" + input_name + "'.");
     }
 
-    nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
-    int vector_size = MemoryFormat_VectorSize(fmt);
-    if (vector_size > 1) {
-      int vector_dim = MemoryFormat_VectorDim(fmt);
-      int dim_idx = engine_dims.nbDims - vector_dim;
-      int64_t padding_offset =
-          vector_size - (engine_dims.d[dim_idx] % vector_size);
-      padding_info_[binding_index] = std::make_pair(dim_idx, padding_offset);
-    } else {
-      // placeholder that does nothing
-      padding_info_[binding_index] = std::make_pair(0, 0);
-    }
+    is_linear_format_[io_index] =
+          (engine_->getBindingFormat(binding_index) ==
+           nvinfer1::TensorFormat::kLINEAR);
 
     // Detect whether dynamic or not
     if (ContainsWildcard(engine_dims)) {
@@ -945,7 +927,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         RETURN_IF_ERROR(CompareDimsSupported(
             name_, input_name, engine_dims, model_config_dims,
             support_batching_, (!engine_->hasImplicitBatchDimension()),
-            false /* compare_exact */, padding_info_[binding_index]));
+            false /* compare_exact */));
       } else {
         // For ragged input, the input will be concatenated and flatten, so
         // expecting engine dims to be one dimensional.
@@ -984,8 +966,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
       if (!is_ragged) {
         Status status = ValidateDimension(
             model_config_dims, context.min_dims_[io_index],
-            context.max_dims_[io_index], support_batching_,
-            padding_info_[binding_index]);
+            context.max_dims_[io_index], support_batching_);
         if (!status.IsOk()) {
           return Status(
               Status::Code::INTERNAL,
@@ -995,12 +976,11 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         }
         RETURN_IF_ERROR(MaximumDims(
             context.max_dims_[io_index], model_config_dims, support_batching_,
-            max_batch_size_, padding_info_[binding_index], &maximum_dims));
+            max_batch_size_, &maximum_dims));
         byte_size = GetByteSize(dt, maximum_dims);
         // Update the maximum dimension with respect to the allocated buffer
         DimVecToDims(
-            maximum_dims, padding_info_[binding_index],
-            &context.max_dims_[io_index]);
+            maximum_dims, &context.max_dims_[io_index]);
       } else {
         byte_size = GetDataTypeByteSize(dt) * context.max_dims_[io_index].d[0];
       }
@@ -1236,17 +1216,9 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
                 inference::DataType_Name(io.data_type()) + " for " + name_);
       }
 
-      MemoryFormat fmt =
-          ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
-      if (fmt != MemoryFormat::LINEAR) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            "unexpected tensor format " + MemoryFormat_Name(fmt) +
-                " for output '" + io.name() +
-                "'. Only LINEAR memory format is supported at present.");
-      }
-      // placeholder that does nothing
-      padding_info_[binding_index] = std::make_pair(0, 0);
+      is_linear_format_[io_index] =
+          (engine_->getBindingFormat(binding_index) ==
+           nvinfer1::TensorFormat::kLINEAR);
 
       const DimsList& model_config_dims =
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
@@ -1263,7 +1235,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       const nvinfer1::Dims output_dim =
           context.context_->getBindingDimensions(binding_index);
       std::vector<int64_t> dim_vec;
-      DimsToDimVec(output_dim, padding_info_[binding_index], &dim_vec);
+      DimsToDimVec(output_dim, &dim_vec);
       int64_t byte_size = GetByteSize(dt, dim_vec);
 
       max_byte_size = std::max(max_byte_size, byte_size);
@@ -1357,25 +1329,15 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       const DimsList& model_config_dims =
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
-      nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
-      int vector_size = MemoryFormat_VectorSize(fmt);
-      if (vector_size > 1) {
-        int vector_dim = MemoryFormat_VectorDim(fmt);
-        int dim_idx = engine_dims.nbDims - vector_dim;
-        int64_t padding_offset =
-            vector_size - (engine_dims.d[dim_idx] % vector_size);
-        padding_info_[binding_index] = std::make_pair(dim_idx, padding_offset);
-      } else {
-        // placeholder that does nothing
-        padding_info_[binding_index] = std::make_pair(0, 0);
-      }
+      is_linear_format_[io_index] =
+          (engine_->getBindingFormat(binding_index) ==
+           nvinfer1::TensorFormat::kLINEAR);
 
       // Skip 'batch_output' validation as it is not exact match to model dims
       if (!buffer_is_ragged_[io_index]) {
         RETURN_IF_ERROR(CompareDimsSupported(
             name_, io.name(), engine_dims, model_config_dims, support_batching_,
-            (!engine_->hasImplicitBatchDimension()), false /* compare_exact */,
-            padding_info_[binding_index]));
+            (!engine_->hasImplicitBatchDimension()), false /* compare_exact */));
       }
 
       int64_t byte_size;
@@ -1383,7 +1345,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
         const nvinfer1::Dims output_dim =
             context.context_->getBindingDimensions(binding_index);
         std::vector<int64_t> dim_vec;
-        DimsToDimVec(output_dim, padding_info_[binding_index], &dim_vec);
+        DimsToDimVec(output_dim, &dim_vec);
         byte_size = GetByteSize(dt, dim_vec);
       } else {
         byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
@@ -1725,7 +1687,7 @@ PlanBackend::Context::SetCudaGraphShape(
                 " for binding " + std::to_string(io_index) + " for " + name_);
       }
       std::vector<int64_t> dims;
-      DimsToDimVec(shape, padding_info_[io_index], &dims);
+      DimsToDimVec(shape, &dims);
       cuda_graph->input_dims_.emplace_back(dims);
       cuda_graph_key->insert(cuda_graph_key->end(), dims.begin(), dims.end());
     } else {
@@ -1743,7 +1705,7 @@ PlanBackend::Context::SetCudaGraphShape(
         auto& shape = cuda_graph->input_dims_.back();
         shape.insert(shape.end(), it->second.begin(), it->second.end());
         nvinfer1::Dims trt_shape;
-        DimVecToDims(shape, padding_info_[io_index], &trt_shape);
+        DimVecToDims(shape, &trt_shape);
         if (!trt_context->context_->setBindingDimensions(io_index, trt_shape)) {
           return Status(
               Status::Code::INTERNAL,
@@ -2205,8 +2167,23 @@ PlanBackend::Context::Run(
             collector.BatchInputShape(batch_input, &ragged_shape),
             "error getting the bath input shape");
 
-        datatype = batch_input.data_type();
-        const size_t total_byte_size = GetByteSize(datatype, ragged_shape);
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
+            SetBindingDimensions(
+                name, ragged_shape, citr->second, bindex, io_index),
+            "error setting the binding dimension");
+
+        size_t total_byte_size = 0;
+        if (is_linear_format_[bindex]) {
+          datatype = batch_input.data_type();
+          total_byte_size = GetByteSize(datatype, ragged_shape);
+        } else {
+          auto component_count =
+              GetElementCount(citr->second.context_->getStrides(io_index));
+          component_count *= engine_->getBindingComponentsPerElement(io_index);
+          total_byte_size = (size_t)(
+              component_count * engine_->getBindingBytesPerComponent(io_index));
+        }
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
@@ -2214,13 +2191,6 @@ PlanBackend::Context::Run(
                 batch_input, input_buffer, total_byte_size, mem_type,
                 mem_type_id),
             "error setting the bath input value");
-
-        FAIL_ALL_AND_RETURN_IF_ERROR(
-            payload_->requests_, payload_->responses_, metric_reporter_.get(),
-            SetBindingDimensions(
-                name, ragged_shape, citr->second, bindex, io_index,
-                &input_dims),
-            "error setting the binding dimension");
 
         if (batch_input.kind() !=
             inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) {
@@ -2251,14 +2221,23 @@ PlanBackend::Context::Run(
           }
         }
 
-        const size_t total_byte_size = GetByteSize(datatype, ragged_shape);
-
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             SetBindingDimensions(
                 name, ragged_shape, citr->second, bindex, io_index,
                 &input_dims),
             "error setting the binding dimension");
+
+        size_t total_byte_size = 0;
+        if (is_linear_format_[bindex]) {
+          total_byte_size = GetByteSize(datatype, ragged_shape);
+        } else {
+          auto component_count =
+              GetElementCount(citr->second.context_->getStrides(io_index));
+          component_count *= engine_->getBindingComponentsPerElement(io_index);
+          total_byte_size = (size_t)(
+              component_count * engine_->getBindingBytesPerComponent(io_index));
+        }
 
         collector.ProcessTensor(
             name, datatype, static_cast<char*>(buffers_[bindex]),
@@ -2286,8 +2265,6 @@ PlanBackend::Context::Run(
           batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
       const inference::DataType datatype = repr_input->DType();
 
-      const size_t total_byte_size = GetByteSize(datatype, batchn_shape);
-
       // Set the binding dimension so that output dimensions can be obtained
       if (UseTensorRTv2API(engine_) && !engine_->isShapeBinding(io_index)) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
@@ -2296,6 +2273,17 @@ PlanBackend::Context::Run(
                 name, batchn_shape, citr->second, bindex, io_index,
                 &input_dims),
             "error setting the binding dimension");
+      }
+
+      size_t total_byte_size = 0;
+      if (is_linear_format_[bindex]) {
+        total_byte_size = GetByteSize(datatype, batchn_shape);
+      } else {
+        auto component_count =
+            GetElementCount(citr->second.context_->getStrides(io_index));
+        component_count *= engine_->getBindingComponentsPerElement(io_index);
+        total_byte_size = (size_t)(
+            component_count * engine_->getBindingBytesPerComponent(io_index));
       }
 
       if ((engine_->isShapeBinding(io_index)) && (support_batching_)) {
@@ -2581,6 +2569,9 @@ PlanBackend::Context::Run(
       inference::DataType dt = ConvertTrtTypeToDataType(
           engine_->getBindingDataType(binding_offset + bindex));
 
+      // FIXME process reformat-free output, need to update output process
+      // code to accept batch1_byte_size and request batch size to break down
+      // output buffer properly.
       size_t batch1_byte_size = GetByteSize(dt, batchn_shape);
       if (support_batching_) {
         batch1_byte_size /= payload_->total_batch_size_;
@@ -2617,7 +2608,7 @@ PlanBackend::Context::SetBindingDimensions(
   }
   nvinfer1::Dims this_dim;
   // Set the binding dimension so that output dimensions can be obtained
-  if (!DimVecToDims(shape, padding_info_[io_idx], &this_dim)) {
+  if (!DimVecToDims(shape, &this_dim)) {
     return Status(
         Status::Code::INTERNAL, "failed to create dims object for " +
                                     DimsListToString(shape) + " for input '" +
@@ -2916,8 +2907,7 @@ PlanBackend::Context::EvaluateTensorRTContext(
       }
       auto status = ValidateDimension(
           shape, citr->second.min_dims_[io_index],
-          citr->second.max_dims_[io_index], false,
-          padding_info_[binding_offset + io_index]);
+          citr->second.max_dims_[io_index], false);
       if (!status.IsOk()) {
         *error_distance = LLONG_MAX;
         break;
@@ -2928,8 +2918,7 @@ PlanBackend::Context::EvaluateTensorRTContext(
     } else {
       auto status = ValidateDimension(
           input->Shape(), citr->second.min_dims_[io_index],
-          citr->second.max_dims_[io_index], support_batching_,
-          padding_info_[binding_offset + io_index]);
+          citr->second.max_dims_[io_index], support_batching_);
       bool valid_bs =
           (!support_batching_) || (((int64_t)total_batch_size >=
                                     citr->second.min_dims_[io_index].d[0]) &&
