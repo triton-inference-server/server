@@ -319,6 +319,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_METRICS_GPU=ON \
                   -DTRITON_ENABLE_STATS=ON \
                   -DTRITON_ENABLE_TRACING=ON \
+                  -DTRITON_ENABLE_ASAN=ON \
                   -DTRITON_ENABLE_GCS=ON \
                   -DTRITON_ENABLE_S3=ON \
                   -DTRITON_ENABLE_CUSTOM=ON \
