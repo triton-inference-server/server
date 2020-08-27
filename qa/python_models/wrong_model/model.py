@@ -31,7 +31,7 @@ sys.path.append('../../')
 import triton_python_backend_utils as utils
 
 
-class TritonPythonBackend:
+class TritonPythonModel:
 
     def initialize(self, args):
         self.model_config = args['model_config']

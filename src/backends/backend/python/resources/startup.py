@@ -106,18 +106,18 @@ class PythonHost(PythonInterpreterServicer):
 
     def __init__(self, module_path, event, *args, **kwargs):
         super(PythonInterpreterServicer, self).__init__(*args, **kwargs)
-        spec = importlib.util.spec_from_file_location('TritonPythonBackend',
+        spec = importlib.util.spec_from_file_location('TritonPythonModel',
                                                       module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         self.module_path = module_path
         self.event = event
 
-        if hasattr(module, 'TritonPythonBackend'):
-            self.backend = module.TritonPythonBackend()
+        if hasattr(module, 'TritonPythonModel'):
+            self.backend = module.TritonPythonModel()
         else:
             raise NotImplementedError(
-                'TritonPythonBackend class doesn\'t exist in ' + module_path)
+                'TritonPythonModel class doesn\'t exist in ' + module_path)
 
     def Init(self, request, context):
         """Init is called on TRITONBACKEND_ModelInstanceInitialize. `request`
