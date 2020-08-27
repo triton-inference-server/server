@@ -41,6 +41,7 @@ extern "C" {
 #define TRITONBACKEND_EXPORT
 #endif
 
+struct TRITONBACKEND_MemoryManager;
 struct TRITONBACKEND_Input;
 struct TRITONBACKEND_Output;
 struct TRITONBACKEND_Request;
@@ -76,7 +77,7 @@ struct TRITONBACKEND_ModelInstance;
 ///   }
 ///
 #define TRITONBACKEND_API_VERSION_MAJOR 0
-#define TRITONBACKEND_API_VERSION_MINOR 3
+#define TRITONBACKEND_API_VERSION_MINOR 4
 
 /// Get the TRITONBACKEND API version supported by Triton. This value
 /// can be compared against the TRITONBACKEND_API_VERSION_MAJOR and
@@ -90,6 +91,58 @@ struct TRITONBACKEND_ModelInstance;
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_ApiVersion(
     uint32_t* major, uint32_t* minor);
+
+///
+/// TRITONBACKEND_MemoryManager
+///
+/// Object representing an memory manager that is capable of
+/// allocating and otherwise managing different memory types. For
+/// improved performance Triton maintains pools for GPU and CPU-pinned
+/// memory and the memory manager allows backends to access those
+/// pools.
+///
+
+/// Allocate a contiguous block of memory of a specific type using a
+/// memory manager. Two error codes have specific interpretations for
+/// this function:
+///
+///   TRITONSERVER_ERROR_UNSUPPORTED: Indicates that Triton is
+///     incapable of allocating the requested memory type and memory
+///     type ID. Requests for the memory type and ID will always fail
+///     no matter 'byte_size' of the request.
+///
+///   TRITONSERVER_ERROR_UNAVAILABLE: Indicates that Triton can
+///      allocate the memory type and ID but that currently it cannot
+///      allocate a contiguous block of memory of the requested
+///      'byte_size'.
+///
+/// \param manager The memory manager.
+/// \param buffer Returns the allocated memory.
+/// \param memory_type The type of memory to allocate.
+/// \param memory_type_id The ID associated with the memory type to
+/// allocate. For GPU memory this indicates the device ID of the GPU
+/// to allocate from.
+/// \param byte_size The size of memory to allocate, in bytes.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_MemoryManagerAllocate(
+    TRITONBACKEND_MemoryManager* manager, void** buffer,
+    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id,
+    const uint64_t byte_size);
+
+/// Free a buffer that was previously allocated with
+/// TRITONBACKEND_MemoryManagerAllocate. The call must provide the
+/// same values for 'memory_type' and 'memory_type_id' as were used
+/// when the buffer was allocate or else the behavior is undefined.
+///
+/// \param manager The memory manager.
+/// \param buffer The allocated memory buffer to free.
+/// \param memory_type The type of memory of the buffer.
+/// \param memory_type_id The ID associated with the memory type of
+/// the buffer.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_MemoryManagerFree(
+    TRITONBACKEND_MemoryManager* manager, void* buffer,
+    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
 
 ///
 /// TRITONBACKEND_Input
@@ -514,7 +567,7 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendExecutionPolicy(
 /// Set the execution policy for this backend. By default the
 /// execution policy is TRITONBACKEND_EXECUTION_BLOCKING. Triton reads
 /// the backend's execution policy after calling
-/// TRITONBACKEND_Initialize, so to be recognized, changes to the
+/// TRITONBACKEND_Initialize, so to be recognized changes to the
 /// execution policy must be made in TRITONBACKEND_Initialize.
 ///
 /// \param backend The backend.
@@ -523,6 +576,14 @@ TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendExecutionPolicy(
 TRITONBACKEND_EXPORT TRITONSERVER_Error*
 TRITONBACKEND_BackendSetExecutionPolicy(
     TRITONBACKEND_Backend* backend, TRITONBACKEND_ExecutionPolicy policy);
+
+/// Get the memory manager associated with a backend.
+///
+/// \param backend The backend.
+/// \param manager Returns the memory manager.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONBACKEND_EXPORT TRITONSERVER_Error* TRITONBACKEND_BackendMemoryManager(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_MemoryManager** manager);
 
 /// Get the user-specified state associated with the backend. The
 /// state is completely owned and managed by the backend.

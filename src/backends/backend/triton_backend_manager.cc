@@ -27,6 +27,7 @@
 #include "src/backends/backend/triton_backend_manager.h"
 
 #include <dlfcn.h>
+#include "src/backends/backend/triton_memory_manager.h"
 #include "src/core/logging.h"
 #include "src/core/server_message.h"
 
@@ -280,6 +281,15 @@ TRITONBACKEND_BackendSetExecutionPolicy(
 {
   TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
   tb->SetExecutionPolicy(policy);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_BackendMemoryManager(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_MemoryManager** manager)
+{
+  static TritonMemoryManager gMemoryManager;
+  *manager = reinterpret_cast<TRITONBACKEND_MemoryManager*>(&gMemoryManager);
   return nullptr;  // success
 }
 
