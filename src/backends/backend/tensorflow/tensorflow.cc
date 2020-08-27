@@ -1526,8 +1526,9 @@ ModelInstanceState::ProcessRequests(
   bool cuda_copy = false;
 
   nib::BackendInputCollector collector(
-      requests, request_count, &responses, StateForModel()->EnablePinnedInput(),
-      CudaStream());
+      requests, request_count, &responses,
+      StateForModel()->TritonMemoryManager(),
+      StateForModel()->EnablePinnedInput(), CudaStream());
   {
     // All requests must have equally-sized input tensors so use the first
     // request as the representative for the input tensors.
@@ -1744,6 +1745,7 @@ ModelInstanceState::ProcessRequests(
   std::vector<std::unique_ptr<std::string>> string_buffer;
   nib::BackendOutputResponder responder(
       requests, request_count, &responses, max_batch_size,
+      StateForModel()->TritonMemoryManager(),
       StateForModel()->EnablePinnedOutput(), CudaStream());
   {
     TRTISTF_TensorList* output_tensor_itr = output_tensors.get();

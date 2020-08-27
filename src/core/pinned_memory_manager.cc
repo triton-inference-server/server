@@ -192,9 +192,8 @@ PinnedMemoryManager::Create(const Options& options)
     LOG_ERROR << "failed to allocate pinned system memory: "
               << std::string(cudaGetErrorString(err));
   } else {
-    LOG_VERBOSE(1) << "Pinned memory pool is created at '"
-                   << PointerToString(buffer) << "' with size "
-                   << options.pinned_memory_pool_byte_size_;
+    LOG_INFO << "Pinned memory pool is created at '" << PointerToString(buffer)
+             << "' with size " << options.pinned_memory_pool_byte_size_;
   }
 #endif  // TRITON_ENABLE_GPU
   instance_.reset(
