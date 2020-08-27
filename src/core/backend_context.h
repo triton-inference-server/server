@@ -269,11 +269,11 @@ class BackendInputCollector {
       std::unique_ptr<InferenceResponse>* response);
   template <typename T>
   Status SetElementCount(
-      const std::string& target_input, char* buffer,
+      const std::string& source_input, char* buffer,
       const size_t buffer_byte_size);
   template <typename T>
   Status SetAccumulatedElementCount(
-      const std::string& target_input, char* buffer,
+      const std::string& source_input, char* buffer,
       const size_t buffer_byte_size);
 
   bool need_sync_;

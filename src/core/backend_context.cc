@@ -692,11 +692,11 @@ BackendInputCollector::BatchInputShape(
       break;
     }
     case inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
-      const auto& target_input = batch_input.target_input(0);
+      const auto& source_input = batch_input.source_input(0);
       for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
         const InferenceRequest::Input* repr_input;
         RETURN_IF_ERROR(
-            requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+            requests_[req_idx]->ImmutableInput(source_input, &repr_input));
         (*shape)[0] = std::max(
             (*shape)[0], GetElementCount(repr_input->ShapeWithBatchDim()));
       }
@@ -725,36 +725,36 @@ BackendInputCollector::ProcessBatchInput(
   const auto& data_type = batch_input.data_type();
   switch (batch_input.kind()) {
     case inference::BatchInput::BATCH_ELEMENT_COUNT: {
-      const auto& target_input = batch_input.target_input(0);
+      const auto& source_input = batch_input.source_input(0);
       if (data_type == inference::TYPE_FP32) {
-        SetElementCount<float>(target_input, input_buffer, buffer_byte_size);
+        SetElementCount<float>(source_input, input_buffer, buffer_byte_size);
       } else {
-        SetElementCount<int32_t>(target_input, input_buffer, buffer_byte_size);
+        SetElementCount<int32_t>(source_input, input_buffer, buffer_byte_size);
       }
       break;
     }
     case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT: {
-      const auto& target_input = batch_input.target_input(0);
+      const auto& source_input = batch_input.source_input(0);
       if (data_type == inference::TYPE_FP32) {
         SetAccumulatedElementCount<float>(
-            target_input, input_buffer, buffer_byte_size);
+            source_input, input_buffer, buffer_byte_size);
       } else {
         SetAccumulatedElementCount<int32_t>(
-            target_input, input_buffer, buffer_byte_size);
+            source_input, input_buffer, buffer_byte_size);
       }
       break;
     }
     case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
-      const auto& target_input = batch_input.target_input(0);
+      const auto& source_input = batch_input.source_input(0);
       if (data_type == inference::TYPE_FP32) {
         *reinterpret_cast<float*>(input_buffer) = 0;
         SetAccumulatedElementCount<float>(
-            target_input, input_buffer + sizeof(float),
+            source_input, input_buffer + sizeof(float),
             buffer_byte_size - sizeof(float));
       } else {
         *reinterpret_cast<int32_t*>(input_buffer) = 0;
         SetAccumulatedElementCount<int32_t>(
-            target_input, input_buffer + sizeof(int32_t),
+            source_input, input_buffer + sizeof(int32_t),
             buffer_byte_size - sizeof(int32_t));
       }
       break;
@@ -780,14 +780,14 @@ BackendInputCollector::ProcessBatchInput(
 template <typename T>
 Status
 BackendInputCollector::SetElementCount(
-    const std::string& target_input, char* buffer,
+    const std::string& source_input, char* buffer,
     const size_t buffer_byte_size)
 {
   size_t buffer_offset = 0;
   for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
     const InferenceRequest::Input* repr_input;
     RETURN_IF_ERROR(
-        requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+        requests_[req_idx]->ImmutableInput(source_input, &repr_input));
     if (buffer_offset + sizeof(T) > buffer_byte_size) {
       return Status(
           Status::Code::INVALID_ARG,
@@ -802,7 +802,7 @@ BackendInputCollector::SetElementCount(
 template <typename T>
 Status
 BackendInputCollector::SetAccumulatedElementCount(
-    const std::string& target_input, char* buffer,
+    const std::string& source_input, char* buffer,
     const size_t buffer_byte_size)
 {
   size_t accumulated_element_count = 0;
@@ -810,7 +810,7 @@ BackendInputCollector::SetAccumulatedElementCount(
   for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
     const InferenceRequest::Input* repr_input;
     RETURN_IF_ERROR(
-        requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+        requests_[req_idx]->ImmutableInput(source_input, &repr_input));
     if (buffer_offset + sizeof(T) > buffer_byte_size) {
       return Status(
           Status::Code::INVALID_ARG,

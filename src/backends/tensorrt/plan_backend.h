@@ -112,6 +112,7 @@ class PlanBackend : public InferenceBackend {
     Status InitializeConfigShapeOutputBindings(
         const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
             ios);
+    Status InitializeBatchOutputBindings(const inference::ModelConfig& config);
 #ifdef TRITON_ENABLE_CUDA_GRAPH
     bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
     bool BuildCudaGraphDynamic(

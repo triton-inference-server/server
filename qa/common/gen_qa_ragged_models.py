@@ -192,15 +192,15 @@ output [
 batch_input [
   {{
     kind: BATCH_ELEMENT_COUNT
-    name: "BATCH_AND_SIZE_INPUT"
+    target_name: "BATCH_AND_SIZE_INPUT"
     data_type: {data_type}
-    target_input: "RAGGED_INPUT"
+    source_input: "RAGGED_INPUT"
   }},
   {{
     kind: BATCH_ACCUMULATED_ELEMENT_COUNT
-    name: "BATCH_INPUT"
+    target_name: "BATCH_INPUT"
     data_type: {data_type}
-    target_input: "RAGGED_INPUT"
+    source_input: "RAGGED_INPUT"
   }}
 ]
 dynamic_batching {{
