@@ -25,9 +25,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
+
 from setuptools import find_packages
 from setuptools import setup
 from itertools import chain
+
+IS_MANYLINUX_BUILD = "manylinux1_x86_64" in sys.argv
 
 if 'VERSION' not in os.environ:
     raise Exception('envvar VERSION must be specified')
@@ -44,20 +48,23 @@ try:
             self.root_is_pure = False
 
         def get_tag(self):
-            pyver, abi, plat = 'py3', 'none', 'any'
+            if IS_MANYLINUX_BUILD:
+                pyver, abi, plat = 'py3', 'none', 'manylinux1_x86_64'
+            else:
+                pyver, abi, plat = 'py3', 'none', 'any'
             return pyver, abi, plat
 except ImportError:
     bdist_wheel = None
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
+
 with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
+
 
 def req_file(filename, folder="requirements"):
     with open(os.path.join(folder, filename)) as f:
         content = f.readlines()
-    # you may also want to remove whitespace characters
-    # Example: `\n` at the end of each line
     return [x.strip() for x in content]
 
 
@@ -74,14 +81,33 @@ setup(
     version=VERSION,
     author='NVIDIA Inc.',
     author_email='sw-dl-triton@nvidia.com',
-    description=
-    'Python client library and utilities for communicating with Triton Inference Server',
+    description="Python client library and utilities for communicating with "
+                "Triton Inference Server",
     long_description=long_description,
     license='BSD',
     url='http://nvidia.com',
     keywords=[
         'grpc', 'http', 'triton', 'tensorrt', 'inference', 'server', 'service',
-        'client'
+        'client', 'nvidia'
+    ],
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Developers',
+        'Intended Audience :: Science/Research',
+        'Intended Audience :: Information Technology',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Scientific/Engineering :: Image Recognition',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+        'Topic :: Software Development :: Libraries',
+        'Topic :: Utilities',
+        'License :: OSI Approved :: BSD License',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Environment :: Console',
+        'Natural Language :: English',
+        'Operating System :: OS Independent',
     ],
     install_requires=install_requires,
     extras_require=extras_require,
