@@ -35,11 +35,13 @@ namespace nvidia { namespace inferenceserver { namespace backend {
 //
 BackendInputCollector::~BackendInputCollector()
 {
-#ifdef TRITON_ENABLE_GPU
   for (auto& pinned_memory : pinned_memories_) {
-    cudaFreeHost(pinned_memory);
+    LOG_IF_ERROR(
+        TRITONBACKEND_MemoryManagerFree(
+            memory_manager_, reinterpret_cast<void*>(pinned_memory),
+            TRITONSERVER_MEMORY_CPU_PINNED, 0),
+        "failed to free pinned memory");
   }
-#endif  // TRITON_ENABLE_GPU
 }
 
 void
@@ -275,27 +277,24 @@ BackendInputCollector::FlushPendingPinned(
 
   // Will be copying from CPU->pinned->GPU or GPU->pinned->CPU
 
-  // Always need a pinned buffer...
-  auto pinned_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
-  int64_t pinned_memory_id = 0;
-
+  // Attempt to allocate a pinned buffer to use for staging the
+  // copy... if we fail to allocated the pinned buffer then we just
+  // directly go CPU->GPU or GPU->CPU.
   char* pinned_memory = nullptr;
-#ifdef TRITON_ENABLE_GPU
-  auto cuerr = cudaHostAlloc(
-      (void**)&pinned_memory, pending_pinned_byte_size_, cudaHostAllocPortable);
-  if (cuerr != cudaSuccess) {
-    pinned_memory_type = TRITONSERVER_MEMORY_CPU;
+  if (pending_pinned_byte_size_ > 0) {
+    TRITONSERVER_Error* err = TRITONBACKEND_MemoryManagerAllocate(
+        memory_manager_, reinterpret_cast<void**>(&pinned_memory),
+        TRITONSERVER_MEMORY_CPU_PINNED, 0 /* memory_type_id */,
+        pending_pinned_byte_size_);
+    if (err != nullptr) {
+      pinned_memory = nullptr;
+      TRITONSERVER_ErrorDelete(err);
+    }
   }
-#else
-  pinned_memory_type = TRITONSERVER_MEMORY_CPU;
-#endif  // TRITON_ENABLE_GPU
 
-  // If the pinned buffer isn't actually pinned memory then just
-  // perform a direct copy. In this case 'pinned_memory' is just
-  // deallocated and not used.
-  if (pinned_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
-    pinned_memory = nullptr;
-
+  // If the pinned buffer wasn't actually allocated then just perform
+  // a direct copy.
+  if (pinned_memory == nullptr) {
     size_t offset = 0;
     for (auto& pr : pending_pinned_inputs_) {
       auto& response = pr.first;
@@ -316,7 +315,7 @@ BackendInputCollector::FlushPendingPinned(
   }
   // We have a pinned buffer so copy the pending input buffer(s) into
   // the pinned memory.
-  else {  // pinned_memory_type == TRITONSERVER_MEMORY_CPU_PINNED
+  else {
     bool cuda_used = false;
     size_t offset = 0;
     for (auto& pr : pending_pinned_inputs_) {
@@ -331,8 +330,8 @@ BackendInputCollector::FlushPendingPinned(
 
       cuda_used |= SetFixedSizeInputTensor(
           request_input, offset, pinned_memory, pending_pinned_byte_size_,
-          pinned_memory_type, pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED,
-          response);
+          TRITONSERVER_MEMORY_CPU_PINNED, 0 /* memory_type_id */,
+          TRITONSERVER_MEMORY_CPU_PINNED, response);
       offset += byte_size;
     }
 
@@ -349,10 +348,10 @@ BackendInputCollector::FlushPendingPinned(
     // finalize after we have waited for all async copies to complete.
     if (!cuda_used) {
       auto err = CopyBuffer(
-          "pinned buffer", pinned_memory_type, pinned_memory_id,
-          tensor_memory_type, tensor_memory_type_id, pending_pinned_byte_size_,
-          pinned_memory, tensor_buffer + pending_pinned_offset_, stream_,
-          &cuda_used);
+          "pinned buffer", TRITONSERVER_MEMORY_CPU_PINNED,
+          0 /* memory_type_id */, tensor_memory_type, tensor_memory_type_id,
+          pending_pinned_byte_size_, pinned_memory,
+          tensor_buffer + pending_pinned_offset_, stream_, &cuda_used);
       cuda_copy |= cuda_used;
 
       // If something goes wrong with the copy all the pending

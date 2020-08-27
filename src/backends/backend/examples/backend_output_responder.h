@@ -51,12 +51,12 @@ class BackendOutputResponder {
   explicit BackendOutputResponder(
       TRITONBACKEND_Request** requests, const uint32_t request_count,
       std::vector<TRITONBACKEND_Response*>* responses, const int max_batch_size,
-      const bool pinned_enabled, cudaStream_t stream,
-      cudaEvent_t event = nullptr)
+      TRITONBACKEND_MemoryManager* memory_manager, const bool pinned_enabled,
+      cudaStream_t stream, cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), request_count_(request_count),
         responses_(responses), max_batch_size_(max_batch_size),
-        pinned_enabled_(pinned_enabled), stream_(stream), event_(event),
-        pending_pinned_byte_size_(0)
+        memory_manager_(memory_manager), pinned_enabled_(pinned_enabled),
+        stream_(stream), event_(event), pending_pinned_byte_size_(0)
   {
   }
 
@@ -107,6 +107,7 @@ class BackendOutputResponder {
   const uint32_t request_count_;
   std::vector<TRITONBACKEND_Response*>* responses_;
   const int max_batch_size_;
+  TRITONBACKEND_MemoryManager* memory_manager_;
   const bool pinned_enabled_;
   cudaStream_t stream_;
   cudaEvent_t event_;

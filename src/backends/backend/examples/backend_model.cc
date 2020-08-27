@@ -82,6 +82,11 @@ BackendModel::BackendModel(TRITONBACKEND_Model* triton_model)
 
   THROW_IF_BACKEND_MODEL_ERROR(
       TRITONBACKEND_ModelServer(triton_model, &triton_server_));
+  TRITONBACKEND_Backend* backend;
+  THROW_IF_BACKEND_MODEL_ERROR(
+      TRITONBACKEND_ModelBackend(triton_model, &backend));
+  THROW_IF_BACKEND_MODEL_ERROR(
+      TRITONBACKEND_BackendMemoryManager(backend, &triton_memory_manager_));
 
   enable_pinned_input_ = false;
   enable_pinned_output_ = false;
