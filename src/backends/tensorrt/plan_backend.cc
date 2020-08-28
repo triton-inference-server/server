@@ -820,10 +820,18 @@ PlanBackend::Context::InitializeShapeInputBinding(
     }
 
     if (engine_->isExecutionBinding(binding_index)) {
-      std::vector<int64_t> dim_vec;
-      DimsToDimVec(
-          context.context_->getBindingDimensions(binding_index), &dim_vec);
-      int64_t byte_size = GetByteSize(dt, dim_vec);
+      int64_t byte_size = 0;
+      if (is_linear_format_[io_index]) {
+        std::vector<int64_t> dim_vec;
+        DimsToDimVec(
+            context.context_->getBindingDimensions(binding_index), &dim_vec);
+        byte_size = GetByteSize(dt, dim_vec);
+      } else {
+        auto component_count =
+            GetElementCount(context.context_->getStrides(binding_index));
+        component_count *= engine_->getBindingComponentsPerElement(binding_index);
+        byte_size = component_count * engine_->getBindingBytesPerComponent(binding_index);
+      }
       max_byte_size = std::max(max_byte_size, byte_size);
     }
   }
