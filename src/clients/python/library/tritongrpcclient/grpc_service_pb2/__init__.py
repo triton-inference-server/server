@@ -27,8 +27,8 @@
 import warnings
 
 warnings.warn(
-    "The package `tritonclientutils` is deprecated and will be "
+    "The package `tritongrpcclient` is deprecated and will be "
     "removed in a future version. Please use instead "
-    "`tritonclient.utils`", DeprecationWarning)
+    "`tritonclient.grpc_service_pb2`", DeprecationWarning)
 
-from tritonclient.utils import *
+from tritonclient.grpc_service_pb2 import *

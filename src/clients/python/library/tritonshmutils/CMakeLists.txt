@@ -24,11 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import warnings
+cmake_minimum_required (VERSION 3.5)
 
-warnings.warn(
-    "The package `tritonclientutils` is deprecated and will be "
-    "removed in a future version. Please use instead "
-    "`tritonclient.utils`", DeprecationWarning)
-
-from tritonclient.utils import *
+if(NOT WIN32)
+  file(COPY shared_memory DESTINATION .)
+  
+  if(${TRITON_ENABLE_GPU})
+    file(COPY cuda_shared_memory DESTINATION .)
+  endif() # TRITON_ENABLE_GPU
+endif() # WIN32

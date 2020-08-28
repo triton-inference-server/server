@@ -27,7 +27,7 @@
 
 import argparse
 
-from tritonclient import grpcclient
+import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
 if __name__ == '__main__':

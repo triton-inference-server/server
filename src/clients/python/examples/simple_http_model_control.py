@@ -28,7 +28,7 @@
 import argparse
 import sys
 
-from tritonclient import httpclient
+import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
 if __name__ == '__main__':

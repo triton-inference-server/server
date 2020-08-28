@@ -26,8 +26,9 @@
 
 import warnings
 
-warnings.warn("The package `tritonhttpclient` is deprecated and will be "
-              "removed in a future version. Please use instead "
-              "`tritonclient.http`",  DeprecationWarning)
+warnings.warn(
+    "The package `tritonhttpclient` is deprecated and will be "
+    "removed in a future version. Please use instead "
+    "`tritonclient.http`", DeprecationWarning)
 
 from tritonclient.http import *

@@ -26,60 +26,37 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-if(NOT WIN32)
-  #
-  # libcshm.so
-  #
-  add_library(cshm SHARED shared_memory/shared_memory.cc)
-  if(${TRITON_ENABLE_GPU})
-    target_include_directories(cshm PRIVATE ${CUDA_INCLUDE_DIRS})
-  endif() # TRITON_ENABLE_GPU
-  target_link_libraries(cshm rt)
+add_subdirectory(tritonclient)
 
-  #
-  # libccudashm.so
-  #
-  if(${TRITON_ENABLE_GPU})
-    add_library(
-        ccudashm SHARED
-        cuda_shared_memory/cuda_shared_memory.cc
-        ../../c++/library/cencode.c
-        ../../c++/library/cencode.h
-    )
-    target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
-    target_link_libraries(
-        ccudashm
-        PRIVATE ${CUDA_LIBRARIES})
-  endif() # TRITON_ENABLE_GPU
-endif() # NOT WIN32
-
-if(NOT WIN32)
-  configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
-  if(${TRITON_ENABLE_GPU})
-    configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
-  endif() # TRITON_ENABLE_GPU
-endif() # NOT WIN32
+# Needed for the backwards-compatibility
+# Remove when moving completely to the
+# new structure.
+if(${TRITON_ENABLE_GRPC})
+  file(COPY tritongrpcclient DESTINATION .)
+endif() # TRITON_ENABLE_GRPC
+if(${TRITON_ENABLE_HTTP})
+  file(COPY tritonhttpclient DESTINATION .)
+endif() # TRITON_ENABLE_HTTP
+file(COPY tritonclientutils DESTINATION .)
+add_subdirectory(tritonshmutils)
+####################################
 
 configure_file(../../../../VERSION VERSION COPYONLY)
 configure_file(LICENSE.txt LICENSE.txt COPYONLY)
 configure_file(README.md README.md COPYONLY)
-file(COPY requirements DESTINATION .)
-configure_file(utils.py utils.py COPYONLY)
 configure_file(setup.py setup.py COPYONLY)
-configure_file(x86_linux_setup.py x86_linux_setup.py COPYONLY)
+file(COPY requirements DESTINATION .)
 
 set(WHEEL_DEPENDS 
       ${CMAKE_CURRENT_BINARY_DIR}/VERSION
       ${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt
       ${CMAKE_CURRENT_BINARY_DIR}/README.md
       ${CMAKE_CURRENT_BINARY_DIR}/setup.py
-      ${CMAKE_CURRENT_BINARY_DIR}/utils.py
 )
 
 if(${TRITON_ENABLE_GRPC})
-  configure_file(grpcclient.py grpcclient.py COPYONLY)
   set(WHEEL_DEPENDS 
-        ${CMAKE_CURRENT_BINARY_DIR}/grpcclient.py
+        ${CMAKE_CURRENT_BINARY_DIR}/tritonclient/grpc.py
         proto-py-library
         grpc-py-library
         ${WHEEL_DEPENDS}
@@ -87,9 +64,8 @@ if(${TRITON_ENABLE_GRPC})
 endif() # TRITON_ENABLE_GRPC
 
 if(${TRITON_ENABLE_HTTP})
-  configure_file(httpclient.py httpclient.py COPYONLY)
   set(WHEEL_DEPENDS 
-        ${CMAKE_CURRENT_BINARY_DIR}/httpclient.py
+        ${CMAKE_CURRENT_BINARY_DIR}/tritonclient/http.py
         ${WHEEL_DEPENDS}
   )
 endif() # TRITON_ENABLE_HTTP
@@ -120,7 +96,6 @@ if (NOT WIN32)
   # linux systems only.
   set(X86LINUX_WHEEL_DEPENDS
         cshm
-        ${CMAKE_CURRENT_BINARY_DIR}/x86_linux_setup.py
         ${WHEEL_DEPENDS}
   )
   if(NOT ${TRITON_CLIENT_SKIP_EXAMPLES})
@@ -186,7 +161,7 @@ install(
 )
 
 if (NOT WIN32)
-install(
+  install(
     CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/x86_linux/triton*.whl\")"
     CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
   )

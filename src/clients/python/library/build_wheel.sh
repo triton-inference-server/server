@@ -45,54 +45,67 @@ function main() {
   echo $(date) : "=== Using builddir: ${WHLDIR}"
 
   echo "Adding package files"
-  mkdir -p ${WHLDIR}/tritonclient/
+  mkdir -p ${WHLDIR}/tritonclient
   touch ${WHLDIR}/tritonclient/__init__.py
 
-  # grpcclient module
-  if [ -f grpcclient.py ]; then
-    mkdir -p ${WHLDIR}/tritonclient/grpcclient
+  # Needed for the backwards-compatibility
+  # Remove when moving completely to the
+  # new structure.
+  if [ -d tritonclientutils ]; then
+    cp -r tritonclientutils ${WHLDIR}/
+  fi
+  if [ -d tritonhttpclient ]; then
+    cp -r tritonhttpclient ${WHLDIR}/
+  fi
+  if [ -d tritongrpcclient ]; then
+    cp -r tritongrpcclient ${WHLDIR}/
+  fi
+  if [ "$2" = true ] ; then
+    if [ -d tritonshmutils ]; then
+      cp -r tritonshmutils ${WHLDIR}/
+      touch ${WHLDIR}/tritonshmutils/__init__.py
+    fi
+  fi
+  ####################################
+
+  if [ -f tritonclient/grpc.py ]; then
+    cp tritonclient/grpc.py \
+      "${WHLDIR}/tritonclient/."
     cp ../../../core/*_pb2.py \
-      "${WHLDIR}/tritonclient/grpcclient/."
+      "${WHLDIR}/tritonclient/."
     cp ../../../core/*_grpc.py \
-      "${WHLDIR}/tritonclient/grpcclient/."
-    cp grpcclient.py \
-      "${WHLDIR}/tritonclient/grpcclient/__init__.py"
+      "${WHLDIR}/tritonclient/."
     # Use 'sed' command to fix protoc compiled imports (see
     # https://github.com/google/protobuf/issues/1491).
-    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient.grpcclient import \1_pb2 as \2/" \
-      ${WHLDIR}/tritonclient/grpcclient/*_pb2.py
-    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient.grpcclient import \1_pb2 as \2/" \
-     ${WHLDIR}/tritonclient/grpcclient/*_pb2_grpc.py
+    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient import \1_pb2 as \2/" \
+      ${WHLDIR}/tritonclient/*_pb2.py
+    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient import \1_pb2 as \2/" \
+     ${WHLDIR}/tritonclient/*_pb2_grpc.py
   fi
 
-  # httpclient module
-  if [ -f httpclient.py ]; then
-    mkdir -p ${WHLDIR}/tritonclient/httpclient
-    cp httpclient.py \
-      "${WHLDIR}/tritonclient/httpclient/__init__.py"
-  fi
+  cp tritonclient/utils.py \
+      "${WHLDIR}/tritonclient/."
 
-  # utility module
-  mkdir -p ${WHLDIR}/tritonclient/utils
-  cp utils.py \
-   "${WHLDIR}/tritonclient/utils/__init__.py"
+  if [ -f tritonclient/http.py ]; then
+    cp tritonclient/http.py \
+      "${WHLDIR}/tritonclient/."
+  fi
 
   if [ "$2" = true ] ; then
-    # shared_memory
-    mkdir -p ${WHLDIR}/tritonclient/shared_memory
-    cp libcshm.so \
-      "${WHLDIR}/tritonclient/shared_memory/."
-    cp shared_memory/__init__.py \
+    mkdir -p ${WHLDIR}/tritonclient/shared_memory/
+    cp tritonclient/shared_memory/__init__.py \
+        "${WHLDIR}/tritonclient/shared_memory/."
+    cp tritonclient/libcshm.so \
       "${WHLDIR}/tritonclient/shared_memory/."
 
-    if [ -f libccudashm.so ] && [ -f cuda_shared_memory/__init__.py ]; then
+    if [ -f tritonclient/libccudashm.so ] && [ -f tritonclient/cuda_shared_memory/__init__.py ]; then
       mkdir -p ${WHLDIR}/tritonclient/cuda_shared_memory
-      cp libccudashm.so \
+      cp tritonclient/cuda_shared_memory/__init__.py \
         "${WHLDIR}/tritonclient/cuda_shared_memory/."
-      cp cuda_shared_memory/__init__.py \
+      cp tritonclient/libccudashm.so \
         "${WHLDIR}/tritonclient/cuda_shared_memory/."
     fi
-
+  
     # Copies the pre-compiled perf_client binary
     if [ -f $3 ]; then
       cp $3 "${WHLDIR}"
@@ -103,7 +116,6 @@ function main() {
   cp README.md "${WHLDIR}"
   cp -r requirements "${WHLDIR}"
   cp setup.py "${WHLDIR}"
-  fi
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"

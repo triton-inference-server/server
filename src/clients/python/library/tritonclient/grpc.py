@@ -38,8 +38,8 @@ except ModuleNotFoundError as error:
         'The installation does not include grpc support. Specify \'grpc\' or \'all\' while installing the tritonclient package to include the support'
     ) from error
 
-import tritonclient.grpcclient.grpc_service_pb2
-import tritonclient.grpcclient.grpc_service_pb2_grpc
+from tritonclient import grpc_service_pb2
+from tritonclient import grpc_service_pb2_grpc
 from tritonclient.utils import *
 
 # Should be kept consistent with the value specified in

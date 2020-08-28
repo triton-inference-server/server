@@ -29,9 +29,10 @@ import argparse
 import numpy as np
 import sys
 from builtins import range
-from tritonclient import httpclient
-from tritonclient import grpcclient
-from tritonclient import utils
+
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+import tritonclient.utils as utils
 import tritonclient.shared_memory as shm
 
 FLAGS = None

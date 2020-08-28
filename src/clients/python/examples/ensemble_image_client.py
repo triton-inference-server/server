@@ -32,11 +32,11 @@ from builtins import range
 from PIL import Image
 import sys
 
-from tritonclient import grpcclient
-from tritonclient import httpclient
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
 from tritonclient.utils import triton_to_np_dtype
 from tritonclient.utils import InferenceServerException
-import tritonclient.grpcclient.model_config_pb2 as model_config
+import tritonclient.model_config_pb2 as model_config
 
 FLAGS = None
 

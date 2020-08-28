@@ -150,10 +150,8 @@ fi
 
 # Check wheels
 WHLVERSION=`cat /workspace/VERSION | sed 's/dev/\.dev0/'`
-WHLS="tritonclientutils-${WHLVERSION}-py3-none-any.whl \
-      tritongrpcclient-${WHLVERSION}-py3-none-any.whl \
-      tritonhttpclient-${WHLVERSION}-py3-none-any.whl \
-      tritonshmutils-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"
+WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
+      tritonclient-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"
 for l in $WHLS; do
     if [[ ! -f "triton_client/python/$l" ]]; then
         echo -e "*** wheel $l not present\n"
@@ -174,8 +172,8 @@ if [ "$CUDAFILES" != "0" ]; then
 fi
 
 SHMFILES=`find /workspace/builddir/client/install -name *shm* | wc -l`
-if [ "$SHMFILES" != "7" ]; then
-    echo -e "*** expected 7 SHM files in TRITON_ENABLE_GPU=OFF build, got $SHMFILES\n"
+if [ "$SHMFILES" != "6" ]; then
+    echo -e "*** expected 6 SHM files in TRITON_ENABLE_GPU=OFF build, got $SHMFILES\n"
     RET=1
 fi
 
