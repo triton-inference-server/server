@@ -66,6 +66,24 @@ cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
 (cd models/pytorch_fp32_fp32 && \
           sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
+mkdir -p models/execute_error/1/
+cp -r ../python_models/execute_error/model.py ./models/execute_error/1/
+cp ../python_models/execute_error/config.pbtxt ./models/execute_error/
+
+mkdir -p models/init_args/1/
+cp -r ../python_models/init_args/model.py ./models/init_args/1/
+cp ../python_models/init_args/config.pbtxt ./models/init_args/
+
+# mkdir -p models/init_error/1/
+# cp -r ../python_models/init_error/model.py ./models/init_error/1/
+# cp ../python_models/init_error/config.pbtxt ./models/init_error/
+
+# mkdir -p models/fini_error/1/
+# cp -r ../python_models/fini_error/model.py ./models/fini_error/1/
+# cp ../python_models/fini_error/config.pbtxt ./models/fini_error/
+
+pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
