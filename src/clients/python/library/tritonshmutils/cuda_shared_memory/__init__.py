@@ -27,8 +27,8 @@
 import warnings
 
 warnings.warn(
-    "The package `tritonclientutils` is deprecated and will be "
+    "The package `tritonshmutils` is deprecated and will be "
     "removed in a future version. Please use instead "
-    "`tritonclient.utils`", DeprecationWarning)
+    "`tritonclient.cuda_shared_memory`", DeprecationWarning)
 
-from tritonclient.utils import *
+from tritonclient.cuda_shared_memory import *

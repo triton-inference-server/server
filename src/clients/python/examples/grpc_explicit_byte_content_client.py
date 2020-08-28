@@ -30,8 +30,8 @@ import sys
 import numpy as np
 
 import grpc
-from tritonclient.grpcclient import grpc_service_pb2
-from tritonclient.grpcclient import grpc_service_pb2_grpc
+from tritonclient import grpc_service_pb2
+from tritonclient import grpc_service_pb2_grpc
 from tritonclient import utils
 
 if __name__ == '__main__':

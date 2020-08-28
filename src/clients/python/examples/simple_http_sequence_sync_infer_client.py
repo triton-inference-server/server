@@ -30,7 +30,7 @@ import numpy as np
 import sys
 import queue
 
-from tritonclient import httpclient
+import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
 FLAGS = None

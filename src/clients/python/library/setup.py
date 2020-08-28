@@ -31,7 +31,7 @@ from setuptools import find_packages
 from setuptools import setup
 from itertools import chain
 
-IS_MANYLINUX_BUILD = "manylinux1_x86_64" in sys.argv
+IS_MANYLINUX_BUILD = "--plat-name=manylinux1_x86_64" in sys.argv
 
 if 'VERSION' not in os.environ:
     raise Exception('envvar VERSION must be specified')
@@ -65,7 +65,7 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 def req_file(filename, folder="requirements"):
     with open(os.path.join(folder, filename)) as f:
         content = f.readlines()
-    return [x.strip() for x in content]
+    return [x.strip() for x in content if not x.startswith("#")]
 
 
 install_requires = req_file("requirements.txt")
@@ -76,13 +76,25 @@ extras_require = {
 
 extras_require['all'] = list(chain(extras_require.values()))
 
+platform_package_data = []
+if IS_MANYLINUX_BUILD:
+    platform_package_data += ['libcshm.so']
+    if bool(os.environ.get('CUDA_VERSION', 0)):
+        platform_package_data += ['libccudashm.so']
+
+data_files = [
+    ("", ["LICENSE.txt"]),
+]
+if IS_MANYLINUX_BUILD:
+    data_files += [("bin", ["perf_client"])]
+
 setup(
     name='tritonclient',
     version=VERSION,
     author='NVIDIA Inc.',
     author_email='sw-dl-triton@nvidia.com',
-    description="Python client library and utilities for communicating with "
-                "Triton Inference Server",
+    description=
+    "Python client library and utilities for communicating with Triton Inference Server",
     long_description=long_description,
     license='BSD',
     url='http://nvidia.com',
@@ -112,7 +124,10 @@ setup(
     install_requires=install_requires,
     extras_require=extras_require,
     packages=find_packages(),
+    package_data={
+        '': platform_package_data,
+    },
     zip_safe=False,
     cmdclass={'bdist_wheel': bdist_wheel},
-    data_files=[("", ["LICENSE.txt"])],
+    data_files=data_files,
 )

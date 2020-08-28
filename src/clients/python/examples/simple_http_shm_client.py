@@ -29,9 +29,10 @@ import argparse
 import numpy as np
 import sys
 from builtins import range
-from tritonclient import httpclient
-from tritonclient import utils
+
+import tritonclient.http as httpclient
 import tritonclient.shared_memory as shm
+from tritonclient import utils
 
 FLAGS = None
 

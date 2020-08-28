@@ -28,7 +28,7 @@
 import argparse
 import numpy as np
 
-from tritonclient import grpcclient
+import tritonclient.grpc as grpcclient
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

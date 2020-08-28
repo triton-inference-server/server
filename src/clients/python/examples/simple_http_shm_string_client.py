@@ -30,7 +30,7 @@ import numpy as np
 import sys
 from builtins import range
 
-from tritonclient import httpclient
+import tritonclient.http as httpclient
 from tritonclient import utils
 import tritonclient.shared_memory as shm
 
