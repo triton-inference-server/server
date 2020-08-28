@@ -115,11 +115,10 @@ class PythonHost(PythonInterpreterServicer):
         spec.loader.exec_module(module)
 
         if hasattr(module, 'TritonPythonBackend'):
-            self.initializer_func = module.TritonPythonBackend
+            self.backend = module.TritonPythonBackend()
         else:
             raise NotImplementedError(
                 'TritonPythonBackend class doesn\'t exist in ' + module_path)
-        self.backend = None
 
     def Init(self, request, context):
         """Init is called on TRITONBACKEND_ModelInstanceInitialize. `request`
@@ -127,13 +126,18 @@ class PythonHost(PythonInterpreterServicer):
         containing the model configuration. This paramter is passed by
         default to every ModelInstance.
         """
+
+        backend = self.backend
+
         if not hasattr(request, 'args'):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('request objects does\'nt have args attribute')
             return Empty()
 
-        args = {x.key: x.value for x in request.args}
-        self.backend = self.initializer_func(args)
+        if hasattr(backend, 'initialize'):
+            args = {x.key: x.value for x in request.args}
+            self.backend.initialize(args)
+
         return Empty()
 
     def Fini(self, request, context):
@@ -180,8 +184,14 @@ class PythonHost(PythonInterpreterServicer):
             inference_requests.append(inference_request)
 
         # Execute inference on the Python backend responses contains a list of
-        # triton_python_backend_utils.InferenceResponse
-        responses = self.backend(inference_requests)
+        # triton_python_backend_utils.InferenceResponse. Each backend must
+        # implement an execute method
+        if not hasattr(self.backend, 'execute'):
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('Backend does not implement `execute` method')
+            return ExecuteResponse()
+
+        responses = self.backend.execute(inference_requests)
 
         # Make sure that number of InferenceResponse and InferenceRequest
         # objects match
