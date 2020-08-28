@@ -942,7 +942,7 @@ TRITONBACKEND_ModelInstanceExecute(
       // Copy Python output to Triton output buffers
       std::copy(
           output_response_tensor->raw_data().begin(),
-          output_response_tensor->raw_data().end(), (char*)output_buffer);
+          output_response_tensor->raw_data().end(), (char*) output_buffer);
     }
 
     if (responses[r] == nullptr) {
