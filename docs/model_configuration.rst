@@ -765,13 +765,17 @@ for the currently available settings.
 TensorRT Optimization
 ^^^^^^^^^^^^^^^^^^^^^
 
-The TensorRT optimization is an especially powerful optimization that
-can be enabled for TensorFlow and ONNX models. When enabled for a
-model, TensorRT optimization will be applied to the model at load time
-or when it first receives inference requests. TensorRT optimizations
-include specializing and fusing model layers, and using reduced
-precision (for example 16-bit floating-point) to provide significant
-throughput and latency improvements.
+TensorRT has existing integrations into the frameworks for
+:ref:`TensorFlow <section-opt-tensorflow-tensorrt>` and :ref:`ONNX
+Runtime <section-opt-onnx-tensorrt>` that can be easily enabled via
+Triton model configuration changes. When enabled, TensorRT
+optimizations will be applied to the TensorFlow or ONNX model at load
+time or when the model first receives inference requests. TensorRT
+optimizations include specializing and fusing model layers, and using
+reduced precision (for example, 16-bit floating-point) to provide
+significant throughput and latency improvements. These TensorRT
+optimizations occur inside the existing TensorFlow or ONNX models,
+transparent to the user.
 
 .. _section-model-warm-up:
 
