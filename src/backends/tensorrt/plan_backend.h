@@ -112,6 +112,7 @@ class PlanBackend : public InferenceBackend {
     Status InitializeConfigShapeOutputBindings(
         const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
             ios);
+    Status InitializeBatchOutputBindings(const inference::ModelConfig& config);
 #ifdef TRITON_ENABLE_CUDA_GRAPH
     bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
     bool BuildCudaGraphDynamic(
@@ -323,6 +324,9 @@ class PlanBackend : public InferenceBackend {
     using BatchInputData =
         std::pair<inference::BatchInput, std::unique_ptr<AllocatedMemory>>;
     std::vector<std::shared_ptr<BatchInputData>> batch_inputs_;
+    // Store the pair of input name to look up and output shape
+    // for output scattering
+    std::vector<std::pair<std::string, std::vector<int64_t>>> io_shape_mapping_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
     // engine. This is used to match the TensorRT context execution declaration

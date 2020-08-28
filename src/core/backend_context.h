@@ -145,6 +145,15 @@ class BackendResponder {
       std::vector<int64_t>& batchn_shape, const char* buffer,
       const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
 
+  // Process all responses for a named output tensor based on the input tensor
+  // shape in corresponding requests. 'batchn_shape' is the model config shape
+  // with batch dimension.
+  void ProcessTensor(
+      const std::string& name, const std::string& input_name,
+      const inference::DataType datatype,
+      const std::vector<int64_t>& batchn_shape, const char* buffer,
+      const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
+
   // Finalize processing of all responses for all output
   // tensors. Return true if cudaMemcpyAsync is called, and the caller
   // should call cudaStreamSynchronize (or cudaEventSynchronize on 'event')
@@ -260,11 +269,11 @@ class BackendInputCollector {
       std::unique_ptr<InferenceResponse>* response);
   template <typename T>
   Status SetElementCount(
-      const std::string& target_input, char* buffer,
+      const std::string& source_input, char* buffer,
       const size_t buffer_byte_size);
   template <typename T>
   Status SetAccumulatedElementCount(
-      const std::string& target_input, char* buffer,
+      const std::string& source_input, char* buffer,
       const size_t buffer_byte_size);
 
   bool need_sync_;

@@ -544,6 +544,9 @@ PlanBackend::CreateExecutionContext(
           context->num_expected_bindings_, nullptr);
   context->buffer_bindings_ =
       std::vector<void*>(context->total_bindings_, nullptr);
+  context->io_shape_mapping_ =
+      std::vector<std::pair<std::string, std::vector<int64_t>>>(
+          context->num_expected_bindings_);
 
   RETURN_IF_ERROR(
       context->InitializeConfigShapeInputBindings(Config().input()));
@@ -576,6 +579,8 @@ PlanBackend::CreateExecutionContext(
             std::to_string(context->engine_->getMaxBatchSize()));
   }
 
+  // Batch output must be processed before other outputs
+  RETURN_IF_ERROR(context->InitializeBatchOutputBindings(Config()));
   RETURN_IF_ERROR(
       context->InitializeConfigShapeOutputBindings(Config().output()));
   RETURN_IF_ERROR(
@@ -1129,21 +1134,22 @@ PlanBackend::Context::InitializeBatchInputBindings(
     const inference::ModelConfig& config)
 {
   for (const auto& batch_input : config.batch_input()) {
-    std::string tensor_name = batch_input.name();
-    inference::DataType tensor_datatype = batch_input.data_type();
-    // Batch inputs are ragged inputs which will be concatenated and flatten,
-    // so expecting dims to be [-1]
-    DimsList dims;
-    dims.Add(-1);
+    for (const auto& tensor_name : batch_input.target_name()) {
+      inference::DataType tensor_datatype = batch_input.data_type();
+      // Batch inputs are ragged inputs which will be concatenated and flatten,
+      // so expecting dims to be [-1]
+      DimsList dims;
+      dims.Add(-1);
 
-    RETURN_IF_ERROR(InitializeExecuteInputBinding(
-        tensor_name, tensor_datatype, dims, false, true));
+      RETURN_IF_ERROR(InitializeExecuteInputBinding(
+          tensor_name, tensor_datatype, dims, false, true));
 
-    int io_index = engine_->getBindingIndex(tensor_name.c_str());
-    batch_inputs_[io_index].reset(new BatchInputData(
-        batch_input,
-        new AllocatedMemory(
-            byte_sizes_[io_index], TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+      int io_index = engine_->getBindingIndex(tensor_name.c_str());
+      batch_inputs_[io_index].reset(new BatchInputData(
+          batch_input,
+          new AllocatedMemory(
+              byte_sizes_[io_index], TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+    }
   }
 
   return Status::Success;
@@ -1370,9 +1376,12 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
                 io.name() + "' is a wildcard.");
       }
 
-      RETURN_IF_ERROR(CompareDimsSupported(
-          name_, io.name(), engine_dims, model_config_dims, support_batching_,
-          is_dynamic_, false /* compare_exact */));
+      // Skip 'batch_output' validation as it is not exact match to model dims
+      if (!buffer_is_ragged_[io_index]) {
+        RETURN_IF_ERROR(CompareDimsSupported(
+            name_, io.name(), engine_dims, model_config_dims, support_batching_,
+            is_dynamic_, false /* compare_exact */));
+      }
 
       int64_t byte_size;
       if (!is_dynamic_) {
@@ -1407,12 +1416,58 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
 
     byte_sizes_[io_index] = max_byte_size;
     buffers_[io_index] = buffer;
+    // Whether the output needs to be scattered based on input
+    if (buffer_is_ragged_[io_index]) {
+      std::vector<int64_t> output_shape;
+      const DimsList& model_config_dims =
+          (io.has_reshape()) ? io.reshape().shape() : io.dims();
+      if (support_batching_) {
+        output_shape.push_back(-1);
+      }
+      for (const auto& dim : model_config_dims) {
+        output_shape.push_back(dim);
+      }
+      io_shape_mapping_[io_index].second = output_shape;
+    }
 
     // Set buffer bindings of all optimization profile since buffer is allocated
     for (auto& trt_context : trt_contexts_) {
       auto binding_index =
           num_expected_bindings_ * trt_context.first + io_index;
       buffer_bindings_[binding_index] = buffers_[io_index];
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
+PlanBackend::Context::InitializeBatchOutputBindings(
+    const inference::ModelConfig& config)
+{
+  for (const auto& io : config.batch_output()) {
+    for (const auto& name : io.target_name()) {
+      // FIXME Currently not handling the case that batch output is shape tensor
+      int io_index = engine_->getBindingIndex(name.c_str());
+
+      if (engine_->isShapeBinding(io_index)) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "batch output '" + name + "' can not be shape binding");
+      }
+
+      // Whether the output needs to be scattered based on input
+      if (io.kind() != inference::BatchOutput::BATCH_SCATTER_WITH_INPUT_SHAPE) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "batch output kind other than"
+            "BATCH_SCATTER_WITH_INPUT_SHAPE is not supported for " +
+                name_);
+      }
+      // Set hints to for InitializeBatchOutputBindings()
+      buffer_is_ragged_[io_index] = true;
+      io_shape_mapping_[io_index] =
+          std::make_pair(io.source_input(0), std::vector<int64_t>());
     }
   }
 
@@ -2014,7 +2069,7 @@ PlanBackend::Context::Run(
       std::vector<int64_t> ragged_shape{0};
       inference::DataType datatype;
       // FIXME inefficient as looping in this way may iterate the same
-      // target_input multiple times
+      // source_input multiple times
       if (batch_inputs_[bindex] != nullptr) {
         const auto& batch_input = batch_inputs_[bindex]->first;
         auto& allocated_memory = batch_inputs_[bindex]->second;
@@ -2326,6 +2381,15 @@ PlanBackend::Context::Run(
 
         free(shape_value_ptr);
       }
+    } else if (buffer_is_ragged_[bindex]) {
+      // FIXME add correctness checking like below
+      inference::DataType dt = ConvertTrtTypeToDataType(
+          engine_->getBindingDataType(binding_offset + bindex));
+      payload_->responder_->ProcessTensor(
+          name, io_shape_mapping_[bindex].first, dt,
+          io_shape_mapping_[bindex].second,
+          static_cast<const char*>(buffers_[bindex]), TRITONSERVER_MEMORY_GPU,
+          gpu_device_);
     } else {
       std::vector<int64_t> batchn_shape;
 
