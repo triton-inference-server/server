@@ -32,6 +32,7 @@ import importlib.util
 import sys
 import threading
 import signal
+import time
 
 import numpy as np
 
@@ -142,10 +143,6 @@ class PythonHost(PythonInterpreterServicer):
         if hasattr(self.backend, 'finalize'):
             self.backend.finalize()
 
-        with cv:
-            cv.notify()
-
-        del self.backend
         return Empty()
 
     def Execute(self, request, context):
@@ -216,18 +213,28 @@ class PythonHost(PythonInterpreterServicer):
 
 
 if __name__ == "__main__":
+    signal_received = False
     FLAGS = parse_startup_arguments()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
     python_host = PythonHost(module_path=FLAGS.model_path)
     add_PythonInterpreterServicer_to_server(python_host, server)
 
+    def interrupt_handler(signum, frame):
+        pass
+
+    def sigterm_handler(signum, frame):
+        global signal_received
+        if not signal_received:
+            signal_received = True
+        else:
+            return
+
+        event.set()
+
+    signal.signal(signal.SIGINT, interrupt_handler)
+    signal.signal(signal.SIGTERM, sigterm_handler)
+
     server.add_insecure_port(FLAGS.socket)
     server.start()
-
-    def signal_handler(signal, frame):
-        with cv:
-            cv.wait()
-        server.stop(grace=5)
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.pause()
+    event.wait()
+    server.stop(grace=5)
