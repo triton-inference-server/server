@@ -25,10 +25,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import warnings
+warnings.simplefilter('always', DeprecationWarning)
 
 warnings.warn(
     "The package `tritonclientutils` is deprecated and will be "
     "removed in a future version. Please use instead "
-    "`tritonclient.utils`", DeprecationWarning)
+    "`tritonclient.utils`",
+    DeprecationWarning
+)
 
 from tritonclient.utils import *
