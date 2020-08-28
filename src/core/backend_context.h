@@ -29,6 +29,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "src/core/async_work_queue.h"
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
 #include "src/core/memory.h"
@@ -135,7 +136,8 @@ class BackendResponder {
       cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), responses_(responses),
         max_batch_size_(max_batch_size), pinned_enabled_(pinned_enabled),
-        stream_(stream), event_(event), pending_pinned_byte_size_(0)
+        use_async_cpu_copy_(AsyncWorkQueue::WorkerCount() > 1), stream_(stream),
+        event_(event), pending_pinned_byte_size_(0)
   {
   }
 
@@ -178,6 +180,7 @@ class BackendResponder {
   std::vector<std::unique_ptr<InferenceResponse>>* responses_;
   const int max_batch_size_;
   const bool pinned_enabled_;
+  const bool use_async_cpu_copy_;
   cudaStream_t stream_;
   cudaEvent_t event_;
 
@@ -223,8 +226,9 @@ class BackendInputCollector {
       const bool pinned_enabled, cudaStream_t stream,
       cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), responses_(responses),
-        pinned_enabled_(pinned_enabled), stream_(stream), event_(event),
-        pending_pinned_byte_size_(0)
+        pinned_enabled_(pinned_enabled),
+        use_async_cpu_copy_(AsyncWorkQueue::WorkerCount() > 1), stream_(stream),
+        event_(event), pending_pinned_byte_size_(0)
   {
   }
 
@@ -280,6 +284,7 @@ class BackendInputCollector {
   const std::vector<std::unique_ptr<InferenceRequest>>& requests_;
   std::vector<std::unique_ptr<InferenceResponse>>* responses_;
   const bool pinned_enabled_;
+  const bool use_async_cpu_copy_;
   cudaStream_t stream_;
   cudaEvent_t event_;
 

@@ -50,7 +50,8 @@ class AsyncWorkQueue {
   // Get the number of worker threads.
   static size_t WorkerCount();
 
-  // Add a task to the queue.
+  // Add a 'task' to the queue. The function will take ownership of 'task'.
+  // Therefore std::move should be used when calling AddTask.
   static void AddTask(const std::function<void(void)>&& task);
 
  private:
