@@ -90,12 +90,12 @@ def parse_startup_arguments():
                         required=True,
                         type=str,
                         help="Socket to comunicate with server")
-    parser.add_argument("--model_path",
+    parser.add_argument("--model-path",
                         default=None,
                         required=True,
                         type=str,
                         help="Path to model code")
-    parser.add_argument("--instance_name",
+    parser.add_argument("--instance-name",
                         default=None,
                         required=True,
                         type=str,
