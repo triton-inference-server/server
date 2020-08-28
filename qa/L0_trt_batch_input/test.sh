@@ -39,9 +39,10 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 BATCH_INPUT_TEST=trt_batch_input_test.py
-EXPECTED_NUM_TESTS="5"
+EXPECTED_NUM_TESTS="6"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_ragged_model_repository
+IDENTITY_DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --exit-timeout-secs=120"
@@ -50,12 +51,14 @@ source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
 
-# Use nobatch model to showcase ragged input, identity model to verify
-# batch input is generated properly
 mkdir -p models/ragged_acc_shape/1 &&
     cp $DATADIR/plan_batch_input/1/model.plan models/ragged_acc_shape/1/.
 mkdir -p models/ragged_element_count_acc_zero/1 &&
     cp $DATADIR/plan_batch_input/1/model.plan models/ragged_element_count_acc_zero/1/.
+# Use nobatch model to showcase ragged input, identity model to verify
+# batch input is generated properly
+mkdir -p models/ragged_io/1 &&
+    cp $IDENTITY_DATADIR/plan_nobatch_zero_1_float32/1/model.plan models/ragged_io/1/.
 
 RET=0
 

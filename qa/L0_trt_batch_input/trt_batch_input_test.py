@@ -50,6 +50,47 @@ class TRTBatchInputTest(tu.TestResultCollector):
         self.client = tritonhttpclient.InferenceServerClient(
             url="localhost:8000", concurrency=len(self.inputs))
 
+    def test_ragged_output(self):
+        model_name = "ragged_io"
+
+        # The model is identity model
+        self.inputs = []
+        for value in [2, 4, 1, 3]:
+            self.inputs.append(
+                [tritonhttpclient.InferInput('INPUT0', [1, value], "FP32")])
+            self.inputs[-1][0].set_data_from_numpy(
+                np.full([1, value], value, np.float32))
+        output_name = 'OUTPUT0'
+        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+
+        async_requests = []
+        try:
+            for inputs in self.inputs:
+                # Asynchronous inference call.
+                async_requests.append(
+                    self.client.async_infer(model_name=model_name,
+                                            inputs=inputs,
+                                            outputs=outputs))
+
+            expected_value_list = [[v] * v for v in [2, 4, 1, 3]]
+            expected_value_list = [
+                np.asarray([expected_value], dtype=np.float32)
+                for expected_value in expected_value_list
+            ]
+            for idx in range(len(async_requests)):
+                # Get the result from the initiated asynchronous inference request.
+                # Note the call will block till the server responds.
+                result = async_requests[idx].get_result()
+
+                # Validate the results by comparing with precomputed values.
+                output_data = result.as_numpy(output_name)
+                self.assertTrue(
+                    np.array_equal(output_data, expected_value_list[idx]),
+                    "Expect response {} to have value {}, got {}".format(
+                        idx, expected_value_list[idx], output_data))
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_ragged_input(self):
         model_name = "ragged_acc_shape"
 

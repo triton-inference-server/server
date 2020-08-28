@@ -59,15 +59,15 @@ output [
 batch_input [
   {
     kind: BATCH_ACCUMULATED_ELEMENT_COUNT
-    name: "BATCH_AND_SIZE_INPUT"
+    target_name: "BATCH_AND_SIZE_INPUT"
     data_type: TYPE_FP32
-    target_input: "RAGGED_INPUT"
+    source_input: "RAGGED_INPUT"
   },
   {
     kind: BATCH_MAX_ELEMENT_COUNT_AS_SHAPE
-    name: "BATCH_INPUT"
+    target_name: "BATCH_INPUT"
     data_type: TYPE_FP32
-    target_input: "RAGGED_INPUT"
+    source_input: "RAGGED_INPUT"
   }
 ]
 dynamic_batching {
