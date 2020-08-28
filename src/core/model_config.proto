@@ -600,7 +600,8 @@ message ModelOptimizationPolicy
       //@@
       //@@         Specification of tensor dimension.
       //@@
-      message Shape {
+      message Shape
+      {
         //@@        .. cpp:var:: int64 dim (repeated)
         //@@
         //@@           The dimension.
