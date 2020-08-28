@@ -65,8 +65,8 @@ TRITION_TO_NUMPY_TYPE = {
     11: np.float32,
     # TRITONSERVER_TYPE_FP64
     12: np.float64,
-    # TRITONSERVER_TYPE_BYTES
-    13: np.bytes_
+    # TRITONSERVER_TYPE_STRING
+    13: np.str_
 }
 
 NUMPY_TO_TRITION_TYPE = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}

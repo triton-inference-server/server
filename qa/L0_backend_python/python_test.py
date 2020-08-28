@@ -189,6 +189,21 @@ class PythonTest(tu.TestResultCollector):
                 self.assertTrue(
                     False, "Wrong exception raised or did not raise an exception")
 
+    def test_init_args(self):
+        client_util = httpclient
+        model_name = "init_args"
+        shape = [2, 2]
+        with client_util.InferenceServerClient("localhost:8000") as client:
+            input_data = np.zeros(shape, dtype=np.float32)
+            inputs = [
+                client_util.InferInput("IN", input_data.shape,
+                                       np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            result = client.infer(model_name, inputs)
+            # output response in this model is the number of keys in the args
+            self.assertTrue(result.as_numpy("OUT") == 7, "Number of keys in the init args is not correct")
+
 
 if __name__ == '__main__':
     unittest.main()
