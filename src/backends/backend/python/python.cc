@@ -204,15 +204,23 @@ ModelInstanceState::CreatePythonInterpreter()
       nullptr, "--instance-name", nullptr,    nullptr};
 
   constexpr int max_tmpfile_name = 255;
-  char tmp_socket_name[max_tmpfile_name] = "/tmp/XXXXXX";
+  char tmp_dir_name[max_tmpfile_name] = "/tmp/XXXXXX";
   char full_socket_name[max_tmpfile_name];
-  mktemp(tmp_socket_name);
 
-  if (strcmp(tmp_socket_name, "") == 0) {
-    LOG_MESSAGE(
-        TRITONSERVER_LOG_ERROR, "Failed to create a temporary socket name");
+  // Create a temporary directory and use <tmp_dir>/unix.socket for GRPC socket
+  // This is the only way that we can make sure that the unix socket path used
+  // for GRPC is unique
+  char* tmp_dir_response = mkdtemp(tmp_dir_name);
+
+  if (!tmp_dir_response) {
+    TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Failed to create a temporary socket name");
+    return err;
   } else {
-    snprintf(full_socket_name, max_tmpfile_name, "unix://%s", tmp_socket_name);
+    std::stringstream ss;
+    ss << tmp_dir_name << "/unix.socket";
+    snprintf(full_socket_name, max_tmpfile_name, "unix://%s", ss.str().c_str());
     subinterpreter_commandline[3] = full_socket_name;
     domain_socket_ = std::string(full_socket_name);
   }
