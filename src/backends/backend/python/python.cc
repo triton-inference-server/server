@@ -29,7 +29,7 @@
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
-#include <src/custom/sdk/error_codes.h>
+#include <grpc/support/time.h>
 #include <stdio.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -57,6 +57,9 @@
 #include "src/backends/backend/tritonbackend.h"
 #include "src/core/json.h"
 #include "src/core/tritonserver.h"
+
+#include "src/core/lib/surface/init.h"
+#include "test/core/util/test_config.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nib = nvidia::inferenceserver::backend;
@@ -199,23 +202,15 @@ ModelInstanceState::CreatePythonInterpreter()
       nullptr, "--instance_name", nullptr,    nullptr};
 
   constexpr int max_tmpfile_name = 255;
-  char tmp_dir_name[max_tmpfile_name] = "/tmp/XXXXXX";
+  char tmp_socket_name[max_tmpfile_name] = "/tmp/XXXXXX";
   char full_socket_name[max_tmpfile_name];
+  mktemp(tmp_socket_name);
 
-  // Create a temporary directory and use <tmp_dir>/unix.socket for GRPC socket
-  // This is the only way that we can make sure that the unix socket path used
-  // for GRPC is unique
-  char* tmp_dir_response = mkdtemp(tmp_dir_name);
-
-  if (!tmp_dir_response) {
-    TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        "Failed to create a temporary socket name");
-    return err;
+  if (strcmp(tmp_socket_name, "") == 0) {
+    LOG_MESSAGE(
+        TRITONSERVER_LOG_ERROR, "Failed to create a temporary socket name");
   } else {
-    std::stringstream ss;
-    ss << tmp_dir_name << "/unix.socket";
-    snprintf(full_socket_name, max_tmpfile_name, "unix://%s", ss.str().c_str());
+    snprintf(full_socket_name, max_tmpfile_name, "unix://%s", tmp_socket_name);
     subinterpreter_commandline[3] = full_socket_name;
     domain_socket_ = std::string(full_socket_name);
   }
@@ -282,7 +277,7 @@ ModelInstanceState::ConnectPythonInterpreter(const std::string& module_path)
   auto grpc_channel =
       grpc::CreateChannel(domain_socket_, grpc::InsecureChannelCredentials());
 
-  stub.reset(new ni::PythonInterpreter::Stub(grpc_channel));
+  stub = ni::PythonInterpreter::NewStub(grpc_channel);
 
   std::shared_ptr<ni::InitializationCommand> initialization_params(
       new ni::InitializationCommand());
@@ -384,22 +379,54 @@ ModelInstanceState::Create(
 ModelInstanceState::~ModelInstanceState()
 {
   // Close python interpreter.
-  grpc::ClientContext context;
-  ni::Empty null_msg;
+  {
+    grpc::ClientContext context;
+    ni::Empty null_msg;
 
-  if (connected_) {
-    const auto err = stub->Fini(&context, null_msg, &null_msg);
-    if (!err.ok()) {
-      LOG_MESSAGE(
-          TRITONSERVER_LOG_ERROR,
-          ("Cannot shutdown interpreter gracefully: " + err.error_message())
-              .c_str());
+    if (connected_) {
+      const auto err = stub->Fini(&context, null_msg, &null_msg);
+      if (!err.ok()) {
+        LOG_MESSAGE(
+            TRITONSERVER_LOG_ERROR,
+            ("Cannot shutdown interpreter gracefully: " + err.error_message())
+                .c_str());
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
   }
 
+  stub.reset();
+
   int status;
+  kill(interpreter_pid_, SIGTERM);
   waitpid(interpreter_pid_, &status, 0);
   unlink(domain_socket_.substr(7).c_str());
+
+  // FIXME currently GRPC client uses an async thread for cleaning up and
+  // shutting down the connection, however, as reported in
+  // https://github.com/grpc/grpc/issues/22479 the clean up thread may continue
+  // to live after resources have been deallocated an cause a segfault. This is
+  // a workaround to do a blocking shutdown of the GRPC client
+
+  gpr_timespec deadline = gpr_time_add(
+      gpr_now(GPR_CLOCK_MONOTONIC),
+      gpr_time_from_millis(
+          static_cast<int64_t>(1e3) * 10,
+          GPR_TIMESPAN));
+
+  while (grpc_is_initialized()) {
+    grpc_maybe_wait_for_async_shutdown();
+    gpr_sleep_until(gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
+                                 gpr_time_from_millis(1, GPR_TIMESPAN)));
+    if (gpr_time_cmp(gpr_now(GPR_CLOCK_MONOTONIC), deadline) > 0) {
+      LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "Time out occured while trying to shutdown the GRPC client");
+      grpc_shutdown_blocking();
+      break;
+    }
+  }
+
+
+  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "GRPC shutdown complete");
 }
 
 TRITONSERVER_Error*
@@ -565,7 +592,7 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
   bool found_py_runtime_config = false;
   if (backend_config.Find("cmdline", &cmdline)) {
     ni::TritonJson::Value value;
-    if (cmdline.Find("python-runtime", &value)) {
+    if (cmdline.Find("python-lib", &value)) {
       RETURN_IF_ERROR(value.AsString(&backend_state->python_runtime));
       found_py_runtime_config = true;
     }
@@ -586,13 +613,13 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
 TRITONSERVER_Error*
 TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
 {
+  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "TRITONBACKEND_Finalize: Start" );
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
   auto backend_state = reinterpret_cast<BackendState*>(vstate);
   delete backend_state;
-  return nullptr;  // success
+  LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "TRITONBACKEND_Finalize: End" );
 }
-
 TRITONSERVER_Error*
 TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
 {
@@ -812,33 +839,25 @@ TRITONBACKEND_ModelInstanceExecute(
         TRITONBACKEND_RequestOutputCount(request, &requested_output_count));
     for (size_t j = 0; j < requested_output_count; ++j) {
       // Prepare output buffers.
-      const ni::Tensor output_tensor = inference_response.outputs(j);
-      TRITONBACKEND_Output* output;
+      const ni::Tensor python_output_result = inference_response.outputs(j);
+      TRITONBACKEND_Output* triton_output;
       TRITONSERVER_DataType triton_dt =
-          static_cast<TRITONSERVER_DataType>(output_tensor.dtype());
+          static_cast<TRITONSERVER_DataType>(python_output_result.dtype());
 
-      auto output_tensor_dims = output_tensor.dims();
-      const std::string output_tensor_name = output_tensor.name();
-      int64_t output_shape[output_tensor_dims.size()];
+      auto python_output_dims = python_output_result.dims();
+      const std::string output_tensor_name = python_output_result.name();
 
-      for (int i = 0; i < output_tensor_dims.size(); i++) {
-        output_shape[i] = output_tensor_dims.data()[i];
-      }
-
-      uint32_t dims_count = output_tensor_dims.size();
+      uint32_t dims_count = python_output_dims.size();
 
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_ResponseOutput(
-              response, &output, output_tensor.name().c_str(), triton_dt,
-              output_shape, dims_count));
+              response, &triton_output, python_output_result.name().c_str(),
+              triton_dt, python_output_dims.data(), dims_count));
 
-      uint64_t total_output_size = std::accumulate(
-          output_tensor_dims.begin(), output_tensor_dims.end(), 1,
-          [](uint64_t acc, const int64_t& val) { return acc * val; });
-
-      size_t type_size = TRITONSERVER_DataTypeByteSize(triton_dt);
-
+      std::vector<int64_t> output_dims(
+          python_output_dims.begin(), python_output_dims.end());
+      int64_t output_byte_size = nib::GetByteSize(triton_dt, output_dims);
       void* output_buffer;
 
       TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
@@ -846,7 +865,7 @@ TRITONBACKEND_ModelInstanceExecute(
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_OutputBuffer(
-              output, &output_buffer, type_size * total_output_size,
+              triton_output, &output_buffer, output_byte_size,
               &output_memory_type, &output_memory_type_id));
 
       if ((responses[r] == nullptr) ||
