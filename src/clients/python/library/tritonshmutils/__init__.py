@@ -25,10 +25,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import warnings
+warnings.simplefilter('always', DeprecationWarning)
 
 warnings.warn(
     "The package `tritonshmutils` is deprecated and will be "
     "removed in a future version. Please use instead "
-    "`tritonclient.shared_memory` ", DeprecationWarning)
+    "`tritonclient.shared_memory`",
+    DeprecationWarning
+)
 
 from tritonclient.shared_memory import *
