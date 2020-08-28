@@ -212,10 +212,24 @@ TritonBackend::LoadBackendLibrary()
 Status
 TritonBackend::UnloadBackendLibrary()
 {
-  if ((dlhandle_ != nullptr) && (dlclose(dlhandle_) != 0)) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unable to unload backend library: " + std::string(dlerror()));
+  bool enable_unload = true;
+
+  // For memory leak debugging do not unload the shared library so
+  // that it is available for stack trace generation when the server
+  // exits.
+  const char* dstr = getenv("TRITONSERVER_DISABLE_BACKEND_UNLOAD");
+  if (dstr != nullptr) {
+    enable_unload = (atoi(dstr) == 0);
+    LOG_VERBOSE(1) << "Disable shared-library unload for backend '" << Name()
+                   << "'";
+  }
+
+  if (enable_unload) {
+    if ((dlhandle_ != nullptr) && (dlclose(dlhandle_) != 0)) {
+      return Status(
+          Status::Code::INTERNAL,
+          "unable to unload backend library: " + std::string(dlerror()));
+    }
   }
 
   ClearHandles();
