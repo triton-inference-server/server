@@ -363,6 +363,10 @@ class PlanBackend : public InferenceBackend {
 
     // The request details of the ongoing model execution
     std::unique_ptr<Payload> payload_;
+
+    // map from binding_index to pair of index of full dims to
+    // be padded and the padding offset.
+    std::unordered_map<int, std::pair<int, int64_t>> padding_info_;
   };
 
   // CUDA engine shared across all model instances on the same device.
