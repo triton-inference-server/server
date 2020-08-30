@@ -35,18 +35,18 @@ Kubernetes Deploy: Triton Inference Server Cluster
     Engine (GKE). You must use a GKE 1.15.x version to avoid this
     issue.**
 
-A helm chart for installing a single cluster of NVIDIA Triton
-Inference Server is provided. By default the cluster contains a single
-instance of the inference server but the *replicaCount* configuration
-parameter can be set to create a cluster of any size, as described
-below. This guide assumes you already have a functional Kubernetes
-cluster and helm installed (see below for instructions on installing
-helm). If you want Triton Server to use GPUs for inferencing, your
-cluster must be configured with support for the NVIDIA driver and CUDA
-version required by the version of the inference server you are using.
+A helm chart for installing a single cluster of Triton Inference
+Server is provided. By default the cluster contains a single instance
+of the inference server but the *replicaCount* configuration parameter
+can be set to create a cluster of any size, as described below. This
+guide assumes you already have a functional Kubernetes cluster and
+helm installed (see below for instructions on installing helm). If you
+want Triton Server to use GPUs for inferencing, your cluster must be
+configured with support for the NVIDIA driver and CUDA version
+required by the version of the inference server you are using.
 
 This helm chart is available from `Triton Inference Server GitHub
-<https://github.com/NVIDIA/triton-inference-server>`_ or from the
+<https://github.com/triton-inference-server/server>`_ or from the
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_
 
 The steps below describe how to set-up a model repository, use helm to
@@ -76,7 +76,7 @@ chart. If you do not have a model repository, you can checkout a local
 copy of the inference server source repository to create an example
 model repository::
 
-  $ git clone https://github.com/NVIDIA/triton-inference-server.git
+  $ git clone https://github.com/triton-inference-server/server.git
 
 Triton Server needs a repository of models that it will make available
 for inferencing. For this example you will place the model repository

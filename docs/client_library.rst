@@ -186,7 +186,7 @@ Download From GitHub
 
 An alternative to building the client library is to download the
 pre-built client libraries from the `GitHub release page
-<https://github.com/NVIDIA/triton-inference-server/releases>`_
+<https://github.com/triton-inference-server/server/releases>`_
 corresponding to the release you are interested in. The client
 libraries are found in the "Assets" section of the release page in a
 tar file named after the version of the release and the OS, for
@@ -198,7 +198,7 @@ clients and server in the same container::
 
   $ mkdir clients
   $ cd clients
-  $ wget https://github.com/NVIDIA/triton-inference-server/releases/download/<tarfile_path>
+  $ wget https://github.com/triton-inference-server/server/releases/download/<tarfile_path>
   $ tar xzf <tarfile_name>
 
 After installing the libraries can be found in lib/, the corresponding
@@ -264,13 +264,13 @@ Client Library API
 The C++ client API exposes a class-based interface for querying server
 and model status and for performing inference. The commented interface
 is available in the `library headers
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/c%2B%2B/library>`_
+<https://github.com/triton-inference-server/server/tree/master/src/clients/c%2B%2B/library>`_
 and in the API Reference.
 
 The Python client API provides similar capabilities as the C++
 API. The commented interface is available in `grpcclient.py and
 httpclient.py
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/library>`_
+<https://github.com/triton-inference-server/server/tree/master/src/clients/python/library>`_
 and in the API Reference.
 
 Section :ref:`section-simple-examples` describes the example

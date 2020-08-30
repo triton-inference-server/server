@@ -109,7 +109,7 @@ Triton Backend API
 
 A Triton backend must implement the C interface defined in
 `tritonbackend.h
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/backends/backend/tritonbackend.h>`_.
+<https://github.com/triton-inference-server/server/blob/master/src/backends/backend/tritonbackend.h>`_.
 
 Triton Backend Objects
 ......................
@@ -368,7 +368,7 @@ Example Backends
 ^^^^^^^^^^^^^^^^
 
 Triton backend implementations can be found in the `src/backends
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/backends>`_. The
+<https://github.com/triton-inference-server/server/tree/master/src/backends>`_. The
 *identity* backend is a simple example backend that uses and explains
 most of the Triton Backend API. The *repeat* backend shows a more
 advanced example of how a backend can produce multiple responses per

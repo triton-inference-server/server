@@ -94,7 +94,7 @@ Trace Summary Tool
 ^^^^^^^^^^^^^^^^^^
 
 An example `trace summary tool
-<https://github.com/NVIDIA/triton-inference-server/blob/master/qa/common/trace_summary.py>`_
+<https://github.com/triton-inference-server/server/blob/master/qa/common/trace_summary.py>`_
 can be used to summarize a set of traces collected from Triton. Basic
 usage is::
 

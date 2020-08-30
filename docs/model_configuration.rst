@@ -34,7 +34,7 @@ Each model in a :ref:`section-model-repository` must include a model
 configuration that provides required and optional information about
 the model. Typically, this configuration is provided in a config.pbtxt
 file specified as `ModelConfig
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/model_config.proto>`_
+<https://github.com/triton-inference-server/server/blob/master/src/core/model_config.proto>`_
 protobuf. In some cases, discussed in
 :ref:`section-generated-model-configuration`, the model configuration
 can be generated automatically by Triton and so does not need to be
