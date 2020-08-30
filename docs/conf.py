@@ -50,7 +50,7 @@ import textwrap
 
 # -- Project information -----------------------------------------------------
 
-project = u'NVIDIA Triton Inference Server'
+project = u'Triton Inference Server'
 copyright = u'2018-2020, NVIDIA Corporation'
 author = u'NVIDIA Corporation'
 
@@ -230,7 +230,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'NVIDIATritonServer.tex',
-     u'NVIDIA Triton Inference Server Documentation', u'NVIDIA Corporation',
+     u'Triton Inference Server Documentation', u'NVIDIA Corporation',
      'manual'),
 ]
 
@@ -239,7 +239,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [(master_doc, 'nvidiatritonserver',
-              u'NVIDIA Triton Inference Server Documentation', [author], 1)]
+              u'Triton Inference Server Documentation', [author], 1)]
 
 # -- Options for Texinfo output ----------------------------------------------
 
@@ -248,15 +248,15 @@ man_pages = [(master_doc, 'nvidiatritonserver',
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'NVIDIATritonServer',
-     u'NVIDIA Triton Inference Server Documentation', author,
+     u'Triton Inference Server Documentation', author,
      'NVIDIATritonServer', 'ML/DL inference server', 'Miscellaneous'),
 ]
 
 # -- Extension configuration -------------------------------------------------
 extlinks = {
-    'issue': ('https://github.com/NVIDIA/triton-inference-server/issues/%s',
+    'issue': ('https://github.com/triton-inference-server/server/issues/%s',
               'issue '),
-    'fileref': ('https://github.com/NVIDIA/triton-inference-server/tree/' +
+    'fileref': ('https://github.com/triton-inference-server/server/tree/' +
                 (git_sha if git_sha != u'0000000' else "master") + '/%s', ''),
 }
 

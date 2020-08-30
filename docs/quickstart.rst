@@ -52,7 +52,7 @@ following prerequisite steps:
 * Clone the Triton Inference Server GitHub repo. Even if you choose to
   get the pre-built Triton from NGC, you need the GitHub repo for the
   example model repository. Go to
-  https://github.com/NVIDIA/triton-inference-server and then select
+  https://github.com/triton-inference-server/server and then select
   the *clone* or *download* drop down button. After cloning the repo
   be sure to select the r<xx.yy> release branch that corresponds to
   the version of Triton you want to use::

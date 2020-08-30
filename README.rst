@@ -27,14 +27,14 @@
 
 |License|
 
-NVIDIA Triton Inference Server
-==============================
+Triton Inference Server
+=======================
 
     **LATEST RELEASE: You are currently on the master branch which
     tracks under-development progress towards the next release. The
     latest release of the Triton Inference Server is 2.1.0 and
     is available on branch** `r20.07
-    <https://github.com/NVIDIA/triton-inference-server/tree/r20.07>`_.
+    <https://github.com/triton-inference-server/server/tree/r20.07>`_.
 
     **Triton V2: Starting with the 20.06 release, Triton moves to
     version 2. The master branch currently tracks V2 development and
@@ -46,35 +46,34 @@ NVIDIA Triton Inference Server
 
 .. overview-begin-marker-do-not-remove
 
-NVIDIA Triton Inference Server provides a cloud inferencing solution
-optimized for NVIDIA GPUs. The server provides an inference service
+Triton Inference Server provides a cloud inferencing solution
+optimized for both CPUs and GPUs. Triton provides an inference service
 via an HTTP/REST or GRPC endpoint, allowing remote clients to request
 inferencing for any model being managed by the server. For edge
-deployments, Triton Server is also available as a shared library with
-an API that allows the full functionality of the server to be included
-directly in an application. Triton Server provides the following
-features:
+deployments, Triton is also available as a shared library with a C API
+that allows the full functionality of Triton to be included directly
+in an application. Triton provides the following features:
 
 * `Multiple framework support
-  <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/model_repository.html#framework-model-definition>`_. The
-  server can manage any number and mix of models (limited by system
-  disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
+  <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/model_repository.html#framework-model-definition>`_. Triton
+  can manage any number and mix of models (limited by system disk and
+  memory resources). Supports TensorRT, TensorFlow GraphDef,
   TensorFlow SavedModel, ONNX, PyTorch, and Caffe2 NetDef model
   formats. Both TensorFlow 1.x and TensorFlow 2.x are supported. Also
   supports TensorFlow-TensorRT and ONNX-TensorRT integrated
   models. Variable-size input and output tensors are allowed if
   supported by the framework. See `Capabilities
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/capabilities.html#capabilities>`_
-  for detailed support information for each framework.
+  for information for each framework.
 
 * `Concurrent model execution support
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/model_configuration.html#instance-groups>`_. Multiple
   models (or multiple instances of the same model) can run
   simultaneously on the same GPU.
 
-* Batching support. For models that support batching, Triton Server
-  can accept requests for a batch of inputs and respond with the
-  corresponding batch of outputs. Triton Server also supports multiple
+* Batching support. For models that support batching, Triton can
+  accept requests for a batch of inputs and respond with the
+  corresponding batch of outputs. Triton also supports multiple
   `scheduling and batching
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/model_configuration.html#scheduling-and-batching>`_
   algorithms that combine individual inference requests together to
@@ -82,12 +81,12 @@ features:
   decisions are transparent to the client requesting inference.
 
 * `Custom backend support
-  <https://github.com/NVIDIA/triton-inference-server/blob/master/docs/backend.rst>`_. Triton
-  Server allows individual models to be implemented with custom
-  backends instead of by a deep-learning framework. With a custom
-  backend a model can implement any logic desired, while still
-  benefiting from the GPU support, concurrent execution, dynamic
-  batching and other features provided by the server.
+  <https://github.com/triton-inference-server/server/blob/master/docs/backend.rst>`_. Triton
+  allows individual models to be implemented with custom backends
+  instead of by a deep-learning framework. With a custom backend a
+  model can implement any logic desired, while still benefiting from
+  the CPU and GPU support, concurrent execution, dynamic batching and
+  other features provided by Triton.
 
 * `Ensemble support
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/models_and_schedulers.html#ensemble-models>`_. An
@@ -96,10 +95,10 @@ features:
   single inference request to an ensemble will trigger the execution
   of the entire pipeline.
 
-* Multi-GPU support. Triton Server can distribute inferencing across
-  all system GPUs.
+* Multi-GPU support. Triton can distribute inferencing across all
+  system GPUs.
 
-* Triton Server provides `multiple modes for model management
+* Triton provides `multiple modes for model management
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/model_management.html>`_. These
   model management modes allow for both implicit and explicit loading
   and unloading of models without requiring a server restart.
@@ -121,12 +120,13 @@ features:
 
 * `Metrics
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/metrics.html>`_
-  indicating GPU utilization, server throughput, and server latency.
+  indicating GPU utilization, server throughput, and server
+  latency. The metrics are provided in Prometheus data format.
 
 * `C library inferface
   <https://docs.nvidia.com/deeplearning/triton-inference-server/master-user-guide/docs/library_api.html>`_
-  allows the full functionality of Triton Server to be included
-  directly in an application.
+  allows the full functionality of Triton to be included directly in
+  an application.
 
 .. overview-end-marker-do-not-remove
 
@@ -134,7 +134,7 @@ The current release of the Triton Inference Server is 2.1.0 and
 corresponds to the 20.07 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
 this release is `r20.07
-<https://github.com/NVIDIA/triton-inference-server/tree/r20.07>`_.
+<https://github.com/triton-inference-server/server/tree/r20.07>`_.
 
 Backwards Compatibility
 -----------------------
@@ -210,14 +210,14 @@ provides answers for frequently asked questions.
 
 READMEs for deployment examples can be found in subdirectories of
 deploy/, for example, `deploy/single_server/README.rst
-<https://github.com/NVIDIA/triton-inference-server/tree/master/deploy/single_server/README.rst>`_.
+<https://github.com/triton-inference-server/server/tree/master/deploy/single_server/README.rst>`_.
 
 The `Release Notes
 <https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html>`_
 and `Support Matrix
 <https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html>`_
 indicate the required versions of the NVIDIA Driver and CUDA, and also
-describe which GPUs are supported by Triton Server.
+describe which GPUs are supported by Triton.
 
 Presentations and Papers
 ^^^^^^^^^^^^^^^^^^^^^^^^
