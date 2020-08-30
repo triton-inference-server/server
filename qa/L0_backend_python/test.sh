@@ -27,6 +27,7 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
+EXPECTED_NUM_TESTS="5"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
@@ -74,14 +75,6 @@ mkdir -p models/init_args/1/
 cp -r ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
 
-# mkdir -p models/init_error/1/
-# cp -r ../python_models/init_error/model.py ./models/init_error/1/
-# cp ../python_models/init_error/config.pbtxt ./models/init_error/
-
-# mkdir -p models/fini_error/1/
-# cp -r ../python_models/fini_error/model.py ./models/fini_error/1/
-# cp ../python_models/fini_error/config.pbtxt ./models/fini_error/
-
 pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
 run_server
@@ -97,6 +90,13 @@ set +e
 python $CLIENT_PY >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
