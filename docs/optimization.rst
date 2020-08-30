@@ -201,6 +201,8 @@ of the supported model frameworks. These optimization settings are
 controlled by the model configuration :ref:`optimization policy
 <section-optimization-policy>`.
 
+.. _section-opt-onnx-tensorrt:
+
 ONNX with TensorRT Optimization
 ...............................
 
@@ -246,6 +248,8 @@ The TensorRT optimization provided 2x throughput improvement while
 cutting latency in half. The benefit provided by TensorRT will vary
 based on the model, but in general it can provide significant
 performance improvement.
+
+.. _section-opt-tensorflow-tensorrt:
 
 TensorFlow with TensorRT Optimization
 .....................................
