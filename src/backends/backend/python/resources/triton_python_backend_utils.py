@@ -100,10 +100,14 @@ class InferenceResponse:
     output_tensors : list
         A list of Tensor objects, each describing data for an output tensor
         required the InferenceRequest
+    error : TritonError
+        A TritonError object describing any errror encountered while creating
+        resposne
     """
 
-    def __init__(self, output_tensors):
+    def __init__(self, output_tensors, error=None):
         self._output_tensors = output_tensors
+        self._err = error
 
     def output_tensors(self):
         """Get output tensors
@@ -113,6 +117,24 @@ class InferenceResponse:
             A list of Tensor objects
         """
         return self._output_tensors
+
+    def has_error(self):
+        """True if response has error
+        Returns
+        -------
+        boolean
+            A boolean indicating whether response has an error
+        """
+        return self._err != None
+
+    def error(self):
+        """Get TritonError for this inference response
+        Returns
+        -------
+        TritonError
+            A TritonError containing the error
+        """
+        return self._err
 
 
 class Tensor:
@@ -151,3 +173,57 @@ class Tensor:
             The numpy array
         """
         return self._numpy_array
+
+class TritonError:
+    """Error indicating non-Success status.
+
+    Parameters
+    ----------
+    msg : str
+        A brief description of error
+    """
+    def __init__(self, msg):
+        self._msg = msg
+
+    def __str__(self):
+        msg = super().__str__() if self._msg is None else self._msg
+        return msg
+
+    def message(self):
+        """Get the error message.
+
+        Returns
+        -------
+        str
+            The message associated with this error, or None if no message.
+
+        """
+        return self._msg
+
+
+class TritonModelException(Exception):
+    """Exception indicating non-Success status.
+
+    Parameters
+    ----------
+    msg : str
+        A brief description of error
+    """
+
+    def __init__(self, msg):
+        self._msg = msg
+
+    def __str__(self):
+        msg = super().__str__() if self._msg is None else self._msg
+        return msg
+
+    def message(self):
+        """Get the exception message.
+
+        Returns
+        -------
+        str
+            The message associated with this exception, or None if no message.
+
+        """
+        return self._msg

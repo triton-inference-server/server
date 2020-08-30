@@ -32,6 +32,7 @@ import importlib.util
 import sys
 import threading
 import signal
+import time
 
 import numpy as np
 
@@ -67,8 +68,8 @@ TRITION_TO_NUMPY_TYPE = {
     11: np.float32,
     # TRITONSERVER_TYPE_FP64
     12: np.float64,
-    # TRITONSERVER_TYPE_BYTES
-    13: np.bytes_
+    # TRITONSERVER_TYPE_STRING
+    13: np.str_
 }
 
 NUMPY_TO_TRITION_TYPE = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
@@ -89,12 +90,12 @@ def parse_startup_arguments():
                         required=True,
                         type=str,
                         help="Socket to comunicate with server")
-    parser.add_argument("--model_path",
+    parser.add_argument("--model-path",
                         default=None,
                         required=True,
                         type=str,
                         help="Path to model code")
-    parser.add_argument("--instance_name",
+    parser.add_argument("--instance-name",
                         default=None,
                         required=True,
                         type=str,
@@ -108,17 +109,16 @@ class PythonHost(PythonInterpreterServicer):
 
     def __init__(self, module_path, *args, **kwargs):
         super(PythonInterpreterServicer, self).__init__(*args, **kwargs)
-        spec = importlib.util.spec_from_file_location('TritonPythonBackend',
+        spec = importlib.util.spec_from_file_location('TritonPythonModel',
                                                       module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        if hasattr(module, 'TritonPythonBackend'):
-            self.initializer_func = module.TritonPythonBackend
+        if hasattr(module, 'TritonPythonModel'):
+            self.backend = module.TritonPythonModel()
         else:
             raise NotImplementedError(
-                'TritonPythonBackend class doesn\'t exist in ' + module_path)
-        self.backend = None
+                'TritonPythonModel class doesn\'t exist in ' + module_path)
 
     def Init(self, request, context):
         """Init is called on TRITONBACKEND_ModelInstanceInitialize. `request`
@@ -126,13 +126,23 @@ class PythonHost(PythonInterpreterServicer):
         containing the model configuration. This paramter is passed by
         default to every ModelInstance.
         """
+
+        backend = self.backend
+
         if not hasattr(request, 'args'):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('request objects does\'nt have args attribute')
             return Empty()
 
-        args = {x.key: x.value for x in request.args}
-        self.backend = self.initializer_func(args)
+        if hasattr(backend, 'initialize'):
+            args = {x.key: x.value for x in request.args}
+            try:
+                self.backend.initialize(args)
+            except tpb_utils.PythonModelException as e:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(e.message())
+
+
         return Empty()
 
     def Fini(self, request, context):
@@ -140,12 +150,12 @@ class PythonHost(PythonInterpreterServicer):
         can perform any necessary clean up in the `finalize` function.
         """
         if hasattr(self.backend, 'finalize'):
-            self.backend.finalize()
+            try:
+                self.backend.finalize()
+            except tpb_utils.PythonModelException as e:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(e.message())
 
-        with cv:
-            cv.notify()
-
-        del self.backend
         return Empty()
 
     def Execute(self, request, context):
@@ -183,8 +193,14 @@ class PythonHost(PythonInterpreterServicer):
             inference_requests.append(inference_request)
 
         # Execute inference on the Python backend responses contains a list of
-        # triton_python_backend_utils.InferenceResponse
-        responses = self.backend(inference_requests)
+        # triton_python_backend_utils.InferenceResponse. Each backend must
+        # implement an execute method
+        if not hasattr(self.backend, 'execute'):
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('Backend does not implement `execute` method')
+            return ExecuteResponse()
+
+        responses = self.backend.execute(inference_requests)
 
         # Make sure that number of InferenceResponse and InferenceRequest
         # objects match
@@ -198,6 +214,13 @@ class PythonHost(PythonInterpreterServicer):
 
         exec_responses = []
         for response in responses:
+            # If there is an error do not look into output_tensors
+            if response.has_error():
+                error = Error(message=response.error().message())
+                inference_response = InferenceResponse(outputs=[], error=error, failed=True)
+                exec_responses.append(inference_response)
+                continue
+
             output_tensors = response.output_tensors()
             response_tensors = []
 
@@ -216,18 +239,28 @@ class PythonHost(PythonInterpreterServicer):
 
 
 if __name__ == "__main__":
+    signal_received = False
     FLAGS = parse_startup_arguments()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
     python_host = PythonHost(module_path=FLAGS.model_path)
     add_PythonInterpreterServicer_to_server(python_host, server)
 
+    def interrupt_handler(signum, frame):
+        pass
+
+    def sigterm_handler(signum, frame):
+        global signal_received
+        if not signal_received:
+            signal_received = True
+        else:
+            return
+
+        event.set()
+
+    signal.signal(signal.SIGINT, interrupt_handler)
+    signal.signal(signal.SIGTERM, sigterm_handler)
+
     server.add_insecure_port(FLAGS.socket)
     server.start()
-
-    def signal_handler(signal, frame):
-        with cv:
-            cv.wait()
-        server.stop(grace=5)
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.pause()
+    event.wait()
+    server.stop(grace=5)
