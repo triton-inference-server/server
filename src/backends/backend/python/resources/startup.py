@@ -142,7 +142,6 @@ class PythonHost(PythonInterpreterServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(e.message())
 
-
         return Empty()
 
     def Fini(self, request, context):
@@ -217,7 +216,9 @@ class PythonHost(PythonInterpreterServicer):
             # If there is an error do not look into output_tensors
             if response.has_error():
                 error = Error(message=response.error().message())
-                inference_response = InferenceResponse(outputs=[], error=error, failed=True)
+                inference_response = InferenceResponse(outputs=[],
+                                                       error=error,
+                                                       failed=True)
                 exec_responses.append(inference_response)
                 continue
 

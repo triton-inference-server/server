@@ -185,7 +185,8 @@ class ModelState {
   ModelState(
       TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
       const char* model_name, const uint64_t model_version,
-      ni::TritonJson::Value&& model_config, ::BackendState* backend_state, const char* model_path);
+      ni::TritonJson::Value&& model_config, ::BackendState* backend_state,
+      const char* model_path);
 
   TRITONSERVER_Server* triton_server_;
   TRITONBACKEND_Model* triton_model_;
@@ -297,11 +298,13 @@ ModelInstanceState::ConnectPythonInterpreter()
   model_config.Write(&buffer);
 
   insert_model_param("model_config", std::move(buffer.MutableContents()));
-  insert_model_param("model_instance_kind", TRITONSERVER_InstanceGroupKindString(kind_));
+  insert_model_param(
+      "model_instance_kind", TRITONSERVER_InstanceGroupKindString(kind_));
   insert_model_param("model_instance_name", name_);
   insert_model_param("model_instance_device_id", std::to_string(device_id_));
   insert_model_param("model_repository", model_state_->ModelPath());
-  insert_model_param("model_version", std::to_string(model_state_->ModelVersion()));
+  insert_model_param(
+      "model_version", std::to_string(model_state_->ModelVersion()));
   insert_model_param("model_name", model_state_->ModelName());
 
   // Attempting to connect to the python runtime
@@ -313,8 +316,8 @@ ModelInstanceState::ConnectPythonInterpreter()
     if (status.ok()) {
       LOG_MESSAGE(
           TRITONSERVER_LOG_VERBOSE,
-          (std::string("GRPC connection was successful ") +
-          name_ + " (device " + std::to_string(device_id_) + ")")
+          (std::string("GRPC connection was successful ") + name_ +
+           " (device " + std::to_string(device_id_) + ")")
               .c_str());
       connected_ = true;
       return nullptr;
@@ -399,7 +402,6 @@ ModelInstanceState::~ModelInstanceState()
                 .c_str());
       }
     }
-
   }
 
   stub.reset();
@@ -521,7 +523,8 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   if (artifact_type != TRITONBACKEND_ARTIFACT_FILESYSTEM) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
-        (std::string("unsupported artifact type for model '") + model_name + "'")
+        (std::string("unsupported artifact type for model '") + model_name +
+         "'")
             .c_str());
   }
 
@@ -535,7 +538,8 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 ModelState::ModelState(
     TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
     const char* model_name, const uint64_t model_version,
-    ni::TritonJson::Value&& model_config, ::BackendState* backend_state, const char* model_path)
+    ni::TritonJson::Value&& model_config, ::BackendState* backend_state,
+    const char* model_path)
     : triton_server_(triton_server), triton_model_(triton_model),
       model_name_(model_name), model_version_(model_version),
       model_config_(std::move(model_config)), backend_state_(backend_state),
@@ -858,7 +862,8 @@ TRITONBACKEND_ModelInstanceExecute(
 
     if (inference_response.failed()) {
       TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL, (inference_response.error().message()).c_str());
+          TRITONSERVER_ERROR_INTERNAL,
+          (inference_response.error().message()).c_str());
       LOG_IF_ERROR(
           TRITONBACKEND_ResponseSend(
               responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
@@ -866,8 +871,8 @@ TRITONBACKEND_ModelInstanceExecute(
       responses[r] = nullptr;
       TRITONSERVER_ErrorDelete(err);
 
-      // If has_error is true, we do not look at the response even if the response
-      // is set.
+      // If has_error is true, we do not look at the response even if the
+      // response is set.
       continue;
     }
 
@@ -942,7 +947,7 @@ TRITONBACKEND_ModelInstanceExecute(
       // Copy Python output to Triton output buffers
       std::copy(
           output_response_tensor->raw_data().begin(),
-          output_response_tensor->raw_data().end(), (char*) output_buffer);
+          output_response_tensor->raw_data().end(), (char*)output_buffer);
     }
 
     if (responses[r] == nullptr) {
