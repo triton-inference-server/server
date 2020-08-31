@@ -33,7 +33,7 @@ from builtins import range
 
 import tritonclient.grpc as grpcclient
 from tritonclient import utils
-import tritonclient.cuda_shared_memory as cudashm
+import tritonclient.utils.cuda_shared_memory as cudashm
 
 from ctypes import *
 

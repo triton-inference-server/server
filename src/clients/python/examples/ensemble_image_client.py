@@ -33,10 +33,10 @@ from PIL import Image
 import sys
 
 import tritonclient.grpc as grpcclient
+import tritonclient.grpc.model_config_pb2 as model_config
 import tritonclient.http as httpclient
 from tritonclient.utils import triton_to_np_dtype
 from tritonclient.utils import InferenceServerException
-import tritonclient.model_config_pb2 as model_config
 
 FLAGS = None
 

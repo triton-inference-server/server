@@ -63,47 +63,46 @@ function main() {
   if [ "$2" = true ] ; then
     if [ -d tritonshmutils ]; then
       cp -r tritonshmutils ${WHLDIR}/
-      touch ${WHLDIR}/tritonshmutils/__init__.py
     fi
   fi
   ####################################
 
-  if [ -f tritonclient/grpc.py ]; then
-    cp tritonclient/grpc.py \
+  if [ -d tritonclient/grpc ]; then
+    cp -r tritonclient/grpc \
       "${WHLDIR}/tritonclient/."
-    cp ../../../core/*_pb2.py \
-      "${WHLDIR}/tritonclient/."
-    cp ../../../core/*_grpc.py \
-      "${WHLDIR}/tritonclient/."
+    cp ../../../core/model_config_pb2.py \
+      "${WHLDIR}/tritonclient/grpc/."
+    cp ../../../core/grpc_service_pb2.py \
+      "${WHLDIR}/tritonclient/grpc/service_pb2.py"
+    cp ../../../core/grpc_service_pb2_grpc.py \
+      "${WHLDIR}/tritonclient/grpc/service_pb2_grpc.py"
     # Use 'sed' command to fix protoc compiled imports (see
     # https://github.com/google/protobuf/issues/1491).
-    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient import \1_pb2 as \2/" \
-      ${WHLDIR}/tritonclient/*_pb2.py
-    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient import \1_pb2 as \2/" \
-     ${WHLDIR}/tritonclient/*_pb2_grpc.py
+    sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient.grpc import \1_pb2 as \2/" \
+      ${WHLDIR}/tritonclient/grpc/*_pb2.py
+    sed -i "s/^import grpc_\([^ ]*\)_pb2 as \([^ ]*\)$/from tritonclient.grpc import \1_pb2 as \2/" \
+     ${WHLDIR}/tritonclient/grpc/*_pb2_grpc.py
   fi
 
-  cp tritonclient/utils.py \
-      "${WHLDIR}/tritonclient/."
-
-  if [ -f tritonclient/http.py ]; then
-    cp tritonclient/http.py \
+  if [ -d tritonclient/http ]; then
+    cp -r tritonclient/http \
       "${WHLDIR}/tritonclient/."
   fi
+
+  mkdir -p "${WHLDIR}/tritonclient/utils"
+  cp tritonclient/utils/__init__.py \
+      "${WHLDIR}/tritonclient/utils/."
 
   if [ "$2" = true ] ; then
-    mkdir -p ${WHLDIR}/tritonclient/shared_memory/
-    cp tritonclient/shared_memory/__init__.py \
-        "${WHLDIR}/tritonclient/shared_memory/."
-    cp tritonclient/libcshm.so \
-      "${WHLDIR}/tritonclient/shared_memory/."
+    cp -r tritonclient/utils/shared_memory  ${WHLDIR}/tritonclient/utils/
 
-    if [ -f tritonclient/libccudashm.so ] && [ -f tritonclient/cuda_shared_memory/__init__.py ]; then
-      mkdir -p ${WHLDIR}/tritonclient/cuda_shared_memory
-      cp tritonclient/cuda_shared_memory/__init__.py \
-        "${WHLDIR}/tritonclient/cuda_shared_memory/."
-      cp tritonclient/libccudashm.so \
-        "${WHLDIR}/tritonclient/cuda_shared_memory/."
+    cp tritonclient/utils/libcshm.so \
+      "${WHLDIR}/tritonclient/utils/shared_memory/."
+
+    if [ -f tritonclient/utils/libccudashm.so ] && [ -f tritonclient/utils/cuda_shared_memory/__init__.py ]; then
+      cp -r tritonclient/utils/cuda_shared_memory  ${WHLDIR}/tritonclient/utils/
+      cp tritonclient/utils/libccudashm.so \
+        "${WHLDIR}/tritonclient/utils/cuda_shared_memory/."
     fi
   
     # Copies the pre-compiled perf_client binary

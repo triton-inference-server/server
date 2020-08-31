@@ -45,7 +45,7 @@ class _utf8(object):
 
 _ccudashm_lib = "ccudashm" if os.name == 'nt' else 'libccudashm.so'
 _ccudashm_path = pkg_resources.resource_filename(
-    'tritonclient.cuda_shared_memory', _ccudashm_lib)
+    'tritonclient.utils.cuda_shared_memory', _ccudashm_lib)
 _ccudashm = cdll.LoadLibrary(_ccudashm_path)
 
 _ccudashm_shared_memory_region_create = _ccudashm.CudaSharedMemoryRegionCreate

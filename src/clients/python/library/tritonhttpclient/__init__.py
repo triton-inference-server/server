@@ -30,8 +30,6 @@ warnings.simplefilter('always', DeprecationWarning)
 warnings.warn(
     "The package `tritonhttpclient` is deprecated and will be "
     "removed in a future version. Please use instead "
-    "`tritonclient.http`",
-    DeprecationWarning
-)
+    "`tritonclient.http`", DeprecationWarning)
 
 from tritonclient.http import *

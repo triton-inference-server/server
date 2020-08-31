@@ -38,7 +38,9 @@ if(${TRITON_ENABLE_HTTP})
   file(COPY tritonhttpclient DESTINATION .)
 endif() # TRITON_ENABLE_HTTP
 file(COPY tritonclientutils DESTINATION .)
-add_subdirectory(tritonshmutils)
+if (NOT WIN32)
+  file(COPY tritonshmutils DESTINATION .)
+endif() # NOT WIN32
 ####################################
 
 configure_file(../../../../VERSION VERSION COPYONLY)
@@ -56,7 +58,7 @@ set(WHEEL_DEPENDS
 
 if(${TRITON_ENABLE_GRPC})
   set(WHEEL_DEPENDS 
-        ${CMAKE_CURRENT_BINARY_DIR}/tritonclient/grpc.py
+        ${CMAKE_CURRENT_BINARY_DIR}/tritonclient/grpc
         proto-py-library
         grpc-py-library
         ${WHEEL_DEPENDS}
@@ -65,7 +67,7 @@ endif() # TRITON_ENABLE_GRPC
 
 if(${TRITON_ENABLE_HTTP})
   set(WHEEL_DEPENDS 
-        ${CMAKE_CURRENT_BINARY_DIR}/tritonclient/http.py
+        ${CMAKE_CURRENT_BINARY_DIR}/tritonclient/http
         ${WHEEL_DEPENDS}
   )
 endif() # TRITON_ENABLE_HTTP

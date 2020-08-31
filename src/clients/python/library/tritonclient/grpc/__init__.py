@@ -287,7 +287,7 @@ class InferenceServerClient:
             if type(model_version) != str:
                 raise_error("model version must be a string")
             request = service_pb2.ModelReadyRequest(name=model_name,
-                                                         version=model_version)
+                                                    version=model_version)
             if self._verbose:
                 print("is_model_ready, metadata {}\n{}".format(
                     metadata, request))
@@ -385,8 +385,8 @@ class InferenceServerClient:
         try:
             if type(model_version) != str:
                 raise_error("model version must be a string")
-            request = service_pb2.ModelMetadataRequest(
-                name=model_name, version=model_version)
+            request = service_pb2.ModelMetadataRequest(name=model_name,
+                                                       version=model_version)
             if self._verbose:
                 print("get_model_metadata, metadata {}\n{}".format(
                     metadata, request))
@@ -444,7 +444,7 @@ class InferenceServerClient:
             if type(model_version) != str:
                 raise_error("model version must be a string")
             request = service_pb2.ModelConfigRequest(name=model_name,
-                                                          version=model_version)
+                                                     version=model_version)
             if self._verbose:
                 print("get_model_config, metadata {}\n{}".format(
                     metadata, request))
@@ -606,8 +606,8 @@ class InferenceServerClient:
         try:
             if type(model_version) != str:
                 raise_error("model version must be a string")
-            request = service_pb2.ModelStatisticsRequest(
-                name=model_name, version=model_version)
+            request = service_pb2.ModelStatisticsRequest(name=model_name,
+                                                         version=model_version)
             if self._verbose:
                 print("get_inference_statistics, metadata {}\n{}".format(
                     metadata, request))
@@ -752,8 +752,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = service_pb2.SystemSharedMemoryUnregisterRequest(
-                name=name)
+            request = service_pb2.SystemSharedMemoryUnregisterRequest(name=name)
             if self._verbose:
                 print("unregister_system_shared_memory, metadata {}\n{}".format(
                     metadata, request))
@@ -898,8 +897,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = service_pb2.CudaSharedMemoryUnregisterRequest(
-                name=name)
+            request = service_pb2.CudaSharedMemoryUnregisterRequest(name=name)
             if self._verbose:
                 print("unregister_cuda_shared_memory, metadata {}\n{}".format(
                     metadata, request))

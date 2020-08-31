@@ -24,10 +24,41 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import warnings
-warnings.simplefilter('always', DeprecationWarning)
+configure_file(__init__.py __init__.py COPYONLY)
 
-warnings.warn(
-    "The package `tritonshmutils` is deprecated and will be "
-    "removed in a future version. Please use instead "
-    "`tritonclient.utils`", DeprecationWarning)
+if(NOT WIN32)
+  file(COPY shared_memory DESTINATION .)
+
+  #
+  # libcshm.so
+  #
+  add_library(cshm SHARED shared_memory/shared_memory.cc)
+  if(${TRITON_ENABLE_GPU})
+    target_include_directories(cshm PRIVATE ${CUDA_INCLUDE_DIRS})
+  endif() # TRITON_ENABLE_GPU
+  target_link_libraries(cshm rt)
+
+  #
+  # libccudashm.so
+  #
+  if(${TRITON_ENABLE_GPU})
+    file(COPY cuda_shared_memory DESTINATION .)
+    add_library(
+        ccudashm SHARED
+        cuda_shared_memory/cuda_shared_memory.cc
+        ../../../../c++/library/cencode.c
+        ../../../../c++/library/cencode.h
+    )
+    target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(
+        ccudashm
+        PRIVATE ${CUDA_LIBRARIES})
+  endif() # TRITON_ENABLE_GPU
+endif() # WIN32
+
+if(NOT WIN32)
+  configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
+  if(${TRITON_ENABLE_GPU})
+    configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
+  endif() # TRITON_ENABLE_GPU
+endif() # NOT WIN32

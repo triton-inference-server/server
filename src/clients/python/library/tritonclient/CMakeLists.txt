@@ -26,49 +26,12 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-configure_file(utils.py utils.py COPYONLY)
-
 if(${TRITON_ENABLE_HTTP})
-  configure_file(http.py http.py COPYONLY)
+  file(COPY http DESTINATION .)
 endif() # TRITON_ENABLE_HTTP
 
 if(${TRITON_ENABLE_GRPC})
-  configure_file(grpc.py grpc.py COPYONLY)
+  file(COPY grpc DESTINATION .)
 endif() # TRITON_ENABLE_GRPC
 
-if(NOT WIN32)
-  file(COPY shared_memory DESTINATION .)
-
-  #
-  # libcshm.so
-  #
-  add_library(cshm SHARED shared_memory/shared_memory.cc)
-  if(${TRITON_ENABLE_GPU})
-    target_include_directories(cshm PRIVATE ${CUDA_INCLUDE_DIRS})
-  endif() # TRITON_ENABLE_GPU
-  target_link_libraries(cshm rt)
-
-  #
-  # libccudashm.so
-  #
-  if(${TRITON_ENABLE_GPU})
-    file(COPY cuda_shared_memory DESTINATION .)
-    add_library(
-        ccudashm SHARED
-        cuda_shared_memory/cuda_shared_memory.cc
-        ../../../c++/library/cencode.c
-        ../../../c++/library/cencode.h
-    )
-    target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
-    target_link_libraries(
-        ccudashm
-        PRIVATE ${CUDA_LIBRARIES})
-  endif() # TRITON_ENABLE_GPU
-endif() # WIN32
-
-if(NOT WIN32)
-  configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
-  if(${TRITON_ENABLE_GPU})
-    configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
-  endif() # TRITON_ENABLE_GPU
-endif() # NOT WIN32
+add_subdirectory(utils)

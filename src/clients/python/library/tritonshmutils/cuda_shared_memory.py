@@ -28,6 +28,8 @@ import warnings
 warnings.simplefilter('always', DeprecationWarning)
 
 warnings.warn(
-    "The package `tritonshmutils` is deprecated and will be "
+    "The package `tritonshmutils.cuda_shared_memory` is deprecated and will be "
     "removed in a future version. Please use instead "
-    "`tritonclient.utils`", DeprecationWarning)
+    "`tritonclient.utils.cuda_shared_memory`", DeprecationWarning)
+
+from tritonclient.utils.cuda_shared_memory import *

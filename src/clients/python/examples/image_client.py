@@ -33,7 +33,7 @@ from functools import partial
 import os
 
 import tritonclient.grpc as grpcclient
-import tritonclient.model_config_pb2 as mc
+import tritonclient.grpc.model_config_pb2 as mc
 import tritonclient.http as httpclient
 from tritonclient.utils import triton_to_np_dtype
 from tritonclient.utils import InferenceServerException

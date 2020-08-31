@@ -32,7 +32,7 @@ from builtins import range
 
 import tritonclient.http as httpclient
 from tritonclient import utils
-import tritonclient.shared_memory as shm
+import tritonclient.utils.shared_memory as shm
 
 FLAGS = None
 

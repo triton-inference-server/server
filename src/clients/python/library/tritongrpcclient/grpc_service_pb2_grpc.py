@@ -28,6 +28,8 @@ import warnings
 warnings.simplefilter('always', DeprecationWarning)
 
 warnings.warn(
-    "The package `tritonshmutils` is deprecated and will be "
+    "The package `tritongrpcclient` is deprecated and will be "
     "removed in a future version. Please use instead "
-    "`tritonclient.utils`", DeprecationWarning)
+    "`tritonclient.grpc.service_pb2_grpc`", DeprecationWarning)
+
+from tritonclient.grpc.service_pb2_grpc import *

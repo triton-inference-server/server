@@ -28,8 +28,8 @@
 import argparse
 
 import grpc
-from tritonclient import grpc_service_pb2
-from tritonclient import grpc_service_pb2_grpc
+from tritonclient.grpc import service_pb2
+from tritonclient.grpc import service_pb2_grpc
 
 FLAGS = None
 
@@ -60,54 +60,54 @@ if __name__ == '__main__':
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     # Health
     try:
-        request = grpc_service_pb2.ServerLiveRequest()
+        request = service_pb2.ServerLiveRequest()
         response = grpc_stub.ServerLive(request)
         print("server {}".format(response))
     except Exception as ex:
         print(ex)
 
-    request = grpc_service_pb2.ServerReadyRequest()
+    request = service_pb2.ServerReadyRequest()
     response = grpc_stub.ServerReady(request)
     print("server {}".format(response))
 
-    request = grpc_service_pb2.ModelReadyRequest(name="resnet_v1_50_graphdef",
-                                                 version=model_version)
+    request = service_pb2.ModelReadyRequest(name="resnet_v1_50_graphdef",
+                                            version=model_version)
     response = grpc_stub.ModelReady(request)
     print("model {}".format(response))
 
     # Metadata
-    request = grpc_service_pb2.ServerMetadataRequest()
+    request = service_pb2.ServerMetadataRequest()
     response = grpc_stub.ServerMetadata(request)
     print("server metadata:\n{}".format(response))
 
-    request = grpc_service_pb2.ModelMetadataRequest(
-        name="resnet_v1_50_graphdef", version=model_version)
+    request = service_pb2.ModelMetadataRequest(name="resnet_v1_50_graphdef",
+                                               version=model_version)
     response = grpc_stub.ModelMetadata(request)
     print("model metadata:\n{}".format(response))
 
     # Configuration
-    request = grpc_service_pb2.ModelConfigRequest(name="resnet_v1_50_graphdef",
-                                                  version=model_version)
+    request = service_pb2.ModelConfigRequest(name="resnet_v1_50_graphdef",
+                                             version=model_version)
     response = grpc_stub.ModelConfig(request)
     print("model config:\n{}".format(response))
 
     # Infer
-    request = grpc_service_pb2.ModelInferRequest()
+    request = service_pb2.ModelInferRequest()
     request.model_name = "resnet_v1_50_graphdef"
     request.model_version = model_version
     request.id = "my request id"
 
-    input = grpc_service_pb2.ModelInferRequest().InferInputTensor()
+    input = service_pb2.ModelInferRequest().InferInputTensor()
     input.name = "input"
     input.datatype = "FP32"
     input.shape.extend([1, 224, 224, 3])
     request.inputs.extend([input])
 
-    output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output = service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output.name = "resnet_v1_50/predictions/Softmax"
     request.outputs.extend([output])
 

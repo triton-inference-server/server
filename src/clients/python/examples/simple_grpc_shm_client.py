@@ -33,8 +33,8 @@ from builtins import range
 from ctypes import *
 
 import tritonclient.grpc as grpcclient
-import tritonclient.shared_memory as shm
 from tritonclient import utils
+import tritonclient.utils.shared_memory as shm
 
 FLAGS = None
 

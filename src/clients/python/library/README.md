@@ -26,27 +26,23 @@ OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# Triton Client Library
+# Triton Python Client Library
 
 This package holds the triton python client library. The generic
 installation is different from the linux-specific installation. The components
-included within package are:
-- grpcclient
-- httpclient
-- utils
+included within generic tritonclient package are:
+- grpc, grpc_service_pb2, grpc_service_pb2_grpc, model_config_pb2
+- http
+- utils [ x86-linux distribution will include `shared_memory` and `cuda_shared_memory`]
 
-The following are available only on x86_linux distribution: 
-- shared_memory
-- cuda_shared_memory
-- pre-compiled perf_client binary
+Apart from the above library, x86-linux distribution will include a pre-compiled perf_client binary
+For further information regarding perf_client, refer to docs [here](https://github.com/triton-inference-server/server/blob/master/docs/perf_client.rst).
 
 Note the following packages are deprecated and will be removed in future releases:
 - tritongrpcclient
 - tritonhttpclient
 - tritonclientutils
 - tritonshmutils
-
-For further information regarding perf_client, refer to these [docs](https://github.com/triton-inference-server/server/blob/master/docs/perf_client.rst).
 
 
 ## Installation

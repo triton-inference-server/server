@@ -97,7 +97,7 @@ setup(
     "Python client library and utilities for communicating with Triton Inference Server",
     long_description=long_description,
     license='BSD',
-    url='http://nvidia.com',
+    url='https://developer.nvidia.com/nvidia-triton-inference-server',
     keywords=[
         'grpc', 'http', 'triton', 'tensorrt', 'inference', 'server', 'service',
         'client', 'nvidia'

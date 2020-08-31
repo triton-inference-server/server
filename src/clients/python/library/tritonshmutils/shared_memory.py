@@ -24,12 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+import warnings
+warnings.simplefilter('always', DeprecationWarning)
 
-if(NOT WIN32)
-  file(COPY shared_memory DESTINATION .)
-  
-  if(${TRITON_ENABLE_GPU})
-    file(COPY cuda_shared_memory DESTINATION .)
-  endif() # TRITON_ENABLE_GPU
-endif() # WIN32
+warnings.warn(
+    "The package `tritonshmutils.shared_memory` is deprecated and will be "
+    "removed in a future version. Please use instead "
+    "`tritonclient.utils.shared_memory`", DeprecationWarning)
+
+from tritonclient.utils.shared_memory import *
