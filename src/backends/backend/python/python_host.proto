@@ -55,7 +55,8 @@ message InferenceRequest
   repeated string requested_output_names = 4;
 }
 
-message Error {
+message Error
+{
   string message = 1;
 }
 

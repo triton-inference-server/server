@@ -174,6 +174,7 @@ class Tensor:
         """
         return self._numpy_array
 
+
 class TritonError:
     """Error indicating non-Success status.
 
@@ -182,6 +183,7 @@ class TritonError:
     msg : str
         A brief description of error
     """
+
     def __init__(self, msg):
         self._msg = msg
 
