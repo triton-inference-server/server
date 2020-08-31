@@ -240,6 +240,8 @@ function run_server_nowait () {
 function run_server_leakcheck () {
     SERVER_PID=0
 
+    export TRITONSERVER_DISABLE_BACKEND_UNLOAD=1
+
     if [ -z "$SERVER" ]; then
         echo "=== SERVER must be defined"
         return
