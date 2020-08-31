@@ -328,7 +328,7 @@ std::vector<Option> options_
       {OPTION_BUFFER_MANAGER_THREAD_COUNT, "buffer-manager-thread-count",
        Option::ArgInt,
        "The number of threads used to accelerate copies and other operations "
-       "required to manage input and output tensor contents. Default is 1."},
+       "required to manage input and output tensor contents. Default is 0."},
   {
     OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
         "Specify a backend-specific configuration setting. The format of this "
@@ -812,7 +812,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
-  int32_t buffer_manager_thread_count = 1;
+  int32_t buffer_manager_thread_count = 0;
 
   std::string backend_dir = "/opt/tritonserver/backends";
   std::vector<std::tuple<std::string, std::string, std::string>>
