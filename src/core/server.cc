@@ -188,9 +188,9 @@ InferenceServer::Init()
 }
 
 Status
-InferenceServer::Stop()
+InferenceServer::Stop(const bool force)
 {
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
+  if (!force && (ready_state_ != ServerReadyState::SERVER_READY)) {
     return Status::Success;
   }
 
