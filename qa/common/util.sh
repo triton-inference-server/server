@@ -234,8 +234,8 @@ function run_server_nowait () {
     SERVER_PID=$!
 }
 
-# Run inference server inside a memory management tool like Valgrind/ASAN. 
-# Return once server's health endpoint shows ready or timeout expires. Sets 
+# Run inference server inside a memory management tool like Valgrind/ASAN.
+# Return once server's health endpoint shows ready or timeout expires. Sets
 # SERVER_PID to pid of SERVER, or 0 if error (including expired timeout)
 function run_server_leakcheck () {
     SERVER_PID=0
@@ -264,7 +264,7 @@ function run_server_leakcheck () {
     LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
-    wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT  
+    wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
         kill $SERVER_PID || true
         SERVER_PID=0
@@ -349,15 +349,15 @@ function check_test_results () {
 #   * ModelInferHandler::InferResponseComplete -> TRITONSERVER_ErrorNew
 #   *
 function check_valgrind_log () {
-    local valgrind_log=$1 
-    
+    local valgrind_log=$1
+
     leak_records=$(grep "are definitely lost" -A 8 $valgrind_log | awk \
     'BEGIN{RS="--";acc=0} !(/cnmem/||/tensorflow::NewSession/||/dl-init/|| \
-    /dlerror/||/StrDup/||/LoadPlan/||/libtorch/||/TRITONSERVER_InferenceTraceNew/) \
+    /dlerror/||/LoadPlan/||/libtorch/) \
     {print;acc+=1} END{print acc}')
 
     num_leaks=$(echo -e "$leak_records" | tail -n1)
-    
+
     if [ "$num_leaks" != "0" ]; then
         echo -e "$leak_records" | sed '$d'
         echo -e "\n***\n*** Test Failed: $num_leaks memory leaks detected.\n***"
