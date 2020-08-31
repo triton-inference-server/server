@@ -104,14 +104,13 @@ class PythonHost(PythonInterpreterServicer):
     """This class handles inference request for python script.
     """
 
-    def __init__(self, module_path, event, *args, **kwargs):
+    def __init__(self, module_path, *args, **kwargs):
         super(PythonInterpreterServicer, self).__init__(*args, **kwargs)
         spec = importlib.util.spec_from_file_location('TritonPythonModel',
                                                       module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         self.module_path = module_path
-        self.event = event
 
         if hasattr(module, 'TritonPythonModel'):
             self.backend = module.TritonPythonModel()
@@ -244,7 +243,7 @@ if __name__ == "__main__":
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
     # Create an Event to keep the GRPC server running
     event = threading.Event()
-    python_host = PythonHost(module_path=FLAGS.model_path, event=event)
+    python_host = PythonHost(module_path=FLAGS.model_path)
     add_PythonInterpreterServicer_to_server(python_host, server)
 
     def interrupt_handler(signum, frame):
