@@ -27,7 +27,7 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# libpython_interpreter.so
+# libtriton_python.so
 #
 configure_file(libtriton_python.ldscript libtriton_python.ldscript COPYONLY)
 
@@ -39,13 +39,21 @@ set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
 
 get_filename_component(python_host_proto_abspath "python_host.proto" ABSOLUTE)
 get_filename_component(python_host_proto_dir "${python_host_proto_abspath}" PATH)
-set(GRPC_SRCS "python_host.grpc.pb.cc")
-set(GRPC_HDRS "python_host.grpc.pb.h")
-set(GRPC_PY "python_host_pb2_grpc.py")
-set(PROTO_PY "python_host_pb2.py")
+
+set(GRPC_SRCS
+    "${CMAKE_CURRENT_BINARY_DIR}/python_host.grpc.pb.cc"
+    "${CMAKE_CURRENT_BINARY_DIR}/python_host.pb.cc")
+
+set(GRPC_HDRS
+    "${CMAKE_CURRENT_BINARY_DIR}/python_host.grpc.pb.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/python_host.pb.h")
+
+set(GRPC_PY
+    "${CMAKE_CURRENT_BINARY_DIR}/python_host_pb2_grpc.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/python_host_pb2.py")
 
 add_custom_command(
-  OUTPUT "${GRPC_SRCS}" "${GRPC_HDRS}"
+  OUTPUT ${GRPC_SRCS} ${GRPC_HDRS}
   COMMAND ${_PROTOBUF_PROTOC}
   ARGS
     --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
@@ -58,7 +66,7 @@ add_custom_command(
 
 find_program(PYTHON "python" REQUIRED)
 add_custom_command(
-  OUTPUT "${GRPC_PY}"
+  OUTPUT ${GRPC_PY}
   COMMAND ${PYTHON}
   ARGS
     -m grpc_tools.protoc
@@ -121,9 +129,9 @@ install(
 )
 
 install(FILES
-          ${CMAKE_CURRENT_BINARY_DIR}/${GRPC_PY}
-          ${CMAKE_CURRENT_BINARY_DIR}/${PROTO_PY}
+          ${GRPC_PY}
           resources/startup.py
         DESTINATION lib/python/runtime)
+
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/triton_python_backend_utils.py
        DESTINATION lib/python/runtime)
