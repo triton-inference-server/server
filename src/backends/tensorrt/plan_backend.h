@@ -68,6 +68,16 @@ class PlanBackend : public InferenceBackend {
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
   friend std::ostream& operator<<(std::ostream&, const PlanBackend&);
 
+#ifdef TRITON_ENABLE_CUDA_GRAPH
+  struct GraphSpec {
+    GraphSpec() : batch_size_(0), captured_(false) {}
+    int batch_size_;
+    std::map<std::string, std::vector<int64_t>> shapes_;
+    bool captured_;
+  };
+  Status InitializeGraphSpecs(std::vector<GraphSpec>* graph_specs);
+#endif
+
   Status DuplicateWarmupRequests(
       const std::vector<std::unique_ptr<InferenceRequest>>& warmup_requests,
       std::vector<std::unique_ptr<InferenceRequest>>* requests);
@@ -114,9 +124,10 @@ class PlanBackend : public InferenceBackend {
             ios);
     Status InitializeBatchOutputBindings(const inference::ModelConfig& config);
 #ifdef TRITON_ENABLE_CUDA_GRAPH
-    bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
+    bool BuildCudaGraph(
+        TensorRTContext* trt_context, const GraphSpec& graph_spec);
     bool BuildCudaGraphDynamic(
-        TensorRTContext* trt_context, const int batch_size);
+        TensorRTContext* trt_context, const GraphSpec& graph_spec);
 #endif
 
     Status InitOptimizationProfiles(
@@ -163,7 +174,7 @@ class PlanBackend : public InferenceBackend {
           const std::string& profile_name, const int profile_idx,
           const int binding_cnts, const int event_set_cnts)
           : profile_name_(profile_name), profile_idx_(profile_idx),
-            context_(nullptr), cuda_graphs_(event_set_cnts),
+            context_(nullptr),
             cuda_graph_execs_(event_set_cnts), min_dims_(binding_cnts),
             max_dims_(binding_cnts), opt_dims_(binding_cnts),
             min_shapes_(binding_cnts), max_shapes_(binding_cnts),
@@ -174,10 +185,22 @@ class PlanBackend : public InferenceBackend {
       int profile_idx_;
       nvinfer1::IExecutionContext* context_;
 
+      // Struct that holds cudaGraphExec_t and the dimensions of the inputs
+      // used to capture the graph
+      struct CudaGraph {
+        CudaGraph() : cuda_graph_exec_(nullptr) {}
+        // Store in the order of the bindng index
+        std::vector<std::vector<int64_t>> input_dims_;
+        cudaGraphExec_t cuda_graph_exec_;
+      };
+
       // The CUDA graphs captured for the model for different
       // batch-sizes.
-      std::vector<std::unordered_map<int, cudaGraph_t>> cuda_graphs_;
-      std::vector<std::unordered_map<int, cudaGraphExec_t>> cuda_graph_execs_;
+      std::vector<cudaGraph_t> cuda_graphs_;
+      // The key is packed input dimensions prepended by batch size, so that
+      // uniqueness is guaranteed and the CUDA graphs are sorted to provide
+      // convinence to find the closest CUDA graph in the future.
+      std::vector<std::map<std::vector<int64_t>, CudaGraph>> cuda_graph_execs_;
 
       // Min Dimensions per bindings
       std::vector<nvinfer1::Dims> min_dims_;
@@ -231,12 +254,14 @@ class PlanBackend : public InferenceBackend {
     Status SetBindingDimensions(
         const std::string& input_name, const std::vector<int64_t>& shape,
         const TensorRTContext& trt_context, const size_t binding_idx,
-        const size_t io_idx, std::vector<nvinfer1::Dims>* input_dims);
+        const size_t io_idx, std::vector<int64_t>* input_dims);
     Status SetCudaGraphShape(
-        TensorRTContext* trt_context, const int batch_size);
+        TensorRTContext* trt_context, const GraphSpec& graph_spec,
+        std::vector<int64_t>* cuda_graph_key,
+        TensorRTContext::CudaGraph* cuda_graph);
     bool FindClosestCudaGraph(
-        const TensorRTContext& trt_context, const size_t total_batch_size,
-        const std::vector<nvinfer1::Dims>& input_dims,
+        const TensorRTContext& trt_context,
+        const std::vector<int64_t>& cuda_graph_key,
         cudaGraphExec_t* cuda_graph_exec);
 
     // The engine used for the context. If the model uses dynamic shape, then
