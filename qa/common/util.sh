@@ -240,8 +240,6 @@ function run_server_nowait () {
 function run_server_leakcheck () {
     SERVER_PID=0
 
-    export TRITONSERVER_DISABLE_BACKEND_UNLOAD=1
-
     if [ -z "$SERVER" ]; then
         echo "=== SERVER must be defined"
         return
@@ -263,6 +261,7 @@ function run_server_leakcheck () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
+    TRITONSERVER_DISABLE_BACKEND_UNLOAD=1
     LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
