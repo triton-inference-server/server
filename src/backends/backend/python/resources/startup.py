@@ -40,9 +40,6 @@ from python_host_pb2 import *
 from python_host_pb2_grpc import PythonInterpreterServicer, add_PythonInterpreterServicer_to_server
 import grpc
 
-lock = threading.Lock()
-cv = threading.Condition(lock)
-
 TRITION_TO_NUMPY_TYPE = {
     # TRITONSERVER_TYPE_BOOL
     1: np.bool,
@@ -113,6 +110,7 @@ class PythonHost(PythonInterpreterServicer):
                                                       module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+        self.module_path = module_path
 
         if hasattr(module, 'TritonPythonModel'):
             self.backend = module.TritonPythonModel()
@@ -138,7 +136,7 @@ class PythonHost(PythonInterpreterServicer):
             args = {x.key: x.value for x in request.args}
             try:
                 self.backend.initialize(args)
-            except tpb_utils.PythonModelException as e:
+            except tpb_utils.TritonModelException as e:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(e.message())
 
@@ -151,7 +149,7 @@ class PythonHost(PythonInterpreterServicer):
         if hasattr(self.backend, 'finalize'):
             try:
                 self.backend.finalize()
-            except tpb_utils.PythonModelException as e:
+            except tpb_utils.TritonModelException as e:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(e.message())
 
@@ -243,6 +241,8 @@ if __name__ == "__main__":
     signal_received = False
     FLAGS = parse_startup_arguments()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
+    # Create an Event to keep the GRPC server running
+    event = threading.Event()
     python_host = PythonHost(module_path=FLAGS.model_path)
     add_PythonInterpreterServicer_to_server(python_host, server)
 
