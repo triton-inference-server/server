@@ -1534,6 +1534,7 @@ TRITONSERVER_ServerNew(
   ni::Status status = lserver->Init();
   if (!status.IsOk()) {
     if (loptions->ExitOnError()) {
+      lserver->Stop(true /* force */);
       delete lserver;
       RETURN_IF_STATUS_ERROR(status);
     }
