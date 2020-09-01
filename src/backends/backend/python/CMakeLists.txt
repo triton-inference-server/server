@@ -41,7 +41,7 @@ get_filename_component(python_host_proto_abspath "python_host.proto" ABSOLUTE)
 get_filename_component(python_host_proto_dir "${python_host_proto_abspath}" PATH)
 
 set(GRPC_SRCS
-    "${CMAKE_CURRENT_BINARY_DIR}/python_host.grpc.pb.cc"
+    "${CMAKE_CURRENT_BINARY_DIR}/python_host.grpc.pb.cc"3
     "${CMAKE_CURRENT_BINARY_DIR}/python_host.pb.cc")
 
 set(GRPC_HDRS
@@ -64,7 +64,7 @@ add_custom_command(
   DEPENDS "python_host.proto" proto-library
 )
 
-find_program(PYTHON "python" REQUIRED)
+find_program(PYTHON "python3" REQUIRED)
 add_custom_command(
   OUTPUT ${GRPC_PY}
   COMMAND ${PYTHON}
