@@ -308,11 +308,12 @@ ModelInstanceState::ConnectPythonInterpreter()
   insert_model_param("model_name", model_state_->ModelName());
 
   // Attempting to connect to the python runtime
+  grpc::Status status;
   constexpr uint8_t conn_attempts = 5;
   for (int i = 0; i < conn_attempts; ++i) {
     grpc::ClientContext context;
     ni::Empty null_msg;
-    const auto status = stub->Init(&context, *initialization_params, &null_msg);
+    status = stub->Init(&context, *initialization_params, &null_msg);
     if (status.ok()) {
       LOG_MESSAGE(
           TRITONSERVER_LOG_VERBOSE,
@@ -327,7 +328,7 @@ ModelInstanceState::ConnectPythonInterpreter()
   }
 
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_INTERNAL, "failed to initialize grpc stub");
+      TRITONSERVER_ERROR_INTERNAL, status.error_message().c_str());
 }
 
 ModelInstanceState::ModelInstanceState(
@@ -641,6 +642,7 @@ TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
   LOG_MESSAGE(TRITONSERVER_LOG_VERBOSE, "TRITONBACKEND_Finalize: End");
   return nullptr;  // success
 }
+
 TRITONSERVER_Error*
 TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
 {
