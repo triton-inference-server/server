@@ -40,7 +40,6 @@ set(
 set(
   BACKEND_HDRS
   backend_factory.h
-  tritonbackend.h
   triton_memory_manager.h
   triton_backend_manager.h
   triton_model.h
@@ -62,6 +61,14 @@ if(${TRITON_ENABLE_METRICS})
     PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif() # TRITON_ENABLE_METRICS
+
+target_link_libraries(
+  triton-backend-library
+  PUBLIC
+    triton-common-backendapi  # from repo-common
+    triton-common-serverapi   # from repo-common
+    triton-common-json        # from repo-common
+)
 
 add_subdirectory(examples src/backends/backend/examples)
 if(${TRITON_ENABLE_ONNXRUNTIME})

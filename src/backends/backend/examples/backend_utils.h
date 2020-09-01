@@ -34,19 +34,19 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "src/backends/backend/tritonbackend.h"
+#include "triton/common/tritonbackend.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
   return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
 #define TRITONJSON_STATUSSUCCESS nullptr
-#include "src/core/json.h"
+#include "triton/common/triton_json.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 #define IGNORE_ERROR(X)                   \
   do {                                    \
@@ -163,7 +163,7 @@ constexpr char kAutoMixedPrecisionExecutionAccelerator[] =
 /// \param shape Returns the shape.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_Error* ParseShape(
-    TritonJson::Value& io, const std::string& name,
+    common::TritonJson::Value& io, const std::string& name,
     std::vector<int64_t>* shape);
 
 /// Return the string representation of a shape.
@@ -222,7 +222,7 @@ TRITONSERVER_Error* ReadInputTensor(
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
 TRITONSERVER_Error* CheckAllowedModelInput(
-    TritonJson::Value& io, const std::set<std::string>& allowed);
+    common::TritonJson::Value& io, const std::set<std::string>& allowed);
 
 /// Validate that an output matches one of the allowed output names.
 /// \param io The model output.
@@ -230,7 +230,7 @@ TRITONSERVER_Error* CheckAllowedModelInput(
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
 TRITONSERVER_Error* CheckAllowedModelOutput(
-    TritonJson::Value& io, const std::set<std::string>& allowed);
+    common::TritonJson::Value& io, const std::set<std::string>& allowed);
 
 /// Get the tensor name, false value, and true value for a boolean
 /// sequence batcher control kind. If 'required' is true then must
@@ -254,7 +254,7 @@ TRITONSERVER_Error* CheckAllowedModelOutput(
 /// the tensor type is FP32.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_Error* GetBooleanSequenceControlProperties(
-    TritonJson::Value& batcher, const std::string& model_name,
+    common::TritonJson::Value& batcher, const std::string& model_name,
     const std::string& control_kind, const bool required,
     std::string* tensor_name, std::string* tensor_datatype,
     float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
@@ -275,7 +275,7 @@ TRITONSERVER_Error* GetBooleanSequenceControlProperties(
 /// \param tensor_datatype Returns the data type of the tensor.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_Error* GetTypedSequenceControlProperties(
-    TritonJson::Value& batcher, const std::string& model_name,
+    common::TritonJson::Value& batcher, const std::string& model_name,
     const std::string& control_kind, const bool required,
     std::string* tensor_name, std::string* tensor_datatype);
 
@@ -400,4 +400,4 @@ TRITONSERVER_Error* ParseIntValue(const std::string& value, int* parsed_value);
 TRITONSERVER_Error* ParseDoubleValue(
     const std::string& value, double* parsed_value);
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend

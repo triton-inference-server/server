@@ -43,14 +43,11 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
-namespace ni = nvidia::inferenceserver;
-namespace nib = nvidia::inferenceserver::backend;
-
 //
 // TF Backend that implements the TRITONBACKEND API.
 //
 
-namespace {
+namespace triton { namespace backend { namespace tensorflow {
 
 #ifndef TRITON_ENABLE_GPU
 using cudaStream_t = void*;
@@ -60,9 +57,9 @@ using IONameMap = std::unordered_map<std::string, std::string>;
 using TRTISTFModelHandle =
     std::unique_ptr<TRTISTF_Model, decltype(&TRTISTF_ModelDelete)>;
 
-// BackendConfig
-struct BackendConfig {
-  BackendConfig()
+// BackendConfiguration
+struct BackendConfiguration {
+  BackendConfiguration()
       : allow_gpu_memory_growth_(true), per_process_gpu_memory_fraction_(0.0),
         allow_soft_placement_(true), memory_limit_mb_()
   {
@@ -73,29 +70,30 @@ struct BackendConfig {
   std::map<int, std::vector<float>> memory_limit_mb_;
 };
 
-namespace GraphDef {
+namespace graphdef {
 
 TRITONSERVER_Error*
 ValidateSequenceControl(
-    const std::string& model_name, ni::TritonJson::Value& model_config,
+    const std::string& model_name,
+    triton::common::TritonJson::Value& model_config,
     const std::string& control_kind, const TRTISTF_IOList* inputs,
     bool required, bool is_boolean)
 {
-  ni::TritonJson::Value sequence_batching;
+  triton::common::TritonJson::Value sequence_batching;
   RETURN_IF_ERROR(
       model_config.MemberAsObject("sequence_batching", &sequence_batching));
   std::string tensor_name;
   if (is_boolean) {
-    RETURN_IF_ERROR(nib::GetBooleanSequenceControlProperties(
+    RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         sequence_batching, model_name, control_kind, required, &tensor_name,
         nullptr, nullptr, nullptr, nullptr, nullptr));
   } else {
-    RETURN_IF_ERROR(nib::GetTypedSequenceControlProperties(
+    RETURN_IF_ERROR(GetTypedSequenceControlProperties(
         sequence_batching, model_name, control_kind, required, &tensor_name,
         nullptr));
   }
   if (!tensor_name.empty()) {
-    const TRTISTF_IO* input = nib::FindIOByName(inputs, tensor_name);
+    const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
     if (input == nullptr) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
@@ -111,8 +109,8 @@ ValidateSequenceControl(
 
 TRITONSERVER_Error*
 ValidateTRTISTFModel(
-    const std::string& model_name, ni::TritonJson::Value& model_config,
-    TRTISTF_Model* model)
+    const std::string& model_name,
+    triton::common::TritonJson::Value& model_config, TRTISTF_Model* model)
 {
   // For graphdef the model inputs and outputs are just "potential"
   // inputs and outputs since graphdef doesn't explicitly list the
@@ -129,7 +127,7 @@ ValidateTRTISTFModel(
     potential_outputs.insert(itr->io_->name_);
   }
 
-  ni::TritonJson::Value config_inputs;
+  triton::common::TritonJson::Value config_inputs;
   RETURN_IF_ERROR(model_config.MemberAsArray("input", &config_inputs));
   if (potential_inputs.size() < config_inputs.ArraySize()) {
     return TRITONSERVER_ErrorNew(
@@ -145,7 +143,7 @@ ValidateTRTISTFModel(
 
   // If this is a sequence model then make sure that the required
   // inputs are present in the model
-  ni::TritonJson::Value sequence_batching;
+  triton::common::TritonJson::Value sequence_batching;
   if (model_config.Find("sequence_batching", &sequence_batching)) {
     RETURN_IF_ERROR(ValidateSequenceControl(
         model_name, model_config, "CONTROL_SEQUENCE_START", inputs,
@@ -162,51 +160,51 @@ ValidateTRTISTFModel(
   }
 
   for (size_t i = 0; i < config_inputs.ArraySize(); i++) {
-    ni::TritonJson::Value io;
+    triton::common::TritonJson::Value io;
     RETURN_IF_ERROR(config_inputs.IndexAsObject(i, &io));
-    RETURN_IF_ERROR(nib::CheckAllowedModelInput(io, potential_inputs));
+    RETURN_IF_ERROR(CheckAllowedModelInput(io, potential_inputs));
   }
 
-  ni::TritonJson::Value config_outputs;
+  triton::common::TritonJson::Value config_outputs;
   RETURN_IF_ERROR(model_config.MemberAsArray("output", &config_outputs));
   for (size_t i = 0; i < config_outputs.ArraySize(); i++) {
-    ni::TritonJson::Value io;
+    triton::common::TritonJson::Value io;
     RETURN_IF_ERROR(config_outputs.IndexAsObject(i, &io));
-    RETURN_IF_ERROR(nib::CheckAllowedModelOutput(io, potential_outputs));
+    RETURN_IF_ERROR(CheckAllowedModelOutput(io, potential_outputs));
   }
 
   return nullptr;  // success
 }
 
-}  // namespace GraphDef
+}  // namespace graphdef
 
-namespace SavedModel {
+namespace savedmodel {
 
 TRITONSERVER_Error*
 ValidateSequenceControl(
-    const std::string& model_name, ni::TritonJson::Value& model_config,
-    const int max_batch_size, const std::string& control_kind,
-    const TRTISTF_IOList* inputs, bool required, bool is_boolean,
-    bool* have_control)
+    const std::string& model_name,
+    triton::common::TritonJson::Value& model_config, const int max_batch_size,
+    const std::string& control_kind, const TRTISTF_IOList* inputs,
+    bool required, bool is_boolean, bool* have_control)
 {
-  ni::TritonJson::Value sequence_batching;
+  triton::common::TritonJson::Value sequence_batching;
   RETURN_IF_ERROR(
       model_config.MemberAsObject("sequence_batching", &sequence_batching));
   std::string tensor_name;
   std::string tensor_datatype;
   if (is_boolean) {
-    RETURN_IF_ERROR(nib::GetBooleanSequenceControlProperties(
+    RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         sequence_batching, model_name, control_kind, required, &tensor_name,
         &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
   } else {
-    RETURN_IF_ERROR(nib::GetTypedSequenceControlProperties(
+    RETURN_IF_ERROR(GetTypedSequenceControlProperties(
         sequence_batching, model_name, control_kind, required, &tensor_name,
         &tensor_datatype));
   }
 
   *have_control = !tensor_name.empty();
   if (*have_control) {
-    const TRTISTF_IO* input = nib::FindIOByName(inputs, tensor_name);
+    const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
     if (input == nullptr) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
@@ -219,7 +217,7 @@ ValidateSequenceControl(
     // Control tensors must have shape [1].
     std::vector<int64_t> dims{1};
 
-    auto err = nib::CompareDims(
+    auto err = CompareDims(
         model_name, tensor_name, input->shape_, dims, max_batch_size > 0,
         true /* compare_exact */);
     if (err != nullptr) {
@@ -233,14 +231,13 @@ ValidateSequenceControl(
       return detailed_err;
     }
 
-    if (!nib::CompareDataType(input->data_type_, tensor_datatype)) {
+    if (!CompareDataType(input->data_type_, tensor_datatype)) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "unable to load model '" + model_name + "', sequence control '" +
               tensor_name + "': the model expects data-type " +
-              TRITONSERVER_DataTypeString(
-                  nib::ConvertDataType(input->data_type_)) +
+              TRITONSERVER_DataTypeString(ConvertDataType(input->data_type_)) +
               " but the model configuration specifies data-type " +
               tensor_datatype)
               .c_str());
@@ -252,9 +249,9 @@ ValidateSequenceControl(
 
 TRITONSERVER_Error*
 ValidateTRTISTFModel(
-    const std::string& model_name, ni::TritonJson::Value& model_config,
-    const int max_batch_size, TRTISTF_Model* model, IONameMap* input_name_map,
-    IONameMap* output_name_map)
+    const std::string& model_name,
+    triton::common::TritonJson::Value& model_config, const int max_batch_size,
+    TRTISTF_Model* model, IONameMap* input_name_map, IONameMap* output_name_map)
 {
   // The model inputs are the expected inputs and the outputs are
   // the allowed outputs. Saved-model gives these explicitly so we can
@@ -272,14 +269,14 @@ ValidateTRTISTFModel(
     output_name_map->insert({itr->io_->name_, itr->io_->inmodel_name_});
   }
 
-  ni::TritonJson::Value config_inputs;
+  triton::common::TritonJson::Value config_inputs;
   RETURN_IF_ERROR(model_config.MemberAsArray("input", &config_inputs));
   size_t expected_input_cnt = config_inputs.ArraySize();
 
   // If this is a sequence model then make sure that the required
   // inputs are present in the model and have the correct shape and
   // datatype.
-  ni::TritonJson::Value sequence_batching;
+  triton::common::TritonJson::Value sequence_batching;
   if (model_config.Find("sequence_batching", &sequence_batching)) {
     bool have_start, have_end, have_ready, have_corrid;
     RETURN_IF_ERROR(ValidateSequenceControl(
@@ -322,13 +319,13 @@ ValidateTRTISTFModel(
   }
 
   for (size_t i = 0; i < config_inputs.ArraySize(); i++) {
-    ni::TritonJson::Value io;
+    triton::common::TritonJson::Value io;
     RETURN_IF_ERROR(config_inputs.IndexAsObject(i, &io));
-    RETURN_IF_ERROR(nib::CheckAllowedModelInput(io, expected_inputs));
+    RETURN_IF_ERROR(CheckAllowedModelInput(io, expected_inputs));
 
     std::string io_name;
     RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
-    const TRTISTF_IO* input = nib::FindIOByName(inputs, io_name);
+    const TRTISTF_IO* input = FindIOByName(inputs, io_name);
     if (input == nullptr) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
@@ -338,14 +335,14 @@ ValidateTRTISTFModel(
     // If a reshape is provided for the input then use that when
     // validating that the TF model matches what is expected.
     std::vector<int64_t> dims;
-    ni::TritonJson::Value reshape;
+    triton::common::TritonJson::Value reshape;
     if (io.Find("reshape", &reshape)) {
-      RETURN_IF_ERROR(nib::ParseShape(reshape, "shape", &dims));
+      RETURN_IF_ERROR(ParseShape(reshape, "shape", &dims));
     } else {
-      RETURN_IF_ERROR(nib::ParseShape(io, "dims", &dims));
+      RETURN_IF_ERROR(ParseShape(io, "dims", &dims));
     }
     if (input->shape_->rank_ != 0) {
-      RETURN_IF_ERROR(nib::CompareDims(
+      RETURN_IF_ERROR(CompareDims(
           model_name, io_name, input->shape_, dims, max_batch_size > 0,
           false /* compare_exact */));
     } else {
@@ -363,29 +360,28 @@ ValidateTRTISTFModel(
 
     std::string io_data_type;
     RETURN_IF_ERROR(io.MemberAsString("data_type", &io_data_type));
-    if (!nib::CompareDataType(input->data_type_, io_data_type)) {
+    if (!CompareDataType(input->data_type_, io_data_type)) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "unable to load model '" + model_name + "', input '" + io_name +
               "' data-type " +
-              TRITONSERVER_DataTypeString(
-                  nib::ConvertDataType(input->data_type_)) +
+              TRITONSERVER_DataTypeString(ConvertDataType(input->data_type_)) +
               " doesn't match configuration data-type " + io_data_type)
               .c_str());
     }
   }
 
-  ni::TritonJson::Value config_outputs;
+  triton::common::TritonJson::Value config_outputs;
   RETURN_IF_ERROR(model_config.MemberAsArray("output", &config_outputs));
   for (size_t i = 0; i < config_outputs.ArraySize(); i++) {
-    ni::TritonJson::Value io;
+    triton::common::TritonJson::Value io;
     RETURN_IF_ERROR(config_outputs.IndexAsObject(i, &io));
-    RETURN_IF_ERROR(nib::CheckAllowedModelOutput(io, allowed_outputs));
+    RETURN_IF_ERROR(CheckAllowedModelOutput(io, allowed_outputs));
 
     std::string io_name;
     RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
-    const TRTISTF_IO* output = nib::FindIOByName(outputs, io_name);
+    const TRTISTF_IO* output = FindIOByName(outputs, io_name);
     if (output == nullptr) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
@@ -395,15 +391,15 @@ ValidateTRTISTFModel(
     // If a reshape is provided for the input then use that when
     // validating that the TF model matches what is expected.
     std::vector<int64_t> dims;
-    ni::TritonJson::Value reshape;
+    triton::common::TritonJson::Value reshape;
     if (io.Find("reshape", &reshape)) {
-      RETURN_IF_ERROR(nib::ParseShape(reshape, "shape", &dims));
+      RETURN_IF_ERROR(ParseShape(reshape, "shape", &dims));
     } else {
-      RETURN_IF_ERROR(nib::ParseShape(io, "dims", &dims));
+      RETURN_IF_ERROR(ParseShape(io, "dims", &dims));
     }
 
     if (output->shape_->rank_ != 0) {
-      RETURN_IF_ERROR(nib::CompareDims(
+      RETURN_IF_ERROR(CompareDims(
           model_name, io_name, output->shape_, dims, max_batch_size > 0,
           true /* compare_exact */));
     } else {
@@ -421,14 +417,13 @@ ValidateTRTISTFModel(
 
     std::string io_data_type;
     RETURN_IF_ERROR(io.MemberAsString("data_type", &io_data_type));
-    if (!nib::CompareDataType(output->data_type_, io_data_type)) {
+    if (!CompareDataType(output->data_type_, io_data_type)) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "unable to load model '" + model_name + "', output '" + io_name +
               "' data-type " +
-              TRITONSERVER_DataTypeString(
-                  nib::ConvertDataType(output->data_type_)) +
+              TRITONSERVER_DataTypeString(ConvertDataType(output->data_type_)) +
               " doesn't match configuration data-type " + io_data_type)
               .c_str());
     }
@@ -437,7 +432,7 @@ ValidateTRTISTFModel(
   return nullptr;  // success
 }
 
-}  // namespace SavedModel
+}  // namespace savedmodel
 
 // This function will return a tensor's contents as a contiguous
 // chunk in system memory. In some cases this will require copying the data.
@@ -499,7 +494,7 @@ GetContiguousInputContent(
       RETURN_IF_ERROR(TRITONBACKEND_InputBuffer(
           rinput, i, &src_ptr, &src_byte_size, &src_memory_type,
           &src_memory_type_id));
-      RETURN_IF_ERROR(nib::CopyBuffer(
+      RETURN_IF_ERROR(CopyBuffer(
           "Contiguous input", src_memory_type, src_memory_type_id,
           TRITONSERVER_MEMORY_CPU, 0, src_byte_size, src_ptr,
           *contiguous_buffer + offset, stream, &cuda_used));
@@ -660,7 +655,7 @@ SetStringOutputBuffer(
 
   // Copy the serialized tensor into the allocated buffer.
   bool cuda_used = false;
-  err = nib::CopyBuffer(
+  err = CopyBuffer(
       "String output", TRITONSERVER_MEMORY_CPU /* src_memory_type */,
       0 /* src_memory_type_id */, actual_memory_type, actual_memory_type_id,
       serialized->size(), reinterpret_cast<const void*>(serialized->c_str()),
@@ -682,13 +677,13 @@ SetStringOutputBuffer(
 // of this class is created and associated with each
 // TRITONBACKEND_Model.
 //
-class ModelState : public nib::BackendModel {
+class ModelState : public BackendModel {
  public:
   static TRITONSERVER_Error* Create(
       TRITONBACKEND_Model* triton_model, ModelState** state);
   virtual ~ModelState() = default;
 
-  ::BackendConfig* BackendConfig() const { return backend_config_; }
+  BackendConfiguration* BackendConfig() const { return backend_config_; }
   bool IsGraphdef() const { return is_graphdef_; }
 
  private:
@@ -700,7 +695,7 @@ class ModelState : public nib::BackendModel {
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
 
-  ::BackendConfig* backend_config_;
+  BackendConfiguration* backend_config_;
   bool is_graphdef_;
 };
 
@@ -710,7 +705,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   try {
     *state = new ModelState(triton_model);
   }
-  catch (const nib::BackendModelException& ex) {
+  catch (const BackendModelException& ex) {
     RETURN_ERROR_IF_TRUE(
         ex.err_ == nullptr, TRITONSERVER_ERROR_INTERNAL,
         std::string("unexpected nullptr in BackendModelException"));
@@ -724,7 +719,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   if (auto_complete_config) {
     RETURN_IF_ERROR((*state)->AutoCompleteConfig());
 
-    ni::TritonJson::WriteBuffer json_buffer;
+    triton::common::TritonJson::WriteBuffer json_buffer;
     (*state)->ModelConfig().Write(&json_buffer);
 
     TRITONSERVER_Message* message;
@@ -740,7 +735,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 }
 
 ModelState::ModelState(TRITONBACKEND_Model* triton_model)
-    : nib::BackendModel(triton_model)
+    : BackendModel(triton_model)
 {
   // Obtain backend configuration
   TRITONBACKEND_Backend* backend;
@@ -748,7 +743,7 @@ ModelState::ModelState(TRITONBACKEND_Model* triton_model)
       TRITONBACKEND_ModelBackend(triton_model, &backend));
   void* vstate;
   THROW_IF_BACKEND_MODEL_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
-  backend_config_ = reinterpret_cast<::BackendConfig*>(vstate);
+  backend_config_ = reinterpret_cast<BackendConfiguration*>(vstate);
 
   std::string platform;
   THROW_IF_BACKEND_MODEL_ERROR(
@@ -758,7 +753,7 @@ ModelState::ModelState(TRITONBACKEND_Model* triton_model)
   } else if (platform == "tensorflow_savedmodel") {
     is_graphdef_ = false;
   } else {
-    throw nib::BackendModelException(TRITONSERVER_ErrorNew(
+    throw BackendModelException(TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG, (std::string("platform ") + platform +
                                          " not supported for TensorFlow "
                                          "model '" +
@@ -849,23 +844,25 @@ AutoCompleteHelper::FixBatchingSupport()
   model_support_batching_ = sig_supports_batch;
   if (model_support_batching_ && (max_batch_size == 0)) {
     bool config_batch_hint = false;
-    ni::TritonJson::Value config_inputs(
-        model_state_->ModelConfig(), ni::TritonJson::ValueType::ARRAY);
+    triton::common::TritonJson::Value config_inputs(
+        model_state_->ModelConfig(),
+        triton::common::TritonJson::ValueType::ARRAY);
     model_state_->ModelConfig().Find("input", &config_inputs);
-    ni::TritonJson::Value config_outputs(
-        model_state_->ModelConfig(), ni::TritonJson::ValueType::ARRAY);
+    triton::common::TritonJson::Value config_outputs(
+        model_state_->ModelConfig(),
+        triton::common::TritonJson::ValueType::ARRAY);
     model_state_->ModelConfig().Find("output", &config_outputs);
     if ((config_inputs.ArraySize() != 0) || (config_outputs.ArraySize() != 0)) {
-      std::vector<ni::TritonJson::Value*> config_ios{&config_inputs,
-                                                     &config_outputs};
+      std::vector<triton::common::TritonJson::Value*> config_ios{
+          &config_inputs, &config_outputs};
       for (size_t ios_idx = 0; ios_idx < config_ios.size(); ios_idx++) {
         for (size_t i = 0; i < config_ios[ios_idx]->ArraySize(); i++) {
-          ni::TritonJson::Value config_io;
+          triton::common::TritonJson::Value config_io;
           RETURN_IF_ERROR(config_ios[ios_idx]->IndexAsObject(i, &config_io));
           if (config_io.Find("name")) {
             std::string config_name;
             RETURN_IF_ERROR(config_io.MemberAsString("name", &config_name));
-            ni::TritonJson::Value config_dims;
+            triton::common::TritonJson::Value config_dims;
             if (config_io.Find("dims", &config_dims) &&
                 (config_dims.ArraySize() != 0)) {
               // look up corresponding io info from model
@@ -905,7 +902,7 @@ AutoCompleteHelper::FixBatchingSupport()
   if (max_batch_size == 0) {
     const int new_max_batch_size = model_support_batching_ ? 1 : 0;
 
-    ni::TritonJson::Value mbs_value;
+    triton::common::TritonJson::Value mbs_value;
     model_state_->ModelConfig().Find("max_batch_size", &mbs_value);
     mbs_value.SetInt(new_max_batch_size);
 
@@ -920,24 +917,27 @@ AutoCompleteHelper::FixIOConfig(
     const TRTISTF_IOList* reference_list, const char* key)
 {
   // Replace I/O even if inputs / outputs are specified in config.
-  ni::TritonJson::Value ios;
+  triton::common::TritonJson::Value ios;
   bool found_ios = model_state_->ModelConfig().Find(key, &ios);
 
-  ni::TritonJson::Value auto_complete_ios(
-      model_state_->ModelConfig(), ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value auto_complete_ios(
+      model_state_->ModelConfig(),
+      triton::common::TritonJson::ValueType::ARRAY);
   for (const TRTISTF_IOList* itr = reference_list; itr != nullptr;
        itr = itr->next_) {
     TRTISTF_IO* io = itr->io_;
 
-    ni::TritonJson::Value auto_complete_io(
-        model_state_->ModelConfig(), ni::TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value auto_complete_io(
+        model_state_->ModelConfig(),
+        triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_ERROR(auto_complete_io.AddString("name", io->name_));
     RETURN_IF_ERROR(auto_complete_io.AddString(
         "data_type",
         std::string("TYPE_") +
-            TRITONSERVER_DataTypeString(nib::ConvertDataType(io->data_type_))));
-    ni::TritonJson::Value dims(
-        model_state_->ModelConfig(), ni::TritonJson::ValueType::ARRAY);
+            TRITONSERVER_DataTypeString(ConvertDataType(io->data_type_))));
+    triton::common::TritonJson::Value dims(
+        model_state_->ModelConfig(),
+        triton::common::TritonJson::ValueType::ARRAY);
     // The model signature supports batching then the first
     // dimension is -1 and should not appear in the model
     // configuration 'dims' that we are creating.
@@ -950,10 +950,12 @@ AutoCompleteHelper::FixIOConfig(
     // io, since 'dims' is not allowed to be empty.
     if (dims.ArraySize() == 0) {
       RETURN_IF_ERROR(dims.AppendInt(1));
-      ni::TritonJson::Value reshape(
-          model_state_->ModelConfig(), ni::TritonJson::ValueType::OBJECT);
-      ni::TritonJson::Value reshape_dims(
-          model_state_->ModelConfig(), ni::TritonJson::ValueType::ARRAY);
+      triton::common::TritonJson::Value reshape(
+          model_state_->ModelConfig(),
+          triton::common::TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value reshape_dims(
+          model_state_->ModelConfig(),
+          triton::common::TritonJson::ValueType::ARRAY);
       RETURN_IF_ERROR(reshape.Add("shape", std::move(reshape_dims)));
       RETURN_IF_ERROR(auto_complete_io.Add("reshape", std::move(reshape)));
     }
@@ -984,14 +986,14 @@ ModelState::AutoCompleteConfig()
       default_model_filename = "model.savedmodel";
     }
 
-    auto model_path = nib::JoinPath(
+    auto model_path = JoinPath(
         {RepositoryPath(), std::to_string(Version()), default_model_filename});
 
     TRTISTF_Model* trtistf_model = nullptr;
     TRTISTF_Error* err = nullptr;
 
     bool exists;
-    RETURN_IF_ERROR(nib::FileExists(model_path, &exists));
+    RETURN_IF_ERROR(FileExists(model_path, &exists));
     if (exists) {
       err = TRTISTF_ModelCreateFromSavedModel(
           &trtistf_model, Name().c_str(), model_path.c_str(),
@@ -1024,16 +1026,16 @@ TRITONSERVER_Error*
 ModelState::ValidateModelConfig()
 {
   // We have the json DOM for the model configuration...
-  ni::TritonJson::WriteBuffer buffer;
+  triton::common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERROR(ModelConfig().PrettyWrite(&buffer));
   LOG_MESSAGE(
       TRITONSERVER_LOG_VERBOSE,
       (std::string("model configuration:\n") + buffer.Contents()).c_str());
 
-  ni::TritonJson::Value ios;
+  triton::common::TritonJson::Value ios;
   RETURN_IF_ERROR(ModelConfig().MemberAsArray("input", &ios));
   for (size_t i = 0; i < ios.ArraySize(); i++) {
-    ni::TritonJson::Value io;
+    triton::common::TritonJson::Value io;
     RETURN_IF_ERROR(ios.IndexAsObject(i, &io));
     std::string io_name;
     RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
@@ -1041,15 +1043,14 @@ ModelState::ValidateModelConfig()
     std::string io_dtype;
     RETURN_IF_ERROR(io.MemberAsString("data_type", &io_dtype));
     RETURN_ERROR_IF_TRUE(
-        nib::ConvertDataType(io_dtype) ==
-            TRTISTF_DataType::TRTISTF_TYPE_INVALID,
+        ConvertDataType(io_dtype) == TRTISTF_DataType::TRTISTF_TYPE_INVALID,
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string("unsupported datatype '") + io_dtype + "' for tensor '" +
             io_name + "' for model '" + Name() + "'");
   }
   RETURN_IF_ERROR(ModelConfig().MemberAsArray("output", &ios));
   for (size_t i = 0; i < ios.ArraySize(); i++) {
-    ni::TritonJson::Value io;
+    triton::common::TritonJson::Value io;
     RETURN_IF_ERROR(ios.IndexAsObject(i, &io));
     std::string io_name;
     RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
@@ -1057,8 +1058,7 @@ ModelState::ValidateModelConfig()
     std::string io_dtype;
     RETURN_IF_ERROR(io.MemberAsString("data_type", &io_dtype));
     RETURN_ERROR_IF_TRUE(
-        nib::ConvertDataType(io_dtype) ==
-            TRTISTF_DataType::TRTISTF_TYPE_INVALID,
+        ConvertDataType(io_dtype) == TRTISTF_DataType::TRTISTF_TYPE_INVALID,
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string("unsupported datatype '") + io_dtype + "' for tensor '" +
             io_name + "' for model '" + Name() + "'");
@@ -1073,7 +1073,7 @@ ModelState::ValidateModelConfig()
 // State associated with a model instance. An object of this class is
 // created and associated with each TRITONBACKEND_ModelInstance.
 //
-class ModelInstanceState : public nib::BackendModelInstance {
+class ModelInstanceState : public BackendModelInstance {
  public:
   // GPU device number that indicates that no gpu is available for a
   // context (which is an invalid state since TensorRT requires a
@@ -1126,7 +1126,7 @@ ModelInstanceState::Create(
   try {
     *state = new ModelInstanceState(model_state, triton_model_instance);
   }
-  catch (const nib::BackendModelInstanceException& ex) {
+  catch (const BackendModelInstanceException& ex) {
     RETURN_ERROR_IF_TRUE(
         ex.err_ == nullptr, TRITONSERVER_ERROR_INTERNAL,
         std::string("unexpected nullptr in BackendModelInstanceException"));
@@ -1144,13 +1144,13 @@ ModelInstanceState::Create(
     }
   }
 
-  auto model_path = nib::JoinPath({model_state->RepositoryPath(),
-                                   std::to_string(model_state->Version()),
-                                   cc_model_filename});
+  auto model_path =
+      JoinPath({model_state->RepositoryPath(),
+                std::to_string(model_state->Version()), cc_model_filename});
 
   {
     bool exists;
-    RETURN_IF_ERROR(nib::FileExists(model_path, &exists));
+    RETURN_IF_ERROR(FileExists(model_path, &exists));
     RETURN_ERROR_IF_FALSE(
         exists, TRITONSERVER_ERROR_UNAVAILABLE,
         std::string("unable to find '") + model_path +
@@ -1177,15 +1177,15 @@ ModelInstanceState::Create(
   int64_t graph_level = 0;
   // [TODO] this can be moved one level above
   {
-    ni::TritonJson::Value optimization;
+    triton::common::TritonJson::Value optimization;
     if (model_state->ModelConfig().Find("optimization", &optimization)) {
       {
-        ni::TritonJson::Value graph;
+        triton::common::TritonJson::Value graph;
         if ((has_graph_level = optimization.Find("graph", &graph))) {
           RETURN_IF_ERROR(graph.MemberAsInt("level", &graph_level));
         }
       }
-      ni::TritonJson::Value eas;
+      triton::common::TritonJson::Value eas;
       if (optimization.Find("execution_accelerators", &eas)) {
         // Set default values. is_dynamic_op is always true for online
         // TF-TRT.
@@ -1196,7 +1196,7 @@ ModelInstanceState::Create(
         tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
         tftrt_config.is_dynamic_op_ = true;
 
-        ni::TritonJson::Value cpu_eas;
+        triton::common::TritonJson::Value cpu_eas;
         RETURN_ERROR_IF_TRUE(
             eas.Find("cpu_execution_accelerator", &cpu_eas) &&
                 (cpu_eas.ArraySize() != 0),
@@ -1211,16 +1211,16 @@ ModelInstanceState::Create(
                 "GPU Execution Accelerator can only be set on non-CPU backend "
                 "context"));
 
-        ni::TritonJson::Value gpu_eas;
+        triton::common::TritonJson::Value gpu_eas;
         if (eas.Find("gpu_execution_accelerator", &gpu_eas)) {
           for (size_t ea_idx = 0; ea_idx < gpu_eas.ArraySize(); ea_idx++) {
-            ni::TritonJson::Value ea;
+            triton::common::TritonJson::Value ea;
             RETURN_IF_ERROR(gpu_eas.IndexAsObject(ea_idx, &ea));
             std::string name;
             RETURN_IF_ERROR(ea.MemberAsString("name", &name));
-            if (name == nib::kTensorRTExecutionAccelerator) {
+            if (name == kTensorRTExecutionAccelerator) {
               // Validate and set parameters
-              ni::TritonJson::Value params;
+              triton::common::TritonJson::Value params;
               if (ea.Find("parameters", &params)) {
                 std::vector<std::string> param_keys;
                 RETURN_IF_ERROR(params.Members(&param_keys));
@@ -1242,17 +1242,17 @@ ModelInstanceState::Create(
                   } else if (param_key == "minimum_segment_size") {
                     RETURN_IF_ERROR(params.MemberAsString(
                         param_key.c_str(), &value_string));
-                    RETURN_IF_ERROR(nib::ParseLongLongValue(
+                    RETURN_IF_ERROR(ParseLongLongValue(
                         value_string, &tftrt_config.minimum_segment_size_));
                   } else if (param_key == "max_workspace_size_bytes") {
                     RETURN_IF_ERROR(params.MemberAsString(
                         param_key.c_str(), &value_string));
-                    RETURN_IF_ERROR(nib::ParseLongLongValue(
+                    RETURN_IF_ERROR(ParseLongLongValue(
                         value_string, &tftrt_config.max_workspace_size_bytes_));
                   } else if (param_key == "max_cached_engines") {
                     RETURN_IF_ERROR(params.MemberAsString(
                         param_key.c_str(), &value_string));
-                    RETURN_IF_ERROR(nib::ParseLongLongValue(
+                    RETURN_IF_ERROR(ParseLongLongValue(
                         value_string, &tftrt_config.max_cached_engines_));
                   } else {
                     return TRITONSERVER_ErrorNew(
@@ -1270,13 +1270,13 @@ ModelInstanceState::Create(
                   (std::string("TensorRT Execution Accelerator is set for ") +
                    (*state)->Name())
                       .c_str());
-            } else if (name == nib::kGPUIOExecutionAccelerator) {
+            } else if (name == kGPUIOExecutionAccelerator) {
               // GPU I/O can be set, set hint
               if ((gpu_device != ModelInstanceState::NO_GPU_DEVICE) &&
                   (gpu_device != ModelInstanceState::MODEL_DEVICE)) {
                 (*state)->input_device_id_ = gpu_device;
               }
-            } else if (name == nib::kAutoMixedPrecisionExecutionAccelerator) {
+            } else if (name == kAutoMixedPrecisionExecutionAccelerator) {
               auto_mixed_precision = true;
             } else {
               return TRITONSERVER_ErrorNew(
@@ -1309,7 +1309,7 @@ ModelInstanceState::Create(
         auto_mixed_precision));
     (*state)->trtistf_model_.reset(model);
 
-    RETURN_IF_ERROR(GraphDef::ValidateTRTISTFModel(
+    RETURN_IF_ERROR(graphdef::ValidateTRTISTFModel(
         model_state->Name(), model_state->ModelConfig(), model));
   } else {
     RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromSavedModel(
@@ -1322,7 +1322,7 @@ ModelInstanceState::Create(
         auto_mixed_precision));
     (*state)->trtistf_model_.reset(model);
 
-    RETURN_IF_ERROR(SavedModel::ValidateTRTISTFModel(
+    RETURN_IF_ERROR(savedmodel::ValidateTRTISTFModel(
         model_state->Name(), model_state->ModelConfig(),
         model_state->MaxBatchSize(), model, &((*state)->input_name_map_),
         &((*state)->output_name_map_)));
@@ -1333,11 +1333,11 @@ ModelInstanceState::Create(
     std::vector<TRTISTF_DataType> input_types, output_types;
     std::deque<std::string> io_names;
 
-    ni::TritonJson::Value config_inputs;
+    triton::common::TritonJson::Value config_inputs;
     RETURN_IF_ERROR(
         model_state->ModelConfig().MemberAsArray("input", &config_inputs));
     for (size_t i = 0; i < config_inputs.ArraySize(); i++) {
-      ni::TritonJson::Value io;
+      triton::common::TritonJson::Value io;
       RETURN_IF_ERROR(config_inputs.IndexAsObject(i, &io));
       io_names.emplace_back();
       RETURN_IF_ERROR(io.MemberAsString("name", &io_names.back()));
@@ -1345,14 +1345,14 @@ ModelInstanceState::Create(
       RETURN_IF_ERROR(io.MemberAsString("data_type", &io_data_type));
 
       input_names.push_back(io_names.back().c_str());
-      input_types.push_back(nib::ConvertDataType(io_data_type));
+      input_types.push_back(ConvertDataType(io_data_type));
     }
 
-    ni::TritonJson::Value config_outputs;
+    triton::common::TritonJson::Value config_outputs;
     RETURN_IF_ERROR(
         model_state->ModelConfig().MemberAsArray("output", &config_outputs));
     for (size_t i = 0; i < config_outputs.ArraySize(); i++) {
-      ni::TritonJson::Value io;
+      triton::common::TritonJson::Value io;
       RETURN_IF_ERROR(config_outputs.IndexAsObject(i, &io));
       io_names.emplace_back();
       RETURN_IF_ERROR(io.MemberAsString("name", &io_names.back()));
@@ -1360,7 +1360,7 @@ ModelInstanceState::Create(
       RETURN_IF_ERROR(io.MemberAsString("data_type", &io_data_type));
 
       output_names.push_back(io_names.back().c_str());
-      output_types.push_back(nib::ConvertDataType(io_data_type));
+      output_types.push_back(ConvertDataType(io_data_type));
     }
     RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelMakeCallable(
         (*state)->trtistf_model_.get(), input_names.data(), input_types.data(),
@@ -1402,7 +1402,7 @@ ModelInstanceState::ProcessRequests(
     // If we get a nullptr request then something is badly wrong. Fail
     // and release all requests.
     if (requests[i] == nullptr) {
-      nib::RequestsRespondWithError(
+      RequestsRespondWithError(
           requests, request_count,
           TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
@@ -1426,7 +1426,7 @@ ModelInstanceState::ProcessRequests(
         total_batch_size += shape[0];
       }
       if (err != nullptr) {
-        nib::RequestsRespondWithError(requests, request_count, err);
+        RequestsRespondWithError(requests, request_count, err);
         return;
       }
     } else {
@@ -1447,7 +1447,7 @@ ModelInstanceState::ProcessRequests(
   // scheduler has done something badly wrong so fail and release all
   // requests.
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size)) {
-    nib::RequestsRespondWithError(
+    RequestsRespondWithError(
         requests, request_count,
         TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
@@ -1504,7 +1504,7 @@ ModelInstanceState::ProcessRequests(
   // must use TF-specific string tensor APIs.
   bool cuda_copy = false;
 
-  nib::BackendInputCollector collector(
+  BackendInputCollector collector(
       requests, request_count, &responses,
       StateForModel()->TritonMemoryManager(),
       StateForModel()->EnablePinnedInput(), CudaStream());
@@ -1542,15 +1542,14 @@ ModelInstanceState::ProcessRequests(
       // is set. If unable to create the tensor then fail all
       // requests.
       TRTISTF_Tensor* tensor = TRTISTF_TensorNew(
-          input_tensor_name, nib::ConvertDataType(datatype),
-          batchn_shape.size(),
+          input_tensor_name, ConvertDataType(datatype), batchn_shape.size(),
           (batchn_shape.size() == 0) ? nullptr : &batchn_shape[0],
           input_device_id_);
       if (tensor == nullptr) {
         auto err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
             (std::string("failed to create input tensor '") + name +
-             "' with shape " + nib::ShapeToString(batchn_shape) +
+             "' with shape " + backend::ShapeToString(batchn_shape) +
              " and data type " + TRITONSERVER_DataTypeString(datatype) +
              " for '" + Name() + "'")
                 .c_str());
@@ -1593,8 +1592,7 @@ ModelInstanceState::ProcessRequests(
                                    input, nullptr, nullptr, &shape, &dims_count,
                                    nullptr, &buffer_count));
 
-          const int64_t batch_element_cnt =
-              nib::GetElementCount(shape, dims_count);
+          const int64_t batch_element_cnt = GetElementCount(shape, dims_count);
 
           cuda_copy |= SetStringInputTensor(
               tensor, input, name, buffer_count, batch_element_cnt,
@@ -1722,7 +1720,7 @@ ModelInstanceState::ProcessRequests(
   cuda_copy = false;
   // The serialized string buffer must be valid until output copies are done
   std::vector<std::unique_ptr<std::string>> string_buffer;
-  nib::BackendOutputResponder responder(
+  BackendOutputResponder responder(
       requests, request_count, &responses, max_batch_size,
       StateForModel()->TritonMemoryManager(),
       StateForModel()->EnablePinnedOutput(), CudaStream());
@@ -1734,7 +1732,7 @@ ModelInstanceState::ProcessRequests(
       TRTISTF_DataType tf_datatype = TRTISTF_TensorDataType(output_tensor);
       TRTISTF_Shape* tf_shape = TRTISTF_TensorShape(output_tensor);
 
-      const TRITONSERVER_DataType datatype = nib::ConvertDataType(tf_datatype);
+      const TRITONSERVER_DataType datatype = ConvertDataType(tf_datatype);
 
       // batchn_shape holds the shape of the entire tensor batch, but
       // is overwritten below and used as the shape for each response
@@ -1764,7 +1762,7 @@ ModelInstanceState::ProcessRequests(
             batchn_shape[0] = shape[0];
           }
 
-          const size_t tensor_element_cnt = nib::GetElementCount(batchn_shape);
+          const size_t tensor_element_cnt = GetElementCount(batchn_shape);
 
           // Only need an response tensor for requested outputs.
           if ((response != nullptr) &&
@@ -1860,8 +1858,6 @@ ModelInstanceState::ProcessRequests(
           .c_str());
 }
 
-}  // namespace
-
 /////////////
 
 extern "C" {
@@ -1921,25 +1917,25 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
       TRITONSERVER_LOG_INFO,
       (std::string("backend configuration:\n") + buffer).c_str());
 
-  ni::TritonJson::Value backend_config;
+  triton::common::TritonJson::Value backend_config;
   if (byte_size != 0) {
     RETURN_IF_ERROR(backend_config.Parse(buffer, byte_size));
   }
 
-  std::unique_ptr<BackendConfig> lconfig(new BackendConfig());
-  ni::TritonJson::Value cmdline;
+  std::unique_ptr<BackendConfiguration> lconfig(new BackendConfiguration());
+  triton::common::TritonJson::Value cmdline;
   if (backend_config.Find("cmdline", &cmdline)) {
-    ni::TritonJson::Value value;
+    triton::common::TritonJson::Value value;
     std::string value_str;
     if (cmdline.Find("allow-soft-placement", &value)) {
       RETURN_IF_ERROR(value.AsString(&value_str));
       RETURN_IF_ERROR(
-          nib::ParseBoolValue(value_str, &lconfig->allow_soft_placement_));
+          ParseBoolValue(value_str, &lconfig->allow_soft_placement_));
     }
     if (cmdline.Find("gpu-memory-fraction", &value)) {
       RETURN_IF_ERROR(value.AsString(&value_str));
       double lvalue;
-      RETURN_IF_ERROR(nib::ParseDoubleValue(value_str, &lvalue));
+      RETURN_IF_ERROR(ParseDoubleValue(value_str, &lvalue));
       lconfig->per_process_gpu_memory_fraction_ = lvalue;
       lconfig->allow_gpu_memory_growth_ = (lvalue == 0.0);
     }
@@ -1959,7 +1955,7 @@ TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
 {
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
-  auto config = reinterpret_cast<BackendConfig*>(vstate);
+  auto config = reinterpret_cast<BackendConfiguration*>(vstate);
   delete config;
   return nullptr;  // success
 }
@@ -2112,3 +2108,5 @@ TRITONBACKEND_ModelInstanceExecute(
 }
 
 }  // extern "C"
+
+}}}  // namespace triton::backend::tensorflow

@@ -29,14 +29,13 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include "src/core/tritonserver.h"
+#include "triton/common/tritonserver.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
   return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
 #define TRITONJSON_STATUSSUCCESS nullptr
-#include "src/core/json.h"
-
+#include "triton/common/triton_json.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -102,7 +101,7 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetStatus(
       const std::string& name, TRITONSERVER_MemoryType memory_type,
-      TritonJson::Value* shm_status);
+      triton::common::TritonJson::Value* shm_status);
 
   /// Removes the named shared memory block of the specified type from
   /// the manager. Any future attempt to get the details of this block

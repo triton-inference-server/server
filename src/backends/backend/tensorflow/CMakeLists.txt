@@ -62,6 +62,9 @@ set_target_properties(
 )
 target_link_libraries(
   triton_tensorflow1
+  PUBLIC triton-common-backendapi  # from repo-common
+  PUBLIC triton-common-serverapi   # from repo-common
+  PUBLIC triton-common-json        # from repo-common
   PUBLIC ${TRITON_EXTRA_LDFLAGS}
   PUBLIC -ltensorflow_trtis
 )
@@ -92,6 +95,9 @@ set_target_properties(
 )
 target_link_libraries(
   triton_tensorflow2
+  PUBLIC triton-common-backendapi  # from repo-common
+  PUBLIC triton-common-serverapi   # from repo-common
+  PUBLIC triton-common-json        # from repo-common
   PUBLIC ${TRITON_EXTRA_LDFLAGS}
   PUBLIC -ltensorflow_triton
 )

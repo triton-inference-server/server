@@ -32,13 +32,14 @@
 #include <algorithm>
 #include <cerrno>
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 TRITONSERVER_Error*
 ParseShape(
-    TritonJson::Value& io, const std::string& name, std::vector<int64_t>* shape)
+    common::TritonJson::Value& io, const std::string& name,
+    std::vector<int64_t>* shape)
 {
-  TritonJson::Value shape_array;
+  common::TritonJson::Value shape_array;
   RETURN_IF_ERROR(io.MemberAsArray(name.c_str(), &shape_array));
   for (size_t i = 0; i < shape_array.ArraySize(); ++i) {
     int64_t d;
@@ -164,7 +165,7 @@ ReadInputTensor(
 
 TRITONSERVER_Error*
 CheckAllowedModelInput(
-    TritonJson::Value& io, const std::set<std::string>& allowed)
+    common::TritonJson::Value& io, const std::set<std::string>& allowed)
 {
   std::string io_name;
   RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
@@ -189,7 +190,7 @@ CheckAllowedModelInput(
 
 TRITONSERVER_Error*
 CheckAllowedModelOutput(
-    TritonJson::Value& io, const std::set<std::string>& allowed)
+    common::TritonJson::Value& io, const std::set<std::string>& allowed)
 {
   std::string io_name;
   RETURN_IF_ERROR(io.MemberAsString("name", &io_name));
@@ -215,7 +216,7 @@ CheckAllowedModelOutput(
 
 TRITONSERVER_Error*
 GetBooleanSequenceControlProperties(
-    TritonJson::Value& batcher, const std::string& model_name,
+    common::TritonJson::Value& batcher, const std::string& model_name,
     const std::string& control_kind, const bool required,
     std::string* tensor_name, std::string* tensor_datatype,
     float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
@@ -227,10 +228,10 @@ GetBooleanSequenceControlProperties(
   // Make sure the control kind is not mentioned multiple times.
   bool seen_control = false;
 
-  TritonJson::Value control_inputs;
+  common::TritonJson::Value control_inputs;
   if (batcher.Find("control_input", &control_inputs)) {
     for (size_t ci_idx = 0; ci_idx < control_inputs.ArraySize(); ci_idx++) {
-      TritonJson::Value control_input;
+      common::TritonJson::Value control_input;
       RETURN_IF_ERROR(control_inputs.IndexAsObject(ci_idx, &control_input));
       std::string input_name;
       RETURN_IF_ERROR(control_input.MemberAsString("name", &input_name));
@@ -252,10 +253,10 @@ GetBooleanSequenceControlProperties(
       }
 
       seen_tensors.insert(input_name);
-      TritonJson::Value controls;
+      common::TritonJson::Value controls;
       if (control_input.Find("control", &controls)) {
         for (size_t c_idx = 0; c_idx < controls.ArraySize(); c_idx++) {
-          TritonJson::Value c;
+          common::TritonJson::Value c;
           RETURN_IF_ERROR(controls.IndexAsObject(c_idx, &c));
           std::string kind_str;
           RETURN_IF_ERROR(c.MemberAsString("kind", &kind_str));
@@ -272,7 +273,7 @@ GetBooleanSequenceControlProperties(
             *tensor_name = input_name;
             seen_control = true;
 
-            TritonJson::Value int32_false_true, fp32_false_true;
+            common::TritonJson::Value int32_false_true, fp32_false_true;
             bool found_int32 =
                 (c.Find("int32_false_true", &int32_false_true) &&
                  (int32_false_true.ArraySize() > 0));
@@ -373,7 +374,7 @@ GetBooleanSequenceControlProperties(
 
 TRITONSERVER_Error*
 GetTypedSequenceControlProperties(
-    TritonJson::Value& batcher, const std::string& model_name,
+    common::TritonJson::Value& batcher, const std::string& model_name,
     const std::string& control_kind, const bool required,
     std::string* tensor_name, std::string* tensor_datatype)
 {
@@ -383,10 +384,10 @@ GetTypedSequenceControlProperties(
   // Make sure the control kind is not mentioned multiple times.
   bool seen_control = false;
 
-  TritonJson::Value control_inputs;
+  common::TritonJson::Value control_inputs;
   if (batcher.Find("control_input", &control_inputs)) {
     for (size_t ci_idx = 0; ci_idx < control_inputs.ArraySize(); ci_idx++) {
-      TritonJson::Value control_input;
+      common::TritonJson::Value control_input;
       RETURN_IF_ERROR(control_inputs.IndexAsObject(ci_idx, &control_input));
       std::string input_name;
       RETURN_IF_ERROR(control_input.MemberAsString("name", &input_name));
@@ -407,10 +408,10 @@ GetTypedSequenceControlProperties(
       }
 
       seen_tensors.insert(input_name);
-      TritonJson::Value controls;
+      common::TritonJson::Value controls;
       if (control_input.Find("control", &controls)) {
         for (size_t c_idx = 0; c_idx < controls.ArraySize(); c_idx++) {
-          TritonJson::Value c;
+          common::TritonJson::Value c;
           RETURN_IF_ERROR(controls.IndexAsObject(c_idx, &c));
           std::string kind_str;
           RETURN_IF_ERROR(c.MemberAsString("kind", &kind_str));
@@ -431,7 +432,7 @@ GetTypedSequenceControlProperties(
 
             seen_control = true;
 
-            TritonJson::Value int32_false_true, fp32_false_true;
+            common::TritonJson::Value int32_false_true, fp32_false_true;
             bool found_int32 =
                 (c.Find("int32_false_true", &int32_false_true) &&
                  (int32_false_true.ArraySize() > 0));
@@ -585,6 +586,7 @@ CopyBuffer(
 }
 
 namespace {
+
 TRITONSERVER_Error*
 GetDirectoryContents(const std::string& path, std::set<std::string>* contents)
 {
@@ -814,4 +816,4 @@ ParseDoubleValue(const std::string& value, double* parsed_value)
   return nullptr;  // success
 }
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend

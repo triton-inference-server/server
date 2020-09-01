@@ -158,7 +158,6 @@ RUN apt-get update && \
             autoconf \
             automake \
             build-essential \
-            cmake \
             git \
             libgoogle-glog0v5 \
             libre2-dev \
@@ -188,6 +187,14 @@ RUN apt-get update && \
 # Install dependencies for protobuf code generation in Python
 RUN pip3 install --upgrade wheel setuptools && \
     pip3 install grpcio-tools
+
+# Server build requires recent version of CMake (FetchContent required)
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+      gpg --dearmor - |  \
+      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends cmake
 
 # TensorFlow libraries. Install the monolithic libtensorflow_trtis and
 # create links from libtensorflow_framework.so and
@@ -353,7 +360,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cp -r server/install/bin /opt/tritonserver/. && \
             cp -r server/install/lib /opt/tritonserver/. && \
             cp -r server/install/backends /opt/tritonserver/. && \
-            cp -r server/install/include /opt/tritonserver/include/tritonserver) && \
+            cp -r server/install/include/triton /opt/tritonserver/include/.) && \
     (cd /opt/tritonserver && ln -sf /workspace/qa qa) && \
     (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/backends && chmod ugo-w+rx *) && \
@@ -442,8 +449,6 @@ COPY --chown=1000:1000 --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE 
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib lib
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends backends
-COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include/tritonserver/tritonserver.h include/
-
 
 # Get ONNX version supported
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/ort_onnx_version.txt ort_onnx_version.txt
