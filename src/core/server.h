@@ -73,8 +73,9 @@ class InferenceServer {
   Status Init();
 
   // Stop the server.  Return true if all models are unloaded, false
-  // if exit timeout occurs.
-  Status Stop();
+  // if exit timeout occurs. If 'force' is true attempt to stop the
+  // server even if it is not in a ready state.
+  Status Stop(const bool force = false);
 
   // Check the model repository for changes and update server state
   // based on those changes.
