@@ -590,6 +590,41 @@ message ModelOptimizationPolicy
   //@@
   message Cuda
   {
+    //@@    .. cpp:var:: message GraphSpec
+    //@@
+    //@@       Specification of the CUDA graph to be captured.
+    //@@
+    message GraphSpec
+    {
+      //@@      .. cpp:var:: message Dims
+      //@@
+      //@@         Specification of tensor dimension.
+      //@@
+      message Shape
+      {
+        //@@        .. cpp:var:: int64 dim (repeated)
+        //@@
+        //@@           The dimension.
+        //@@
+        repeated int64 dim = 1;
+      }
+
+      //@@      .. cpp:var:: int32 batch_size
+      //@@
+      //@@         The batch size of the CUDA graph. If 'max_batch_size' is 0,
+      //@@         'batch_size' must be set to 0. Otherwise, 'batch_size' must
+      //@@         be set to value between 1 and 'max_batch_size'.
+      //@@
+      int32 batch_size = 1;
+
+      //@@      .. cpp:var:: map<string, Shape> input
+      //@@
+      //@@         The specification of the inputs. 'Shape' is the shape of the
+      //@@         input without batching dimension.
+      //@@
+      map<string, Shape> input = 2;
+    }
+
     //@@    .. cpp:var:: bool graphs
     //@@
     //@@       Use CUDA graphs API to capture model operations and execute
@@ -606,6 +641,15 @@ message ModelOptimizationPolicy
     //@@       Currently only recognized by TensorRT backend.
     //@@
     bool busy_wait_events = 2;
+
+    //@@    .. cpp:var:: GraphSpec graph_spec (repeated)
+    //@@
+    //@@       Specification of the CUDA graph to be captured. If not specified
+    //@@       and 'graphs' is true, the default CUDA graphs will be captured
+    //@@       based on model settings.
+    //@@       Currently only recognized by TensorRT backend.
+    //@@
+    repeated GraphSpec graph_spec = 3;
   }
 
   //@@
