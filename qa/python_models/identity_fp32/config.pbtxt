@@ -26,7 +26,6 @@
 
 name: "identity_fp32"
 backend: "python"
-platform: "custom"
 max_batch_size: 64
 
 input [
