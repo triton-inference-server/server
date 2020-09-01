@@ -85,10 +85,16 @@ InputOutputNames(
           ort_api->SessionGetOutputName(session, i, allocator, &node_name);
     }
 
+    // Make a std::string copy of the name and then free 'node_name'
+    // since the ORT API makes us responsible for doing that.
+    std::string name(node_name);
+    free(node_name);
+
     if (onnx_status != nullptr) {
       break;
     }
-    names.emplace(node_name);
+
+    names.emplace(std::move(name));
   }
   RETURN_IF_ORT_ERROR(onnx_status);
 
@@ -111,14 +117,19 @@ InputOutputInfos(
 
   // iterate over all nodes
   for (size_t i = 0; i < num_nodes; i++) {
-    char* name;
+    char* cname;
     if (is_input) {
       RETURN_IF_ORT_ERROR(
-          ort_api->SessionGetInputName(session, i, allocator, &name));
+          ort_api->SessionGetInputName(session, i, allocator, &cname));
     } else {
       RETURN_IF_ORT_ERROR(
-          ort_api->SessionGetOutputName(session, i, allocator, &name));
+          ort_api->SessionGetOutputName(session, i, allocator, &cname));
     }
+
+    // Make a std::string copy of the name and then free 'cname' since
+    // the ORT API makes us responsible for doing that.
+    std::string name(cname);
+    free(cname);
 
     OrtTypeInfo* typeinfo;
     if (is_input) {
@@ -153,7 +164,7 @@ InputOutputInfos(
     RETURN_IF_ORT_ERROR(
         ort_api->GetDimensions(tensor_info, (int64_t*)dims.data(), num_dims));
 
-    infos.emplace(name, OnnxTensorInfo(type, dims));
+    infos.emplace(std::move(name), OnnxTensorInfo(type, dims));
   }
 
   return nullptr;  // success

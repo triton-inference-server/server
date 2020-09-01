@@ -115,6 +115,8 @@ struct OnnxTensorInfo {
   std::vector<int64_t> dims_;
 };
 
+using OnnxTensorInfoMap = std::unordered_map<std::string, OnnxTensorInfo>;
+
 /// Deleter for OrtTypeInfo.
 struct TypeInfoDeleter {
   void operator()(OrtTypeInfo* f) { ort_api->ReleaseTypeInfo(f); }
@@ -124,8 +126,6 @@ struct TypeInfoDeleter {
 struct SessionOptionsDeleter {
   void operator()(OrtSessionOptions* f) { ort_api->ReleaseSessionOptions(f); }
 };
-
-using OnnxTensorInfoMap = std::unordered_map<std::string, OnnxTensorInfo>;
 
 std::string OnnxDataTypeName(ONNXTensorElementDataType onnx_type);
 
