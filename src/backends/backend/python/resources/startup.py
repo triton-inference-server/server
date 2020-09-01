@@ -136,7 +136,7 @@ class PythonHost(PythonInterpreterServicer):
             args = {x.key: x.value for x in request.args}
             try:
                 self.backend.initialize(args)
-            except tpb_utils.PythonModelException as e:
+            except tpb_utils.TritonModelException as e:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(e.message())
 
@@ -149,7 +149,7 @@ class PythonHost(PythonInterpreterServicer):
         if hasattr(self.backend, 'finalize'):
             try:
                 self.backend.finalize()
-            except tpb_utils.PythonModelException as e:
+            except tpb_utils.TritonModelException as e:
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(e.message())
 

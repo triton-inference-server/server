@@ -68,11 +68,11 @@ cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
           sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
 mkdir -p models/execute_error/1/
-cp -r ../python_models/execute_error/model.py ./models/execute_error/1/
+cp ../python_models/execute_error/model.py ./models/execute_error/1/
 cp ../python_models/execute_error/config.pbtxt ./models/execute_error/
 
 mkdir -p models/init_args/1/
-cp -r ../python_models/init_args/model.py ./models/init_args/1/
+cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
 
 pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
@@ -102,6 +102,50 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# These models have errors in the initialization and finalization
+# steps and we want to ensure that correct error is being returned
+
+rm -rf models/
+mkdir -p models/init_error/1/
+cp ../python_models/init_error/model.py ./models/init_error/1/
+cp ../python_models/init_error/config.pbtxt ./models/init_error/
+
+set +e
+run_server_nowait
+wait $SERVER_PID
+
+grep "Exception calling application: name 'lorem_ipsum' is not defined" $SERVER_LOG
+
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** init_error model test failed \n***"
+    RET=1
+fi
+set -e
+
+rm -rf models/
+mkdir -p models/fini_error/1/
+cp ../python_models/fini_error/model.py ./models/fini_error/1/
+cp ../python_models/fini_error/config.pbtxt ./models/fini_error/
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+grep "Exception calling application: name 'undefined_variable' is not defined" $SERVER_LOG
+
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** fini_error model test failed \n***"
+    RET=1
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

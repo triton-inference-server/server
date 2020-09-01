@@ -141,7 +141,8 @@ class PythonTest(tu.TestResultCollector):
                     "Exception message is not correct")
             else:
                 self.assertTrue(
-                    False, "Wrong exception raised or did not raise an exception")
+                    False,
+                    "Wrong exception raised or did not raise an exception")
 
     def test_infer_pytorch(self):
         client_util = httpclient
@@ -187,7 +188,8 @@ class PythonTest(tu.TestResultCollector):
                     "Exception message is not correct")
             else:
                 self.assertTrue(
-                    False, "Wrong exception raised or did not raise an exception")
+                    False,
+                    "Wrong exception raised or did not raise an exception")
 
     def test_init_args(self):
         client_util = httpclient
@@ -202,7 +204,9 @@ class PythonTest(tu.TestResultCollector):
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
             # output response in this model is the number of keys in the args
-            self.assertTrue(result.as_numpy("OUT") == 7, "Number of keys in the init args is not correct")
+            self.assertTrue(
+                result.as_numpy("OUT") == 7,
+                "Number of keys in the init args is not correct")
 
 
 if __name__ == '__main__':

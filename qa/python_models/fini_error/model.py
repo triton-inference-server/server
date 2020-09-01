@@ -26,7 +26,6 @@
 
 import numpy as np
 import sys
-import json
 
 sys.path.append('../../')
 import triton_python_backend_utils as utils
@@ -35,26 +34,20 @@ import triton_python_backend_utils as utils
 class TritonPythonModel:
 
     def initialize(self, args):
-        self.args = args
-        print(args)
+        self.model_config = args['model_config']
 
     def execute(self, requests):
         """ This function is called on inference request.
         """
-        keys = [
-            'model_config', 'model_instance_kind', 'model_instance_name',
-            'model_instance_device_id', 'model_repository', 'model_version',
-            'model_name'
-        ]
-
-        correct_keys = 0
-        for key in keys:
-            if key in list(self.args):
-                correct_keys += 1
-
         responses = []
         for request in requests:
-            out_args = utils.Tensor("OUT",
-                                    np.array([correct_keys], dtype=np.float32))
-            responses.append(utils.InferenceResponse([out_args]))
+            input_tensors = request.inputs()
+            in_all = input_tensors[0].numpy_array()
+
+            out_tensor = utils.Tensor("OUT", in_all)
+            error = utils.TritonError('An error occured during execution')
+            responses.append(utils.InferenceResponse([out_tensor], error))
         return responses
+
+    def finalize(self):
+        undefined_variable

@@ -24,37 +24,29 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
-import json
+name: "fini_error"
+backend: "python"
+max_batch_size: 64
 
-sys.path.append('../../')
-import triton_python_backend_utils as utils
+input [
+  {
+    name: "IN"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
 
+output [
+  {
+    name: "OUT"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
 
-class TritonPythonModel:
-
-    def initialize(self, args):
-        self.args = args
-        print(args)
-
-    def execute(self, requests):
-        """ This function is called on inference request.
-        """
-        keys = [
-            'model_config', 'model_instance_kind', 'model_instance_name',
-            'model_instance_device_id', 'model_repository', 'model_version',
-            'model_name'
-        ]
-
-        correct_keys = 0
-        for key in keys:
-            if key in list(self.args):
-                correct_keys += 1
-
-        responses = []
-        for request in requests:
-            out_args = utils.Tensor("OUT",
-                                    np.array([correct_keys], dtype=np.float32))
-            responses.append(utils.InferenceResponse([out_args]))
-        return responses
+instance_group [
+  {
+    count: 1
+    kind : KIND_CPU
+  }
+]
