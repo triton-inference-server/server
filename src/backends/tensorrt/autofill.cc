@@ -45,7 +45,7 @@ class AutoFillPlanImpl : public AutoFill {
       const std::string& model_name, const std::string& plan_filename,
       nvinfer1::ICudaEngine* engine, nvinfer1::IRuntime* runtime)
       : AutoFill(model_name), plan_filename_(plan_filename), engine_(engine),
-        runtime_(runtime), max_batch_size_(0), is_dynamic_(false)
+        runtime_(runtime), max_batch_size_(0), num_profile_bindings_(0)
   {
   }
 
@@ -69,6 +69,18 @@ class AutoFillPlanImpl : public AutoFill {
 
   Status Init(inference::ModelConfig* config);
 
+  Status GetMaxSupportedBatchSize(inference::ModelConfig* config);
+
+  Status GetProfileMaxBatchSize(
+      const int profile_index, int* max_profile_batch_size);
+
+  Status GetProfileIndices(
+      inference::ModelConfig* config, std::set<int>* config_profiles);
+
+  Status ExtractBatchHintFromIOConfig(
+      const std::string& tensor_name, const DimsList& dims,
+      bool* config_batch_hint);
+
   Status FixBatchingSupport(inference::ModelConfig* config);
 
   void InitIOLists();
@@ -84,7 +96,7 @@ class AutoFillPlanImpl : public AutoFill {
   nvinfer1::ICudaEngine* engine_;
   nvinfer1::IRuntime* runtime_;
   int max_batch_size_;
-  bool is_dynamic_;
+  int num_profile_bindings_;
 };
 
 Status
@@ -121,174 +133,19 @@ AutoFillPlanImpl::Fix(inference::ModelConfig* config)
 Status
 AutoFillPlanImpl::Init(inference::ModelConfig* config)
 {
-  bool first_dim_variable = true;
-  int num_profiles = 0;
-
-  int num_model_bindings = engine_->getNbBindings();
-
-  // Visits all the model bindings in the engine and verifies if
-  // dynamic shapes are in use. Also verifies if the first dimension
-  // can be the batch dimension.
-  for (int i = 0; i < num_model_bindings; ++i) {
-    nvinfer1::Dims dims = engine_->getBindingDimensions(i);
-    if (engine_->bindingIsInput(i)) {
-      if (!is_dynamic_) {
-        for (int didx = 0; didx < dims.nbDims; ++didx) {
-          if (dims.d[didx] == -1) {
-            // Initialize the necessary variables
-            num_profiles = engine_->getNbOptimizationProfiles();
-            num_model_bindings /= num_profiles;
-            is_dynamic_ = true;
-            break;
-          }
-        }
-      }
-    }
-    if (!engine_->isShapeBinding(i)) {
-      if (dims.d[0] != -1) {
-        first_dim_variable = false;
-        break;
-      }
-    } else {
-      // Handle models with empty shape tensors
-      if (dims.nbDims == 0) {
-        first_dim_variable = false;
-        break;
-      }
-    }
-  }
-
   if (engine_->hasImplicitBatchDimension()) {
     // If engine has implicit batch dimension then retrieve the value and exit
     max_batch_size_ = engine_->getMaxBatchSize();
     return Status::Success;
-  } else if (!first_dim_variable) {
-    LOG_WARNING << "The TRT engine doesn't specify appropriate dimensions to "
-                   "support dynamic batching";
-    max_batch_size_ = 0;
   } else {
-    // Generate the set of profiles that supports dynamic batching. A profile to
-    // support dynamic batching should have minimum shape of first dim for every
-    // binding to be 1.
-    std::set<int> supported_profiles;
-    for (int profile = 0; profile < num_profiles; profile++) {
-      bool supports_batching = true;
-      for (int binding = 0; binding < num_model_bindings; binding++) {
-        int effective_binding_index = binding + (profile * num_model_bindings);
-        if (engine_->bindingIsInput(effective_binding_index)) {
-          if (!engine_->isShapeBinding(effective_binding_index)) {
-            nvinfer1::Dims min_shape = engine_->getProfileDimensions(
-                effective_binding_index, profile,
-                nvinfer1::OptProfileSelector::kMIN);
-            if (min_shape.d[0] != 1) {
-              supports_batching = false;
-              break;
-            }
-          } else {
-            const int32_t* shapes = engine_->getProfileShapeValues(
-                effective_binding_index, profile,
-                nvinfer1::OptProfileSelector::kMIN);
-            if (*shapes != 1) {
-              supports_batching = false;
-              break;
-            }
-          }
-        }
-      }
-      if (supports_batching) {
-        supported_profiles.insert(profile);
-      }
-    }
-    // Generate the map between supported profile and the corresponding maximum
-    // possible batch size
-    std::map<int, int> supported_profile_bs_map;
-    for (auto profile : supported_profiles) {
-      int min_max_shape = INT_MAX;
-      for (int binding = 0; binding < num_model_bindings; binding++) {
-        int effective_binding_index = binding + (profile * num_model_bindings);
-        if (engine_->bindingIsInput(effective_binding_index)) {
-          if (!engine_->isShapeBinding(effective_binding_index)) {
-            nvinfer1::Dims max_shape = engine_->getProfileDimensions(
-                effective_binding_index, profile,
-                nvinfer1::OptProfileSelector::kMAX);
-            if (min_max_shape > max_shape.d[0]) {
-              min_max_shape = max_shape.d[0];
-            }
-          } else {
-            const int32_t* shapes = engine_->getProfileShapeValues(
-                effective_binding_index, profile,
-                nvinfer1::OptProfileSelector::kMAX);
-            if (min_max_shape > *shapes) {
-              min_max_shape = *shapes;
-            }
-          }
-        }
-      }
-      supported_profile_bs_map[profile] = min_max_shape;
-    }
-
-    if (supported_profiles.empty()) {
-      // no supported profiles
-      max_batch_size_ = 0;
-    } else {
-      std::set<int> config_profiles;
-      // Verify all the profiles in the instance groups are supported or not
-      bool supports_batching = true;
-      for (const auto& group : config->instance_group()) {
-        for (const auto& profile : group.profile()) {
-          int profile_idx;
-          RETURN_IF_ERROR(GetProfileIndex(profile, &profile_idx));
-          if (profile_idx < 0 || profile_idx >= num_profiles) {
-            return Status(
-                Status::Code::INTERNAL,
-                "unable to autofill for '" + model_name_ +
-                    "', configuration specified invalid profile " + profile +
-                    " . Number of profiles supported by TensorRT engine: " +
-                    std::to_string(num_profiles));
-          }
-          config_profiles.insert(profile_idx);
-          if (supported_profiles.find(profile_idx) ==
-              supported_profiles.end()) {
-            supports_batching = false;
-            break;
-          }
-        }
-      }
-      // Get the max batch size if batching is supported
-      if (supports_batching) {
-        // Get the minimum of the maximum shape in config_profiles if non-empty,
-        // else get the minimum of the maximum shape in first supported profile.
-        if (!config_profiles.empty()) {
-          max_batch_size_ = INT_MAX;
-          for (auto profiles : config_profiles) {
-            if (max_batch_size_ > supported_profile_bs_map[profiles]) {
-              max_batch_size_ = supported_profile_bs_map[profiles];
-            }
-          }
-        } else {
-          LOG_WARNING
-              << "No profiles specified in the model config. Will be selecting "
-                 "profile index 0 to determine the max_batch_size for "
-              << model_name_;
-          if (supported_profile_bs_map.find(0) !=
-              supported_profile_bs_map.end()) {
-            max_batch_size_ = supported_profile_bs_map[0];
-          } else {
-            LOG_WARNING << "Profile index 0 for " << model_name_
-                        << " does not support batching.";
-            max_batch_size_ = 0;
-          }
-        }
-      } else {
-        LOG_WARNING << "Some of the profiles for " << model_name_
-                    << " do not support batching.";
-        max_batch_size_ = 0;
-      }
-    }
+    // Assuming the first dimension to be batch dimension, until and unless
+    // proven otherwise.
+    RETURN_IF_ERROR(GetMaxSupportedBatchSize(config));
   }
 
-  // For dynamic batching, the number of dimensions specified in model config
+  // For batching support, the number of dimensions specified in model config
   // match should be 1 less than the number of dimensions specified in engine.
+  // Will use that as a hint to ascertain whether or not to enable batching.
   bool config_batch_hint = false;
   // The number of IO Tensors with shape specification in config
   int tensors_with_config_shape_cnt = 0;
@@ -296,62 +153,22 @@ AutoFillPlanImpl::Init(inference::ModelConfig* config)
     for (const auto& config_io : config->input()) {
       if (!config_io.dims().empty()) {
         tensors_with_config_shape_cnt++;
-        // look up corresponding io info from model
-        for (int binding = 0; binding < num_model_bindings; binding++) {
-          if (config_io.name() == engine_->getBindingName(binding)) {
-            nvinfer1::Dims shape = engine_->getBindingDimensions(binding);
-            bool should_batch;
-            if (!engine_->isShapeBinding(binding)) {
-              should_batch = (shape.nbDims == (config_io.dims_size() + 1));
-            } else {
-              should_batch = (shape.d[0] == (config_io.dims(0) + 1));
-            }
-            if (should_batch) {
-              config_batch_hint = true;
-            }
-            if (config_batch_hint && (!should_batch)) {
-              return Status(
-                  Status::Code::INTERNAL,
-                  "unable to autofill for '" + model_name_ +
-                      "', model tensor configurations are contradicting " +
-                      "each other in terms of whether batching is supported");
-            }
-          }
-        }
+        RETURN_IF_ERROR(ExtractBatchHintFromIOConfig(
+            config_io.name(), config_io.dims(), &config_batch_hint));
       }
     }
     for (const auto& config_io : config->output()) {
       if (!config_io.dims().empty()) {
         tensors_with_config_shape_cnt++;
-        // look up corresponding io info from model
-        for (int binding = 0; binding < num_model_bindings; binding++) {
-          if (config_io.name() == engine_->getBindingName(binding)) {
-            nvinfer1::Dims shape = engine_->getBindingDimensions(binding);
-            bool should_batch;
-            if (!engine_->isShapeBinding(binding)) {
-              should_batch = (shape.nbDims == (config_io.dims_size() + 1));
-            } else {
-              should_batch = (shape.d[0] == (config_io.dims(0) + 1));
-            }
-            if (should_batch) {
-              config_batch_hint = true;
-            }
-            if (config_batch_hint && (!should_batch)) {
-              return Status(
-                  Status::Code::INTERNAL,
-                  "unable to autofill for '" + model_name_ +
-                      "', model tensor configurations are contradicting " +
-                      "each other in terms of whether batching is supported");
-            }
-          }
-        }
+        RETURN_IF_ERROR(ExtractBatchHintFromIOConfig(
+            config_io.name(), config_io.dims(), &config_batch_hint));
       }
     }
   }
 
   // Validate cases with incomplete input and output shapes
   if (tensors_with_config_shape_cnt != 0 &&
-      tensors_with_config_shape_cnt != num_model_bindings) {
+      tensors_with_config_shape_cnt != num_profile_bindings_) {
     return Status(
         Status::Code::INTERNAL,
         "unable to autofill for '" + model_name_ +
@@ -376,6 +193,124 @@ AutoFillPlanImpl::Init(inference::ModelConfig* config)
 }
 
 Status
+AutoFillPlanImpl::GetMaxSupportedBatchSize(inference::ModelConfig* config)
+{
+  std::set<int> profile_indices;
+  RETURN_IF_ERROR(GetProfileIndices(config, &profile_indices));
+
+  int running_max = 0;
+  for (const auto profile_index : profile_indices) {
+    int max_profile_batch_size;
+    RETURN_IF_ERROR(
+        GetProfileMaxBatchSize(profile_index, &max_profile_batch_size));
+    if (max_profile_batch_size > running_max) {
+      running_max = max_profile_batch_size;
+    }
+  }
+
+  max_batch_size_ = running_max;
+
+  return Status::Success;
+}
+
+Status
+AutoFillPlanImpl::GetProfileIndices(
+    inference::ModelConfig* config, std::set<int>* config_profiles)
+{
+  int num_profiles = engine_->getNbOptimizationProfiles();
+  num_profile_bindings_ = engine_->getNbBindings() / num_profiles;
+
+  for (const auto& group : config->instance_group()) {
+    for (const auto& profile : group.profile()) {
+      int profile_idx;
+      RETURN_IF_ERROR(GetProfileIndex(profile, &profile_idx));
+      if (profile_idx < 0 || profile_idx >= num_profiles) {
+        return Status(
+            Status::Code::INTERNAL,
+            "unable to autofill for '" + model_name_ +
+                "', configuration specified invalid profile " + profile +
+                " . Number of profiles supported by TensorRT engine: " +
+                std::to_string(num_profiles));
+      }
+      config_profiles->insert(profile_idx);
+    }
+  }
+
+  if (config_profiles->empty()) {
+    // If not specified then use the default.
+    config_profiles->insert(0);
+  }
+
+  return Status::Success;
+}
+
+Status
+AutoFillPlanImpl::GetProfileMaxBatchSize(
+    int profile_index, int* max_profile_batch_size)
+{
+  *max_profile_batch_size = INT_MAX;
+
+  // Visit all the bindings of the profile to capture the maximum and
+  // minimum batch size supported.
+  for (int binding_index = 0; binding_index < num_profile_bindings_;
+       binding_index++) {
+    int effective_binding_index =
+        (profile_index * num_profile_bindings_) + binding_index;
+    if (engine_->bindingIsInput(effective_binding_index)) {
+      if (!engine_->isShapeBinding(effective_binding_index)) {
+        nvinfer1::Dims max_shape = engine_->getProfileDimensions(
+            effective_binding_index, profile_index,
+            nvinfer1::OptProfileSelector::kMAX);
+        if (*max_profile_batch_size > max_shape.d[0]) {
+          *max_profile_batch_size = max_shape.d[0];
+        }
+
+      } else {
+        const int32_t* max_shapes = engine_->getProfileShapeValues(
+            effective_binding_index, profile_index,
+            nvinfer1::OptProfileSelector::kMAX);
+        if (*max_profile_batch_size > *max_shapes) {
+          *max_profile_batch_size = *max_shapes;
+        }
+      }
+    }
+  }
+  return Status::Success;
+}
+
+
+Status
+AutoFillPlanImpl::ExtractBatchHintFromIOConfig(
+    const std::string& tensor_name, const DimsList& dims,
+    bool* config_batch_hint)
+{
+  // look up corresponding io info from model
+  for (int binding_index = 0; binding_index < num_profile_bindings_;
+       binding_index++) {
+    if (tensor_name == engine_->getBindingName(binding_index)) {
+      nvinfer1::Dims shape = engine_->getBindingDimensions(binding_index);
+      bool should_batch;
+      if (!engine_->isShapeBinding(binding_index)) {
+        should_batch = (shape.nbDims == (dims.size() + 1));
+      } else {
+        should_batch = (shape.d[0] == (dims[0] + 1));
+      }
+      if (should_batch) {
+        *config_batch_hint = true;
+      }
+      if (*config_batch_hint && (!should_batch)) {
+        return Status(
+            Status::Code::INTERNAL,
+            "unable to autofill for '" + model_name_ +
+                "', model tensor configurations are contradicting " +
+                "each other in terms of whether batching is supported");
+      }
+    }
+  }
+  return Status::Success;
+}
+
+Status
 AutoFillPlanImpl::FixBatchingSupport(inference::ModelConfig* config)
 {
   if (config->max_batch_size() == 0) {
@@ -395,9 +330,7 @@ AutoFillPlanImpl::FixBatchingSupport(inference::ModelConfig* config)
 void
 AutoFillPlanImpl::InitIOLists()
 {
-  int num_model_bindings =
-      engine_->getNbBindings() / engine_->getNbOptimizationProfiles();
-  for (int i = 0; i < num_model_bindings; ++i) {
+  for (int i = 0; i < num_profile_bindings_; ++i) {
     nvinfer1::Dims dims = engine_->getBindingDimensions(i);
     bool is_shape_binding = engine_->isShapeBinding(i);
     if (engine_->bindingIsInput(i)) {
@@ -425,7 +358,7 @@ void
 AutoFillPlanImpl::InitIODims(
     nvinfer1::Dims& dims, bool is_shape_binding, IO* config_io)
 {
-  bool skip_first = (max_batch_size_ != 0) && is_dynamic_;
+  bool skip_first = (max_batch_size_ != 0);
   auto config_dims = config_io->mutable_dims();
   if (!is_shape_binding) {
     for (int didx = (skip_first ? 1 : 0); didx < dims.nbDims; ++didx) {

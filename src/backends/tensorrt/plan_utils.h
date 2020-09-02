@@ -74,7 +74,7 @@ Status ValidateDimension(
 Status CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
-    const bool supports_batching, const bool is_dynamic,
+    const bool supports_batching, const bool contains_explicit_batch,
     const bool compare_exact);
 
 Status CompareShapeDimsSupported(
