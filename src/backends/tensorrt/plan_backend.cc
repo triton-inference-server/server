@@ -417,8 +417,8 @@ PlanBackend::Context::InitOptimizationProfiles(
           return Status(
               Status::Code::INTERNAL, "unable to create TensorRT context");
         }
-        if (!res.first->second.context_->setOptimizationProfile(
-                profile_index)) {
+        if (!res.first->second.context_->setOptimizationProfileAsync(
+                profile_index, stream_)) {
           return Status(
               Status::Code::INVALID_ARG,
               "Can not set the specified optimization profile " + profile_name +

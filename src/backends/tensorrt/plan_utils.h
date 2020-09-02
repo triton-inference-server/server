@@ -46,6 +46,10 @@ enum class MemoryFormat {
   CHW16,
   // Thirty-two wide channel vectorized row major format.
   CHW32,
+  // Eight channel format where C is padded to a multiple of 8 with 3 spatial dims.
+  DHWC8,
+  // Thirty-two wide channel vectorized row major format with 3 spatial dims.
+  CDHW32,
   // Invalid Memory format
   INVALID
 };

@@ -63,6 +63,12 @@ ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt)
       return MemoryFormat::CHW16;
     case nvinfer1::TensorFormat::kCHW32:
       return MemoryFormat::CHW32;
+    case nvinfer1::TensorFormat::kDHWC8:
+      return MemoryFormat::DHWC8;
+    case nvinfer1::TensorFormat::kCDHW32:
+      return MemoryFormat::CDHW32;
+    default:
+      return MemoryFormat::INVALID; 
   }
 
   return MemoryFormat::INVALID;
@@ -84,6 +90,10 @@ MemoryFormat_Name(MemoryFormat fmt)
       return "CHW16";
     case MemoryFormat::CHW32:
       return "CHW32";
+    case MemoryFormat::DHWC8:
+      return "DHWC8";
+    case MemoryFormat::CDHW32:
+      return "CDHW32";
     case MemoryFormat::INVALID:
       return "INVALID";
   }
@@ -116,12 +126,14 @@ MemoryFormat_VectorSize(MemoryFormat fmt)
       vector_size = 4;
       break;
     case MemoryFormat::HWC8:
+    case MemoryFormat::DHWC8:
       vector_size = 8;
       break;
     case MemoryFormat::CHW16:
       vector_size = 16;
       break;
     case MemoryFormat::CHW32:
+    case MemoryFormat::CDHW32:
       vector_size = 32;
       break;
     default:
@@ -146,8 +158,12 @@ MemoryFormat_VectorDim(MemoryFormat fmt)
     case MemoryFormat::CHW32:
       vector_dim = 3;
       break;
+    case MemoryFormat::DHWC8:
+    case MemoryFormat::CDHW32:
+      vector_dim = 4;
+      break;
     default:
-      vector_dim = -1;  // In the default case, assume LINEAR
+      vector_dim = -1; // In the default case, assume LINEAR
       break;
   }
   return vector_dim;
