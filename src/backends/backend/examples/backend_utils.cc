@@ -29,6 +29,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <algorithm>
 #include <cerrno>
 
 namespace nvidia { namespace inferenceserver { namespace backend {
@@ -738,6 +739,77 @@ CreateCudaStream(
             .c_str());
   }
 #endif  // TRITON_ENABLE_GPU
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+ParseLongLongValue(const std::string& value, int64_t* parsed_value)
+{
+  try {
+    *parsed_value = std::stoll(value);
+  }
+  catch (const std::invalid_argument& ia) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("failed to convert '") + value +
+         "' to long long integral number")
+            .c_str());
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+ParseBoolValue(const std::string& value, bool* parsed_value)
+{
+  std::string lvalue = value;
+  std::transform(
+      lvalue.begin(), lvalue.end(), lvalue.begin(),
+      [](unsigned char c) { return std::tolower(c); });
+
+  if ((lvalue == "true") || (lvalue == "on") || (lvalue == "1")) {
+    *parsed_value = true;
+    return nullptr;  // success
+  }
+  if ((lvalue == "false") || (lvalue == "off") || (lvalue == "0")) {
+    *parsed_value = false;
+    return nullptr;  // success
+  }
+
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INVALID_ARG,
+      (std::string("failed to convert '") + value + "' to boolean").c_str());
+}
+
+TRITONSERVER_Error*
+ParseIntValue(const std::string& value, int* parsed_value)
+{
+  try {
+    *parsed_value = std::stoi(value);
+  }
+  catch (const std::invalid_argument& ia) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("failed to convert '") + value + "' to integral number")
+            .c_str());
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+ParseDoubleValue(const std::string& value, double* parsed_value)
+{
+  try {
+    *parsed_value = std::stod(value);
+  }
+  catch (const std::invalid_argument& ia) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("failed to convert '") + value + "' to double number")
+            .c_str());
+  }
 
   return nullptr;  // success
 }

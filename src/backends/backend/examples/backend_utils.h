@@ -369,4 +369,35 @@ TRITONSERVER_Error* ModelPaths(
 TRITONSERVER_Error* CreateCudaStream(
     const int device_id, const int cuda_stream_priority, cudaStream_t* stream);
 
+/// Parse the string as long long integer.
+///
+/// \param value The string.
+/// \param parse_value The long long integral value of the string.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* ParseLongLongValue(
+    const std::string& value, int64_t* parsed_value);
+
+/// Parse the string as boolean.
+///
+/// \param value The string.
+/// \param parse_value The boolean value of the string.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* ParseBoolValue(
+    const std::string& value, bool* parsed_value);
+
+/// Parse the string as integer.
+///
+/// \param value The string.
+/// \param parse_value The integral value of the string.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* ParseIntValue(const std::string& value, int* parsed_value);
+
+/// Parse the string as double.
+///
+/// \param value The string.
+/// \param parse_value The double value of the string.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* ParseDoubleValue(
+    const std::string& value, double* parsed_value);
+
 }}}  // namespace nvidia::inferenceserver::backend
