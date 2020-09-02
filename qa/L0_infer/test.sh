@@ -88,7 +88,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom python"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1

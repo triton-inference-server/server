@@ -170,7 +170,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $ONNX_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
+docker run --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -190,8 +190,10 @@ cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
 #!/bin/bash
 set -e
 python3 $SRCDIR/gen_qa_models.py --netdef --libtorch --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --pytorch --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --netdef --libtorch --variable --models_dir=$VARDESTDIR
+python3 $SRCDIR/gen_qa_models.py --netdef --pytorch --variable --models_dir=$VARDESTDIR
 chmod -R 777 $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --netdef --libtorch --models_dir=$IDENTITYDESTDIR
 chmod -R 777 $IDENTITYDESTDIR

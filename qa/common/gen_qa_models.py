@@ -1280,6 +1280,226 @@ def create_onnx_modelconfig(models_dir, max_batch, model_version, input_shape,
             lfile.write("label" + str(l) + "\n")
 
 
+def create_pytorch_modelfile(models_dir,
+                              max_batch,
+                              model_version,
+                              input_shape,
+                              output0_shape,
+                              output1_shape,
+                              input_dtype,
+                              output0_dtype,
+                              output1_dtype,
+                              swap=False):
+
+    if not tu.validate_for_pytorch_model(input_dtype, output0_dtype,
+                                          output1_dtype, input_shape,
+                                          output0_shape, output1_shape):
+        return
+
+    torch_input_dtype = np_to_torch_dtype(input_dtype)
+    torch_output0_dtype = np_to_torch_dtype(output0_dtype)
+    torch_output1_dtype = np_to_torch_dtype(output1_dtype)
+
+    model_name = tu.get_model_name(
+        "pytorch_nobatch" if max_batch == 0 else "pytorch", input_dtype,
+        output0_dtype, output1_dtype)
+    # handle for -1 (when variable) since can't create tensor with shape of [-1]
+    input_shape = [abs(ips) for ips in input_shape]
+    example_input = torch.zeros(input_shape, dtype=torch_input_dtype)
+
+    # Create the model
+    if not swap:
+
+        model='''
+import numpy as np
+import sys
+from torch import nn
+import torch
+
+sys.path.append('../../')
+import triton_python_backend_utils as utils
+
+
+class AddSubNet(nn.Module):
+    def __init__(self, *args):
+        example_input = torch.zeros({}, dtype={})
+        self.torch_output0_dtype = example_input
+        self.torch_output1_dtype = example_input
+        super(AddSubNet, self).__init__()
+
+    def forward(self, input0, input1):
+        return (input0 + input1).to(self.torch_output0_dtype), \
+            (input0 - input1).to(self.torch_output1_dtype)
+
+
+class TritonPythonModel:
+
+    def initialize(self, args):
+        self.model_config = args['model_config']
+        self.model = AddSubNet()
+
+    def execute(self, requests):
+        """ This function is called on inference request.
+        """
+        responses = []
+        for request in requests:
+            input_tensors = request.inputs()
+            in_0 = input_tensors[0].numpy_array()
+            in_1 = input_tensors[1].numpy_array()
+            out_0, out_1 = self.model(in_0, in_1)
+            out_tensor_0 = utils.Tensor("OUT0", out_0)
+            out_tensor_1 = utils.Tensor("OUT1", out_1)
+            responses.append(utils.InferenceResponse([out_tensor_0, out_tensor_1]))
+        return responses
+'''.format(input_shape, torch_input_dtype, example_input, example_input)
+
+    else:
+
+        model='''
+import numpy as np
+import sys
+from torch import nn
+import torch
+
+sys.path.append('../../')
+import triton_python_backend_utils as utils
+
+
+class SubAddNet(nn.Module):
+
+    def __init__(self, *args):
+        example_input = torch.zeros({}, dtype={})
+        self.torch_output0_dtype = example_input
+        self.torch_output1_dtype = example_input
+        self.model = AddSubNet()
+
+    def execute(self, requests):
+        """ This function is called on inference request.
+        """
+        responses = []
+        for request in requests:
+            input_tensors = request.inputs()
+            in_0 = input_tensors[0].numpy_array()
+            in_1 = input_tensors[1].numpy_array()
+            out_0, out_1 = self.model(in_0, in_1)
+            out_tensor_0 = utils.Tensor("OUT0", out_0)
+            out_tensor_1 = utils.Tensor("OUT1", out_1)
+            responses.append(utils.InferenceResponse([out_tensor_0, out_tensor_1]))
+        return responses
+
+
+class TritonPythonModel:
+
+    def initialize(self, args):
+        self.model_config = args['model_config']
+        self.model = SubAddNet()
+
+    def execute(self, requests):
+        """ This function is called on inference request.
+        """
+        responses = []
+        for request in requests:
+            input_tensors = request.inputs()
+            in_0 = input_tensors[0].numpy_array()
+            in_1 = input_tensors[1].numpy_array()
+            out_0, out_1 = self.model(in_0, in_1)
+            out_tensor_0 = utils.Tensor("OUT0", out_0)
+            out_tensor_1 = utils.Tensor("OUT1", out_1)
+            responses.append(utils.InferenceResponse([out_tensor_0, out_tensor_1]))
+        return responses
+'''.format(input_shape, torch_input_dtype, example_input, example_input)
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(model_version_dir + '/model.py', 'w') as model_file:
+        model_file.write(model)
+
+
+def create_pytorch_modelconfig(models_dir, max_batch, model_version,
+                                input_shape, output0_shape, output1_shape,
+                                input_dtype, output0_dtype, output1_dtype,
+                                output0_label_cnt, version_policy):
+
+    if not tu.validate_for_libtorch_model(input_dtype, output0_dtype,
+                                          output1_dtype, input_shape,
+                                          output0_shape, output1_shape):
+        return
+
+    # Unpack version policy
+    version_policy_str = "{ latest { num_versions: 1 }}"
+    if version_policy is not None:
+        type, val = version_policy
+        if type == 'latest':
+            version_policy_str = "{{ latest {{ num_versions: {} }}}}".format(
+                val)
+        elif type == 'specific':
+            version_policy_str = "{{ specific {{ versions: {} }}}}".format(val)
+        else:
+            version_policy_str = "{ all { }}"
+
+    # Use a different model name for the non-batching variant
+    model_name = tu.get_model_name(
+        "pytorch_nobatch" if max_batch == 0 else "pytorch", input_dtype,
+        output0_dtype, output1_dtype)
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "custom"
+backend: "python"
+max_batch_size: {}
+input [
+  {{
+    name: "IN0"
+    data_type: {}
+    dims: [ {} ]
+  }},
+  {{
+    name: "IN1"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "OUT0"
+    data_type: {}
+    dims: [ {} ]
+  }},
+  {{
+    name: "OUT1"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+
+instance_group [
+  {{
+    count: 1
+    kind : KIND_CPU
+  }}
+]
+'''.format(model_name, max_batch,
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(output0_dtype),
+           tu.shape_to_dims_str(output0_shape),
+           np_to_model_dtype(output1_dtype),
+           tu.shape_to_dims_str(output1_shape))
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_libtorch_modelfile(models_dir,
                               max_batch,
                               model_version,
@@ -1624,6 +1844,24 @@ def create_models(models_dir,
                                           config_output1_shape, input_dtype,
                                           output0_dtype, output1_dtype)
 
+    if FLAGS.pytorch:
+        # max-batch 8
+        create_pytorch_modelconfig(models_dir, 8, model_version, input_shape,
+                                    output0_shape, output1_shape, input_dtype,
+                                    output0_dtype, output1_dtype,
+                                    output0_label_cnt, version_policy)
+        create_pytorch_modelfile(models_dir, 8, model_version, input_shape,
+                                  output0_shape, output1_shape, input_dtype,
+                                  output0_dtype, output1_dtype)
+        # max-batch 0
+        create_pytorch_modelconfig(models_dir, 0, model_version, input_shape,
+                                    output0_shape, output1_shape, input_dtype,
+                                    output0_dtype, output1_dtype,
+                                    output0_label_cnt, version_policy)
+        create_pytorch_modelfile(models_dir, 0, model_version, input_shape,
+                                  output0_shape, output1_shape, input_dtype,
+                                  output0_dtype, output1_dtype)
+
 
 def create_fixed_models(models_dir,
                         input_dtype,
@@ -1672,6 +1910,10 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate Pytorch LibTorch models')
+    parser.add_argument('--pytorch',
+                        required=False,
+                        action='store_true',
+                        help='Generate Pytorch models for Python backend')
     parser.add_argument('--variable',
                         required=False,
                         action='store_true',
@@ -1695,6 +1937,9 @@ if __name__ == '__main__':
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch:
+        import torch
+        from torch import nn
+    if FLAGS.pytorch:
         import torch
         from torch import nn
 
