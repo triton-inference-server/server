@@ -174,11 +174,10 @@ class PlanBackend : public InferenceBackend {
           const std::string& profile_name, const int profile_idx,
           const int binding_cnts, const int event_set_cnts)
           : profile_name_(profile_name), profile_idx_(profile_idx),
-            context_(nullptr),
-            cuda_graph_execs_(event_set_cnts), min_dims_(binding_cnts),
-            max_dims_(binding_cnts), opt_dims_(binding_cnts),
-            min_shapes_(binding_cnts), max_shapes_(binding_cnts),
-            opt_shapes_(binding_cnts)
+            context_(nullptr), cuda_graph_execs_(event_set_cnts),
+            min_dims_(binding_cnts), max_dims_(binding_cnts),
+            opt_dims_(binding_cnts), min_shapes_(binding_cnts),
+            max_shapes_(binding_cnts), opt_shapes_(binding_cnts)
       {
       }
       std::string profile_name_;
@@ -259,10 +258,10 @@ class PlanBackend : public InferenceBackend {
         TensorRTContext* trt_context, const GraphSpec& graph_spec,
         std::vector<int64_t>* cuda_graph_key,
         TensorRTContext::CudaGraph* cuda_graph);
-    bool FindClosestCudaGraph(
+    void FindClosestCudaGraph(
         const TensorRTContext& trt_context,
         const std::vector<int64_t>& cuda_graph_key,
-        cudaGraphExec_t* cuda_graph_exec);
+        const TensorRTContext::CudaGraph** cuda_graph, bool* found_exact);
 
     // The engine used for the context. If the model uses dynamic shape, then
     // the CUDA engine is owned by the context. Otherwise, the engine is shared
@@ -329,6 +328,9 @@ class PlanBackend : public InferenceBackend {
 
     // Is set true if the loaded model has one or more dynamic shaped inputs
     bool is_dynamic_;
+
+    // Whether inexact match is allowed for finding CUDA graph
+    bool allow_inexact_match_;
 
     // The total number of bindings
     int total_bindings_;

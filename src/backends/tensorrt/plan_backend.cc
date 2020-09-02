@@ -626,6 +626,8 @@ PlanBackend::CreateExecutionContext(
     }
   }
 #endif
+  context->allow_inexact_match_ =
+      Config().optimization().cuda().allow_inexact_match();
 
   if (context->is_dynamic_) {
     std::string profiles_str;
@@ -1587,7 +1589,6 @@ PlanBackend::Context::BuildCudaGraphDynamic(
     }
   }
 
-  // FIXME add model specific tuning for particular use case
   std::vector<int64_t> cuda_graph_key;
   auto cuda_graph = TensorRTContext::CudaGraph();
   if (!SetCudaGraphShape(trt_context, graph_spec, &cuda_graph_key, &cuda_graph)
@@ -1720,18 +1721,39 @@ PlanBackend::Context::SetCudaGraphShape(
   return Status::Success;
 }
 
-bool
+void
 PlanBackend::Context::FindClosestCudaGraph(
     const TensorRTContext& trt_context,
     const std::vector<int64_t>& cuda_graph_key,
-    cudaGraphExec_t* cuda_graph_exec)
+    const TensorRTContext::CudaGraph** cuda_graph, bool* found_exact)
 {
-  auto itr = trt_context.cuda_graph_execs_[next_set_].find(cuda_graph_key);
+  *cuda_graph = nullptr;
+  auto itr =
+      trt_context.cuda_graph_execs_[next_set_].lower_bound(cuda_graph_key);
   if (itr != trt_context.cuda_graph_execs_[next_set_].end()) {
-    *cuda_graph_exec = itr->second.cuda_graph_exec_;
-    return true;
+    *found_exact = (itr->first == cuda_graph_key);
+    if (*found_exact) {
+      *cuda_graph = &itr->second;
+      return;
+    } else if (allow_inexact_match_) {
+      // For vector as key, returned lower bound may not satisfy requirements
+      // that all dims must be >= actual dims
+      for (; itr != trt_context.cuda_graph_execs_[next_set_].end(); itr++) {
+        bool found = true;
+        for (size_t key_idx = 0; key_idx < cuda_graph_key.size(); key_idx++) {
+          if (cuda_graph_key[key_idx] > itr->first[key_idx]) {
+            found = false;
+            break;
+          }
+        }
+        if (found) {
+          *cuda_graph = &itr->second;
+          return;
+        }
+      }
+    }
   }
-  return false;
+  return;
 }
 
 PlanBackend::~PlanBackend()
@@ -2258,6 +2280,63 @@ PlanBackend::Context::Run(
   }
   collector.Finalize();
 
+  const TensorRTContext::CudaGraph* cuda_graph = nullptr;
+  bool found_exact = false;
+  // FIXME closest_cuda_graph
+  FindClosestCudaGraph(citr->second, input_dims, &cuda_graph, &found_exact);
+  if ((cuda_graph != nullptr) && !found_exact && is_dynamic_) {
+    size_t input_idx = 0;
+    for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
+      int io_index = binding_offset + bindex;
+      if (!engine_->bindingIsInput(io_index) ||
+          engine_->isShapeBinding(io_index)) {
+        continue;
+      }
+      FAIL_ALL_AND_RETURN_IF_ERROR(
+          payload_->requests_, payload_->responses_, metric_reporter_.get(),
+          SetBindingDimensions(
+              "CUDA graph input", cuda_graph->input_dims_[input_idx],
+              citr->second, bindex, io_index, nullptr),
+          "error setting the binding dimension");
+      // Initialize additional entries in batch input
+      if (batch_inputs_[bindex] != nullptr) {
+        const auto& batch_input = batch_inputs_[bindex]->first;
+        const size_t total_byte_size = GetByteSize(
+            batch_input.data_type(), cuda_graph->input_dims_[input_idx]);
+
+        auto& allocated_memory = batch_inputs_[bindex]->second;
+        TRITONSERVER_MemoryType mem_type;
+        int64_t mem_type_id;
+        char* input_buffer =
+            allocated_memory->MutableBuffer(&mem_type, &mem_type_id);
+
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            payload_->requests_, payload_->responses_, metric_reporter_.get(),
+            collector.ProcessBatchInput(
+                batch_input, input_buffer, total_byte_size, mem_type,
+                mem_type_id),
+            "error setting the bath input value");
+        if (batch_input.kind() !=
+            inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) {
+          bool cuda_used = false;
+          FAIL_ALL_AND_RETURN_IF_ERROR(
+              payload_->requests_, payload_->responses_, metric_reporter_.get(),
+              CopyBuffer(
+                  "CUDA graph bathc input", mem_type, mem_type_id,
+                  TRITONSERVER_MEMORY_GPU, gpu_device_, total_byte_size,
+                  input_buffer, buffers_[bindex], input_copy_stream_,
+                  &cuda_used),
+              "error copying the batch input buffer");
+          if (cuda_used) {
+            cudaEventRecord(
+                events_[next_set_].input_ready_, input_copy_stream_);
+          }
+        }
+      }
+      input_idx++;
+    }
+  }
+
   // Ensure inputs are ready before execution. Output buffers will always be
   // available at this point as the execution and output copy are on the same
   // stream.
@@ -2265,9 +2344,11 @@ PlanBackend::Context::Run(
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
-  cudaGraphExec_t cuda_graph_exec;
-  if (FindClosestCudaGraph(citr->second, input_dims, &cuda_graph_exec)) {
-    cudaError_t err = cudaGraphLaunch(cuda_graph_exec, stream_);
+  if (cuda_graph != nullptr) {
+    LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
+                   << " [" << std::to_string(citr->first)
+                   << "] is launching CUDA graph for " << name_;
+    cudaError_t err = cudaGraphLaunch(cuda_graph->cuda_graph_exec_, stream_);
     if (err != cudaSuccess) {
       cudaStreamSynchronize(stream_);
       FAIL_ALL_AND_RETURN_IF_ERROR(
@@ -2485,7 +2566,9 @@ PlanBackend::Context::SetBindingDimensions(
     const TensorRTContext& trt_context, const size_t binding_idx,
     const size_t io_idx, std::vector<int64_t>* input_dims)
 {
-  input_dims->insert(input_dims->end(), shape.begin(), shape.end());
+  if (input_dims != nullptr) {
+    input_dims->insert(input_dims->end(), shape.begin(), shape.end());
+  }
   nvinfer1::Dims this_dim;
   // Set the binding dimension so that output dimensions can be obtained
   if (!DimVecToDims(shape, &this_dim)) {
