@@ -60,24 +60,6 @@ using IONameMap = std::unordered_map<std::string, std::string>;
 using TRTISTFModelHandle =
     std::unique_ptr<TRTISTF_Model, decltype(&TRTISTF_ModelDelete)>;
 
-TRITONSERVER_Error*
-ParseLongLongParameter(
-    const std::string& key, const std::string& value, int64_t* parsed_value)
-{
-  try {
-    *parsed_value = std::stoll(value);
-  }
-  catch (const std::invalid_argument& ia) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        (std::string("failed to convert ") + key + " '" + value +
-         "' to integral number")
-            .c_str());
-  }
-
-  return nullptr;  // success
-}
-
 // BackendConfig
 struct BackendConfig {
   BackendConfig()
@@ -1260,21 +1242,18 @@ ModelInstanceState::Create(
                   } else if (param_key == "minimum_segment_size") {
                     RETURN_IF_ERROR(params.MemberAsString(
                         param_key.c_str(), &value_string));
-                    RETURN_IF_ERROR(ParseLongLongParameter(
-                        "minimum_segment_size", value_string,
-                        &tftrt_config.minimum_segment_size_));
+                    RETURN_IF_ERROR(nib::ParseLongLongValue(
+                        value_string, &tftrt_config.minimum_segment_size_));
                   } else if (param_key == "max_workspace_size_bytes") {
                     RETURN_IF_ERROR(params.MemberAsString(
                         param_key.c_str(), &value_string));
-                    RETURN_IF_ERROR(ParseLongLongParameter(
-                        "max_workspace_size_bytes", value_string,
-                        &tftrt_config.max_workspace_size_bytes_));
+                    RETURN_IF_ERROR(nib::ParseLongLongValue(
+                        value_string, &tftrt_config.max_workspace_size_bytes_));
                   } else if (param_key == "max_cached_engines") {
                     RETURN_IF_ERROR(params.MemberAsString(
                         param_key.c_str(), &value_string));
-                    RETURN_IF_ERROR(ParseLongLongParameter(
-                        "max_cached_engines", value_string,
-                        &tftrt_config.max_cached_engines_));
+                    RETURN_IF_ERROR(nib::ParseLongLongValue(
+                        value_string, &tftrt_config.max_cached_engines_));
                   } else {
                     return TRITONSERVER_ErrorNew(
                         TRITONSERVER_ERROR_INVALID_ARG,
@@ -1951,12 +1930,16 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
   ni::TritonJson::Value cmdline;
   if (backend_config.Find("cmdline", &cmdline)) {
     ni::TritonJson::Value value;
+    std::string value_str;
     if (cmdline.Find("allow-soft-placement", &value)) {
-      RETURN_IF_ERROR(value.AsBool(&lconfig->allow_soft_placement_));
+      RETURN_IF_ERROR(value.AsString(&value_str));
+      RETURN_IF_ERROR(
+          nib::ParseBoolValue(value_str, &lconfig->allow_soft_placement_));
     }
     if (cmdline.Find("gpu-memory-fraction", &value)) {
+      RETURN_IF_ERROR(value.AsString(&value_str));
       double lvalue;
-      RETURN_IF_ERROR(value.AsDouble(&lvalue));
+      RETURN_IF_ERROR(nib::ParseDoubleValue(value_str, &lvalue));
       lconfig->per_process_gpu_memory_fraction_ = lvalue;
       lconfig->allow_gpu_memory_growth_ = (lvalue == 0.0);
     }
