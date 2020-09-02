@@ -31,8 +31,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 This package holds the triton python client library. The generic
 installation is different from the linux-specific installation. The components
 included within generic tritonclient package are:
-- grpc, grpc_service_pb2, grpc_service_pb2_grpc, model_config_pb2
 - http
+- grpc [ `service_pb2`, `service_pb2_grpc`, `model_config_pb2` ]
 - utils [ x86-linux distribution will include `shared_memory` and `cuda_shared_memory`]
 
 Apart from the above library, x86-linux distribution will include a pre-compiled perf_client binary
@@ -59,19 +59,20 @@ Use the package manager [pip](https://pip.pypa.io/en/stable/) to install triton 
 library.
 
 ```bash
+pip install nvidia-pyindex
 pip install tritonclient[all]
 ```
 
-There are two optional packages available, namely, grpc and http. [`all`] installs
+There are two optional packages available, namely, `grpc` and `http`. [`all`] installs
 dependencies for both the protocols.
 
 The perf_client is installed in the system configuration specific `bin` directory.
 
 ## Usage
 
-Refer to the  examples [here](https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples) for the usage of the library.
+Refer to the  examples [here](https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples) for the usage of library.
 
-Use the following command to get the detailed usage for perf_client.
+Use the following command to get the detailed usage for perf_client binary.
 
 ```bash
 perf_client -h
