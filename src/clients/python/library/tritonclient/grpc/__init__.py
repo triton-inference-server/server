@@ -24,19 +24,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import base64
-import numpy as np
-import grpc
-import rapidjson as json
-import threading
-import queue
-import struct
+try:
+    from google.protobuf.json_format import MessageToJson
+    import grpc
+    import base64
+    import numpy as np
+    import rapidjson as json
+    import threading
+    import queue
+    import struct
+except ModuleNotFoundError as error:
+    raise RuntimeError(
+        'The installation does not include grpc support. Specify \'grpc\' or \'all\' while installing the tritonclient package to include the support'
+    ) from error
 
-from google.protobuf.json_format import MessageToJson
+from tritonclient.grpc import model_config_pb2
+from tritonclient.grpc import service_pb2
+from tritonclient.grpc import service_pb2_grpc
 
-from tritongrpcclient import grpc_service_pb2
-from tritongrpcclient import grpc_service_pb2_grpc
-from tritonclientutils import *
+from tritonclient.utils import *
 
 # Should be kept consistent with the value specified in
 # src/core/constants.h, which specifies MAX_GRPC_MESSAGE_SIZE
@@ -58,7 +64,7 @@ def raise_error_grpc(rpc_error):
 def _get_inference_request(model_name, inputs, model_version, request_id,
                            outputs, sequence_id, sequence_start, sequence_end,
                            priority, timeout):
-    request = grpc_service_pb2.ModelInferRequest()
+    request = service_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
     if request_id != "":
@@ -151,7 +157,7 @@ class InferenceServerClient:
             self._channel = grpc.secure_channel(url, creds, options=channel_opt)
         else:
             self._channel = grpc.insecure_channel(url, options=channel_opt)
-        self._client_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(
+        self._client_stub = service_pb2_grpc.GRPCInferenceServiceStub(
             self._channel)
         self._verbose = verbose
         self._stream = None
@@ -198,7 +204,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.ServerLiveRequest()
+            request = service_pb2.ServerLiveRequest()
             if self._verbose:
                 print("is_server_live, metadata {}\n{}".format(
                     metadata, request))
@@ -235,7 +241,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.ServerReadyRequest()
+            request = service_pb2.ServerReadyRequest()
             if self._verbose:
                 print("is_server_ready, metadata {}\n{}".format(
                     metadata, request))
@@ -280,8 +286,8 @@ class InferenceServerClient:
         try:
             if type(model_version) != str:
                 raise_error("model version must be a string")
-            request = grpc_service_pb2.ModelReadyRequest(name=model_name,
-                                                         version=model_version)
+            request = service_pb2.ModelReadyRequest(name=model_name,
+                                                    version=model_version)
             if self._verbose:
                 print("is_model_ready, metadata {}\n{}".format(
                     metadata, request))
@@ -322,7 +328,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.ServerMetadataRequest()
+            request = service_pb2.ServerMetadataRequest()
             if self._verbose:
                 print("get_server_metadata, metadata {}\n{}".format(
                     metadata, request))
@@ -379,8 +385,8 @@ class InferenceServerClient:
         try:
             if type(model_version) != str:
                 raise_error("model version must be a string")
-            request = grpc_service_pb2.ModelMetadataRequest(
-                name=model_name, version=model_version)
+            request = service_pb2.ModelMetadataRequest(name=model_name,
+                                                       version=model_version)
             if self._verbose:
                 print("get_model_metadata, metadata {}\n{}".format(
                     metadata, request))
@@ -437,8 +443,8 @@ class InferenceServerClient:
         try:
             if type(model_version) != str:
                 raise_error("model version must be a string")
-            request = grpc_service_pb2.ModelConfigRequest(name=model_name,
-                                                          version=model_version)
+            request = service_pb2.ModelConfigRequest(name=model_name,
+                                                     version=model_version)
             if self._verbose:
                 print("get_model_config, metadata {}\n{}".format(
                     metadata, request))
@@ -479,7 +485,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.RepositoryIndexRequest()
+            request = service_pb2.RepositoryIndexRequest()
             if self._verbose:
                 print("get_model_repository_index, metadata {}\n{}".format(
                     metadata, request))
@@ -517,7 +523,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.RepositoryModelLoadRequest(
+            request = service_pb2.RepositoryModelLoadRequest(
                 model_name=model_name)
             if self._verbose:
                 print("load_model, metadata {}\n{}".format(metadata, request))
@@ -550,7 +556,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.RepositoryModelUnloadRequest(
+            request = service_pb2.RepositoryModelUnloadRequest(
                 model_name=model_name)
             if self._verbose:
                 print("unload_model, metadata {}\n{}".format(metadata, request))
@@ -600,8 +606,8 @@ class InferenceServerClient:
         try:
             if type(model_version) != str:
                 raise_error("model version must be a string")
-            request = grpc_service_pb2.ModelStatisticsRequest(
-                name=model_name, version=model_version)
+            request = service_pb2.ModelStatisticsRequest(name=model_name,
+                                                         version=model_version)
             if self._verbose:
                 print("get_inference_statistics, metadata {}\n{}".format(
                     metadata, request))
@@ -654,7 +660,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.SystemSharedMemoryStatusRequest(
+            request = service_pb2.SystemSharedMemoryStatusRequest(
                 name=region_name)
             if self._verbose:
                 print("get_system_shared_memory_status, metadata {}\n{}".format(
@@ -708,7 +714,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.SystemSharedMemoryRegisterRequest(
+            request = service_pb2.SystemSharedMemoryRegisterRequest(
                 name=name, key=key, offset=offset, byte_size=byte_size)
             if self._verbose:
                 print("register_system_shared_memory, metadata {}\n{}".format(
@@ -746,8 +752,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.SystemSharedMemoryUnregisterRequest(
-                name=name)
+            request = service_pb2.SystemSharedMemoryUnregisterRequest(name=name)
             if self._verbose:
                 print("unregister_system_shared_memory, metadata {}\n{}".format(
                     metadata, request))
@@ -800,7 +805,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.CudaSharedMemoryStatusRequest(
+            request = service_pb2.CudaSharedMemoryStatusRequest(
                 name=region_name)
             if self._verbose:
                 print("get_cuda_shared_memory_status, metadata {}\n{}".format(
@@ -851,7 +856,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.CudaSharedMemoryRegisterRequest(
+            request = service_pb2.CudaSharedMemoryRegisterRequest(
                 name=name,
                 raw_handle=base64.b64decode(raw_handle),
                 device_id=device_id,
@@ -892,8 +897,7 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
-            request = grpc_service_pb2.CudaSharedMemoryUnregisterRequest(
-                name=name)
+            request = service_pb2.CudaSharedMemoryUnregisterRequest(name=name)
             if self._verbose:
                 print("unregister_cuda_shared_memory, metadata {}\n{}".format(
                     metadata, request))
@@ -1320,7 +1324,7 @@ class InferInput:
     """
 
     def __init__(self, name, shape, datatype):
-        self._input = grpc_service_pb2.ModelInferRequest().InferInputTensor()
+        self._input = service_pb2.ModelInferRequest().InferInputTensor()
         self._input.name = name
         self._input.ClearField('shape')
         self._input.shape.extend(shape)
@@ -1468,7 +1472,7 @@ class InferRequestedOutput:
     """
 
     def __init__(self, name, class_count=0):
-        self._output = grpc_service_pb2.ModelInferRequest(
+        self._output = service_pb2.ModelInferRequest(
         ).InferRequestedOutputTensor()
         self._output.name = name
         if class_count != 0:

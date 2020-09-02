@@ -33,8 +33,9 @@ import sys
 import struct
 
 import grpc
-from tritongrpcclient import grpc_service_pb2, grpc_service_pb2_grpc
-import tritongrpcclient.model_config_pb2 as mc
+
+from tritonclient.grpc import service_pb2, service_pb2_grpc
+import tritonclient.grpc.model_config_pb2 as mc
 
 FLAGS = None
 
@@ -224,7 +225,7 @@ def postprocess(response, filenames, batch_size):
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
                      result_filenames):
-    request = grpc_service_pb2.ModelInferRequest()
+    request = service_pb2.ModelInferRequest()
     request.model_name = FLAGS.model_name
     request.model_version = FLAGS.model_version
 
@@ -242,12 +243,12 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
 
     filenames.sort()
 
-    output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output = service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output.name = output_name
     output.parameters['classification'].int64_param = FLAGS.classes
     request.outputs.extend([output])
 
-    input = grpc_service_pb2.ModelInferRequest().InferInputTensor()
+    input = service_pb2.ModelInferRequest().InferInputTensor()
     input.name = input_name
     input.datatype = dtype
     if format == mc.ModelInput.FORMAT_NHWC:
@@ -358,16 +359,16 @@ if __name__ == '__main__':
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
-    metadata_request = grpc_service_pb2.ModelMetadataRequest(
+    metadata_request = service_pb2.ModelMetadataRequest(
         name=FLAGS.model_name, version=FLAGS.model_version)
     metadata_response = grpc_stub.ModelMetadata(metadata_request)
 
-    config_request = grpc_service_pb2.ModelConfigRequest(
-        name=FLAGS.model_name, version=FLAGS.model_version)
+    config_request = service_pb2.ModelConfigRequest(name=FLAGS.model_name,
+                                                    version=FLAGS.model_version)
     config_response = grpc_stub.ModelConfig(config_request)
 
     input_name, output_name, c, h, w, format, dtype = parse_model(

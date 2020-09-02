@@ -29,7 +29,7 @@ import argparse
 import numpy as np
 import sys
 
-import tritongrpcclient
+import tritonclient.grpc as grpcclient
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = tritongrpcclient.InferenceServerClient(
+        triton_client = grpcclient.InferenceServerClient(
             url=FLAGS.url,
             verbose=FLAGS.verbose,
             ssl=FLAGS.ssl,
@@ -103,8 +103,8 @@ if __name__ == '__main__':
     # Infer
     inputs = []
     outputs = []
-    inputs.append(tritongrpcclient.InferInput('INPUT0', [1, 16], "INT32"))
-    inputs.append(tritongrpcclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "INT32"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -116,8 +116,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data)
     inputs[1].set_data_from_numpy(input1_data)
 
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
 
     # Test with outputs
     results = triton_client.infer(model_name=model_name,

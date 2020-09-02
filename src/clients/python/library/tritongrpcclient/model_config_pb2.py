@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,54 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-set -e
+import warnings
+warnings.simplefilter('always', DeprecationWarning)
 
-function main() {
-  if [[ $# -lt 1 ]] ; then
-    echo "usage: $0 <destination dir>"
-    exit 1
-  fi
+warnings.warn(
+    "The package `tritongrpcclient` is deprecated and will be "
+    "removed in a future version. Please use instead "
+    "`tritonclient.grpc.model_config_pb2`", DeprecationWarning)
 
-  if [[ ! -f "VERSION" ]]; then
-    echo "Could not find VERSION"
-    exit 1
-  fi
-
-  VERSION=`cat VERSION`
-  DEST="$1"
-  WHLDIR="$DEST/wheel"
-
-  echo $(date) : "=== Using builddir: ${WHLDIR}"
-  mkdir -p ${WHLDIR}/tritongrpcclient/
-
-  echo "Adding package files"
-  cp ../../../core/*_pb2.py \
-    "${WHLDIR}/tritongrpcclient/."
-
-  cp ../../../core/*_grpc.py \
-    "${WHLDIR}/tritongrpcclient/."
-
-  cp grpcclient.py \
-    "${WHLDIR}/tritongrpcclient/__init__.py"
-
-  cp grpc_setup.py "${WHLDIR}"
-
-  # Use 'sed' command to fix protoc compiled imports (see
-  # https://github.com/google/protobuf/issues/1491).
-  sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritongrpcclient import \1_pb2 as \2/" \
-    ${WHLDIR}/tritongrpcclient/*_pb2.py
-  sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritongrpcclient import \1_pb2 as \2/" \
-    ${WHLDIR}/tritongrpcclient/*_pb2_grpc.py
-
-  pushd "${WHLDIR}"
-  echo $(date) : "=== Building wheel"
-  VERSION=$VERSION python${PYVER} grpc_setup.py bdist_wheel
-  mkdir -p "${DEST}"
-  cp dist/* "${DEST}"
-  popd
-  echo $(date) : "=== Output wheel file is in: ${DEST}"
-
-  touch ${DEST}/stamp.whl
-}
-
-main "$@"
+from tritonclient.grpc.model_config_pb2 import *

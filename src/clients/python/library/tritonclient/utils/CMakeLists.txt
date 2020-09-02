@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,54 +24,41 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-set -e
+configure_file(__init__.py __init__.py COPYONLY)
 
-function main() {
-  if [[ $# -lt 1 ]] ; then
-    echo "usage: $0 <destination dir>"
-    exit 1
-  fi
+if(NOT WIN32)
+  file(COPY shared_memory DESTINATION .)
 
-  if [[ ! -f "VERSION" ]]; then
-    echo "Could not find VERSION"
-    exit 1
-  fi
+  #
+  # libcshm.so
+  #
+  add_library(cshm SHARED shared_memory/shared_memory.cc)
+  if(${TRITON_ENABLE_GPU})
+    target_include_directories(cshm PRIVATE ${CUDA_INCLUDE_DIRS})
+  endif() # TRITON_ENABLE_GPU
+  target_link_libraries(cshm rt)
 
-  VERSION=`cat VERSION`
-  DEST="$1"
-  WHLDIR="$DEST/wheel"
+  #
+  # libccudashm.so
+  #
+  if(${TRITON_ENABLE_GPU})
+    file(COPY cuda_shared_memory DESTINATION .)
+    add_library(
+        ccudashm SHARED
+        cuda_shared_memory/cuda_shared_memory.cc
+        ../../../../c++/library/cencode.c
+        ../../../../c++/library/cencode.h
+    )
+    target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(
+        ccudashm
+        PRIVATE ${CUDA_LIBRARIES})
+  endif() # TRITON_ENABLE_GPU
+endif() # WIN32
 
-  echo $(date) : "=== Using builddir: ${WHLDIR}"
-  mkdir -p ${WHLDIR}/tritonshmutils/
-
-  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
-    mkdir -p ${WHLDIR}/tritonshmutils/shared_memory
-    cp libcshm.so \
-      "${WHLDIR}/tritonshmutils/shared_memory/."
-    cp shared_memory/__init__.py \
-      "${WHLDIR}/tritonshmutils/shared_memory/."
-
-    if [ -f libccudashm.so ] && [ -f cuda_shared_memory/__init__.py ]; then
-      mkdir -p ${WHLDIR}/tritonshmutils/cuda_shared_memory
-      cp libccudashm.so \
-        "${WHLDIR}/tritonshmutils/cuda_shared_memory/."
-      cp cuda_shared_memory/__init__.py \
-        "${WHLDIR}/tritonshmutils/cuda_shared_memory/."
-    fi
-  fi
-
-  cp shm_utils_setup.py "${WHLDIR}"
-  touch ${WHLDIR}/tritonshmutils/__init__.py
-
-  pushd "${WHLDIR}"
-  echo $(date) : "=== Building wheel"
-  VERSION=$VERSION python${PYVER} shm_utils_setup.py bdist_wheel
-  mkdir -p "${DEST}"
-  cp dist/* "${DEST}"
-  popd
-  echo $(date) : "=== Output wheel file is in: ${DEST}"
-
-  touch ${DEST}/stamp.whl
-}
-
-main "$@"
+if(NOT WIN32)
+  configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
+  if(${TRITON_ENABLE_GPU})
+    configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
+  endif() # TRITON_ENABLE_GPU
+endif() # NOT WIN32

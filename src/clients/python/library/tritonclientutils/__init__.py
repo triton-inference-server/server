@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,40 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-set -e
+import warnings
+warnings.simplefilter('always', DeprecationWarning)
 
-function main() {
-  if [[ $# -lt 1 ]] ; then
-    echo "usage: $0 <destination dir>"
-    exit 1
-  fi
+warnings.warn(
+    "The package `tritonclientutils` is deprecated and will be "
+    "removed in a future version. Please use instead "
+    "`tritonclient.utils`", DeprecationWarning)
 
-  if [[ ! -f "VERSION" ]]; then
-    echo "Could not find VERSION"
-    exit 1
-  fi
-
-  VERSION=`cat VERSION`
-  DEST="$1"
-  WHLDIR="$DEST/wheel"
-
-  echo $(date) : "=== Using builddir: ${WHLDIR}"
-  mkdir -p ${WHLDIR}/tritonclientutils/
-
-  cp utils.py \
-    "${WHLDIR}/tritonclientutils/__init__.py"
-
-  cp utils_setup.py "${WHLDIR}"
-
-  pushd "${WHLDIR}"
-  echo $(date) : "=== Building wheel"
-  VERSION=$VERSION python${PYVER} utils_setup.py bdist_wheel
-  mkdir -p "${DEST}"
-  cp dist/* "${DEST}"
-  popd
-  echo $(date) : "=== Output wheel file is in: ${DEST}"
-
-  touch ${DEST}/stamp.whl
-}
-
-main "$@"
+from tritonclient.utils import *
