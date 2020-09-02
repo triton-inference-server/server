@@ -30,24 +30,23 @@ import numpy as np
 import sys
 import gevent.ssl
 
-import tritonhttpclient
-from tritonclientutils import InferenceServerException
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
 
 def test_infer(model_name, input0_data, input1_data, headers=None):
     inputs = []
     outputs = []
-    inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "INT32"))
-    inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
 
     # Initialize the data
     inputs[0].set_data_from_numpy(input0_data, binary_data=False)
     inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
-    outputs.append(
-        tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-    outputs.append(
-        tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
+                                                   binary_data=False))
     query_params = {'test_1': 1, 'test_2': 2}
     results = triton_client.infer(model_name,
                                   inputs,
@@ -60,8 +59,8 @@ def test_infer(model_name, input0_data, input1_data, headers=None):
 
 def test_infer_no_outputs(model_name, input0_data, input1_data, headers=None):
     inputs = []
-    inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "INT32"))
-    inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
 
     # Initialize the data
     inputs[0].set_data_from_numpy(input0_data, binary_data=False)
@@ -115,14 +114,14 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
     try:
         if FLAGS.ssl:
-            triton_client = tritonhttpclient.InferenceServerClient(
+            triton_client = httpclient.InferenceServerClient(
                 url=FLAGS.url,
                 verbose=FLAGS.verbose,
                 ssl=True,
                 ssl_context_factory=gevent.ssl._create_unverified_context,
                 insecure=True)
         else:
-            triton_client = tritonhttpclient.InferenceServerClient(
+            triton_client = httpclient.InferenceServerClient(
                 url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))

@@ -24,13 +24,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from builtins import range
-from enum import IntEnum
-from functools import partial
-from future.utils import iteritems
+import os
 from ctypes import *
 import numpy as np
-from numpy.ctypeslib import ndpointer
 import pkg_resources
 import struct
 
@@ -47,10 +43,9 @@ class _utf8(object):
             return value.encode('utf8')
 
 
-import os
 _ccudashm_lib = "ccudashm" if os.name == 'nt' else 'libccudashm.so'
 _ccudashm_path = pkg_resources.resource_filename(
-    'tritonshmutils.cuda_shared_memory', _ccudashm_lib)
+    'tritonclient.utils.cuda_shared_memory', _ccudashm_lib)
 _ccudashm = cdll.LoadLibrary(_ccudashm_path)
 
 _ccudashm_shared_memory_region_create = _ccudashm.CudaSharedMemoryRegionCreate

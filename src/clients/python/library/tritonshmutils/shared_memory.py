@@ -24,43 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-from setuptools import find_packages
-from setuptools import setup
+import warnings
+warnings.simplefilter('always', DeprecationWarning)
 
-if 'VERSION' not in os.environ:
-    raise Exception('envvar VERSION must be specified')
+warnings.warn(
+    "The package `tritonshmutils.shared_memory` is deprecated and will be "
+    "removed in a future version. Please use instead "
+    "`tritonclient.utils.shared_memory`", DeprecationWarning)
 
-VERSION = os.environ['VERSION']
-
-REQUIRED = ['numpy']
-
-try:
-    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
-
-    class bdist_wheel(_bdist_wheel):
-
-        def finalize_options(self):
-            _bdist_wheel.finalize_options(self)
-            self.root_is_pure = False
-
-        def get_tag(self):
-            pyver, abi, plat = 'py3', 'none', 'any'
-            return pyver, abi, plat
-except ImportError:
-    bdist_wheel = None
-
-setup(
-    name='tritonclientutils',
-    version=VERSION,
-    author='NVIDIA Inc.',
-    author_email='tanmayv@nvidia.com',
-    description='Python utils library for NVIDIA Triton Inference Server client',
-    license='BSD',
-    url='http://nvidia.com',
-    keywords='triton tensorrt inference server utils client',
-    packages=find_packages(),
-    install_requires=REQUIRED,
-    zip_safe=False,
-    cmdclass={'bdist_wheel': bdist_wheel},
-)
+from tritonclient.utils.shared_memory import *

@@ -24,17 +24,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from geventhttpclient import HTTPClient
-from geventhttpclient.url import URL
+try:
+    from geventhttpclient import HTTPClient
+    from geventhttpclient.url import URL
+    import gevent
+    import gevent.pool
+    from urllib.parse import quote, quote_plus
+    import rapidjson as json
+    import numpy as np
+    import struct
+except ModuleNotFoundError as error:
+    raise RuntimeError(
+        'The installation does not include http support. Specify \'http\' or \'all\' while installing the tritonclient package to include the support'
+    ) from error
 
-from urllib.parse import quote, quote_plus
-import rapidjson as json
-import numpy as np
-import gevent
-import gevent.pool
-import struct
-
-from tritonclientutils import *
+from tritonclient.utils import *
 
 
 def _get_error(response):
