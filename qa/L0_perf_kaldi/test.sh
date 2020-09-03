@@ -44,7 +44,7 @@ cp -r asr_kaldi/model-repo/kaldi_online/config.pbtxt model-repo/kaldi_online/
         libb64-dev \
         rapidjson-dev)
 
-pip3 install --upgrade wheel 'setuptools<50.0.0' grpcio-tools
+pip3 install --upgrade wheel setuptools grpcio-tools
 
 # Build client library and kaldi perf client
 (cd triton-inference-server/build && \
