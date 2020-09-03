@@ -2359,6 +2359,9 @@ PlanBackend::Context::Run(
                                           cudaGetErrorString(err)),
           "failed to run TRT inference");
     }
+    // Event recorded during CUDA graph capture is not visible outside of the
+    // graph, need to explicitly record it.
+    cudaEventRecord(events_[next_set_].ready_for_input_, stream_);
   } else {
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
                    << " [" << std::to_string(citr->first)
