@@ -650,6 +650,17 @@ message ModelOptimizationPolicy
     //@@       Currently only recognized by TensorRT backend.
     //@@
     repeated GraphSpec graph_spec = 3;
+
+    //@@    .. Use the CUDA graph those specified input shapes are larger to the
+    //@@       inputs of the inference if the graph with exact matching shapes
+    //@@       is not found. For dynamic shape model, this option allows CUDA
+    //@@       graphs to be launched frequently without capturing all possible
+    //@@       shape combinations. However, using graph with larger input shapes
+    //@@       introduces uninitialized data for execution and it may distort
+    //@@       the inference result if the model is sensitive to the
+    //@@       uninitialized data. Default value is false.
+    //@@       Currently only recognized by TensorRT backend.
+    bool allow_inexact_match = 4;
   }
 
   //@@
