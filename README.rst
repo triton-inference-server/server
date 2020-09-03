@@ -222,6 +222,8 @@ describe which GPUs are supported by Triton.
 Presentations and Papers
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
+* `Maximizing Deep Learning Inference Performance with NVIDIA Model Analyzer <https://developer.nvidia.com/blog/maximizing-deep-learning-inference-performance-with-nvidia-model-analyzer/>`_.
+
 * `High-Performance Inferencing at Scale Using the TensorRT Inference Server <https://developer.nvidia.com/gtc/2020/video/s22418>`_.
 
 * `Accelerate and Autoscale Deep Learning Inference on GPUs with KFServing <https://developer.nvidia.com/gtc/2020/video/s22459>`_.
