@@ -795,6 +795,11 @@ BackendInputCollector::SetElementCount(
     }
     *(reinterpret_cast<T*>(buffer) + req_idx) =
         GetElementCount(repr_input->ShapeWithBatchDim());
+    buffer_offset += sizeof(T);
+  }
+  for (; buffer_offset + sizeof(T) <= buffer_byte_size;
+       buffer_offset += sizeof(T)) {
+    *reinterpret_cast<T*>(buffer + buffer_offset) = 0;
   }
   return Status::Success;
 }
@@ -819,6 +824,11 @@ BackendInputCollector::SetAccumulatedElementCount(
     accumulated_element_count +=
         GetElementCount(repr_input->ShapeWithBatchDim());
     *(reinterpret_cast<T*>(buffer) + req_idx) = accumulated_element_count;
+    buffer_offset += sizeof(T);
+  }
+  for (; buffer_offset + sizeof(T) <= buffer_byte_size;
+       buffer_offset += sizeof(T)) {
+    *reinterpret_cast<T*>(buffer + buffer_offset) = accumulated_element_count;
   }
   return Status::Success;
 }
