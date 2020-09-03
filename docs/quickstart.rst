@@ -57,7 +57,7 @@ following prerequisite steps:
   be sure to select the r<xx.yy> release branch that corresponds to
   the version of Triton you want to use::
 
-  $ git checkout r20.07
+  $ git checkout r20.08
 
 * Create a model repository containing one or more models that you
   want Triton to serve. An example model repository is included in the
@@ -109,7 +109,7 @@ the GitHub repo and checkout the release version of the branch that
 you want to build (or the master branch if you want to build the
 under-development version)::
 
-  $ git checkout r20.07
+  $ git checkout r20.08
 
 Then use docker to build::
 
