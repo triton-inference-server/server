@@ -37,6 +37,12 @@ improve the performance of your model. As a prerequisite you should
 follow the :ref:`section-quickstart` to get Triton and client examples
 running with the example model repository.
 
+This section focuses on understanding latecy and throughput tradeoffs
+for a single model. The :ref:`Model Analyzer <section-model-analyzer>`
+section describes a tool that helps you understand the GPU memory and
+compute utilization of your models so you can decide how to best run
+multiple models on a single GPU.
+
 Unless you already have a client application suitable for measuring
 the performance of your model on Triton, you should familiarize
 yourself with :ref:`perf\_client <section-perf-client>`. The
@@ -332,5 +338,6 @@ You can follow the steps described above for TensorRT to see how this
 automatic FP16 optimization benefits a model by using perf\_client to
 evaluate the model's performance with and without the optimization.
 
+.. include:: model_analyzer.rst
 .. include:: perf_client.rst
 .. include:: trace.rst
