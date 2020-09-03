@@ -44,7 +44,7 @@ RUN yum install -y \
         python3-pip \
         rapidjson-devel && \
     yum clean all && \
-    pip3 install --upgrade wheel 'setuptools<50.0.0' && \
+    pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools
 
 # QA scripts expect "cmake" executable (not cmake3).

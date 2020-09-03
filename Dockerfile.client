@@ -52,7 +52,7 @@ RUN apt-get update && \
             python3-dev \
             rapidjson-dev \
             vim && \
-    pip3 install --upgrade wheel 'setuptools<50.0.0' && \
+    pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools
 
 # Build expects "python" executable (not python3).

@@ -315,7 +315,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade wheel 'setuptools<50.0.0' && \
+RUN pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six boofuzz
 
 # need protoc-gen-go to generate go specific gRPC modules
