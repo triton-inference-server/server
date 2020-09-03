@@ -32,7 +32,7 @@ RET=0
 
 apt-get update && \
     apt-get install -y --no-install-recommends python3-pip zip doxygen && \
-    pip3 install --upgrade 'setuptools<50.0.0' && \
+    pip3 install --upgrade setuptools && \
     pip3 install --upgrade sphinx==2.4.4 sphinx-rtd-theme==0.4.3 nbsphinx==0.6.0 \
          exhale==0.2.3 breathe==4.14.1 && \
     pip3 install --upgrade ../pkgs/triton*.whl
