@@ -145,7 +145,7 @@ for MODEL in \
         RET=1
     fi
 
-    grep "failed to load '${MODEL}_invalid_param' version 1: Invalid argument: failed to convert 'abc' to integral number" $SERVER_LOG
+    grep "failed to load '${MODEL}_invalid_param' version 1: Invalid argument: failed to convert 'abc' to long long integral number" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected invalid parameter 'abc' returns error\n***"
         RET=1
