@@ -91,7 +91,6 @@ add_library(
   triton_python SHARED
   python.cc
 
-  $<TARGET_OBJECTS:backend-library>
   $<TARGET_OBJECTS:python-grpc-library>)
 
 if(${TRITON_ENABLE_GPU})
@@ -120,10 +119,9 @@ target_include_directories(
 
 target_link_libraries(
   triton_python
-  PUBLIC triton-common-backendapi  # from repo-common
-  PUBLIC triton-common-serverapi   # from repo-common
-  PUBLIC triton-common-json        # from repo-common
-  PRIVATE gRPC::grpc++
+  PRIVATE
+    triton-backend-utils  # from repo-backend
+    gRPC::grpc++
 )
 
 install(

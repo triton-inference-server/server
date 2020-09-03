@@ -47,7 +47,6 @@ set(
 add_library(
  triton_onnxruntime SHARED
   ${ONNXRUNTIME_SRCS} ${ONNXRUNTIME_HDRS}
-  $<TARGET_OBJECTS:backend-library>
 )
 
 target_include_directories(triton_onnxruntime PRIVATE ${TRITON_ONNXRUNTIME_INCLUDE_PATHS})
@@ -68,18 +67,17 @@ set_target_properties(
 
 target_link_libraries(
   triton_onnxruntime
-  PUBLIC triton-common-backendapi  # from repo-common
-  PUBLIC triton-common-serverapi   # from repo-common
-  PUBLIC triton-common-json        # from repo-common
-  PUBLIC ${TRITON_EXTRA_LDFLAGS}
-  PUBLIC -lonnxruntime
+  PRIVATE
+    triton-backend-utils  # from repo-backend
+    ${TRITON_EXTRA_LDFLAGS}
+    -lonnxruntime
 )
 if(${TRITON_ENABLE_ONNXRUNTIME_OPENVINO})
   target_link_libraries(
     triton_onnxruntime
-    PUBLIC ${TRITON_EXTRA_LDFLAGS}
-    PUBLIC -ltbb
-    PUBLIC -linference_engine
+    PRIVATE
+      -ltbb
+      -linference_engine
   )
 endif() # TRITON_ENABLE_ONNXRUNTIME_OPENVINO
 

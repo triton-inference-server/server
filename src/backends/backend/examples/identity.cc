@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <memory>
-#include "src/backends/backend/examples/backend_utils.h"
+#include "triton/backend/backend_common.h"
 
 //
 // Simple backend that demonstrates the TRITONBACKEND API for a

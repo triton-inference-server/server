@@ -24,13 +24,13 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/backend/examples/backend_input_collector.h"
-#include "src/backends/backend/examples/backend_model.h"
-#include "src/backends/backend/examples/backend_model_instance.h"
-#include "src/backends/backend/examples/backend_output_responder.h"
-#include "src/backends/backend/examples/backend_utils.h"
 #include "src/backends/backend/tensorflow/tf_utils.h"
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
+#include "triton/backend/backend_common.h"
+#include "triton/backend/backend_input_collector.h"
+#include "triton/backend/backend_model.h"
+#include "triton/backend/backend_model_instance.h"
+#include "triton/backend/backend_output_responder.h"
 
 #include <atomic>
 #include <chrono>
