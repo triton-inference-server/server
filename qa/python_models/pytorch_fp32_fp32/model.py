@@ -76,7 +76,7 @@ class TritonPythonModel:
         """
         responses = []
         for request in requests:
-            input_tensor = pb_utils.Utils.get_input_tensor_by_name(
+            input_tensor = pb_utils.get_input_tensor_by_name(
                 request, "IN")
             # This tensor is read-only, wee need to make a copy
             input_data_ro = input_tensor.numpy_array()

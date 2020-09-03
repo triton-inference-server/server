@@ -26,6 +26,37 @@
 
 import numpy as np
 
+TRITION_TO_NUMPY_TYPE = {
+    # TRITONSERVER_TYPE_BOOL
+    1: np.bool,
+    # TRITONSERVER_TYPE_UINT8
+    2: np.uint8,
+    # TRITONSERVER_TYPE_UINT16
+    3: np.uint16,
+    # TRITONSERVER_TYPE_UINT32
+    4: np.uint32,
+    # TRITONSERVER_TYPE_UINT64
+    5: np.uint64,
+    # TRITONSERVER_TYPE_INT8
+    6: np.int8,
+    # TRITONSERVER_TYPE_INT16
+    7: np.int16,
+    # TRITONSERVER_TYPE_INT32
+    8: np.int32,
+    # TRITONSERVER_TYPE_INT64
+    9: np.int64,
+    # TRITONSERVER_TYPE_FP16
+    10: np.float16,
+    # TRITONSERVER_TYPE_FP32
+    11: np.float32,
+    # TRITONSERVER_TYPE_FP64
+    12: np.float64,
+    # TRITONSERVER_TYPE_STRING
+    13: np.str_
+}
+
+NUMPY_TO_TRITION_TYPE = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
+
 
 class InferenceRequest:
     """InferenceRequest represents a request for inference for a model that
@@ -230,81 +261,86 @@ class TritonModelException(Exception):
         return self._msg
 
 
-class Utils:
+def get_input_tensor_by_name(inference_request, name):
+    """Find an input Tensor in the inference_request that has the given
+    name
 
-    @staticmethod
-    def get_input_tensor_by_name(inference_request, name):
-        """Find an input Tensor in the inference_request that has the given
-        name
+    Parameters
+    ----------
+    inference_request : InferenceRequest
+        InferenceRequest object
+    name : str
+        name of the input Tensor object
 
-        Parameters
-        ----------
-        inference_request : InferenceRequest
-            InferenceRequest object
-        name : str
-            name of the input Tensor object
+    Returns
+    -------
+    Tensor
+        The input Tensor with the specified name, or None if no
+        input Tensor with this name exists
+    """
+    input_tensors = inference_request.inputs()
+    for input_tensor in input_tensors:
+        if input_tensor.name() == name:
+            return input_tensor
 
-        Returns
-        -------
-        Tensor
-            The input Tensor with the specified name, or None if no
-            input Tensor with this name exists
-        """
-        input_tensors = inference_request.inputs()
-        for input_tensor in input_tensors:
-            if input_tensor.name() == name:
-                return input_tensor
+    return None
 
-        return None
 
-    @staticmethod
-    def get_input_properties_by_name(model_config, name):
-        """Get input properties corresponding to the input
-        with given `name`
+def get_input_properties_by_name(model_config, name):
+    """Get input properties corresponding to the input
+    with given `name`
 
-        Parameters
-        ----------
-        model_config : dict
-            dictionary object containing the model configuration
-        name : str
-            name of the input object
+    Parameters
+    ----------
+    model_config : dict
+        dictionary object containing the model configuration
+    name : str
+        name of the input object
 
-        Returns
-        -------
-        dict
-            A dictionary containing all the properties for a given input
-            name, or None if no input with this name exists
-        """
-        if 'input' in model_config:
-            inputs = model_config['input']
-            for input_properties in inputs:
-                if input_properties['name'] == name:
-                    return input_properties
+    Returns
+    -------
+    dict
+        A dictionary containing all the properties for a given input
+        name, or None if no input with this name exists
+    """
+    if 'input' in model_config:
+        inputs = model_config['input']
+        for input_properties in inputs:
+            if input_properties['name'] == name:
+                return input_properties
 
-        return None
+    return None
 
-    @staticmethod
-    def get_output_config_by_name(model_config, name):
-        """Get output properties corresponding to the output
-        with given `name`
 
-        Parameters
-        ----------
-        model_config : dict
-            dictionary object containing the model configuration
-        name : str
-            name of the output object
+def get_output_config_by_name(model_config, name):
+    """Get output properties corresponding to the output
+    with given `name`
 
-        Returns
-        -------
-        dict
-            A dictionary containing all the properties for a given output
-            name, or None if no output with this name exists
-        """
-        if 'output' in model_config:
-            outputs = model_config['output']
-            for output_properties in outputs:
-                if output_properties['name'] == name:
-                    return output_properties
+    Parameters
+    ----------
+    model_config : dict
+        dictionary object containing the model configuration
+    name : str
+        name of the output object
 
-        return None
+    Returns
+    -------
+    dict
+        A dictionary containing all the properties for a given output
+        name, or None if no output with this name exists
+    """
+    if 'output' in model_config:
+        outputs = model_config['output']
+        for output_properties in outputs:
+            if output_properties['name'] == name:
+                return output_properties
+
+    return None
+
+
+def triton_to_numpy_type(data_type):
+    return TRITION_TO_NUMPY_TYPE[data_type]
+
+
+def numpy_to_triton_type(data_type):
+    return NUMPY_TO_TRITION_TYPE[data_type]
