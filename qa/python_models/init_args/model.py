@@ -29,7 +29,7 @@ import sys
 import json
 
 sys.path.append('../../')
-import triton_python_backend_utils as utils
+import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
@@ -54,7 +54,7 @@ class TritonPythonModel:
 
         responses = []
         for request in requests:
-            out_args = utils.Tensor("OUT",
-                                    np.array([correct_keys], dtype=np.float32))
-            responses.append(utils.InferenceResponse([out_args]))
+            out_args = pb_utils.Tensor(
+                "OUT", np.array([correct_keys], dtype=np.float32))
+            responses.append(pb_utils.InferenceResponse([out_args]))
         return responses
