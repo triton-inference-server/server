@@ -33,7 +33,6 @@
 #include <stdio.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
@@ -51,9 +50,8 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
 #include "python_host.grpc.pb.h"
-#include "src/backends/backend/examples/backend_utils.h"
+#include "triton/backend/backend_common.h"
 #include "triton/common/triton_json.h"
 #include "triton/common/tritonbackend.h"
 #include "triton/common/tritonserver.h"

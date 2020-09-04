@@ -52,7 +52,13 @@ FetchContent_Declare(
   GIT_TAG ${REPO_TAG}
   GIT_SHALLOW ON
 )
-FetchContent_MakeAvailable(repo-common)
+FetchContent_Declare(
+  repo-backend
+  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+  GIT_TAG ${REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_MakeAvailable(repo-common repo-backend)
 
 
 add_definitions(-DTRITON_VERSION="${TRITON_VERSION}")
