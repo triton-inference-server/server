@@ -2532,34 +2532,6 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
         batch_size = shape[0];
       }
 
-      const char* datatype_str =
-          TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES);
-      RETURN_IF_ERR(output_json.AddStringRef("datatype", datatype_str));
-
-      TritonJson::Value shape_json(response_json, TritonJson::ValueType::ARRAY);
-      if (batch_size > 0) {
-        RETURN_IF_ERR(shape_json.AppendUInt(batch_size));
-        element_count *= batch_size;
-      }
-      RETURN_IF_ERR(shape_json.AppendUInt(info->class_cnt_));
-      element_count *= info->class_cnt_;
-      RETURN_IF_ERR(output_json.Add("shape", std::move(shape_json)));
-    } else {
-      const char* datatype_str = TRITONSERVER_DataTypeString(datatype);
-      RETURN_IF_ERR(output_json.AddStringRef("datatype", datatype_str));
-
-      TritonJson::Value shape_json(response_json, TritonJson::ValueType::ARRAY);
-      for (size_t j = 0; j < dim_count; j++) {
-        RETURN_IF_ERR(shape_json.AppendUInt(shape[j]));
-        element_count *= shape[j];
-      }
-
-      RETURN_IF_ERR(output_json.Add("shape", std::move(shape_json)));
-    }
-
-    // For classification replace existing output with serialized
-    // classification output.
-    if ((info != nullptr) && (info->class_cnt_ > 0)) {
       // Determine the batch1 byte size of the output tensor... needed
       // when the response tensor batch-size > 1 so that we know how
       // to stride though the tensor data.
@@ -2596,6 +2568,20 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
         class_offset += batch1_byte_size;
       }
 
+      // Replace existing output with serialized classification output.
+      const char* datatype_str =
+          TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES);
+      RETURN_IF_ERR(output_json.AddStringRef("datatype", datatype_str));
+
+      TritonJson::Value shape_json(response_json, TritonJson::ValueType::ARRAY);
+      if (batch_size > 0) {
+        RETURN_IF_ERR(shape_json.AppendUInt(batch_size));
+        element_count *= batch_size;
+      }
+      element_count *= batch1_element_count;
+      RETURN_IF_ERR(shape_json.AppendUInt(batch1_element_count));
+      RETURN_IF_ERR(output_json.Add("shape", std::move(shape_json)));
+
       evbuffer_free(info->evbuffer_);
       info->evbuffer_ = nullptr;
 
@@ -2605,6 +2591,17 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
       memcpy(buffer, serialized.c_str(), byte_size);
       base = reinterpret_cast<const void*>(buffer);
       datatype = TRITONSERVER_TYPE_BYTES;
+    } else {
+      const char* datatype_str = TRITONSERVER_DataTypeString(datatype);
+      RETURN_IF_ERR(output_json.AddStringRef("datatype", datatype_str));
+
+      TritonJson::Value shape_json(response_json, TritonJson::ValueType::ARRAY);
+      for (size_t j = 0; j < dim_count; j++) {
+        RETURN_IF_ERR(shape_json.AppendUInt(shape[j]));
+        element_count *= shape[j];
+      }
+
+      RETURN_IF_ERR(output_json.Add("shape", std::move(shape_json)));
     }
 
     // Add JSON data, or collect binary data. If 'info' is nullptr
