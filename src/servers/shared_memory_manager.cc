@@ -265,15 +265,15 @@ SharedMemoryManager::GetMemoryInfo(
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(
     const std::string& name, TRITONSERVER_MemoryType memory_type,
-    TritonJson::Value* shm_status)
+    triton::common::TritonJson::Value* shm_status)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
   if (name.empty()) {
     for (const auto& shm_info : shared_memory_map_) {
       if (shm_info.second->kind_ == memory_type) {
-        TritonJson::Value shm_region(
-            *shm_status, TritonJson::ValueType::OBJECT);
+        triton::common::TritonJson::Value shm_region(
+            *shm_status, triton::common::TritonJson::ValueType::OBJECT);
         RETURN_IF_ERR(shm_region.AddString(
             "name", shm_info.first.c_str(), shm_info.first.size()));
         if (memory_type == TRITONSERVER_MEMORY_CPU) {
@@ -320,7 +320,8 @@ SharedMemoryManager::GetStatus(
       }
     }
 
-    TritonJson::Value shm_region(*shm_status, TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value shm_region(
+        *shm_status, triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_ERR(shm_region.AddString(
         "name", it->second->name_.c_str(), it->second->name_.size()));
     if (memory_type == TRITONSERVER_MEMORY_CPU) {

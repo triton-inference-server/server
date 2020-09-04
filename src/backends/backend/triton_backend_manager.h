@@ -29,10 +29,10 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include "src/backends/backend/tritonbackend.h"
 #include "src/core/model_config.h"
 #include "src/core/server_message.h"
 #include "src/core/status.h"
+#include "triton/common/tritonbackend.h"
 
 namespace nvidia { namespace inferenceserver {
 

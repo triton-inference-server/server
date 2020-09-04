@@ -54,14 +54,11 @@
 
 #include "python_host.grpc.pb.h"
 #include "src/backends/backend/examples/backend_utils.h"
-#include "src/backends/backend/tritonbackend.h"
-#include "src/core/json.h"
-#include "src/core/tritonserver.h"
+#include "triton/common/triton_json.h"
+#include "triton/common/tritonbackend.h"
+#include "triton/common/tritonserver.h"
 
-namespace ni = nvidia::inferenceserver;
-namespace nib = nvidia::inferenceserver::backend;
-
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend { namespace python {
 
 #define RESPOND_AND_RETURN_IF_ERROR(REQUEST, X)                         \
   do {                                                                  \
@@ -81,10 +78,6 @@ namespace nvidia { namespace inferenceserver { namespace backend {
       return rarie_err__;                                               \
     }                                                                   \
   } while (false)
-
-}}}  // namespace nvidia::inferenceserver::backend
-
-namespace {
 
 #define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
   do {                                                                  \
@@ -130,18 +123,18 @@ class ModelInstanceState {
 
   /// Load Triton inputs to the appropriate Protobufs
   TRITONSERVER_Error* GetInputTensor(
-      const uint32_t iidx, TRITONBACKEND_Request* request,
-      ni::Tensor* input_tensor, std::vector<TRITONBACKEND_Response*>& responses,
-      size_t r, uint32_t& batch_size);
+      const uint32_t iidx, TRITONBACKEND_Request* request, Tensor* input_tensor,
+      std::vector<TRITONBACKEND_Response*>& responses, size_t r,
+      uint32_t& batch_size);
 
   // TODO: Create getter and setters
-  std::unique_ptr<ni::PythonInterpreter::Stub> stub;
+  std::unique_ptr<PythonInterpreter::Stub> stub;
 
  private:
   ModelInstanceState(
       ModelState* model_state, TRITONBACKEND_ModelInstance* model_instance,
       const char* name, const TRITONSERVER_InstanceGroupKind kind,
-      const int32_t device_id, ni::TritonJson::Value&& model_config,
+      const int32_t device_id, triton::common::TritonJson::Value&& model_config,
       TRITONBACKEND_Model* trition_model);
 
   TRITONSERVER_Error* ConnectPythonInterpreter();
@@ -156,7 +149,7 @@ class ModelInstanceState {
   bool connected_ = false;
 
  public:
-  ni::TritonJson::Value model_config;
+  triton::common::TritonJson::Value model_config;
 
  private:
   TRITONBACKEND_Model* triton_model_;
@@ -176,7 +169,7 @@ class ModelState {
   uint64_t ModelVersion() const { return model_version_; }
 
   // Get backend state
-  ::BackendState* BackendState() { return backend_state_; }
+  BackendState* StateForBackend() { return backend_state_; }
 
   // Get Model Path
   const char* ModelPath() { return model_path_; }
@@ -185,15 +178,15 @@ class ModelState {
   ModelState(
       TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
       const char* model_name, const uint64_t model_version,
-      ni::TritonJson::Value&& model_config, ::BackendState* backend_state,
-      const char* model_path);
+      triton::common::TritonJson::Value&& model_config,
+      BackendState* backend_state, const char* model_path);
 
   TRITONSERVER_Server* triton_server_;
   TRITONBACKEND_Model* triton_model_;
   const std::string model_name_;
   const uint64_t model_version_;
-  ni::TritonJson::Value model_config_;
-  ::BackendState* backend_state_;
+  triton::common::TritonJson::Value model_config_;
+  BackendState* backend_state_;
   const char* model_path_;
 };
 
@@ -238,10 +231,10 @@ ModelInstanceState::CreatePythonInterpreter()
   if (interpreter_pid_ == 0) {
     // Use the python available in $PATH
     std::string python_interpreter_path =
-        model_state_->BackendState()->python_runtime;
+        model_state_->StateForBackend()->python_runtime;
 
     std::stringstream ss;
-    ss << model_state_->BackendState()->python_lib << "/startup.py";
+    ss << model_state_->StateForBackend()->python_lib << "/startup.py";
     std::string python_interpreter_startup = ss.str();
 
     subinterpreter_commandline[0] = python_interpreter_path.c_str();
@@ -279,10 +272,10 @@ ModelInstanceState::ConnectPythonInterpreter()
   auto grpc_channel =
       grpc::CreateChannel(domain_socket_, grpc::InsecureChannelCredentials());
 
-  stub = ni::PythonInterpreter::NewStub(grpc_channel);
+  stub = PythonInterpreter::NewStub(grpc_channel);
 
-  std::shared_ptr<ni::InitializationCommand> initialization_params(
-      new ni::InitializationCommand());
+  std::shared_ptr<InitializationCommand> initialization_params(
+      new InitializationCommand());
 
   std::vector<std::string> keys;
   LOG_IF_ERROR(model_config.Members(&keys), "can't get key names");
@@ -295,7 +288,7 @@ ModelInstanceState::ConnectPythonInterpreter()
         value_pair->set_value(val);
       };
 
-  ni::TritonJson::WriteBuffer buffer;
+  triton::common::TritonJson::WriteBuffer buffer;
   model_config.Write(&buffer);
 
   insert_model_param("model_config", std::move(buffer.MutableContents()));
@@ -313,7 +306,7 @@ ModelInstanceState::ConnectPythonInterpreter()
   constexpr uint8_t conn_attempts = 5;
   for (int i = 0; i < conn_attempts; ++i) {
     grpc::ClientContext context;
-    ni::Empty null_msg;
+    Empty null_msg;
     status = stub->Init(&context, *initialization_params, &null_msg);
     if (status.ok()) {
       LOG_MESSAGE(
@@ -335,7 +328,7 @@ ModelInstanceState::ConnectPythonInterpreter()
 ModelInstanceState::ModelInstanceState(
     ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
     const char* name, const TRITONSERVER_InstanceGroupKind kind,
-    const int32_t device_id, ni::TritonJson::Value&& model_config,
+    const int32_t device_id, triton::common::TritonJson::Value&& model_config,
     TRITONBACKEND_Model* triton_model)
     : model_state_(model_state), triton_model_instance_(triton_model_instance),
       name_(name), kind_(kind), device_id_(device_id),
@@ -373,7 +366,7 @@ ModelInstanceState::Create(
   RETURN_IF_ERROR(
       TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
 
-  ni::TritonJson::Value model_config;
+  triton::common::TritonJson::Value model_config;
 
   TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
   RETURN_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
@@ -393,7 +386,7 @@ ModelInstanceState::~ModelInstanceState()
   {
     // Close python interpreter.
     grpc::ClientContext context;
-    ni::Empty null_msg;
+    Empty null_msg;
 
     if (connected_) {
       auto err = stub->Fini(&context, null_msg, &null_msg);
@@ -425,9 +418,9 @@ ModelInstanceState::~ModelInstanceState()
 
 TRITONSERVER_Error*
 ModelInstanceState::GetInputTensor(
-    const uint32_t iidx, TRITONBACKEND_Request* request,
-    ni::Tensor* input_tensor, std::vector<TRITONBACKEND_Response*>& responses,
-    size_t r, uint32_t& batch_size)
+    const uint32_t iidx, TRITONBACKEND_Request* request, Tensor* input_tensor,
+    std::vector<TRITONBACKEND_Response*>& responses, size_t r,
+    uint32_t& batch_size)
 {
   const char* input_name;
   // Load iidx'th input name
@@ -491,7 +484,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   RETURN_IF_ERROR(
       TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
 
-  ni::TritonJson::Value model_config;
+  triton::common::TritonJson::Value model_config;
   TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
   RETURN_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
   RETURN_IF_ERROR(err);
@@ -510,7 +503,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 
   void* bstate;
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &bstate));
-  ::BackendState* backend_state = reinterpret_cast<::BackendState*>(bstate);
+  BackendState* backend_state = reinterpret_cast<BackendState*>(bstate);
 
   const char* path = nullptr;
   TRITONBACKEND_ModelArtifactType artifact_type;
@@ -535,16 +528,14 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 ModelState::ModelState(
     TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
     const char* model_name, const uint64_t model_version,
-    ni::TritonJson::Value&& model_config, ::BackendState* backend_state,
-    const char* model_path)
+    triton::common::TritonJson::Value&& model_config,
+    BackendState* backend_state, const char* model_path)
     : triton_server_(triton_server), triton_model_(triton_model),
       model_name_(model_name), model_version_(model_version),
       model_config_(std::move(model_config)), backend_state_(backend_state),
       model_path_(model_path)
 {
 }
-
-}  // namespace
 
 extern "C" {
 
@@ -586,24 +577,24 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
       TRITONSERVER_LOG_VERBOSE,
       (std::string("backend configuration:\n") + buffer).c_str());
 
-  ni::TritonJson::Value backend_config;
+  triton::common::TritonJson::Value backend_config;
   if (byte_size != 0) {
     RETURN_IF_ERROR(backend_config.Parse(buffer, byte_size));
   }
 
   std::unique_ptr<BackendState> backend_state(new BackendState());
-  ni::TritonJson::Value cmdline;
+  triton::common::TritonJson::Value cmdline;
   bool found_py_lib_config = false;
   bool found_py_runtime_config = false;
 
   if (backend_config.Find("cmdline", &cmdline)) {
-    ni::TritonJson::Value python_lib;
+    triton::common::TritonJson::Value python_lib;
     if (cmdline.Find("python-lib", &python_lib)) {
       RETURN_IF_ERROR(python_lib.AsString(&backend_state->python_lib));
       found_py_lib_config = true;
     }
 
-    ni::TritonJson::Value python_runtime;
+    triton::common::TritonJson::Value python_runtime;
     if (cmdline.Find("python-runtime", &python_runtime)) {
       RETURN_IF_ERROR(python_runtime.AsString(&backend_state->python_runtime));
       found_py_runtime_config = true;
@@ -752,11 +743,11 @@ TRITONBACKEND_ModelInstanceExecute(
   }
 
   // Create ExecuteRequest
-  ni::ExecuteRequest execute_request;
+  ExecuteRequest execute_request;
   for (uint32_t r = 0; r < request_count; ++r) {
     TRITONBACKEND_Request* request = requests[r];
 
-    ni::InferenceRequest* inference_request = execute_request.add_requests();
+    InferenceRequest* inference_request = execute_request.add_requests();
 
     uint32_t requested_input_count = 0;
     GUARDED_RESPOND_IF_ERROR(
@@ -770,7 +761,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
     uint32_t batch_size = 0;
     for (size_t iidx = 0; iidx < requested_input_count; ++iidx) {
-      ni::Tensor* input_tensor = inference_request->add_inputs();
+      Tensor* input_tensor = inference_request->add_inputs();
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           instance_state->GetInputTensor(
@@ -802,7 +793,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
   // ExecuteResponse
   grpc::ClientContext context;
-  ni::ExecuteResponse execute_response;
+  ExecuteResponse execute_response;
 
   uint64_t compute_start_ns = 0;
   SET_TIMESTAMP(compute_start_ns);
@@ -856,7 +847,7 @@ TRITONBACKEND_ModelInstanceExecute(
     uint32_t requested_output_count = 0;
 
     // Get response r
-    ni::InferenceResponse inference_response = execute_response.responses(r);
+    InferenceResponse inference_response = execute_response.responses(r);
 
     if (inference_response.failed()) {
       TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
@@ -879,7 +870,7 @@ TRITONBACKEND_ModelInstanceExecute(
         TRITONBACKEND_RequestOutputCount(request, &requested_output_count));
     for (size_t j = 0; j < requested_output_count; ++j) {
       // Prepare output buffers.
-      const ni::Tensor python_output_result = inference_response.outputs(j);
+      const Tensor python_output_result = inference_response.outputs(j);
       TRITONBACKEND_Output* triton_output;
       TRITONSERVER_DataType triton_dt =
           static_cast<TRITONSERVER_DataType>(python_output_result.dtype());
@@ -903,7 +894,7 @@ TRITONBACKEND_ModelInstanceExecute(
       } else {
         std::vector<int64_t> output_dims(
             python_output_dims.begin(), python_output_dims.end());
-        output_byte_size = nib::GetByteSize(triton_dt, output_dims);
+        output_byte_size = GetByteSize(triton_dt, output_dims);
       }
 
       void* output_buffer;
@@ -936,7 +927,7 @@ TRITONBACKEND_ModelInstanceExecute(
       auto output_response_tensor = std::find_if(
           inference_response.outputs().begin(),
           inference_response.outputs().end(),
-          [&output_tensor_name](const ni::Tensor& itr) {
+          [&output_tensor_name](const Tensor& itr) {
             return itr.name() == output_tensor_name;
           });
 
@@ -1032,3 +1023,5 @@ TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance)
 }
 
 }  // extern "C"
+
+}}}  // namespace triton::backend::python

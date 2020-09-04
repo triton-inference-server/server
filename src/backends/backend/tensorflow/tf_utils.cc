@@ -28,7 +28,7 @@
 
 #include "src/backends/backend/examples/backend_utils.h"
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend { namespace tensorflow {
 
 TRITONSERVER_Error*
 CompareDims(
@@ -75,7 +75,7 @@ CompareDims(
            " dimensions (an initial batch dimension because max_batch_size "
            "> 0 followed by the explicit tensor shape, making complete "
            "shape " +
-           ShapeToString(full_dims) + ")")
+           backend::ShapeToString(full_dims) + ")")
               .c_str());
     }
   } else {
@@ -98,7 +98,7 @@ CompareDims(
            " dimensions (shape " + ShapeToString(model_shape) +
            ") but the model configuration specifies " +
            std::to_string(dims.size()) + " dimensions (shape " +
-           ShapeToString(dims) + ")")
+           backend::ShapeToString(dims) + ")")
               .c_str());
     }
   }
@@ -293,4 +293,4 @@ ConvertDataType(TRITONSERVER_DataType dtype)
   return TRTISTF_DataType::TRTISTF_TYPE_INVALID;
 }
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}}  // namespace triton::backend::tensorflow

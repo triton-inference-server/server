@@ -27,10 +27,10 @@
 
 #include <string>
 #include "src/backends/backend/examples/backend_utils.h"
-#include "src/backends/backend/tritonbackend.h"
-#include "src/core/tritonserver.h"
+#include "triton/common/tritonbackend.h"
+#include "triton/common/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 //
 // BackendModel
@@ -61,7 +61,7 @@ class BackendModel {
   const std::string& RepositoryPath() const { return repository_path_; }
 
   // The model configuration.
-  TritonJson::Value& ModelConfig() { return model_config_; }
+  common::TritonJson::Value& ModelConfig() { return model_config_; }
 
   // Maximum batch size supported by the model. A value of 0
   // indicates that the model does not support batching.
@@ -90,7 +90,7 @@ class BackendModel {
   uint64_t version_;
   std::string repository_path_;
 
-  TritonJson::Value model_config_;
+  common::TritonJson::Value model_config_;
   int max_batch_size_;
   bool enable_pinned_input_;
   bool enable_pinned_output_;
@@ -111,13 +111,12 @@ struct BackendModelException {
   TRITONSERVER_Error* err_;
 };
 
-#define THROW_IF_BACKEND_MODEL_ERROR(X)                              \
-  do {                                                               \
-    TRITONSERVER_Error* tie_err__ = (X);                             \
-    if (tie_err__ != nullptr) {                                      \
-      throw nvidia::inferenceserver::backend::BackendModelException( \
-          tie_err__);                                                \
-    }                                                                \
+#define THROW_IF_BACKEND_MODEL_ERROR(X)                        \
+  do {                                                         \
+    TRITONSERVER_Error* tie_err__ = (X);                       \
+    if (tie_err__ != nullptr) {                                \
+      throw triton::backend::BackendModelException(tie_err__); \
+    }                                                          \
   } while (false)
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend

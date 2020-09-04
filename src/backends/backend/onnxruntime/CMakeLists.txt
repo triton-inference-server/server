@@ -68,6 +68,9 @@ set_target_properties(
 
 target_link_libraries(
   triton_onnxruntime
+  PUBLIC triton-common-backendapi  # from repo-common
+  PUBLIC triton-common-serverapi   # from repo-common
+  PUBLIC triton-common-json        # from repo-common
   PUBLIC ${TRITON_EXTRA_LDFLAGS}
   PUBLIC -lonnxruntime
 )

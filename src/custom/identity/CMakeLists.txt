@@ -46,6 +46,7 @@ set_target_properties(
 target_link_libraries(
   identity
   PRIVATE custombackend
+  PRIVATE triton-common-serverapi        # from repo-common
 )
 if(${TRITON_ENABLE_GPU})
 target_include_directories(identity PRIVATE ${CUDA_INCLUDE_DIRS})

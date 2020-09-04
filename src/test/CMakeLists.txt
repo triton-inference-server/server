@@ -130,6 +130,7 @@ target_include_directories(
 )
 target_link_libraries(
   memory_test
+  PRIVATE triton-common-serverapi  # from repo-backend
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}

@@ -44,3 +44,8 @@ add_library(
   ${ONNXRUNTIME_SRCS} ${ONNXRUNTIME_HDRS}
 )
 add_dependencies(onnxruntime-backend-library proto-library)
+
+target_link_libraries(
+  onnxruntime-backend-library
+  PUBLIC triton-common-serverapi   # from repo-common
+)

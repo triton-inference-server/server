@@ -28,8 +28,6 @@
 
 #include "src/backends/backend/examples/backend_utils.h"
 
-namespace nib = nvidia::inferenceserver::backend;
-
 namespace triton { namespace backend { namespace onnxruntime {
 
 const OrtApi* ort_api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
@@ -427,7 +425,7 @@ CompareDimsSupported(
             "': for the model to support batching the shape should have at "
             "least 1 dimension and the first dimension must be -1; but shape "
             "expected by the model is " +
-            nib::ShapeToString(model_shape));
+            ShapeToString(model_shape));
 
     std::vector<int64_t> full_dims;
     full_dims.reserve(1 + dims.size());
@@ -448,13 +446,13 @@ CompareDimsSupported(
         !succ, TRITONSERVER_ERROR_INVALID_ARG,
         std::string("model '") + model_name + "', tensor '" + tensor_name +
             "': the model expects " + std::to_string(model_shape.size()) +
-            " dimensions (shape " + nib::ShapeToString(model_shape) +
+            " dimensions (shape " + ShapeToString(model_shape) +
             ") but the model configuration specifies " +
             std::to_string(full_dims.size()) +
             " dimensions (an initial batch dimension because max_batch_size "
             "> 0 followed by the explicit tensor shape, making complete "
             "shape " +
-            nib::ShapeToString(full_dims) + ")");
+            ShapeToString(full_dims) + ")");
   } else {
     // ! supports_batching
     bool succ = (model_shape.size() == dims.size());
@@ -471,10 +469,10 @@ CompareDimsSupported(
         !succ, TRITONSERVER_ERROR_INVALID_ARG,
         std::string("model '") + model_name + "', tensor '" + tensor_name +
             "': the model expects " + std::to_string(model_shape.size()) +
-            " dimensions (shape " + nib::ShapeToString(model_shape) +
+            " dimensions (shape " + ShapeToString(model_shape) +
             ") but the model configuration specifies " +
             std::to_string(dims.size()) + " dimensions (shape " +
-            nib::ShapeToString(dims) + ")");
+            ShapeToString(dims) + ")");
   }
 
   return nullptr;  // success

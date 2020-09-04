@@ -26,10 +26,10 @@
 #pragma once
 
 #include <string>
-#include "src/backends/backend/tritonbackend.h"
-#include "src/core/tritonserver.h"
+#include "triton/common/tritonbackend.h"
+#include "triton/common/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 //
 // BackendMemory
@@ -81,4 +81,4 @@ class BackendMemory {
   size_t byte_size_;
 };
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend

@@ -24,8 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/tritonserver.h"
-
+#include "triton/common/tritonserver.h"
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
@@ -44,10 +43,12 @@
 #include "src/core/server_message.h"
 #include "src/core/status.h"
 
-#define TRITONJSON_STATUSTYPE Status
-#define TRITONJSON_STATUSRETURN(M) return Status(Status::Code::INTERNAL, (M))
-#define TRITONJSON_STATUSSUCCESS Status::Success
-#include "src/core/json.h"
+#define TRITONJSON_STATUSTYPE nvidia::inferenceserver::Status
+#define TRITONJSON_STATUSRETURN(M)        \
+  return nvidia::inferenceserver::Status( \
+      nvidia::inferenceserver::Status::Code::INTERNAL, (M))
+#define TRITONJSON_STATUSSUCCESS nvidia::inferenceserver::Status::Success
+#include "triton/common/triton_json.h"
 
 namespace ni = nvidia::inferenceserver;
 
@@ -347,12 +348,13 @@ TritonServerOptions::AddBackendConfig(
   return nullptr;  // success
 }
 
-#define SetDurationStat(DOC, PARENT, STAT_NAME, COUNT, NS)               \
-  do {                                                                   \
-    ni::TritonJson::Value dstat(DOC, ni::TritonJson::ValueType::OBJECT); \
-    dstat.AddUInt("count", (COUNT));                                     \
-    dstat.AddUInt("ns", (NS));                                           \
-    PARENT.Add(STAT_NAME, std::move(dstat));                             \
+#define SetDurationStat(DOC, PARENT, STAT_NAME, COUNT, NS)   \
+  do {                                                       \
+    triton::common::TritonJson::Value dstat(                 \
+        DOC, triton::common::TritonJson::ValueType::OBJECT); \
+    dstat.AddUInt("count", (COUNT));                         \
+    dstat.AddUInt("ns", (NS));                               \
+    PARENT.Add(STAT_NAME, std::move(dstat));                 \
   } while (false)
 
 }  // namespace
@@ -1661,7 +1663,8 @@ TRITONSERVER_ServerMetadata(
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  ni::TritonJson::Value metadata(ni::TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value metadata(
+      triton::common::TritonJson::ValueType::OBJECT);
 
   // Just store string reference in JSON object since it will be
   // serialized to another buffer before lserver->Id() or
@@ -1670,7 +1673,8 @@ TRITONSERVER_ServerMetadata(
   RETURN_IF_STATUS_ERROR(
       metadata.AddStringRef("version", lserver->Version().c_str()));
 
-  ni::TritonJson::Value extensions(metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value extensions(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   const std::vector<const char*>& exts = lserver->Extensions();
   for (const auto ext : exts) {
     RETURN_IF_STATUS_ERROR(extensions.AppendStringRef(ext));
@@ -1698,14 +1702,16 @@ TRITONSERVER_ServerModelMetadata(
   RETURN_IF_STATUS_ERROR(
       lserver->ModelReadyVersions(model_name, &ready_versions));
 
-  ni::TritonJson::Value metadata(ni::TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value metadata(
+      triton::common::TritonJson::ValueType::OBJECT);
 
   // Can use string ref in this function even though model can be
   // unloaded and config becomes invalid, because TritonServeMessage
   // serializes the json when it is constructed below.
   RETURN_IF_STATUS_ERROR(metadata.AddStringRef("name", model_name));
 
-  ni::TritonJson::Value versions(metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value versions(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   if (model_version != -1) {
     RETURN_IF_STATUS_ERROR(
         versions.AppendString(std::move(std::to_string(model_version))));
@@ -1727,18 +1733,19 @@ TRITONSERVER_ServerModelMetadata(
         metadata.AddStringRef("platform", model_config.backend().c_str()));
   }
 
-  ni::TritonJson::Value inputs(metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value inputs(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   for (const auto& io : model_config.input()) {
-    ni::TritonJson::Value io_metadata(
-        metadata, ni::TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value io_metadata(
+        metadata, triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef("name", io.name().c_str()));
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef(
         "datatype", ni::DataTypeToProtocolString(io.data_type())));
 
     // Input shape. If the model supports batching then must include
     // '-1' for the batch dimension.
-    ni::TritonJson::Value io_metadata_shape(
-        metadata, ni::TritonJson::ValueType::ARRAY);
+    triton::common::TritonJson::Value io_metadata_shape(
+        metadata, triton::common::TritonJson::ValueType::ARRAY);
     if (model_config.max_batch_size() >= 1) {
       RETURN_IF_STATUS_ERROR(io_metadata_shape.AppendInt(-1));
     }
@@ -1752,18 +1759,19 @@ TRITONSERVER_ServerModelMetadata(
   }
   RETURN_IF_STATUS_ERROR(metadata.Add("inputs", std::move(inputs)));
 
-  ni::TritonJson::Value outputs(metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value outputs(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   for (const auto& io : model_config.output()) {
-    ni::TritonJson::Value io_metadata(
-        metadata, ni::TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value io_metadata(
+        metadata, triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef("name", io.name().c_str()));
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef(
         "datatype", ni::DataTypeToProtocolString(io.data_type())));
 
     // Output shape. If the model supports batching then must include
     // '-1' for the batch dimension.
-    ni::TritonJson::Value io_metadata_shape(
-        metadata, ni::TritonJson::ValueType::ARRAY);
+    triton::common::TritonJson::Value io_metadata_shape(
+        metadata, triton::common::TritonJson::ValueType::ARRAY);
     if (model_config.max_batch_size() >= 1) {
       RETURN_IF_STATUS_ERROR(io_metadata_shape.AppendInt(-1));
     }
@@ -1837,10 +1845,11 @@ TRITONSERVER_ServerModelStatistics(
 
   // Can use string ref in this function because TritonServeMessage
   // serializes the json when it is constructed below.
-  ni::TritonJson::Value metadata(ni::TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value metadata(
+      triton::common::TritonJson::ValueType::OBJECT);
 
-  ni::TritonJson::Value model_stats_json(
-      metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value model_stats_json(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   for (const auto& mv_pair : ready_model_versions) {
     for (const auto& version : mv_pair.second) {
       std::shared_ptr<ni::InferenceBackend> backend;
@@ -1851,8 +1860,8 @@ TRITONSERVER_ServerModelStatistics(
       const auto& infer_batch_stats =
           backend->StatsAggregator().ImmutableInferBatchStats();
 
-      ni::TritonJson::Value inference_stats(
-          metadata, ni::TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value inference_stats(
+          metadata, triton::common::TritonJson::ValueType::OBJECT);
       SetDurationStat(
           metadata, inference_stats, "success", infer_stats.success_count_,
           infer_stats.request_duration_ns_);
@@ -1872,11 +1881,11 @@ TRITONSERVER_ServerModelStatistics(
           metadata, inference_stats, "compute_output",
           infer_stats.success_count_, infer_stats.compute_output_duration_ns_);
 
-      ni::TritonJson::Value batch_stats(
-          metadata, ni::TritonJson::ValueType::ARRAY);
+      triton::common::TritonJson::Value batch_stats(
+          metadata, triton::common::TritonJson::ValueType::ARRAY);
       for (const auto& batch : infer_batch_stats) {
-        ni::TritonJson::Value batch_stat(
-            metadata, ni::TritonJson::ValueType::OBJECT);
+        triton::common::TritonJson::Value batch_stat(
+            metadata, triton::common::TritonJson::ValueType::OBJECT);
         RETURN_IF_STATUS_ERROR(batch_stat.AddUInt("batch_size", batch.first));
         SetDurationStat(
             metadata, batch_stat, "compute_input", batch.second.count_,
@@ -1890,8 +1899,8 @@ TRITONSERVER_ServerModelStatistics(
         RETURN_IF_STATUS_ERROR(batch_stats.Append(std::move(batch_stat)));
       }
 
-      ni::TritonJson::Value model_stat(
-          metadata, ni::TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value model_stat(
+          metadata, triton::common::TritonJson::ValueType::OBJECT);
       RETURN_IF_STATUS_ERROR(
           model_stat.AddStringRef("name", mv_pair.first.c_str()));
       RETURN_IF_STATUS_ERROR(
@@ -1958,11 +1967,12 @@ TRITONSERVER_ServerModelIndex(
 
   // Can use string ref in this function because TritonServeMessage
   // serializes the json when it is constructed below.
-  ni::TritonJson::Value repository_index_json(ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value repository_index_json(
+      triton::common::TritonJson::ValueType::ARRAY);
 
   for (const auto& in : index) {
-    ni::TritonJson::Value model_index(
-        repository_index_json, ni::TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value model_index(
+        repository_index_json, triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_STATUS_ERROR(model_index.AddStringRef("name", in.name_.c_str()));
     if (!in.name_only_) {
       if (in.version_ >= 0) {
