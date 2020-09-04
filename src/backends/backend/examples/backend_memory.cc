@@ -28,7 +28,7 @@
 
 #include "src/backends/backend/examples/backend_utils.h"
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 TRITONSERVER_Error*
 BackendMemory::Create(
@@ -84,4 +84,4 @@ BackendMemory::~BackendMemory()
       "failed to free memory buffer");
 }
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend

@@ -57,6 +57,13 @@ if(${TRITON_ENABLE_GRPC})
     add_dependencies(grpc-endpoint-library grpc-library)
   endif() # TRITON_ENABLE_GRPC
 
+  target_link_libraries(
+    grpc-endpoint-library
+    PUBLIC
+      triton-common-serverapi   # from repo-common
+      triton-common-json        # from repo-common
+  )
+
   set(
     GRPC_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:grpc-endpoint-library>
@@ -113,6 +120,13 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
   )
 
+  target_link_libraries(
+    http-endpoint-library
+    PUBLIC
+      triton-common-serverapi   # from repo-common
+      triton-common-json        # from repo-common
+  )
+
   set(
     HTTP_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:http-endpoint-library>
@@ -156,6 +170,11 @@ if(${TRITON_ENABLE_TRACING})
   if(${TRITON_ENABLE_GPU})
     target_include_directories(tracing-library PRIVATE ${CUDA_INCLUDE_DIRS})
   endif() # TRITON_ENABLE_GPU
+  target_link_libraries(
+    tracing-library
+    PRIVATE triton-common-serverapi
+  )
+
   set(
     TRACING_OBJECTS
     $<TARGET_OBJECTS:tracing-library>
@@ -210,6 +229,7 @@ target_link_libraries(
   PRIVATE rt
   ${TRACING_LIBRARIES}
   PRIVATE protobuf::libprotobuf
+  PRIVATE triton-common-serverapi
   PRIVATE tritonserver
 )
 if(${TRITON_ENABLE_GPU})
@@ -252,9 +272,11 @@ set_target_properties(
 )
 target_link_libraries(
   simple
+  PRIVATE triton-common-serverapi   # from repo-common
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
-)
+  )
+
 if(${TRITON_ENABLE_GPU})
 target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
@@ -302,6 +324,7 @@ target_link_libraries(
   PUBLIC -L/usr/local/cuda/lib64/stubs
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
+  PRIVATE triton-common-serverapi   # from repo-common
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
@@ -350,7 +373,6 @@ add_library(
   $<TARGET_OBJECTS:server-library>
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
-  $<TARGET_OBJECTS:triton-json-library>
   ${CUDA_OBJS}
   ${BACKEND_OBJS}
 )
@@ -367,6 +389,9 @@ set_target_properties(
 target_link_libraries(
   tritonserver
   PRIVATE -ldl
+  PRIVATE triton-common-backendapi
+  PRIVATE triton-common-serverapi
+  PRIVATE triton-common-json
   PRIVATE ${TRITON_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf
 )
@@ -443,9 +468,4 @@ endif() # TRITON_ENABLE_GPU
 install(
   TARGETS tritonserver
   LIBRARY DESTINATION lib
-)
-
-install(
-  FILES ../core/tritonserver.h
-  DESTINATION include
 )

@@ -28,12 +28,12 @@
 
 #include <vector>
 #include "src/backends/backend/triton_model_instance.h"
-#include "src/backends/backend/tritonbackend.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_message.h"
-#include "src/core/tritonserver.h"
+#include "triton/common/tritonbackend.h"
+#include "triton/common/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 

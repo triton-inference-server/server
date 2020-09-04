@@ -38,7 +38,6 @@ RUN apt-get update && \
             autoconf \
             automake \
             build-essential \
-            cmake \
             curl \
             git \
             libb64-dev \
@@ -51,9 +50,19 @@ RUN apt-get update && \
             python3-pip \
             python3-dev \
             rapidjson-dev \
-            vim && \
+            vim \
+            wget && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools
+
+# Client build requires recent version of CMake (FetchContent required)
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+      gpg --dearmor - |  \
+      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends cmake && \
+    cmake --version
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \

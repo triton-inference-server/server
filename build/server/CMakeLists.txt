@@ -37,6 +37,24 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+#
+# Dependencies
+#
+# FetchContent's composibility isn't very good. We must include the
+# transitive closure of all repos so that we can override the tag.
+#
+include(FetchContent)
+
+set(REPO_TAG main)
+FetchContent_Declare(
+  repo-common
+  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+  GIT_TAG ${REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_MakeAvailable(repo-common)
+
+
 add_definitions(-DTRITON_VERSION="${TRITON_VERSION}")
 
 if(${TRITON_ENABLE_ASAN})

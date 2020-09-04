@@ -40,6 +40,10 @@ add_library(
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
 )
+target_link_libraries(
+  custombackendparts
+  PRIVATE triton-common-serverapi        # from repo-common
+)
 
 add_custom_command(
   OUTPUT libcustombackend.a
@@ -74,7 +78,6 @@ install(
 install(
   FILES
     ../../core/model_config.h
-    ../../core/tritonserver.h
     ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
   DESTINATION include/src/core
 )

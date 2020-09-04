@@ -30,7 +30,7 @@
 #include "src/backends/backend/examples/backend_model.h"
 #include "src/backends/backend/examples/backend_utils.h"
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 //
 // BackendModelInstance
@@ -52,7 +52,7 @@ BackendModelInstance::BackendModelInstance(
   THROW_IF_BACKEND_INSTANCE_ERROR(
       TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &device_id_));
 
-  TritonJson::Value& model_config = backend_model->ModelConfig();
+  common::TritonJson::Value& model_config = backend_model->ModelConfig();
 
   // If the model configuration specifies a 'default_model_filename'
   // and/or specifies 'cc_model_filenames' then determine the
@@ -95,8 +95,8 @@ BackendModelInstance::BackendModelInstance(
 
       const std::string cc =
           std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
-      TritonJson::Value cc_names;
-      TritonJson::Value cc_name;
+      common::TritonJson::Value cc_names;
+      common::TritonJson::Value cc_name;
       if ((model_config.Find("cc_model_filenames", &cc_names)) &&
           (cc_names.Find(cc.c_str(), &cc_name))) {
         cc_name.AsString(&artifact_filename_);
@@ -146,4 +146,4 @@ BackendModelInstance::~BackendModelInstance()
 #endif  // TRITON_ENABLE_GPU
 }
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend
