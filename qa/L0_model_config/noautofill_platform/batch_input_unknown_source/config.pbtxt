@@ -1,0 +1,23 @@
+name: "batch_input_unknown_source"
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+batch_input [
+  {
+    kind: BATCH_ELEMENT_COUNT
+    target_name: "BATCH_INPUT"
+    data_type: TYPE_FP32
+    source_input: "UNKNOWN_INPUT"
+  }
+]

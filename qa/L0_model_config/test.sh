@@ -272,12 +272,12 @@ for TRIAL in $TRIALS; do
         continue
     fi
 
-    for TARGET in `ls noautofill_platform_not_custom`; do
+    for TARGET in `ls noautofill_platform_special_io`; do
         SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
-        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_not_custom_${TRIAL}_${TARGET}.log
+        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_special_io_${TRIAL}_${TARGET}.log
 
         rm -fr models && mkdir models
-        cp -r noautofill_platform_not_custom/$TARGET models/.
+        cp -r noautofill_platform_special_io/$TARGET models/.
 
         CONFIG=models/$TARGET/config.pbtxt
         EXPECTEDS=models/$TARGET/expected*
@@ -289,7 +289,7 @@ for TRIAL in $TRIALS; do
             cat $CONFIG
         fi
 
-        echo -e "Test platform $TRIAL on noautofill_platform_not_custom/$TARGET" >> $CLIENT_LOG
+        echo -e "Test platform $TRIAL on noautofill_platform_special_io/$TARGET" >> $CLIENT_LOG
 
         # We expect all the tests to fail with one of the expected
         # error messages
@@ -313,7 +313,7 @@ for TRIAL in $TRIALS; do
             done
 
             if [ "$EXFOUND" == "0" ]; then
-                echo -e "*** FAILED: platform $TRIAL noautofill_platform_not_custom/$TARGET" >> $CLIENT_LOG
+                echo -e "*** FAILED: platform $TRIAL noautofill_platform_special_io/$TARGET" >> $CLIENT_LOG
                 RET=1
             fi
         fi

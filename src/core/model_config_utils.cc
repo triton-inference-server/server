@@ -844,6 +844,113 @@ ValidateModelIOConfig(const inference::ModelConfig& config)
           status.StatusCode(), status.Message() + " for " + config.name());
     }
   }
+  status = ValidateBatchIO(config);
+  if (!status.IsOk()) {
+    return Status(
+        status.StatusCode(), status.Message() + " for " + config.name());
+  }
+  return Status::Success;
+}
+
+Status
+ValidateBatchIO(const inference::ModelConfig& config)
+{
+  if ((config.batch_input_size() != 0) && (config.batch_output_size() != 0)) {
+    if (
+#ifdef TRITON_ENABLE_CUSTOM
+        (config.platform() != kCustomPlatform) &&
+#endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_TENSORRT
+        (config.platform() != kTensorRTPlanPlatform)
+#endif  // TRITON_ENABLE_TENSORRT
+    ) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "batch inputs and batch outputs are only supported for custom "
+          "platform"
+          " and TensorRT platform");
+    }
+  }
+
+  std::set<std::string> input_names;
+  std::set<std::string> output_names;
+  for (const auto& io : config.input()) {
+    input_names.emplace(io.name());
+  }
+  for (const auto& io : config.output()) {
+    output_names.emplace(io.name());
+  }
+  for (const auto& batch_io : config.batch_input()) {
+    switch (batch_io.kind()) {
+      case inference::BatchInput::BATCH_ELEMENT_COUNT:
+      case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT:
+      case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO:
+      case inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
+        if (batch_io.source_input_size() != 1) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "batch input kind '" +
+                  inference::BatchInput::Kind_Name(batch_io.kind()) +
+                  "' expects 1 source input, got " +
+                  std::to_string(batch_io.source_input_size()));
+        }
+        break;
+      }
+      default:
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown batch input kind '" +
+                inference::BatchInput::Kind_Name(batch_io.kind()) + "'");
+    }
+    for (const auto& source_name : batch_io.source_input()) {
+      if (input_names.find(source_name) == input_names.end()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown source input name '" + source_name + "'");
+      }
+    }
+  }
+
+  for (const auto& batch_io : config.batch_output()) {
+    switch (batch_io.kind()) {
+      case inference::BatchOutput::BATCH_SCATTER_WITH_INPUT_SHAPE: {
+        if (batch_io.source_input_size() != 1) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "batch output kind '" +
+                  inference::BatchOutput::Kind_Name(batch_io.kind()) +
+                  "' expects 1 source input, got " +
+                  std::to_string(batch_io.source_input_size()));
+        }
+        break;
+      }
+      default:
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown batch output kind '" +
+                inference::BatchOutput::Kind_Name(batch_io.kind()) + "'");
+    }
+    for (const auto& source_name : batch_io.source_input()) {
+      if (input_names.find(source_name) == input_names.end()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown source input name '" + source_name + "'");
+      }
+    }
+    std::set<std::string> target_names;
+    for (const auto& target_name : batch_io.target_name()) {
+      if (output_names.find(target_name) == output_names.end()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown target output name '" + target_name + "'");
+      }
+      if (target_names.emplace(target_name).second == false) {
+        return Status(
+            Status::Code::INVALID_ARG, "target output name '" + target_name +
+                                           "' can only be specified once");
+      }
+    }
+  }
   return Status::Success;
 }
 
