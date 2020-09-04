@@ -855,21 +855,19 @@ ValidateModelIOConfig(const inference::ModelConfig& config)
 Status
 ValidateBatchIO(const inference::ModelConfig& config)
 {
-  if ((config.batch_input_size() != 0) && (config.batch_output_size() != 0)) {
-    if (
+  if (
 #ifdef TRITON_ENABLE_CUSTOM
-        (config.platform() != kCustomPlatform) &&
+      (config.platform() != kCustomPlatform) &&
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_TENSORRT
-        (config.platform() != kTensorRTPlanPlatform)
+      (config.platform() != kTensorRTPlanPlatform) &&
 #endif  // TRITON_ENABLE_TENSORRT
-    ) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "batch inputs and batch outputs are only supported for custom "
-          "platform"
-          " and TensorRT platform");
-    }
+      ((config.batch_input_size() != 0) || (config.batch_output_size() != 0))
+  ) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "batch inputs and batch outputs are only supported for custom "
+        "platform and TensorRT platform");
   }
 
   std::set<std::string> input_names;
