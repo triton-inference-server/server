@@ -26,13 +26,13 @@
 #pragma once
 
 #include <string>
-#include "src/backends/backend/tritonbackend.h"
+#include "triton/common/tritonbackend.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 #ifndef TRITON_ENABLE_GPU
 using cudaStream_t = void*;
@@ -103,13 +103,12 @@ struct BackendModelInstanceException {
   TRITONSERVER_Error* err_;
 };
 
-#define THROW_IF_BACKEND_INSTANCE_ERROR(X)                                   \
-  do {                                                                       \
-    TRITONSERVER_Error* tie_err__ = (X);                                     \
-    if (tie_err__ != nullptr) {                                              \
-      throw nvidia::inferenceserver::backend::BackendModelInstanceException( \
-          tie_err__);                                                        \
-    }                                                                        \
+#define THROW_IF_BACKEND_INSTANCE_ERROR(X)                             \
+  do {                                                                 \
+    TRITONSERVER_Error* tie_err__ = (X);                               \
+    if (tie_err__ != nullptr) {                                        \
+      throw triton::backend::BackendModelInstanceException(tie_err__); \
+    }                                                                  \
   } while (false)
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend

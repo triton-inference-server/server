@@ -28,7 +28,7 @@
 
 #include "src/backends/backend/examples/backend_utils.h"
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 //
 // BackendInputCollector
@@ -391,4 +391,4 @@ BackendInputCollector::FlushPendingPinned(
   return cuda_copy;
 }
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend

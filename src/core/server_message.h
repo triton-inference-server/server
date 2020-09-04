@@ -28,10 +28,12 @@
 #include <string>
 #include "src/core/status.h"
 
-#define TRITONJSON_STATUSTYPE Status
-#define TRITONJSON_STATUSRETURN(M) return Status(Status::Code::INTERNAL, (M))
-#define TRITONJSON_STATUSSUCCESS Status::Success
-#include "src/core/json.h"
+#define TRITONJSON_STATUSTYPE nvidia::inferenceserver::Status
+#define TRITONJSON_STATUSRETURN(M)        \
+  return nvidia::inferenceserver::Status( \
+      nvidia::inferenceserver::Status::Code::INTERNAL, (M))
+#define TRITONJSON_STATUSSUCCESS nvidia::inferenceserver::Status::Success
+#include "triton/common/triton_json.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -40,7 +42,7 @@ namespace nvidia { namespace inferenceserver {
 //
 class TritonServerMessage {
  public:
-  TritonServerMessage(const TritonJson::Value& msg)
+  TritonServerMessage(const triton::common::TritonJson::Value& msg)
   {
     json_buffer_.Clear();
     msg.Write(&json_buffer_);
@@ -79,7 +81,7 @@ class TritonServerMessage {
 
  private:
   bool from_json_;
-  TritonJson::WriteBuffer json_buffer_;
+  triton::common::TritonJson::WriteBuffer json_buffer_;
   std::string str_buffer_;
 
   const char* base_;

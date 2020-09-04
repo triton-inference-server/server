@@ -49,6 +49,7 @@ set_target_properties(
 target_link_libraries(
   imagepreprocess
   PRIVATE custombackend
+  PRIVATE triton-common-serverapi        # from repo-common
   PRIVATE ${OpenCV_LIBS}
 )
 
