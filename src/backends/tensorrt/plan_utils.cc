@@ -47,50 +47,6 @@ ConvertTrtTypeToDataType(nvinfer1::DataType trt_type)
   return inference::DataType::TYPE_INVALID;
 }
 
-MemoryFormat
-ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt)
-{
-  switch (trt_fmt) {
-    case nvinfer1::TensorFormat::kLINEAR:
-      return MemoryFormat::LINEAR;
-    case nvinfer1::TensorFormat::kCHW2:
-      return MemoryFormat::CHW2;
-    case nvinfer1::TensorFormat::kCHW4:
-      return MemoryFormat::CHW4;
-    case nvinfer1::TensorFormat::kHWC8:
-      return MemoryFormat::HWC8;
-    case nvinfer1::TensorFormat::kCHW16:
-      return MemoryFormat::CHW16;
-    case nvinfer1::TensorFormat::kCHW32:
-      return MemoryFormat::CHW32;
-  }
-
-  return MemoryFormat::INVALID;
-}
-
-const std::string
-MemoryFormat_Name(MemoryFormat fmt)
-{
-  switch (fmt) {
-    case MemoryFormat::LINEAR:
-      return "LINEAR";
-    case MemoryFormat::CHW2:
-      return "CHW2";
-    case MemoryFormat::CHW4:
-      return "CHW4";
-    case MemoryFormat::HWC8:
-      return "HWC8";
-    case MemoryFormat::CHW16:
-      return "CHW16";
-    case MemoryFormat::CHW32:
-      return "CHW32";
-    case MemoryFormat::INVALID:
-      return "INVALID";
-  }
-
-  return "INVALID";
-}
-
 bool
 UseTensorRTv2API(const nvinfer1::ICudaEngine* engine)
 {
@@ -99,36 +55,6 @@ UseTensorRTv2API(const nvinfer1::ICudaEngine* engine)
   // an implicit batch dimension to detect whether or not
   // to use the TensorRT V2 API.
   return !engine->hasImplicitBatchDimension();
-}
-
-int
-MemoryFormat_VectorSize(MemoryFormat fmt)
-{
-  unsigned int vector_size = 1;
-  switch (fmt) {
-    case MemoryFormat::LINEAR:
-      vector_size = 1;
-      break;
-    case MemoryFormat::CHW2:
-      vector_size = 2;
-      break;
-    case MemoryFormat::CHW4:
-      vector_size = 4;
-      break;
-    case MemoryFormat::HWC8:
-      vector_size = 8;
-      break;
-    case MemoryFormat::CHW16:
-      vector_size = 16;
-      break;
-    case MemoryFormat::CHW32:
-      vector_size = 32;
-      break;
-    default:
-      vector_size = 1;  // In the default case, assume LINEAR
-      break;
-  }
-  return vector_size;
 }
 
 std::pair<bool, nvinfer1::DataType>

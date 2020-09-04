@@ -417,8 +417,8 @@ PlanBackend::Context::InitOptimizationProfiles(
           return Status(
               Status::Code::INTERNAL, "unable to create TensorRT context");
         }
-        if (!res.first->second.context_->setOptimizationProfile(
-                profile_index)) {
+        if (!res.first->second.context_->setOptimizationProfileAsync(
+                profile_index, stream_)) {
           return Status(
               Status::Code::INVALID_ARG,
               "Can not set the specified optimization profile " + profile_name +
@@ -2177,7 +2177,7 @@ PlanBackend::Context::Run(
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             SetBindingDimensions(
-                name, ragged_shape, citr->second, bindex, io_index),
+                name, ragged_shape, citr->second, bindex, io_index, &input_dims),
             "error setting the binding dimension");
 
         size_t total_byte_size = 0;
