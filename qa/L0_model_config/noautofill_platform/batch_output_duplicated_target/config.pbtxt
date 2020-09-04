@@ -1,0 +1,22 @@
+name: "batch_output_duplicated_target"
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }
+]
+batch_output [
+  {
+    target_name: ["OUTPUT", "OUTPUT"]
+    kind: BATCH_SCATTER_WITH_INPUT_SHAPE
+    source_input: "INPUT"
+  }
+]
