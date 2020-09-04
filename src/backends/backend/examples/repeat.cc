@@ -31,9 +31,6 @@
 #include <memory>
 #include <thread>
 
-namespace ni = nvidia::inferenceserver;
-namespace nib = nvidia::inferenceserver::backend;
-
 //
 // Backend that demonstrates the TRITONBACKEND API for a decoupled
 // backend where each request can generate 0 to many responses.
@@ -73,7 +70,7 @@ namespace nib = nvidia::inferenceserver::backend;
 // time, and the responses for multiple requests can be intermixed,
 // depending on the values of DELAY and WAIT.
 
-namespace {
+namespace triton { namespace backend { namespace repeat {
 
 #define RESPOND_AND_RETURN_IF_ERROR(REQUEST, X)                         \
   do {                                                                  \
@@ -136,10 +133,11 @@ class ModelState {
 
  private:
   ModelState(
-      TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config);
+      TRITONBACKEND_Model* triton_model,
+      common::TritonJson::Value&& model_config);
 
   TRITONBACKEND_Model* triton_model_;
-  ni::TritonJson::Value model_config_;
+  common::TritonJson::Value model_config_;
 };
 
 TRITONSERVER_Error*
@@ -161,7 +159,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   RETURN_IF_ERROR(
       TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
 
-  ni::TritonJson::Value model_config;
+  common::TritonJson::Value model_config;
   TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
   RETURN_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
   RETURN_IF_ERROR(err);
@@ -171,7 +169,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 }
 
 ModelState::ModelState(
-    TRITONBACKEND_Model* triton_model, ni::TritonJson::Value&& model_config)
+    TRITONBACKEND_Model* triton_model, common::TritonJson::Value&& model_config)
     : triton_model_(triton_model), model_config_(std::move(model_config))
 {
 }
@@ -180,7 +178,7 @@ TRITONSERVER_Error*
 ModelState::ValidateModelConfig()
 {
   // We have the json DOM for the model configuration...
-  ni::TritonJson::WriteBuffer buffer;
+  common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
   LOG_MESSAGE(
       TRITONSERVER_LOG_INFO,
@@ -195,7 +193,7 @@ ModelState::ValidateModelConfig()
       std::string(
           "repeat backend only supports models with max_batch_size == 0"));
 
-  ni::TritonJson::Value inputs, outputs;
+  common::TritonJson::Value inputs, outputs;
   RETURN_IF_ERROR(model_config_.MemberAsArray("input", &inputs));
   RETURN_IF_ERROR(model_config_.MemberAsArray("output", &outputs));
 
@@ -211,7 +209,7 @@ ModelState::ValidateModelConfig()
 
   // Here we rely on the model configuation listing the inputs and
   // outputs in a specific order, which we shouldn't really require...
-  ni::TritonJson::Value in, delay, wait, out, idx;
+  common::TritonJson::Value in, delay, wait, out, idx;
   RETURN_IF_ERROR(inputs.IndexAsObject(0, &in));
   RETURN_IF_ERROR(inputs.IndexAsObject(1, &delay));
   RETURN_IF_ERROR(inputs.IndexAsObject(2, &wait));
@@ -248,36 +246,36 @@ ModelState::ValidateModelConfig()
 
   // Check shapes
   std::vector<int64_t> in_shape, delay_shape, wait_shape, out_shape, idx_shape;
-  RETURN_IF_ERROR(nib::ParseShape(in, "dims", &in_shape));
-  RETURN_IF_ERROR(nib::ParseShape(delay, "dims", &delay_shape));
-  RETURN_IF_ERROR(nib::ParseShape(wait, "dims", &wait_shape));
-  RETURN_IF_ERROR(nib::ParseShape(out, "dims", &out_shape));
-  RETURN_IF_ERROR(nib::ParseShape(idx, "dims", &idx_shape));
+  RETURN_IF_ERROR(backend::ParseShape(in, "dims", &in_shape));
+  RETURN_IF_ERROR(backend::ParseShape(delay, "dims", &delay_shape));
+  RETURN_IF_ERROR(backend::ParseShape(wait, "dims", &wait_shape));
+  RETURN_IF_ERROR(backend::ParseShape(out, "dims", &out_shape));
+  RETURN_IF_ERROR(backend::ParseShape(idx, "dims", &idx_shape));
 
   RETURN_ERROR_IF_FALSE(
       in_shape.size() == 1, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected IN shape to have one dimension, got ") +
-          nib::ShapeToString(in_shape));
+          backend::ShapeToString(in_shape));
   RETURN_ERROR_IF_FALSE(
       in_shape == delay_shape, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected IN and DELAY shape to match, got ") +
-          nib::ShapeToString(in_shape) + " and " +
-          nib::ShapeToString(delay_shape));
+          backend::ShapeToString(in_shape) + " and " +
+          backend::ShapeToString(delay_shape));
   RETURN_ERROR_IF_FALSE(
       (wait_shape.size() == 1) && (wait_shape[0] == 1),
       TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected WAIT shape to be [1], got ") +
-          nib::ShapeToString(wait_shape));
+          backend::ShapeToString(wait_shape));
   RETURN_ERROR_IF_FALSE(
       (out_shape.size() == 1) && (out_shape[0] == 1),
       TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected OUT shape to be [1], got ") +
-          nib::ShapeToString(out_shape));
+          backend::ShapeToString(out_shape));
   RETURN_ERROR_IF_FALSE(
       (idx_shape.size() == 1) && (idx_shape[0] == 1),
       TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected IDX shape to be [1], got ") +
-          nib::ShapeToString(idx_shape));
+          backend::ShapeToString(idx_shape));
 
   // Check datatypes
   std::string in_dtype, delay_dtype, wait_dtype, out_dtype, idx_dtype;
@@ -407,7 +405,7 @@ ModelInstanceState::ProcessRequest(
   size_t wait_byte_size = sizeof(uint32_t);
   RESPOND_AND_RETURN_IF_ERROR(
       request,
-      nib::ReadInputTensor(
+      backend::ReadInputTensor(
           request, "WAIT", reinterpret_cast<char*>(wait_ms), &wait_byte_size));
 
   if (wait_byte_size != sizeof(uint32_t)) {
@@ -454,8 +452,8 @@ ModelInstanceState::ProcessRequest(
         TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string("expected IN and DELAY shape to match, got ") +
-             nib::ShapeToString(in_shape) + " and " +
-             nib::ShapeToString(delay_shape))
+             backend::ShapeToString(in_shape) + " and " +
+             backend::ShapeToString(delay_shape))
                 .c_str()));
   }
 
@@ -467,14 +465,14 @@ ModelInstanceState::ProcessRequest(
   // buffers directly.
   std::unique_ptr<int32_t> in_buffer(new int32_t[element_count]);
   RESPOND_AND_RETURN_IF_ERROR(
-      request, nib::ReadInputTensor(
+      request, backend::ReadInputTensor(
                    request, "IN", reinterpret_cast<char*>(in_buffer.get()),
                    &in_byte_size));
 
   std::unique_ptr<int32_t> delay_buffer(new int32_t[element_count]);
   RESPOND_AND_RETURN_IF_ERROR(
       request,
-      nib::ReadInputTensor(
+      backend::ReadInputTensor(
           request, "DELAY", reinterpret_cast<char*>(delay_buffer.get()),
           &delay_byte_size));
 
@@ -507,7 +505,8 @@ ModelInstanceState::ResponseThread(
     TRITONBACKEND_ResponseFactory* factory_ptr, const int32_t* in_buffer_ptr,
     const int32_t* delay_buffer_ptr, const uint32_t element_count)
 {
-  std::unique_ptr<TRITONBACKEND_ResponseFactory, nib::ResponseFactoryDeleter>
+  std::unique_ptr<
+      TRITONBACKEND_ResponseFactory, backend::ResponseFactoryDeleter>
       factory(factory_ptr);
   std::unique_ptr<const int32_t> in_buffer(in_buffer_ptr);
   std::unique_ptr<const int32_t> delay_buffer(delay_buffer_ptr);
@@ -619,8 +618,6 @@ ModelInstanceState::ResponseThread(
 
   inflight_thread_count_--;
 }
-
-}  // namespace
 
 /////////////
 
@@ -832,3 +829,5 @@ TRITONBACKEND_ModelInstanceExecute(
 }
 
 }  // extern "C"
+
+}}}  // namespace triton::backend::repeat

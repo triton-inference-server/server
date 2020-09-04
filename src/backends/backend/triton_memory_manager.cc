@@ -26,10 +26,10 @@
 
 #include "src/backends/backend/triton_memory_manager.h"
 
-#include "src/backends/backend/tritonbackend.h"
 #include "src/core/pinned_memory_manager.h"
 #include "src/core/status.h"
-#include "src/core/tritonserver.h"
+#include "triton/common/tritonbackend.h"
+#include "triton/common/tritonserver.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>

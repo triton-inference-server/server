@@ -60,6 +60,12 @@ if(${TRITON_ENABLE_GRPC})
       model-config-library grpc-library proto-library
   )
 
+  target_link_libraries(
+    grpc-client-library
+    PUBLIC
+      triton-common-json        # from repo-common
+  )
+
   # libgrpcclient_static.a
   add_library(
       grpcclient_static STATIC
@@ -67,7 +73,6 @@ if(${TRITON_ENABLE_GRPC})
       $<TARGET_OBJECTS:model-config-library>
       $<TARGET_OBJECTS:proto-library>
       $<TARGET_OBJECTS:grpc-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::grpcclient_static ALIAS grpcclient_static
@@ -86,6 +91,7 @@ if(${TRITON_ENABLE_GRPC})
       grpcclient_static
       PRIVATE gRPC::grpc++
       PRIVATE gRPC::grpc
+      PRIVATE triton-common-json
       PUBLIC protobuf::libprotobuf
       PUBLIC Threads::Threads
   )
@@ -97,7 +103,6 @@ if(${TRITON_ENABLE_GRPC})
       $<TARGET_OBJECTS:model-config-library>
       $<TARGET_OBJECTS:proto-library>
       $<TARGET_OBJECTS:grpc-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::grpcclient ALIAS grpcclient
@@ -125,6 +130,7 @@ if(${TRITON_ENABLE_GRPC})
       grpcclient
       PRIVATE gRPC::grpc++
       PRIVATE gRPC::grpc
+      PRIVATE triton-common-json
       PUBLIC protobuf::libprotobuf
       PUBLIC Threads::Threads
   )
@@ -238,11 +244,16 @@ if(${TRITON_ENABLE_HTTP})
     target_include_directories(http-client-library PUBLIC ${CUDA_INCLUDE_DIRS})
   endif() # TRITON_ENABLE_GPU
 
+  target_link_libraries(
+    http-client-library
+    PUBLIC
+      triton-common-json        # from repo-common
+  )
+
   # libhttpclient_static.a
   add_library(
       httpclient_static STATIC
       $<TARGET_OBJECTS:http-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::httpclient_static ALIAS httpclient_static
@@ -259,6 +270,7 @@ if(${TRITON_ENABLE_HTTP})
   )
   target_link_libraries(
       httpclient_static
+      PRIVATE triton-common-json
       PRIVATE CURL::libcurl
       PUBLIC Threads::Threads
   )
@@ -267,7 +279,6 @@ if(${TRITON_ENABLE_HTTP})
   add_library(
       httpclient SHARED
       $<TARGET_OBJECTS:http-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::httpclient ALIAS httpclient
@@ -293,6 +304,7 @@ if(${TRITON_ENABLE_HTTP})
   )
   target_link_libraries(
       httpclient
+      PRIVATE triton-common-json
       PRIVATE CURL::libcurl
       PUBLIC Threads::Threads
   )

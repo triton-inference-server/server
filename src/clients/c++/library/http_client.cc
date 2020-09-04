@@ -43,7 +43,7 @@ extern "C" {
 #define TRITONJSON_STATUSRETURN(M) \
   return nvidia::inferenceserver::client::Error(M)
 #define TRITONJSON_STATUSSUCCESS nvidia::inferenceserver::client::Error::Success
-#include "src/core/json.h"
+#include "triton/common/triton_json.h"
 
 #ifdef _WIN32
 #define strncasecmp(x, y, z) _strnicmp(x, y, z)
@@ -148,7 +148,7 @@ class HttpInferRequest : public InferRequest {
   Error PrepareRequestJson(
       const InferOptions& options, const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs,
-      TritonJson::Value* request_json);
+      triton::common::TritonJson::Value* request_json);
 
   // Pointer to the list of the HTTP request header, keep it such that it will
   // be valid during the transfer and can be freed once transfer is completed.
@@ -159,7 +159,7 @@ class HttpInferRequest : public InferRequest {
 
   size_t total_input_byte_size_;
 
-  TritonJson::WriteBuffer request_json_;
+  triton::common::TritonJson::WriteBuffer request_json_;
 
   // Buffer that accumulates the response body.
   std::unique_ptr<std::string> infer_response_buffer_;
@@ -195,7 +195,8 @@ HttpInferRequest::InitializeRequest(
   total_input_byte_size_ = 0;
   http_code_ = 400;
 
-  TritonJson::Value request_json(TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value request_json(
+      triton::common::TritonJson::ValueType::OBJECT);
   Error err = PrepareRequestJson(options, inputs, outputs, &request_json);
   if (!err.IsOk()) {
     return err;
@@ -217,7 +218,7 @@ Error
 HttpInferRequest::PrepareRequestJson(
     const InferOptions& options, const std::vector<InferInput*>& inputs,
     const std::vector<const InferRequestedOutput*>& outputs,
-    TritonJson::Value* request_json)
+    triton::common::TritonJson::Value* request_json)
 {
   // Can use string-ref because json is serialized before end of
   // 'options', 'inputs' and 'outputs' lifetime.
@@ -226,8 +227,8 @@ HttpInferRequest::PrepareRequestJson(
 
   if ((options.sequence_id_ != 0) || (options.priority_ != 0) ||
       (options.server_timeout_ != 0)) {
-    TritonJson::Value parameters_json(
-        *request_json, TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value parameters_json(
+        *request_json, triton::common::TritonJson::ValueType::OBJECT);
     {
       if (options.sequence_id_ != 0) {
         parameters_json.AddUInt("sequence_id", options.sequence_id_);
@@ -248,21 +249,24 @@ HttpInferRequest::PrepareRequestJson(
   }
 
   if (!inputs.empty()) {
-    TritonJson::Value inputs_json(*request_json, TritonJson::ValueType::ARRAY);
+    triton::common::TritonJson::Value inputs_json(
+        *request_json, triton::common::TritonJson::ValueType::ARRAY);
     for (const auto io : inputs) {
-      TritonJson::Value io_json(*request_json, TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value io_json(
+          *request_json, triton::common::TritonJson::ValueType::OBJECT);
       io_json.AddStringRef("name", io->Name().c_str(), io->Name().size());
       io_json.AddStringRef(
           "datatype", io->Datatype().c_str(), io->Datatype().size());
 
-      TritonJson::Value shape_json(*request_json, TritonJson::ValueType::ARRAY);
+      triton::common::TritonJson::Value shape_json(
+          *request_json, triton::common::TritonJson::ValueType::ARRAY);
       for (const auto dim : io->Shape()) {
         shape_json.AppendUInt(dim);
       }
       io_json.Add("shape", std::move(shape_json));
 
-      TritonJson::Value ioparams_json(
-          *request_json, TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value ioparams_json(
+          *request_json, triton::common::TritonJson::ValueType::OBJECT);
       if (io->IsSharedMemory()) {
         std::string region_name;
         size_t offset;
@@ -296,13 +300,15 @@ HttpInferRequest::PrepareRequestJson(
   }
 
   if (!outputs.empty()) {
-    TritonJson::Value outputs_json(*request_json, TritonJson::ValueType::ARRAY);
+    triton::common::TritonJson::Value outputs_json(
+        *request_json, triton::common::TritonJson::ValueType::ARRAY);
     for (const auto io : outputs) {
-      TritonJson::Value io_json(*request_json, TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value io_json(
+          *request_json, triton::common::TritonJson::ValueType::OBJECT);
       io_json.AddStringRef("name", io->Name().c_str(), io->Name().size());
 
-      TritonJson::Value ioparams_json(
-          *request_json, TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value ioparams_json(
+          *request_json, triton::common::TritonJson::ValueType::OBJECT);
 
       if (io->ClassificationCount() > 0) {
         ioparams_json.AddUInt("classification", io->ClassificationCount());
@@ -410,12 +416,13 @@ class InferResultHttp : public InferResult {
  private:
   InferResultHttp(std::shared_ptr<HttpInferRequest> infer_request);
 
-  std::map<std::string, TritonJson::Value> output_name_to_result_map_;
+  std::map<std::string, triton::common::TritonJson::Value>
+      output_name_to_result_map_;
   std::map<std::string, std::pair<const uint8_t*, const size_t>>
       output_name_to_buffer_map_;
 
   Error status_;
-  TritonJson::Value response_json_;
+  triton::common::TritonJson::Value response_json_;
   std::shared_ptr<HttpInferRequest> infer_request_;
 };
 
@@ -487,11 +494,13 @@ namespace {
 
 Error
 ShapeHelper(
-    const std::string& result_name, const TritonJson::Value& result_json,
+    const std::string& result_name,
+    const triton::common::TritonJson::Value& result_json,
     std::vector<int64_t>* shape)
 {
-  TritonJson::Value shape_json;
-  if (!const_cast<TritonJson::Value&>(result_json).Find("shape", &shape_json)) {
+  triton::common::TritonJson::Value shape_json;
+  if (!const_cast<triton::common::TritonJson::Value&>(result_json)
+           .Find("shape", &shape_json)) {
     return Error(
         "The response does not contain shape for output name " + result_name);
   }
@@ -619,7 +628,7 @@ InferResultHttp::DebugString() const
     return status_.Message();
   }
 
-  TritonJson::WriteBuffer buffer;
+  triton::common::TritonJson::WriteBuffer buffer;
   Error err = response_json_.Write(&buffer);
   if (!err.IsOk()) {
     return "<failed>";
@@ -673,10 +682,10 @@ InferResultHttp::InferResultHttp(
         status_ = Error(std::string(err_str, err_strlen));
       }
     } else {
-      TritonJson::Value outputs_json;
+      triton::common::TritonJson::Value outputs_json;
       if (response_json_.Find("outputs", &outputs_json)) {
         for (size_t i = 0; i < outputs_json.ArraySize(); i++) {
-          TritonJson::Value output_json;
+          triton::common::TritonJson::Value output_json;
           status_ = outputs_json.IndexAsObject(i, &output_json);
           if (!status_.IsOk()) {
             break;
@@ -691,7 +700,7 @@ InferResultHttp::InferResultHttp(
 
           std::string output_name(name_str, name_strlen);
 
-          TritonJson::Value param_json;
+          triton::common::TritonJson::Value param_json;
           if (output_json.Find("parameters", &param_json)) {
             uint64_t data_size = 0;
             status_ = param_json.MemberAsUInt("binary_data_size", &data_size);
@@ -937,14 +946,15 @@ InferenceServerHttpClient::RegisterSystemSharedMemory(
   std::string request_uri(
       url_ + "/v2/systemsharedmemory/region/" + name + "/register");
 
-  TritonJson::Value request_json(TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value request_json(
+      triton::common::TritonJson::ValueType::OBJECT);
   {
     request_json.AddStringRef("key", key.c_str(), key.size());
     request_json.AddUInt("offset", offset);
     request_json.AddUInt("byte_size", byte_size);
   }
 
-  TritonJson::WriteBuffer buffer;
+  triton::common::TritonJson::WriteBuffer buffer;
   Error err = request_json.Write(&buffer);
   if (!err.IsOk()) {
     return err;
@@ -993,10 +1003,11 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
   std::string request_uri(
       url_ + "/v2/cudasharedmemory/region/" + name + "/register");
 
-  TritonJson::Value request_json(TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value request_json(
+      triton::common::TritonJson::ValueType::OBJECT);
   {
-    TritonJson::Value raw_handle_json(
-        request_json, TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value raw_handle_json(
+        request_json, triton::common::TritonJson::ValueType::OBJECT);
     {
       // Must free encoded_handle after use to prevent memory leak
       char* encoded_handle = nullptr;
@@ -1016,7 +1027,7 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
     request_json.AddUInt("byte_size", byte_size);
   }
 
-  TritonJson::WriteBuffer buffer;
+  triton::common::TritonJson::WriteBuffer buffer;
   Error err = request_json.Write(&buffer);
   if (!err.IsOk()) {
     return err;
@@ -1430,7 +1441,7 @@ namespace {
 Error
 ParseErrorJson(const std::string& json_str)
 {
-  TritonJson::Value json;
+  triton::common::TritonJson::Value json;
   Error err = json.Parse(json_str.c_str(), json_str.size());
   if (!err.IsOk()) {
     return err;
