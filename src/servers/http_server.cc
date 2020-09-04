@@ -1978,7 +1978,7 @@ HTTPAPIServer::EVBufferToInput(
     }
 
     {
-      TritonJson::Value bdo_json;
+      triton::common::TritonJson::Value bdo_json;
       if (params_json.Find("binary_data_output", &bdo_json)) {
         bool bdo;
         RETURN_MSG_IF_ERR(
