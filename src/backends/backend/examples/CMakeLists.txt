@@ -42,6 +42,14 @@ if(${TRITON_ENABLE_GPU})
   target_include_directories(backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
 
+target_link_libraries(
+  backend-library
+  PUBLIC
+    triton-common-backendapi  # from repo-common
+    triton-common-serverapi   # from repo-common
+    triton-common-json        # from repo-common
+)
+
 #
 # libtriton_identity.so
 #
@@ -62,6 +70,14 @@ set_target_properties(
 set_target_properties(
   triton_identity
   PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_identity.ldscript"
+)
+
+target_link_libraries(
+  triton_identity
+  PUBLIC
+    triton-common-backendapi  # from repo-common
+    triton-common-serverapi   # from repo-common
+    triton-common-json        # from repo-common
 )
 
 #
@@ -86,6 +102,14 @@ set_target_properties(
   PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_repeat.ldscript"
 )
 
+target_link_libraries(
+  triton_repeat
+  PUBLIC
+    triton-common-backendapi  # from repo-common
+    triton-common-serverapi   # from repo-common
+    triton-common-json        # from repo-common
+)
+
 #
 # libtriton_square.so
 #
@@ -106,6 +130,14 @@ set_target_properties(
 set_target_properties(
   triton_square
   PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_square.ldscript"
+)
+
+target_link_libraries(
+  triton_square
+  PUBLIC
+    triton-common-backendapi  # from repo-common
+    triton-common-serverapi   # from repo-common
+    triton-common-json        # from repo-common
 )
 
 install(

@@ -26,7 +26,7 @@
 
 syntax = "proto3";
 
-package nvidia.inferenceserver;
+package triton.backend.python;
 
 message InitializationCommand
 {

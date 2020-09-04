@@ -152,7 +152,7 @@ exhale_args = {
     "exhaleDoxygenStdin":
         textwrap.dedent('''
         JAVADOC_AUTOBRIEF = YES
-    INPUT = ../src/core/tritonserver.h ../src/clients/c++/library/common.h ../src/clients/c++/library/grpc_client.h ../src/clients/c++/library/http_client.h ../src/backends/custom/custom.h ../src/custom/sdk/custom_instance.h
+    INPUT = ../src/clients/c++/library/common.h ../src/clients/c++/library/grpc_client.h ../src/clients/c++/library/http_client.h
     ''')
 }
 

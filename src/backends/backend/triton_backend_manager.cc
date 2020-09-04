@@ -83,10 +83,11 @@ TritonBackend::Create(
     std::shared_ptr<TritonBackend>* backend)
 {
   // Create the JSON representation of the backend configuration.
-  TritonJson::Value backend_config_json(TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value backend_config_json(
+      triton::common::TritonJson::ValueType::OBJECT);
   if (!backend_cmdline_config.empty()) {
-    TritonJson::Value cmdline_json(
-        backend_config_json, TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value cmdline_json(
+        backend_config_json, triton::common::TritonJson::ValueType::OBJECT);
     for (const auto& pr : backend_cmdline_config) {
       RETURN_IF_ERROR(cmdline_json.AddString(pr.first.c_str(), pr.second));
     }

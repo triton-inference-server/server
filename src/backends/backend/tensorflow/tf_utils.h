@@ -26,9 +26,9 @@
 #pragma once
 
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
-#include "src/core/tritonserver.h"
+#include "triton/common/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend { namespace tensorflow {
 
 /// \return nullptr if a TensorFlow shape can support a model
 /// configuration shape. Dimensions with variable size in the
@@ -83,4 +83,4 @@ TRTISTF_DataType ConvertDataType(TRITONSERVER_DataType dtype);
     }                                                                        \
   } while (false)
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}}  // namespace triton::backend::tensorflow

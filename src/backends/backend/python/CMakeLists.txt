@@ -64,10 +64,10 @@ add_custom_command(
   DEPENDS "python_host.proto" proto-library
 )
 
-find_program(PYTHON "python3" REQUIRED)
+find_package(Python REQUIRED COMPONENTS Interpreter)
 add_custom_command(
   OUTPUT ${GRPC_PY}
-  COMMAND ${PYTHON}
+  COMMAND ${Python_EXECUTABLE}
   ARGS
     -m grpc_tools.protoc
     -I "${python_host_proto_dir}"
@@ -120,6 +120,9 @@ target_include_directories(
 
 target_link_libraries(
   triton_python
+  PUBLIC triton-common-backendapi  # from repo-common
+  PUBLIC triton-common-serverapi   # from repo-common
+  PUBLIC triton-common-json        # from repo-common
   PRIVATE gRPC::grpc++
 )
 
