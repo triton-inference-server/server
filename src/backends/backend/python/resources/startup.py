@@ -40,45 +40,6 @@ from python_host_pb2 import *
 from python_host_pb2_grpc import PythonInterpreterServicer, add_PythonInterpreterServicer_to_server
 import grpc
 
-TRITION_TO_NUMPY_TYPE = {
-    # TRITONSERVER_TYPE_BOOL
-    1: np.bool,
-    # TRITONSERVER_TYPE_UINT8
-    2: np.uint8,
-    # TRITONSERVER_TYPE_UINT16
-    3: np.uint16,
-    # TRITONSERVER_TYPE_UINT32
-    4: np.uint32,
-    # TRITONSERVER_TYPE_UINT64
-    5: np.uint64,
-    # TRITONSERVER_TYPE_INT8
-    6: np.int8,
-    # TRITONSERVER_TYPE_INT16
-    7: np.int16,
-    # TRITONSERVER_TYPE_INT32
-    8: np.int32,
-    # TRITONSERVER_TYPE_INT64
-    9: np.int64,
-    # TRITONSERVER_TYPE_FP16
-    10: np.float16,
-    # TRITONSERVER_TYPE_FP32
-    11: np.float32,
-    # TRITONSERVER_TYPE_FP64
-    12: np.float64,
-    # TRITONSERVER_TYPE_STRING
-    13: np.str_
-}
-
-NUMPY_TO_TRITION_TYPE = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
-
-
-def protobuf_to_numpy_type(data_type):
-    return TRITION_TO_NUMPY_TYPE[data_type]
-
-
-def numpy_to_protobuf_type(data_type):
-    return NUMPY_TO_TRITION_TYPE[data_type]
-
 
 def parse_startup_arguments():
     parser = argparse.ArgumentParser(description="Triton Python Host")
@@ -177,7 +138,7 @@ class PythonHost(PythonInterpreterServicer):
                 tensor = tpb_utils.Tensor(
                     x.name,
                     np.frombuffer(x.raw_data,
-                                  dtype=protobuf_to_numpy_type(
+                                  dtype=tpb_utils.triton_to_numpy_type(
                                       x.dtype)).reshape(x.dims))
                 input_tensors.append(tensor)
 
@@ -224,9 +185,9 @@ class PythonHost(PythonInterpreterServicer):
             response_tensors = []
 
             for output_tensor in output_tensors:
-                output_np_array = output_tensor.numpy_array()
+                output_np_array = output_tensor.as_numpy()
                 tensor = Tensor(name=output_tensor.name(),
-                                dtype=numpy_to_protobuf_type(
+                                dtype=tpb_utils.numpy_to_triton_type(
                                     output_np_array.dtype.type),
                                 dims=output_np_array.shape,
                                 raw_data=output_np_array.tobytes())

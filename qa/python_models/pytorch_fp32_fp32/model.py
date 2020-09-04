@@ -33,7 +33,7 @@ import torch.nn.functional as F
 import sys
 sys.path.append('../..')
 
-import triton_python_backend_utils as utils
+import triton_python_backend_utils as pb_utils
 
 
 class Net(nn.Module):
@@ -76,13 +76,12 @@ class TritonPythonModel:
         """
         responses = []
         for request in requests:
-            input_tensors = request.inputs()
-            # This tensor is read-only, wee need to make a copy
-            input_data_ro = input_tensors[0].numpy_array()
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
+            # This tensor is read-only, we need to make a copy
+            input_data_ro = input_tensor.as_numpy()
             input_data = np.array(input_data_ro)
             result = self.model(torch.tensor(input_data))
-            print(result.shape)
 
-            out_tensor = utils.Tensor("OUT", result.detach().numpy())
-            responses.append(utils.InferenceResponse([out_tensor]))
+            out_tensor = pb_utils.Tensor("OUT", result.detach().numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
