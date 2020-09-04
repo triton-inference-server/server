@@ -68,6 +68,7 @@ add_executable(
 )
 target_link_libraries(
   perf_client
+  PRIVATE triton-common-json        # from repo-common
   PRIVATE TRITON::grpcclient_static
   PRIVATE TRITON::httpclient_static
   PRIVATE -lb64

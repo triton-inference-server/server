@@ -30,19 +30,19 @@
 #include <set>
 #include <unordered_map>
 #include <vector>
-#include "src/core/tritonserver.h"
+#include "triton/common/tritonserver.h"
 
 namespace triton { namespace backend { namespace onnxruntime {
 
 extern const OrtApi* ort_api;
 
-#define RESPOND_ALL_AND_RETURN_IF_ERROR(RESPONSES, RESPONSES_COUNT, X)      \
-  do {                                                                      \
-    TRITONSERVER_Error* raarie_err__ = (X);                                 \
-    if (raarie_err__ != nullptr) {                                          \
-      nib::SendErrorForResponses(RESPONSES, RESPONSES_COUNT, raarie_err__); \
-      return;                                                               \
-    }                                                                       \
+#define RESPOND_ALL_AND_RETURN_IF_ERROR(RESPONSES, RESPONSES_COUNT, X) \
+  do {                                                                 \
+    TRITONSERVER_Error* raarie_err__ = (X);                            \
+    if (raarie_err__ != nullptr) {                                     \
+      SendErrorForResponses(RESPONSES, RESPONSES_COUNT, raarie_err__); \
+      return;                                                          \
+    }                                                                  \
   } while (false)
 
 #define RETURN_IF_ORT_ERROR(S)                                               \
@@ -66,7 +66,7 @@ extern const OrtApi* ort_api;
       OrtErrorCode code = ort_api->GetErrorCode(status__);                 \
       std::string msg = std::string(ort_api->GetErrorMessage(status__));   \
       ort_api->ReleaseStatus(status__);                                    \
-      nib::SendErrorForResponses(                                          \
+      SendErrorForResponses(                                               \
           R, C,                                                            \
           TRITONSERVER_ErrorNew(                                           \
               TRITONSERVER_ERROR_INTERNAL,                                 \
@@ -84,7 +84,7 @@ extern const OrtApi* ort_api;
       OrtErrorCode code = ort_api->GetErrorCode(status__);                   \
       std::string msg = std::string(ort_api->GetErrorMessage(status__));     \
       ort_api->ReleaseStatus(status__);                                      \
-      throw nib::BackendModelException(TRITONSERVER_ErrorNew(                \
+      throw BackendModelException(TRITONSERVER_ErrorNew(                     \
           TRITONSERVER_ERROR_INTERNAL, (std::string("onnx runtime error ") + \
                                         std::to_string(code) + ": " + msg)   \
                                            .c_str()));                       \
@@ -98,7 +98,7 @@ extern const OrtApi* ort_api;
       OrtErrorCode code = ort_api->GetErrorCode(status__);                   \
       std::string msg = std::string(ort_api->GetErrorMessage(status__));     \
       ort_api->ReleaseStatus(status__);                                      \
-      throw nib::BackendModelInstanceException(TRITONSERVER_ErrorNew(        \
+      throw BackendModelInstanceException(TRITONSERVER_ErrorNew(             \
           TRITONSERVER_ERROR_INTERNAL, (std::string("onnx runtime error ") + \
                                         std::to_string(code) + ": " + msg)   \
                                            .c_str()));                       \

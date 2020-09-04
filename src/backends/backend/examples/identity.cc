@@ -27,9 +27,6 @@
 #include <memory>
 #include "src/backends/backend/examples/backend_utils.h"
 
-namespace ni = nvidia::inferenceserver;
-namespace nib = nvidia::inferenceserver::backend;
-
 //
 // Simple backend that demonstrates the TRITONBACKEND API for a
 // blocking backend. A blocking backend completes execution of the
@@ -42,7 +39,7 @@ namespace nib = nvidia::inferenceserver::backend;
 // the input tensor.
 //
 
-namespace {
+namespace triton { namespace backend { namespace identify {
 
 #define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
   do {                                                                  \
@@ -91,13 +88,13 @@ class ModelState {
   ModelState(
       TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
       const char* name, const uint64_t version,
-      ni::TritonJson::Value&& model_config);
+      common::TritonJson::Value&& model_config);
 
   TRITONSERVER_Server* triton_server_;
   TRITONBACKEND_Model* triton_model_;
   const std::string name_;
   const uint64_t version_;
-  ni::TritonJson::Value model_config_;
+  common::TritonJson::Value model_config_;
 
   bool supports_batching_initialized_;
   bool supports_batching_;
@@ -122,7 +119,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   RETURN_IF_ERROR(
       TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
 
-  ni::TritonJson::Value model_config;
+  common::TritonJson::Value model_config;
   TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
   RETURN_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
   RETURN_IF_ERROR(err);
@@ -145,7 +142,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 ModelState::ModelState(
     TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
     const char* name, const uint64_t version,
-    ni::TritonJson::Value&& model_config)
+    common::TritonJson::Value&& model_config)
     : triton_server_(triton_server), triton_model_(triton_model), name_(name),
       version_(version), model_config_(std::move(model_config)),
       supports_batching_initialized_(false), supports_batching_(false)
@@ -174,13 +171,13 @@ TRITONSERVER_Error*
 ModelState::ValidateModelConfig()
 {
   // We have the json DOM for the model configuration...
-  ni::TritonJson::WriteBuffer buffer;
+  common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
   LOG_MESSAGE(
       TRITONSERVER_LOG_INFO,
       (std::string("model configuration:\n") + buffer.Contents()).c_str());
 
-  ni::TritonJson::Value inputs, outputs;
+  common::TritonJson::Value inputs, outputs;
   RETURN_IF_ERROR(model_config_.MemberAsArray("input", &inputs));
   RETURN_IF_ERROR(model_config_.MemberAsArray("output", &outputs));
 
@@ -194,7 +191,7 @@ ModelState::ValidateModelConfig()
       std::string("expected 1 output, got ") +
           std::to_string(outputs.ArraySize()));
 
-  ni::TritonJson::Value input, output;
+  common::TritonJson::Value input, output;
   RETURN_IF_ERROR(inputs.IndexAsObject(0, &input));
   RETURN_IF_ERROR(outputs.IndexAsObject(0, &output));
 
@@ -210,14 +207,14 @@ ModelState::ValidateModelConfig()
 
   // Input and output must have same shape
   std::vector<int64_t> input_shape, output_shape;
-  RETURN_IF_ERROR(nib::ParseShape(input, "dims", &input_shape));
-  RETURN_IF_ERROR(nib::ParseShape(output, "dims", &output_shape));
+  RETURN_IF_ERROR(backend::ParseShape(input, "dims", &input_shape));
+  RETURN_IF_ERROR(backend::ParseShape(output, "dims", &output_shape));
 
   RETURN_ERROR_IF_FALSE(
       input_shape == output_shape, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("expected input and output shape to match, got ") +
-          nib::ShapeToString(input_shape) + " and " +
-          nib::ShapeToString(output_shape));
+          backend::ShapeToString(input_shape) + " and " +
+          backend::ShapeToString(output_shape));
 
   return nullptr;  // success
 }
@@ -293,8 +290,6 @@ ModelInstanceState::ModelInstanceState(
       name_(name), kind_(kind), device_id_(device_id)
 {
 }
-
-}  // namespace
 
 /////////////
 
@@ -706,7 +701,7 @@ TRITONBACKEND_ModelInstanceExecute(
         TRITONSERVER_LOG_INFO,
         (std::string("\tinput ") + input_name +
          ": datatype = " + TRITONSERVER_DataTypeString(input_datatype) +
-         ", shape = " + nib::ShapeToString(input_shape, input_dims_count) +
+         ", shape = " + backend::ShapeToString(input_shape, input_dims_count) +
          ", byte_size = " + std::to_string(input_byte_size) +
          ", buffer_count = " + std::to_string(input_buffer_count))
             .c_str());
@@ -906,3 +901,5 @@ TRITONBACKEND_ModelInstanceExecute(
 }
 
 }  // extern "C"
+
+}}}  // namespace triton::backend::identify

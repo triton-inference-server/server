@@ -28,13 +28,13 @@
 #include <list>
 #include <string>
 #include <vector>
-#include "src/backends/backend/tritonbackend.h"
+#include "triton/common/tritonbackend.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 #ifndef TRITON_ENABLE_GPU
 using cudaStream_t = void*;
@@ -139,4 +139,4 @@ class BackendInputCollector {
   std::list<DeferredPinned> deferred_pinned_;
 };
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend

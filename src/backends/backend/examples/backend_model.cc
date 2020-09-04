@@ -28,7 +28,7 @@
 
 #include "src/backends/backend/examples/backend_utils.h"
 
-namespace nvidia { namespace inferenceserver { namespace backend {
+namespace triton { namespace backend {
 
 //
 // BackendModel
@@ -91,9 +91,9 @@ BackendModel::BackendModel(TRITONBACKEND_Model* triton_model)
   enable_pinned_input_ = false;
   enable_pinned_output_ = false;
   {
-    TritonJson::Value optimization;
+    common::TritonJson::Value optimization;
     if (model_config_.Find("optimization", &optimization)) {
-      TritonJson::Value pinned_memory;
+      common::TritonJson::Value pinned_memory;
       if (model_config_.Find("input_pinned_memory", &pinned_memory)) {
         THROW_IF_BACKEND_MODEL_ERROR(
             pinned_memory.MemberAsBool("enable", &enable_pinned_input_));
@@ -124,4 +124,4 @@ BackendModel::SupportsFirstDimBatching(bool* supports)
   return nullptr;  // success
 }
 
-}}}  // namespace nvidia::inferenceserver::backend
+}}  // namespace triton::backend
