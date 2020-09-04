@@ -621,7 +621,6 @@ BackendResponder::FlushPendingPinned(
 
         offset += response_byte_size;
       }
-
     } else {
       deferred_pinned_.emplace_back(
           std::move(pinned_memory), std::move(pending_pinned_outputs_));
@@ -988,7 +987,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
   // Request input tensor data may be in multiple non-contiguous
   // buffers.
   std::vector<size_t> async_task_ids;
-  size_t input_offset = 0, count = 0;
+  size_t input_offset = 0;
   for (size_t idx = 0; idx < request_input->DataBufferCount(); ++idx) {
     const void* src_buffer;
     size_t src_byte_size;
@@ -1025,53 +1024,24 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 
     // Direct copy without intermediate pinned memory.
-    // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1
-    if (use_async_cpu_copy_ && (src_memory_type != TRITONSERVER_MEMORY_GPU) &&
-        (tensor_memory_type != TRITONSERVER_MEMORY_GPU)) {
-      AsyncWorkQueue::AddTask(std::move(std::bind(
-          CopyBufferHandler, request_input->Name(), src_memory_type,
-          src_memory_type_id, tensor_memory_type, tensor_memory_type_id,
-          src_byte_size, src_buffer,
-          tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-          reinterpret_cast<void*>(response), &completion_queue)));
-      async_task_ids.push_back(count);
-    } else {
-      bool cuda_used = false;
-      status = CopyBuffer(
-          request_input->Name(), src_memory_type, src_memory_type_id,
-          tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
-          tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-          &cuda_used);
-      cuda_copy |= cuda_used;
+    bool cuda_used = false;
+    status = CopyBuffer(
+        request_input->Name(), src_memory_type, src_memory_type_id,
+        tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
+        tensor_buffer + tensor_buffer_offset + input_offset, stream_,
+        &cuda_used);
+    cuda_copy |= cuda_used;
 
-      if (!status.IsOk()) {
-        LOG_STATUS_ERROR(
-            InferenceResponse::SendWithStatus(
-                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                status),
-            "error setting TensorFlow input tensor");
-        return cuda_copy;
-      }
+    if (!status.IsOk()) {
+      LOG_STATUS_ERROR(
+          InferenceResponse::SendWithStatus(
+              std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+              status),
+          "error setting TensorFlow input tensor");
+      return cuda_copy;
     }
 
     input_offset += src_byte_size;
-  }
-
-  for (size_t idx = 0; idx < request_input->DataBufferCount(); ++idx) {
-    if (std::find(async_task_ids.begin(), async_task_ids.end(), idx) !=
-        async_task_ids.end()) {
-      auto completed_item = completion_queue.Get();
-      auto completed_status = std::get<0>(completed_item);
-      cuda_copy |= std::get<1>(completed_item);
-      if (!completed_status.IsOk()) {
-        LOG_STATUS_ERROR(
-            InferenceResponse::SendWithStatus(
-                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                completed_status),
-            "error sending TensorFlow response");
-        return cuda_copy;
-      }
-    }
   }
 
   return cuda_copy;
