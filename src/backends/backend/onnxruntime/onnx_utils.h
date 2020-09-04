@@ -139,7 +139,6 @@ ONNXTensorElementDataType ConvertToOnnxDataType(
 
 ONNXTensorElementDataType ModelConfigDataTypeToOnnxDataType(
     const std::string& data_type_str);
-
 std::string OnnxDataTypeToModelConfigDataType(
     ONNXTensorElementDataType data_type);
 

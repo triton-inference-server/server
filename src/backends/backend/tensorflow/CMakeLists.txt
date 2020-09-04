@@ -45,7 +45,6 @@ set(
 add_library(
   triton_tensorflow1 SHARED
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
-  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_tensorflow1 PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -62,11 +61,10 @@ set_target_properties(
 )
 target_link_libraries(
   triton_tensorflow1
-  PUBLIC triton-common-backendapi  # from repo-common
-  PUBLIC triton-common-serverapi   # from repo-common
-  PUBLIC triton-common-json        # from repo-common
-  PUBLIC ${TRITON_EXTRA_LDFLAGS}
-  PUBLIC -ltensorflow_trtis
+  PRIVATE
+    triton-backend-utils  # from repo-backend
+    ${TRITON_EXTRA_LDFLAGS}
+    -ltensorflow_trtis
 )
 
 install(
@@ -78,7 +76,6 @@ install(
 add_library(
   triton_tensorflow2 SHARED
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
-  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_tensorflow2 PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -95,11 +92,10 @@ set_target_properties(
 )
 target_link_libraries(
   triton_tensorflow2
-  PUBLIC triton-common-backendapi  # from repo-common
-  PUBLIC triton-common-serverapi   # from repo-common
-  PUBLIC triton-common-json        # from repo-common
-  PUBLIC ${TRITON_EXTRA_LDFLAGS}
-  PUBLIC -ltensorflow_triton
+  PRIVATE
+    triton-backend-utils  # from repo-backend
+    ${TRITON_EXTRA_LDFLAGS}
+    -ltensorflow_triton
 )
 
 install(

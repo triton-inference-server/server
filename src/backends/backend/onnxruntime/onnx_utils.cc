@@ -26,7 +26,7 @@
 
 #include "src/backends/backend/onnxruntime/onnx_utils.h"
 
-#include "src/backends/backend/examples/backend_utils.h"
+#include "triton/backend/backend_common.h"
 
 namespace triton { namespace backend { namespace onnxruntime {
 

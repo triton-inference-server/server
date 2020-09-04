@@ -24,13 +24,13 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/backend/examples/backend_input_collector.h"
-#include "src/backends/backend/examples/backend_model.h"
-#include "src/backends/backend/examples/backend_model_instance.h"
-#include "src/backends/backend/examples/backend_output_responder.h"
-#include "src/backends/backend/examples/backend_utils.h"
 #include "src/backends/backend/tensorflow/tf_utils.h"
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
+#include "triton/backend/backend_common.h"
+#include "triton/backend/backend_input_collector.h"
+#include "triton/backend/backend_model.h"
+#include "triton/backend/backend_model_instance.h"
+#include "triton/backend/backend_output_responder.h"
 
 #include <atomic>
 #include <chrono>
@@ -932,9 +932,10 @@ AutoCompleteHelper::FixIOConfig(
         triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_ERROR(auto_complete_io.AddString("name", io->name_));
     RETURN_IF_ERROR(auto_complete_io.AddString(
-        "data_type", nib::ConvertToModelConfigString(io->data_type_)));
+        "data_type", ConvertToModelConfigString(io->data_type_)));
     triton::common::TritonJson::Value dims(
-        model_state_->ModelConfig(), triton::common::TritonJson::ValueType::ARRAY);
+        model_state_->ModelConfig(),
+        triton::common::TritonJson::ValueType::ARRAY);
     // The model signature supports batching then the first
     // dimension is -1 and should not appear in the model
     // configuration 'dims' that we are creating.
