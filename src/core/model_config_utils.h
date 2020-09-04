@@ -139,6 +139,13 @@ Status ValidateModelOutput(
 Status CheckAllowedModelOutput(
     const inference::ModelOutput& io, const std::set<std::string>& allowed);
 
+/// Validate that a model batch inputs and batch outputs are specified
+/// correctly.
+/// \param config The model configuration to validate..
+/// \return The error status. A non-OK status indicates the batch inputs or
+/// batch outputs are not valid.
+Status ValidateBatchIO(const inference::ModelConfig& config);
+
 /// Parse the 'value' of the parameter 'key' into a boolean value.
 /// \param key The name of the parameter.
 /// \param value The value of the parameter in string.
