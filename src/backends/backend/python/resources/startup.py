@@ -185,7 +185,7 @@ class PythonHost(PythonInterpreterServicer):
             response_tensors = []
 
             for output_tensor in output_tensors:
-                output_np_array = output_tensor.numpy_array()
+                output_np_array = output_tensor.as_numpy()
                 tensor = Tensor(name=output_tensor.name(),
                                 dtype=tpb_utils.numpy_to_triton_type(
                                     output_np_array.dtype.type),

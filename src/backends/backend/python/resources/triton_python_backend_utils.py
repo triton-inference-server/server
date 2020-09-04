@@ -196,7 +196,7 @@ class Tensor:
         """
         return self._name
 
-    def numpy_array(self):
+    def as_numpy(self):
         """Get the underlying numpy array
         Returns
         -------
@@ -286,7 +286,7 @@ def get_input_tensor_by_name(inference_request, name):
     return None
 
 
-def get_input_properties_by_name(model_config, name):
+def get_input_config_by_name(model_config, name):
     """Get input properties corresponding to the input
     with given `name`
 

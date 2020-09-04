@@ -41,9 +41,8 @@ class TritonPythonModel:
         """
         responses = []
         for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(
-                request, "IN")
-            out_tensor = pb_utils.Tensor("OUT", input_tensor.numpy_array())
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
+            out_tensor = pb_utils.Tensor("OUT", input_tensor.as_numpy())
             error = pb_utils.TritonError('An error occured during execution')
             responses.append(pb_utils.InferenceResponse([out_tensor], error))
         return responses
