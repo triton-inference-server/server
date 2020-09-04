@@ -27,30 +27,6 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# Backend utilities
-#
-add_library(
-  backend-library EXCLUDE_FROM_ALL OBJECT
-  backend_utils.cc backend_utils.h
-  backend_memory.cc backend_memory.h
-  backend_model.cc backend_model.h
-  backend_model_instance.cc backend_model_instance.h
-  backend_input_collector.cc backend_input_collector.h
-  backend_output_responder.cc backend_output_responder.h
-)
-if(${TRITON_ENABLE_GPU})
-  target_include_directories(backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
-endif() # TRITON_ENABLE_GPU
-
-target_link_libraries(
-  backend-library
-  PUBLIC
-    triton-common-backendapi  # from repo-common
-    triton-common-serverapi   # from repo-common
-    triton-common-json        # from repo-common
-)
-
-#
 # libtriton_identity.so
 #
 configure_file(libtriton_identity.ldscript libtriton_identity.ldscript COPYONLY)
@@ -58,26 +34,20 @@ configure_file(libtriton_identity.ldscript libtriton_identity.ldscript COPYONLY)
 add_library(
   triton_identity SHARED
   identity.cc
-  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_identity PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
 set_target_properties(
-  triton_identity
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_identity.ldscript
-)
-set_target_properties(
-  triton_identity
-  PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_identity.ldscript"
+  triton_identity PROPERTIES
+  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_identity.ldscript
+  LINK_FLAGS "-Wl,--version-script libtriton_identity.ldscript"
 )
 
 target_link_libraries(
   triton_identity
-  PUBLIC
-    triton-common-backendapi  # from repo-common
-    triton-common-serverapi   # from repo-common
-    triton-common-json        # from repo-common
+  PRIVATE
+    triton-backend-utils  # from repo-backend
 )
 
 #
@@ -88,7 +58,6 @@ configure_file(libtriton_repeat.ldscript libtriton_repeat.ldscript COPYONLY)
 add_library(
   triton_repeat SHARED
   repeat.cc
-  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_repeat PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -101,13 +70,10 @@ set_target_properties(
   triton_repeat
   PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_repeat.ldscript"
 )
-
 target_link_libraries(
   triton_repeat
-  PUBLIC
-    triton-common-backendapi  # from repo-common
-    triton-common-serverapi   # from repo-common
-    triton-common-json        # from repo-common
+  PRIVATE
+    triton-backend-utils  # from repo-backend
 )
 
 #
@@ -118,7 +84,6 @@ configure_file(libtriton_square.ldscript libtriton_square.ldscript COPYONLY)
 add_library(
   triton_square SHARED
   square.cc
-  $<TARGET_OBJECTS:backend-library>
 )
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton_square PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -131,13 +96,10 @@ set_target_properties(
   triton_square
   PROPERTIES LINK_FLAGS "-Wl,--version-script libtriton_square.ldscript"
 )
-
 target_link_libraries(
   triton_square
-  PUBLIC
-    triton-common-backendapi  # from repo-common
-    triton-common-serverapi   # from repo-common
-    triton-common-json        # from repo-common
+  PRIVATE
+    triton-backend-utils  # from repo-backend
 )
 
 install(

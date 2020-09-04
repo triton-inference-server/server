@@ -24,12 +24,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/backend/examples/backend_utils.h"
-
 #include <atomic>
 #include <chrono>
 #include <memory>
 #include <thread>
+#include "triton/backend/backend_common.h"
 
 //
 // Backend that demonstrates the TRITONBACKEND API for a decoupled
