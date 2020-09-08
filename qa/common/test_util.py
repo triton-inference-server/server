@@ -224,14 +224,6 @@ def validate_for_python_model(input_dtype, output0_dtype, output1_dtype,
                                       == np.object) or (output1_dtype
                                                         == np.object):
         return False
-    if (input_dtype == np.uint16) or (output0_dtype
-                                      == np.uint16) or (output1_dtype
-                                                        == np.uint16):
-        return False
-    if (input_dtype == np.float16) or (output0_dtype
-                                       == np.float16) or (output1_dtype
-                                                          == np.float16):
-        return False
 
     return True
 

@@ -61,6 +61,8 @@ fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
     EXPECTED_NUM_TESTS="29"
+elif [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
+    EXPECTED_NUM_TESTS="38"
 fi
 
 MODELDIR=`pwd`/models
@@ -112,23 +114,25 @@ for TARGET in cpu gpu; do
 
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
-      if [ "$BACKEND" != "custom" ]; then
+      if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
-      else
+      elif [ "$BACKEND" == "custom" ]; then
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.
+      elif [ "$BACKEND" == "python" ]; then
+        python3 ../common/gen_qa_models.py --python --models_dir models/
       fi
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
       if [[ $BACKENDS == *"custom"* ]]; then
         for BACKEND in $BACKENDS; do
-          if [ "$BACKEND" != "custom" ]; then
+          if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
               cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
                 models/.
-          else
+          elif [ "$BACKEND" == "custom" ]; then
             cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
               models/.
           fi

@@ -1424,9 +1424,9 @@ def create_python_modelconfig(models_dir, max_batch, model_version, input_shape,
                               output0_dtype, output1_dtype, output0_label_cnt,
                               version_policy):
 
-    if not tu.validate_for_libtorch_model(input_dtype, output0_dtype,
-                                          output1_dtype, input_shape,
-                                          output0_shape, output1_shape):
+    if not tu.validate_for_python_model(input_dtype, output0_dtype,
+                                        output1_dtype, input_shape,
+                                        output0_shape, output1_shape):
         return
 
     # Unpack version policy
