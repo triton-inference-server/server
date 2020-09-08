@@ -895,9 +895,17 @@ TRITONBACKEND_ModelInstanceExecute(
               response, &triton_output, python_output_result.name().c_str(),
               triton_dt, python_output_dims.data(), dims_count));
 
-      std::vector<int64_t> output_dims(
-          python_output_dims.begin(), python_output_dims.end());
-      int64_t output_byte_size = nib::GetByteSize(triton_dt, output_dims);
+      int64_t output_byte_size;
+
+      // Custom handling for TRITONSERVER_TYPE_BYTES
+      if (triton_dt == TRITONSERVER_TYPE_BYTES) {
+        output_byte_size = python_output_result.raw_data().size();
+      } else {
+        std::vector<int64_t> output_dims(
+            python_output_dims.begin(), python_output_dims.end());
+        output_byte_size = nib::GetByteSize(triton_dt, output_dims);
+      }
+
       void* output_buffer;
 
       TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;

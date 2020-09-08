@@ -1291,11 +1291,6 @@ def create_python_modelfile(models_dir,
                             output1_dtype,
                             swap=False):
 
-    if not tu.validate_for_python_model(input_dtype, output0_dtype,
-                                        output1_dtype, input_shape,
-                                        output0_shape, output1_shape):
-        return
-
     torch_input_dtype = np_to_torch_dtype(input_dtype)
     torch_output0_dtype = np_to_torch_dtype(output0_dtype)
     torch_output1_dtype = np_to_torch_dtype(output1_dtype)
@@ -1352,9 +1347,14 @@ class TritonPythonModel:
             input_tensors = request.inputs()
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             in_1 = pb_utils.get_input_tensor_by_name(request, "INPUT1")
-            out_0, out_1 = self.model(in_0.as_numpy(), in_1.as_numpy())
-            out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0)
-            out_tensor_1 = pb_utils.Tensor("OUTPUT1", out_1)
+            if in_0.as_numpy().dtype.type is np.bytes_ or in_0.as_numpy().dtype.type is np.object:
+                out_0, out_1 = self.model(in_0.as_numpy().astype(np.int32), in_1.as_numpy().astype(np.int32))
+                out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0)
+                out_tensor_1 = pb_utils.Tensor("OUTPUT1", out_1)
+            else:
+                out_0, out_1 = self.model(in_0.as_numpy(), in_1.as_numpy())
+                out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0)
+                out_tensor_1 = pb_utils.Tensor("OUTPUT1", out_1)
             responses.append(pb_utils.InferenceResponse([out_tensor_0, out_tensor_1]))
         return responses
 '''.format(input_shape, torch_input_dtype, example_input, example_input)
@@ -1401,7 +1401,12 @@ class TritonPythonModel:
             input_tensors = request.inputs()
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             in_1 = pb_utils.get_input_tensor_by_name(request, "INPUT1")
-            out_0, out_1 = self.model(in_0.as_numpy(), in_1.as_numpy())
+
+            if in_0.as_numpy().dtype.type is np.bytes_ or in_0.as_numpy().dtype.type is np.object:
+                out_0, out_1 = self.model(in_0.as_numpy().astype(np.int32), in_1.as_numpy().astype(np.int32))
+            else:
+                out_0, out_1 = self.model(in_0.as_numpy(), in_1.as_numpy())
+
             out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0)
             out_tensor_1 = pb_utils.Tensor("OUTPUT1", out_1)
             responses.append(pb_utils.InferenceResponse([out_tensor_0, out_tensor_1]))
@@ -1423,11 +1428,6 @@ def create_python_modelconfig(models_dir, max_batch, model_version, input_shape,
                               output0_shape, output1_shape, input_dtype,
                               output0_dtype, output1_dtype, output0_label_cnt,
                               version_policy):
-
-    if not tu.validate_for_python_model(input_dtype, output0_dtype,
-                                        output1_dtype, input_shape,
-                                        output0_shape, output1_shape):
-        return
 
     # Unpack version policy
     version_policy_str = "{ latest { num_versions: 1 }}"

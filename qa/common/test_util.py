@@ -215,19 +215,6 @@ def validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
     return True
 
 
-def validate_for_python_model(input_dtype, output0_dtype, output1_dtype,
-                              input_shape, output0_shape, output1_shape):
-    """Return True if input and output dtypes are supported by a Python model."""
-
-    # STRING, FLOAT16 and UINT16 data types are not supported currently
-    if (input_dtype == np.object) or (output0_dtype
-                                      == np.object) or (output1_dtype
-                                                        == np.object):
-        return False
-
-    return True
-
-
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
     return "{}_{}_{}_{}".format(pf,
                                 np.dtype(input_dtype).name,
