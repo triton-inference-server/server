@@ -233,8 +233,8 @@ class InferTest(tu.TestResultCollector):
                                         swap=swap)
 
         if tu.validate_for_python_model(input_dtype, output0_dtype,
-                                         output1_dtype, (input_size,),
-                                         (input_size,), (input_size,)):
+                                        output1_dtype, (input_size,),
+                                        (input_size,), (input_size,)):
             for prefix in ensemble_prefix:
                 if 'python' in BACKENDS:
                     _infer_exact_helper(self,

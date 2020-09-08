@@ -1281,19 +1281,19 @@ def create_onnx_modelconfig(models_dir, max_batch, model_version, input_shape,
 
 
 def create_python_modelfile(models_dir,
-                              max_batch,
-                              model_version,
-                              input_shape,
-                              output0_shape,
-                              output1_shape,
-                              input_dtype,
-                              output0_dtype,
-                              output1_dtype,
-                              swap=False):
+                            max_batch,
+                            model_version,
+                            input_shape,
+                            output0_shape,
+                            output1_shape,
+                            input_dtype,
+                            output0_dtype,
+                            output1_dtype,
+                            swap=False):
 
     if not tu.validate_for_python_model(input_dtype, output0_dtype,
-                                          output1_dtype, input_shape,
-                                          output0_shape, output1_shape):
+                                        output1_dtype, input_shape,
+                                        output0_shape, output1_shape):
         return
 
     torch_input_dtype = np_to_torch_dtype(input_dtype)
@@ -1310,7 +1310,7 @@ def create_python_modelfile(models_dir,
     # Create the model
     if not swap:
 
-        model='''
+        model = '''
 import numpy as np
 import sys
 from torch import nn
@@ -1361,7 +1361,7 @@ class TritonPythonModel:
 
     else:
 
-        model='''
+        model = '''
 import numpy as np
 import sys
 from torch import nn
@@ -1419,10 +1419,10 @@ class TritonPythonModel:
         model_file.write(model)
 
 
-def create_python_modelconfig(models_dir, max_batch, model_version,
-                                input_shape, output0_shape, output1_shape,
-                                input_dtype, output0_dtype, output1_dtype,
-                                output0_label_cnt, version_policy):
+def create_python_modelconfig(models_dir, max_batch, model_version, input_shape,
+                              output0_shape, output1_shape, input_dtype,
+                              output0_dtype, output1_dtype, output0_label_cnt,
+                              version_policy):
 
     if not tu.validate_for_libtorch_model(input_dtype, output0_dtype,
                                           output1_dtype, input_shape,
@@ -1483,10 +1483,9 @@ instance_group [
     kind : KIND_CPU
   }}
 ]
-'''.format(model_name, max_batch,
-           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
-           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
-           np_to_model_dtype(output0_dtype),
+'''.format(model_name, max_batch, np_to_model_dtype(input_dtype),
+           tu.shape_to_dims_str(input_shape), np_to_model_dtype(input_dtype),
+           tu.shape_to_dims_str(input_shape), np_to_model_dtype(output0_dtype),
            tu.shape_to_dims_str(output0_shape),
            np_to_model_dtype(output1_dtype),
            tu.shape_to_dims_str(output1_shape))
@@ -1851,20 +1850,20 @@ def create_models(models_dir,
     if FLAGS.python:
         # max-batch 8
         create_python_modelconfig(models_dir, 8, model_version, input_shape,
-                                    output0_shape, output1_shape, input_dtype,
-                                    output0_dtype, output1_dtype,
-                                    output0_label_cnt, version_policy)
-        create_python_modelfile(models_dir, 8, model_version, input_shape,
                                   output0_shape, output1_shape, input_dtype,
-                                  output0_dtype, output1_dtype)
+                                  output0_dtype, output1_dtype,
+                                  output0_label_cnt, version_policy)
+        create_python_modelfile(models_dir, 8, model_version, input_shape,
+                                output0_shape, output1_shape, input_dtype,
+                                output0_dtype, output1_dtype)
         # max-batch 0
         create_python_modelconfig(models_dir, 0, model_version, input_shape,
-                                    output0_shape, output1_shape, input_dtype,
-                                    output0_dtype, output1_dtype,
-                                    output0_label_cnt, version_policy)
-        create_python_modelfile(models_dir, 0, model_version, input_shape,
                                   output0_shape, output1_shape, input_dtype,
-                                  output0_dtype, output1_dtype)
+                                  output0_dtype, output1_dtype,
+                                  output0_label_cnt, version_policy)
+        create_python_modelfile(models_dir, 0, model_version, input_shape,
+                                output0_shape, output1_shape, input_dtype,
+                                output0_dtype, output1_dtype)
 
 
 def create_fixed_models(models_dir,
@@ -2209,33 +2208,33 @@ if __name__ == '__main__':
         if FLAGS.python:
             for vt in [np.float32, np.int32, np.int16, np.int8]:
                 create_python_modelfile(FLAGS.models_dir,
-                                          8,
-                                          2, (16,), (16,), (16,),
-                                          vt,
-                                          vt,
-                                          vt,
-                                          swap=True)
+                                        8,
+                                        2, (16,), (16,), (16,),
+                                        vt,
+                                        vt,
+                                        vt,
+                                        swap=True)
                 create_python_modelfile(FLAGS.models_dir,
-                                          8,
-                                          3, (16,), (16,), (16,),
-                                          vt,
-                                          vt,
-                                          vt,
-                                          swap=True)
+                                        8,
+                                        3, (16,), (16,), (16,),
+                                        vt,
+                                        vt,
+                                        vt,
+                                        swap=True)
                 create_python_modelfile(FLAGS.models_dir,
-                                          0,
-                                          2, (16,), (16,), (16,),
-                                          vt,
-                                          vt,
-                                          vt,
-                                          swap=True)
+                                        0,
+                                        2, (16,), (16,), (16,),
+                                        vt,
+                                        vt,
+                                        vt,
+                                        swap=True)
                 create_python_modelfile(FLAGS.models_dir,
-                                          0,
-                                          3, (16,), (16,), (16,),
-                                          vt,
-                                          vt,
-                                          vt,
-                                          swap=True)
+                                        0,
+                                        3, (16,), (16,), (16,),
+                                        vt,
+                                        vt,
+                                        vt,
+                                        swap=True)
 
         if FLAGS.ensemble:
             for pair in emu.platform_types_and_validation():
