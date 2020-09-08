@@ -232,13 +232,13 @@ class InferTest(tu.TestResultCollector):
                                         output1_raw=output1_raw,
                                         swap=swap)
 
-        if tu.validate_for_pytorch_model(input_dtype, output0_dtype,
+        if tu.validate_for_python_model(input_dtype, output0_dtype,
                                          output1_dtype, (input_size,),
                                          (input_size,), (input_size,)):
             for prefix in ensemble_prefix:
                 if 'python' in BACKENDS:
                     _infer_exact_helper(self,
-                                        prefix + 'pytorch', (input_size,),
+                                        prefix + 'python', (input_size,),
                                         8,
                                         input_dtype,
                                         output0_dtype,
