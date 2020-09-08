@@ -99,6 +99,10 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
         infer_request['outputs'] = [
             this_output._get_tensor() for this_output in outputs
         ]
+    else:
+        # no outputs specified so set 'binary_data_output' True in the
+        # request so that all outputs are returned in binary format
+        parameters['binary_data_output'] = True
 
     if parameters:
         infer_request['parameters'] = parameters
@@ -157,7 +161,7 @@ class InferenceServerClient:
     ssl_options : dict
         Any options supported by `ssl.wrap_socket` specified as
         dictionary. The argument is ignored if 'ssl' is specified
-        False. 
+        False.
     ssl_context_factory : SSLContext callable
         It must be a callbable that returns a SSLContext. The default
         value is None which use `ssl.create_default_context`. The
@@ -1432,22 +1436,18 @@ class InferInput:
         dict
             The underlying tensor specification as dict
         """
-        if self._parameters.get('shared_memory_region') is not None or \
-                self._raw_data is not None:
-            return {
-                'name': self._name,
-                'shape': self._shape,
-                'datatype': self._datatype,
-                'parameters': self._parameters,
-            }
-        else:
-            return {
-                'name': self._name,
-                'shape': self._shape,
-                'datatype': self._datatype,
-                'parameters': self._parameters,
-                'data': self._data
-            }
+        tensor = {
+            'name': self._name,
+            'shape': self._shape,
+            'datatype': self._datatype
+        }
+        if self._parameters:
+            tensor['parameters'] = self._parameters
+
+        if self._parameters.get('shared_memory_region') is None and \
+                self._raw_data is None:
+            tensor['data'] = self._data
+        return tensor
 
 
 class InferRequestedOutput:
@@ -1533,7 +1533,10 @@ class InferRequestedOutput:
         dict
             The underlying tensor as a dict
         """
-        return {'name': self._name, 'parameters': self._parameters}
+        tensor = {'name': self._name}
+        if self._parameters:
+            tensor['parameters'] = self._parameters
+        return tensor
 
 
 class InferResult:

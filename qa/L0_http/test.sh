@@ -281,7 +281,104 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test combinations of binary and JSON data
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_binaryjson.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
 
+# no parameters, no outputs == json output
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8000/v2/models/simple/infer`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+# binary_data=true on INPUT0, binary_data=false on INPUT1
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1","parameters":{"binary_data":false}}]}' localhost:8000/v2/models/simple/infer`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+# binary_data=true on INPUT0, binary_data not given on INPUT1
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1"}]}' localhost:8000/v2/models/simple/infer`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+# binary_data_output=true, no outputs requested
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8000/v2/models/simple/infer`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "0" ]; then
+    RET=1
+fi
+
+# binary_data_output=true
+# binary_data=false on INPUT0, binary_data not given on INPUT1
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":false}},{"name":"OUTPUT1"}]}' localhost:8000/v2/models/simple/infer`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 
 if [ $RET -eq 0 ]; then
