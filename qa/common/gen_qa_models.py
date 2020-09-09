@@ -818,6 +818,24 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
                              [max_batch] + max_shape)
     config.add_optimization_profile(profile[6])
 
+    # Will add some profiles with static shapes to test the cases where min_shape=opt_shape=max_shape
+    for i in range(3):
+        profile.append(builder.create_optimization_profile())
+        if max_batch == 0:
+            static_shape = max_shape
+            profile[7 + i].set_shape("INPUT0", static_shape, static_shape,
+                                     static_shape)
+            profile[7 + i].set_shape("INPUT1", static_shape, static_shape,
+                                     static_shape)
+        else:
+            # Skipping alternate batch sizes for testing unsupported batches in L0_trt_dynamic_shape.
+            full_static_shape = [1 + (2 * i)] + max_shape
+            profile[7 + i].set_shape("INPUT0", full_static_shape,
+                                     full_static_shape, full_static_shape)
+            profile[7 + i].set_shape("INPUT1", full_static_shape,
+                                     full_static_shape, full_static_shape)
+        config.add_optimization_profile(profile[7 + i])
+
     config.max_workspace_size = 1 << 20
     engine = builder.build_engine(network, config)
 

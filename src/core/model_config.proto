@@ -157,13 +157,14 @@ message ModelInstanceGroup
 
   //@@  .. cpp:var:: string profile (repeated)
   //@@
-  //@@     For TensorRT models, using inputs with dynamic shape, this
+  //@@     For TensorRT models containing multiple optimization profile, this
   //@@     parameter specifies a set of optimization profiles available to this
   //@@     instance group. The inference server will choose the optimal profile
   //@@     based on the shapes of the input tensors. This field should lie
   //@@     between 0 and <TotalNumberOfOptimizationProfilesInPlanModel> - 1
   //@@     and be specified only for TensorRT backend, otherwise an error will
-  //@@     be generated.
+  //@@     be generated. If not specified, the server will select the first
+  //@@     optimization profile by default.
   //@@
   repeated string profile = 5;
 }
