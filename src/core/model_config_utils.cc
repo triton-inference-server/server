@@ -862,8 +862,7 @@ ValidateBatchIO(const inference::ModelConfig& config)
 #ifdef TRITON_ENABLE_TENSORRT
       (config.platform() != kTensorRTPlanPlatform) &&
 #endif  // TRITON_ENABLE_TENSORRT
-      ((config.batch_input_size() != 0) || (config.batch_output_size() != 0))
-  ) {
+      ((config.batch_input_size() != 0) || (config.batch_output_size() != 0))) {
     return Status(
         Status::Code::INVALID_ARG,
         "batch inputs and batch outputs are only supported for custom "
