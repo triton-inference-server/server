@@ -70,9 +70,6 @@ target_link_libraries(
     triton-common-json        # from repo-common
 )
 
-if(${TRITON_ENABLE_ONNXRUNTIME})
-  add_subdirectory(onnxruntime src/backends/backend/onnxruntime)
-endif() # TRITON_ENABLE_ONNXRUNTIME
 if(${TRITON_ENABLE_TENSORFLOW})
   add_subdirectory(tensorflow src/backends/backend/tensorflow)
 endif() # TRITON_ENABLE_TENSORFLOW
