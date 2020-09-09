@@ -43,11 +43,10 @@ element is represented by a 4-byte unsigned integer giving the length
 followed by the actual bytes. The binary data for a tensor is
 delivered in the HTTP body after the JSON object (see Examples).
 
-The binary tensor data extension uses a set of parameters to indicate
-that an input or output tensor is communicated as binary data. The
-first parameter is used in $request_input and $response_output to
-indicate that the input or output tensor is communicated as binary
-data:
+The binary tensor data extension uses parameters to indicate that an
+input or output tensor is communicated as binary data. The first
+parameter is used in $request_input and $response_output to indicate
+that the input or output tensor is communicated as binary data:
 
 - "binary_data_size" : int64 parameter indicating the size of the
   tensor binary data, in bytes.
@@ -58,6 +57,15 @@ output should be returned from Triton as binary data.
 - "binary_data" : bool parameter that is true if the output should be
   returned as binary data and false (or not given) if the tensor
   should be returned as JSON.
+
+The third parameter is used in $inference_request to indicate that all
+outputs should be returned from Triton as binary data, unless
+overridden by "binary_data" on a specific output.
+
+- "binary_data_output" : bool parameter that is true if all outputs
+  should be returned as binary data and false (or not given) if the
+  outputs should be returned as JSON. If "binary_data" is specified on
+  an output it overrides this setting.
 
 When one or more tensors are communicated as binary data, the HTTP
 body of the request or response will contain the JSON inference

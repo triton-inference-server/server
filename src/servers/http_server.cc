@@ -982,8 +982,9 @@ class HTTPAPIServer : public HTTPServerImpl {
       evbuffer* evbuffer_;
     };
 
-    AllocPayload() = default;
+    AllocPayload() : default_output_kind_(OutputInfo::Kind::JSON){};
     std::unordered_map<std::string, OutputInfo*> output_map_;
+    AllocPayload::OutputInfo::Kind default_output_kind_;
   };
 
   // Object associated with an inference request. This persists
@@ -1110,6 +1111,8 @@ HTTPAPIServer::InferResponseAlloc(
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   std::unordered_map<std::string, AllocPayload::OutputInfo*>& output_map =
       payload->output_map_;
+  const AllocPayload::OutputInfo::Kind default_output_kind =
+      payload->default_output_kind_;
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
@@ -1123,7 +1126,7 @@ HTTPAPIServer::InferResponseAlloc(
   // OutputInfo for it that uses default setting of JSON.
   auto pr = output_map.find(tensor_name);
   if (pr == output_map.end()) {
-    info = new AllocPayload::OutputInfo(AllocPayload::OutputInfo::JSON, 0);
+    info = new AllocPayload::OutputInfo(default_output_kind, 0);
   } else {
     // Take ownership of the OutputInfo object.
     info = pr->second;
@@ -1905,6 +1908,11 @@ HTTPAPIServer::EVBufferToInput(
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(irequest, id));
   }
 
+  // The default setting for returned outputs (JSON or BINARY). This
+  // is needed for the case when outputs are not explicitly specified.
+  AllocPayload::OutputInfo::Kind default_output_kind =
+      AllocPayload::OutputInfo::JSON;
+
   // Set sequence correlation ID and flags if any
   TritonJson::Value params_json;
   if (request_json.Find("parameters", &params_json)) {
@@ -1960,6 +1968,17 @@ HTTPAPIServer::EVBufferToInput(
         RETURN_MSG_IF_ERR(timeout_json.AsUInt(&t), "Unable to parse 'timeout'");
         RETURN_IF_ERR(
             TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(irequest, t));
+      }
+    }
+
+    {
+      TritonJson::Value bdo_json;
+      if (params_json.Find("binary_data_output", &bdo_json)) {
+        bool bdo;
+        RETURN_MSG_IF_ERR(
+            bdo_json.AsBool(&bdo), "Unable to parse 'binary_data_output'");
+        default_output_kind = (bdo) ? AllocPayload::OutputInfo::BINARY
+                                    : AllocPayload::OutputInfo::JSON;
       }
     }
   }
@@ -2182,6 +2201,8 @@ HTTPAPIServer::EVBufferToInput(
       }
     }
   }
+
+  infer_req->alloc_payload_.default_output_kind_ = default_output_kind;
 
   return nullptr;  // success
 }
