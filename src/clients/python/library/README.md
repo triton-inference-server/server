@@ -35,8 +35,10 @@ included within generic tritonclient package are:
 - grpc [ `service_pb2`, `service_pb2_grpc`, `model_config_pb2` ]
 - utils [ x86-linux distribution will include `shared_memory` and `cuda_shared_memory`]
 
-Apart from the above library, x86-linux distribution will include a pre-compiled perf_client binary
-For further information regarding perf_client, refer to docs [here](https://github.com/triton-inference-server/server/blob/master/docs/perf_client.rst).
+Apart from the above library, x86-linux distribution will include a
+pre-compiled perf_client binary For further information regarding
+perf_client, refer to docs
+[here](https://github.com/triton-inference-server/server/blob/master/docs/perf_client.rst).
 
 Note the following packages are deprecated and will be removed in future releases:
 - tritongrpcclient
@@ -47,32 +49,37 @@ Note the following packages are deprecated and will be removed in future release
 
 ## Installation
 
-Install dependencies needed by the perf_client binary shipped with the package. This step
-can be skipped if perf_client is not needed.
+Install dependencies needed by the perf_client binary shipped with the
+package. This step can be skipped if perf_client is not needed.
 
 ```bash
 sudo apt update
 sudo apt install libb64-dev
 ```
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install triton client
-library.
+Use the package manager [pip](https://pip.pypa.io/en/stable/) to
+install triton client library. A recent version of pip is required for
+the install.
 
 ```bash
 pip install nvidia-pyindex
 pip install tritonclient[all]
 ```
 
-There are two optional packages available, namely, `grpc` and `http`. [`all`] installs
-dependencies for both the protocols.
+There are two optional packages available, namely, `grpc` and
+`http`. [`all`] installs dependencies for both the protocols.
 
-The perf_client is installed in the system configuration specific `bin` directory.
+The perf_client is installed in the system configuration specific
+`bin` directory.
 
 ## Usage
 
-Refer to the  examples [here](https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples) for the usage of library.
+Refer to the examples
+[here](https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples)
+for the usage of library.
 
-Use the following command to get the detailed usage for perf_client binary.
+Use the following command to get the detailed usage for perf_client
+binary.
 
 ```bash
 perf_client -h
