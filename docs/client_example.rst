@@ -78,9 +78,16 @@ Getting the Client Examples
 ---------------------------
 
 The provided Dockerfile.client and CMake support can be used to build
-the examples, or the pre-built examples can be downloaded from GitHub
+the examples, or they can be :ref:`downloaded from GitHub
+<section-client-libraries-download-from-github>` or :ref:`downloaded
+in pre-built Docker image
+<section-client-libraries-download-from-ngc>` from `NVIDIA GPU Cloud
+(NGC) <https://ngc.nvidia.com>`_.
+
+or the pre-built examples can be downloaded from GitHub
 or a pre-built Docker image containing the client libraries from
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_.
+
 
 Build Using Dockerfile
 ^^^^^^^^^^^^^^^^^^^^^^
