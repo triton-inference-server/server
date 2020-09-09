@@ -320,11 +320,9 @@ PlanBackend::CreateExecutionContexts(
               break;
             }
           }
-          // Model with dynamic shapes or mulitple optimization profiles
-          // can't share engine, set to engine to 'nullptr' as hint, but
-          // keeping runtime as it can be used repeatedly
-          if (is_dynamic ||
-              (eit->second.second->getNbOptimizationProfiles() > 0)) {
+          // Model with dynamic shapes can't share engine, set to engine to
+          // 'nullptr' as hint, but keeping runtime as it can be used repeatedly
+          if (is_dynamic) {
             if (eit->second.second != nullptr) {
               eit->second.second->destroy();
               eit->second.second = nullptr;
@@ -617,7 +615,7 @@ PlanBackend::CreateExecutionContext(
     // merely capturing GPU activities for a given execution.
     for (auto& graph_spec : graph_specs) {
       for (auto& trt_context : context->trt_contexts_) {
-        if (!context->engine_->hasImplicitBatchDimension()) {
+        if (UseTensorRTv2API(context->engine_)) {
           graph_spec.captured_ =
               context->BuildCudaGraphV2(&(trt_context.second), graph_spec);
         } else {
@@ -631,7 +629,7 @@ PlanBackend::CreateExecutionContext(
   context->allow_inexact_match_ =
       Config().optimization().cuda().allow_inexact_match();
 
-  if (!context->engine_->hasImplicitBatchDimension()) {
+  if (UseTensorRTv2API(context->engine_)) {
     std::string profiles_str;
     for (const auto& trt_context : context->trt_contexts_) {
       profiles_str +=
@@ -960,13 +958,11 @@ PlanBackend::Context::InitializeExecuteInputBinding(
 
     int64_t byte_size = 0;
 
-    if (!engine_->hasImplicitBatchDimension()) {
+    if (UseTensorRTv2API(engine_)) {
       RETURN_IF_ERROR(GetProfileDimensions(io_index, profile_index, &context));
     }
 
-    if (!context.is_dynamic_per_binding_[io_index]) {
-      byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
-    } else {
+    if (context.is_dynamic_per_binding_[io_index]) {
       std::vector<int64_t> maximum_dims;
       if (!is_ragged) {
         Status status = ValidateDimension(
@@ -997,6 +993,8 @@ PlanBackend::Context::InitializeExecuteInputBinding(
                 DimsDebugString(context.max_dims_[io_index]) + " for input '" +
                 input_name + "' for " + name_);
       }
+    } else {
+      byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
     }
 
     if (byte_size == -1) {
@@ -1321,9 +1319,6 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
       nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
-      if (ContainsWildcard(engine_dims)) {
-        context.is_dynamic_per_binding_[io_index];
-      }
 
       // Skip 'batch_output' validation as it is not exact match to model dims
       if (!buffer_is_ragged_[io_index]) {
@@ -1334,14 +1329,14 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       }
 
       int64_t byte_size;
-      if (!context.is_dynamic_per_binding_[io_index]) {
-        byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
-      } else {
+      if (UseTensorRTv2API(engine_)) {
         const nvinfer1::Dims output_dim =
             context.context_->getBindingDimensions(binding_index);
         std::vector<int64_t> dim_vec;
         DimsToDimVec(output_dim, &dim_vec);
         byte_size = GetByteSize(dt, dim_vec);
+      } else {
+        byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
       }
 
       if (byte_size == -1) {
@@ -1429,14 +1424,12 @@ PlanBackend::Context::GetProfileDimensions(
     const int io_index, const int profile_index, TensorRTContext* context)
 {
   int binding_index = (profile_index * num_expected_bindings_) + io_index;
-  if (!engine_->hasImplicitBatchDimension()) {
     context->max_dims_[io_index] = engine_->getProfileDimensions(
         binding_index, profile_index, nvinfer1::OptProfileSelector::kMAX);
     context->min_dims_[io_index] = engine_->getProfileDimensions(
         binding_index, profile_index, nvinfer1::OptProfileSelector::kMIN);
     context->opt_dims_[io_index] = engine_->getProfileDimensions(
         binding_index, profile_index, nvinfer1::OptProfileSelector::kOPT);
-  }
   return Status::Success;
 }
 
@@ -2060,24 +2053,10 @@ PlanBackend::Context::Run(
   status = GetMostOptimizedProfile(
       payload_->total_batch_size_, payload_->requests_, request_shape_values,
       &citr);
-  if (!status.IsOk() || ((trt_contexts_.size() == 1) &&
-                         (!engine_->hasImplicitBatchDimension()))) {
-    if (!status.IsOk()) {
+
+  if (!status.IsOk()) {
       LOG_ERROR << status.Message();
     }
-    // Update the status with more detailed error response only when no
-    // suitable optimization profiles were found above.
-    int64_t error_distance;
-    status = ValidateTensorRTContext(
-        citr, payload_->total_batch_size_, payload_->requests_,
-        request_shape_values, &error_distance);
-
-    if (!status.IsOk()) {
-      InferenceRequest::RespondIfError(
-          payload_->requests_, status, true /* release_requests */);
-      return;
-    }
-  }
 
   int binding_offset = citr->first * num_expected_bindings_;
 
@@ -2252,8 +2231,7 @@ PlanBackend::Context::Run(
       const size_t total_byte_size = GetByteSize(datatype, batchn_shape);
 
       // Set the binding dimension so that output dimensions can be obtained
-      if (citr->second.is_dynamic_per_binding_[bindex] &&
-          (!engine_->isShapeBinding(io_index))) {
+      if (UseTensorRTv2API(engine_) && !engine_->isShapeBinding(io_index)) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             SetBindingDimensions(
@@ -2298,7 +2276,7 @@ PlanBackend::Context::Run(
   // FIXME closest_cuda_graph
   FindClosestCudaGraph(citr->second, input_dims, &cuda_graph, &found_exact);
   if ((cuda_graph != nullptr) && !found_exact &&
-      (!engine_->hasImplicitBatchDimension())) {
+      (UseTensorRTv2API(engine_))) {
     size_t input_idx = 0;
     for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
       int io_index = binding_offset + bindex;
@@ -2396,7 +2374,7 @@ PlanBackend::Context::Run(
               "failed to specify the values for all input shape tensors"),
           "failed to run TRT inference");
     }
-    if (!engine_->hasImplicitBatchDimension()) {
+    if (UseTensorRTv2API(engine_)) {
       if (!citr->second.context_->enqueueV2(
               buffer_bindings_.data(), stream_,
               &events_[next_set_].ready_for_input_)) {
@@ -2577,11 +2555,6 @@ PlanBackend::Context::SetBindingDimensions(
     const TensorRTContext& trt_context, const size_t binding_idx,
     const size_t io_idx, std::vector<int64_t>* input_dims)
 {
-  if (!trt_context.is_dynamic_per_binding_[binding_idx]) {
-    // No need to set dimension for the binding that does not inlcude
-    // dynamic shape.
-    return Status::Success;
-  }
   if (input_dims != nullptr) {
     input_dims->insert(input_dims->end(), shape.begin(), shape.end());
   }
@@ -2602,6 +2575,13 @@ PlanBackend::Context::SetBindingDimensions(
                                     input_name + "' for " + name_ +
                                     ". Error details: " + status.Message());
   }
+
+  if (!trt_context.is_dynamic_per_binding_[binding_idx]) {
+    // No need to set dimension for the binding that does not inlcude
+    // dynamic shape.
+    return Status::Success;
+  }
+
   if (!trt_context.context_->setBindingDimensions(io_idx, this_dim)) {
     return Status(
         Status::Code::INTERNAL, "trt failed to set binding dimension to " +
@@ -2825,7 +2805,7 @@ PlanBackend::Context::GetMostOptimizedProfile(
     int64_t shortest_distance = LLONG_MAX;
     for (auto cit = trt_contexts_.begin(); cit != trt_contexts_.end(); cit++) {
       int64_t current_distance = 0;
-      auto status = ValidateTensorRTContext(
+      EvaluateTensorRTContext(
           cit, total_batch_size, requests, request_shape_values,
           &current_distance);
       if (current_distance < shortest_distance) {
@@ -2858,7 +2838,7 @@ PlanBackend::Context::GetMostOptimizedProfile(
 
 
 Status
-PlanBackend::Context::ValidateTensorRTContext(
+PlanBackend::Context::EvaluateTensorRTContext(
     std::map<int, PlanBackend::Context::TensorRTContext>::iterator& citr,
     size_t total_batch_size,
     const std::vector<std::unique_ptr<InferenceRequest>>& requests,
@@ -2881,10 +2861,7 @@ PlanBackend::Context::ValidateTensorRTContext(
           citr->second.max_dims_[io_index], false);
       if (!status.IsOk()) {
         *error_distance = LLONG_MAX;
-        return Status(
-            Status::Code::INTERNAL,
-            "request specifies invalid shape for input '" + input->Name() +
-                "' for " + name_ + ". Error details: " + status.Message());
+        break;
       } else {
         const auto& opt_dims = citr->second.opt_dims_[io_index];
         *error_distance += std::abs(opt_dims.d[0] - shape[0]);
@@ -2893,31 +2870,11 @@ PlanBackend::Context::ValidateTensorRTContext(
       auto status = ValidateDimension(
           input->Shape(), citr->second.min_dims_[io_index],
           citr->second.max_dims_[io_index], support_batching_);
-      if (!status.IsOk()) {
-        *error_distance = LLONG_MAX;
-        return Status(
-            Status::Code::INTERNAL,
-            "request specifies invalid shape for input '" + input->Name() +
-                "' for " + name_ + ". Error details: " + status.Message());
-      }
       bool valid_bs =
           (!support_batching_) || (((int64_t)total_batch_size >=
                                     citr->second.min_dims_[io_index].d[0]) &&
                                    ((int64_t)total_batch_size <=
                                     citr->second.max_dims_[io_index].d[0]));
-      if (!valid_bs) {
-        *error_distance = LLONG_MAX;
-        return Status(
-            Status::Code::INTERNAL,
-            "request specifies invalid shape for input '" + input->Name() +
-                "' for " + name_ +
-                ". Error details model: expected shape of the batch dimension "
-                "to be between " +
-                std::to_string(citr->second.min_dims_[io_index].d[0]) +
-                " and " +
-                std::to_string(citr->second.max_dims_[io_index].d[0]) +
-                " but received " + std::to_string(total_batch_size));
-      }
 
       bool missing_shape_values = false;
       if (engine_->isShapeBinding(io_index)) {
@@ -2927,44 +2884,19 @@ PlanBackend::Context::ValidateTensorRTContext(
               it->second, citr->second.min_shapes_[io_index],
               citr->second.max_shapes_[io_index], citr->second.nb_shape_values_,
               support_batching_);
-          if (!status.IsOk()) {
-            *error_distance = LLONG_MAX;
-            return Status(
-                Status::Code::INTERNAL,
-                "request specifies invalid shape for input '" + input->Name() +
-                    "' for " + name_ + ". Error details: " + status.Message());
-          }
-
           valid_bs =
               (!support_batching_) || (((int32_t)total_batch_size >=
                                         *citr->second.min_shapes_[io_index]) &&
                                        ((int64_t)total_batch_size <=
                                         *citr->second.max_shapes_[io_index]));
-          if (!valid_bs) {
-            *error_distance = LLONG_MAX;
-            return Status(
-                Status::Code::INTERNAL,
-                "request specifies invalid value for shape input '" +
-                    input->Name() + "' for " + name_ +
-                    ". Error details: "
-                    "model expected shape value of the batch dimension to be "
-                    "between " +
-                    std::to_string(*citr->second.min_shapes_[io_index]) +
-                    " and " +
-                    std::to_string(*citr->second.max_shapes_[io_index]) +
-                    " but received " + std::to_string(total_batch_size));
-          }
         } else {
           missing_shape_values = true;
         }
       }
 
-      if (missing_shape_values) {
+      if (!status.IsOk() || !valid_bs || missing_shape_values) {
         *error_distance = LLONG_MAX;
-        return Status(
-            Status::Code::INTERNAL,
-            "failed to obtain values for shape input '" + input->Name() +
-                "' for " + name_);
+        break;
       } else {
         const auto& opt_dims = citr->second.opt_dims_[io_index];
         *error_distance += std::abs(opt_dims.d[0] - (int64_t)total_batch_size);

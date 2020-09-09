@@ -91,6 +91,16 @@ MemoryFormat_Name(MemoryFormat fmt)
   return "INVALID";
 }
 
+bool
+UseTensorRTv2API(const nvinfer1::ICudaEngine* engine)
+{
+  // In order to use TensorRT V2 API, engine must contain
+  // an explicit batch dimension. Detecting the presence of
+  // an implicit batch dimension to detect whether or not
+  // to use the TensorRT V2 API.
+  return !engine->hasImplicitBatchDimension();
+}
+
 std::pair<bool, nvinfer1::DataType>
 ConvertDataTypeToTrtType(const inference::DataType& dtype)
 {

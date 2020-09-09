@@ -257,7 +257,7 @@ class PlanBackend : public InferenceBackend {
         const std::map<int, std::vector<int32_t>>& request_shape_values,
         std::map<int, PlanBackend::Context::TensorRTContext>::iterator* citr);
 
-    Status ValidateTensorRTContext(
+    Status EvaluateTensorRTContext(
         std::map<int, PlanBackend::Context::TensorRTContext>::iterator& citr,
         size_t total_batch_size,
         const std::vector<std::unique_ptr<InferenceRequest>>& requests,

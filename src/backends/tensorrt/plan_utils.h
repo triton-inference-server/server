@@ -50,6 +50,8 @@ enum class MemoryFormat {
   INVALID
 };
 
+bool UseTensorRTv2API(const nvinfer1::ICudaEngine* engine);
+
 MemoryFormat ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt);
 
 const std::string MemoryFormat_Name(MemoryFormat fmt);
