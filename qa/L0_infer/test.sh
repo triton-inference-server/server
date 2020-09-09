@@ -61,8 +61,6 @@ fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
     EXPECTED_NUM_TESTS="29"
-elif [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
-    EXPECTED_NUM_TESTS="38"
 fi
 
 MODELDIR=`pwd`/models
