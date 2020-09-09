@@ -63,6 +63,10 @@ bool CompareDataType(TRTISTF_DataType model_dtype, const std::string& dtype);
 /// TRTISTF data-type.
 TRITONSERVER_DataType ConvertDataType(TRTISTF_DataType dtype);
 
+/// \return the model configuration data-type corresponding to a TRTISTF
+/// data-type.
+std::string ConvertToModelConfigString(TRTISTF_DataType dtype);
+
 /// \return the TRTISTF data-type corresponding to a model
 /// configuration data-type.
 TRTISTF_DataType ConvertDataType(const std::string& dtype);
