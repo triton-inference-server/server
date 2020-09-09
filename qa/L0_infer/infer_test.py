@@ -232,18 +232,6 @@ class InferTest(tu.TestResultCollector):
                                         output1_raw=output1_raw,
                                         swap=swap)
 
-        for prefix in ensemble_prefix:
-            if 'python' in BACKENDS:
-                _infer_exact_helper(self,
-                                    prefix + 'python', (input_size,),
-                                    8,
-                                    input_dtype,
-                                    output0_dtype,
-                                    output1_dtype,
-                                    output0_raw=output0_raw,
-                                    output1_raw=output1_raw,
-                                    swap=swap)
-
     def test_raw_bbb(self):
         self._full_exact(np.int8,
                          np.int8,
