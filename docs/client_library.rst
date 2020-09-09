@@ -49,8 +49,12 @@ Getting the Client Libraries
 
 The provided Dockerfile.client and CMake support can be used to build
 the client libraries. As an alternative to building, it is also
-possible to download the pre-build client libraries from GitHub or a
-pre-built Docker image containing the client libraries from `NVIDIA
+possible to :ref:`use pip to install the client libraries
+<section-client-libraries-download-from-pip>` or :ref:`download the
+pre-build client libraries
+<section-client-libraries-download-from-github>` from GitHub or
+:ref:`download a pre-built Docker image containing the client
+libraries <section-client-libraries-download-from-ngc>` from `NVIDIA
 GPU Cloud (NGC) <https://ngc.nvidia.com>`_.
 
 .. build-client-begin-marker-do-not-remove
@@ -178,6 +182,17 @@ The MSBuild.exe may need to be invoked twice for a successfull
 build.
 
 .. build-client-end-marker-do-not-remove
+
+.. _section-client-libraries-download-from-pip:
+
+Download Using Python Package Installer (pip)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The GRPC and HTTP client libraries are available as a Python package
+that can be installed using pip::
+
+  $ pip install nvidia-pyindex
+  $ pip install tritonclient[http,grpc]
 
 .. _section-client-libraries-download-from-github:
 
