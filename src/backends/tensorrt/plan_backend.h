@@ -123,10 +123,12 @@ class PlanBackend : public InferenceBackend {
         const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
             ios);
     Status InitializeBatchOutputBindings(const inference::ModelConfig& config);
+    Status GetProfileDimensions(
+        const int io_index, const int profile_index, TensorRTContext* context);
 #ifdef TRITON_ENABLE_CUDA_GRAPH
     bool BuildCudaGraph(
         TensorRTContext* trt_context, const GraphSpec& graph_spec);
-    bool BuildCudaGraphDynamic(
+    bool BuildCudaGraphV2(
         TensorRTContext* trt_context, const GraphSpec& graph_spec);
 #endif
 
@@ -177,7 +179,8 @@ class PlanBackend : public InferenceBackend {
             context_(nullptr), cuda_graph_execs_(event_set_cnts),
             min_dims_(binding_cnts), max_dims_(binding_cnts),
             opt_dims_(binding_cnts), min_shapes_(binding_cnts),
-            max_shapes_(binding_cnts), opt_shapes_(binding_cnts)
+            max_shapes_(binding_cnts), opt_shapes_(binding_cnts),
+            is_dynamic_per_binding_(binding_cnts)
       {
       }
       std::string profile_name_;
@@ -221,6 +224,9 @@ class PlanBackend : public InferenceBackend {
 
       // The number of shape values
       size_t nb_shape_values_;
+
+      // Whether or not the binding contains a dynamic shape
+      std::vector<bool> is_dynamic_per_binding_;
     };
 
     // A group of CUDA events that signals different stages of the request.
@@ -245,10 +251,18 @@ class PlanBackend : public InferenceBackend {
         const std::unique_ptr<InferenceRequest>& request,
         std::map<int, std::vector<int32_t>>* request_shape_values);
 
-    std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
+    Status GetMostOptimizedProfile(
         size_t total_batch_size,
         const std::vector<std::unique_ptr<InferenceRequest>>& requests,
-        const std::map<int, std::vector<int32_t>>& request_shape_values);
+        const std::map<int, std::vector<int32_t>>& request_shape_values,
+        std::map<int, PlanBackend::Context::TensorRTContext>::iterator* citr);
+
+    Status EvaluateTensorRTContext(
+        std::map<int, PlanBackend::Context::TensorRTContext>::iterator& citr,
+        size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        const std::map<int, std::vector<int32_t>>& request_shape_values,
+        int64_t* error_distance);
 
     Status SetBindingDimensions(
         const std::string& input_name, const std::vector<int64_t>& shape,
@@ -325,9 +339,6 @@ class PlanBackend : public InferenceBackend {
 
     // Is set true if the configuration supports batching
     bool support_batching_;
-
-    // Is set true if the loaded model has one or more dynamic shaped inputs
-    bool is_dynamic_;
 
     // Whether inexact match is allowed for finding CUDA graph
     bool allow_inexact_match_;

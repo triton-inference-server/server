@@ -91,6 +91,16 @@ MemoryFormat_Name(MemoryFormat fmt)
   return "INVALID";
 }
 
+bool
+UseTensorRTv2API(const nvinfer1::ICudaEngine* engine)
+{
+  // In order to use TensorRT V2 API, engine must contain
+  // an explicit batch dimension. Detecting the presence of
+  // an implicit batch dimension to detect whether or not
+  // to use the TensorRT V2 API.
+  return !engine->hasImplicitBatchDimension();
+}
+
 std::pair<bool, nvinfer1::DataType>
 ConvertDataTypeToTrtType(const inference::DataType& dtype)
 {
@@ -153,19 +163,18 @@ Status
 CompareDimsSupported(
     const std::string& model_name, const std::string& binding_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
-    const bool supports_batching, const bool is_dynamic,
+    const bool supports_batching, const bool contains_explicit_batch,
     const bool compare_exact)
 {
   // If the model configuration expects batching support in the model,
   // then the first dimension must be -1.
-  if (supports_batching && is_dynamic) {
-    if ((model_dims.nbDims == 0) || (model_dims.d[0] != -1)) {
+  if (supports_batching && contains_explicit_batch) {
+    if ((model_dims.nbDims == 0)) {
       return Status(
           Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + binding_name +
               "': for the model to support batching the shape should have at "
-              "least 1 dimension and the first dimension must be -1; but shape "
-              "expected by the model is " +
+              "least 1 dimension; but shape expected by the model is " +
               DimsDebugString(model_dims));
     }
 
@@ -179,7 +188,7 @@ CompareDimsSupported(
     if (succ) {
       for (int i = 0; i < full_dims.size(); ++i) {
         const int64_t model_dim = model_dims.d[i];
-        if (compare_exact || (model_dim != -1)) {
+        if (compare_exact || ((model_dim != -1) && (full_dims[i] != -1))) {
           succ &= (model_dim == full_dims[i]);
         }
       }
@@ -204,7 +213,7 @@ CompareDimsSupported(
     if (succ) {
       for (int i = 0; i < dims.size(); ++i) {
         const int64_t model_dim = model_dims.d[i];
-        if (compare_exact || (model_dim != -1)) {
+        if (compare_exact || ((model_dim != -1) && (dims[i] != -1))) {
           succ &= (model_dim == dims[i]);
         }
       }
@@ -277,14 +286,10 @@ MaximumDims(
   }
 
   if (support_batching) {
-    if (max_batch_size > max_profile_dims.d[0]) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "unexpected configuration maximum batch size " +
-              std::to_string(max_batch_size) + " binding maximum is " +
-              std::to_string(max_profile_dims.d[0]));
-    }
-    max_dims->emplace_back(max_batch_size);
+    int this_batch_size = max_batch_size > max_profile_dims.d[0]
+                              ? max_profile_dims.d[0]
+                              : max_batch_size;
+    max_dims->emplace_back(this_batch_size);
   }
 
   for (int i = 0; i < dims.size(); ++i) {

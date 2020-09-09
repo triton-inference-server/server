@@ -86,8 +86,7 @@ for modelpath in \
         autofill_noplatform_success/tensorrt/empty_config_variable/1     \
         autofill_noplatform_success/tensorrt/no_config_variable/1 \
         autofill_noplatform_success/tensorrt/hint_for_no_batch/1 \
-        autofill_noplatform_success/tensorrt/multi_prof_max_bs/1 \
-        autofill_noplatform_success/tensorrt/multi_prof_no_batch/1 ; do
+        autofill_noplatform_success/tensorrt/multi_prof_max_bs/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32/1/model.plan \
        $modelpath/.
