@@ -47,6 +47,9 @@ class AutoFillPlanImpl : public AutoFill {
       : AutoFill(model_name), plan_filename_(plan_filename), engine_(engine),
         runtime_(runtime), max_batch_size_(0), num_profile_bindings_(0)
   {
+    if (!UseTensorRTv2API(engine_)) {
+      num_profile_bindings_ = engine_->getNbBindings();
+    }
   }
 
   ~AutoFillPlanImpl()
@@ -358,7 +361,8 @@ void
 AutoFillPlanImpl::InitIODims(
     nvinfer1::Dims& dims, bool is_shape_binding, IO* config_io)
 {
-  bool skip_first = (max_batch_size_ != 0);
+  bool skip_first =
+      (max_batch_size_ != 0) && (!engine_->hasImplicitBatchDimension());
   auto config_dims = config_io->mutable_dims();
   if (!is_shape_binding) {
     for (int didx = (skip_first ? 1 : 0); didx < dims.nbDims; ++didx) {

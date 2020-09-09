@@ -962,7 +962,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
       RETURN_IF_ERROR(GetProfileDimensions(io_index, profile_index, &context));
     }
 
-    if (context.is_dynamic_per_binding_[io_index]) {
+    if (UseTensorRTv2API(engine_)) {
       std::vector<int64_t> maximum_dims;
       if (!is_ragged) {
         Status status = ValidateDimension(
@@ -1424,12 +1424,12 @@ PlanBackend::Context::GetProfileDimensions(
     const int io_index, const int profile_index, TensorRTContext* context)
 {
   int binding_index = (profile_index * num_expected_bindings_) + io_index;
-    context->max_dims_[io_index] = engine_->getProfileDimensions(
-        binding_index, profile_index, nvinfer1::OptProfileSelector::kMAX);
-    context->min_dims_[io_index] = engine_->getProfileDimensions(
-        binding_index, profile_index, nvinfer1::OptProfileSelector::kMIN);
-    context->opt_dims_[io_index] = engine_->getProfileDimensions(
-        binding_index, profile_index, nvinfer1::OptProfileSelector::kOPT);
+  context->max_dims_[io_index] = engine_->getProfileDimensions(
+      binding_index, profile_index, nvinfer1::OptProfileSelector::kMAX);
+  context->min_dims_[io_index] = engine_->getProfileDimensions(
+      binding_index, profile_index, nvinfer1::OptProfileSelector::kMIN);
+  context->opt_dims_[io_index] = engine_->getProfileDimensions(
+      binding_index, profile_index, nvinfer1::OptProfileSelector::kOPT);
   return Status::Success;
 }
 
@@ -2055,8 +2055,8 @@ PlanBackend::Context::Run(
       &citr);
 
   if (!status.IsOk()) {
-      LOG_ERROR << status.Message();
-    }
+    LOG_ERROR << status.Message();
+  }
 
   int binding_offset = citr->first * num_expected_bindings_;
 
@@ -2275,8 +2275,7 @@ PlanBackend::Context::Run(
   bool found_exact = false;
   // FIXME closest_cuda_graph
   FindClosestCudaGraph(citr->second, input_dims, &cuda_graph, &found_exact);
-  if ((cuda_graph != nullptr) && !found_exact &&
-      (UseTensorRTv2API(engine_))) {
+  if ((cuda_graph != nullptr) && !found_exact && (UseTensorRTv2API(engine_))) {
     size_t input_idx = 0;
     for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
       int io_index = binding_offset + bindex;
