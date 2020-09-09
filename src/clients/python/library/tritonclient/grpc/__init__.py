@@ -104,18 +104,18 @@ class InferenceServerClient:
 
     ssl : bool
         If True use SSL encrypted secure channel. Default is False.
-    
+
     root_certificates : str
         File holding the PEM-encoded root certificates as a byte
         string, or None to retrieve them from a default location
-        chosen by gRPC runtime. The option is ignored if `ssl` 
+        chosen by gRPC runtime. The option is ignored if `ssl`
         is False. Default is None.
-    
+
     private_key : str
         File holding the PEM-encoded private key as a byte string,
         or None if no private key should be used. The option is
         ignored if `ssl` is False. Default is None.
-    
+
     certificate_chain : str
         File holding PEM-encoded certificate chain as a byte string
         to use or None if no certificate chain should be used. The
@@ -309,7 +309,12 @@ class InferenceServerClient:
             headers to include in the request.
         as_json : bool
             If True then returns server metadata as a json dict,
-            otherwise as a protobuf message. Default value is False.
+            otherwise as a protobuf message. Default value is
+            False. The returned json is generated from the protobuf
+            message using MessageToJson and as a result int64 values
+            are represented as string. It is the caller's
+            responsibility to convert these strings back to int64
+            values as necessary.
 
         Returns
         -------
@@ -363,8 +368,13 @@ class InferenceServerClient:
             Optional dictionary specifying additional HTTP
             headers to include in the request.
         as_json : bool
-            If True then returns model metadata as a json dict, otherwise
-            as a protobuf message. Default value is False.
+            If True then returns model metadata as a json dict,
+            otherwise as a protobuf message. Default value is False.
+            The returned json is generated from the protobuf message
+            using MessageToJson and as a result int64 values are
+            represented as string. It is the caller's responsibility
+            to convert these strings back to int64 values as
+            necessary.
 
         Returns
         -------
@@ -423,6 +433,11 @@ class InferenceServerClient:
         as_json : bool
             If True then returns configuration as a json dict, otherwise
             as a protobuf message. Default value is False.
+            The returned json is generated from the protobuf message
+            using MessageToJson and as a result int64 values are
+            represented as string. It is the caller's responsibility
+            to convert these strings back to int64 values as
+            necessary.
 
         Returns
         -------
@@ -472,6 +487,11 @@ class InferenceServerClient:
             If True then returns model repository index
             as a json dict, otherwise as a protobuf message.
             Default value is False.
+            The returned json is generated from the protobuf message
+            using MessageToJson and as a result int64 values are
+            represented as string. It is the caller's responsibility
+            to convert these strings back to int64 values as
+            necessary.
 
         Returns
         -------
@@ -592,6 +612,11 @@ class InferenceServerClient:
             If True then returns inference statistics
             as a json dict, otherwise as a protobuf message.
             Default value is False.
+            The returned json is generated from the protobuf message
+            using MessageToJson and as a result int64 values are
+            represented as string. It is the caller's responsibility
+            to convert these strings back to int64 values as
+            necessary.
 
         Raises
         ------
@@ -639,9 +664,13 @@ class InferenceServerClient:
             Optional dictionary specifying additional HTTP
             headers to include in the request.
         as_json : bool
-            If True then returns system shared memory status as a
-            json dict, otherwise as a protobuf message. Default
-            value is False.
+            If True then returns system shared memory status as a json
+            dict, otherwise as a protobuf message. Default value is
+            False.  The returned json is generated from the protobuf
+            message using MessageToJson and as a result int64 values
+            are represented as string. It is the caller's
+            responsibility to convert these strings back to int64
+            values as necessary.
 
         Returns
         -------
@@ -783,9 +812,13 @@ class InferenceServerClient:
             Optional dictionary specifying additional HTTP
             headers to include in the request.
         as_json : bool
-            If True then returns cuda shared memory status as a
-            json dict, otherwise as a protobuf message. Default
-            value is False.
+            If True then returns cuda shared memory status as a json
+            dict, otherwise as a protobuf message. Default value is
+            False.  The returned json is generated from the protobuf
+            message using MessageToJson and as a result int64 values
+            are represented as string. It is the caller's
+            responsibility to convert these strings back to int64
+            values as necessary.
 
         Returns
         -------
@@ -1609,6 +1642,11 @@ class InferResult:
         as_json : bool
             If True then returns response as a json dict, otherwise
             as a protobuf message. Default value is False.
+            The returned json is generated from the protobuf message
+            using MessageToJson and as a result int64 values are
+            represented as string. It is the caller's responsibility
+            to convert these strings back to int64 values as
+            necessary.
 
         Returns
         -------
@@ -1636,6 +1674,11 @@ class InferResult:
         as_json : bool
             If True then returns response as a json dict, otherwise
             as a protobuf message. Default value is False.
+            The returned json is generated from the protobuf message
+            using MessageToJson and as a result int64 values are
+            represented as string. It is the caller's responsibility
+            to convert these strings back to int64 values as
+            necessary.
 
         Returns
         -------
