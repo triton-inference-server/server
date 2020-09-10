@@ -33,12 +33,93 @@ import sys
 import threading
 import signal
 import time
+import struct
 
 import numpy as np
 
 from python_host_pb2 import *
 from python_host_pb2_grpc import PythonInterpreterServicer, add_PythonInterpreterServicer_to_server
 import grpc
+
+
+def serialize_byte_tensor(input_tensor):
+    """
+        Serializes a bytes tensor into a flat numpy array of length prepend bytes.
+        Can pass bytes tensor as numpy array of bytes with dtype of np.bytes_,
+        numpy strings with dtype of np.str_ or python strings with dtype of np.object.
+        Parameters
+        ----------
+        input_tensor : np.array
+            The bytes tensor to serialize.
+        Returns
+        -------
+        serialized_bytes_tensor : np.array
+            The 1-D numpy array of type uint8 containing the serialized bytes in 'C' order.
+        Raises
+        ------
+        InferenceServerException
+            If unable to serialize the given tensor.
+        """
+
+    if input_tensor.size == 0:
+        return np.empty([0])
+
+    # If the input is a tensor of string/bytes objects, then must flatten those into
+    # a 1-dimensional array containing the 4-byte byte size followed by the
+    # actual element bytes. All elements are concatenated together in "C"
+    # order.
+    if (input_tensor.dtype == np.object) or (input_tensor.dtype.type
+                                             == np.bytes_):
+        flattened = bytes()
+        for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
+            # If directly passing bytes to BYTES type,
+            # don't convert it to str as Python will encode the
+            # bytes which may distort the meaning
+            if obj.dtype.type == np.bytes_:
+                if type(obj.item()) == bytes:
+                    s = obj.item()
+                else:
+                    s = bytes(obj)
+            else:
+                s = str(obj).encode('utf-8')
+            flattened += struct.pack("<I", len(s))
+            flattened += s
+        flattened_array = np.asarray(flattened)
+        if not flattened_array.flags['C_CONTIGUOUS']:
+            flattened_array = np.ascontiguousarray(flattened_array)
+        return flattened_array
+    else:
+        raise TritonModelException(
+            "cannot serialize bytes tensor: invalid datatype")
+    return None
+
+
+def deserialize_bytes_tensor(encoded_tensor):
+    """
+    Deserializes an encoded bytes tensor into an
+    numpy array of dtype of python objects
+    Parameters
+    ----------
+    encoded_tensor : bytes
+        The encoded bytes tensor where each element
+        has its length in first 4 bytes followed by
+        the content
+    Returns
+    -------
+    string_tensor : np.array
+        The 1-D numpy array of type object containing the
+        deserialized bytes in 'C' order.
+    """
+    strs = list()
+    offset = 0
+    val_buf = encoded_tensor
+    while offset < len(val_buf):
+        l = struct.unpack_from("<I", val_buf, offset)[0]
+        offset += 4
+        sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
+        offset += l
+        strs.append(sb)
+    return (np.array(strs, dtype=bytes))
 
 
 def parse_startup_arguments():
@@ -135,12 +216,20 @@ class PythonHost(PythonInterpreterServicer):
             input_tensors = []
             for request_input in request.inputs:
                 x = request_input
-                tensor = tpb_utils.Tensor(
-                    x.name,
-                    np.frombuffer(x.raw_data,
-                                  dtype=tpb_utils.triton_to_numpy_type(
-                                      x.dtype)).reshape(x.dims))
-                input_tensors.append(tensor)
+                numpy_type = tpb_utils.triton_to_numpy_type(x.dtype)
+
+                # We need to deserialize TYPE_STRING
+                if numpy_type == np.object or numpy_type == np.bytes_:
+                    numpy_data = deserialize_bytes_tensor(x.raw_data)
+                    tensor = tpb_utils.Tensor(x.name,
+                                              numpy_data.reshape(x.dims))
+                    input_tensors.append(tensor)
+                else:
+                    tensor = tpb_utils.Tensor(
+                        x.name,
+                        np.frombuffer(x.raw_data,
+                                      dtype=numpy_type).reshape(x.dims))
+                    input_tensors.append(tensor)
 
             request_id = request.id
             correlation_id = request.correlation_id
@@ -186,11 +275,18 @@ class PythonHost(PythonInterpreterServicer):
 
             for output_tensor in output_tensors:
                 output_np_array = output_tensor.as_numpy()
+                output_shape = output_np_array.shape
+
+                # We need to serialize TYPE_STRING
+                if output_np_array.dtype.type is np.object or output_np_array.dtype.type is np.bytes_:
+                    output_np_array = serialize_byte_tensor(output_np_array)
+
                 tensor = Tensor(name=output_tensor.name(),
                                 dtype=tpb_utils.numpy_to_triton_type(
                                     output_np_array.dtype.type),
-                                dims=output_np_array.shape,
+                                dims=output_shape,
                                 raw_data=output_np_array.tobytes())
+
                 response_tensors.append(tensor)
             exec_responses.append(InferenceResponse(outputs=response_tensors))
         execute_response = ExecuteResponse(responses=exec_responses)

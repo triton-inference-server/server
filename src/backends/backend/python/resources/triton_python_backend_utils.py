@@ -52,10 +52,27 @@ TRITION_TO_NUMPY_TYPE = {
     # TRITONSERVER_TYPE_FP64
     12: np.float64,
     # TRITONSERVER_TYPE_STRING
-    13: np.str_
+    13: np.bytes_
+}
+
+TRITION_STRING_TO_NUMPY = {
+    'TYPE_BOOL': np.bool,
+    'TYPE_UINT8': np.uint8,
+    'TYPE_UINT16': np.uint16,
+    'TYPE_UINT32': np.uint32,
+    'TYPE_UINT64': np.uint64,
+    'TYPE_INT8': np.int8,
+    'TYPE_INT16': np.int16,
+    'TYPE_INT32': np.int32,
+    'TYPE_INT64': np.int64,
+    'TYPE_FP16': np.float16,
+    'TYPE_FP32': np.float32,
+    'TYPE_FP64': np.float64,
+    'TYPE_STRING': np.bytes_
 }
 
 NUMPY_TO_TRITION_TYPE = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
+NUMPY_TO_TRITION_STRING = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
 
 
 class InferenceRequest:
@@ -344,3 +361,7 @@ def triton_to_numpy_type(data_type):
 
 def numpy_to_triton_type(data_type):
     return NUMPY_TO_TRITION_TYPE[data_type]
+
+
+def triton_string_to_numpy(triton_type_string):
+    return TRITION_STRING_TO_NUMPY[triton_type_string]

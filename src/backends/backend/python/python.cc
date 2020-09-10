@@ -275,6 +275,7 @@ ModelInstanceState::CreatePythonInterpreter()
 TRITONSERVER_Error*
 ModelInstanceState::ConnectPythonInterpreter()
 {
+  grpc_init();
   auto grpc_channel =
       grpc::CreateChannel(domain_socket_, grpc::InsecureChannelCredentials());
 
@@ -444,11 +445,10 @@ ModelInstanceState::GetInputTensor(
   uint32_t input_dims_count;
   uint64_t input_byte_size;
   uint32_t input_buffer_count;
-  GUARDED_RESPOND_IF_ERROR(
-      responses, r,
-      TRITONBACKEND_InputProperties(
-          in, &input_name, &input_dtype, &input_shape, &input_dims_count,
-          &input_byte_size, &input_buffer_count));
+
+  RETURN_IF_ERROR(TRITONBACKEND_InputProperties(
+      in, &input_name, &input_dtype, &input_shape, &input_dims_count,
+      &input_byte_size, &input_buffer_count));
 
   // Update input_tensor
   input_tensor->set_name(input_name);
@@ -465,18 +465,14 @@ ModelInstanceState::GetInputTensor(
   TRITONSERVER_MemoryType input_memory_type = TRITONSERVER_MEMORY_CPU;
   int64_t input_memory_type_id = 0;
   for (size_t j = 0; j < input_buffer_count; ++j) {
-    GUARDED_RESPOND_IF_ERROR(
-        responses, r,
-        TRITONBACKEND_InputBuffer(
-            in, j, &input_buffer, &buffer_byte_size, &input_memory_type,
-            &input_memory_type_id));
-    if ((responses[iidx] == nullptr) ||
-        (input_memory_type == TRITONSERVER_MEMORY_GPU)) {
-      GUARDED_RESPOND_IF_ERROR(
-          responses, r,
-          TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "failed to get input buffer in CPU memory"));
+    RETURN_IF_ERROR(TRITONBACKEND_InputBuffer(
+        in, j, &input_buffer, &buffer_byte_size, &input_memory_type,
+        &input_memory_type_id));
+
+    if (input_memory_type == TRITONSERVER_MEMORY_GPU) {
+      RETURN_IF_ERROR(TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "failed to get input buffer in CPU memory"));
     }
     data_buffer->append((const char*)input_buffer, buffer_byte_size);
   }
@@ -899,9 +895,17 @@ TRITONBACKEND_ModelInstanceExecute(
               response, &triton_output, python_output_result.name().c_str(),
               triton_dt, python_output_dims.data(), dims_count));
 
-      std::vector<int64_t> output_dims(
-          python_output_dims.begin(), python_output_dims.end());
-      int64_t output_byte_size = nib::GetByteSize(triton_dt, output_dims);
+      int64_t output_byte_size;
+
+      // Custom handling for TRITONSERVER_TYPE_BYTES
+      if (triton_dt == TRITONSERVER_TYPE_BYTES) {
+        output_byte_size = python_output_result.raw_data().size();
+      } else {
+        std::vector<int64_t> output_dims(
+            python_output_dims.begin(), python_output_dims.end());
+        output_byte_size = nib::GetByteSize(triton_dt, output_dims);
+      }
+
       void* output_buffer;
 
       TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
