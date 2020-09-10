@@ -718,13 +718,13 @@ InferenceRequest::ReportStatisticsWithDuration(
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
-    backend_raw_->MutableStatsAggregator()->UpdateSuccess(
+    backend_raw_->MutableStatsAggregator()->UpdateSuccessWithDuration(
         metric_reporter, std::max(1U, batch_size_), request_start_ns_,
         queue_start_ns_, compute_start_ns, request_end_ns,
         compute_input_duration_ns, compute_infer_duration_ns,
         compute_output_duration_ns);
     if (secondary_stats_aggregator_ != nullptr) {
-      secondary_stats_aggregator_->UpdateSuccess(
+      secondary_stats_aggregator_->UpdateSuccessWithDuration(
           nullptr /* metric_reporter */, std::max(1U, batch_size_),
           request_start_ns_, queue_start_ns_, compute_start_ns, request_end_ns,
           compute_input_duration_ns, compute_infer_duration_ns,
