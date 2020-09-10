@@ -88,7 +88,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom python"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
@@ -112,23 +112,55 @@ for TARGET in cpu gpu; do
 
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
-      if [ "$BACKEND" != "custom" ]; then
+      if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
-      else
+      elif [ "$BACKEND" == "custom" ]; then
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.
+      elif [ "$BACKEND" == "python" ]; then
+        # We will be using ONNX models config.pbtxt and tweak them to make them
+        # appropriate for Python backend
+        onnx_models=`find ${DATADIR}/qa_model_repository/ -maxdepth 1 -type d -regex '.*onnx_.*'`
+
+        # Types that need to use SubAdd instead of AddSub
+        swap_types="float32 int32 int16 int8"
+        for onnx_model in $onnx_models; do
+          python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
+          mkdir -p models/$python_model/1/
+          # Remove platform and use Python as the backend
+          cat $onnx_model/config.pbtxt | sed 's/platform:.*//g' | sed 's/version_policy.*/backend:\ "python"/g' | sed 's/onnx/python/g' > models/$python_model/config.pbtxt
+          cp $onnx_model/output0_labels.txt models/$python_model
+
+          is_swap_type="0"
+
+          # Check whether this model needs to be swapped
+          for swap_type in $swap_types; do
+            model_type="$swap_type"_"$swap_type"_"$swap_type"
+            model_name=python_$model_type
+            model_name_nobatch=python_nobatch_$model_type
+            if [ $python_model == $model_name ] || [ $python_model == $model_name_nobatch ]; then
+                cp ../python_models/sub_add/model.py models/$python_model/1/
+                is_swap_type="1"
+            fi
+          done
+
+          # Use the AddSub model if it doesn't need to be swapped
+          if [ $is_swap_type == "0" ]; then
+                cp ../python_models/add_sub/model.py models/$python_model/1/
+          fi
+        done
       fi
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
       if [[ $BACKENDS == *"custom"* ]]; then
         for BACKEND in $BACKENDS; do
-          if [ "$BACKEND" != "custom" ]; then
+          if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
               cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
                 models/.
-          else
+          elif [ "$BACKEND" == "custom" ]; then
             cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
               models/.
           fi
@@ -156,9 +188,13 @@ for TARGET in cpu gpu; do
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" != "plan" ]; then
+      if [ "$FW" != "plan" ] && [ "$FW" != "python" ];then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
+        done
+      elif [ "$FW" == "python" ]; then
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: KIND_CPU }]" >> $MC
         done
       fi
     done
