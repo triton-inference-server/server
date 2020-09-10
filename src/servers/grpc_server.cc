@@ -2903,7 +2903,8 @@ InferResponseCompleteCommon(
       if (batch_size > 0) {
         output->add_shape(batch_size);
       }
-      output->add_shape(std::min(classification_count, (uint32_t) batch1_element_count));
+      output->add_shape(
+          std::min(classification_count, (uint32_t)batch1_element_count));
 
       (*response.mutable_raw_output_contents())[output_idx] =
           std::move(serialized);
