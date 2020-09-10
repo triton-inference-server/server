@@ -353,7 +353,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                   -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
-                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/backends/tensorflow2;/opt/tritonserver/lib/pytorch;/opt/tritonserver/backends/onnxruntime" \
+                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/backends/tensorflow2;/opt/tritonserver/lib/pytorch" \
                   ../build && \
             make -j16 server && \
             mkdir -p /opt/tritonserver/include && \
@@ -366,14 +366,19 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
 # Build the backends.
 #
 ARG BACKEND_TAG=main
-RUN for BE in identity repeat square; do \
+RUN for BE in identity repeat square onnxruntime; do \
         rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
             (cd /tmp/triton_backends && \
                  git clone --single-branch --depth=1 -b ${BACKEND_TAG} \
                      https://github.com/triton-inference-server/${BE}_backend.git) && \
             (cd /tmp/triton_backends/${BE}_backend && \
                  mkdir build && cd build && \
-                 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install .. && \
+                 cmake -DCMAKE_BUILD_TYPE=Release \
+                       -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+                       -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON \
+                       -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON \
+                       -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
+                       -DTRITON_ONNXRUNTIME_LIB_PATHS="/opt/tritonserver/backends/onnxruntime" .. && \
                  make -j16 install && \
                  mkdir -p /opt/tritonserver/backends/${BE} && \
                  cp -r install/lib/libtriton_${BE}.so /opt/tritonserver/backends/${BE}); \
