@@ -2610,12 +2610,14 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
           TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES);
       RETURN_IF_ERR(output_json.AddStringRef("datatype", datatype_str));
 
-      triton::common::TritonJson::Value shape_json(response_json, triton::common::TritonJson::ValueType::ARRAY);
+      triton::common::TritonJson::Value shape_json(
+          response_json, triton::common::TritonJson::ValueType::ARRAY);
       if (batch_size > 0) {
         RETURN_IF_ERR(shape_json.AppendUInt(batch_size));
         element_count *= batch_size;
       }
-      size_t actual_class_count = std::min((size_t) info->class_cnt_, batch1_element_count);
+      size_t actual_class_count =
+          std::min((size_t)info->class_cnt_, batch1_element_count);
       element_count *= actual_class_count;
       RETURN_IF_ERR(shape_json.AppendUInt(actual_class_count));
       RETURN_IF_ERR(output_json.Add("shape", std::move(shape_json)));
@@ -2633,7 +2635,8 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
       const char* datatype_str = TRITONSERVER_DataTypeString(datatype);
       RETURN_IF_ERR(output_json.AddStringRef("datatype", datatype_str));
 
-      triton::common::TritonJson::Value shape_json(response_json, triton::common::TritonJson::ValueType::ARRAY);
+      triton::common::TritonJson::Value shape_json(
+          response_json, triton::common::TritonJson::ValueType::ARRAY);
       for (size_t j = 0; j < dim_count; j++) {
         RETURN_IF_ERR(shape_json.AppendUInt(shape[j]));
         element_count *= shape[j];
