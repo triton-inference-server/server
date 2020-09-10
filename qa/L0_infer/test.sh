@@ -192,6 +192,10 @@ for TARGET in cpu gpu; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
+      elif [ "$FW" == "python" ]; then
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: KIND_CPU }]" >> $MC
+        done
       fi
     done
 
