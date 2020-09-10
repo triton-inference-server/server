@@ -2578,8 +2578,9 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
         RETURN_IF_ERR(shape_json.AppendUInt(batch_size));
         element_count *= batch_size;
       }
-      element_count *= batch1_element_count;
-      RETURN_IF_ERR(shape_json.AppendUInt(std::min(info->class_cnt_, (uint32_t) batch1_element_count)));
+      size_t actual_class_count = std::min((size_t) info->class_cnt_, batch1_element_count);
+      element_count *= actual_class_count;
+      RETURN_IF_ERR(shape_json.AppendUInt(actual_class_count));
       RETURN_IF_ERR(output_json.Add("shape", std::move(shape_json)));
 
       evbuffer_free(info->evbuffer_);
