@@ -933,9 +933,7 @@ AutoCompleteHelper::FixIOConfig(
         model_state_->ModelConfig(), ni::TritonJson::ValueType::OBJECT);
     RETURN_IF_ERROR(auto_complete_io.AddString("name", io->name_));
     RETURN_IF_ERROR(auto_complete_io.AddString(
-        "data_type",
-        std::string("TYPE_") +
-            TRITONSERVER_DataTypeString(nib::ConvertDataType(io->data_type_))));
+        "data_type", nib::ConvertToModelConfigString(io->data_type_)));
     ni::TritonJson::Value dims(
         model_state_->ModelConfig(), ni::TritonJson::ValueType::ARRAY);
     // The model signature supports batching then the first
