@@ -1109,10 +1109,28 @@ PlanBackend::Context::InitializeBatchInputBindings(
   for (const auto& batch_input : config.batch_input()) {
     for (const auto& tensor_name : batch_input.target_name()) {
       inference::DataType tensor_datatype = batch_input.data_type();
-      // Batch inputs are ragged inputs which will be concatenated and flatten,
-      // so expecting dims to be [-1]
       DimsList dims;
-      dims.Add(-1);
+      if (max_batch_size_ == NO_BATCHING) {
+        // If the model doesn't support batching, the range of some batch input
+        // kind is convergent to a fixed value, need to specify the fixed value
+        // in such case.
+        switch (batch_input.kind()) {
+          case inference::BatchInput::BATCH_ELEMENT_COUNT:
+          case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT:
+            dims.Add(1);
+            break;
+          case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO:
+            dims.Add(2);
+            break;
+          default:
+            dims.Add(-1);
+            break;
+        }
+      } else {
+        // Batch inputs are ragged inputs which will be concatenated and
+        // flatten, so expecting dims to be [-1]
+        dims.Add(-1);
+      }
 
       RETURN_IF_ERROR(InitializeExecuteInputBinding(
           tensor_name, tensor_datatype, dims, false, true));
@@ -1532,6 +1550,14 @@ PlanBackend::Context::BuildCudaGraph(
       return false;
     }
   }
+
+  // Enqueue to TRT to setup resources properly BEFORE capturing CUDA graph
+  if (!trt_context->context_->enqueue(
+          batch_size, buffer_bindings_.data(), stream_, nullptr)) {
+    LOG_WARNING << "unable to record CUDA graph for " << name_;
+    return false;
+  }
+
   bool captured = true;
   for (int set_idx = 0; set_idx < EVENT_SET_COUNT; set_idx++) {
     // The same spec has been captured
