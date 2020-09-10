@@ -361,11 +361,23 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cp -r server/install/lib /opt/tritonserver/. && \
             cp -r server/install/backends /opt/tritonserver/. && \
             cp -r server/install/include/triton /opt/tritonserver/include/.) && \
-    (cd /opt/tritonserver && ln -sf /workspace/qa qa) && \
-    (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/backends && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/lib/pytorch && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/backends/onnxruntime && chmod ugo-w+rx *)
+    (cd /opt/tritonserver && ln -sf /workspace/qa qa)
+
+# Build the backends.
+#
+ARG BACKEND_TAG=main
+RUN for BE in identity repeat square; do \
+        rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+            (cd /tmp/triton_backends && \
+                 git clone --single-branch --depth=1 -b ${BACKEND_TAG} \
+                     https://github.com/triton-inference-server/${BE}_backend.git) && \
+            (cd /tmp/triton_backends/${BE}_backend && \
+                 mkdir build && cd build && \
+                 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install .. && \
+                 make -j16 install && \
+                 mkdir -p /opt/tritonserver/backends/${BE} && \
+                 cp -r install/lib/libtriton_${BE}.so /opt/tritonserver/backends/${BE}); \
+    done
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}

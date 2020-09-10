@@ -70,7 +70,6 @@ target_link_libraries(
     triton-common-json        # from repo-common
 )
 
-add_subdirectory(examples src/backends/backend/examples)
 if(${TRITON_ENABLE_ONNXRUNTIME})
   add_subdirectory(onnxruntime src/backends/backend/onnxruntime)
 endif() # TRITON_ENABLE_ONNXRUNTIME
