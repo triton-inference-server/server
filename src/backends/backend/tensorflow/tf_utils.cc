@@ -219,6 +219,41 @@ ConvertDataType(const std::string& dtype)
   return TRTISTF_DataType::TRTISTF_TYPE_INVALID;
 }
 
+std::string
+ConvertToModelConfigString(TRTISTF_DataType dtype)
+{
+  if (dtype == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
+    return "TYPE_INVALID";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_BOOL) {
+    return "TYPE_BOOL";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_UINT8) {
+    return "TYPE_UINT8";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_UINT16) {
+    return "TYPE_UINT16";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_UINT32) {
+    return "TYPE_UINT32";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_UINT64) {
+    return "TYPE_UINT64";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_INT8) {
+    return "TYPE_INT8";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_INT16) {
+    return "TYPE_INT16";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_INT32) {
+    return "TYPE_INT32";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_INT64) {
+    return "TYPE_INT64";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_FP16) {
+    return "TYPE_FP16";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_FP32) {
+    return "TYPE_FP32";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_FP64) {
+    return "TYPE_FP64";
+  } else if (dtype == TRTISTF_DataType::TRTISTF_TYPE_STRING) {
+    return "TYPE_STRING";
+  }
+  return "TYPE_INVALID";
+}
+
 TRTISTF_DataType
 ConvertDataType(TRITONSERVER_DataType dtype)
 {

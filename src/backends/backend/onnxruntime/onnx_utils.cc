@@ -349,6 +349,41 @@ ModelConfigDataTypeToOnnxDataType(const std::string& data_type_str)
   return ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
 }
 
+std::string
+OnnxDataTypeToModelConfigDataType(ONNXTensorElementDataType data_type)
+{
+  if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
+    return "TYPE_INVALID";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL) {
+    return "TYPE_BOOL";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8) {
+    return "TYPE_UINT8";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16) {
+    return "TYPE_UINT16";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32) {
+    return "TYPE_UINT32";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64) {
+    return "TYPE_UINT64";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8) {
+    return "TYPE_INT8";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16) {
+    return "TYPE_INT16";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32) {
+    return "TYPE_INT32";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
+    return "TYPE_INT64";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16) {
+    return "TYPE_FP16";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+    return "TYPE_FP32";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE) {
+    return "TYPE_FP64";
+  } else if (data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING) {
+    return "TYPE_STRING";
+  }
+  return "TYPE_INVALID";
+}
+
 TRITONSERVER_Error*
 InputNames(OrtSession* session, std::set<std::string>& names)
 {

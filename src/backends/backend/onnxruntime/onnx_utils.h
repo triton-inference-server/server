@@ -140,6 +140,9 @@ ONNXTensorElementDataType ConvertToOnnxDataType(
 ONNXTensorElementDataType ModelConfigDataTypeToOnnxDataType(
     const std::string& data_type_str);
 
+std::string OnnxDataTypeToModelConfigDataType(
+    ONNXTensorElementDataType data_type);
+
 TRITONSERVER_Error* InputNames(
     OrtSession* session, std::set<std::string>& names);
 TRITONSERVER_Error* OutputNames(

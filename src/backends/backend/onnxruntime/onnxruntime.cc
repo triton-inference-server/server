@@ -459,9 +459,7 @@ ModelState::AutoCompleteIO(const char* key, const OnnxTensorInfoMap& io_infos)
     ni::TritonJson::Value io(ModelConfig(), ni::TritonJson::ValueType::OBJECT);
     RETURN_IF_ERROR(io.AddString("name", io_info.first));
     RETURN_IF_ERROR(io.AddString(
-        "data_type", std::string("TYPE_") +
-                         TRITONSERVER_DataTypeString(
-                             ConvertFromOnnxDataType(io_info.second.type_))));
+        "data_type", OnnxDataTypeToModelConfigDataType(io_info.second.type_)));
 
     // The model signature supports batching then the first dimension
     // is -1 and should not appear in the model configuration 'dims'
