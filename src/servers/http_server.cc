@@ -982,6 +982,13 @@ class HTTPAPIServer : public HTTPServerImpl {
       evbuffer* evbuffer_;
     };
 
+    ~AllocPayload()
+    {
+      for (auto it : output_map_) {
+        delete it.second;
+      }
+    }
+
     AllocPayload() : default_output_kind_(OutputInfo::Kind::JSON){};
     std::unordered_map<std::string, OutputInfo*> output_map_;
     AllocPayload::OutputInfo::Kind default_output_kind_;
