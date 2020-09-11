@@ -45,7 +45,7 @@ namespace nvidia { namespace inferenceserver {
 class AsyncWorkQueue {
  public:
   // Start 'worker_count' number of worker threads.
-  static void Initialize(size_t worker_count);
+  static Status Initialize(size_t worker_count);
 
   // Get the number of worker threads.
   static size_t WorkerCount();

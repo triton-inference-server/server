@@ -36,6 +36,7 @@
 #include <utility>
 #include <vector>
 
+#include "src/core/async_work_queue.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
@@ -97,6 +98,7 @@ InferenceServer::InferenceServer()
   strict_readiness_ = true;
   exit_timeout_secs_ = 30;
   pinned_memory_pool_size_ = 1 << 28;
+  buffer_manager_thread_count_ = 0;
 #ifdef TRITON_ENABLE_GPU
   min_supported_compute_capability_ = TRITON_MIN_COMPUTE_CAPABILITY;
 #else
@@ -134,7 +136,13 @@ InferenceServer::Init()
         Status::Code::INVALID_ARG, "--model-repository must be specified");
   }
 
-  AsyncWorkQueue::Initialize(buffer_manager_thread_count_);
+  // Always initialize async work queue for now
+  status = AsyncWorkQueue::Initialize(
+      std::max((uint32_t)1, buffer_manager_thread_count_));
+  if (!status.IsOk()) {
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return status;
+  }
 
   PinnedMemoryManager::Options options(pinned_memory_pool_size_);
   status = PinnedMemoryManager::Create(options);

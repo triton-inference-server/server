@@ -864,6 +864,29 @@ BackendInputCollector::SetAccumulatedElementCount(
 bool
 BackendInputCollector::Finalize()
 {
+  // Sync previous async tasks if any.
+  for (size_t i = 0; i < async_task_count_; i++) {
+    auto completed_item = completion_queue_.Get();
+    auto completed_status = std::get<0>(completed_item);
+    need_sync_ |= std::get<1>(completed_item);
+
+    // If something goes wrong with the copy all the pending
+    // responses fail...
+    if (!completed_status.IsOk()) {
+      auto response = reinterpret_cast<std::unique_ptr<InferenceResponse>*>(
+          std::get<2>(completed_item));
+
+      if (*response != nullptr) {
+        LOG_STATUS_ERROR(
+            InferenceResponse::SendWithStatus(
+                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                completed_status),
+            "error setting TensorFlow input tensor");
+      }
+    }
+  }
+  async_task_count_ = 0;
+
 #ifdef TRITON_ENABLE_GPU
   if ((!deferred_pinned_.empty()) && need_sync_) {
     if (event_ != nullptr) {
@@ -875,10 +898,9 @@ BackendInputCollector::Finalize()
   }
 #endif  // TRITON_ENABLE_GPU
 
+
   // After the above sync all the GPU->pinned copies are complete. Any
   // deferred copies of pinned->CPU can now be done.
-  SyncQueue<std::tuple<Status, bool, void*>> completion_queue;
-  size_t async_task_count = 0;
   for (auto& def : deferred_pinned_) {
     auto pinned_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
     int64_t pinned_memory_id = 0;
@@ -892,8 +914,8 @@ BackendInputCollector::Finalize()
           pinned_memory_id, def.tensor_memory_type_, def.tensor_memory_id_,
           def.pinned_memory_->TotalByteSize(), pinned_buffer,
           def.tensor_buffer_ + def.tensor_buffer_offset_, stream_,
-          reinterpret_cast<void*>(&def.requests_), &completion_queue)));
-      async_task_count++;
+          reinterpret_cast<void*>(&def.requests_), &completion_queue_)));
+      async_task_count_++;
     } else {
       bool cuda_used = false;
       Status status = CopyBuffer(
@@ -920,8 +942,8 @@ BackendInputCollector::Finalize()
     }
   }
 
-  for (size_t i = 0; i < async_task_count; i++) {
-    auto completed_item = completion_queue.Get();
+  for (size_t i = 0; i < async_task_count_; i++) {
+    auto completed_item = completion_queue_.Get();
     auto completed_status = std::get<0>(completed_item);
     need_sync_ |= std::get<1>(completed_item);
 
@@ -982,11 +1004,8 @@ BackendInputCollector::SetFixedSizeInputTensor(
     return cuda_copy;
   }
 
-  SyncQueue<std::tuple<Status, bool, void*>> completion_queue;
-
   // Request input tensor data may be in multiple non-contiguous
   // buffers.
-  std::vector<size_t> async_task_ids;
   size_t input_offset = 0;
   for (size_t idx = 0; idx < request_input->DataBufferCount(); ++idx) {
     const void* src_buffer;
@@ -1024,21 +1043,36 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 
     // Direct copy without intermediate pinned memory.
-    bool cuda_used = false;
-    status = CopyBuffer(
-        request_input->Name(), src_memory_type, src_memory_type_id,
-        tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
-        tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-        &cuda_used);
-    cuda_copy |= cuda_used;
+    //
+    // Only use parallel CopyBuffer for CPU-CPU copy when worker count > 1,
+    // it is the caller's responsibility to sync the tasks and handle error
+    // properly.
+    if (use_async_cpu_copy_ && (src_memory_type != TRITONSERVER_MEMORY_GPU) &&
+        (tensor_memory_type != TRITONSERVER_MEMORY_GPU)) {
+      AsyncWorkQueue::AddTask(std::move(std::bind(
+          CopyBufferHandler, "async CPU-CPU copy", src_memory_type,
+          src_memory_type_id, tensor_memory_type, tensor_memory_type_id,
+          src_byte_size, src_buffer,
+          tensor_buffer + tensor_buffer_offset + input_offset, stream_,
+          reinterpret_cast<void*>(response), &completion_queue_)));
+      async_task_count_++;
+    } else {
+      bool cuda_used = false;
+      status = CopyBuffer(
+          request_input->Name(), src_memory_type, src_memory_type_id,
+          tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
+          tensor_buffer + tensor_buffer_offset + input_offset, stream_,
+          &cuda_used);
+      cuda_copy |= cuda_used;
 
-    if (!status.IsOk()) {
-      LOG_STATUS_ERROR(
-          InferenceResponse::SendWithStatus(
-              std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-              status),
-          "error setting TensorFlow input tensor");
-      return cuda_copy;
+      if (!status.IsOk()) {
+        LOG_STATUS_ERROR(
+            InferenceResponse::SendWithStatus(
+                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                status),
+            "error setting TensorFlow input tensor");
+        return cuda_copy;
+      }
     }
 
     input_offset += src_byte_size;
@@ -1101,6 +1135,32 @@ BackendInputCollector::FlushPendingPinned(
     }
 
     cuda_copy |= cuda_used;
+
+    // Sync previous async tasks if any. This sync is require because the below
+    // CPU-PINNED to GPU copy.
+    // FIXME: Can the CPU-PINNED to GPU copy be deferred to Finalize() and
+    // remove this sync?
+    for (size_t i = 0; i < async_task_count_; i++) {
+      auto completed_item = completion_queue_.Get();
+      auto completed_status = std::get<0>(completed_item);
+      cuda_copy |= std::get<1>(completed_item);
+
+      // If something goes wrong with the copy all the pending
+      // responses fail...
+      if (!completed_status.IsOk()) {
+        auto response = reinterpret_cast<std::unique_ptr<InferenceResponse>*>(
+            std::get<2>(completed_item));
+
+        if (*response != nullptr) {
+          LOG_STATUS_ERROR(
+              InferenceResponse::SendWithStatus(
+                  std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                  completed_status),
+              "error setting TensorFlow input tensor");
+        }
+      }
+    }
+    async_task_count_ = 0;
 
     // If the copy was not async (i.e. if request input was in CPU so
     // a CPU->CPU-PINNED copy was performed above), then the pinned

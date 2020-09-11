@@ -228,7 +228,7 @@ class BackendInputCollector {
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
         use_async_cpu_copy_(AsyncWorkQueue::WorkerCount() > 1), stream_(stream),
-        event_(event), pending_pinned_byte_size_(0)
+        event_(event), pending_pinned_byte_size_(0), async_task_count_(0)
   {
   }
 
@@ -324,6 +324,9 @@ class BackendInputCollector {
   };
 
   std::list<DeferredPinned> deferred_pinned_;
+  // FIXME use future to maintain an issue-order queue to drop task count
+  SyncQueue<std::tuple<Status, bool, void*>> completion_queue_;
+  size_t async_task_count_;
 };
 
 }}  // namespace nvidia::inferenceserver

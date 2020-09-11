@@ -265,8 +265,8 @@ class TritonServerOptions {
   bool metrics_;
   bool gpu_metrics_;
   unsigned int exit_timeout_;
-  unsigned int buffer_manager_thread_count_;
   uint64_t pinned_memory_pool_size_;
+  unsigned int buffer_manager_thread_count_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_compute_capability_;
   std::string backend_dir_;
@@ -281,7 +281,7 @@ TritonServerOptions::TritonServerOptions()
       model_control_mode_(ni::ModelControlMode::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
       metrics_(true), gpu_metrics_(true), exit_timeout_(30),
-      pinned_memory_pool_size_(1 << 28),
+      pinned_memory_pool_size_(1 << 28), buffer_manager_thread_count_(0),
 #ifdef TRITON_ENABLE_GPU
       min_compute_capability_(TRITON_MIN_COMPUTE_CAPABILITY),
 #else

@@ -1107,7 +1107,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetBufferManagerThreadCount(
           loptions, std::max(0, buffer_manager_thread_count)),
-      "setting exit timeout");
+      "setting buffer manager thread count");
 
 #ifdef TRITON_ENABLE_LOGGING
   FAIL_IF_ERR(

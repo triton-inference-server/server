@@ -36,8 +36,10 @@ namespace nvidia { namespace inferenceserver {
 
 AsyncWorkQueue::~AsyncWorkQueue()
 {
-  for (const auto& worker_thread : worker_threads_) {
+  for (size_t cnt = 0; cnt < worker_threads_.size(); cnt++) {
     GetSingleton()->task_queue_.Put(nullptr);
+  }
+  for (const auto& worker_thread : worker_threads_) {
     worker_thread->join();
   }
 }
@@ -49,13 +51,19 @@ AsyncWorkQueue::GetSingleton()
   return &singleton;
 }
 
-void
+Status
 AsyncWorkQueue::Initialize(size_t worker_count)
 {
-  for (size_t id = 0; id < worker_count; id++) {
+  if (worker_count < 1) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "Async work queue must be initialized with positive 'worker_count'");
+  }
+  for (size_t cnt = 0; cnt < worker_count; cnt++) {
     GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
         new std::thread([] { InitializeThread(); })));
   }
+  return Status::Success;
 }
 
 size_t
@@ -75,9 +83,11 @@ AsyncWorkQueue::InitializeThread()
 {
   while (true) {
     auto task = GetSingleton()->task_queue_.Get();
-    if (task == nullptr)
+    if (task != nullptr) {
+      task();
+    } else {
       break;
-    task();
+    }
   }
 }
 
