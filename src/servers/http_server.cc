@@ -982,9 +982,9 @@ class HTTPAPIServer : public HTTPServerImpl {
       evbuffer* evbuffer_;
     };
 
-    ~AllocPayload() 
+    ~AllocPayload()
     {
-      for(auto it: output_map_) {
+      for (auto it : output_map_) {
         delete it.second;
       }
     }
