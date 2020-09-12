@@ -70,9 +70,6 @@ target_link_libraries(
     triton-common-json        # from repo-common
 )
 
-if(${TRITON_ENABLE_TENSORFLOW})
-  add_subdirectory(tensorflow src/backends/backend/tensorflow)
-endif() # TRITON_ENABLE_TENSORFLOW
 if(${TRITON_ENABLE_PYTHON})
   add_subdirectory(python src/backends/backend/python)
 endif() # TRITON_ENABLE_PYTHON

@@ -383,6 +383,32 @@ RUN for BE in identity repeat square onnxruntime; do \
                  mkdir -p /opt/tritonserver/backends/${BE} && \
                  cp -r install/lib/libtriton_${BE}.so /opt/tritonserver/backends/${BE}); \
     done
+RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+    (cd /tmp/triton_backends && \
+         git clone --single-branch --depth=1 -b ${BACKEND_TAG} \
+             https://github.com/triton-inference-server/tensorflow_backend.git) && \
+    (cd /tmp/triton_backends/tensorflow_backend && \
+         mkdir build && cd build && \
+         cmake -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_TENSORFLOW_VERSION="1" .. \
+               -DTRITON_TENSORFLOW_LIB_PATHS="/opt/tritonserver/backends/tensorflow1" .. && \
+         make -j16 install && \
+         mkdir -p /opt/tritonserver/backends/tensorflow1 && \
+         cp -r install/lib/libtriton_tensorflow1.so /opt/tritonserver/backends/tensorflow1)
+RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+    (cd /tmp/triton_backends && \
+         git clone --single-branch --depth=1 -b ${BACKEND_TAG} \
+             https://github.com/triton-inference-server/tensorflow_backend.git) && \
+    (cd /tmp/triton_backends/tensorflow_backend && \
+         mkdir build && cd build && \
+         cmake -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_TENSORFLOW_VERSION="2" .. \
+               -DTRITON_TENSORFLOW_LIB_PATHS="/opt/tritonserver/backends/tensorflow2" .. && \
+         make -j16 install && \
+         mkdir -p /opt/tritonserver/backends/tensorflow2 && \
+         cp -r install/lib/libtriton_tensorflow2.so /opt/tritonserver/backends/tensorflow2)
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
