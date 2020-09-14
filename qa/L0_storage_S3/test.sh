@@ -61,7 +61,7 @@ BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_TIMEOUT=360
+SERVER_TIMEOUT=420
 
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
@@ -251,7 +251,7 @@ fi
 
 # copy contents of /models into S3 bucket and wait for them to be loaded.
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
-sleep 120
+sleep 200
 
 set +e
 
