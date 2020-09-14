@@ -948,14 +948,17 @@ PlanBackend::Context::InitializeExecuteInputBinding(
             false /* compare_exact */, padding_info_[binding_index]));
       } else {
         // For ragged input, the input will be concatenated and flatten, so
-        // expecting engine dims to be [-1]
-        if ((engine_dims.nbDims != 1) || (engine_dims.d[0] != -1)) {
+        // expecting engine dims to be one dimensional.
+        if ((engine_dims.nbDims != 1) ||
+            (engine_dims.d[0] != model_config_dims[0])) {
           return Status(
               Status::Code::INVALID_ARG,
               "model '" + name_ + "', tensor '" + input_name +
                   "': for the model to support ragged input, the engine shape"
-                  " should be [-1], got :" +
-                  DimsDebugString(engine_dims));
+                  " is: " +
+                  DimsDebugString(engine_dims) +
+                  " while the model config shape is: " +
+                  DimsListToString(model_config_dims));
         }
       }
     } else {
@@ -1110,7 +1113,7 @@ PlanBackend::Context::InitializeBatchInputBindings(
     for (const auto& tensor_name : batch_input.target_name()) {
       inference::DataType tensor_datatype = batch_input.data_type();
       DimsList dims;
-      if (max_batch_size_ == NO_BATCHING) {
+      if ((max_batch_size_ == NO_BATCHING) || (max_batch_size_ == 1)) {
         // If the model doesn't support batching, the range of some batch input
         // kind is convergent to a fixed value, need to specify the fixed value
         // in such case.
