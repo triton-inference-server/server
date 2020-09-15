@@ -78,7 +78,7 @@ GetEntrypoint(
 //
 Status
 TritonBackend::Create(
-    const std::string& name, const std::string& path,
+    const std::string& name, const std::string& dir, const std::string& libpath,
     const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
@@ -99,7 +99,7 @@ TritonBackend::Create(
   TritonServerMessage backend_config(backend_config_json);
 
   auto local_backend = std::shared_ptr<TritonBackend>(
-      new TritonBackend(name, path, backend_config));
+      new TritonBackend(name, dir, libpath, backend_config));
 
   // Load the library and initialize all the entrypoints
   RETURN_IF_ERROR(local_backend->LoadBackendLibrary());
@@ -116,9 +116,10 @@ TritonBackend::Create(
 }
 
 TritonBackend::TritonBackend(
-    const std::string& name, const std::string& path,
+    const std::string& name, const std::string& dir, const std::string& libpath,
     const TritonServerMessage& backend_config)
-    : name_(name), path_(path), backend_config_(backend_config),
+    : name_(name), dir_(dir), libpath_(libpath),
+      backend_config_(backend_config),
       exec_policy_(TRITONBACKEND_EXECUTION_BLOCKING), state_(nullptr)
 {
   ClearHandles();
@@ -155,7 +156,7 @@ TritonBackend::ClearHandles()
 Status
 TritonBackend::LoadBackendLibrary()
 {
-  void* handle = dlopen(path_.c_str(), RTLD_LAZY);
+  void* handle = dlopen(libpath_.c_str(), RTLD_LAZY);
   if (handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
@@ -286,6 +287,17 @@ TRITONBACKEND_BackendSetExecutionPolicy(
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_BackendArtifacts(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_ArtifactType* artifact_type,
+    const char** location)
+{
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  *artifact_type = TRITONBACKEND_ARTIFACT_FILESYSTEM;
+  *location = tb->Directory().c_str();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_BackendMemoryManager(
     TRITONBACKEND_Backend* backend, TRITONBACKEND_MemoryManager** manager)
 {
@@ -317,7 +329,7 @@ TRITONBACKEND_BackendSetState(TRITONBACKEND_Backend* backend, void* state)
 //
 Status
 TritonBackendManager::CreateBackend(
-    const std::string& name, const std::string& path,
+    const std::string& name, const std::string& dir, const std::string& libpath,
     const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
@@ -325,7 +337,7 @@ TritonBackendManager::CreateBackend(
 
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
-  const auto& itr = singleton_manager.backend_map_.find(path);
+  const auto& itr = singleton_manager.backend_map_.find(libpath);
   if (itr != singleton_manager.backend_map_.end()) {
     // Found in map. If the weak_ptr is still valid that means that
     // there are other models using the backend and we just reuse that
@@ -340,9 +352,9 @@ TritonBackendManager::CreateBackend(
     singleton_manager.backend_map_.erase(itr);
   }
 
-  RETURN_IF_ERROR(
-      TritonBackend::Create(name, path, backend_cmdline_config, backend));
-  singleton_manager.backend_map_.insert({path, *backend});
+  RETURN_IF_ERROR(TritonBackend::Create(
+      name, dir, libpath, backend_cmdline_config, backend));
+  singleton_manager.backend_map_.insert({libpath, *backend});
 
   return Status::Success;
 }
