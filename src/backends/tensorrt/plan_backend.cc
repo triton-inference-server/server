@@ -427,6 +427,22 @@ PlanBackend::Context::InitOptimizationProfiles(
                   std::to_string(engine_->getNbOptimizationProfiles() - 1));
         }
       }
+      // Store the profile dimensions and set binding dimensions to max dims for
+    // later initializing the input bindings
+    for (int io_index = 0; io_index < num_expected_bindings_; io_index++) {
+      const auto binding_index = profile_index * num_expected_bindings_ + io_index;
+      if (engine_->bindingIsInput(binding_index)) {
+        RETURN_IF_ERROR(GetProfileDimensions(io_index, profile_index, &res.first->second));
+        if (!res.first->second.context_->setBindingDimensions(
+            binding_index, res.first->second.max_dims_[io_index])) {
+          return Status(
+              Status::Code::INTERNAL,
+              "trt failed to set binding dimension to " +
+                  DimsDebugString(res.first->second.max_dims_[io_index]) + " for input '" +
+                  engine_->getBindingName(binding_index) + "' for " + name_);
+        }
+      }
+    }
     }
 
     // profile 0 is not specified
@@ -792,8 +808,6 @@ PlanBackend::Context::InitializeShapeInputBinding(
     RETURN_IF_ERROR(CompareShapeDimsSupported(
         name_, input_name, engine_dims, model_config_dims, support_batching_));
 
-    RETURN_IF_ERROR(GetProfileDimensions(io_index, profile_index, &context));
-
     if (!context.context_->setBindingDimensions(
             binding_index, context.max_dims_[io_index])) {
       return Status(
@@ -957,10 +971,6 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     }
 
     int64_t byte_size = 0;
-
-    if (UseTensorRTv2API(engine_)) {
-      RETURN_IF_ERROR(GetProfileDimensions(io_index, profile_index, &context));
-    }
 
     if (UseTensorRTv2API(engine_)) {
       std::vector<int64_t> maximum_dims;
