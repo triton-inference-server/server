@@ -24,7 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "triton/common/tritonserver.h"
+#include "triton/core/tritonserver.h"
+
 #include <string>
 #include <vector>
 #include "src/core/backend.h"

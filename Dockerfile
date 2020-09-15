@@ -375,6 +375,9 @@ RUN for BE in identity repeat square onnxruntime; do \
                  mkdir build && cd build && \
                  cmake -DCMAKE_BUILD_TYPE=Release \
                        -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+                       -DTRITON_COMMON_REPO_TAG=${BACKEND_TAG} \
+                       -DTRITON_CORE_REPO_TAG=${BACKEND_TAG} \
+                       -DTRITON_BACKEND_REPO_TAG=${BACKEND_TAG} \
                        -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON \
                        -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON \
                        -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
@@ -391,6 +394,9 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          mkdir build && cd build && \
          cmake -DCMAKE_BUILD_TYPE=Release \
                -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_COMMON_REPO_TAG=${BACKEND_TAG} \
+               -DTRITON_CORE_REPO_TAG=${BACKEND_TAG} \
+               -DTRITON_BACKEND_REPO_TAG=${BACKEND_TAG} \
                -DTRITON_TENSORFLOW_VERSION="1" .. \
                -DTRITON_TENSORFLOW_LIB_PATHS="/opt/tritonserver/backends/tensorflow1" .. && \
          make -j16 install && \
@@ -404,6 +410,9 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          mkdir build && cd build && \
          cmake -DCMAKE_BUILD_TYPE=Release \
                -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_COMMON_REPO_TAG=${BACKEND_TAG} \
+               -DTRITON_CORE_REPO_TAG=${BACKEND_TAG} \
+               -DTRITON_BACKEND_REPO_TAG=${BACKEND_TAG} \
                -DTRITON_TENSORFLOW_VERSION="2" .. \
                -DTRITON_TENSORFLOW_LIB_PATHS="/opt/tritonserver/backends/tensorflow2" .. && \
          make -j16 install && \

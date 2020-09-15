@@ -33,7 +33,7 @@ Library API
 The Triton Inference Server provides a backwards-compatible C API that
 allows Triton to be linked directly into a C/C++ application. The API
 is documented in `tritonserver.h
-<https://github.com/triton-inference-server/common/blob/main/include/triton/common/tritonserver.h>`_.
+<https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h>`_.
 
 A simple example of the library API can be found at
 `src/servers/simple.cc

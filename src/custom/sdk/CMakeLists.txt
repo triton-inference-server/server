@@ -42,7 +42,7 @@ add_library(
 )
 target_link_libraries(
   custombackendparts
-  PRIVATE triton-common-serverapi        # from repo-common
+  PRIVATE triton-core-serverapi        # from repo-core
 )
 
 add_custom_command(
