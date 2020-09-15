@@ -31,7 +31,7 @@
 #include <mutex>
 #include "src/core/constants.h"
 #include "src/core/status.h"
-#include "triton/common/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 

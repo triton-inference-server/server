@@ -65,9 +65,9 @@ endif() # TRITON_ENABLE_METRICS
 target_link_libraries(
   triton-backend-library
   PUBLIC
-    triton-common-backendapi  # from repo-common
-    triton-common-serverapi   # from repo-common
-    triton-common-json        # from repo-common
+    triton-core-backendapi  # from repo-core
+    triton-core-serverapi   # from repo-core
+    triton-common-json      # from repo-common
 )
 
 if(${TRITON_ENABLE_PYTHON})

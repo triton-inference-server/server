@@ -60,8 +60,8 @@ if(${TRITON_ENABLE_GRPC})
   target_link_libraries(
     grpc-endpoint-library
     PUBLIC
-      triton-common-serverapi   # from repo-common
-      triton-common-json        # from repo-common
+      triton-core-serverapi   # from repo-core
+      triton-common-json      # from repo-common
   )
 
   set(
@@ -123,8 +123,8 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
   target_link_libraries(
     http-endpoint-library
     PUBLIC
-      triton-common-serverapi   # from repo-common
-      triton-common-json        # from repo-common
+      triton-core-serverapi   # from repo-core
+      triton-common-json      # from repo-common
   )
 
   set(
@@ -172,7 +172,7 @@ if(${TRITON_ENABLE_TRACING})
   endif() # TRITON_ENABLE_GPU
   target_link_libraries(
     tracing-library
-    PRIVATE triton-common-serverapi
+    PRIVATE triton-core-serverapi
   )
 
   set(
@@ -229,7 +229,8 @@ target_link_libraries(
   PRIVATE rt
   ${TRACING_LIBRARIES}
   PRIVATE protobuf::libprotobuf
-  PRIVATE triton-common-serverapi
+  PRIVATE triton-common-json
+  PRIVATE triton-core-serverapi
   PRIVATE tritonserver
 )
 if(${TRITON_ENABLE_GPU})
@@ -272,7 +273,7 @@ set_target_properties(
 )
 target_link_libraries(
   simple
-  PRIVATE triton-common-serverapi   # from repo-common
+  PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
   )
@@ -324,7 +325,7 @@ target_link_libraries(
   PUBLIC -L/usr/local/cuda/lib64/stubs
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
-  PRIVATE triton-common-serverapi   # from repo-common
+  PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
@@ -389,8 +390,8 @@ set_target_properties(
 target_link_libraries(
   tritonserver
   PRIVATE -ldl
-  PRIVATE triton-common-backendapi
-  PRIVATE triton-common-serverapi
+  PRIVATE triton-core-backendapi
+  PRIVATE triton-core-serverapi
   PRIVATE triton-common-json
   PRIVATE ${TRITON_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf

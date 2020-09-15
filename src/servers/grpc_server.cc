@@ -49,7 +49,7 @@
 #include "src/core/model_config.h"
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
-#include "triton/common/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \

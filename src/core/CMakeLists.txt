@@ -96,7 +96,7 @@ add_dependencies(model-config-library proto-library)
 target_link_libraries(
   model-config-library
   PUBLIC
-    triton-common-serverapi   # from repo-common
+    triton-core-serverapi   # from repo-core
 )
 
 if(${TRITON_ENABLE_GPU})
@@ -238,7 +238,7 @@ endif() # TRITON_ENABLE_S3
 target_link_libraries(
   server-library
   PUBLIC
-    triton-common-backendapi  # from repo-common
-    triton-common-serverapi   # from repo-common
-    triton-common-json        # from repo-common
+    triton-core-backendapi  # from repo-core
+    triton-core-serverapi   # from repo-core
+    triton-common-json      # from repo-common
 )

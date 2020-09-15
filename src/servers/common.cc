@@ -26,7 +26,7 @@
 
 #include "src/servers/common.h"
 
-#include "triton/common/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 

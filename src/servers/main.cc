@@ -46,7 +46,7 @@
 #include "src/servers/common.h"
 #include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
-#include "triton/common/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "src/servers/http_server.h"

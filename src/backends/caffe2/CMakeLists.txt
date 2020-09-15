@@ -68,5 +68,5 @@ endif() # TRITON_ENABLE_METRICS
 
 target_link_libraries(
   caffe2-backend-library
-  PUBLIC triton-common-serverapi   # from repo-common
+  PUBLIC triton-core-serverapi   # from repo-core
 )

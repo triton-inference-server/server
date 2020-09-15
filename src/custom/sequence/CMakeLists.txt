@@ -46,7 +46,7 @@ set_target_properties(
 target_link_libraries(
   sequence
   PRIVATE custombackend
-  PRIVATE triton-common-serverapi        # from repo-common
+  PRIVATE triton-core-serverapi        # from repo-core
 )
 
 install(
