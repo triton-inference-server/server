@@ -2110,8 +2110,16 @@ HTTPAPIServer::EVBufferToInput(
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         } else {
           // JSON... presence of "data" already validated but still
-          // checking here. Flow in this endpoint needs to be
-          // reworked...
+          // checking here. First check if Null then fetch array contents.
+          // Flow in this endpoint needs to be reworked...
+          bool is_null;
+          RETURN_MSG_IF_ERR(
+              request_input.IsMemberNull("data", &is_null),
+              "Unable to parse 'data'");
+          if (is_null) {
+            return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "Unable to parse 'data': cannot be null value");
+          }
+
           triton::common::TritonJson::Value tensor_data;
           RETURN_MSG_IF_ERR(
               request_input.MemberAsArray("data", &tensor_data),
