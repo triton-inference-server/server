@@ -54,12 +54,14 @@ class TritonBackend {
       const uint32_t request_cnt);
 
   static Status Create(
-      const std::string& name, const std::string& path,
+      const std::string& name, const std::string& dir,
+      const std::string& libpath,
       const BackendCmdlineConfig& backend_cmdline_config,
       std::shared_ptr<TritonBackend>* backend);
   ~TritonBackend();
 
   const std::string& Name() const { return name_; }
+  const std::string& Directory() const { return dir_; }
   const TritonServerMessage& BackendConfig() const { return backend_config_; }
 
   TRITONBACKEND_ExecutionPolicy ExecutionPolicy() const { return exec_policy_; }
@@ -93,8 +95,8 @@ class TritonBackend {
       TRITONBACKEND_Backend* backend);
 
   TritonBackend(
-      const std::string& name, const std::string& path,
-      const TritonServerMessage& backend_config);
+      const std::string& name, const std::string& dir,
+      const std::string& libpath, const TritonServerMessage& backend_config);
 
   void ClearHandles();
   Status LoadBackendLibrary();
@@ -103,8 +105,12 @@ class TritonBackend {
   // The name of the backend.
   const std::string name_;
 
+  // Full path to the directory holding backend shared library and
+  // other artifacts.
+  const std::string dir_;
+
   // Full path to the backend shared library.
-  const std::string path_;
+  const std::string libpath_;
 
   // Backend configuration as JSON
   TritonServerMessage backend_config_;
@@ -132,7 +138,8 @@ class TritonBackend {
 class TritonBackendManager {
  public:
   static Status CreateBackend(
-      const std::string& name, const std::string& path,
+      const std::string& name, const std::string& dir,
+      const std::string& libpath,
       const BackendCmdlineConfig& backend_cmdline_config,
       std::shared_ptr<TritonBackend>* backend);
 
