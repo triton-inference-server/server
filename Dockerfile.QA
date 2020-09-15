@@ -295,7 +295,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
     fi
 
 # go client requires golang and CI/QA for memcheck requires valgrind
-# wkhtmltox, xfonts-75dpi are dependencies of pdfkit
+# wkhtmltox, xfonts-75dpi, xfonts-base are dependencies of pdfkit
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               libopencv-dev \
@@ -310,7 +310,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               nginx \
                               protobuf-compiler \
                               valgrind \
-                              xfonts-75dpi && \
+                              xfonts-75dpi \
+                              xfonts-base && \
     rm -rf /var/lib/apt/lists/* && \
     wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \
     dpkg -i wkhtmltox_0.12.6-1.bionic_amd64.deb && \
