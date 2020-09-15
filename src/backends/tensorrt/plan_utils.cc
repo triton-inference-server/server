@@ -409,7 +409,7 @@ const std::string
 DimsDebugString(const nvinfer1::Dims& dims)
 {
   std::vector<int64_t> dims_vec;
-  DimsToDimVec(dims, {0, 0}, &dims_vec);
+  DimsToDimVec(dims, &dims_vec);
   return DimsListToString(dims_vec);
 }
 

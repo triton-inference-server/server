@@ -417,8 +417,8 @@ PlanBackend::Context::InitOptimizationProfiles(
           return Status(
               Status::Code::INTERNAL, "unable to create TensorRT context");
         }
-        if (!res.first->second.context_->setOptimizationProfileAsync(
-                profile_index, stream_)) {
+        if (!res.first->second.context_->setOptimizationProfile(
+                profile_index)) {
           return Status(
               Status::Code::INVALID_ARG,
               "Can not set the specified optimization profile " + profile_name +
@@ -917,15 +917,11 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         (engine_->getBindingFormat(binding_index) ==
          nvinfer1::TensorFormat::kLINEAR);
 
-    is_linear_format_[io_index] =
-          (engine_->getBindingFormat(binding_index) ==
-           nvinfer1::TensorFormat::kLINEAR);
-
     // Detect whether dynamic or not
+    nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
     if (ContainsWildcard(engine_dims)) {
       context.is_dynamic_per_binding_[io_index] = true;
     }
-
 
     if (!(is_control && context.is_dynamic_per_binding_[io_index])) {
       if (!is_ragged) {
@@ -998,16 +994,22 @@ PlanBackend::Context::InitializeExecuteInputBinding(
                 DimsDebugString(context.max_dims_[io_index]) + " for input '" +
                 input_name + "' for " + name_);
       }
+      if (!is_linear_format_[io_index]) {
+        // FIXME calculate this only once
+        size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+        // FIXME case where vectorized dim is first dimension
+        byte_size = element_size * context.context_->getStrides(io_index).d[0] * context.max_dims_[io_index].d[0];
+      }
     } else {
       byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
+      if (!is_linear_format_[io_index]) {
+        // FIXME calculate this only once
+        size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+        // FIXME case where vectorized dim is first dimension
+        byte_size = element_size * context.context_->getStrides(io_index).d[0] * model_config_dims[0];
+      }
     }
 
-    if (!is_linear_format_[io_index]) {
-      auto component_count =
-          GetElementCount(context.context_->getStrides(binding_index));
-      component_count *= engine_->getBindingComponentsPerElement(binding_index);
-      byte_size = component_count * engine_->getBindingBytesPerComponent(binding_index);
-    }
 
     if (byte_size == -1) {
       return Status(
@@ -1336,10 +1338,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       const DimsList& model_config_dims =
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
-      is_linear_format_[io_index] =
-          (engine_->getBindingFormat(binding_index) ==
-           nvinfer1::TensorFormat::kLINEAR);
-
+      nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
       // Skip 'batch_output' validation as it is not exact match to model dims
       if (!buffer_is_ragged_[io_index]) {
         RETURN_IF_ERROR(CompareDimsSupported(
@@ -2185,11 +2184,11 @@ PlanBackend::Context::Run(
           datatype = batch_input.data_type();
           total_byte_size = GetByteSize(datatype, ragged_shape);
         } else {
-          auto component_count =
-              GetElementCount(citr->second.context_->getStrides(io_index));
-          component_count *= engine_->getBindingComponentsPerElement(io_index);
-          total_byte_size = (size_t)(
-              component_count * engine_->getBindingBytesPerComponent(io_index));
+          // FIXME does ragged have format?
+          // FIXME calculate this only once
+          size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+          // FIXME case where vectorized dim is first dimension
+          total_byte_size = element_size * citr->second.context_->getStrides(io_index).d[0] * ragged_shape[0];
         }
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
@@ -2239,11 +2238,10 @@ PlanBackend::Context::Run(
         if (is_linear_format_[bindex]) {
           total_byte_size = GetByteSize(datatype, ragged_shape);
         } else {
-          auto component_count =
-              GetElementCount(citr->second.context_->getStrides(io_index));
-          component_count *= engine_->getBindingComponentsPerElement(io_index);
-          total_byte_size = (size_t)(
-              component_count * engine_->getBindingBytesPerComponent(io_index));
+          // FIXME calculate this only once
+          size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+          // FIXME case where vectorized dim is first dimension
+          total_byte_size = element_size * citr->second.context_->getStrides(io_index).d[0] * ragged_shape[0];
         }
 
         collector.ProcessTensor(
@@ -2286,11 +2284,10 @@ PlanBackend::Context::Run(
       if (is_linear_format_[bindex]) {
         total_byte_size = GetByteSize(datatype, batchn_shape);
       } else {
-        auto component_count =
-            GetElementCount(citr->second.context_->getStrides(io_index));
-        component_count *= engine_->getBindingComponentsPerElement(io_index);
-        total_byte_size = (size_t)(
-            component_count * engine_->getBindingBytesPerComponent(io_index));
+        // FIXME calculate this only once
+        size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+        // FIXME case where vectorized dim is first dimension
+        total_byte_size = element_size * citr->second.context_->getStrides(io_index).d[0] * batchn_shape[0];
       }
 
       if ((engine_->isShapeBinding(io_index)) && (support_batching_)) {
@@ -2901,7 +2898,6 @@ PlanBackend::Context::EvaluateTensorRTContext(
     int64_t* error_distance)
 {
   *error_distance = 0;
-  int binding_offset = citr->second.profile_idx_ * num_expected_bindings_;
   for (const auto& pr : requests[0]->ImmutableInputs()) {
     const auto input = pr.second;
     int io_index = engine_->getBindingIndex(input->Name().c_str());
