@@ -61,5 +61,5 @@ endif() # TRITON_ENABLE_METRICS
 
 target_link_libraries(
   custom-backend-library
-  PUBLIC triton-common-serverapi   # from repo-common
+  PUBLIC triton-core-serverapi   # from repo-core
 )

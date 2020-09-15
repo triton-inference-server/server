@@ -30,7 +30,7 @@
 #include <string>
 #include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
-#include "triton/common/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
