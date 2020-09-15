@@ -386,8 +386,8 @@ RUN for BE in identity repeat square; do \
                        -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
                        -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
                  make -j16 install && \
-                 mkdir -p /opt/tritonserver/backends/${BE} && \
-                 cp -r install/lib/libtriton_${BE}.so /opt/tritonserver/backends/${BE}); \
+                 mkdir -p /opt/tritonserver/backends && \
+                 cp -r install/backends/${BE} /opt/tritonserver/backends/.); \
     done
 
 ARG TRITON_ONNXRUNTIME_BACKEND_TAG=main
@@ -407,8 +407,8 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
                -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                -DTRITON_ONNXRUNTIME_LIB_PATHS="/opt/tritonserver/backends/onnxruntime" .. && \
          make -j16 install && \
-         mkdir -p /opt/tritonserver/backends/onnxruntime && \
-         cp -r install/lib/libtriton_onnxruntime.so /opt/tritonserver/backends/onnxruntime)
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/onnxruntime /opt/tritonserver/backends/.)
 
 ARG TRITON_TENSORFLOW1_BACKEND_TAG=main
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
@@ -425,8 +425,8 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
                -DTRITON_TENSORFLOW_VERSION="1" .. \
                -DTRITON_TENSORFLOW_LIB_PATHS="/opt/tritonserver/backends/tensorflow1" .. && \
          make -j16 install && \
-         mkdir -p /opt/tritonserver/backends/tensorflow1 && \
-         cp -r install/lib/libtriton_tensorflow1.so /opt/tritonserver/backends/tensorflow1)
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/tensorflow1 /opt/tritonserver/backends/.)
 
 ARG TRITON_TENSORFLOW2_BACKEND_TAG=main
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
@@ -443,8 +443,8 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
                -DTRITON_TENSORFLOW_VERSION="2" .. \
                -DTRITON_TENSORFLOW_LIB_PATHS="/opt/tritonserver/backends/tensorflow2" .. && \
          make -j16 install && \
-         mkdir -p /opt/tritonserver/backends/tensorflow2 && \
-         cp -r install/lib/libtriton_tensorflow2.so /opt/tritonserver/backends/tensorflow2)
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/tensorflow2 /opt/tritonserver/backends/.)
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
