@@ -75,11 +75,9 @@ Status MaximumDims(
     const bool support_batching, const int max_batch_size,
     std::vector<int64_t>* maximum_dims);
 
-void DimsToDimVec(
-    const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims);
+void DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims);
 
-bool DimVecToDims(
-    const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims);
+bool DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims);
 
 int64_t GetElementCount(const nvinfer1::Dims& dims);
 

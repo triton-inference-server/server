@@ -258,8 +258,7 @@ MaximumDims(
         return Status(
             Status::Code::INVALID_ARG,
             "can not maximize dimension " + DimsListToString(dims) + " to " +
-                DimsDebugString(max_profile_dims) +
-                " due to incompatibility.");
+                DimsDebugString(max_profile_dims) + " due to incompatibility.");
       }
     }
   }
@@ -350,8 +349,7 @@ ValidateShapeValues(
 }
 
 void
-DimsToDimVec(
-    const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims)
+DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims)
 {
   dims->clear();
   for (int i = 0; i < model_dims.nbDims; ++i) {
@@ -360,8 +358,7 @@ DimsToDimVec(
 }
 
 bool
-DimVecToDims(
-    const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims)
+DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims)
 {
   if (dim_vec.size() > dims->MAX_DIMS) {
     return false;

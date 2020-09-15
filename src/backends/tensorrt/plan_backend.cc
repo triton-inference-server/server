@@ -428,21 +428,24 @@ PlanBackend::Context::InitOptimizationProfiles(
         }
       }
       // Store the profile dimensions and set binding dimensions to max dims for
-    // later initializing the input bindings
-    for (int io_index = 0; io_index < num_expected_bindings_; io_index++) {
-      const auto binding_index = profile_index * num_expected_bindings_ + io_index;
-      if (engine_->bindingIsInput(binding_index)) {
-        RETURN_IF_ERROR(GetProfileDimensions(io_index, profile_index, &res.first->second));
-        if (!res.first->second.context_->setBindingDimensions(
-            binding_index, res.first->second.max_dims_[io_index])) {
-          return Status(
-              Status::Code::INTERNAL,
-              "trt failed to set binding dimension to " +
-                  DimsDebugString(res.first->second.max_dims_[io_index]) + " for input '" +
-                  engine_->getBindingName(binding_index) + "' for " + name_);
+      // later initializing the input bindings
+      for (int io_index = 0; io_index < num_expected_bindings_; io_index++) {
+        const auto binding_index =
+            profile_index * num_expected_bindings_ + io_index;
+        if (engine_->bindingIsInput(binding_index)) {
+          RETURN_IF_ERROR(GetProfileDimensions(
+              io_index, profile_index, &res.first->second));
+          if (!res.first->second.context_->setBindingDimensions(
+                  binding_index, res.first->second.max_dims_[io_index])) {
+            return Status(
+                Status::Code::INTERNAL,
+                "trt failed to set binding dimension to " +
+                    DimsDebugString(res.first->second.max_dims_[io_index]) +
+                    " for input '" + engine_->getBindingName(binding_index) +
+                    "' for " + name_);
+          }
         }
       }
-    }
     }
 
     // profile 0 is not specified
@@ -845,8 +848,10 @@ PlanBackend::Context::InitializeShapeInputBinding(
       } else {
         auto component_count =
             GetElementCount(context.context_->getStrides(binding_index));
-        component_count *= engine_->getBindingComponentsPerElement(binding_index);
-        byte_size = component_count * engine_->getBindingBytesPerComponent(binding_index);
+        component_count *=
+            engine_->getBindingComponentsPerElement(binding_index);
+        byte_size = component_count *
+                    engine_->getBindingBytesPerComponent(binding_index);
       }
       max_byte_size = std::max(max_byte_size, byte_size);
     }
@@ -990,8 +995,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
             max_batch_size_, &maximum_dims));
         byte_size = GetByteSize(dt, maximum_dims);
         // Update the maximum dimension with respect to the allocated buffer
-        DimVecToDims(
-            maximum_dims, &context.max_dims_[io_index]);
+        DimVecToDims(maximum_dims, &context.max_dims_[io_index]);
       } else {
         byte_size = GetDataTypeByteSize(dt) * context.max_dims_[io_index].d[0];
       }
@@ -1006,17 +1010,23 @@ PlanBackend::Context::InitializeExecuteInputBinding(
       }
       if (!is_linear_format_[io_index]) {
         // FIXME calculate this only once
-        size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+        size_t element_size =
+            engine_->getBindingComponentsPerElement(io_index) *
+            engine_->getBindingBytesPerComponent(io_index);
         // FIXME case where vectorized dim is first dimension
-        byte_size = element_size * context.context_->getStrides(io_index).d[0] * context.max_dims_[io_index].d[0];
+        byte_size = element_size * context.context_->getStrides(io_index).d[0] *
+                    context.max_dims_[io_index].d[0];
       }
     } else {
       byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
       if (!is_linear_format_[io_index]) {
         // FIXME calculate this only once
-        size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+        size_t element_size =
+            engine_->getBindingComponentsPerElement(io_index) *
+            engine_->getBindingBytesPerComponent(io_index);
         // FIXME case where vectorized dim is first dimension
-        byte_size = element_size * context.context_->getStrides(io_index).d[0] * model_config_dims[0];
+        byte_size = element_size * context.context_->getStrides(io_index).d[0] *
+                    model_config_dims[0];
       }
     }
 
@@ -1342,8 +1352,8 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       }
 
       is_linear_format_[io_index] =
-        (engine_->getBindingFormat(binding_index) ==
-         nvinfer1::TensorFormat::kLINEAR);
+          (engine_->getBindingFormat(binding_index) ==
+           nvinfer1::TensorFormat::kLINEAR);
 
       const DimsList& model_config_dims =
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
@@ -1353,7 +1363,8 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       if (!buffer_is_ragged_[io_index]) {
         RETURN_IF_ERROR(CompareDimsSupported(
             name_, io.name(), engine_dims, model_config_dims, support_batching_,
-            (!engine_->hasImplicitBatchDimension()), false /* compare_exact */));
+            (!engine_->hasImplicitBatchDimension()),
+            false /* compare_exact */));
       }
 
       int64_t byte_size;
@@ -2186,7 +2197,8 @@ PlanBackend::Context::Run(
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             SetBindingDimensions(
-                name, ragged_shape, citr->second, bindex, io_index, &input_dims),
+                name, ragged_shape, citr->second, bindex, io_index,
+                &input_dims),
             "error setting the binding dimension");
 
         size_t total_byte_size = 0;
@@ -2196,9 +2208,13 @@ PlanBackend::Context::Run(
         } else {
           // FIXME does ragged have format?
           // FIXME calculate this only once
-          size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+          size_t element_size =
+              engine_->getBindingComponentsPerElement(io_index) *
+              engine_->getBindingBytesPerComponent(io_index);
           // FIXME case where vectorized dim is first dimension
-          total_byte_size = element_size * citr->second.context_->getStrides(io_index).d[0] * ragged_shape[0];
+          total_byte_size = element_size *
+                            citr->second.context_->getStrides(io_index).d[0] *
+                            ragged_shape[0];
         }
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
@@ -2249,9 +2265,13 @@ PlanBackend::Context::Run(
           total_byte_size = GetByteSize(datatype, ragged_shape);
         } else {
           // FIXME calculate this only once
-          size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+          size_t element_size =
+              engine_->getBindingComponentsPerElement(io_index) *
+              engine_->getBindingBytesPerComponent(io_index);
           // FIXME case where vectorized dim is first dimension
-          total_byte_size = element_size * citr->second.context_->getStrides(io_index).d[0] * ragged_shape[0];
+          total_byte_size = element_size *
+                            citr->second.context_->getStrides(io_index).d[0] *
+                            ragged_shape[0];
         }
 
         collector.ProcessTensor(
@@ -2295,9 +2315,13 @@ PlanBackend::Context::Run(
         total_byte_size = GetByteSize(datatype, batchn_shape);
       } else {
         // FIXME calculate this only once
-        size_t element_size = engine_->getBindingComponentsPerElement(io_index) * engine_->getBindingBytesPerComponent(io_index);
+        size_t element_size =
+            engine_->getBindingComponentsPerElement(io_index) *
+            engine_->getBindingBytesPerComponent(io_index);
         // FIXME case where vectorized dim is first dimension
-        total_byte_size = element_size * citr->second.context_->getStrides(io_index).d[0] * batchn_shape[0];
+        total_byte_size = element_size *
+                          citr->second.context_->getStrides(io_index).d[0] *
+                          batchn_shape[0];
       }
 
       if ((engine_->isShapeBinding(io_index)) && (support_batching_)) {
