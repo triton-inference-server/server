@@ -312,7 +312,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               valgrind \
                               xfonts-75dpi && \
     rm -rf /var/lib/apt/lists/* && \
-    wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \    dpkg -i wkhtmltox_0.12.6-1.bionic_amd64.deb && \
+    wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \
+    dpkg -i wkhtmltox_0.12.6-1.bionic_amd64.deb && \
     rm -rf wkhtmltox_0.12.6-1.bionic_amd64.deb
 
 # CI/QA expects "python" executable (not python3).
