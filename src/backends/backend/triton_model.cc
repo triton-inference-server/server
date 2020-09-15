@@ -168,6 +168,7 @@ TritonModel::Create(
       }
     }
   }
+
   const std::string backend_libname = "libtriton_" + backend_name + ".so";
 
   // Get the path to the backend shared library. Search path is
@@ -178,12 +179,14 @@ TritonModel::Create(
   const std::vector<std::string> search_paths = {version_path, model_path,
                                                  global_path};
 
+  std::string backend_libdir;
   std::string backend_libpath;
   for (const auto& path : search_paths) {
     const auto full_path = JoinPath({path, backend_libname});
     bool exists = false;
     RETURN_IF_ERROR(FileExists(full_path, &exists));
     if (exists) {
+      backend_libdir = path;
       backend_libpath = full_path;
       break;
     }
@@ -209,7 +212,8 @@ TritonModel::Create(
 
   std::shared_ptr<TritonBackend> backend;
   RETURN_IF_ERROR(TritonBackendManager::CreateBackend(
-      model_config.backend(), backend_libpath, *config, &backend));
+      model_config.backend(), backend_libdir, backend_libpath, *config,
+      &backend));
 
   // Create and initialize the model.
   std::unique_ptr<TritonModel> local_model(new TritonModel(
@@ -419,7 +423,7 @@ TRITONBACKEND_ModelVersion(TRITONBACKEND_Model* model, uint64_t* version)
 
 TRITONSERVER_Error*
 TRITONBACKEND_ModelRepository(
-    TRITONBACKEND_Model* model, TRITONBACKEND_ModelArtifactType* artifact_type,
+    TRITONBACKEND_Model* model, TRITONBACKEND_ArtifactType* artifact_type,
     const char** location)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);

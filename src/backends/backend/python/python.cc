@@ -504,7 +504,7 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   BackendState* backend_state = reinterpret_cast<BackendState*>(bstate);
 
   const char* path = nullptr;
-  TRITONBACKEND_ModelArtifactType artifact_type;
+  TRITONBACKEND_ArtifactType artifact_type;
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelRepository(triton_model, &artifact_type, &path));
 
