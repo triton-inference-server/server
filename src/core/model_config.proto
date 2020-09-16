@@ -644,16 +644,18 @@ message ModelOptimizationPolicy
       map<string, Shape> input = 2;
 
       //@@      .. cpp:var:: LowerBound graph_lower_bound
-      //@@         Specify the lower bound of the CUDA graph. If specified,
-      //@@         the graph can be used for input shapes and batch sizes that
-      //@@         are in closed interval between the lower bound specification
-      //@@         and graph specification. For dynamic shape model, this allows
-      //@@         CUDA graphs to be launched frequently without capturing all
-      //@@         possible shape combinations. However, using graph for shape
-      //@@         combinations different from the one used for capturing
-      //@@         introduces uninitialized data for execution and it may
-      //@@         distort the inference result if the model is sensitive to
-      //@@         uninitialized data.
+      //@@
+      //@@         Specify the lower bound of the CUDA graph. Optional.
+      //@@         If specified, the graph can be used for input shapes and
+      //@@         batch sizes that are in closed interval between the lower
+      //@@         bound specification and graph specification. For dynamic
+      //@@         shape model, this allows CUDA graphs to be launched
+      //@@         frequently without capturing all possible shape combinations.
+      //@@         However, using graph for shape combinations different from
+      //@@         the one used for capturing introduces uninitialized data for
+      //@@         execution and it may distort the inference result if
+      //@@         the model is sensitive to uninitialized data.
+      //@@
       LowerBound graph_lower_bound = 3;
     }
 
