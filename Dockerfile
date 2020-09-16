@@ -365,7 +365,6 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             mkdir -p /opt/tritonserver/include && \
             cp -r server/install/bin /opt/tritonserver/. && \
             cp -r server/install/lib /opt/tritonserver/. && \
-            cp -r server/install/backends /opt/tritonserver/. && \
             cp -r server/install/include/triton /opt/tritonserver/include/.) && \
     (cd /opt/tritonserver && ln -sf /workspace/qa qa)
 
