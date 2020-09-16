@@ -36,13 +36,14 @@
 
 namespace nvidia { namespace inferenceserver {
 
-/// Validate that the ensembles are specified correctly. Assuming that the
-/// inputs and outputs specified in all model configurations are accurate.
-/// \param affected_ensembles A set of ensembles that needs to be validated.
-/// If the ensemble config is not valid, the node status will be updated.
-void ValidateEnsembleConfig(
+/// Validate that the ensemble are specified correctly. Assuming that the
+/// inputs and outputs specified in depending model configurations are accurate.
+/// \param model_repository_manager The model manager to acquire model config.
+/// \param ensemble The ensemble to be validated.
+/// \return The error status.
+Status ValidateEnsembleConfig(
     ModelRepositoryManager* model_repository_manager,
-    std::set<ModelRepositoryManager::DependencyNode*>* affected_ensembles);
+    ModelRepositoryManager::DependencyNode* ensemble);
 
 }}  // namespace nvidia::inferenceserver
 

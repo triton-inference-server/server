@@ -232,14 +232,12 @@ ValidateTensorMapping(
   return Status::Success;
 }
 
+}  // namespace
+
 Status
 ValidateEnsembleConfig(
     ModelRepositoryManager* model_repository_manager,
-    ModelRepositoryManager::DependencyNode* ensemble,
-    std::unordered_map<
-        std::string, std::pair<ModelRepositoryManager::DependencyNode*, bool>>*
-        ensembles,
-    std::deque<std::string>* ensemble_dependency)
+    ModelRepositoryManager::DependencyNode* ensemble)
 {
   const auto& ensemble_name = ensemble->model_name_;
   if (!ensemble->missing_upstreams_.empty()) {
@@ -306,43 +304,6 @@ ValidateEnsembleConfig(
               std::to_string(model_config.max_batch_size()));
     }
 
-    if (model_config.has_ensemble_scheduling()) {
-      bool found = false;
-      for (const auto& name : *ensemble_dependency) {
-        if (name == model_name) {
-          found = true;
-          break;
-        }
-      }
-      if (found) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            "circular dependency between ensembles: " + model_name +
-                " -> ... -> " + ensemble_name + " -> " + model_name);
-      }
-
-      auto it = ensembles->find(model_name);
-      // if can't find the name in ensemble, it is either non-ensemble model
-      // or ensemble that is not affected in current change. Thus it is not
-      // possible to cause circular dependency
-      if (it != ensembles->end()) {
-        if (it->second.second == false) {
-          ensemble_dependency->push_back(ensemble_name);
-          it->second.first->status_ = ValidateEnsembleConfig(
-              model_repository_manager, it->second.first, ensembles,
-              ensemble_dependency);
-          it->second.second = true;
-          ensemble_dependency->pop_back();
-          if (!it->second.first->status_.IsOk()) {
-            return Status(
-                Status::Code::INVALID_ARG,
-                "ensemble " + ensemble_name + " depends on " + model_name +
-                    " which contains invalid model config");
-          }
-        }
-      }
-    }
-
     RETURN_IF_ERROR(ValidateTensorMapping(
         ensemble_name, step, model_config, &ensemble_tensors));
   }
@@ -407,36 +368,6 @@ ValidateEnsembleConfig(
       decouple_label != 0);
 
   return Status::Success;
-}
-
-}  // namespace
-
-void
-ValidateEnsembleConfig(
-    ModelRepositoryManager* model_repository_manager,
-    std::set<ModelRepositoryManager::DependencyNode*>* affected_ensembles)
-{
-  // map from ensemble name to <node, has_validated> pair
-  std::unordered_map<
-      std::string, std::pair<ModelRepositoryManager::DependencyNode*, bool>>
-      ensembles;
-
-  for (const auto& node : (*affected_ensembles)) {
-    ensembles.emplace(
-        std::make_pair(node->model_name_, std::make_pair(node, false)));
-  }
-
-  std::deque<std::string> ensemble_dependency;
-  for (auto& pair : ensembles) {
-    if (pair.second.second) {
-      continue;
-    }
-    // return not ok status if ensemble config is not valid
-    pair.second.first->status_ = ValidateEnsembleConfig(
-        model_repository_manager, pair.second.first, &ensembles,
-        &ensemble_dependency);
-    pair.second.second = true;
-  }
 }
 
 }}  // namespace nvidia::inferenceserver

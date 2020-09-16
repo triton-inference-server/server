@@ -1696,6 +1696,37 @@ ModelRepositoryManager::UpdateDependencyGraph(
       affected_ensembles.emplace(updated_node);
     }
   }
+
+#ifdef TRITON_ENABLE_ENSEMBLE
+  // After the dependency graph is updated, check if circular dependency exists
+  for (auto& ensemble : affected_ensembles) {
+    if (ensemble->status_.IsOk()) {
+      ensemble->status_ = CircularcyCheck(ensemble, ensemble);
+    }
+  }
+#endif  // TRITON_ENABLE_ENSEMBLE
+  return Status::Success;
+}
+
+Status
+ModelRepositoryManager::CircularcyCheck(
+    DependencyNode* current_node, const DependencyNode* start_node)
+{
+  for (auto& downstream : current_node->downstreams_) {
+    if (downstream->model_name_ == start_node->model_name_) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "circular dependency between ensembles: " + start_node->model_name_ +
+              " -> ... -> " + current_node->model_name_ + " -> " +
+              start_node->model_name_);
+    } else {
+      const auto status = CircularcyCheck(downstream, start_node);
+      if (!status.IsOk() && current_node->status_.IsOk()) {
+        current_node->status_ = status;
+        return status;
+      }
+    }
+  }
   return Status::Success;
 }
 
@@ -1856,10 +1887,8 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
 #ifdef TRITON_ENABLE_ENSEMBLE
   // Validate ensemble config if the node is ready. By this point, the depending
   // models are loaded and their configs are completed
-  if (node_ready) {
-    std::set<ModelRepositoryManager::DependencyNode*> affected_ensembles{node};
-    // FIXME edit this function to be simpler
-    ValidateEnsembleConfig(this, &affected_ensembles);
+  if (node_ready && node->status_.IsOk()) {
+    node->status_ = ValidateEnsembleConfig(this, node);
   }
 #endif  // TRITON_ENABLE_ENSEMBLE
   return node_ready;
