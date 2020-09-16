@@ -2112,6 +2112,7 @@ HTTPAPIServer::EVBufferToInput(
           // JSON... presence of "data" already validated but still
           // checking here. Flow in this endpoint needs to be
           // reworked...
+          triton::common::TritonJson::Value tensor_data;
           RETURN_MSG_IF_ERR(
               request_input.MemberAsArray("data", &tensor_data),
               "Unable to parse 'data'");
