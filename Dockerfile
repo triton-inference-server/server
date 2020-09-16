@@ -372,7 +372,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
 
 # Build the backends.
 #
-ARG TRITON_EXAMPLE_BACKEND_TAG=main
+ARG TRITON_EXAMPLE_BACKEND_TAG=davidg-install
 RUN for BE in identity repeat square; do \
         rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
             (cd /tmp/triton_backends && \
@@ -390,7 +390,7 @@ RUN for BE in identity repeat square; do \
                  cp -r install/backends/${BE} /opt/tritonserver/backends/.); \
     done
 
-ARG TRITON_ONNXRUNTIME_BACKEND_TAG=main
+ARG TRITON_ONNXRUNTIME_BACKEND_TAG=davidg-install
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
     (cd /tmp/triton_backends && \
          git clone --single-branch --depth=1 -b ${TRITON_ONNXRUNTIME_BACKEND_TAG} \
@@ -410,7 +410,7 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          mkdir -p /opt/tritonserver/backends && \
          cp -r install/backends/onnxruntime /opt/tritonserver/backends/.)
 
-ARG TRITON_TENSORFLOW1_BACKEND_TAG=main
+ARG TRITON_TENSORFLOW1_BACKEND_TAG=davidg-install
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
     (cd /tmp/triton_backends && \
          git clone --single-branch --depth=1 -b ${TRITON_TENSORFLOW1_BACKEND_TAG} \
@@ -428,7 +428,7 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          mkdir -p /opt/tritonserver/backends && \
          cp -r install/backends/tensorflow1 /opt/tritonserver/backends/.)
 
-ARG TRITON_TENSORFLOW2_BACKEND_TAG=main
+ARG TRITON_TENSORFLOW2_BACKEND_TAG=davidg-install
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
     (cd /tmp/triton_backends && \
          git clone --single-branch --depth=1 -b ${TRITON_TENSORFLOW2_BACKEND_TAG} \
