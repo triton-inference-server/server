@@ -1446,7 +1446,8 @@ class InferInput:
 
         if self._parameters.get('shared_memory_region') is None and \
                 self._raw_data is None:
-            tensor['data'] = self._data
+            if self._data is not None:
+                tensor['data'] = self._data
         return tensor
 
 
