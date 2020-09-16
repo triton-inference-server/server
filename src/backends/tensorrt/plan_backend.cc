@@ -654,8 +654,8 @@ PlanBackend::CreateExecutionContext(
     }
   }
 #endif
-  context->allow_inexact_match_ =
-      Config().optimization().cuda().allow_inexact_match();
+  // FIXME set in InitializeGraphSpecs()
+  context->allow_inexact_match_ = false;
 
   if (UseTensorRTv2API(context->engine_)) {
     std::string profiles_str;
