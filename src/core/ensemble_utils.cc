@@ -29,6 +29,7 @@
 #include "src/core/ensemble_utils.h"
 
 #include <set>
+#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
@@ -233,6 +234,7 @@ ValidateTensorMapping(
 
 Status
 ValidateEnsembleConfig(
+    ModelRepositoryManager* model_repository_manager,
     ModelRepositoryManager::DependencyNode* ensemble,
     std::unordered_map<
         std::string, std::pair<ModelRepositoryManager::DependencyNode*, bool>>*
@@ -282,7 +284,11 @@ ValidateEnsembleConfig(
     inference::ModelConfig model_config;
     for (auto& node : ensemble->upstreams_) {
       if (model_name == node.first->model_name_) {
-        model_config = node.first->model_config_;
+        // Obtain completed config from backend instance
+        std::shared_ptr<InferenceBackend> backend;
+        RETURN_IF_ERROR(model_repository_manager->GetInferenceBackend(
+            model_name, -1, &backend));
+        model_config = backend->Config();
         break;
       }
     }
@@ -323,7 +329,8 @@ ValidateEnsembleConfig(
         if (it->second.second == false) {
           ensemble_dependency->push_back(ensemble_name);
           it->second.first->status_ = ValidateEnsembleConfig(
-              it->second.first, ensembles, ensemble_dependency);
+              model_repository_manager, it->second.first, ensembles,
+              ensemble_dependency);
           it->second.second = true;
           ensemble_dependency->pop_back();
           if (!it->second.first->status_.IsOk()) {
@@ -406,6 +413,7 @@ ValidateEnsembleConfig(
 
 void
 ValidateEnsembleConfig(
+    ModelRepositoryManager* model_repository_manager,
     std::set<ModelRepositoryManager::DependencyNode*>* affected_ensembles)
 {
   // map from ensemble name to <node, has_validated> pair
@@ -425,7 +433,8 @@ ValidateEnsembleConfig(
     }
     // return not ok status if ensemble config is not valid
     pair.second.first->status_ = ValidateEnsembleConfig(
-        pair.second.first, &ensembles, &ensemble_dependency);
+        model_repository_manager, pair.second.first, &ensembles,
+        &ensemble_dependency);
     pair.second.second = true;
   }
 }

@@ -1696,16 +1696,6 @@ ModelRepositoryManager::UpdateDependencyGraph(
       affected_ensembles.emplace(updated_node);
     }
   }
-
-#ifdef TRITON_ENABLE_ENSEMBLE
-  // FIXME: ensemble config validation will not work with new auto-completion
-  // workflow as the model I/O is completed only after the backend is loaded,
-  // but the validation requires model I/O before attempting to load the models.
-  // Thus the validation needs to be postponed until the ensemble is ready to
-  // be loaded, when all depending models are loaded.
-  ValidateEnsembleConfig(&affected_ensembles);
-#endif  // TRITON_ENABLE_ENSEMBLE
-
   return Status::Success;
 }
 
@@ -1828,45 +1818,50 @@ bool
 ModelRepositoryManager::CheckNode(DependencyNode* node)
 {
   bool node_ready = true;
-  // if the node failed on validation, mark as ready as we know
-  // it should not be loaded
-  if (node->status_.IsOk()) {
-    for (auto& upstream : node->upstreams_) {
-      if (!upstream.first->checked_) {
-        node_ready = false;
-        break;
-      }
-      if (!upstream.first->status_.IsOk()) {
-        node->status_ = Status(
-            Status::Code::INVALID_ARG,
-            "ensemble '" + node->model_name_ + "' depends on '" +
-                upstream.first->model_name_ + "' which is not valid");
-      } else if (upstream.first->loaded_versions_.empty()) {
-        node->status_ = Status(
-            Status::Code::INVALID_ARG,
-            "ensemble '" + node->model_name_ + "' depends on '" +
-                upstream.first->model_name_ + "' which has no loaded version");
-      } else {
-        for (const auto& required_version : upstream.second) {
-          if (required_version == -1) {
-            continue;
-          }
+  for (auto& upstream : node->upstreams_) {
+    if (!upstream.first->checked_) {
+      node_ready = false;
+      break;
+    }
+    if (!upstream.first->status_.IsOk()) {
+      node->status_ = Status(
+          Status::Code::INVALID_ARG,
+          "ensemble '" + node->model_name_ + "' depends on '" +
+              upstream.first->model_name_ + "' which is not valid");
+    } else if (upstream.first->loaded_versions_.empty()) {
+      node->status_ = Status(
+          Status::Code::INVALID_ARG,
+          "ensemble '" + node->model_name_ + "' depends on '" +
+              upstream.first->model_name_ + "' which has no loaded version");
+    } else {
+      for (const auto& required_version : upstream.second) {
+        if (required_version == -1) {
+          continue;
+        }
 
-          auto it = upstream.first->loaded_versions_.find(required_version);
-          if (it == upstream.first->loaded_versions_.end()) {
-            node->status_ = Status(
-                Status::Code::INVALID_ARG,
-                "ensemble '" + node->model_name_ + "' depends on '" +
-                    upstream.first->model_name_ + "' whose required version " +
-                    std::to_string(required_version) + " is not loaded");
-          }
+        auto it = upstream.first->loaded_versions_.find(required_version);
+        if (it == upstream.first->loaded_versions_.end()) {
+          node->status_ = Status(
+              Status::Code::INVALID_ARG,
+              "ensemble '" + node->model_name_ + "' depends on '" +
+                  upstream.first->model_name_ + "' whose required version " +
+                  std::to_string(required_version) + " is not loaded");
         }
       }
-      if (!node->status_.IsOk()) {
-        break;
-      }
+    }
+    if (!node->status_.IsOk()) {
+      break;
     }
   }
+#ifdef TRITON_ENABLE_ENSEMBLE
+  // Validate ensemble config if the node is ready. By this point, the depending
+  // models are loaded and their configs are completed
+  if (node_ready) {
+    std::set<ModelRepositoryManager::DependencyNode*> affected_ensembles{node};
+    // FIXME edit this function to be simpler
+    ValidateEnsembleConfig(this, &affected_ensembles);
+  }
+#endif  // TRITON_ENABLE_ENSEMBLE
   return node_ready;
 }
 
