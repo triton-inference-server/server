@@ -1265,8 +1265,8 @@ class LifeCycleTest(tu.TestResultCollector):
 
     def test_model_control(self):
         model_shape = (1, 16)
-        onnx_name = tu.get_model_name('onnx', np.float32,
-                                            np.float32, np.float32)
+        onnx_name = tu.get_model_name('onnx', np.float32, np.float32,
+                                      np.float32)
 
         ensemble_prefix = "simple_"
         ensemble_name = ensemble_prefix + onnx_name
@@ -1427,10 +1427,10 @@ class LifeCycleTest(tu.TestResultCollector):
 
     def test_multiple_model_repository_control_startup_models(self):
         model_shape = (1, 16)
-        onnx_name = tu.get_model_name('onnx', np.float32,
-                                            np.float32, np.float32)
+        onnx_name = tu.get_model_name('onnx', np.float32, np.float32,
+                                      np.float32)
         plan_name = tu.get_model_name('plan', np.float32, np.float32,
-                                          np.float32)
+                                      np.float32)
 
         ensemble_prefix = "simple_"
         onnx_ensemble_name = ensemble_prefix + onnx_name
@@ -1535,8 +1535,7 @@ class LifeCycleTest(tu.TestResultCollector):
                                       "localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
-                self.assertFalse(
-                    triton_client.is_model_ready(onnx_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(onnx_name, "1"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
