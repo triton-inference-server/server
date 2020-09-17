@@ -81,13 +81,16 @@ export AWS_ACCESS_KEY_ID=minio && \
 # Force version to 0.7 to prevent failures due to version changes
 python -m pip install awscli-local==0.07
 
+# Needed to set correct port for awscli-local
+ENDPOINT_FLAG="--endpoint-url=http://localhost:4572"
+
 # Cleanup bucket if exists
-awslocal s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
-    awslocal s3 rb s3://demo-bucket1.0 || true
+awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
+    awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0 || true
 
 # Create and add data to bucket
-awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket1.0 && \
-    awslocal s3 sync $MODELDIR s3://demo-bucket1.0
+awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
+    awslocal $ENDPOINT_FLAG s3 sync $MODELDIR s3://demo-bucket1.0
 
 RET=0
 
@@ -176,8 +179,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Destroy bucket
-awslocal s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
-    awslocal s3 rb s3://demo-bucket1.0
+awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
+    awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
 
 # Kill minio server
 kill $MINIO_PID
