@@ -245,21 +245,6 @@ ValidateEnsembleConfig(
   }
 
   const auto& ensemble_name = ensemble->model_name_;
-  if (!ensemble->missing_upstreams_.empty()) {
-    std::string name_list;
-    for (auto it = ensemble->missing_upstreams_.begin();
-         it != ensemble->missing_upstreams_.end(); it++) {
-      if (it != ensemble->missing_upstreams_.begin()) {
-        name_list += ", ";
-      }
-      name_list += (*it)->model_name_;
-    }
-    return Status(
-        Status::Code::INVALID_ARG,
-        "ensemble " + ensemble_name +
-            " contains models that are not available: " + name_list);
-  }
-
   const bool batching = (ensemble_config.max_batch_size() > 0);
   std::unordered_map<std::string, TensorNode> ensemble_tensors;
   for (const auto& input : ensemble_config.input()) {

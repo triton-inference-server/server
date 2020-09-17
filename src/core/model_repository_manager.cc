@@ -1698,10 +1698,25 @@ ModelRepositoryManager::UpdateDependencyGraph(
   }
 
 #ifdef TRITON_ENABLE_ENSEMBLE
-  // After the dependency graph is updated, check if circular dependency exists
+  // After the dependency graph is updated, check ensemble dependencies
   for (auto& ensemble : affected_ensembles) {
     if (ensemble->status_.IsOk()) {
-      ensemble->status_ = CircularcyCheck(ensemble, ensemble);
+      if (!ensemble->missing_upstreams_.empty()) {
+        std::string name_list;
+        for (auto it = ensemble->missing_upstreams_.begin();
+            it != ensemble->missing_upstreams_.end(); it++) {
+          if (it != ensemble->missing_upstreams_.begin()) {
+            name_list += ", ";
+          }
+          name_list += (*it)->model_name_;
+        }
+        ensemble->status_ = Status(
+            Status::Code::INVALID_ARG,
+            "ensemble " + ensemble->model_name_ +
+                " contains models that are not available: " + name_list);
+      } else {
+        ensemble->status_ = CircularcyCheck(ensemble, ensemble);
+      }
     }
   }
 #endif  // TRITON_ENABLE_ENSEMBLE
