@@ -34,7 +34,7 @@
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
 #include "src/core/status.h"
-#include "src/core/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 

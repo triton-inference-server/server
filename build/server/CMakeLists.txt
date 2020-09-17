@@ -37,6 +37,35 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+#
+# Dependencies
+#
+# FetchContent's composibility isn't very good. We must include the
+# transitive closure of all repos so that we can override the tag.
+#
+include(FetchContent)
+
+FetchContent_Declare(
+  repo-common
+  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+  GIT_TAG ${TRITON_COMMON_REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_Declare(
+  repo-core
+  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+  GIT_TAG ${TRITON_CORE_REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_Declare(
+  repo-backend
+  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_MakeAvailable(repo-common repo-core repo-backend)
+
+
 add_definitions(-DTRITON_VERSION="${TRITON_VERSION}")
 
 if(${TRITON_ENABLE_ASAN})
@@ -95,6 +124,10 @@ endif() # TRITON_ENABLE_S3
 if(${TRITON_ENABLE_TENSORFLOW})
   add_definitions(-DTRITON_ENABLE_TENSORFLOW=1)
 endif() # TRITON_ENABLE_TENSORFLOW
+
+if(${TRITON_ENABLE_PYTHON})
+  add_definitions(-DTRITON_ENABLE_PYTHON=1)
+endif() # TRITON_ENABLE_PYTHON
 
 if(${TRITON_ENABLE_TENSORRT})
   add_definitions(-DTRITON_ENABLE_TENSORRT=1)

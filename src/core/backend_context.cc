@@ -248,6 +248,77 @@ BackendResponder::ProcessTensor(
 #endif  // TRITON_ENABLE_GPU
 }
 
+void
+BackendResponder::ProcessTensor(
+    const std::string& name, const std::string& input_name,
+    const inference::DataType datatype,
+    const std::vector<int64_t>& batchn_shape, const char* buffer,
+    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
+{
+  // A value of CPU_PINNED indicates that pinned memory buffer is not
+  // needed for this tensor. Any other value indicates that a pinned
+  // memory buffer is needed when the target memory type matches
+  // 'use_pinned_memory_type'.
+  TRITONSERVER_MemoryType use_pinned_memory_type =
+      TRITONSERVER_MEMORY_CPU_PINNED;
+  if (pinned_enabled_) {
+    use_pinned_memory_type = GetUsePinnedMemoryType(memory_type);
+  }
+
+  size_t tensor_offset = 0;
+
+  for (size_t idx = 0; idx < responses_->size(); idx++) {
+    auto& request = requests_[idx];
+    auto& response = (*responses_)[idx];
+
+    // If then pending copies are from tensor buffer that is not
+    // contiguous with 'response's part of that buffer, then need to
+    // go ahead and perform the pending copies so that can start a
+    // new contiguous region if necessary.
+    if ((pending_pinned_byte_size_ > 0) &&
+        (tensor_offset !=
+         (pending_pinned_byte_size_ + pending_pinned_offset_))) {
+      need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
+    }
+
+    // Override shape to be correct for this response, with a naive assumption
+    // that the dynamic dimension in output is mapped to the same dimension
+    // in the input
+    const InferenceRequest::Input* input = nullptr;
+    request->ImmutableInput(input_name, &input);
+    const auto& input_batchn_shape = input->ShapeWithBatchDim();
+    auto output_batchn_shape = batchn_shape;
+    for (size_t dim_idx = 0; dim_idx < output_batchn_shape.size(); dim_idx++) {
+      if (output_batchn_shape[dim_idx] == -1) {
+        output_batchn_shape[dim_idx] = input_batchn_shape[dim_idx];
+      }
+    }
+
+    const size_t tensor_byte_size = GetByteSize(datatype, output_batchn_shape);
+
+    InferenceResponse::Output* response_output = nullptr;
+    if ((response != nullptr) &&
+        (request->ImmutableRequestedOutputs().find(name) !=
+         request->ImmutableRequestedOutputs().end())) {
+      response->AddOutput(
+          name, datatype, output_batchn_shape, &response_output);
+      need_sync_ |= SetFixedSizeOutputBuffer(
+          &response, response_output, tensor_byte_size, tensor_offset, buffer,
+          memory_type, memory_type_id, use_pinned_memory_type);
+    }
+
+    tensor_offset += tensor_byte_size;
+  }
+
+  // Done with the tensor, flush any pending pinned copies.
+  need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
+#ifdef TRITON_ENABLE_GPU
+  if (need_sync_ && (event_ != nullptr)) {
+    cudaEventRecord(event_, stream_);
+  }
+#endif  // TRITON_ENABLE_GPU
+}
+
 bool
 BackendResponder::Finalize()
 {
@@ -621,11 +692,11 @@ BackendInputCollector::BatchInputShape(
       break;
     }
     case inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
-      const auto& target_input = batch_input.target_input(0);
+      const auto& source_input = batch_input.source_input(0);
       for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
         const InferenceRequest::Input* repr_input;
         RETURN_IF_ERROR(
-            requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+            requests_[req_idx]->ImmutableInput(source_input, &repr_input));
         (*shape)[0] = std::max(
             (*shape)[0], GetElementCount(repr_input->ShapeWithBatchDim()));
       }
@@ -654,36 +725,36 @@ BackendInputCollector::ProcessBatchInput(
   const auto& data_type = batch_input.data_type();
   switch (batch_input.kind()) {
     case inference::BatchInput::BATCH_ELEMENT_COUNT: {
-      const auto& target_input = batch_input.target_input(0);
+      const auto& source_input = batch_input.source_input(0);
       if (data_type == inference::TYPE_FP32) {
-        SetElementCount<float>(target_input, input_buffer, buffer_byte_size);
+        SetElementCount<float>(source_input, input_buffer, buffer_byte_size);
       } else {
-        SetElementCount<int32_t>(target_input, input_buffer, buffer_byte_size);
+        SetElementCount<int32_t>(source_input, input_buffer, buffer_byte_size);
       }
       break;
     }
     case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT: {
-      const auto& target_input = batch_input.target_input(0);
+      const auto& source_input = batch_input.source_input(0);
       if (data_type == inference::TYPE_FP32) {
         SetAccumulatedElementCount<float>(
-            target_input, input_buffer, buffer_byte_size);
+            source_input, input_buffer, buffer_byte_size);
       } else {
         SetAccumulatedElementCount<int32_t>(
-            target_input, input_buffer, buffer_byte_size);
+            source_input, input_buffer, buffer_byte_size);
       }
       break;
     }
     case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO: {
-      const auto& target_input = batch_input.target_input(0);
+      const auto& source_input = batch_input.source_input(0);
       if (data_type == inference::TYPE_FP32) {
         *reinterpret_cast<float*>(input_buffer) = 0;
         SetAccumulatedElementCount<float>(
-            target_input, input_buffer + sizeof(float),
+            source_input, input_buffer + sizeof(float),
             buffer_byte_size - sizeof(float));
       } else {
         *reinterpret_cast<int32_t*>(input_buffer) = 0;
         SetAccumulatedElementCount<int32_t>(
-            target_input, input_buffer + sizeof(int32_t),
+            source_input, input_buffer + sizeof(int32_t),
             buffer_byte_size - sizeof(int32_t));
       }
       break;
@@ -709,14 +780,14 @@ BackendInputCollector::ProcessBatchInput(
 template <typename T>
 Status
 BackendInputCollector::SetElementCount(
-    const std::string& target_input, char* buffer,
+    const std::string& source_input, char* buffer,
     const size_t buffer_byte_size)
 {
   size_t buffer_offset = 0;
   for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
     const InferenceRequest::Input* repr_input;
     RETURN_IF_ERROR(
-        requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+        requests_[req_idx]->ImmutableInput(source_input, &repr_input));
     if (buffer_offset + sizeof(T) > buffer_byte_size) {
       return Status(
           Status::Code::INVALID_ARG,
@@ -724,6 +795,11 @@ BackendInputCollector::SetElementCount(
     }
     *(reinterpret_cast<T*>(buffer) + req_idx) =
         GetElementCount(repr_input->ShapeWithBatchDim());
+    buffer_offset += sizeof(T);
+  }
+  for (; buffer_offset + sizeof(T) <= buffer_byte_size;
+       buffer_offset += sizeof(T)) {
+    *reinterpret_cast<T*>(buffer + buffer_offset) = 0;
   }
   return Status::Success;
 }
@@ -731,7 +807,7 @@ BackendInputCollector::SetElementCount(
 template <typename T>
 Status
 BackendInputCollector::SetAccumulatedElementCount(
-    const std::string& target_input, char* buffer,
+    const std::string& source_input, char* buffer,
     const size_t buffer_byte_size)
 {
   size_t accumulated_element_count = 0;
@@ -739,7 +815,7 @@ BackendInputCollector::SetAccumulatedElementCount(
   for (size_t req_idx = 0; req_idx < requests_.size(); req_idx++) {
     const InferenceRequest::Input* repr_input;
     RETURN_IF_ERROR(
-        requests_[req_idx]->ImmutableInput(target_input, &repr_input));
+        requests_[req_idx]->ImmutableInput(source_input, &repr_input));
     if (buffer_offset + sizeof(T) > buffer_byte_size) {
       return Status(
           Status::Code::INVALID_ARG,
@@ -748,6 +824,11 @@ BackendInputCollector::SetAccumulatedElementCount(
     accumulated_element_count +=
         GetElementCount(repr_input->ShapeWithBatchDim());
     *(reinterpret_cast<T*>(buffer) + req_idx) = accumulated_element_count;
+    buffer_offset += sizeof(T);
+  }
+  for (; buffer_offset + sizeof(T) <= buffer_byte_size;
+       buffer_offset += sizeof(T)) {
+    *reinterpret_cast<T*>(buffer + buffer_offset) = accumulated_element_count;
   }
   return Status::Success;
 }

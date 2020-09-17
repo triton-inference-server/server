@@ -66,10 +66,10 @@ add_custom_command(
   DEPENDS "grpc_service.proto" proto-library
 )
 
-find_program(PYTHON "python" REQUIRED)
+find_package(Python REQUIRED COMPONENTS Interpreter)
 add_custom_command(
   OUTPUT "${GRPC_PY}"
-  COMMAND ${PYTHON}
+  COMMAND ${Python_EXECUTABLE}
   ARGS
     -m grpc_tools.protoc
     -I "${grpc_service_proto_dir}"
@@ -93,6 +93,11 @@ add_library(
   model_config.cc model_config.h
 )
 add_dependencies(model-config-library proto-library)
+target_link_libraries(
+  model-config-library
+  PUBLIC
+    triton-core-serverapi   # from repo-core
+)
 
 if(${TRITON_ENABLE_GPU})
   add_library(
@@ -102,20 +107,6 @@ if(${TRITON_ENABLE_GPU})
   target_include_directories(model-config-cuda-library PRIVATE ${CUDA_INCLUDE_DIRS})
   add_dependencies(model-config-cuda-library proto-library)
 endif() # TRITON_ENABLE_GPU
-
-#
-# JSON utilities used by both clients and server
-#
-find_package(RapidJSON CONFIG REQUIRED)
-add_library(
-    triton-json-library EXCLUDE_FROM_ALL OBJECT
-    json.h
-)
-target_include_directories(
-  triton-json-library
-  PUBLIC ${RapidJSON_INCLUDE_DIRS}
-)
-set_target_properties(triton-json-library PROPERTIES LINKER_LANGUAGE CXX)
 
 #
 # Inference server core
@@ -194,7 +185,6 @@ set(
   infer_stats.h
   infer_trace.h
   status.h
-  tritonserver.h
 )
 
 if(${TRITON_ENABLE_GPU})
@@ -244,3 +234,11 @@ if(${TRITON_ENABLE_S3})
     PRIVATE $<TARGET_PROPERTY:aws-cpp-sdk-s3,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif() # TRITON_ENABLE_S3
+
+target_link_libraries(
+  server-library
+  PUBLIC
+    triton-core-backendapi  # from repo-core
+    triton-core-serverapi   # from repo-core
+    triton-common-json      # from repo-common
+)

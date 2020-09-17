@@ -49,8 +49,12 @@ Getting the Client Libraries
 
 The provided Dockerfile.client and CMake support can be used to build
 the client libraries. As an alternative to building, it is also
-possible to download the pre-build client libraries from GitHub or a
-pre-built Docker image containing the client libraries from `NVIDIA
+possible to :ref:`use pip to install the client libraries
+<section-client-libraries-download-from-pip>` or :ref:`download the
+pre-build client libraries
+<section-client-libraries-download-from-github>` from GitHub or
+:ref:`download a pre-built Docker image containing the client
+libraries <section-client-libraries-download-from-ngc>` from `NVIDIA
 GPU Cloud (NGC) <https://ngc.nvidia.com>`_.
 
 .. build-client-begin-marker-do-not-remove
@@ -66,7 +70,7 @@ you want to build (or the master branch if you want to build the
 under-development version). The branch you use for the client build
 should match the version of Triton you are using::
 
-  $ git checkout r20.07
+  $ git checkout r20.08
 
 Then, issue the following command to build the C++ client library and
 the Python wheel files for the Python client library::
@@ -104,7 +108,7 @@ of the repo and checkout the release version of the branch that you
 want to build (or the master branch if you want to build the
 under-development version)::
 
-  $ git checkout r20.07
+  $ git checkout r20.08
 
 Ubuntu 18.04
 ............
@@ -179,6 +183,17 @@ build.
 
 .. build-client-end-marker-do-not-remove
 
+.. _section-client-libraries-download-from-pip:
+
+Download Using Python Package Installer (pip)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The GRPC and HTTP client libraries are available as a Python package
+that can be installed using pip::
+
+  $ pip install nvidia-pyindex
+  $ pip install tritonclient[http,grpc]
+
 .. _section-client-libraries-download-from-github:
 
 Download From GitHub
@@ -186,7 +201,7 @@ Download From GitHub
 
 An alternative to building the client library is to download the
 pre-built client libraries from the `GitHub release page
-<https://github.com/NVIDIA/triton-inference-server/releases>`_
+<https://github.com/triton-inference-server/server/releases>`_
 corresponding to the release you are interested in. The client
 libraries are found in the "Assets" section of the release page in a
 tar file named after the version of the release and the OS, for
@@ -198,7 +213,7 @@ clients and server in the same container::
 
   $ mkdir clients
   $ cd clients
-  $ wget https://github.com/NVIDIA/triton-inference-server/releases/download/<tarfile_path>
+  $ wget https://github.com/triton-inference-server/server/releases/download/<tarfile_path>
   $ tar xzf <tarfile_name>
 
 After installing the libraries can be found in lib/, the corresponding
@@ -264,13 +279,13 @@ Client Library API
 The C++ client API exposes a class-based interface for querying server
 and model status and for performing inference. The commented interface
 is available in the `library headers
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/c%2B%2B/library>`_
+<https://github.com/triton-inference-server/server/tree/master/src/clients/c%2B%2B/library>`_
 and in the API Reference.
 
 The Python client API provides similar capabilities as the C++
 API. The commented interface is available in `grpcclient.py and
 httpclient.py
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/library>`_
+<https://github.com/triton-inference-server/server/tree/master/src/clients/python/library>`_
 and in the API Reference.
 
 Section :ref:`section-simple-examples` describes the example

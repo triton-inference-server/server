@@ -84,11 +84,8 @@ AutoFillSavedModel::Create(
   std::set<std::string> savedmodel_dirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &savedmodel_dirs));
 
-  // If find a file named with the default graphdef name then assume
-  // it is a graphdef. We could be smarter here and try to parse to
-  // see if it really is a graphdef. We could also guess thae
-  // placeholders are inputs... but we have no way to know what the
-  // outputs are.
+  // If find a directory named with the default savedmodel name then
+  // assume it is a savedmodel.
   if (savedmodel_dirs.find(kTensorFlowSavedModelFilename) ==
       savedmodel_dirs.end()) {
     return Status(

@@ -33,19 +33,18 @@ Library API
 The Triton Inference Server provides a backwards-compatible C API that
 allows Triton to be linked directly into a C/C++ application. The API
 is documented in `tritonserver.h
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/tritonserver.h>`_
-as well as in the API section of the documentation.
+<https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h>`_.
 
 A simple example of the library API can be found at
 `src/servers/simple.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/servers/simple.cc>`_. A
+<https://github.com/triton-inference-server/server/blob/master/src/servers/simple.cc>`_. A
 more complicated example can be found in the files that make up the
 inference server executable, *tritonserver*. The tritonserver
 executable implements the HTTP/REST and GRPC endpoints and uses the
 library API to communicate with the core of Triton. The primary files
 composing *tritonserver* are `src/servers/main.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/servers/main.cc>`_,
+<https://github.com/triton-inference-server/server/blob/master/src/servers/main.cc>`_,
 `src/servers/grpc_server.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/servers/grpc_server.cc>`_,
+<https://github.com/triton-inference-server/server/blob/master/src/servers/grpc_server.cc>`_,
 and `src/servers/http_server.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/servers/http_server.cc>`_.
+<https://github.com/triton-inference-server/server/blob/master/src/servers/http_server.cc>`_.

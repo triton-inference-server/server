@@ -41,7 +41,7 @@ TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
 CPU_ONLY = (os.environ.get('TRITON_SERVER_CPU_ONLY') is not None)
 BACKENDS = os.environ.get(
-    'BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
+    'BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 np_dtype_string = np.dtype(object)
@@ -231,6 +231,18 @@ class InferTest(tu.TestResultCollector):
                                         output0_raw=output0_raw,
                                         output1_raw=output1_raw,
                                         swap=swap)
+
+        if prefix == "":
+            if 'python' in BACKENDS:
+                _infer_exact_helper(self,
+                                    prefix + 'python', (input_size,),
+                                    8,
+                                    input_dtype,
+                                    output0_dtype,
+                                    output1_dtype,
+                                    output0_raw=output0_raw,
+                                    output1_raw=output1_raw,
+                                    swap=swap)
 
     def test_raw_bbb(self):
         self._full_exact(np.int8,

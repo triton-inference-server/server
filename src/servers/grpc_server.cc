@@ -47,15 +47,15 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/core/tritonserver.h"
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
+#include "triton/core/tritonserver.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
   return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
 #define TRITONJSON_STATUSSUCCESS nullptr
-#include "src/core/json.h"
+#include "triton/common/triton_json.h"
 
 #ifdef TRITON_ENABLE_TRACING
 #include "src/servers/tracer.h"
@@ -511,7 +511,7 @@ CommonHandler::SetUpAllRequests()
         GOTO_IF_ERR(err, earlyexit);
 
         {
-          TritonJson::Value server_metadata_json;
+          triton::common::TritonJson::Value server_metadata_json;
           err = server_metadata_json.Parse(buffer, byte_size);
           GOTO_IF_ERR(err, earlyexit);
 
@@ -530,7 +530,7 @@ CommonHandler::SetUpAllRequests()
           response->set_version(std::string(version, versionlen));
 
           if (server_metadata_json.Find("extensions")) {
-            TritonJson::Value extensions_json;
+            triton::common::TritonJson::Value extensions_json;
             err = server_metadata_json.MemberAsArray(
                 "extensions", &extensions_json);
             GOTO_IF_ERR(err, earlyexit);
@@ -591,7 +591,7 @@ CommonHandler::SetUpAllRequests()
           model_metadata_message, &buffer, &byte_size);
       GOTO_IF_ERR(err, earlyexit);
 
-      TritonJson::Value model_metadata_json;
+      triton::common::TritonJson::Value model_metadata_json;
       err = model_metadata_json.Parse(buffer, byte_size);
       GOTO_IF_ERR(err, earlyexit);
 
@@ -603,7 +603,7 @@ CommonHandler::SetUpAllRequests()
       response->set_name(std::string(name, namelen));
 
       if (model_metadata_json.Find("versions")) {
-        TritonJson::Value versions_json;
+        triton::common::TritonJson::Value versions_json;
         err = model_metadata_json.MemberAsArray("versions", &versions_json);
         GOTO_IF_ERR(err, earlyexit);
 
@@ -624,12 +624,12 @@ CommonHandler::SetUpAllRequests()
       response->set_platform(std::string(platform, platformlen));
 
       if (model_metadata_json.Find("inputs")) {
-        TritonJson::Value inputs_json;
+        triton::common::TritonJson::Value inputs_json;
         err = model_metadata_json.MemberAsArray("inputs", &inputs_json);
         GOTO_IF_ERR(err, earlyexit);
 
         for (size_t idx = 0; idx < inputs_json.ArraySize(); ++idx) {
-          TritonJson::Value io_json;
+          triton::common::TritonJson::Value io_json;
           err = inputs_json.IndexAsObject(idx, &io_json);
           GOTO_IF_ERR(err, earlyexit);
 
@@ -650,7 +650,7 @@ CommonHandler::SetUpAllRequests()
           io->set_datatype(std::string(datatype, datatypelen));
 
           if (io_json.Find("shape")) {
-            TritonJson::Value shape_json;
+            triton::common::TritonJson::Value shape_json;
             err = io_json.MemberAsArray("shape", &shape_json);
             GOTO_IF_ERR(err, earlyexit);
 
@@ -666,12 +666,12 @@ CommonHandler::SetUpAllRequests()
       }
 
       if (model_metadata_json.Find("outputs")) {
-        TritonJson::Value outputs_json;
+        triton::common::TritonJson::Value outputs_json;
         err = model_metadata_json.MemberAsArray("outputs", &outputs_json);
         GOTO_IF_ERR(err, earlyexit);
 
         for (size_t idx = 0; idx < outputs_json.ArraySize(); ++idx) {
-          TritonJson::Value io_json;
+          triton::common::TritonJson::Value io_json;
           err = outputs_json.IndexAsObject(idx, &io_json);
           GOTO_IF_ERR(err, earlyexit);
 
@@ -692,7 +692,7 @@ CommonHandler::SetUpAllRequests()
           io->set_datatype(std::string(datatype, datatypelen));
 
           if (io_json.Find("shape")) {
-            TritonJson::Value shape_json;
+            triton::common::TritonJson::Value shape_json;
             err = io_json.MemberAsArray("shape", &shape_json);
             GOTO_IF_ERR(err, earlyexit);
 
@@ -785,7 +785,7 @@ CommonHandler::SetUpAllRequests()
           inference::ModelStatisticsRequest& request,
           inference::ModelStatisticsResponse* response, grpc::Status* status) {
 #ifdef TRITON_ENABLE_STATS
-        TritonJson::Value model_stats_json;
+        triton::common::TritonJson::Value model_stats_json;
 
         int64_t requested_model_version;
         auto err = GetModelVersionFromString(
@@ -812,12 +812,12 @@ CommonHandler::SetUpAllRequests()
         }
 
         if (model_stats_json.Find("model_stats")) {
-          TritonJson::Value stats_json;
+          triton::common::TritonJson::Value stats_json;
           err = model_stats_json.MemberAsArray("model_stats", &stats_json);
           GOTO_IF_ERR(err, earlyexit);
 
           for (size_t idx = 0; idx < stats_json.ArraySize(); ++idx) {
-            TritonJson::Value model_stat;
+            triton::common::TritonJson::Value model_stat;
             err = stats_json.IndexAsObject(idx, &model_stat);
             GOTO_IF_ERR(err, earlyexit);
 
@@ -849,13 +849,13 @@ CommonHandler::SetUpAllRequests()
             GOTO_IF_ERR(err, earlyexit);
             statistics->set_execution_count(ucnt);
 
-            TritonJson::Value infer_stats_json;
+            triton::common::TritonJson::Value infer_stats_json;
             err =
                 model_stat.MemberAsObject("inference_stats", &infer_stats_json);
             GOTO_IF_ERR(err, earlyexit);
 
             {
-              TritonJson::Value success_json;
+              triton::common::TritonJson::Value success_json;
               err = infer_stats_json.MemberAsObject("success", &success_json);
               GOTO_IF_ERR(err, earlyexit);
 
@@ -871,7 +871,7 @@ CommonHandler::SetUpAllRequests()
             }
 
             {
-              TritonJson::Value fail_json;
+              triton::common::TritonJson::Value fail_json;
               err = infer_stats_json.MemberAsObject("fail", &fail_json);
               GOTO_IF_ERR(err, earlyexit);
 
@@ -886,7 +886,7 @@ CommonHandler::SetUpAllRequests()
             }
 
             {
-              TritonJson::Value queue_json;
+              triton::common::TritonJson::Value queue_json;
               err = infer_stats_json.MemberAsObject("queue", &queue_json);
               GOTO_IF_ERR(err, earlyexit);
 
@@ -901,7 +901,7 @@ CommonHandler::SetUpAllRequests()
             }
 
             {
-              TritonJson::Value compute_input_json;
+              triton::common::TritonJson::Value compute_input_json;
               err = infer_stats_json.MemberAsObject(
                   "compute_input", &compute_input_json);
               GOTO_IF_ERR(err, earlyexit);
@@ -919,7 +919,7 @@ CommonHandler::SetUpAllRequests()
             }
 
             {
-              TritonJson::Value compute_infer_json;
+              triton::common::TritonJson::Value compute_infer_json;
               err = infer_stats_json.MemberAsObject(
                   "compute_infer", &compute_infer_json);
               GOTO_IF_ERR(err, earlyexit);
@@ -937,7 +937,7 @@ CommonHandler::SetUpAllRequests()
             }
 
             {
-              TritonJson::Value compute_output_json;
+              triton::common::TritonJson::Value compute_output_json;
               err = infer_stats_json.MemberAsObject(
                   "compute_output", &compute_output_json);
               GOTO_IF_ERR(err, earlyexit);
@@ -955,12 +955,12 @@ CommonHandler::SetUpAllRequests()
             }
 
 
-            TritonJson::Value batches_json;
+            triton::common::TritonJson::Value batches_json;
             err = model_stat.MemberAsArray("batch_stats", &batches_json);
             GOTO_IF_ERR(err, earlyexit);
 
             for (size_t idx = 0; idx < batches_json.ArraySize(); ++idx) {
-              TritonJson::Value batch_stat;
+              triton::common::TritonJson::Value batch_stat;
               err = batches_json.IndexAsObject(idx, &batch_stat);
               GOTO_IF_ERR(err, earlyexit);
 
@@ -972,7 +972,7 @@ CommonHandler::SetUpAllRequests()
               batch_statistics->set_batch_size(ucnt);
 
               {
-                TritonJson::Value compute_input_json;
+                triton::common::TritonJson::Value compute_input_json;
                 err = batch_stat.MemberAsObject(
                     "compute_input", &compute_input_json);
                 GOTO_IF_ERR(err, earlyexit);
@@ -986,7 +986,7 @@ CommonHandler::SetUpAllRequests()
               }
 
               {
-                TritonJson::Value compute_infer_json;
+                triton::common::TritonJson::Value compute_infer_json;
                 err = batch_stat.MemberAsObject(
                     "compute_infer", &compute_infer_json);
                 GOTO_IF_ERR(err, earlyexit);
@@ -1000,7 +1000,7 @@ CommonHandler::SetUpAllRequests()
               }
 
               {
-                TritonJson::Value compute_output_json;
+                triton::common::TritonJson::Value compute_output_json;
                 err = batch_stat.MemberAsObject(
                     "compute_output", &compute_output_json);
                 GOTO_IF_ERR(err, earlyexit);
@@ -1054,13 +1054,14 @@ CommonHandler::SetUpAllRequests()
           inference::SystemSharedMemoryStatusRequest& request,
           inference::SystemSharedMemoryStatusResponse* response,
           grpc::Status* status) {
-        TritonJson::Value shm_status_json(TritonJson::ValueType::ARRAY);
+        triton::common::TritonJson::Value shm_status_json(
+            triton::common::TritonJson::ValueType::ARRAY);
         TRITONSERVER_Error* err = shm_manager_->GetStatus(
             request.name(), TRITONSERVER_MEMORY_CPU, &shm_status_json);
         GOTO_IF_ERR(err, earlyexit);
 
         for (size_t idx = 0; idx < shm_status_json.ArraySize(); ++idx) {
-          TritonJson::Value shm_region_json;
+          triton::common::TritonJson::Value shm_region_json;
           err = shm_status_json.IndexAsObject(idx, &shm_region_json);
           GOTO_IF_ERR(err, earlyexit);
 
@@ -1200,13 +1201,14 @@ CommonHandler::SetUpAllRequests()
           inference::CudaSharedMemoryStatusRequest& request,
           inference::CudaSharedMemoryStatusResponse* response,
           grpc::Status* status) {
-        TritonJson::Value shm_status_json(TritonJson::ValueType::ARRAY);
+        triton::common::TritonJson::Value shm_status_json(
+            triton::common::TritonJson::ValueType::ARRAY);
         TRITONSERVER_Error* err = shm_manager_->GetStatus(
             request.name(), TRITONSERVER_MEMORY_GPU, &shm_status_json);
         GOTO_IF_ERR(err, earlyexit);
 
         for (size_t idx = 0; idx < shm_status_json.ArraySize(); ++idx) {
-          TritonJson::Value shm_region_json;
+          triton::common::TritonJson::Value shm_region_json;
           err = shm_status_json.IndexAsObject(idx, &shm_region_json);
           GOTO_IF_ERR(err, earlyexit);
 
@@ -1365,15 +1367,16 @@ CommonHandler::SetUpAllRequests()
               model_index_message, &buffer, &byte_size);
           GOTO_IF_ERR(err, earlyexit);
 
-          TritonJson::Value model_index_json;
+          triton::common::TritonJson::Value model_index_json;
           err = model_index_json.Parse(buffer, byte_size);
           GOTO_IF_ERR(err, earlyexit);
 
-          err = model_index_json.AssertType(TritonJson::ValueType::ARRAY);
+          err = model_index_json.AssertType(
+              triton::common::TritonJson::ValueType::ARRAY);
           GOTO_IF_ERR(err, earlyexit);
 
           for (size_t idx = 0; idx < model_index_json.ArraySize(); ++idx) {
-            TritonJson::Value index_json;
+            triton::common::TritonJson::Value index_json;
             err = model_index_json.IndexAsObject(idx, &index_json);
             GOTO_IF_ERR(err, earlyexit);
 
@@ -2900,7 +2903,8 @@ InferResponseCompleteCommon(
       if (batch_size > 0) {
         output->add_shape(batch_size);
       }
-      output->add_shape(classification_count);
+      output->add_shape(
+          std::min(classification_count, (uint32_t)batch1_element_count));
 
       (*response.mutable_raw_output_contents())[output_idx] =
           std::move(serialized);

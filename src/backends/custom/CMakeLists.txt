@@ -58,3 +58,8 @@ if(${TRITON_ENABLE_METRICS})
     PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif() # TRITON_ENABLE_METRICS
+
+target_link_libraries(
+  custom-backend-library
+  PUBLIC triton-core-serverapi   # from repo-core
+)

@@ -363,18 +363,18 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
   cv::Mat sample_final;
   if (scaling_ == ScaleType::INCEPTION) {
     if (c == 1) {
-      sample_final = sample_type.mul(cv::Scalar(1 / 128.0));
+      sample_final = sample_type.mul(cv::Scalar(1 / 127.5));
       sample_final = sample_final - cv::Scalar(1.0);
     } else {
       sample_final =
-          sample_type.mul(cv::Scalar(1 / 128.0, 1 / 128.0, 1 / 128.0));
+          sample_type.mul(cv::Scalar(1 / 127.5, 1 / 127.5, 1 / 127.5));
       sample_final = sample_final - cv::Scalar(1.0, 1.0, 1.0);
     }
   } else if (scaling_ == ScaleType::VGG) {
     if (c == 1) {
       sample_final = sample_type - cv::Scalar(128);
     } else {
-      sample_final = sample_type - cv::Scalar(104, 117, 123);
+      sample_final = sample_type - cv::Scalar(123, 117, 104);
     }
   } else if (scaling_ == ScaleType::ONE255) {
     if (c == 1) {

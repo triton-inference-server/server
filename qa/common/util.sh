@@ -234,6 +234,43 @@ function run_server_nowait () {
     SERVER_PID=$!
 }
 
+# Run inference server inside a memory management tool like Valgrind/ASAN.
+# Return once server's health endpoint shows ready or timeout expires. Sets
+# SERVER_PID to pid of SERVER, or 0 if error (including expired timeout)
+function run_server_leakcheck () {
+    SERVER_PID=0
+
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
+    if [ -z "$LEAKCHECK" ]; then
+        echo "=== LEAKCHECK must be defined"
+        return
+    fi
+
+    if [ ! -f "$SERVER" ]; then
+        echo "=== $SERVER does not exist"
+        return
+    fi
+
+    if [ -z "$SERVER_LD_PRELOAD" ]; then
+      echo "=== Running $SERVER $SERVER_ARGS"
+    else
+      echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
+    fi
+
+    TRITONSERVER_DISABLE_BACKEND_UNLOAD=1 LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    SERVER_PID=$!
+
+    wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
+    if [ "$WAIT_RET" != "0" ]; then
+        kill $SERVER_PID || true
+        SERVER_PID=0
+    fi
+}
+
 # Run nvidia-smi to monitor GPU utilization.
 # Writes utilization into MONITOR_LOG. If MONITOR_ID is specified only
 # that GPU PCI bus ID is monitored.
@@ -274,21 +311,56 @@ function check_test_results () {
     local log_file=$1
     local expected_num_tests=$2
 
-    if [ -z "$expected_num_tests" ]; then
+    if [[ -z "$expected_num_tests" ]]; then
         echo "=== expected number of tests must be defined"
         return 1
     fi
 
-    num_failures=`cat $log_file | grep -E ".*total.*errors.*failures.*skipped.*" | tail -n 1 | jq .failures`
-    num_tests=`cat $log_file | grep -E ".*total.*errors.*failures.*skipped.*" | tail -n 1 | jq .total`
-    if [ $? -ne 0 ]; then
+    num_failures=`cat $log_file | grep -E ".*total.*errors.*failures.*" | tail -n 1 | jq .failures`
+    num_tests=`cat $log_file | grep -E ".*total.*errors.*failures.*" | tail -n 1 | jq .total`
+    num_errors=`cat $log_file | grep -E ".*total.*errors.*failures.*" | tail -n 1 | jq .errors`
+
+    # Number regular expression
+    re='^[0-9]+$'
+
+    if [[ $? -ne 0 ]] || ! [[ $num_failures =~ $re ]] || ! [[ $num_tests =~ $re ]] || \
+     ! [[ $num_errors =~ $re ]]; then
         cat $log_file
         echo -e "\n***\n*** Test Failed: unable to parse test results\n***" >> $log_file
         return 1
     fi
-    if [ $num_failures != "0" ] || [ $num_tests -ne $expected_num_tests ]; then
+    if [[ $num_errors != "0" ]] || [[ $num_failures != "0" ]] || [[ $num_tests -ne $expected_num_tests ]]; then
         cat $log_file
-        echo -e "\n***\n*** Test Failed: Expected $expected_num_tests test(s), $num_tests test(s) executed, and $num_failures test(s) failed. \n***" >> $log_file
+        echo -e "\n***\n*** Test Failed: Expected $expected_num_tests test(s), $num_tests test(s) executed, $num_errors test(s) had error, and $num_failures test(s) failed. \n***" >> $log_file
+        return 1
+    fi
+
+    return 0
+}
+
+# Check the valgrind logs for memory leaks, ignoring known memory leaks
+#   * cnmem https://github.com/NVIDIA/cnmem/issues/12
+#   * dlopen leak could be due to https://bugs.kde.org/show_bug.cgi?id=358980
+#   * Tensorflow::NewSession
+#   * PlanBackend::CreateExecutionContexts -> LoadPlan -> createInferRuntime_INTERNAL
+#   * OnnxBackend::CreateExecutionContext -> OnnxBackend::Context::ValidateOutputs -> OutputInfos -> InputOutputInfos
+#     -> OrtApis::SessionGetOutputName -> StrDup -> onnxruntime::utils::DefaultAlloc
+#   * NetDefBackend::CreateExecutionContext -> Caffe2WorkspaceCreate
+#   * ModelInferHandler::InferResponseComplete -> TRITONSERVER_ErrorNew
+#   *
+function check_valgrind_log () {
+    local valgrind_log=$1
+
+    leak_records=$(grep "are definitely lost" -A 8 $valgrind_log | awk \
+    'BEGIN{RS="--";acc=0} !(/cnmem/||/tensorflow::NewSession/||/dl-init/|| \
+    /dlerror/||/libtorch/) \
+    {print;acc+=1} END{print acc}')
+
+    num_leaks=$(echo -e "$leak_records" | tail -n1)
+
+    if [ "$num_leaks" != "0" ]; then
+        echo -e "$leak_records" | sed '$d'
+        echo -e "\n***\n*** Test Failed: $num_leaks memory leaks detected.\n***"
         return 1
     fi
 

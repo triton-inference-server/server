@@ -43,7 +43,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
-MODELBASE=onnx_int32_int32_int32
+MODELBASE=plan_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
 

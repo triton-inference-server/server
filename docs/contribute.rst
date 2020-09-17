@@ -31,7 +31,7 @@ Contributing
 Contributions to Triton Inference Server are more than welcome. To
 contribute make a pull request and follow the guidelines outlined in
 the `CONTRIBUTING
-<https://github.com/NVIDIA/triton-inference-server/blob/master/CONTRIBUTING.md>`_
+<https://github.com/triton-inference-server/server/blob/master/CONTRIBUTING.md>`_
 document.
 
 Coding Convention

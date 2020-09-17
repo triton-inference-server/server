@@ -34,8 +34,8 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "src/core/tritonserver.h"
 #include "src/servers/common.h"
+#include "triton/core/tritonserver.h"
 
 static_assert(
     TRITON_MIN_COMPUTE_CAPABILITY >= 1.0,

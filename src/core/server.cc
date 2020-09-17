@@ -116,7 +116,17 @@ InferenceServer::Init()
 
   ready_state_ = ServerReadyState::SERVER_INITIALIZING;
 
-  LOG_INFO << "Initializing Triton Inference Server";
+  if (LOG_INFO_IS_ON) {
+    LOG_INFO << "Initializing Triton Inference Server";
+    LOG_INFO << "  id: '" << id_ << "'";
+    LOG_INFO << "  version: '" << version_ << "'";
+    std::string exts;
+    for (const auto& ext : extensions_) {
+      exts.append(" ");
+      exts.append(ext);
+    }
+    LOG_INFO << "  extensions: " << exts;
+  }
 
   if (model_repository_paths_.empty()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
@@ -188,9 +198,9 @@ InferenceServer::Init()
 }
 
 Status
-InferenceServer::Stop()
+InferenceServer::Stop(const bool force)
 {
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
+  if (!force && (ready_state_ != ServerReadyState::SERVER_READY)) {
     return Status::Success;
   }
 

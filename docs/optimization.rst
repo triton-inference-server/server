@@ -37,6 +37,12 @@ improve the performance of your model. As a prerequisite you should
 follow the :ref:`section-quickstart` to get Triton and client examples
 running with the example model repository.
 
+This section focuses on understanding latecy and throughput tradeoffs
+for a single model. The :ref:`Model Analyzer <section-model-analyzer>`
+section describes a tool that helps you understand the GPU memory and
+compute utilization of your models so you can decide how to best run
+multiple models on a single GPU.
+
 Unless you already have a client application suitable for measuring
 the performance of your model on Triton, you should familiarize
 yourself with :ref:`perf\_client <section-perf-client>`. The
@@ -48,7 +54,7 @@ options, we will use a Caffe2 ResNet50 model that you can obtain by
 following the :ref:`section-quickstart`. As a baseline we use
 perf\_client to determine the performance of the model using a `basic
 model configuration that does not enable any performance features
-<https://github.com/NVIDIA/triton-inference-server/blob/master/docs/examples/model_repository/resnet50_netdef/config.pbtxt>`_::
+<https://github.com/triton-inference-server/server/blob/master/docs/examples/model_repository/resnet50_netdef/config.pbtxt>`_::
 
   $ perf_client -m resnet50_netdef --percentile=95 --concurrency-range 1:4
   ...
@@ -201,6 +207,8 @@ of the supported model frameworks. These optimization settings are
 controlled by the model configuration :ref:`optimization policy
 <section-optimization-policy>`.
 
+.. _section-opt-onnx-tensorrt:
+
 ONNX with TensorRT Optimization
 ...............................
 
@@ -211,7 +219,7 @@ model, we will use an ONNX DenseNet model that you can obtain by
 following the :ref:`section-quickstart`. As a baseline we use
 perf\_client to determine the performance of the model using a `basic
 model configuration that does not enable any performance features
-<https://github.com/NVIDIA/triton-inference-server/blob/master/docs/examples/model_repository/densenet_onnx/config.pbtxt>`_::
+<https://github.com/triton-inference-server/server/blob/master/docs/examples/model_repository/densenet_onnx/config.pbtxt>`_::
 
   $ perf_client -m densenet_onnx --percentile=95 --concurrency-range 1:4
   ...
@@ -247,6 +255,8 @@ cutting latency in half. The benefit provided by TensorRT will vary
 based on the model, but in general it can provide significant
 performance improvement.
 
+.. _section-opt-tensorflow-tensorrt:
+
 TensorFlow with TensorRT Optimization
 .....................................
 
@@ -273,7 +283,7 @@ we will use a TensorFlow Inception model that you can obtain by
 following the :ref:`section-quickstart`. As a baseline we use
 perf\_client to determine the performance of the model using a `basic
 model configuration that does not enable any performance features
-<https://github.com/NVIDIA/triton-inference-server/blob/master/docs/examples/model_repository/inception_graphdef/config.pbtxt>`_::
+<https://github.com/triton-inference-server/server/blob/master/docs/examples/model_repository/inception_graphdef/config.pbtxt>`_::
 
   $ perf_client -m inception_graphdef --percentile=95 --concurrency-range 1:4
   ...
@@ -328,5 +338,6 @@ You can follow the steps described above for TensorRT to see how this
 automatic FP16 optimization benefits a model by using perf\_client to
 evaluate the model's performance with and without the optimization.
 
+.. include:: model_analyzer.rst
 .. include:: perf_client.rst
 .. include:: trace.rst

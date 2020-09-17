@@ -235,37 +235,31 @@ def get_zero_model_name(pf, io_cnt, dtype):
 
 
 class TestResultCollector(unittest.TestCase):
-    # TestResultCollector stores test result and prints it to stdout. In order to use
-    # this class, unittest class should inherit this class
-
-    current_result = None
+    # TestResultCollector stores test result and prints it to stdout. In order
+    # to use this class, unit tests must inherit this class. Use
+    # `check_test_results` bash function from `common/util.sh` to verify the
+    # expected number of tests produced by this class
 
     @classmethod
-    def setResult(cls, amount, errors, failures, skipped):
-        cls.amount, cls.errors, cls.failures, cls.skipped = \
-            amount, errors, failures, skipped
-
-    def tearDown(self):
-        # this is called immediately after the test method
-        amount = self.current_result.testsRun
-        errors = len(self.current_result.errors)
-        failures = len(self.current_result.failures)
-        skipped = len(self.current_result.skipped)
-        self.setResult(amount, errors, failures, skipped)
+    def setResult(cls, total, errors, failures):
+        cls.total, cls.errors, cls.failures = \
+            total, errors, failures
 
     @classmethod
     def tearDownClass(cls):
         # this method is called when all the unit tests in a class are
         # finished.
         json_res = {
-            'total': cls.amount,
+            'total': cls.total,
             'errors': cls.errors,
-            'failures': cls.failures,
-            'skipped': cls.skipped
+            'failures': cls.failures
         }
         print(json.dumps(json_res))
 
     def run(self, result=None):
-        # result argument stores the test results
-        self.current_result = result
-        unittest.TestCase.run(self, result)
+        # result argument stores the accumulative test results
+        test_result = super().run(result)
+        total = test_result.testsRun
+        errors = len(test_result.errors)
+        failures = len(test_result.failures)
+        self.setResult(total, errors, failures)

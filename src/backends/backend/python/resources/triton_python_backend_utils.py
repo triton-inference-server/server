@@ -26,6 +26,54 @@
 
 import numpy as np
 
+TRITION_TO_NUMPY_TYPE = {
+    # TRITONSERVER_TYPE_BOOL
+    1: np.bool,
+    # TRITONSERVER_TYPE_UINT8
+    2: np.uint8,
+    # TRITONSERVER_TYPE_UINT16
+    3: np.uint16,
+    # TRITONSERVER_TYPE_UINT32
+    4: np.uint32,
+    # TRITONSERVER_TYPE_UINT64
+    5: np.uint64,
+    # TRITONSERVER_TYPE_INT8
+    6: np.int8,
+    # TRITONSERVER_TYPE_INT16
+    7: np.int16,
+    # TRITONSERVER_TYPE_INT32
+    8: np.int32,
+    # TRITONSERVER_TYPE_INT64
+    9: np.int64,
+    # TRITONSERVER_TYPE_FP16
+    10: np.float16,
+    # TRITONSERVER_TYPE_FP32
+    11: np.float32,
+    # TRITONSERVER_TYPE_FP64
+    12: np.float64,
+    # TRITONSERVER_TYPE_STRING
+    13: np.bytes_
+}
+
+TRITION_STRING_TO_NUMPY = {
+    'TYPE_BOOL': np.bool,
+    'TYPE_UINT8': np.uint8,
+    'TYPE_UINT16': np.uint16,
+    'TYPE_UINT32': np.uint32,
+    'TYPE_UINT64': np.uint64,
+    'TYPE_INT8': np.int8,
+    'TYPE_INT16': np.int16,
+    'TYPE_INT32': np.int32,
+    'TYPE_INT64': np.int64,
+    'TYPE_FP16': np.float16,
+    'TYPE_FP32': np.float32,
+    'TYPE_FP64': np.float64,
+    'TYPE_STRING': np.bytes_
+}
+
+NUMPY_TO_TRITION_TYPE = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
+NUMPY_TO_TRITION_STRING = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
+
 
 class InferenceRequest:
     """InferenceRequest represents a request for inference for a model that
@@ -100,10 +148,14 @@ class InferenceResponse:
     output_tensors : list
         A list of Tensor objects, each describing data for an output tensor
         required the InferenceRequest
+    error : TritonError
+        A TritonError object describing any errror encountered while creating
+        resposne
     """
 
-    def __init__(self, output_tensors):
+    def __init__(self, output_tensors, error=None):
         self._output_tensors = output_tensors
+        self._err = error
 
     def output_tensors(self):
         """Get output tensors
@@ -113,6 +165,24 @@ class InferenceResponse:
             A list of Tensor objects
         """
         return self._output_tensors
+
+    def has_error(self):
+        """True if response has error
+        Returns
+        -------
+        boolean
+            A boolean indicating whether response has an error
+        """
+        return self._err != None
+
+    def error(self):
+        """Get TritonError for this inference response
+        Returns
+        -------
+        TritonError
+            A TritonError containing the error
+        """
+        return self._err
 
 
 class Tensor:
@@ -129,7 +199,7 @@ class Tensor:
 
     def __init__(self, name, numpy_array):
         if not isinstance(numpy_array, (np.ndarray,)):
-            raise_error("numpy_array must be a numpy array")
+            raise TritonModelException("numpy_array must be a numpy array")
 
         self._name = name
         self._numpy_array = numpy_array
@@ -143,7 +213,7 @@ class Tensor:
         """
         return self._name
 
-    def numpy_array(self):
+    def as_numpy(self):
         """Get the underlying numpy array
         Returns
         -------
@@ -151,3 +221,147 @@ class Tensor:
             The numpy array
         """
         return self._numpy_array
+
+
+class TritonError:
+    """Error indicating non-Success status.
+
+    Parameters
+    ----------
+    msg : str
+        A brief description of error
+    """
+
+    def __init__(self, msg):
+        self._msg = msg
+
+    def __str__(self):
+        msg = super().__str__() if self._msg is None else self._msg
+        return msg
+
+    def message(self):
+        """Get the error message.
+
+        Returns
+        -------
+        str
+            The message associated with this error, or None if no message.
+
+        """
+        return self._msg
+
+
+class TritonModelException(Exception):
+    """Exception indicating non-Success status.
+
+    Parameters
+    ----------
+    msg : str
+        A brief description of error
+    """
+
+    def __init__(self, msg):
+        self._msg = msg
+
+    def __str__(self):
+        msg = super().__str__() if self._msg is None else self._msg
+        return msg
+
+    def message(self):
+        """Get the exception message.
+
+        Returns
+        -------
+        str
+            The message associated with this exception, or None if no message.
+        """
+        return self._msg
+
+
+def get_input_tensor_by_name(inference_request, name):
+    """Find an input Tensor in the inference_request that has the given
+    name
+
+    Parameters
+    ----------
+    inference_request : InferenceRequest
+        InferenceRequest object
+    name : str
+        name of the input Tensor object
+
+    Returns
+    -------
+    Tensor
+        The input Tensor with the specified name, or None if no
+        input Tensor with this name exists
+    """
+    input_tensors = inference_request.inputs()
+    for input_tensor in input_tensors:
+        if input_tensor.name() == name:
+            return input_tensor
+
+    return None
+
+
+def get_input_config_by_name(model_config, name):
+    """Get input properties corresponding to the input
+    with given `name`
+
+    Parameters
+    ----------
+    model_config : dict
+        dictionary object containing the model configuration
+    name : str
+        name of the input object
+
+    Returns
+    -------
+    dict
+        A dictionary containing all the properties for a given input
+        name, or None if no input with this name exists
+    """
+    if 'input' in model_config:
+        inputs = model_config['input']
+        for input_properties in inputs:
+            if input_properties['name'] == name:
+                return input_properties
+
+    return None
+
+
+def get_output_config_by_name(model_config, name):
+    """Get output properties corresponding to the output
+    with given `name`
+
+    Parameters
+    ----------
+    model_config : dict
+        dictionary object containing the model configuration
+    name : str
+        name of the output object
+
+    Returns
+    -------
+    dict
+        A dictionary containing all the properties for a given output
+        name, or None if no output with this name exists
+    """
+    if 'output' in model_config:
+        outputs = model_config['output']
+        for output_properties in outputs:
+            if output_properties['name'] == name:
+                return output_properties
+
+    return None
+
+
+def triton_to_numpy_type(data_type):
+    return TRITION_TO_NUMPY_TYPE[data_type]
+
+
+def numpy_to_triton_type(data_type):
+    return NUMPY_TO_TRITION_TYPE[data_type]
+
+
+def triton_string_to_numpy(triton_type_string):
+    return TRITION_STRING_TO_NUMPY[triton_type_string]

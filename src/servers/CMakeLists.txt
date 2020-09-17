@@ -57,6 +57,13 @@ if(${TRITON_ENABLE_GRPC})
     add_dependencies(grpc-endpoint-library grpc-library)
   endif() # TRITON_ENABLE_GRPC
 
+  target_link_libraries(
+    grpc-endpoint-library
+    PUBLIC
+      triton-core-serverapi   # from repo-core
+      triton-common-json      # from repo-common
+  )
+
   set(
     GRPC_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:grpc-endpoint-library>
@@ -113,6 +120,13 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
   )
 
+  target_link_libraries(
+    http-endpoint-library
+    PUBLIC
+      triton-core-serverapi   # from repo-core
+      triton-common-json      # from repo-common
+  )
+
   set(
     HTTP_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:http-endpoint-library>
@@ -156,6 +170,11 @@ if(${TRITON_ENABLE_TRACING})
   if(${TRITON_ENABLE_GPU})
     target_include_directories(tracing-library PRIVATE ${CUDA_INCLUDE_DIRS})
   endif() # TRITON_ENABLE_GPU
+  target_link_libraries(
+    tracing-library
+    PRIVATE triton-core-serverapi
+  )
+
   set(
     TRACING_OBJECTS
     $<TARGET_OBJECTS:tracing-library>
@@ -210,6 +229,8 @@ target_link_libraries(
   PRIVATE rt
   ${TRACING_LIBRARIES}
   PRIVATE protobuf::libprotobuf
+  PRIVATE triton-common-json
+  PRIVATE triton-core-serverapi
   PRIVATE tritonserver
 )
 if(${TRITON_ENABLE_GPU})
@@ -252,9 +273,11 @@ set_target_properties(
 )
 target_link_libraries(
   simple
+  PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
-)
+  )
+
 if(${TRITON_ENABLE_GPU})
 target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
@@ -302,6 +325,7 @@ target_link_libraries(
   PUBLIC -L/usr/local/cuda/lib64/stubs
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
+  PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
@@ -350,7 +374,6 @@ add_library(
   $<TARGET_OBJECTS:server-library>
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
-  $<TARGET_OBJECTS:triton-json-library>
   ${CUDA_OBJS}
   ${BACKEND_OBJS}
 )
@@ -360,13 +383,16 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch:$\{ORIGIN\}/onnx"
+    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch"
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonserver.ldscript
     LINK_FLAGS "-Wl,--version-script libtritonserver.ldscript"
 )
 target_link_libraries(
   tritonserver
   PRIVATE -ldl
+  PRIVATE triton-core-backendapi
+  PRIVATE triton-core-serverapi
+  PRIVATE triton-common-json
   PRIVATE ${TRITON_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf
 )
@@ -400,22 +426,6 @@ if(${TRITON_ENABLE_CAFFE2} OR ${TRITON_ENABLE_PYTORCH})
     PUBLIC -lmkl_vml_def
   )
 endif() # TRITON_ENABLE_CAFFE2 || TRITON_ENABLE_PYTORCH
-
-if(${TRITON_ENABLE_ONNXRUNTIME})
-  target_link_libraries(
-    tritonserver
-    PUBLIC ${TRITON_EXTRA_LDFLAGS}
-    PUBLIC -lonnxruntime
-  )
-endif() # TRITON_ENABLE_ONNXRUNTIME
-if(${TRITON_ENABLE_ONNXRUNTIME_OPENVINO})
-  target_link_libraries(
-    tritonserver
-    PUBLIC ${TRITON_EXTRA_LDFLAGS}
-    PUBLIC -ltbb
-    PUBLIC -linference_engine
-  )
-endif() # TRITON_ENABLE_ONNXRUNTIME_OPENVINO
 
 if(${TRITON_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)
@@ -459,9 +469,4 @@ endif() # TRITON_ENABLE_GPU
 install(
   TARGETS tritonserver
   LIBRARY DESTINATION lib
-)
-
-install(
-  FILES ../core/tritonserver.h
-  DESTINATION include
 )

@@ -40,15 +40,15 @@ from tritonclientutils import InferenceServerException
 
 class PluginModelTest(tu.TestResultCollector):
 
-    def _full_exact(self, batch_size, model_name, plugin_name):
+    def _full_exact(self, model_name, plugin_name, shape):
         triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                          verbose=True)
 
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT0', [batch_size, 16], "FP32"))
+        inputs.append(httpclient.InferInput('INPUT0', list(shape), "FP32"))
 
-        input0_data = np.random.randn(batch_size, 16).astype(np.float32)
+        input0_data = np.ones(shape=shape).astype(np.float32)
         inputs[0].set_data_from_numpy(input0_data, binary_data=True)
 
         outputs.append(
@@ -60,23 +60,29 @@ class PluginModelTest(tu.TestResultCollector):
 
         output0_data = results.as_numpy('OUTPUT0')
 
-        # Verify values of Leaky RELU (it uses 0.1 instead of the default 0.01)
-        # and for CustomClipPlugin min_clip = 0.1, max_clip = 0.5
-        for b in range(batch_size):
-            if plugin_name == 'LReLU_TRT':
-                test_input = np.where(input0_data > 0, input0_data,
-                                      input0_data * 0.1)
-                self.assertTrue(np.isclose(output0_data, test_input).all())
-            else:
-                # [TODO] Add test for CustomClip output
-                test_input = np.clip(input0_data, 0.1, 0.5)
+        # Verify values of Normalize and GELU
+        if plugin_name == 'CustomGeluPluginDynamic':
+            # Add bias
+            input0_data += 1
+            # Calculate Gelu activation
+            test_output = (input0_data *
+                           0.5) * (1 + np.tanh((0.797885 * input0_data) +
+                                               (0.035677 * (input0_data**3))))
+            self.assertTrue(np.isclose(output0_data, test_output).all())
+        else:
+            # L2 norm is sqrt(sum([1]*16)))
+            test_output = input0_data / np.sqrt(sum([1] * 16))
+            self.assertTrue(np.isclose(output0_data, test_output).all())
 
-    def test_raw_fff_lrelu(self):
+    def test_raw_fff_gelu(self):
+        self._full_exact('plan_nobatch_float32_float32_float32',
+                         'CustomGeluPluginDynamic', (16, 1, 1))
+
+    def test_raw_fff_norm(self):
         # model that supports batching
         for bs in (1, 8):
-            self._full_exact(bs, 'plan_float32_float32_float32', 'LReLU_TRT')
-
-    # add test for CustomClipPlugin after model is fixed
+            self._full_exact('plan_float32_float32_float32', 'Normalize_TRT',
+                             (bs, 16, 16, 16))
 
 
 if __name__ == '__main__':

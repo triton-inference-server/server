@@ -48,6 +48,29 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
+#
+# Dependencies
+#
+# FetchContent's composibility isn't very good. We must include the
+# transitive closure of all repos so that we can override the tag.
+#
+include(FetchContent)
+
+FetchContent_Declare(
+  repo-common
+  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+  GIT_TAG ${TRITON_COMMON_REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_Declare(
+  repo-core
+  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+  GIT_TAG ${TRITON_CORE_REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_MakeAvailable(repo-common repo-core)
+
+
 if(${TRITON_CLIENT_SKIP_EXAMPLES})
   add_definitions(-DTRITON_CLIENT_SKIP_EXAMPLES=1)
 endif() # TRITON_CLIENT_SKIP_EXAMPLES

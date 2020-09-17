@@ -32,6 +32,8 @@ import importlib.util
 import sys
 import threading
 import signal
+import time
+import struct
 
 import numpy as np
 
@@ -39,47 +41,85 @@ from python_host_pb2 import *
 from python_host_pb2_grpc import PythonInterpreterServicer, add_PythonInterpreterServicer_to_server
 import grpc
 
-lock = threading.Lock()
-cv = threading.Condition(lock)
 
-TRITION_TO_NUMPY_TYPE = {
-    # TRITONSERVER_TYPE_BOOL
-    1: np.bool,
-    # TRITONSERVER_TYPE_UINT8
-    2: np.uint8,
-    # TRITONSERVER_TYPE_UINT16
-    3: np.uint16,
-    # TRITONSERVER_TYPE_UINT32
-    4: np.uint32,
-    # TRITONSERVER_TYPE_UINT64
-    5: np.uint64,
-    # TRITONSERVER_TYPE_INT8
-    6: np.int8,
-    # TRITONSERVER_TYPE_INT16
-    7: np.int16,
-    # TRITONSERVER_TYPE_INT32
-    8: np.int32,
-    # TRITONSERVER_TYPE_INT64
-    9: np.int64,
-    # TRITONSERVER_TYPE_FP16
-    10: np.float16,
-    # TRITONSERVER_TYPE_FP32
-    11: np.float32,
-    # TRITONSERVER_TYPE_FP64
-    12: np.float64,
-    # TRITONSERVER_TYPE_BYTES
-    13: np.bytes_
-}
+def serialize_byte_tensor(input_tensor):
+    """
+        Serializes a bytes tensor into a flat numpy array of length prepend bytes.
+        Can pass bytes tensor as numpy array of bytes with dtype of np.bytes_,
+        numpy strings with dtype of np.str_ or python strings with dtype of np.object.
+        Parameters
+        ----------
+        input_tensor : np.array
+            The bytes tensor to serialize.
+        Returns
+        -------
+        serialized_bytes_tensor : np.array
+            The 1-D numpy array of type uint8 containing the serialized bytes in 'C' order.
+        Raises
+        ------
+        InferenceServerException
+            If unable to serialize the given tensor.
+        """
 
-NUMPY_TO_TRITION_TYPE = {v: k for k, v in TRITION_TO_NUMPY_TYPE.items()}
+    if input_tensor.size == 0:
+        return np.empty([0])
+
+    # If the input is a tensor of string/bytes objects, then must flatten those into
+    # a 1-dimensional array containing the 4-byte byte size followed by the
+    # actual element bytes. All elements are concatenated together in "C"
+    # order.
+    if (input_tensor.dtype == np.object) or (input_tensor.dtype.type
+                                             == np.bytes_):
+        flattened = bytes()
+        for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
+            # If directly passing bytes to BYTES type,
+            # don't convert it to str as Python will encode the
+            # bytes which may distort the meaning
+            if obj.dtype.type == np.bytes_:
+                if type(obj.item()) == bytes:
+                    s = obj.item()
+                else:
+                    s = bytes(obj)
+            else:
+                s = str(obj).encode('utf-8')
+            flattened += struct.pack("<I", len(s))
+            flattened += s
+        flattened_array = np.asarray(flattened)
+        if not flattened_array.flags['C_CONTIGUOUS']:
+            flattened_array = np.ascontiguousarray(flattened_array)
+        return flattened_array
+    else:
+        raise TritonModelException(
+            "cannot serialize bytes tensor: invalid datatype")
+    return None
 
 
-def protobuf_to_numpy_type(data_type):
-    return TRITION_TO_NUMPY_TYPE[data_type]
-
-
-def numpy_to_protobuf_type(data_type):
-    return NUMPY_TO_TRITION_TYPE[data_type]
+def deserialize_bytes_tensor(encoded_tensor):
+    """
+    Deserializes an encoded bytes tensor into an
+    numpy array of dtype of python objects
+    Parameters
+    ----------
+    encoded_tensor : bytes
+        The encoded bytes tensor where each element
+        has its length in first 4 bytes followed by
+        the content
+    Returns
+    -------
+    string_tensor : np.array
+        The 1-D numpy array of type object containing the
+        deserialized bytes in 'C' order.
+    """
+    strs = list()
+    offset = 0
+    val_buf = encoded_tensor
+    while offset < len(val_buf):
+        l = struct.unpack_from("<I", val_buf, offset)[0]
+        offset += 4
+        sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
+        offset += l
+        strs.append(sb)
+    return (np.array(strs, dtype=bytes))
 
 
 def parse_startup_arguments():
@@ -89,12 +129,12 @@ def parse_startup_arguments():
                         required=True,
                         type=str,
                         help="Socket to comunicate with server")
-    parser.add_argument("--model_path",
+    parser.add_argument("--model-path",
                         default=None,
                         required=True,
                         type=str,
                         help="Path to model code")
-    parser.add_argument("--instance_name",
+    parser.add_argument("--instance-name",
                         default=None,
                         required=True,
                         type=str,
@@ -108,17 +148,17 @@ class PythonHost(PythonInterpreterServicer):
 
     def __init__(self, module_path, *args, **kwargs):
         super(PythonInterpreterServicer, self).__init__(*args, **kwargs)
-        spec = importlib.util.spec_from_file_location('TritonPythonBackend',
+        spec = importlib.util.spec_from_file_location('TritonPythonModel',
                                                       module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+        self.module_path = module_path
 
-        if hasattr(module, 'TritonPythonBackend'):
-            self.initializer_func = module.TritonPythonBackend
+        if hasattr(module, 'TritonPythonModel'):
+            self.backend = module.TritonPythonModel()
         else:
             raise NotImplementedError(
-                'TritonPythonBackend class doesn\'t exist in ' + module_path)
-        self.backend = None
+                'TritonPythonModel class doesn\'t exist in ' + module_path)
 
     def Init(self, request, context):
         """Init is called on TRITONBACKEND_ModelInstanceInitialize. `request`
@@ -126,13 +166,22 @@ class PythonHost(PythonInterpreterServicer):
         containing the model configuration. This paramter is passed by
         default to every ModelInstance.
         """
+
+        backend = self.backend
+
         if not hasattr(request, 'args'):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('request objects does\'nt have args attribute')
             return Empty()
 
-        args = {x.key: x.value for x in request.args}
-        self.backend = self.initializer_func(args)
+        if hasattr(backend, 'initialize'):
+            args = {x.key: x.value for x in request.args}
+            try:
+                self.backend.initialize(args)
+            except tpb_utils.TritonModelException as e:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(e.message())
+
         return Empty()
 
     def Fini(self, request, context):
@@ -140,12 +189,12 @@ class PythonHost(PythonInterpreterServicer):
         can perform any necessary clean up in the `finalize` function.
         """
         if hasattr(self.backend, 'finalize'):
-            self.backend.finalize()
+            try:
+                self.backend.finalize()
+            except tpb_utils.TritonModelException as e:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(e.message())
 
-        with cv:
-            cv.notify()
-
-        del self.backend
         return Empty()
 
     def Execute(self, request, context):
@@ -167,12 +216,20 @@ class PythonHost(PythonInterpreterServicer):
             input_tensors = []
             for request_input in request.inputs:
                 x = request_input
-                tensor = tpb_utils.Tensor(
-                    x.name,
-                    np.frombuffer(x.raw_data,
-                                  dtype=protobuf_to_numpy_type(
-                                      x.dtype)).reshape(x.dims))
-                input_tensors.append(tensor)
+                numpy_type = tpb_utils.triton_to_numpy_type(x.dtype)
+
+                # We need to deserialize TYPE_STRING
+                if numpy_type == np.object or numpy_type == np.bytes_:
+                    numpy_data = deserialize_bytes_tensor(x.raw_data)
+                    tensor = tpb_utils.Tensor(x.name,
+                                              numpy_data.reshape(x.dims))
+                    input_tensors.append(tensor)
+                else:
+                    tensor = tpb_utils.Tensor(
+                        x.name,
+                        np.frombuffer(x.raw_data,
+                                      dtype=numpy_type).reshape(x.dims))
+                    input_tensors.append(tensor)
 
             request_id = request.id
             correlation_id = request.correlation_id
@@ -183,8 +240,14 @@ class PythonHost(PythonInterpreterServicer):
             inference_requests.append(inference_request)
 
         # Execute inference on the Python backend responses contains a list of
-        # triton_python_backend_utils.InferenceResponse
-        responses = self.backend(inference_requests)
+        # triton_python_backend_utils.InferenceResponse. Each backend must
+        # implement an execute method
+        if not hasattr(self.backend, 'execute'):
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('Backend does not implement `execute` method')
+            return ExecuteResponse()
+
+        responses = self.backend.execute(inference_requests)
 
         # Make sure that number of InferenceResponse and InferenceRequest
         # objects match
@@ -198,16 +261,32 @@ class PythonHost(PythonInterpreterServicer):
 
         exec_responses = []
         for response in responses:
+            # If there is an error do not look into output_tensors
+            if response.has_error():
+                error = Error(message=response.error().message())
+                inference_response = InferenceResponse(outputs=[],
+                                                       error=error,
+                                                       failed=True)
+                exec_responses.append(inference_response)
+                continue
+
             output_tensors = response.output_tensors()
             response_tensors = []
 
             for output_tensor in output_tensors:
-                output_np_array = output_tensor.numpy_array()
+                output_np_array = output_tensor.as_numpy()
+                output_shape = output_np_array.shape
+
+                # We need to serialize TYPE_STRING
+                if output_np_array.dtype.type is np.object or output_np_array.dtype.type is np.bytes_:
+                    output_np_array = serialize_byte_tensor(output_np_array)
+
                 tensor = Tensor(name=output_tensor.name(),
-                                dtype=numpy_to_protobuf_type(
+                                dtype=tpb_utils.numpy_to_triton_type(
                                     output_np_array.dtype.type),
-                                dims=output_np_array.shape,
+                                dims=output_shape,
                                 raw_data=output_np_array.tobytes())
+
                 response_tensors.append(tensor)
             exec_responses.append(InferenceResponse(outputs=response_tensors))
         execute_response = ExecuteResponse(responses=exec_responses)
@@ -216,18 +295,30 @@ class PythonHost(PythonInterpreterServicer):
 
 
 if __name__ == "__main__":
+    signal_received = False
     FLAGS = parse_startup_arguments()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
+    # Create an Event to keep the GRPC server running
+    event = threading.Event()
     python_host = PythonHost(module_path=FLAGS.model_path)
     add_PythonInterpreterServicer_to_server(python_host, server)
 
+    def interrupt_handler(signum, frame):
+        pass
+
+    def sigterm_handler(signum, frame):
+        global signal_received
+        if not signal_received:
+            signal_received = True
+        else:
+            return
+
+        event.set()
+
+    signal.signal(signal.SIGINT, interrupt_handler)
+    signal.signal(signal.SIGTERM, sigterm_handler)
+
     server.add_insecure_port(FLAGS.socket)
     server.start()
-
-    def signal_handler(signal, frame):
-        with cv:
-            cv.wait()
-        server.stop(grace=5)
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.pause()
+    event.wait()
+    server.stop(grace=5)

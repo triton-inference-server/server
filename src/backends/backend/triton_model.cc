@@ -28,12 +28,12 @@
 
 #include <vector>
 #include "src/backends/backend/triton_model_instance.h"
-#include "src/backends/backend/tritonbackend.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_message.h"
-#include "src/core/tritonserver.h"
+#include "triton/core/tritonbackend.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -168,6 +168,7 @@ TritonModel::Create(
       }
     }
   }
+
   const std::string backend_libname = "libtriton_" + backend_name + ".so";
 
   // Get the path to the backend shared library. Search path is
@@ -178,12 +179,14 @@ TritonModel::Create(
   const std::vector<std::string> search_paths = {version_path, model_path,
                                                  global_path};
 
+  std::string backend_libdir;
   std::string backend_libpath;
   for (const auto& path : search_paths) {
     const auto full_path = JoinPath({path, backend_libname});
     bool exists = false;
     RETURN_IF_ERROR(FileExists(full_path, &exists));
     if (exists) {
+      backend_libdir = path;
       backend_libpath = full_path;
       break;
     }
@@ -209,7 +212,8 @@ TritonModel::Create(
 
   std::shared_ptr<TritonBackend> backend;
   RETURN_IF_ERROR(TritonBackendManager::CreateBackend(
-      model_config.backend(), backend_libpath, *config, &backend));
+      model_config.backend(), backend_libdir, backend_libpath, *config,
+      &backend));
 
   // Create and initialize the model.
   std::unique_ptr<TritonModel> local_model(new TritonModel(
@@ -261,15 +265,6 @@ TritonModel::Create(
           triton_requests.push_back(
               reinterpret_cast<TRITONBACKEND_Request*>(r.release()));
         }
-
-        // We don't want the backend used by this model to unload
-        // while exec_fn is running (can happen if model is unloaded
-        // during the request and then that request is released in
-        // exec_fn as the last reference to the model). So we hold a
-        // copy of the backend here... This convoluted flow will be
-        // cleaned up once legacy InferenceBackend is replaced with
-        // TritonModel.
-        std::shared_ptr<TritonBackend> backendx = backend;
 
         TRITONBACKEND_ModelInstance* triton_model_instance =
             reinterpret_cast<TRITONBACKEND_ModelInstance*>(
@@ -385,6 +380,13 @@ TritonModel::TritonModel(
 
 TritonModel::~TritonModel()
 {
+  // Need to explicitly delete the scheduler from InferenceBackend
+  // base class to make sure that all scheduler threads have returned
+  // from running in the backend code... This convoluted flow will be
+  // cleaned up once legacy InferenceBackend is completed replaced by
+  // TritonModel.
+  scheduler_.reset();
+
   // Explicitly delete/finalize all model instances before finalizing
   // the model itself.
   instances_.clear();
@@ -421,7 +423,7 @@ TRITONBACKEND_ModelVersion(TRITONBACKEND_Model* model, uint64_t* version)
 
 TRITONSERVER_Error*
 TRITONBACKEND_ModelRepository(
-    TRITONBACKEND_Model* model, TRITONBACKEND_ModelArtifactType* artifact_type,
+    TRITONBACKEND_Model* model, TRITONBACKEND_ArtifactType* artifact_type,
     const char** location)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
@@ -587,6 +589,39 @@ TRITONBACKEND_RequestInput(
 
   InferenceRequest::Input* in = itr->second;
   *input = reinterpret_cast<TRITONBACKEND_Input*>(in);
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestInputByIndex(
+    TRITONBACKEND_Request* request, const uint32_t index,
+    TRITONBACKEND_Input** input)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  const auto& inputs = tr->ImmutableInputs();
+  if (index >= inputs.size()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("out of bounds index ") + std::to_string(index) +
+         ": request has " + std::to_string(inputs.size()) + " inputs")
+            .c_str());
+  }
+
+  // The request inputs are not allowed to change once the request
+  // makes it to the backend, so it is ok to just iterate through the
+  // map. This linear search is the best we can do given the need for
+  // the inputs to be in a map and given the typical small number of
+  // inputs is better than having every request maintain the inputs as
+  // both map and vector.
+  uint32_t cnt = 0;
+  for (const auto& pr : inputs) {
+    if (cnt++ == index) {
+      InferenceRequest::Input* in = pr.second;
+      *input = reinterpret_cast<TRITONBACKEND_Input*>(in);
+      break;
+    }
+  }
 
   return nullptr;  // success
 }
@@ -841,7 +876,7 @@ TRITONBACKEND_InputProperties(
     *dims_count = ti->ShapeWithBatchDim().size();
   }
   if (byte_size != nullptr) {
-    *byte_size = GetByteSize(ti->DType(), ti->ShapeWithBatchDim());
+    *byte_size = ti->Data()->TotalByteSize();
   }
   if (buffer_count != nullptr) {
     *buffer_count = ti->DataBufferCount();

@@ -1,0 +1,1 @@
+batch inputs and batch outputs are only supported for custom platform and TensorRT platform

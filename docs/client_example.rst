@@ -45,7 +45,7 @@ several example applications that show how to use these libraries.
   :ref:`section-image-classification-example`.
 
 * Several simple `C++ examples
-  <https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/c%2B%2B/examples>`_
+  <https://github.com/triton-inference-server/server/tree/master/src/clients/c%2B%2B/examples>`_
   show how to use the C++ library to communicate with Triton to
   perform inferencing and other task. The C++ examples demonstrating
   the HTTP/REST client are named with a *simple_http_* prefix and the
@@ -53,7 +53,7 @@ several example applications that show how to use these libraries.
   *simple_grpc_* prefix.
 
 * Several simple `Python examples
-  <https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/examples>`_
+  <https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples>`_
   show how to use the Python library to communicate with Triton to
   perform inferencing and other task. The Python examples
   demonstrating the HTTP/REST client are named with a *simple_http_*
@@ -78,9 +78,16 @@ Getting the Client Examples
 ---------------------------
 
 The provided Dockerfile.client and CMake support can be used to build
-the examples, or the pre-built examples can be downloaded from GitHub
+the examples, or they can be :ref:`downloaded from GitHub
+<section-client-libraries-download-from-github>` or :ref:`downloaded
+in pre-built Docker image
+<section-client-libraries-download-from-ngc>` from `NVIDIA GPU Cloud
+(NGC) <https://ngc.nvidia.com>`_.
+
+or the pre-built examples can be downloaded from GitHub
 or a pre-built Docker image containing the client libraries from
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_.
+
 
 Build Using Dockerfile
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -207,11 +214,11 @@ datatypes).
 String tensors are demonstrated in the C++ example applications
 `simple\_http\_string\_infer\_client.cc and
 simple\_grpc\_string\_infer\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/c%2B%2B/examples>`_.
+<https://github.com/triton-inference-server/server/tree/master/src/clients/c%2B%2B/examples>`_.
 String tensors are demonstrated in the Python example application
 `simple\_http\_string\_infer\_client.py and
 simple\_grpc\_string\_infer\_client.py
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/examples>`_.
+<https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples>`_.
 
 System Shared Memory
 ^^^^^^^^^^^^^^^^^^^^
@@ -221,15 +228,15 @@ library and Triton can significantly improve performance in some
 cases. Using system shared memory is demonstrated in the C++ example
 applications `simple\_http\_shm\_client.cc and
 simple\_grpc\_shm\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/c%2B%2B/examples>`_.
+<https://github.com/triton-inference-server/server/tree/master/src/clients/c%2B%2B/examples>`_.
 Using system shared memory is demonstrated in the Python example
 application `simple\_http\_shm\_client.py and
 simple\_grpc\_shm\_client.py
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/examples>`_.
+<https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples>`_.
 
 Python does not have a standard way of allocating and accessing shared
 memory so as an example a simple `system shared memory module
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/library/shared_memory>`_
+<https://github.com/triton-inference-server/server/tree/master/src/clients/python/library/shared_memory>`_
 is provided that can be used with the Python client library to create,
 set and destroy system shared memory.
 
@@ -241,15 +248,15 @@ library and Triton can significantly improve performance in some
 cases. Using CUDA shared memory is demonstrated in the C++ example
 applications `simple\_http\_cudashm\_client.cc and
 simple\_grpc\_cudashm\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/c%2B%2B/examples>`_.
+<https://github.com/triton-inference-server/server/tree/master/src/clients/c%2B%2B/examples>`_.
 Using CUDA shared memory is demonstrated in the Python example
 application `simple\_http\_cudashm\_client.py and
 simple\_grpc\_cudashm\_client.py
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/examples>`_.
+<https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples>`_.
 
 Python does not have a standard way of allocating and accessing shared
 memory so as an example a simple `CUDA shared memory module
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/library/cuda_shared_memory>`_
+<https://github.com/triton-inference-server/server/tree/master/src/clients/python/library/cuda_shared_memory>`_
 is provided that can be used with the Python client library to create,
 set and destroy CUDA shared memory.
 
@@ -273,12 +280,12 @@ The use of sequence ID and start and end flags are demonstrated in the
 C++ example applications
 `simple\_http\_sequence\_stream\_infer\_client.cc and
 simple\_grpc\_sequence\_stream\_infer\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/c%2B%2B/examples>`_.
+<https://github.com/triton-inference-server/server/tree/master/src/clients/c%2B%2B/examples>`_.
 The use of sequence ID and start and end flags are demonstrated in the
 Python example application
 `simple\_http\_sequence\_stream\_infer\_client.py and
 simple\_grpc\_sequence\_stream\_infer\_client.py
-<https://github.com/NVIDIA/triton-inference-server/tree/master/src/clients/python/examples>`_.
+<https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples>`_.
 
 .. _section-image-classification-example:
 
@@ -287,10 +294,10 @@ Image Classification Example Application
 
 The image classification example that uses the C++ client API is
 available at `src/clients/c++/examples/image\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/examples/image_client.cc>`_. The
+<https://github.com/triton-inference-server/server/blob/master/src/clients/c%2B%2B/examples/image_client.cc>`_. The
 Python version of the image classification client is available at
 `src/clients/python/examples/image\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/examples/image_client.py>`_.
+<https://github.com/triton-inference-server/server/blob/master/src/clients/python/examples/image_client.py>`_.
 
 To use image\_client (or image\_client.py) you must first have a
 running Triton that is serving one or more image classification
@@ -307,7 +314,7 @@ specify a single image or a directory holding images. Here we send a
 request for the resnet50_netdef model from the :ref:`example model
 repository <section-example-model-repository>` for an image from the
 `qa/images
-<https://github.com/NVIDIA/triton-inference-server/tree/master/qa/images>`_
+<https://github.com/triton-inference-server/server/tree/master/qa/images>`_
 directory::
 
   $ image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
@@ -385,7 +392,7 @@ on all images in the directory::
       751 (RACER) = 0.0597549
 
 The `/grpc\_image\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/examples/grpc_image_client.py>`_
+<https://github.com/triton-inference-server/server/blob/master/src/clients/python/examples/grpc_image_client.py>`_
 application behaves the same as the image\_client except that instead
 of using the client library it uses the GRPC generated library to
 communicate with Triton.
@@ -403,10 +410,10 @@ classification results without preprocessing the images on the
 client. The ensemble image classification example that uses the C++
 client API is available at
 `src/clients/c++/examples/ensemble\_image\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/examples/ensemble_image_client.cc>`_. The
+<https://github.com/triton-inference-server/server/blob/master/src/clients/c%2B%2B/examples/ensemble_image_client.cc>`_. The
 Python version of the image classification client is available at
 `src/clients/python/examples/ensemble\_image\_client.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/examples/ensemble_image_client.py>`_.
+<https://github.com/triton-inference-server/server/blob/master/src/clients/python/examples/ensemble_image_client.py>`_.
 
 To use ensemble\_image\_client (or ensemble\_image\_client.py) you
 must first have a running Triton that is serving the
@@ -422,7 +429,7 @@ requests. You can specify a single image or a directory holding
 images. Here we send a request for the ensemble from the :ref:`example
 ensemble model repository <section-example-model-repository>` for an
 image from the `qa/images
-<https://github.com/NVIDIA/triton-inference-server/tree/master/qa/images>`_
+<https://github.com/triton-inference-server/server/tree/master/qa/images>`_
 directory::
 
   $ ensemble_image_client qa/images/mug.jpg

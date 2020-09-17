@@ -130,7 +130,7 @@ RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3
 RUN mkdir -p qa/L0_backend_identity/models && \
     cp -r src/backends/backend/examples/models/identity_fp32 qa/L0_backend_identity/models/. && \
     mkdir -p qa/L0_backend_identity/models/identity_fp32/1 && \
-    cp builddir/server/install/backends/libtriton_identity.so \
+    cp /opt/tritonserver/backends/identity/libtriton_identity.so \
         qa/L0_backend_identity/models/identity_fp32/1/.
 
 RUN mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
@@ -198,6 +198,8 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_infer_cudashm && \
     cp -r qa/L0_infer/. qa/L0_infer_cudashm && \
+    mkdir -p qa/L0_infer_valgrind && \
+    cp -r qa/L0_infer/. qa/L0_infer_valgrind && \
     mkdir -p qa/L0_trt_shape_tensors_shm && \
     cp -r qa/L0_trt_shape_tensors/. qa/L0_trt_shape_tensors_shm && \
     mkdir -p qa/L0_trt_shape_tensors_cudashm && \
@@ -206,26 +208,30 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     cp -r qa/L0_batcher/. qa/L0_batcher_shm && \
     mkdir -p qa/L0_batcher_cudashm && \
     cp -r qa/L0_batcher/. qa/L0_batcher_cudashm && \
+    mkdir -p qa/L0_batcher_valgrind && \
+    cp -r qa/L0_batcher/. qa/L0_batcher_valgrind && \
     mkdir -p qa/L0_sequence_batcher_shm && \
     cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_shm && \
     mkdir -p qa/L0_sequence_batcher_cudashm && \
     cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_cudashm && \
+    mkdir -p qa/L0_sequence_batcher_valgrind && \
+    cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_valgrind && \
     mkdir -p qa/L0_perf_nomodel_shm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_shm && \
     mkdir -p qa/L0_perf_nomodel_cudashm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm
 
-RUN cp builddir/server/install/backends/libtriton_repeat.so \
+RUN cp /opt/tritonserver/backends/repeat/libtriton_repeat.so \
         qa/L0_model_config/.
 
 RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
-    cp builddir/server/install/backends/libtriton_repeat.so \
+    cp /opt/tritonserver/backends/repeat/libtriton_repeat.so \
         qa/L0_decoupled/models/repeat_int32/1/.
 RUN mkdir -p qa/L0_decoupled/models/square_int32/1 && \
-    cp builddir/server/install/backends/libtriton_square.so \
+    cp /opt/tritonserver/backends/square/libtriton_square.so \
         qa/L0_decoupled/models/square_int32/1/.
 RUN mkdir -p qa/L0_decoupled/models/identity_int32/1 && \
-    cp builddir/server/install/backends/libtriton_identity.so \
+    cp /opt/tritonserver/backends/identity/libtriton_identity.so \
         qa/L0_decoupled/models/identity_int32/1/.
 RUN mkdir -p qa/L0_decoupled/models/custom_nobatch_int32_int32_int32/1 && \
     cp builddir/custom-backend/install/lib/libaddsub.so \
@@ -288,7 +294,8 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
         exit 1; \
     fi
 
-# go client requires golang
+# go client requires golang and CI/QA for memcheck requires valgrind
+# wkhtmltox, xfonts-75dpi, xfonts-base are dependencies of pdfkit
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               libopencv-dev \
@@ -301,8 +308,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               swig \
                               golang-go \
                               nginx \
-                              protobuf-compiler && \
-    rm -rf /var/lib/apt/lists/*
+                              protobuf-compiler \
+                              valgrind \
+                              xfonts-75dpi \
+                              xfonts-base && \
+    rm -rf /var/lib/apt/lists/* && \
+    wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \
+    dpkg -i wkhtmltox_0.12.6-1.bionic_amd64.deb && \
+    rm -rf wkhtmltox_0.12.6-1.bionic_amd64.deb
 
 # CI/QA expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
@@ -324,7 +337,9 @@ COPY --chown=1000:1000 --from=cbe /workspace/qa/ qa/
 # Remove CI tests that are meant to run only on build image and
 # install the tritonserver/triton python client APIs.
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
-    pip3 install --upgrade qa/pkgs/triton*.whl
+    find qa/pkgs/ -maxdepth 1 -type f -name \
+    "tritonclient-*-manylinux1_x86_64.whl" | xargs printf -- '%s[all]' | \
+    xargs pip3 install --upgrade
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 

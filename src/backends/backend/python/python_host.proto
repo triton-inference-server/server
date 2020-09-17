@@ -26,7 +26,7 @@
 
 syntax = "proto3";
 
-package nvidia.inferenceserver;
+package triton.backend.python;
 
 message InitializationCommand
 {
@@ -44,7 +44,7 @@ message Tensor
   string name = 1;
   int32 dtype = 2;
   repeated int64 dims = 3;
-  bytes raw_data = 5;
+  bytes raw_data = 4;
 }
 
 message InferenceRequest
@@ -55,9 +55,16 @@ message InferenceRequest
   repeated string requested_output_names = 4;
 }
 
+message Error
+{
+  string message = 1;
+}
+
 message InferenceResponse
 {
-  repeated Tensor outputs = 1;
+  Error error = 1;
+  bool failed = 2;
+  repeated Tensor outputs = 3;
 }
 
 message ExecuteResponse

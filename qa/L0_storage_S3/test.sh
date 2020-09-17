@@ -49,7 +49,11 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 # S3 bucket path (Point to bucket when testing cloud storage)
 BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
 
-# Make test bucket
+# Cleanup S3 test bucket if exists (due to test failure)
+aws s3 rm $BUCKET_URL --recursive --include "*" && \
+    aws s3 rb $BUCKET_URL || true
+
+# Make S3 test bucket
 aws s3 mb "${BUCKET_URL}"
 
 # Remove Slash in BUCKET_URL
@@ -57,7 +61,7 @@ BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_TIMEOUT=360
+SERVER_TIMEOUT=420
 
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
@@ -247,7 +251,7 @@ fi
 
 # copy contents of /models into S3 bucket and wait for them to be loaded.
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
-sleep 120
+sleep 600
 
 set +e
 

@@ -37,7 +37,7 @@ that have been proposed by the `KFServing project
 <https://github.com/kubeflow/kfserving>`_. To fully enable all
 capabilities Triton also implements a number `HTTP/REST and GRPC
 extensions
-<https://github.com/NVIDIA/triton-inference-server/tree/master/docs/protocol>`_
+<https://github.com/triton-inference-server/server/tree/master/docs/protocol>`_
 to the KFServing inference protocol.
 
 The HTTP/REST and GRPC protcols provide endpoints to check server and
