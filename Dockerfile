@@ -326,8 +326,8 @@ COPY --from=tritonserver_onnx /workspace/build/Release/testdata/custom_op_librar
 # may need to link against them. This is identical to the logic in TF
 # container nvbuild.sh
 ARG TRITON_COMMON_REPO_TAG=main
-ARG TRITON_CORE_REPO_TAG=davidg-dir
-ARG TRITON_BACKEND_REPO_TAG=davidg-dir
+ARG TRITON_CORE_REPO_TAG=main
+ARG TRITON_BACKEND_REPO_TAG=main
 
 RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.so | wc -l) && \
     if [[ "$LIBCUDA_FOUND" -eq 0 ]]; then \
