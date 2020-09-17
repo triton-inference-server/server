@@ -374,7 +374,7 @@ ARG BACKEND_TAG=main
 RUN for BE in identity repeat square onnxruntime python; do \
         rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
             (cd /tmp/triton_backends && \
-                 git clone --single-branch --depth=1 -b ${TRITON_EXAMPLE_BACKEND_TAG} \
+                 git clone --single-branch --depth=1 -b ${BACKEND_TAG} \
                      https://github.com/triton-inference-server/${BE}_backend.git) && \
             (cd /tmp/triton_backends/${BE}_backend && \
                  mkdir build && cd build && \
