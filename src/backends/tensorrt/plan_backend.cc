@@ -550,7 +550,8 @@ PlanBackend::CreateExecutionContext(
   // Initialize the inputs and outputs. Make sure the model matches
   // what is in the configuration. Allocate memory for the maximum
   // possible batch size: min(engine maximum, config maximum)
-  context->io_binding_infos_ = std::vector<Context::IOBindingInfo>(context->num_expected_bindings_);
+  context->io_binding_infos_ =
+      std::vector<Context::IOBindingInfo>(context->num_expected_bindings_);
   context->buffer_bindings_ =
       std::vector<void*>(context->total_bindings_, nullptr);
 
@@ -792,8 +793,8 @@ PlanBackend::Context::InitializeShapeInputBinding(
          nvinfer1::TensorFormat::kLINEAR);
     if (!io_binding_info.is_linear_format_) {
       io_binding_info.format_element_size_ =
-              engine_->getBindingComponentsPerElement(binding_index) *
-              engine_->getBindingBytesPerComponent(binding_index);
+          engine_->getBindingComponentsPerElement(binding_index) *
+          engine_->getBindingBytesPerComponent(binding_index);
     }
 
     nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
@@ -931,8 +932,8 @@ PlanBackend::Context::InitializeExecuteInputBinding(
          nvinfer1::TensorFormat::kLINEAR);
     if (!io_binding_info.is_linear_format_) {
       io_binding_info.format_element_size_ =
-              engine_->getBindingComponentsPerElement(binding_index) *
-              engine_->getBindingBytesPerComponent(binding_index);
+          engine_->getBindingComponentsPerElement(binding_index) *
+          engine_->getBindingBytesPerComponent(binding_index);
     }
 
     // Detect whether dynamic or not
@@ -1255,10 +1256,10 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
           (engine_->getBindingFormat(binding_index) ==
            nvinfer1::TensorFormat::kLINEAR);
       if (!io_binding_info.is_linear_format_) {
-      io_binding_info.format_element_size_ =
-              engine_->getBindingComponentsPerElement(binding_index) *
-              engine_->getBindingBytesPerComponent(binding_index);
-    }
+        io_binding_info.format_element_size_ =
+            engine_->getBindingComponentsPerElement(binding_index) *
+            engine_->getBindingBytesPerComponent(binding_index);
+      }
 
       const DimsList& model_config_dims =
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
@@ -1362,10 +1363,10 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
           (engine_->getBindingFormat(binding_index) ==
            nvinfer1::TensorFormat::kLINEAR);
       if (!io_binding_info.is_linear_format_) {
-      io_binding_info.format_element_size_ =
-              engine_->getBindingComponentsPerElement(binding_index) *
-              engine_->getBindingBytesPerComponent(binding_index);
-    }
+        io_binding_info.format_element_size_ =
+            engine_->getBindingComponentsPerElement(binding_index) *
+            engine_->getBindingBytesPerComponent(binding_index);
+      }
 
       const DimsList& model_config_dims =
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
@@ -1724,7 +1725,8 @@ PlanBackend::Context::SetCudaGraphShape(
         return Status(
             Status::Code::INTERNAL,
             "trt failed to set binding dimension to " + DimsDebugString(shape) +
-                " for binding " + std::to_string(binding_index) + " for " + name_);
+                " for binding " + std::to_string(binding_index) + " for " +
+                name_);
       }
       std::vector<int64_t> dims;
       DimsToDimVec(shape, &dims);
@@ -1746,7 +1748,8 @@ PlanBackend::Context::SetCudaGraphShape(
         shape.insert(shape.end(), it->second.begin(), it->second.end());
         nvinfer1::Dims trt_shape;
         DimVecToDims(shape, &trt_shape);
-        if (!trt_context->context_->setBindingDimensions(binding_index, trt_shape)) {
+        if (!trt_context->context_->setBindingDimensions(
+                binding_index, trt_shape)) {
           return Status(
               Status::Code::INTERNAL,
               "trt failed to set binding dimension to " +
@@ -2166,8 +2169,8 @@ PlanBackend::Context::Run(
       if (it != request_shape_values.end()) {
         status = ValidateShapeValues(
             it->second, citr->second.min_shapes_[binding_index],
-            citr->second.max_shapes_[binding_index], citr->second.nb_shape_values_,
-            support_batching_);
+            citr->second.max_shapes_[binding_index],
+            citr->second.nb_shape_values_, support_batching_);
       } else {
         status = Status(
             Status::Code::INTERNAL,
@@ -2178,7 +2181,8 @@ PlanBackend::Context::Run(
             status, "missing shape values for the shape tensor");
       }
       if (status.IsOk()) {
-        citr->second.context_->setInputShapeBinding(binding_index, &(it->second[0]));
+        citr->second.context_->setInputShapeBinding(
+            binding_index, &(it->second[0]));
       } else {
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
@@ -2221,9 +2225,10 @@ PlanBackend::Context::Run(
           total_byte_size = GetByteSize(datatype, ragged_shape);
         } else {
           // FIXME case where vectorized dim is first dimension
-          total_byte_size = io_binding_info.format_element_size_ *
-                            citr->second.context_->getStrides(binding_index).d[0] *
-                            ragged_shape[0];
+          total_byte_size =
+              io_binding_info.format_element_size_ *
+              citr->second.context_->getStrides(binding_index).d[0] *
+              ragged_shape[0];
         }
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
@@ -2240,8 +2245,8 @@ PlanBackend::Context::Run(
               payload_->requests_, payload_->responses_, metric_reporter_.get(),
               CopyBuffer(
                   name, mem_type, mem_type_id, TRITONSERVER_MEMORY_GPU,
-                  gpu_device_, total_byte_size, input_buffer, io_binding_info.buffer_,
-                  input_copy_stream_, &cuda_used),
+                  gpu_device_, total_byte_size, input_buffer,
+                  io_binding_info.buffer_, input_copy_stream_, &cuda_used),
               "error copying the batch input buffer");
           if (cuda_used) {
             cudaEventRecord(
@@ -2274,9 +2279,10 @@ PlanBackend::Context::Run(
           total_byte_size = GetByteSize(datatype, ragged_shape);
         } else {
           // FIXME case where vectorized dim is first dimension
-          total_byte_size = io_binding_info.format_element_size_ *
-                            citr->second.context_->getStrides(binding_index).d[0] *
-                            ragged_shape[0];
+          total_byte_size =
+              io_binding_info.format_element_size_ *
+              citr->second.context_->getStrides(binding_index).d[0] *
+              ragged_shape[0];
         }
 
         collector.ProcessTensor(
@@ -2306,7 +2312,8 @@ PlanBackend::Context::Run(
       const inference::DataType datatype = repr_input->DType();
 
       // Set the binding dimension so that output dimensions can be obtained
-      if (UseTensorRTv2API(engine_) && !engine_->isShapeBinding(binding_index)) {
+      if (UseTensorRTv2API(engine_) &&
+          !engine_->isShapeBinding(binding_index)) {
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             SetBindingDimensions(
@@ -2320,9 +2327,10 @@ PlanBackend::Context::Run(
         total_byte_size = GetByteSize(datatype, batchn_shape);
       } else {
         // FIXME case where vectorized dim is first dimension
-        total_byte_size = io_binding_info.format_element_size_ *
-                          citr->second.context_->getStrides(binding_index).d[0] *
-                          batchn_shape[0];
+        total_byte_size =
+            io_binding_info.format_element_size_ *
+            citr->second.context_->getStrides(binding_index).d[0] *
+            batchn_shape[0];
       }
 
       if ((engine_->isShapeBinding(binding_index)) && (support_batching_)) {
@@ -2341,7 +2349,8 @@ PlanBackend::Context::Run(
         // Copy rest of the shape values to the buffer.
         status = CopyBuffer(
             name, TRITONSERVER_MEMORY_CPU, 0, TRITONSERVER_MEMORY_GPU,
-            gpu_device_, total_byte_size, (void*)&request_shape_values[io_index],
+            gpu_device_, total_byte_size,
+            (void*)&request_shape_values[io_index],
             (static_cast<char*>(io_binding_info.buffer_) + sizeof(int32_t)),
             input_copy_stream_, &cuda_used);
         FAIL_ALL_AND_RETURN_IF_ERROR(
@@ -2589,13 +2598,13 @@ PlanBackend::Context::Run(
       }
     } else if (io_binding_info.buffer_is_ragged_) {
       // FIXME add correctness checking like below
-      inference::DataType dt = ConvertTrtTypeToDataType(
-          engine_->getBindingDataType(binding_index));
+      inference::DataType dt =
+          ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
       payload_->responder_->ProcessTensor(
           name, io_binding_info.io_shape_mapping_.first, dt,
           io_binding_info.io_shape_mapping_.second,
-          static_cast<const char*>(io_binding_info.buffer_), TRITONSERVER_MEMORY_GPU,
-          gpu_device_);
+          static_cast<const char*>(io_binding_info.buffer_),
+          TRITONSERVER_MEMORY_GPU, gpu_device_);
     } else {
       std::vector<int64_t> batchn_shape;
 
@@ -2607,8 +2616,8 @@ PlanBackend::Context::Run(
         batchn_shape.push_back(dims.d[i]);
       }
 
-      inference::DataType dt = ConvertTrtTypeToDataType(
-          engine_->getBindingDataType(binding_index));
+      inference::DataType dt =
+          ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
 
       // FIXME process reformat-free output, need to update output process
       // code to accept batch1_byte_size and request batch size to break down
@@ -2625,14 +2634,16 @@ PlanBackend::Context::Run(
             Status(
                 Status::Code::INTERNAL,
                 "unexpected size for output '" + name + "', byte-size " +
-                    std::to_string(io_binding_info.byte_size_) + " is less than " +
+                    std::to_string(io_binding_info.byte_size_) +
+                    " is less than " +
                     std::to_string(payload_->total_batch_size_) + " * " +
                     std::to_string(batch1_byte_size)),
             "failed to run TRT response");
       }
 
       payload_->responder_->ProcessTensor(
-          name, dt, batchn_shape, static_cast<const char*>(io_binding_info.buffer_),
+          name, dt, batchn_shape,
+          static_cast<const char*>(io_binding_info.buffer_),
           TRITONSERVER_MEMORY_GPU, gpu_device_);
     }
   }

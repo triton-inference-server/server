@@ -357,19 +357,22 @@ class PlanBackend : public InferenceBackend {
     using BatchInputData =
         std::pair<inference::BatchInput, std::unique_ptr<AllocatedMemory>>;
     struct IOBindingInfo {
-        IOBindingInfo() : byte_size_(0), buffer_(nullptr), buffer_is_ragged_(false),
-        is_linear_format_(false), format_element_size_(0) {}
-    uint64_t byte_size_;
-    void* buffer_;
-    bool buffer_is_ragged_;
-    bool is_linear_format_;
-    size_t format_element_size_;
-    // Instructions on constructing the batch input and the CPU buffer for
-    // storing mutable data
-    std::shared_ptr<BatchInputData> batch_input_;
-    // Store the pair of input name to look up and output shape
-    // for output scattering
-    std::pair<std::string, std::vector<int64_t>> io_shape_mapping_;
+      IOBindingInfo()
+          : byte_size_(0), buffer_(nullptr), buffer_is_ragged_(false),
+            is_linear_format_(false), format_element_size_(0)
+      {
+      }
+      uint64_t byte_size_;
+      void* buffer_;
+      bool buffer_is_ragged_;
+      bool is_linear_format_;
+      size_t format_element_size_;
+      // Instructions on constructing the batch input and the CPU buffer for
+      // storing mutable data
+      std::shared_ptr<BatchInputData> batch_input_;
+      // Store the pair of input name to look up and output shape
+      // for output scattering
+      std::pair<std::string, std::vector<int64_t>> io_shape_mapping_;
     };
 
     // The array sizes are equal to Context::num_expected_bindings_
