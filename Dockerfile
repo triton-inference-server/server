@@ -146,8 +146,8 @@ FROM ${TENSORFLOW2_IMAGE} AS tritonserver_tf2
 ############################################################################
 FROM ${BASE_IMAGE} AS tritonserver_build
 
-ARG TRITON_VERSION=2.3.0dev
-ARG TRITON_CONTAINER_VERSION=20.09dev
+ARG TRITON_VERSION=2.3.0
+ARG TRITON_CONTAINER_VERSION=20.09
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
@@ -374,8 +374,8 @@ ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRITON_VERSION=2.3.0dev
-ARG TRITON_CONTAINER_VERSION=20.09dev
+ARG TRITON_VERSION=2.3.0
+ARG TRITON_CONTAINER_VERSION=20.09
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
