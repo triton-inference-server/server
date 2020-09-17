@@ -622,10 +622,10 @@ message ModelOptimizationPolicy
 
         //@@      .. cpp:var:: map<string, Shape> input
         //@@
-        //@@         The specification of the inputs. 'Shape' is the shape of the
-        //@@         input without batching dimension.
+        //@@         The specification of the inputs. 'Shape' is the shape of
+        //@@         the input without batching dimension.
         //@@
-        map<string, Shape> input = 2;  
+        map<string, Shape> input = 2;
       }
 
       //@@      .. cpp:var:: int32 batch_size
