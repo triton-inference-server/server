@@ -388,7 +388,7 @@ RUN for BE in identity repeat square onnxruntime python; do \
                  cp -r install/backends/${BE} /opt/tritonserver/backends/.); \
     done
 
-ARG TRITON_ONNXRUNTIME_BACKEND_TAG=davidg-install
+ARG TRITON_ONNXRUNTIME_BACKEND_TAG=main
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
     (cd /tmp/triton_backends && \
          git clone --single-branch --depth=1 -b ${TRITON_ONNXRUNTIME_BACKEND_TAG} \
@@ -408,7 +408,7 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          mkdir -p /opt/tritonserver/backends && \
          cp -r install/backends/onnxruntime /opt/tritonserver/backends/.)
 
-ARG TRITON_TENSORFLOW1_BACKEND_TAG=davidg-install
+ARG TRITON_TENSORFLOW1_BACKEND_TAG=main
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
     (cd /tmp/triton_backends && \
          git clone --single-branch --depth=1 -b ${TRITON_TENSORFLOW1_BACKEND_TAG} \
@@ -426,7 +426,7 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          mkdir -p /opt/tritonserver/backends && \
          cp -r install/backends/tensorflow1 /opt/tritonserver/backends/.)
 
-ARG TRITON_TENSORFLOW2_BACKEND_TAG=davidg-install
+ARG TRITON_TENSORFLOW2_BACKEND_TAG=main
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
     (cd /tmp/triton_backends && \
          git clone --single-branch --depth=1 -b ${TRITON_TENSORFLOW2_BACKEND_TAG} \
