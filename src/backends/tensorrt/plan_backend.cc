@@ -1445,7 +1445,7 @@ PlanBackend::Context::InitializeBatchOutputBindings(
     for (const auto& name : io.target_name()) {
       // FIXME Currently not handling the case that batch output is shape tensor
       int io_index = engine_->getBindingIndex(name.c_str());
-
+      auto& io_binding_info = io_binding_infos_[io_index];
       if (engine_->isShapeBinding(io_index)) {
         return Status(
             Status::Code::INVALID_ARG,
@@ -1710,6 +1710,7 @@ PlanBackend::Context::SetCudaGraphShape(
   int binding_offset = trt_context->profile_idx_ * num_expected_bindings_;
   *cuda_graph_key = std::vector<int64_t>{batch_size};
   for (int io_index = 0; io_index < num_expected_bindings_; io_index++) {
+    auto& io_binding_info = io_binding_infos_[io_index];
     auto binding_index = binding_offset + io_index;
     if (!engine_->bindingIsInput(binding_index)) {
       continue;
@@ -2150,6 +2151,7 @@ PlanBackend::Context::Run(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
       input_copy_stream_, events_[next_set_].input_ready_);
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
+    auto& io_binding_info = io_binding_infos_[io_index];
     int binding_index = binding_offset + io_index;
     if (!engine_->bindingIsInput(binding_index)) {
       continue;
@@ -2361,6 +2363,7 @@ PlanBackend::Context::Run(
   if ((cuda_graph != nullptr) && !found_exact && (UseTensorRTv2API(engine_))) {
     size_t input_idx = 0;
     for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
+      auto& io_binding_info = io_binding_infos_[io_index];
       int binding_index = binding_offset + io_index;
       if (!engine_->bindingIsInput(binding_index) ||
           engine_->isShapeBinding(binding_index)) {
@@ -2935,6 +2938,7 @@ PlanBackend::Context::EvaluateTensorRTContext(
   for (const auto& pr : requests[0]->ImmutableInputs()) {
     const auto input = pr.second;
     int io_index = engine_->getBindingIndex(input->Name().c_str());
+    auto& io_binding_info = io_binding_infos_[io_index];
     if (io_binding_info.buffer_is_ragged_) {
       std::vector<int64_t> shape{0};
       for (const auto& request : requests) {
