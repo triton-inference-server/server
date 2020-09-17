@@ -1849,48 +1849,52 @@ bool
 ModelRepositoryManager::CheckNode(DependencyNode* node)
 {
   bool node_ready = true;
-  for (auto& upstream : node->upstreams_) {
-    if (!upstream.first->checked_) {
-      node_ready = false;
-      break;
-    }
-    if (!upstream.first->status_.IsOk()) {
-      node->status_ = Status(
-          Status::Code::INVALID_ARG,
-          "ensemble '" + node->model_name_ + "' depends on '" +
-              upstream.first->model_name_ + "' which is not valid");
-    } else if (upstream.first->loaded_versions_.empty()) {
-      node->status_ = Status(
-          Status::Code::INVALID_ARG,
-          "ensemble '" + node->model_name_ + "' depends on '" +
-              upstream.first->model_name_ + "' which has no loaded version");
-    } else {
-      for (const auto& required_version : upstream.second) {
-        if (required_version == -1) {
-          continue;
-        }
+  // if the node is in invalid status, mark as ready as we know
+  // it should not be loaded
+  if (node->status_.IsOk()) {
+    for (auto& upstream : node->upstreams_) {
+      if (!upstream.first->checked_) {
+        node_ready = false;
+        break;
+      }
+      if (!upstream.first->status_.IsOk()) {
+        node->status_ = Status(
+            Status::Code::INVALID_ARG,
+            "ensemble '" + node->model_name_ + "' depends on '" +
+                upstream.first->model_name_ + "' which is not valid");
+      } else if (upstream.first->loaded_versions_.empty()) {
+        node->status_ = Status(
+            Status::Code::INVALID_ARG,
+            "ensemble '" + node->model_name_ + "' depends on '" +
+                upstream.first->model_name_ + "' which has no loaded version");
+      } else {
+        for (const auto& required_version : upstream.second) {
+          if (required_version == -1) {
+            continue;
+          }
 
-        auto it = upstream.first->loaded_versions_.find(required_version);
-        if (it == upstream.first->loaded_versions_.end()) {
-          node->status_ = Status(
-              Status::Code::INVALID_ARG,
-              "ensemble '" + node->model_name_ + "' depends on '" +
-                  upstream.first->model_name_ + "' whose required version " +
-                  std::to_string(required_version) + " is not loaded");
+          auto it = upstream.first->loaded_versions_.find(required_version);
+          if (it == upstream.first->loaded_versions_.end()) {
+            node->status_ = Status(
+                Status::Code::INVALID_ARG,
+                "ensemble '" + node->model_name_ + "' depends on '" +
+                    upstream.first->model_name_ + "' whose required version " +
+                    std::to_string(required_version) + " is not loaded");
+          }
         }
       }
+      if (!node->status_.IsOk()) {
+        break;
+      }
     }
-    if (!node->status_.IsOk()) {
-      break;
-    }
-  }
 #ifdef TRITON_ENABLE_ENSEMBLE
-  // Validate ensemble config if the node is ready. By this point, the depending
-  // models are loaded and their configs are completed
-  if (node_ready && node->status_.IsOk()) {
-    node->status_ = ValidateEnsembleConfig(this, node);
-  }
+    // Validate ensemble config if the node is ready. By this point, the
+    // depending models are loaded and their configs are completed
+    if (node_ready && node->status_.IsOk()) {
+      node->status_ = ValidateEnsembleConfig(this, node);
+    }
 #endif  // TRITON_ENABLE_ENSEMBLE
+  }
   return node_ready;
 }
 

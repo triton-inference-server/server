@@ -239,6 +239,11 @@ ValidateEnsembleConfig(
     ModelRepositoryManager* model_repository_manager,
     ModelRepositoryManager::DependencyNode* ensemble)
 {
+  const auto& ensemble_config = ensemble->model_config_;
+  if (!ensemble_config.has_ensemble_scheduling()) {
+    return Status::Success;
+  }
+
   const auto& ensemble_name = ensemble->model_name_;
   if (!ensemble->missing_upstreams_.empty()) {
     std::string name_list;
@@ -255,7 +260,6 @@ ValidateEnsembleConfig(
             " contains models that are not available: " + name_list);
   }
 
-  const auto& ensemble_config = ensemble->model_config_;
   const bool batching = (ensemble_config.max_batch_size() > 0);
   std::unordered_map<std::string, TensorNode> ensemble_tensors;
   for (const auto& input : ensemble_config.input()) {
