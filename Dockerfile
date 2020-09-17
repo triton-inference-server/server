@@ -370,11 +370,11 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
 
 # Build the backends.
 #
-ARG BACKEND_TAG=main
-RUN for BE in identity repeat square onnxruntime python; do \
+ARG TRITON_EXAMPLE_BACKEND_TAG=main
+RUN for BE in identity repeat square; do \
         rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
             (cd /tmp/triton_backends && \
-                 git clone --single-branch --depth=1 -b ${BACKEND_TAG} \
+                 git clone --single-branch --depth=1 -b ${TRITON_EXAMPLE_BACKEND_TAG} \
                      https://github.com/triton-inference-server/${BE}_backend.git) && \
             (cd /tmp/triton_backends/${BE}_backend && \
                  mkdir build && cd build && \
@@ -443,6 +443,22 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          make -j16 install && \
          mkdir -p /opt/tritonserver/backends && \
          cp -r install/backends/tensorflow2 /opt/tritonserver/backends/.)
+
+ARG TRITON_PYTHON_BACKEND_TAG=imant-update-artifact
+RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+    (cd /tmp/triton_backends && \
+         git clone --single-branch --depth=1 -b ${TRITON_PYTHON_BACKEND_TAG} \
+             https://github.com/triton-inference-server/python_backend.git) && \
+    (cd /tmp/triton_backends/python_backend && \
+         mkdir build && cd build && \
+         cmake -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+               -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+               -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
+         make -j16 install && \
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/python /opt/tritonserver/backends/.)
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -548,3 +564,4 @@ ENV NVIDIA_BUILD_ID ${NVIDIA_BUILD_ID:-<unknown>}
 LABEL com.nvidia.build.id="${NVIDIA_BUILD_ID}"
 ARG NVIDIA_BUILD_REF
 LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
+
