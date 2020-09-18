@@ -5,6 +5,7 @@ ensemble_scheduling {
   step [
     {
       model_name: "model_a"
+      model_version: -1
       input_map {
         key: "model_a_input"
         value: "data"
@@ -16,6 +17,7 @@ ensemble_scheduling {
     },
     {
       model_name: "model_b"
+      model_version: -1
       input_map {
         key: "model_b_input"
         value: "temp_1"
@@ -23,6 +25,7 @@ ensemble_scheduling {
     },
     {
       model_name: "model_c"
+      model_version: -1
       input_map {
         key: "model_c_input"
         value: "temp_2"

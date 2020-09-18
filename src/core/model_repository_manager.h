@@ -301,6 +301,9 @@ class ModelRepositoryManager {
   /// \return True if the node is ready. False otherwise.
   bool CheckNode(DependencyNode* node);
 
+  Status CircularcyCheck(
+      DependencyNode* current_node, const DependencyNode* start_node);
+
   /// Get the list of versions to be loaded for a named model based on version
   /// policy. Version directories that are not numerically named,
   /// or that have zero prefix will be ignored.
