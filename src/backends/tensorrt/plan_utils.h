@@ -32,31 +32,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// The memory layouts for i/o tensors
-enum class MemoryFormat {
-  // Row major linear format.
-  LINEAR,
-  // Two wide channel vectorized row major format.
-  CHW2,
-  // Four wide channel vectorized row major format.
-  CHW4,
-  // Eight channel format where C is padded to a multiple of 8.
-  HWC8,
-  // Sixteen wide channel vectorized row major format.
-  CHW16,
-  // Thirty-two wide channel vectorized row major format.
-  CHW32,
-  // Invalid Memory format
-  INVALID
-};
-
 bool UseTensorRTv2API(const nvinfer1::ICudaEngine* engine);
-
-MemoryFormat ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt);
-
-const std::string MemoryFormat_Name(MemoryFormat fmt);
-int MemoryFormat_VectorSize(MemoryFormat fmt);
-int MemoryFormat_VectorDim(MemoryFormat fmt);
 
 inference::DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
 
@@ -79,7 +55,7 @@ Status CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
     const bool supports_batching, const bool contains_explicit_batch,
-    const bool compare_exact, const std::pair<int, int64_t>& padding);
+    const bool compare_exact);
 
 Status CompareShapeDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
@@ -97,15 +73,13 @@ Status ValidateShapeValues(
 Status MaximumDims(
     const nvinfer1::Dims& max_profile_dims, const DimsList& dims,
     const bool support_batching, const int max_batch_size,
-    const std::pair<int, int64_t>& padding, std::vector<int64_t>* maximum_dims);
+    std::vector<int64_t>* maximum_dims);
 
-void DimsToDimVec(
-    const nvinfer1::Dims& model_dims, const std::pair<int, int64_t>& padding,
-    std::vector<int64_t>* dims);
+void DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims);
 
-bool DimVecToDims(
-    const std::vector<int64_t>& dim_vec, const std::pair<int, int64_t>& padding,
-    nvinfer1::Dims* dims);
+bool DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims);
+
+int64_t GetElementCount(const nvinfer1::Dims& dims);
 
 bool ContainsWildcard(const nvinfer1::Dims& dims);
 
@@ -121,8 +95,7 @@ template <typename T>
 Status
 ValidateDimension(
     const T& this_dims, const nvinfer1::Dims& min_dims,
-    const nvinfer1::Dims& max_dims, const bool skip_first_dimension,
-    const std::pair<int, int64_t>& padding)
+    const nvinfer1::Dims& max_dims, const bool skip_first_dimension)
 {
   const int nonbatch_start_idx = (skip_first_dimension ? 1 : 0);
   if (int(this_dims.size() + nonbatch_start_idx) != max_dims.nbDims) {
@@ -138,18 +111,15 @@ ValidateDimension(
     if (this_dims[i] == -1) {
       continue;
     }
-    auto this_dim = (i == (padding.first - nonbatch_start_idx))
-                        ? (this_dims[i] - padding.second)
-                        : this_dims[i];
-    if (this_dim < min_dims.d[i + nonbatch_start_idx] ||
-        this_dim > max_dims.d[i + nonbatch_start_idx]) {
+    if (this_dims[i] < min_dims.d[i + nonbatch_start_idx] ||
+        this_dims[i] > max_dims.d[i + nonbatch_start_idx]) {
       return Status(
           Status::Code::INTERNAL,
           "model expected the shape of dimension " + std::to_string(i) +
               " to be between " +
               std::to_string(min_dims.d[i + nonbatch_start_idx]) + " and " +
               std::to_string(max_dims.d[i + nonbatch_start_idx]) +
-              " but received " + std::to_string(this_dim));
+              " but received " + std::to_string(this_dims[i]));
     }
   }
   return Status::Success;
