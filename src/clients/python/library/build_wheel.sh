@@ -122,7 +122,7 @@ function main() {
   echo $(date) : "=== Building wheel"
   if [ "$2" = true ] ; then
     PLATFORM=`uname -m`
-    if [ "$PLATFORM" = "aarch64"] ; then
+    if [ "$PLATFORM" = "aarch64" ] ; then
       PLAT_NAME="linux_aarch64"
     else
       PLAT_NAME="manylinux1_x86_64"
