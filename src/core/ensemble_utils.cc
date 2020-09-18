@@ -29,6 +29,7 @@
 #include "src/core/ensemble_utils.h"
 
 #include <set>
+#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
@@ -231,31 +232,19 @@ ValidateTensorMapping(
   return Status::Success;
 }
 
+}  // namespace
+
 Status
 ValidateEnsembleConfig(
-    ModelRepositoryManager::DependencyNode* ensemble,
-    std::unordered_map<
-        std::string, std::pair<ModelRepositoryManager::DependencyNode*, bool>>*
-        ensembles,
-    std::deque<std::string>* ensemble_dependency)
+    ModelRepositoryManager* model_repository_manager,
+    ModelRepositoryManager::DependencyNode* ensemble)
 {
-  const auto& ensemble_name = ensemble->model_name_;
-  if (!ensemble->missing_upstreams_.empty()) {
-    std::string name_list;
-    for (auto it = ensemble->missing_upstreams_.begin();
-         it != ensemble->missing_upstreams_.end(); it++) {
-      if (it != ensemble->missing_upstreams_.begin()) {
-        name_list += ", ";
-      }
-      name_list += (*it)->model_name_;
-    }
-    return Status(
-        Status::Code::INVALID_ARG,
-        "ensemble " + ensemble_name +
-            " contains models that are not available: " + name_list);
+  const auto& ensemble_config = ensemble->model_config_;
+  if (!ensemble_config.has_ensemble_scheduling()) {
+    return Status::Success;
   }
 
-  const auto& ensemble_config = ensemble->model_config_;
+  const auto& ensemble_name = ensemble->model_name_;
   const bool batching = (ensemble_config.max_batch_size() > 0);
   std::unordered_map<std::string, TensorNode> ensemble_tensors;
   for (const auto& input : ensemble_config.input()) {
@@ -282,7 +271,11 @@ ValidateEnsembleConfig(
     inference::ModelConfig model_config;
     for (auto& node : ensemble->upstreams_) {
       if (model_name == node.first->model_name_) {
-        model_config = node.first->model_config_;
+        // Obtain completed config from backend instance
+        std::shared_ptr<InferenceBackend> backend;
+        RETURN_IF_ERROR(model_repository_manager->GetInferenceBackend(
+            model_name, -1, &backend));
+        model_config = backend->Config();
         break;
       }
     }
@@ -298,42 +291,6 @@ ValidateEnsembleConfig(
               ", but it contains model " + model_name +
               " which only allows maximum batch size to be " +
               std::to_string(model_config.max_batch_size()));
-    }
-
-    if (model_config.has_ensemble_scheduling()) {
-      bool found = false;
-      for (const auto& name : *ensemble_dependency) {
-        if (name == model_name) {
-          found = true;
-          break;
-        }
-      }
-      if (found) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            "circular dependency between ensembles: " + model_name +
-                " -> ... -> " + ensemble_name + " -> " + model_name);
-      }
-
-      auto it = ensembles->find(model_name);
-      // if can't find the name in ensemble, it is either non-ensemble model
-      // or ensemble that is not affected in current change. Thus it is not
-      // possible to cause circular dependency
-      if (it != ensembles->end()) {
-        if (it->second.second == false) {
-          ensemble_dependency->push_back(ensemble_name);
-          it->second.first->status_ = ValidateEnsembleConfig(
-              it->second.first, ensembles, ensemble_dependency);
-          it->second.second = true;
-          ensemble_dependency->pop_back();
-          if (!it->second.first->status_.IsOk()) {
-            return Status(
-                Status::Code::INVALID_ARG,
-                "ensemble " + ensemble_name + " depends on " + model_name +
-                    " which contains invalid model config");
-          }
-        }
-      }
     }
 
     RETURN_IF_ERROR(ValidateTensorMapping(
@@ -400,34 +357,6 @@ ValidateEnsembleConfig(
       decouple_label != 0);
 
   return Status::Success;
-}
-
-}  // namespace
-
-void
-ValidateEnsembleConfig(
-    std::set<ModelRepositoryManager::DependencyNode*>* affected_ensembles)
-{
-  // map from ensemble name to <node, has_validated> pair
-  std::unordered_map<
-      std::string, std::pair<ModelRepositoryManager::DependencyNode*, bool>>
-      ensembles;
-
-  for (const auto& node : (*affected_ensembles)) {
-    ensembles.emplace(
-        std::make_pair(node->model_name_, std::make_pair(node, false)));
-  }
-
-  std::deque<std::string> ensemble_dependency;
-  for (auto& pair : ensembles) {
-    if (pair.second.second) {
-      continue;
-    }
-    // return not ok status if ensemble config is not valid
-    pair.second.first->status_ = ValidateEnsembleConfig(
-        pair.second.first, &ensembles, &ensemble_dependency);
-    pair.second.second = true;
-  }
 }
 
 }}  // namespace nvidia::inferenceserver
