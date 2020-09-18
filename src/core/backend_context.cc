@@ -652,8 +652,6 @@ BackendInputCollector::ProcessTensor(
 
     const InferenceRequest::Input* request_input;
     Status status = request->ImmutableInput(name, &request_input);
-    const size_t request_byte_size =
-        GetByteSize(datatype, request_input->ShapeWithBatchDim());
     if (!status.IsOk() && (response != nullptr)) {
       InferenceResponse::SendWithStatus(
           std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
@@ -663,7 +661,7 @@ BackendInputCollector::ProcessTensor(
           memory_type_id, use_pinned_memory_type, &response);
     }
 
-    buffer_offset += request_byte_size;
+    buffer_offset += request_input->Data()->TotalByteSize();
   }
 
   // Done with the tensor, flush any pending pinned copies.
