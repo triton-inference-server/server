@@ -392,6 +392,25 @@ PlanBackend::Context::InitOptimizationProfiles(
             .first;
     it->second.context_ = default_trt_context;
     default_trt_context = nullptr;
+    if (UseTensorRTv2API(engine_)) {
+      // Store the profile dimensions and set binding dimensions to max dims for
+      // later initializing the input bindings
+      for (int io_index = 0; io_index < num_expected_bindings_; io_index++) {
+        const auto binding_index = io_index;
+        if (engine_->bindingIsInput(binding_index)) {
+          RETURN_IF_ERROR(GetProfileDimensions(io_index, 0, &it->second));
+          if (!it->second.context_->setBindingDimensions(
+                  binding_index, it->second.max_dims_[io_index])) {
+            return Status(
+                Status::Code::INTERNAL,
+                "trt failed to set binding dimension to " +
+                    DimsDebugString(it->second.max_dims_[io_index]) +
+                    " for input '" + engine_->getBindingName(binding_index) +
+                    "' for " + name_);
+          }
+        }
+      }
+    }
   } else {
     // Create one TRT context for each specified profile
     for (const auto& profile_name : profile_names) {
@@ -1009,23 +1028,15 @@ PlanBackend::Context::InitializeExecuteInputBinding(
                 input_name + "' for " + name_);
       }
       if (!io_binding_info.is_linear_format_) {
-        // FIXME calculate this only once
-        size_t element_size =
-            engine_->getBindingComponentsPerElement(io_index) *
-            engine_->getBindingBytesPerComponent(io_index);
         // FIXME case where vectorized dim is first dimension
-        byte_size = element_size * context.context_->getStrides(io_index).d[0] *
+        byte_size = io_binding_info.format_element_size_ * context.context_->getStrides(io_index).d[0] *
                     context.max_dims_[io_index].d[0];
       }
     } else {
       byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
       if (!io_binding_info.is_linear_format_) {
-        // FIXME calculate this only once
-        size_t element_size =
-            engine_->getBindingComponentsPerElement(io_index) *
-            engine_->getBindingBytesPerComponent(io_index);
         // FIXME case where vectorized dim is first dimension
-        byte_size = element_size * context.context_->getStrides(io_index).d[0] *
+        byte_size = io_binding_info.format_element_size_ * context.context_->getStrides(io_index).d[0] *
                     model_config_dims[0];
       }
     }
