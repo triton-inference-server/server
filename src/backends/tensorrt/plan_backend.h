@@ -70,12 +70,18 @@ class PlanBackend : public InferenceBackend {
 
 #ifdef TRITON_ENABLE_CUDA_GRAPH
   struct GraphSpec {
-    GraphSpec() : batch_size_(0), captured_(false) {}
+    GraphSpec() : batch_size_(0), lower_bound_batch_size_(0), captured_(false)
+    {
+    }
     int batch_size_;
     std::map<std::string, std::vector<int64_t>> shapes_;
+    int lower_bound_batch_size_;
+    std::map<std::string, std::vector<int64_t>> lower_bound_shapes_;
     bool captured_;
   };
-  Status InitializeGraphSpecs(std::vector<GraphSpec>* graph_specs);
+  Status InitializeGraphSpecs(
+      std::vector<GraphSpec>* graph_specs, bool* allow_inexact_match);
+  Status ValidateGraphSpec(const GraphSpec& graph_spec);
 #endif
 
   Status DuplicateWarmupRequests(
@@ -191,6 +197,7 @@ class PlanBackend : public InferenceBackend {
       // used to capture the graph
       struct CudaGraph {
         CudaGraph() : cuda_graph_exec_(nullptr) {}
+        std::vector<int64_t> lower_bound_key_;
         // Store in the order of the bindng index
         std::vector<std::vector<int64_t>> input_dims_;
         cudaGraphExec_t cuda_graph_exec_;

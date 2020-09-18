@@ -637,7 +637,8 @@ PlanBackend::CreateExecutionContext(
   const bool use_cuda_graphs = Config().optimization().cuda().graphs();
   if (use_cuda_graphs) {
     std::vector<GraphSpec> graph_specs;
-    RETURN_IF_ERROR(InitializeGraphSpecs(&graph_specs));
+    RETURN_IF_ERROR(
+        InitializeGraphSpecs(&graph_specs, &context->allow_inexact_match_));
 
     // CUDA graph will be captured for every TRT contexts as CUDA graph is
     // merely capturing GPU activities for a given execution.
@@ -654,8 +655,6 @@ PlanBackend::CreateExecutionContext(
     }
   }
 #endif
-  context->allow_inexact_match_ =
-      Config().optimization().cuda().allow_inexact_match();
 
   if (UseTensorRTv2API(context->engine_)) {
     std::string profiles_str;
@@ -1499,8 +1498,10 @@ PlanBackend::Context::GetProfileDimensions(
 // CUDA 10.1 starts to support CUDA graphs.
 #ifdef TRITON_ENABLE_CUDA_GRAPH
 Status
-PlanBackend::InitializeGraphSpecs(std::vector<GraphSpec>* graph_specs)
+PlanBackend::InitializeGraphSpecs(
+    std::vector<GraphSpec>* graph_specs, bool* allow_inexact_match)
 {
+  *allow_inexact_match = false;
   graph_specs->clear();
   if (Config().optimization().cuda().graph_spec_size() == 0) {
     // No graph spec is provided, use default specs
@@ -1528,8 +1529,11 @@ PlanBackend::InitializeGraphSpecs(std::vector<GraphSpec>* graph_specs)
     }
 
     for (const auto bs : cuda_graph_batch_sizes) {
-      graph_specs->emplace_back();
-      graph_specs->back().batch_size_ = bs;
+      if (bs <= Config().max_batch_size()) {
+        graph_specs->emplace_back();
+        graph_specs->back().batch_size_ = bs;
+        graph_specs->back().lower_bound_batch_size_ = bs;
+      }
     }
   } else {
     for (const auto& config_spec :
@@ -1544,6 +1548,86 @@ PlanBackend::InitializeGraphSpecs(std::vector<GraphSpec>* graph_specs)
         }
         graph_spec.shapes_[input.first] = std::move(input_shape);
       }
+
+      if (config_spec.has_graph_lower_bound()) {
+        const auto& lower_bound_spec = config_spec.graph_lower_bound();
+        *allow_inexact_match = true;
+        graph_spec.lower_bound_batch_size_ = lower_bound_spec.batch_size();
+        for (const auto& input : lower_bound_spec.input()) {
+          std::vector<int64_t> input_shape;
+          for (const auto& dim : input.second.dim()) {
+            input_shape.emplace_back(dim);
+          }
+          graph_spec.lower_bound_shapes_[input.first] = std::move(input_shape);
+        }
+      } else {
+        graph_spec.lower_bound_batch_size_ = graph_spec.batch_size_;
+        graph_spec.lower_bound_shapes_ = graph_spec.shapes_;
+      }
+    }
+  }
+  for (const auto& graph_spec : *graph_specs) {
+    RETURN_IF_ERROR(ValidateGraphSpec(graph_spec));
+  }
+  return Status::Success;
+}
+
+Status
+PlanBackend::ValidateGraphSpec(const GraphSpec& graph_spec)
+{
+  if (Config().max_batch_size() == 0) {
+    if ((graph_spec.batch_size_ != 0) ||
+        (graph_spec.lower_bound_batch_size_ != 0)) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "graph spec expects 'batch_size' to be 0 if 'max_batch_size' is 0");
+    }
+  } else if (
+      ((graph_spec.batch_size_ > Config().max_batch_size()) ||
+       (graph_spec.batch_size_ < 1)) ||
+      ((graph_spec.lower_bound_batch_size_ > Config().max_batch_size()) ||
+       (graph_spec.lower_bound_batch_size_ < 1))) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "graph spec expects 'batch_size' to be >= 1 and <= " +
+            std::to_string(Config().max_batch_size()));
+  }
+  if (graph_spec.lower_bound_batch_size_ > graph_spec.batch_size_) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "graph lower bound spec expects 'batch_size' to be <= graph spec "
+        "'batch_size'");
+  }
+  for (const auto& input : graph_spec.shapes_) {
+    const auto lit = graph_spec.lower_bound_shapes_.find(input.first);
+    if (lit == graph_spec.lower_bound_shapes_.end()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "graph lower bound spec expects shape for input '" + input.first +
+              "'");
+    } else {
+      if (lit->second.size() != input.second.size()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "graph lower bound spec expects to have " +
+                std::to_string(input.second.size()) + " dimensions, got " +
+                std::to_string(lit->second.size()));
+      }
+      for (size_t idx = 0; idx < input.second.size(); idx++) {
+        if ((lit->second[idx] < 0) || (input.second[idx] < 0)) {
+          return Status(
+              Status::Code::INVALID_ARG, "graph spec expects input '" +
+                                             input.first +
+                                             "' to have dimension >= 0");
+        }
+        if (lit->second[idx] > input.second[idx]) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "graph lower bound spec expects input '" + input.first +
+                  "' to have dimension <= " +
+                  std::to_string(input.second[idx]));
+        }
+      }
     }
   }
   return Status::Success;
@@ -1557,6 +1641,10 @@ PlanBackend::Context::BuildCudaGraph(
   int batch_size = (graph_spec.batch_size_ == 0) ? 1 : graph_spec.batch_size_;
   std::vector<int64_t> cuda_graph_key{batch_size};
   auto cuda_graph = TensorRTContext::CudaGraph();
+  int lower_bound_batch_size = (graph_spec.lower_bound_batch_size_ == 0)
+                                   ? 1
+                                   : graph_spec.lower_bound_batch_size_;
+  cuda_graph.lower_bound_key_ = {lower_bound_batch_size};
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
     // FIXME handle shape tensor properly, for now if model uses shape tensor
     // then cuda graph is not captured
@@ -1721,6 +1809,11 @@ PlanBackend::Context::SetCudaGraphShape(
   int batch_size = (graph_spec.batch_size_ == 0) ? 1 : graph_spec.batch_size_;
   int binding_offset = trt_context->profile_idx_ * num_expected_bindings_;
   *cuda_graph_key = std::vector<int64_t>{batch_size};
+  auto& lower_bound_key = cuda_graph->lower_bound_key_;
+  lower_bound_key.push_back(
+      (graph_spec.lower_bound_batch_size_ == 0)
+          ? 1
+          : graph_spec.lower_bound_batch_size_);
   for (int io_index = 0; io_index < num_expected_bindings_; io_index++) {
     auto& io_binding_info = io_binding_infos_[io_index];
     auto binding_index = binding_offset + io_index;
@@ -1743,6 +1836,7 @@ PlanBackend::Context::SetCudaGraphShape(
       DimsToDimVec(shape, &dims);
       cuda_graph->input_dims_.emplace_back(dims);
       cuda_graph_key->insert(cuda_graph_key->end(), dims.begin(), dims.end());
+      lower_bound_key.insert(lower_bound_key.end(), dims.begin(), dims.end());
     } else {
       const std::string& name = engine_->getBindingName(io_index);
       auto it = graph_spec.shapes_.find(name);
@@ -1754,6 +1848,7 @@ PlanBackend::Context::SetCudaGraphShape(
         } else {
           cuda_graph->input_dims_.emplace_back();
           cuda_graph->input_dims_.back().push_back(batch_size);
+          lower_bound_key.push_back(batch_size);
         }
         auto& shape = cuda_graph->input_dims_.back();
         shape.insert(shape.end(), it->second.begin(), it->second.end());
@@ -1769,6 +1864,9 @@ PlanBackend::Context::SetCudaGraphShape(
         }
         cuda_graph_key->insert(
             cuda_graph_key->end(), shape.begin(), shape.end());
+        auto lit = graph_spec.lower_bound_shapes_.find(name);
+        lower_bound_key.insert(
+            lower_bound_key.end(), lit->second.begin(), lit->second.end());
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -1800,7 +1898,9 @@ PlanBackend::Context::FindClosestCudaGraph(
       for (; itr != trt_context.cuda_graph_execs_[next_set_].end(); itr++) {
         bool found = true;
         for (size_t key_idx = 0; key_idx < cuda_graph_key.size(); key_idx++) {
-          if (cuda_graph_key[key_idx] > itr->first[key_idx]) {
+          if ((cuda_graph_key[key_idx] > itr->first[key_idx]) ||
+              (cuda_graph_key[key_idx] <
+               itr->second.lower_bound_key_[key_idx])) {
             found = false;
             break;
           }
