@@ -69,7 +69,3 @@ target_link_libraries(
     triton-core-serverapi   # from repo-core
     triton-common-json      # from repo-common
 )
-
-if(${TRITON_ENABLE_PYTHON})
-  add_subdirectory(python src/backends/backend/python)
-endif() # TRITON_ENABLE_PYTHON
