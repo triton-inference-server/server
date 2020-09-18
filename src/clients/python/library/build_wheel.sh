@@ -121,7 +121,13 @@ function main() {
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
   if [ "$2" = true ] ; then
-    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name=manylinux1_x86_64
+    PLATFORM=`uname -m`
+    if [ "$PLATFORM" = "aarch64"] ; then
+      PLAT_NAME="linux_aarch64"
+    else
+      PLAT_NAME="manylinux1_x86_64"
+    fi
+    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name=PLAT_NAME
   else
     VERSION=$VERSION python${PYVER} setup.py bdist_wheel
   fi
