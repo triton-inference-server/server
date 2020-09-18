@@ -610,6 +610,24 @@ message ModelOptimizationPolicy
         repeated int64 dim = 1;
       }
 
+      message LowerBound
+      {
+        //@@      .. cpp:var:: int32 batch_size
+        //@@
+        //@@         The batch size of the CUDA graph. If 'max_batch_size' is 0,
+        //@@         'batch_size' must be set to 0. Otherwise, 'batch_size' must
+        //@@         be set to value between 1 and 'max_batch_size'.
+        //@@
+        int32 batch_size = 1;
+
+        //@@      .. cpp:var:: map<string, Shape> input
+        //@@
+        //@@         The specification of the inputs. 'Shape' is the shape of
+        //@@         the input without batching dimension.
+        //@@
+        map<string, Shape> input = 2;
+      }
+
       //@@      .. cpp:var:: int32 batch_size
       //@@
       //@@         The batch size of the CUDA graph. If 'max_batch_size' is 0,
@@ -624,6 +642,21 @@ message ModelOptimizationPolicy
       //@@         input without batching dimension.
       //@@
       map<string, Shape> input = 2;
+
+      //@@      .. cpp:var:: LowerBound graph_lower_bound
+      //@@
+      //@@         Specify the lower bound of the CUDA graph. Optional.
+      //@@         If specified, the graph can be used for input shapes and
+      //@@         batch sizes that are in closed interval between the lower
+      //@@         bound specification and graph specification. For dynamic
+      //@@         shape model, this allows CUDA graphs to be launched
+      //@@         frequently without capturing all possible shape combinations.
+      //@@         However, using graph for shape combinations different from
+      //@@         the one used for capturing introduces uninitialized data for
+      //@@         execution and it may distort the inference result if
+      //@@         the model is sensitive to uninitialized data.
+      //@@
+      LowerBound graph_lower_bound = 3;
     }
 
     //@@    .. cpp:var:: bool graphs
@@ -651,17 +684,6 @@ message ModelOptimizationPolicy
     //@@       Currently only recognized by TensorRT backend.
     //@@
     repeated GraphSpec graph_spec = 3;
-
-    //@@    .. Use the CUDA graph those specified input shapes are larger to the
-    //@@       inputs of the inference if the graph with exact matching shapes
-    //@@       is not found. For dynamic shape model, this option allows CUDA
-    //@@       graphs to be launched frequently without capturing all possible
-    //@@       shape combinations. However, using graph with larger input shapes
-    //@@       introduces uninitialized data for execution and it may distort
-    //@@       the inference result if the model is sensitive to the
-    //@@       uninitialized data. Default value is false.
-    //@@       Currently only recognized by TensorRT backend.
-    bool allow_inexact_match = 4;
   }
 
   //@@
