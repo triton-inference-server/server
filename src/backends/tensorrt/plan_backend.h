@@ -359,7 +359,7 @@ class PlanBackend : public InferenceBackend {
     struct IOBindingInfo {
       IOBindingInfo()
           : byte_size_(0), buffer_(nullptr), buffer_is_ragged_(false),
-            is_linear_format_(false), format_element_size_(0)
+            is_linear_format_(true), format_element_size_(0)
       {
       }
       uint64_t byte_size_;
