@@ -35,6 +35,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <iomanip>
 
 #include "src/core/backend.h"
 #include "src/core/constants.h"
@@ -107,6 +108,116 @@ InferenceServer::InferenceServer()
   tf_gpu_memory_fraction_ = 0.0;
 
   inflight_request_counter_ = 0;
+}
+
+void
+InferenceServer::PrintSummary()
+{
+  // Small lambda function to update current max len
+  auto update_current_max = [](int &current_max, int current_len) {
+    if (current_len > current_max)
+      current_max = current_len;
+  };
+
+  // Print an aligned table
+  auto print_table =
+      [](std::vector<size_t>& col_sizes,
+         const std::vector<std::string>& headers,
+         const std::vector<std::vector<std::string>>& columns) {
+        std::stringstream table;
+        table << "\n";
+
+        auto append_row_divider =
+            [&table](const std::vector<size_t>& col_sizes) {
+              table << "+";
+              for (const auto& col_size : col_sizes) {
+                for (size_t i = 0; i < col_size + 2; i++) table << "-";
+                table << "+";
+              }
+              table << "\n";
+            };
+
+        for (size_t i = 0; i < col_sizes.size(); i++)
+        {
+          if (col_sizes[i] < headers[i].size())
+            col_sizes[i] = headers[i].size();
+        }
+
+        append_row_divider(col_sizes);
+
+        table << "|" << std::left;
+        for (size_t i = 0; i < col_sizes.size(); i++) {
+          table << " " << std::setw(col_sizes[i]) << headers[i] << " |";
+        }
+        table << "\n";
+
+        append_row_divider(col_sizes);
+
+        for (size_t j = 0; j < columns[0].size(); j++) {
+          table << "|" << std::left;
+          for (size_t i = 0; i < col_sizes.size(); i++) {
+            table << " " << std::setw(col_sizes[i]) << columns[i][j] << " |";
+          }
+          table << "\n";
+        }
+
+        append_row_divider(col_sizes);
+
+        LOG_INFO << table.str() << std::endl;
+      };
+
+  // Model Summary section
+  auto model_states = model_repository_manager_->BackendStates();
+
+  std::vector<std::string> models;
+  std::vector<std::string> versions;
+  std::vector<std::string> status;
+
+  int model_max_len = 0;
+  int status_max_len = 0;
+  int version_max_len = 0;
+
+  for (const auto& model_state : model_states) {
+    auto model_version_map = model_state.second;
+    std::string model_name = model_state.first;
+    for (const auto& model_map : model_version_map) {
+      std::string model_version = std::to_string(model_map.first);
+      auto model_status_pair = model_map.second;
+      std::string model_status = ModelReadyStateString(model_status_pair.first);
+
+      if (model_status_pair.second != "")  {
+        model_status += ": " + model_status_pair.second;
+      }
+
+      update_current_max(model_max_len, model_name.size());
+      update_current_max(status_max_len, model_status.size());
+      update_current_max(version_max_len, model_version.size());
+
+      models.emplace_back(model_name);
+      versions.emplace_back(model_version);
+      status.emplace_back(model_status);
+    }
+  }
+
+  std::vector<std::string> headers;
+  headers.emplace_back("Model");
+  headers.emplace_back("Version");
+  headers.emplace_back("Status");
+
+  std::vector<size_t> col_sizes;
+  col_sizes.emplace_back(model_max_len);
+  col_sizes.emplace_back(version_max_len);
+  col_sizes.emplace_back(status_max_len);
+
+  std::vector<std::vector<std::string>> col_data;
+  col_data.emplace_back(models);
+  col_data.emplace_back(versions);
+  col_data.emplace_back(status);
+  print_table(col_sizes, headers, col_data);
+
+
+  // Backend Summary section
+  auto model_states = model_repository_manager_->BackendStates();
 }
 
 Status
@@ -190,11 +301,15 @@ InferenceServer::Init()
       // continue if not exiting on error.
       ready_state_ = ServerReadyState::SERVER_READY;
     }
-    return status;
+  } else {
+    ready_state_ = ServerReadyState::SERVER_READY;
+    status = Status::Success;
   }
 
-  ready_state_ = ServerReadyState::SERVER_READY;
-  return Status::Success;
+  // Print models and backends summary
+  PrintSummary();
+
+  return status;
 }
 
 Status

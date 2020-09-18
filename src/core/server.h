@@ -97,6 +97,9 @@ class InferenceServer {
   Status ModelReadyVersions(
       std::map<std::string, std::vector<int64_t>>* model_versions);
 
+  // Print backends and models summary
+  void PrintSummary();
+
   /// Get the index of all models in all repositories.
   /// \param ready_only If true return only index of models that are ready.
   /// \param index Returns the index.
