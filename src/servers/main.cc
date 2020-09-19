@@ -1154,6 +1154,10 @@ main(int argc, char** argv)
   auto shm_manager =
       std::make_shared<nvidia::inferenceserver::SharedMemoryManager>();
 
+  // Trap SIGINT and SIGTERM to allow server to exit gracefully
+  signal(SIGINT, SignalHandler);
+  signal(SIGTERM, SignalHandler);
+
   // Create the server...
   TRITONSERVER_Server* server_ptr = nullptr;
   FAIL_IF_ERR(
@@ -1174,10 +1178,6 @@ main(int argc, char** argv)
   if (!StartEndpoints(server, trace_manager, shm_manager)) {
     exit(1);
   }
-
-  // Trap SIGINT and SIGTERM to allow server to exit gracefully
-  signal(SIGINT, SignalHandler);
-  signal(SIGTERM, SignalHandler);
 
   // Wait until a signal terminates the server...
   while (!exiting_) {
