@@ -36,7 +36,7 @@ source ../common/util.sh
 
 rm -fr *.log ./models
 
-cp /opt/tritonserver/lib/python/runtime/triton_python_backend_utils.py .
+cp /opt/tritonserver/backends/python/triton_python_backend_utils.py .
 
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
@@ -74,8 +74,6 @@ cp ../python_models/execute_error/config.pbtxt ./models/execute_error/
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
-
-pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
