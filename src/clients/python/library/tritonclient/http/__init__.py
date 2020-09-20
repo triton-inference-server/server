@@ -189,8 +189,11 @@ class InferenceServerClient:
                  ssl_options=None,
                  ssl_context_factory=None,
                  insecure=False):
-        scheme = "https://" if ssl else "http://"
-        self._parsed_url = URL(scheme + url)
+        if not url.startswith("http://") and not url.startswith("https://"):
+            scheme = "https://" if ssl else "http://"
+            url = scheme + url   
+        self._parsed_url = URL(url)
+        self._base_uri = self._parsed_url.request_uri.rstrip('/')
         self._client_stub = HTTPClient.from_url(
             self._parsed_url,
             concurrency=concurrency,
@@ -237,6 +240,9 @@ class InferenceServerClient:
         geventhttpclient.response.HTTPSocketPoolResponse
             The response from server.
         """
+        if self._base_uri is not None:
+            request_uri = self._base_uri + "/" + request_uri
+
         if query_params is not None:
             request_uri = request_uri + "?" + _get_query_string(query_params)
 
@@ -273,6 +279,9 @@ class InferenceServerClient:
         geventhttpclient.response.HTTPSocketPoolResponse
             The response from server.
         """
+        if self._base_uri is not None:
+            request_uri = self._base_uri + "/" + request_uri
+   
         if query_params is not None:
             request_uri = request_uri + "?" + _get_query_string(query_params)
 
