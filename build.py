@@ -181,6 +181,8 @@ def core_cmake_args(components, backends, install_dir):
         cmake_enable('gcs' in FLAGS.filesystem)))
     cargs.append('-DTRITON_ENABLE_S3:BOOL={}'.format(
         cmake_enable('s3' in FLAGS.filesystem)))
+    cargs.append('-DTRITON_ENABLE_AZURE_STORAGE:BOOL={}'.format(
+        cmake_enable('as' in FLAGS.filesystem)))
 
     cargs.append('-DTRITON_ENABLE_TENSORFLOW={}'.format(
         cmake_enable(('tensorflow1' in backends) or
@@ -412,6 +414,7 @@ ARG TRITON_CONTAINER_VERSION
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip is needed by python backend
+# uuid-dev and pkg-config is needed for Azure Storage
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -434,7 +437,9 @@ RUN apt-get update && \
             software-properties-common \
             unzip \
             wget \
-            zlib1g-dev && \
+            zlib1g-dev \
+            pkg-config \
+            uuid-dev && \       
     rm -rf /var/lib/apt/lists/*
 
 # grpcio-tools grpcio-channelz are needed by python backend
@@ -1041,7 +1046,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified filesystem in build. Allowed values are "gcs" and "s3".'
+        'Include specified filesystem in build. Allowed values are "gcs", "as" and "s3".'
     )
     parser.add_argument(
         '-b',

@@ -54,6 +54,7 @@ option(TRITON_ENABLE_METRICS_GPU "Include GPU metrics support in server" ON)
 # Cloud storage
 option(TRITON_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 option(TRITON_ENABLE_S3 "Include S3 Filesystem support in server" OFF)
+option(TRITON_ENABLE_AZURE_STORAGE "Include Azure Storage Filesystem support in server" OFF)
 
 # Multiple paths may be specified by separating them with semicolon
 set(TRITON_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
@@ -337,6 +338,24 @@ ExternalProject_Add(google-cloud-cpp
 )
 
 #
+# Build azure-storage-cpplite 
+#
+ExternalProject_Add(azure-storage-cpplite
+  PREFIX azure-storage-cpplite
+  GIT_REPOSITORY "https://github.com/Azure/azure-storage-cpplite.git"
+  GIT_TAG "v0.3.0"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/azure-storage-cpplite/src/azure-storage-cpplite"
+  CMAKE_CACHE_ARGS
+    -DBUILD_SHARED_LIBS:BOOL=OFF
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+    -DCURL_INCLUDE_DIR=${CMAKE_CURRENT_BINARY_DIR}/curl/install/include
+    -DCURL_LIBRARY=${CMAKE_CURRENT_BINARY_DIR}/curl/install/lib
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/azure-storage-cpplite/install
+  DEPENDS curl
+)
+
+#
 # Build CNMeM (CUDA memeory management library)
 #
 ExternalProject_Add(cnmem
@@ -453,6 +472,9 @@ endif() # TRITON_ENABLE_GCS
 if(${TRITON_ENABLE_S3})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} aws-sdk-cpp)
 endif() # TRITON_ENABLE_S3
+if(${TRITON_ENABLE_AZURE_STORAGE})
+  set(TRITON_DEPENDS ${TRITON_DEPENDS} azure-storage-cpplite)
+endif() # TRITON_ENABLE_AZURE_STORAGE
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} libevent libevhtp)
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
@@ -480,6 +502,7 @@ ExternalProject_Add(server
     -Dlibevhtp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install/lib/cmake/libevhtp
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
     -Dstorage_client_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/storage_client
+    -Dazure-storage-cpplite_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/azure-storage-cpplite/install
     -Dgoogle_cloud_cpp_common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/google_cloud_cpp_common
     -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
     -DAWSSDK_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/AWSSDK
@@ -507,6 +530,7 @@ ExternalProject_Add(server
     -DTRITON_ENABLE_METRICS:BOOL=${TRITON_ENABLE_METRICS}
     -DTRITON_ENABLE_METRICS_GPU:BOOL=${TRITON_ENABLE_METRICS_GPU}
     -DTRITON_ENABLE_GCS:BOOL=${TRITON_ENABLE_GCS}
+    -DTRITON_ENABLE_AZURE_STORAGE:BOOL=${TRITON_ENABLE_AZURE_STORAGE}
     -DTRITON_ENABLE_S3:BOOL=${TRITON_ENABLE_S3}
     -DTRITON_ENABLE_TENSORFLOW:BOOL=${TRITON_ENABLE_TENSORFLOW}
     -DTRITON_ENABLE_PYTHON:BOOL=${TRITON_ENABLE_PYTHON}

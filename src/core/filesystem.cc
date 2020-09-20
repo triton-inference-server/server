@@ -51,9 +51,16 @@
 #include <unistd.h>
 #include <cerrno>
 #include <fstream>
+
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/status.h"
+
+#ifdef TRITON_ENABLE_AZURE_STORAGE
+#include <blob/blob_client.h>
+#include <storage_account.h>
+#include <storage_credential.h>
+#endif  // TRITON_ENABLE_AZURE_STORAGE
 
 namespace nvidia { namespace inferenceserver {
 
@@ -290,7 +297,8 @@ LocalFileSystem::WriteTextFile(
   return Status::Success;
 }
 
-#if defined(TRITON_ENABLE_GCS) || defined(TRITON_ENABLE_S3)
+#if defined(TRITON_ENABLE_GCS) || defined(TRITON_ENABLE_S3) || \
+    defined(TRITON_ENABLE_AZURE_STORAGE)
 // Helper function to take care of lack of trailing slashes
 std::string
 AppendSlash(const std::string& name)
@@ -301,7 +309,7 @@ AppendSlash(const std::string& name)
 
   return (name + "/");
 }
-#endif  // TRITON_ENABLE_GCS || TRITON_ENABLE_S3
+#endif  // TRITON_ENABLE_GCS || TRITON_ENABLE_S3 || TRITON_ENABLE_AZURE_STORAGE
 
 #ifdef TRITON_ENABLE_GCS
 
@@ -680,6 +688,353 @@ GCSFileSystem::WriteTextFile(
 }
 
 #endif  // TRITON_ENABLE_GCS
+
+
+#ifdef TRITON_ENABLE_AZURE_STORAGE
+
+namespace as = azure::storage_lite;
+const std::string AS_URL_PATTERN = "as://([^/]+)/([^/?]+)(?:/([^?]*))?(\\?.*)?";
+
+class ASFileSystem :  public FileSystem {
+ public:
+  ASFileSystem(const std::string& s3_path);
+  Status CheckClient();
+
+  Status FileExists(const std::string& path, bool* exists);
+  Status IsDirectory(const std::string& path, bool* is_dir);
+  Status FileModificationTime(const std::string& path, int64_t* mtime_ns);
+  Status GetDirectoryContents(
+      const std::string& path, std::set<std::string>* contents);
+  Status GetDirectorySubdirs(
+      const std::string& path, std::set<std::string>* subdirs);
+  Status GetDirectoryFiles(
+      const std::string& path, std::set<std::string>* files);
+  Status ReadTextFile(const std::string& path, std::string* contents);
+  Status LocalizeDirectory(
+      const std::string& path, std::shared_ptr<LocalizedDirectory>* localized);
+  Status WriteTextFile(const std::string& path, const std::string& contents);
+
+ private:
+  Status ParsePath(
+      const std::string& path, std::string* bucket, std::string* object);
+  std::shared_ptr<as::blob_client> client_;
+
+  Status ListDirectory(
+      const std::string& path, const std::string& dir_path,
+      std::function<
+          Status(const as::list_blobs_segmented_item&, const std::string&)>
+          func);
+
+  Status DownloadFolder(
+      const std::string& container, const std::string& path,
+      const std::string& dest);
+  re2::RE2 as_regex_;
+};
+
+Status
+ASFileSystem::ParsePath(
+    const std::string& path, std::string* container, std::string* object)
+{
+  std::string host_name, query;
+  if (!RE2::FullMatch(path, as_regex_, &host_name, container, object, &query)) {
+    return Status(
+        Status::Code::INTERNAL, "Invalid azure storage path: " + path);
+  }
+  return Status::Success;
+}
+
+ASFileSystem::ASFileSystem(const std::string& path)
+    : as_regex_(AS_URL_PATTERN)
+{
+  const char* account_str = std::getenv("AZURE_STORAGE_ACCOUNT");
+  const char* account_key = std::getenv("AZURE_STORAGE_KEY");
+  std::shared_ptr<as::storage_account> account = nullptr;
+  std::string host_name, container, blob_path, query;
+  if (RE2::FullMatch(
+          path, as_regex_, &host_name, &container, &blob_path, &query)) {
+    size_t pos = host_name.rfind(".blob.core.windows.net");
+    std::string account_name;
+    if (account_str == NULL) { 
+      if (pos != std::string::npos) {
+        account_name = host_name.substr(0, pos);
+      } else {
+        account_name = host_name;
+      }
+    } else {
+      account_name = std::string(account_str);
+    }
+
+    std::shared_ptr<as::storage_credential> cred;
+
+    if (account_key != NULL)  // Shared Key
+    {
+      cred = std::make_shared<as::shared_key_credential>(
+          account_name, account_key);
+    } else if (query.find("sig=") != std::string::npos) {
+      // Shared Access Signature
+      cred = std::make_shared<as::shared_access_signature_credential>(query);
+    } else {
+      cred = std::make_shared<as::anonymous_credential>();
+    }
+
+    account = std::make_shared<as::storage_account>(
+        account_name, cred, /* use_https */ true);
+    client_ = std::make_shared<as::blob_client>(account, /*max_concurrency*/ 16);
+  }
+}
+
+Status ASFileSystem::CheckClient() 
+{
+  if (client_ == nullptr) 
+  {
+    return Status(Status::Code::INTERNAL, "blob client initialize failed.");
+  }
+  return Status::Success;
+}
+
+
+Status
+ASFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
+{
+  as::blob_client_wrapper bc(client_);
+  std::string container, object_path;
+  RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
+
+  auto blobProperty = bc.get_blob_property(container, object_path);
+  auto time =
+      std::chrono::system_clock::from_time_t(blobProperty.last_modified);
+  auto update_time =
+      std::chrono::time_point_cast<std::chrono::nanoseconds>(time)
+          .time_since_epoch()
+          .count();
+
+  *mtime_ns = update_time;
+  return Status::Success;
+};
+
+Status
+ASFileSystem::ListDirectory(
+    const std::string& container, const std::string& dir_path,
+    std::function<
+        Status(const as::list_blobs_segmented_item&, const std::string&)>
+        func)
+{
+
+  as::blob_client_wrapper bc(client_);
+
+  // Append a slash to make it easier to list contents
+  std::string full_dir = AppendSlash(dir_path);
+  auto blobs = bc.list_blobs_segmented(container, "/", "", full_dir);
+  for (auto&& item : blobs.blobs) {
+    std::string name = item.name;
+    int item_start = name.find(full_dir) + full_dir.size();
+    int item_end = name.find("/", item_start);
+    // Let set take care of subdirectory contents
+    std::string subfile = name.substr(item_start, item_end - item_start);
+    auto status = func(item, subfile);
+    if (!status.IsOk()){
+      return status;
+    }
+  }
+  return Status::Success;
+}
+
+Status
+ASFileSystem::GetDirectoryContents(
+    const std::string& path, std::set<std::string>* contents)
+{
+  auto func = [&](const as::list_blobs_segmented_item& item,
+                  const std::string& dir) { 
+    contents->insert(dir); 
+    return Status::Success;
+  };
+  std::string container, dir_path;
+  RETURN_IF_ERROR(ParsePath(path, &container, &dir_path));
+  return ListDirectory(container, dir_path, func);
+}
+
+Status
+ASFileSystem::GetDirectorySubdirs(
+    const std::string& path, std::set<std::string>* subdirs)
+{
+  auto func = [&](const as::list_blobs_segmented_item& item,
+                  const std::string& dir) {
+    if (item.is_directory) {
+      subdirs->insert(dir);
+    }
+    return Status::Success;
+  };
+  std::string container, dir_path;
+  RETURN_IF_ERROR(ParsePath(path, &container, &dir_path));
+  return ListDirectory(container, dir_path, func);
+}
+
+Status
+ASFileSystem::GetDirectoryFiles(
+    const std::string& path, std::set<std::string>* files)
+{
+  auto func = [&](const as::list_blobs_segmented_item& item,
+                  const std::string& file) {
+    if (!item.is_directory) {
+      files->insert(file);
+    }
+    return Status::Success;
+  };
+  std::string container, dir_path;
+  RETURN_IF_ERROR(ParsePath(path, &container, &dir_path));
+  return ListDirectory(container, dir_path, func);
+}
+
+Status
+ASFileSystem::IsDirectory(const std::string& path, bool* is_dir)
+{
+  *is_dir = false;
+  std::string container, object_path;
+  RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
+
+  // Check if the bucket exists
+  as::blob_client_wrapper bc(client_);
+
+  bool exists = bc.container_exists(container);
+  if (!exists) {
+    return Status(Status::Code::NOT_FOUND, "container not exits " + container);
+  }
+
+  auto blobs = bc.list_blobs_segmented(container, "/", "", object_path, 1);
+  *is_dir = blobs.blobs.size() > 0;
+
+  return Status::Success;
+};
+
+Status
+ASFileSystem::ReadTextFile(const std::string& path, std::string* contents)
+{
+
+  as::blob_client_wrapper bc(client_);
+  std::string container, object_path;
+  RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
+  using namespace azure::storage_lite;
+  std::ostringstream out_stream;
+  bc.download_blob_to_stream(container, object_path, 0, 0, out_stream);
+  if (errno!=0) {
+    auto error = "Failed to download blob " + path;
+    return Status(Status::Code::INTERNAL, error);
+  }
+  *contents = out_stream.str();
+
+  return Status::Success;
+}
+
+Status
+ASFileSystem::FileExists(const std::string& path, bool* exists)
+{
+  *exists = false;
+
+  std::string container, object;
+  RETURN_IF_ERROR(ParsePath(path, &container, &object));
+  as::blob_client_wrapper bc(client_);
+  auto blobs = bc.list_blobs_segmented(container, "/", "", object, 1);
+  if (errno != 0) {
+    return Status(Status::Code::INTERNAL, "Failed check file: " + path);
+  }
+  if (blobs.blobs.size() > 0) {
+    *exists = true;
+  }
+  return Status::Success;
+}
+
+Status
+ASFileSystem::DownloadFolder(
+    const std::string& container, const std::string& path,
+    const std::string& dest)
+{
+  as::blob_client_wrapper bc(client_);
+  auto func = [&](const as::list_blobs_segmented_item& item,
+                  const std::string& dir) {
+    auto local_path = JoinPath({dest, dir});
+    auto blob_path = JoinPath({path, dir});
+    if (item.is_directory) {
+      int status = mkdir(
+          const_cast<char*>(local_path.c_str()), S_IRUSR | S_IWUSR | S_IXUSR);
+      if (status == -1) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Failed to create local folder: " + local_path +
+                ", errno:" + strerror(errno));
+      }
+      auto ret = DownloadFolder(container, blob_path, local_path);
+      if (!ret.IsOk()) 
+      {
+        return ret;
+      }
+    } else {
+      time_t last_modified;
+      bc.download_blob_to_file(container, blob_path, local_path, last_modified);
+      if (errno != 0) {
+        return Status(Status::Code::INTERNAL, "download file "+ blob_path+" failed.");
+      }
+    }
+    return Status::Success;
+  };
+  return ListDirectory(container, path, func);
+}
+
+Status
+ASFileSystem::LocalizeDirectory(
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* localized)
+{
+  bool exists;
+  RETURN_IF_ERROR(FileExists(path, &exists));
+
+  bool is_dir = false;
+  if (exists) {
+    RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  }
+  if (!is_dir) {
+    return Status(
+        Status::Code::INTERNAL, "directory does not exist at " + path);
+  }
+
+  std::string folder_template = "/tmp/folderXXXXXX";
+  char* tmp_folder = mkdtemp(const_cast<char*>(folder_template.c_str()));
+  if (tmp_folder == nullptr) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder: " + folder_template +
+            ", errno:" + strerror(errno));
+  }
+  localized->reset(new LocalizedDirectory(path, tmp_folder));
+
+  std::string dest(folder_template);
+
+  as::blob_client_wrapper bc(client_);
+
+  std::string container, object;
+  RETURN_IF_ERROR(ParsePath(path, &container, &object));
+  return DownloadFolder(container, object, dest);
+}
+
+Status
+ASFileSystem::WriteTextFile(
+    const std::string& path, const std::string& contents)
+{
+  std::stringstream ss(contents);
+  std::istream is(ss.rdbuf());
+  std::string container, object;
+  RETURN_IF_ERROR(ParsePath(path, &container, &object));
+  std::vector<std::pair<std::string, std::string>> metadata;
+  auto ret =
+      client_->upload_block_blob_from_stream(container, object, is, metadata)
+          .get();
+  if (!ret.success()) {
+    return Status(
+        Status::Code::INTERNAL, "Failed to upload blob, Error: " + ret.error().code +
+                              ", " + ret.error().code_name);
+  }
+  return Status::Success;
+}
+#endif  // TRITON_ENABLE_AZURE_STORAGE
+
 
 #ifdef TRITON_ENABLE_S3
 
@@ -1161,6 +1516,21 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
     *file_system = &s3_fs;
     return Status::Success;
 #endif  // TRITON_ENABLE_S3
+  }
+
+  // Check if this is an Azure Storage path 
+  if (!path.empty() && !path.rfind("as://", 0)) {
+#ifndef TRITON_ENABLE_AZURE_STORAGE
+    return Status(
+        Status::Code::INTERNAL,
+        "as:// file-system not supported. To enable, build with "
+        "-DTRITON_ENABLE_AZURE_STORAGE=ON.");
+#else
+    static ASFileSystem as_fs(path);
+    RETURN_IF_ERROR(as_fs.CheckClient());
+    *file_system = &as_fs;
+    return Status::Success;
+#endif  // TRITON_ENABLE_AZURE_STORAGE
   }
 
   // Assume path is for local filesystem
