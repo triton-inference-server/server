@@ -127,7 +127,7 @@ function main() {
     else
       PLAT_NAME="manylinux1_x86_64"
     fi
-    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name=PLAT_NAME
+    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name=$PLAT_NAME
   else
     VERSION=$VERSION python${PYVER} setup.py bdist_wheel
   fi
