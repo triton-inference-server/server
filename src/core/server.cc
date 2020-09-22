@@ -156,7 +156,8 @@ InferenceServer::PrintSummary()
       }
     }
   }
-  std::unique_ptr<std::string> models_table_string = models_table->print_table();
+  std::unique_ptr<std::string> models_table_string =
+      models_table->print_table();
   LOG_INFO << *models_table_string;
 
   // Backends Summary
@@ -168,17 +169,18 @@ InferenceServer::PrintSummary()
   backend_headers.emplace_back("Config");
 
   triton::common::TablePrinter::Create(&backends_table, backend_headers);
-  TritonBackendManager& triton_backend_manager = TritonBackendManager::Instance();
+  TritonBackendManager& triton_backend_manager =
+      TritonBackendManager::Instance();
 
   std::lock_guard<std::mutex> lock(triton_backend_manager.Mutex());
   auto backend_map = triton_backend_manager.BackendMap();
 
-  for (const auto& backend_pair: backend_map) {
+  for (const auto& backend_pair : backend_map) {
     std::vector<std::string> backend_record;
     auto backend = backend_pair.second.lock();
     if (backend != nullptr) {
       backend_record.emplace_back(backend->Name());
-      const char *config_message;
+      const char* config_message;
       size_t config_message_size;
       backend->BackendConfig().Serialize(&config_message, &config_message_size);
       backend_record.emplace_back(std::string(config_message));
@@ -190,7 +192,8 @@ InferenceServer::PrintSummary()
     backend_record.emplace_back(backend_pair.first);
     backends_table->insert_row(backend_record);
   }
-  std::unique_ptr<std::string> backends_table_string = backends_table->print_table();
+  std::unique_ptr<std::string> backends_table_string =
+      backends_table->print_table();
   LOG_INFO << *backends_table_string;
 }
 

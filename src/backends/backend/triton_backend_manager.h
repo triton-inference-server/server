@@ -144,21 +144,21 @@ class TritonBackendManager {
       std::shared_ptr<TritonBackend>* backend);
 
   static TritonBackendManager& Instance();
-  static std::mutex& Mutex() {
+  static std::mutex& Mutex()
+  {
     static std::mutex m;
     return m;
   }
 
-  TritonBackendManager() {
-
-  }
+  TritonBackendManager() {}
 
   TritonBackendManager(TritonBackendManager const&) = delete;
   TritonBackendManager(TritonBackendManager&&) = delete;
   TritonBackendManager& operator=(TritonBackendManager const&) = delete;
-  TritonBackendManager& operator=(TritonBackendManager &&) = delete;
+  TritonBackendManager& operator=(TritonBackendManager&&) = delete;
 
-  const std::unordered_map<std::string, std::weak_ptr<TritonBackend>>& BackendMap();
+  const std::unordered_map<std::string, std::weak_ptr<TritonBackend>>&
+  BackendMap();
 
  private:
   std::unordered_map<std::string, std::weak_ptr<TritonBackend>> backend_map_;

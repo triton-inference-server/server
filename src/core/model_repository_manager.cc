@@ -894,7 +894,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
       backend_info->state_ = ModelReadyState::READY;
       backend_info->state_reason_.clear();
       LOG_VERBOSE(1) << "successfully loaded '" << model_name << "' version "
-               << version;
+                     << version;
     } else {
       LOG_ERROR << "failed to load '" << model_name << "' version " << version
                 << ": " << status.AsString();
