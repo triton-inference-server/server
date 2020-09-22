@@ -327,15 +327,27 @@ TRITONBACKEND_BackendSetState(TRITONBACKEND_Backend* backend, void* state)
 //
 // TritonBackendManager
 //
+
+TritonBackendManager&
+TritonBackendManager::Instance() {
+  static TritonBackendManager triton_backend_manager{};
+  return triton_backend_manager;
+}
+
+const std::unordered_map<std::string, std::weak_ptr<TritonBackend>>&
+TritonBackendManager::BackendMap() {
+  return backend_map_;
+}
+
 Status
 TritonBackendManager::CreateBackend(
     const std::string& name, const std::string& dir, const std::string& libpath,
     const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
-  static TritonBackendManager singleton_manager;
+  TritonBackendManager &singleton_manager = TritonBackendManager::Instance();
 
-  std::lock_guard<std::mutex> lock(singleton_manager.mu_);
+  std::lock_guard<std::mutex> lock(singleton_manager.Mutex());
 
   const auto& itr = singleton_manager.backend_map_.find(libpath);
   if (itr != singleton_manager.backend_map_.end()) {

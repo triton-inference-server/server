@@ -50,6 +50,7 @@
       nvidia::inferenceserver::Status::Code::INTERNAL, (M))
 #define TRITONJSON_STATUSSUCCESS nvidia::inferenceserver::Status::Success
 #include "triton/common/triton_json.h"
+#include "triton/common/triton_utils.h"
 
 namespace ni = nvidia::inferenceserver;
 
@@ -1533,6 +1534,62 @@ TRITONSERVER_ServerNew(
       loptions->TensorFlowSoftPlacement());
   lserver->SetTensorFlowGPUMemoryFraction(
       loptions->TensorFlowGpuMemoryFraction());
+  
+  std::vector<std::string> options_headers;
+  options_headers.emplace_back("Option");
+  options_headers.emplace_back("Value");
+
+  std::unique_ptr<triton::common::TablePrinter> options_table;
+  triton::common::TablePrinter::Create(&options_table, options_headers);
+  options_table->insert_row(std::vector<std::string>{"server_id", loptions->ServerId()});
+
+  size_t i = 0;
+  for (const auto& model_repository_path: loptions->ModelRepositoryPaths()) {
+    options_table->insert_row(std::vector<std::string>{"model_repository_path_"+std::to_string(i), model_repository_path});
+    ++i;
+  }
+
+  std::string model_control_mode;
+  auto control_mode = loptions->ModelControlMode();
+  switch (control_mode) {
+    case ni::ModelControlMode::MODE_NONE: {
+      model_control_mode = "MODE_NONE";
+      break;
+    }
+    case ni::ModelControlMode::MODE_POLL: {
+      model_control_mode = "MODE_POLL";
+      break;
+    }
+    case ni::ModelControlMode::MODE_EXPLICIT: {
+      model_control_mode = "MODE_EXPLICIT";
+      break;
+    }
+    default: {
+      model_control_mode = "<unknown>";
+    }
+  }
+  options_table->insert_row(std::vector<std::string>{"model_control_mode", model_control_mode});
+
+  i = 0;
+  for (const auto& startup_model: loptions->StartupModels()) {
+    options_table->insert_row(std::vector<std::string>{"startup_models_"+std::to_string(i), startup_model});
+    ++i;
+  }
+  options_table->insert_row(std::vector<std::string>{"strict_model_config", std::to_string(loptions->StrictModelConfig())});
+  options_table->insert_row(std::vector<std::string>{"pinned_memory_pool_byte_size", std::to_string(loptions->PinnedMemoryPoolByteSize())});
+  for (const auto& cuda_memory_pool: loptions->CudaMemoryPoolByteSize()) {
+    options_table->insert_row(std::vector<std::string>{"cuda_memory_pool_byte_size{"+std::to_string(cuda_memory_pool.first)+"}", std::to_string(cuda_memory_pool.second)});
+  }
+  std::stringstream compute_capability_ss;
+  compute_capability_ss.setf(std::ios::fixed);
+  compute_capability_ss.precision(1);
+  compute_capability_ss << loptions->MinSupportedComputeCapability();
+  options_table->insert_row(std::vector<std::string>{"min_supported_compute_capability", compute_capability_ss.str()});
+  options_table->insert_row(std::vector<std::string>{"strict_readiness", std::to_string(loptions->StrictReadiness())});
+  options_table->insert_row(std::vector<std::string>{"exit_timeout", std::to_string(loptions->ExitTimeout())});
+
+  std::unique_ptr<std::string> options_table_string = options_table->print_table();
+  LOG_INFO << *options_table_string;
 
   ni::Status status = lserver->Init();
   if (!status.IsOk()) {

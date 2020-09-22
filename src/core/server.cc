@@ -48,6 +48,10 @@
 #include "src/core/pinned_memory_manager.h"
 #include "src/core/server.h"
 
+#include "src/backends/backend/triton_backend_manager.h"
+
+#include "triton/common/triton_utils.h"
+
 #ifdef TRITON_ENABLE_GPU
 #include "src/core/cuda_memory_manager.h"
 #endif  // TRITON_ENABLE_GPU
@@ -113,111 +117,82 @@ InferenceServer::InferenceServer()
 void
 InferenceServer::PrintSummary()
 {
-  // Small lambda function to update current max len
-  auto update_current_max = [](int &current_max, int current_len) {
-    if (current_len > current_max)
-      current_max = current_len;
-  };
-
-  // Print an aligned table
-  auto print_table =
-      [](std::vector<size_t>& col_sizes,
-         const std::vector<std::string>& headers,
-         const std::vector<std::vector<std::string>>& columns) {
-        std::stringstream table;
-        table << "\n";
-
-        auto append_row_divider =
-            [&table](const std::vector<size_t>& col_sizes) {
-              table << "+";
-              for (const auto& col_size : col_sizes) {
-                for (size_t i = 0; i < col_size + 2; i++) table << "-";
-                table << "+";
-              }
-              table << "\n";
-            };
-
-        for (size_t i = 0; i < col_sizes.size(); i++)
-        {
-          if (col_sizes[i] < headers[i].size())
-            col_sizes[i] = headers[i].size();
-        }
-
-        append_row_divider(col_sizes);
-
-        table << "|" << std::left;
-        for (size_t i = 0; i < col_sizes.size(); i++) {
-          table << " " << std::setw(col_sizes[i]) << headers[i] << " |";
-        }
-        table << "\n";
-
-        append_row_divider(col_sizes);
-
-        for (size_t j = 0; j < columns[0].size(); j++) {
-          table << "|" << std::left;
-          for (size_t i = 0; i < col_sizes.size(); i++) {
-            table << " " << std::setw(col_sizes[i]) << columns[i][j] << " |";
-          }
-          table << "\n";
-        }
-
-        append_row_divider(col_sizes);
-
-        LOG_INFO << table.str() << std::endl;
-      };
-
-  // Model Summary section
+  // Models Summary
   auto model_states = model_repository_manager_->BackendStates();
 
-  std::vector<std::string> models;
-  std::vector<std::string> versions;
-  std::vector<std::string> status;
+  std::vector<std::string> model_headers;
+  model_headers.emplace_back("Model");
+  model_headers.emplace_back("Version");
+  model_headers.emplace_back("Status");
 
-  int model_max_len = 0;
-  int status_max_len = 0;
-  int version_max_len = 0;
+  std::unique_ptr<triton::common::TablePrinter> models_table;
+  triton::common::TablePrinter::Create(&models_table, model_headers);
 
   for (const auto& model_state : model_states) {
+    std::vector<std::string> model_record;
     auto model_version_map = model_state.second;
     std::string model_name = model_state.first;
-    for (const auto& model_map : model_version_map) {
-      std::string model_version = std::to_string(model_map.first);
-      auto model_status_pair = model_map.second;
-      std::string model_status = ModelReadyStateString(model_status_pair.first);
 
-      if (model_status_pair.second != "")  {
-        model_status += ": " + model_status_pair.second;
+    // If model_version_map size is zero, no version is found for this model
+    if (model_version_map.size() == 0) {
+      model_record.emplace_back(model_name);
+      model_record.emplace_back("-");
+      model_record.emplace_back("Not loaded: No model version was found");
+      models_table->insert_row(model_record);
+    } else {
+      for (const auto& model_map : model_version_map) {
+        std::string model_version = std::to_string(model_map.first);
+        auto model_status_pair = model_map.second;
+        std::string model_status =
+            ModelReadyStateString(model_status_pair.first);
+
+        if (model_status_pair.second != "") {
+          model_status += ": " + model_status_pair.second;
+        }
+
+        model_record.emplace_back(model_name);
+        model_record.emplace_back(model_version);
+        model_record.emplace_back(model_status);
+        models_table->insert_row(model_record);
       }
-
-      update_current_max(model_max_len, model_name.size());
-      update_current_max(status_max_len, model_status.size());
-      update_current_max(version_max_len, model_version.size());
-
-      models.emplace_back(model_name);
-      versions.emplace_back(model_version);
-      status.emplace_back(model_status);
     }
   }
+  std::unique_ptr<std::string> models_table_string = models_table->print_table();
+  LOG_INFO << *models_table_string;
 
-  std::vector<std::string> headers;
-  headers.emplace_back("Model");
-  headers.emplace_back("Version");
-  headers.emplace_back("Status");
+  // Backends Summary
+  std::unique_ptr<triton::common::TablePrinter> backends_table;
 
-  std::vector<size_t> col_sizes;
-  col_sizes.emplace_back(model_max_len);
-  col_sizes.emplace_back(version_max_len);
-  col_sizes.emplace_back(status_max_len);
+  std::vector<std::string> backend_headers;
+  backend_headers.emplace_back("Backend");
+  backend_headers.emplace_back("Path");
+  backend_headers.emplace_back("Config");
 
-  std::vector<std::vector<std::string>> col_data;
-  col_data.emplace_back(models);
-  col_data.emplace_back(versions);
-  col_data.emplace_back(status);
-  print_table(col_sizes, headers, col_data);
+  triton::common::TablePrinter::Create(&backends_table, backend_headers);
+  TritonBackendManager& triton_backend_manager = TritonBackendManager::Instance();
 
+  std::lock_guard<std::mutex> lock(triton_backend_manager.Mutex());
+  auto backend_map = triton_backend_manager.BackendMap();
 
-  // Backend Summary section
-  auto model_states = model_repository_manager_->BackendStates();
+  for (const auto& backend_pair: backend_map) {
+    std::vector<std::string> backend_record;
+    auto backend = backend_pair.second.lock();
+    if (backend != nullptr) {
+      backend_record.emplace_back(backend->Name());
+      const char *config_message;
+      size_t config_message_size;
+      backend->BackendConfig().Serialize(&config_message, &config_message_size);
+      backend_record.emplace_back(std::string(config_message));
+    } else {
+      std::string not_found_msg = "NA";
+      backend_record.emplace_back(not_found_msg);
+      backend_record.emplace_back(not_found_msg);
+    }
+    backend_record.emplace_back(backend_pair.first);
+    backends_table->insert_row(backend_record);
+  }
+  std::unique_ptr<std::string> backends_table_string = backends_table->print_table();
+  LOG_INFO << *backends_table_string;
 }
 
 Status
@@ -300,14 +275,13 @@ InferenceServer::Init()
       // failure is due to a model not loading correctly so we just
       // continue if not exiting on error.
       ready_state_ = ServerReadyState::SERVER_READY;
+      PrintSummary();
     }
   } else {
     ready_state_ = ServerReadyState::SERVER_READY;
     status = Status::Success;
+    PrintSummary();
   }
-
-  // Print models and backends summary
-  PrintSummary();
 
   return status;
 }
