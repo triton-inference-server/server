@@ -325,7 +325,7 @@ COPY --from=tritonserver_onnx /workspace/build/Release/testdata/custom_op_librar
 # - Need to find CUDA stubs if they are available since some backends
 # may need to link against them. This is identical to the logic in TF
 # container nvbuild.sh
-ARG TRITON_COMMON_REPO_TAG=main
+ARG TRITON_COMMON_REPO_TAG=imant-summary
 ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_BACKEND_REPO_TAG=main
 
