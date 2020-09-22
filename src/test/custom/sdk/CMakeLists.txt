@@ -70,19 +70,19 @@ install(
     custom_instance.h
     error_codes.cc
     error_codes.h
-  DESTINATION include/src/custom/sdk
+  DESTINATION include/src/test/custom/sdk
 )
 
 # Install the triton and protobuf headers needed to build a custom
 # backend
 install(
   FILES
-    ../../core/model_config.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
+    ../../../core/model_config.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../../core/model_config.pb.h
   DESTINATION include/src/core
 )
 install(
-  FILES ../../backends/custom/custom.h
+  FILES ../../../backends/custom/custom.h
   DESTINATION include/src/backends/custom
 )
 install(

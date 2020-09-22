@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/custom/sdk/error_codes.h"
+#include "src/test/custom/sdk/error_codes.h"
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 

@@ -32,7 +32,7 @@
 #include "src/backends/custom/custom.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "src/custom/sdk/error_codes.h"
+#include "src/test/custom/sdk/error_codes.h"
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 
