@@ -28,12 +28,12 @@
 
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "src/custom/sdk/custom_instance.h"
+#include "src/test/custom/sdk/custom_instance.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda.h>
 #include "src/core/model_config_cuda.h"
-#include "src/custom/addsub/kernel.h"
+#include "src/test/custom/addsub/kernel.h"
 #endif  // TRITON_ENABLE_GPU
 
 #define LOG_ERROR std::cerr

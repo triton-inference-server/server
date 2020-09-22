@@ -31,7 +31,7 @@
 
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "src/custom/sdk/custom_instance.h"
+#include "src/test/custom/sdk/custom_instance.h"
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
