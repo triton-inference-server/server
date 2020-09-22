@@ -123,11 +123,11 @@ function main() {
   if [ "$2" = true ] ; then
     PLATFORM=`uname -m`
     if [ "$PLATFORM" = "aarch64" ] ; then
-      PLAT_NAME="linux_aarch64"
+      PLATFORM_NAME="linux_aarch64"
     else
-      PLAT_NAME="manylinux1_x86_64"
+      PLATFORM_NAME="manylinux1_x86_64"
     fi
-    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name=$PLAT_NAME
+    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name $PLATFORM_NAME
   else
     VERSION=$VERSION python${PYVER} setup.py bdist_wheel
   fi
