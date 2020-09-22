@@ -35,7 +35,6 @@
 #include <memory>
 #include <utility>
 #include <vector>
-#include <iomanip>
 
 #include "src/core/backend.h"
 #include "src/core/constants.h"
