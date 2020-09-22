@@ -2205,6 +2205,19 @@ InferResponseFree(
   return nullptr;  // Success
 }
 
+TRITONSERVER_Error*
+InferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
+{
+  AllocPayload<inference::ModelInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+
+  // ModelInfer RPC expects exactly one response per request. Hence, always call
+  // GetNonDecoupledResponse() to create one response object on response start.
+  payload->response_queue_->GetNonDecoupledResponse();
+
+  return nullptr;  // success
+}
+
 template <typename TensorType>
 TRITONSERVER_Error*
 ParseSharedMemoryParams(
@@ -2950,7 +2963,7 @@ class ModelInferHandler
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
             &allocator_, InferResponseAlloc, InferResponseFree,
-            nullptr /* start_fn */),
+            InferResponseStart),
         "creating inference response allocator");
   }
 
