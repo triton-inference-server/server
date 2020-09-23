@@ -727,19 +727,14 @@ GetNormalizedModelConfig(
 
   // If dynamic batching is specified...
   if (config->has_dynamic_batching()) {
-    // If preferred batch size is not specified choose
-    // automatically. For now we just choose 4, 8, and max batch size
-    // as those are generally good values for GPUs.
+    // If preferred batch size is not specified set it to
+    // max-batch-size.
     if (config->dynamic_batching().preferred_batch_size().size() == 0) {
-      auto mutable_preferred_batch_sie =
+      auto mutable_preferred_batch_size =
           config->mutable_dynamic_batching()->mutable_preferred_batch_size();
-      if (config->max_batch_size() > 4) {
-        mutable_preferred_batch_sie->Add(4);
+      if (config->max_batch_size() > 0) {
+        mutable_preferred_batch_size->Add(config->max_batch_size());
       }
-      if (config->max_batch_size() > 8) {
-        mutable_preferred_batch_sie->Add(8);
-      }
-      mutable_preferred_batch_sie->Add(config->max_batch_size());
     }
   }
 
@@ -752,21 +747,17 @@ GetNormalizedModelConfig(
     }
 
     if (config->sequence_batching().has_oldest()) {
-      // If preferred batch size is not specified choose
-      // automatically. For now we just choose 4, 8, and max batch size
-      // as those are generally good values for GPUs.
+      // If preferred batch size is not specified set it to
+      // max-batch-size.
       if (config->sequence_batching().oldest().preferred_batch_size().size() ==
           0) {
-        auto mutable_preferred_batch_sie = config->mutable_sequence_batching()
-                                               ->mutable_oldest()
-                                               ->mutable_preferred_batch_size();
-        if (config->max_batch_size() > 4) {
-          mutable_preferred_batch_sie->Add(4);
+        auto mutable_preferred_batch_size =
+            config->mutable_sequence_batching()
+                ->mutable_oldest()
+                ->mutable_preferred_batch_size();
+        if (config->max_batch_size() > 0) {
+          mutable_preferred_batch_size->Add(config->max_batch_size());
         }
-        if (config->max_batch_size() > 8) {
-          mutable_preferred_batch_sie->Add(8);
-        }
-        mutable_preferred_batch_sie->Add(config->max_batch_size());
       }
     }
   }
