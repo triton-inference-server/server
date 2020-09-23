@@ -51,6 +51,17 @@ else
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
     SERVER_TIMEOUT=3600
     rm -f *.valgrind.log
+
+    NO_DELAY_TESTS="test_static_batch_preferred \
+                        test_multi_batch_sum_gt_max_preferred \
+                        test_multi_same_output0 \
+                        test_multi_different_output_order"
+
+    DELAY_TESTS="test_multi_batch_use_biggest_preferred \
+                    test_multi_batch_use_best_preferred"
+
+    DIFFERENT_SHAPE_TESTS="test_multi_batch_not_preferred_different_shape \
+                                test_multi_batch_different_shape_allow_ragged"
 fi
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -64,6 +75,30 @@ RET=0
 # If BACKENDS not specified, set to all
 BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
 export BACKENDS
+
+# Basic batcher tests
+NO_DELAY_TESTS=${NO_DELAY_TESTS:="test_static_batch_preferred \
+                            test_static_batch_lt_any_preferred \
+                            test_static_batch_not_preferred \
+                            test_static_batch_gt_max_preferred \
+                            test_multi_batch_not_preferred \
+                            test_multi_batch_gt_max_preferred \
+                            test_multi_batch_sum_gt_max_preferred \
+                            test_multi_same_output0 \
+                            test_multi_same_output1 \
+                            test_multi_different_outputs \
+                            test_multi_different_output_order"}
+
+# Tests that use scheduler delay
+DELAY_TESTS=${DELAY_TESTS:="test_multi_batch_delayed_sum_gt_max_preferred \
+                        test_multi_batch_use_biggest_preferred \
+                        test_multi_batch_use_best_preferred"}
+
+# Tests with different shapes
+DIFFERENT_SHAPE_TESTS=${DIFFERENT_SHAPE_TESTS:="test_multi_batch_not_preferred_different_shape \
+                                        test_multi_batch_preferred_different_shape \
+                                        test_multi_batch_different_shape_allow_ragged \
+                                        test_multi_batch_different_shape"}
 
 # Setup non-variable-size model repository
 rm -fr *.log *.serverlog models && mkdir models
@@ -120,18 +155,7 @@ fi
 for model_type in FIXED VARIABLE; do
     export BATCHER_TYPE=$model_type
     MODEL_PATH=models && [[ "$model_type" == "VARIABLE" ]] && MODEL_PATH=var_models
-    for i in \
-            test_static_batch_preferred \
-            test_static_batch_lt_any_preferred \
-            test_static_batch_not_preferred \
-            test_static_batch_gt_max_preferred \
-            test_multi_batch_not_preferred \
-            test_multi_batch_gt_max_preferred \
-            test_multi_batch_sum_gt_max_preferred \
-            test_multi_same_output0 \
-            test_multi_same_output1 \
-            test_multi_different_outputs \
-            test_multi_different_output_order ; do
+    for i in $NO_DELAY_TESTS ; do
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH"
         SERVER_LOG="./$i.$model_type.serverlog"
         
@@ -181,10 +205,7 @@ for model_type in FIXED VARIABLE; do
 
     # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
     # scheduler is delayed and requests can collect in the queue.
-    for i in \
-            test_multi_batch_delayed_sum_gt_max_preferred \
-            test_multi_batch_use_biggest_preferred \
-            test_multi_batch_use_best_preferred ; do
+    for i in $DELAY_TESTS ; do
         export TRITONSERVER_DELAY_SCHEDULER=6 &&
             [[ "$i" != "test_multi_batch_use_biggest_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=3 &&
             [[ "$i" != "test_multi_batch_use_best_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=2
@@ -238,11 +259,7 @@ for model_type in FIXED VARIABLE; do
 done
 
 export BATCHER_TYPE=VARIABLE
-for i in \
-        test_multi_batch_not_preferred_different_shape \
-        test_multi_batch_preferred_different_shape \
-        test_multi_batch_different_shape_allow_ragged \
-        test_multi_batch_different_shape ; do
+for i in $DIFFERENT_SHAPE_TESTS ; do
     SERVER_ARGS="--model-repository=`pwd`/var_models"
     SERVER_LOG="./$i.VARIABLE.serverlog"
     
