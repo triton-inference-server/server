@@ -30,7 +30,7 @@
 #include <iostream>
 #include <string>
 
-#include "src/clients/c++/perf_client/perf_utils.h"
+#include "src/clients/c++/perf_analyzer/perf_utils.h"
 
 ProtocolType
 ParseProtocol(const std::string& str)

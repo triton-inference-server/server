@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/c++/perf_client/concurrency_manager.h"
+#include "src/clients/c++/perf_analyzer/concurrency_manager.h"
 #include <queue>
 
 ConcurrencyManager::~ConcurrencyManager()

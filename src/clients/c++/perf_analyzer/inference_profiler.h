@@ -26,10 +26,10 @@
 #pragma once
 
 #include <thread>
-#include "src/clients/c++/perf_client/concurrency_manager.h"
-#include "src/clients/c++/perf_client/custom_load_manager.h"
-#include "src/clients/c++/perf_client/model_parser.h"
-#include "src/clients/c++/perf_client/request_rate_manager.h"
+#include "src/clients/c++/perf_analyzer/concurrency_manager.h"
+#include "src/clients/c++/perf_analyzer/custom_load_manager.h"
+#include "src/clients/c++/perf_analyzer/model_parser.h"
+#include "src/clients/c++/perf_analyzer/request_rate_manager.h"
 
 
 /// Constant parameters that determine the whether stopping criteria has met

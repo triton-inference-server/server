@@ -37,8 +37,12 @@ if [[ ! -x "triton_client/bin/image_client" ]]; then
     echo -e "*** image_client executable not present\n"
     RET=1
 fi
+if [[ ! -x "triton_client/bin/perf_analyzer" ]]; then
+    echo -e "*** perf_analyzer executable is not present\n"
+    RET=1
+fi
 if [[ ! -x "triton_client/bin/perf_client" ]]; then
-    echo -e "*** perf_client executable not present\n"
+    echo -e "*** perf_client link is not present\n"
     RET=1
 fi
 

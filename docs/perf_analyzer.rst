@@ -25,29 +25,29 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-.. _section-perf-client:
+.. _section-perf-analyzer:
 
-perf\_client
+perf\_analyzer
 ------------
 
 A critical part of optimizing the inference performance of your model
 is being able to measure changes in performance as you experiment with
-different optimization strategies. The *perf\_client* application
-performs this task for the Triton Inference Server. The perf\_client
+different optimization strategies. The *perf\_analyzer* application
+performs this task for the Triton Inference Server. The perf\_analyzer
 is included with the client examples which are :ref:`available from
 several sources <section-getting-the-client-examples>`.
 
-The perf\_client generates inference requests to your model and
+The perf\_analyzer generates inference requests to your model and
 measures the throughput and latency of those requests. To get
-representative results, the perf\_client measures the throughput and
+representative results, the perf\_analyzer measures the throughput and
 latency over a time window, and then repeats the measurements until it
-gets stable values. By default the perf\_client uses average latency
+gets stable values. By default the perf\_analyzer uses average latency
 to determine stability but you can use the -\\-percentile flag to
 stabilize results based on that confidence level. For example,
 if -\\-percentile=95 is used the results will be stabilized using the
 95-th percentile request latency. For example::
 
-  $ perf_client -m resnet50_netdef --percentile=95
+  $ perf_analyzer -m resnet50_netdef --percentile=95
   *** Measurement Settings ***
     Batch size: 1
     Measurement window: 5000 msec
@@ -69,27 +69,27 @@ if -\\-percentile=95 is used the results will be stabilized using the
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 1, 161.8 infer/sec, latency 6260 usec
 
-.. _section-perf-client-request-concurrency:
+.. _section-perf-analyzer-request-concurrency:
 
 Request Concurrency
 ^^^^^^^^^^^^^^^^^^^
 
-By default perf\_client measures your model's latency and throughput
-using the lowest possible load on the model. To do this perf\_client
+By default perf\_analyzer measures your model's latency and throughput
+using the lowest possible load on the model. To do this perf\_analyzer
 sends one inference request to Triton and waits for the response.
-When that response is received, the perf\_client immediately sends
+When that response is received, the perf\_analyzer immediately sends
 another request, and then repeats this process during the measurement
 windows. The number of outstanding inference requests is referred to
-as the *request concurrency*, and so by default perf\_client uses a
+as the *request concurrency*, and so by default perf\_analyzer uses a
 request concurrency of 1.
 
 Using the -\\-concurrency-range <start>:<end>:<step> option you can have
-perf\_client collect data for a range of request concurrency
+perf\_analyzer collect data for a range of request concurrency
 levels. Use the -\\-help option to see complete documentation for this
 and other options. For example, to see the latency and throughput of
 your model for request concurrency values from 1 to 4::
 
-  $ perf_client -m resnet50_netdef --concurrency-range 1:4
+  $ perf_analyzer -m resnet50_netdef --concurrency-range 1:4
   *** Measurement Settings ***
     Batch size: 1
     Measurement window: 5000 msec
@@ -127,9 +127,9 @@ your model for request concurrency values from 1 to 4::
 Understanding The Output
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-For each request concurrency level perf\_client reports latency and
+For each request concurrency level perf\_analyzer reports latency and
 throughput as seen from the *client* (that is, as seen by
-perf\_client) and also the average request latency on the server.
+perf\_analyzer) and also the average request latency on the server.
 
 The server latency measures the total time from when the request is
 received at the server until the response is sent from the
@@ -157,19 +157,19 @@ follows:
   waiting for the response, and reading the GRPC response from the
   network.
 
-Use the verbose (\-v) option to perf\_client to see more output,
+Use the verbose (\-v) option to perf\_analyzer to see more output,
 including the stabilization passes run for each request concurrency
 level.
 
-.. _section-perf-client-visualize:
+.. _section-perf-analyzer-visualize:
 
 Visualizing Latency vs. Throughput
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The perf\_client provides the \-f option to generate a file containing
+The perf\_analyzer provides the \-f option to generate a file containing
 CSV output of the results::
 
-  $ perf_client -m resnet50_netdef --concurrency-range 1:4 -f perf.csv
+  $ perf_analyzer -m resnet50_netdef --concurrency-range 1:4 -f perf.csv
   $ cat perf.csv
   Concurrency,Inferences/Second,Client Send,Network+Server Send/Recv,Server Queue,Server Compute Input,Server Compute Infer,Server Compute Output,Client Recv,p50 latency,p90 latency,p95 latency,p99 latency
   1,163.6,69,1230,33,43,4719,5,9,6133,6191,6224,6415
@@ -194,7 +194,7 @@ Input Data
 ^^^^^^^^^^
 
 Use the -\\-help option to see complete documentation for all input
-data options. By default perf\_client sends random data to all the
+data options. By default perf\_analyzer sends random data to all the
 inputs of your model. You can select a different input data mode with
 the -\\-input-data option:
 
@@ -208,21 +208,21 @@ For tensors with with STRING datatype there are additional options
 (see -\\-help for full documentation).
 
 For models that support batching you can use the \-b option to
-indicate the batch-size of the requests that perf\_client should
+indicate the batch-size of the requests that perf\_analyzer should
 send. For models with variable-sized inputs you must provide the
--\\-shape argument so that perf\_client knows what shape tensors to
+-\\-shape argument so that perf\_analyzer knows what shape tensors to
 use. For example, for a model that has an input called *IMAGE* that
 has shape [ 3, N, M ], where N and M are variable-size dimensions, to
-tell perf\_client to send batch-size 4 requests of shape [ 3, 224, 224 ]::
+tell perf\_analyzer to send batch-size 4 requests of shape [ 3, 224, 224 ]::
 
-  $ perf_client -m mymodel -b 4 --shape IMAGE:3,224,224
+  $ perf_analyzer -m mymodel -b 4 --shape IMAGE:3,224,224
 
 Real Input Data
 ^^^^^^^^^^^^^^^
 
 The performance of some models is highly dependent on the data used.
 For such cases users can provide data to be used with every inference request
-made by client in a JSON file. The perf_client will use the provided data when
+made by analyzer in a JSON file. The perf_analyzer will use the provided data when
 sending inference requests in a round-robin fashion.
 
 Each entry in the "data" array must specify all input tensors with the exact
@@ -285,7 +285,7 @@ example highlights how this can be acheived: ::
 
 
 In case of sequence models, multiple data streams can be specified in the JSON file. Each sequence
-will get a data stream of its own and the client will ensure the data from each stream is
+will get a data stream of its own and the analyzer will ensure the data from each stream is
 played back to the same correlation id. The below example highlights how to specify data for
 multiple streams for a sequence model with a single input named INPUT, shape [1] and data type STRING: ::
 
@@ -330,11 +330,11 @@ multiple streams for a sequence model with a single input named INPUT, shape [1]
   }
 
 The above example describes three data streams with lengths 4, 3 and 2 respectively.
-The perf_client will hence produce sequences of length 4, 3 and 2 in this case.
+The perf_analyzer will hence produce sequences of length 4, 3 and 2 in this case.
 
 Users can also provide an optional "shape" field to the tensors. This is especially
 useful while profiling the models with variable-sized tensors as input. The
-specified shape values are treated as an override and client still expects
+specified shape values are treated as an override and analyzer still expects
 default input shapes to be provided as a command line option (see --shape) for
 variable-sized inputs. In the absence of "shape" field, the provided defaults
 will be used. Below is an example json file for a model with single input "INPUT",
@@ -382,8 +382,8 @@ shape [-1,-1] and data type INT32: ::
 Shared Memory
 ^^^^^^^^^^^^^
 
-By default perf\_client sends input tensor data and receives output
-tensor data over the network. You can instead instruct perf\_client to
+By default perf\_analyzer sends input tensor data and receives output
+tensor data over the network. You can instead instruct perf\_analyzer to
 use system shared memory or CUDA shared memory to communicate tensor
 data. By using these options you can model the performance that you
 can achieve by using shared memory in your application. Use
@@ -393,6 +393,6 @@ can achieve by using shared memory in your application. Use
 Communication Protocol
 ^^^^^^^^^^^^^^^^^^^^^^
 
-By default perf\_client uses HTTP to communicate with Triton. The GRPC
+By default perf\_analyzer uses HTTP to communicate with Triton. The GRPC
 protocol can be specificed with the -i option. If GRPC is selected the
 -\\-streaming option can also be specified for GRPC streaming.

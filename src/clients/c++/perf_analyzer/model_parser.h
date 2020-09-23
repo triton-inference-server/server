@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/perf_client/perf_utils.h"
-#include "src/clients/c++/perf_client/triton_client_wrapper.h"
+#include "src/clients/c++/perf_analyzer/perf_utils.h"
+#include "src/clients/c++/perf_analyzer/triton_client_wrapper.h"
 
 struct ModelTensor {
   ModelTensor() : is_shape_tensor_(false) {}
@@ -43,7 +43,7 @@ using ComposingModelMap = std::map<std::string, std::set<ModelIdentifier>>;
 /// ModelParser is a helper class to parse the information about the target
 /// model from the metadata and configuration returned by the server.
 ///
-/// Perf Client depends upon the various properties of the model to correctly
+/// Perf Analyzer depends upon the various properties of the model to correctly
 /// generate and issue inference request for the model. The object of this
 /// class will provide these necessary details.
 class ModelParser {
