@@ -39,7 +39,9 @@ import test_util as tu
 import tritonhttpclient
 from tritonclientutils import InferenceServerException
 
-class TrtDynamicShapeTest(unittest.TestCase):
+
+class TrtDynamicShapeTest(tu.TestResultCollector):
+
     def setUp(self):
         self.dtype_ = np.float32
         self.model_name_ = 'plan'
@@ -49,14 +51,15 @@ class TrtDynamicShapeTest(unittest.TestCase):
         tensor_shape = (1,)
         try:
             iu.infer_exact(self, self.model_name_, (1,) + tensor_shape, 1,
-                            self.dtype_, self.dtype_, self.dtype_)
+                           self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(
-              "model expected the shape of dimension 0 to be between 6 and 8 but received 1" in ex.message())
+                "model expected the shape of dimension 0 to be between 6 and 8 but received 1"
+                in ex.message())
 
         try:
             iu.infer_exact(self, self.model_name_, (8,) + tensor_shape, 8,
-                            self.dtype_, self.dtype_, self.dtype_)
+                           self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -66,31 +69,33 @@ class TrtDynamicShapeTest(unittest.TestCase):
 
         try:
             iu.infer_exact(self, self.model_name_, (8,) + tensor_shape, 8,
-                            self.dtype_, self.dtype_, self.dtype_)
+                           self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         over_tensor_shape = (34,)
         try:
             iu.infer_exact(self, self.model_name_, (8,) + over_tensor_shape, 8,
-                            self.dtype_, self.dtype_, self.dtype_)
+                           self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(
-                    "model expected the shape of dimension 1 to be between 1 and 33 but received 34" in ex.message())
+                "model expected the shape of dimension 1 to be between 1 and 33 but received 34"
+                in ex.message())
 
     def test_select_optimization_profile(self):
         # Different profile has different optimized input shape
         batch_size = 4
         tensor_shape = (16,)
         try:
-            iu.infer_exact(self, self.model_name_, (batch_size,) + tensor_shape, batch_size,
-                            self.dtype_, self.dtype_, self.dtype_)
+            iu.infer_exact(self, self.model_name_, (batch_size,) + tensor_shape,
+                           batch_size, self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_load_wrong_optimization_profile(self):
         client = tritonhttpclient.InferenceServerClient("localhost:8000")
-        model_name = tu.get_model_name(self.model_name_, self.dtype_, self.dtype_, self.dtype_)
+        model_name = tu.get_model_name(self.model_name_, self.dtype_,
+                                       self.dtype_, self.dtype_)
         model_status = client.is_model_ready(model_name, "1")
         self.assertFalse(model_status, "expected model to be not ready")
 

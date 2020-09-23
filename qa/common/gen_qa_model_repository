@@ -48,7 +48,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=20.06
+TRITON_VERSION=20.08
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.6.0
@@ -74,12 +74,13 @@ HOST_VARSEQDESTDIR=/tmp/$TRITON_VERSION/qa_variable_sequence_model_repository
 HOST_ENSEMBLEDESTDIR=/tmp/$TRITON_VERSION/qa_ensemble_model_repository
 HOST_NOSHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_noshape_model_repository
 HOST_PLGDESTDIR=/tmp/$TRITON_VERSION/qa_trt_plugin_model_repository
+HOST_RAGGEDDESTDIR=/tmp/$TRITON_VERSION/qa_ragged_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR
-rm -fr $HOST_PLGDESTDIR $HOST_RESHAPEDESTDIR
+rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
@@ -93,6 +94,7 @@ mkdir -p $HOST_VARSEQDESTDIR
 mkdir -p $HOST_ENSEMBLEDESTDIR
 mkdir -p $HOST_NOSHAPEDESTDIR
 mkdir -p $HOST_PLGDESTDIR
+mkdir -p $HOST_RAGGEDDESTDIR
 
 # Since the models required by ensemble models may not be available
 # at this point, storing ensemble models separately so that other qa directories
@@ -115,6 +117,7 @@ cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
 cp ./gen_qa_dyna_sequence_models.py $HOST_SRCDIR/.
 cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
+cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
@@ -135,6 +138,7 @@ VARSEQDESTDIR=/tmp/varseqmodels
 ENSEMBLEDESTDIR=/tmp/ensemblemodels
 NOSHAPEDESTDIR=/tmp/noshapemodels
 PLGDESTDIR=/tmp/pluginmodels
+RAGGEDDESTDIR=/tmp/raggedmodels
 
 # ONNX
 cat >$HOST_SRCDIR/$ONNXSCRIPT <<EOF
@@ -302,6 +306,8 @@ python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$DYNASEQD
 chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
 chmod -R 777 $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$RAGGEDDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
 # make shared library for custom clip plugin
 (cd /workspace/tensorrt/samples/python/uff_custom_plugin && cmake . && make && \
 cp libclipplugin.so $PLGDESTDIR/.)
@@ -328,6 +334,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
+       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        $TENSORRT_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"

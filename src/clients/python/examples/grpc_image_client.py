@@ -33,8 +33,9 @@ import sys
 import struct
 
 import grpc
-from tritongrpcclient import grpc_service_pb2, grpc_service_pb2_grpc
-import tritongrpcclient.model_config_pb2 as mc
+
+from tritonclient.grpc import service_pb2, service_pb2_grpc
+import tritonclient.grpc.model_config_pb2 as mc
 
 FLAGS = None
 
@@ -64,6 +65,7 @@ def model_dtype_to_np(model_dtype):
         return np.dtype(object)
     return None
 
+
 def deserialize_bytes_tensor(encoded_tensor):
     strs = list()
     offset = 0
@@ -75,6 +77,7 @@ def deserialize_bytes_tensor(encoded_tensor):
         offset += l
         strs.append(sb)
     return (np.array(strs, dtype=bytes))
+
 
 def parse_model(model_metadata, model_config):
     """
@@ -191,15 +194,20 @@ def preprocess(img, format, dtype, c, h, w, scaling):
     return ordered
 
 
-def postprocess(results, filenames, batch_size):
+def postprocess(response, filenames, batch_size):
     """
-    Post-process results to show classifications.
+    Post-process response to show classifications.
     """
-    if len(results) != 1:
-        raise Exception("expected 1 result, got {}".format(len(results)))
+    if len(response.outputs) != 1:
+        raise Exception("expected 1 output, got {}".format(len(
+            response.outputs)))
 
-    batched_result = deserialize_bytes_tensor(results[0].contents.raw_contents)
-    contents = np.reshape(batched_result, results[0].shape)
+    if len(response.raw_output_contents) != 1:
+        raise Exception("expected 1 output content, got {}".format(
+            len(response.raw_output_contents)))
+
+    batched_result = deserialize_bytes_tensor(response.raw_output_contents[0])
+    contents = np.reshape(batched_result, response.outputs[0].shape)
 
     if len(contents) != batch_size:
         raise Exception("expected {} results, got {}".format(
@@ -217,7 +225,7 @@ def postprocess(results, filenames, batch_size):
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
                      result_filenames):
-    request = grpc_service_pb2.ModelInferRequest()
+    request = service_pb2.ModelInferRequest()
     request.model_name = FLAGS.model_name
     request.model_version = FLAGS.model_version
 
@@ -235,12 +243,12 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
 
     filenames.sort()
 
-    output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output = service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output.name = output_name
     output.parameters['classification'].int64_param = FLAGS.classes
     request.outputs.extend([output])
 
-    input = grpc_service_pb2.ModelInferRequest().InferInputTensor()
+    input = service_pb2.ModelInferRequest().InferInputTensor()
     input.name = input_name
     input.datatype = dtype
     if format == mc.ModelInput.FORMAT_NHWC:
@@ -266,6 +274,7 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
         input_bytes = None
         input_filenames = []
         request.ClearField("inputs")
+        request.ClearField("raw_input_contents")
         for idx in range(FLAGS.batch_size):
             input_filenames.append(filenames[image_idx])
             if input_bytes is None:
@@ -277,11 +286,9 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
             if image_idx == 0:
                 last_request = True
 
-        input_contents = grpc_service_pb2.InferTensorContents()
-        input_contents.raw_contents = input_bytes
-        input.contents.CopyFrom(input_contents)
         request.inputs.extend([input])
         result_filenames.append(input_filenames)
+        request.raw_input_contents.extend([input_bytes])
         yield request
 
 
@@ -352,16 +359,16 @@ if __name__ == '__main__':
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
-    metadata_request = grpc_service_pb2.ModelMetadataRequest(
+    metadata_request = service_pb2.ModelMetadataRequest(
         name=FLAGS.model_name, version=FLAGS.model_version)
     metadata_response = grpc_stub.ModelMetadata(metadata_request)
 
-    config_request = grpc_service_pb2.ModelConfigRequest(
-        name=FLAGS.model_name, version=FLAGS.model_version)
+    config_request = service_pb2.ModelConfigRequest(name=FLAGS.model_name,
+                                                    version=FLAGS.model_version)
     config_response = grpc_stub.ModelConfig(config_request)
 
     input_name, output_name, c, h, w, format, dtype = parse_model(
@@ -401,9 +408,10 @@ if __name__ == '__main__':
                 error_found = True
                 print(response.error_message)
             else:
-                postprocess(response.infer_response.outputs, result_filenames[idx], FLAGS.batch_size)
+                postprocess(response.infer_response, result_filenames[idx],
+                            FLAGS.batch_size)
         else:
-            postprocess(response.outputs, result_filenames[idx], FLAGS.batch_size)
+            postprocess(response, result_filenames[idx], FLAGS.batch_size)
         idx += 1
 
     if error_found:

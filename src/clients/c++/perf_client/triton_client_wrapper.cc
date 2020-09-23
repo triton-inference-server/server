@@ -87,8 +87,8 @@ TritonClientWrapper::ModelMetadata(
 
 nic::Error
 TritonClientWrapper::ModelMetadata(
-    ni::ModelMetadataResponse* model_metadata, const std::string& model_name,
-    const std::string& model_version)
+    inference::ModelMetadataResponse* model_metadata,
+    const std::string& model_name, const std::string& model_version)
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->ModelMetadata(
@@ -119,7 +119,7 @@ TritonClientWrapper::ModelConfig(
 
 nic::Error
 TritonClientWrapper::ModelConfig(
-    ni::ModelConfigResponse* model_config, const std::string& model_name,
+    inference::ModelConfigResponse* model_config, const std::string& model_name,
     const std::string& model_version)
 {
   if (protocol_ == ProtocolType::GRPC) {
@@ -168,11 +168,11 @@ TritonClientWrapper::AsyncInfer(
 
 nic::Error
 TritonClientWrapper::StartStream(
-    nic::InferenceServerClient::OnCompleteFn callback)
+    nic::InferenceServerClient::OnCompleteFn callback, bool enable_stats)
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->StartStream(
-        callback, true /*enable_stats*/, *http_headers_));
+        callback, enable_stats, 0 /* stream_timeout */, *http_headers_));
   } else {
     return nic::Error("HTTP does not support starting streams");
   }
@@ -213,7 +213,7 @@ TritonClientWrapper::ModelInferenceStatistics(
     const std::string& model_name, const std::string& model_version)
 {
   if (protocol_ == ProtocolType::GRPC) {
-    ni::ModelStatisticsResponse infer_stat;
+    inference::ModelStatisticsResponse infer_stat;
     RETURN_IF_ERROR(client_.grpc_client_->ModelInferenceStatistics(
         &infer_stat, model_name, model_version, *http_headers_));
     ParseStatistics(infer_stat, model_stats);
@@ -282,7 +282,7 @@ TritonClientWrapper::RegisterCudaSharedMemory(
 
 void
 TritonClientWrapper::ParseStatistics(
-    ni::ModelStatisticsResponse& infer_stat,
+    inference::ModelStatisticsResponse& infer_stat,
     std::map<ModelIdentifier, ModelStatistics>* model_stats)
 {
   model_stats->clear();

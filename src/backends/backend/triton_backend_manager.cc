@@ -27,7 +27,9 @@
 #include "src/backends/backend/triton_backend_manager.h"
 
 #include <dlfcn.h>
+#include "src/backends/backend/triton_memory_manager.h"
 #include "src/core/logging.h"
+#include "src/core/server_message.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -76,11 +78,28 @@ GetEntrypoint(
 //
 Status
 TritonBackend::Create(
-    const std::string& name, const std::string& path,
+    const std::string& name, const std::string& dir, const std::string& libpath,
+    const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
-  auto local_backend =
-      std::shared_ptr<TritonBackend>(new TritonBackend(name, path));
+  // Create the JSON representation of the backend configuration.
+  triton::common::TritonJson::Value backend_config_json(
+      triton::common::TritonJson::ValueType::OBJECT);
+  if (!backend_cmdline_config.empty()) {
+    triton::common::TritonJson::Value cmdline_json(
+        backend_config_json, triton::common::TritonJson::ValueType::OBJECT);
+    for (const auto& pr : backend_cmdline_config) {
+      RETURN_IF_ERROR(cmdline_json.AddString(pr.first.c_str(), pr.second));
+    }
+
+    RETURN_IF_ERROR(
+        backend_config_json.Add("cmdline", std::move(cmdline_json)));
+  }
+
+  TritonServerMessage backend_config(backend_config_json);
+
+  auto local_backend = std::shared_ptr<TritonBackend>(
+      new TritonBackend(name, dir, libpath, backend_config));
 
   // Load the library and initialize all the entrypoints
   RETURN_IF_ERROR(local_backend->LoadBackendLibrary());
@@ -96,8 +115,12 @@ TritonBackend::Create(
   return Status::Success;
 }
 
-TritonBackend::TritonBackend(const std::string& name, const std::string& path)
-    : name_(name), path_(path), state_(nullptr)
+TritonBackend::TritonBackend(
+    const std::string& name, const std::string& dir, const std::string& libpath,
+    const TritonServerMessage& backend_config)
+    : name_(name), dir_(dir), libpath_(libpath),
+      backend_config_(backend_config),
+      exec_policy_(TRITONBACKEND_EXECUTION_BLOCKING), state_(nullptr)
 {
   ClearHandles();
 }
@@ -125,13 +148,15 @@ TritonBackend::ClearHandles()
   backend_fini_fn_ = nullptr;
   model_init_fn_ = nullptr;
   model_fini_fn_ = nullptr;
-  model_exec_fn_ = nullptr;
+  inst_init_fn_ = nullptr;
+  inst_fini_fn_ = nullptr;
+  inst_exec_fn_ = nullptr;
 }
 
 Status
 TritonBackend::LoadBackendLibrary()
 {
-  void* handle = dlopen(path_.c_str(), RTLD_LAZY);
+  void* handle = dlopen(libpath_.c_str(), RTLD_LAZY);
   if (handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
@@ -142,7 +167,9 @@ TritonBackend::LoadBackendLibrary()
   TritonBackendFiniFn_t bffn;
   TritonModelInitFn_t mifn;
   TritonModelFiniFn_t mffn;
-  TritonModelExecFn_t mefn;
+  TritonModelInstanceInitFn_t iifn;
+  TritonModelInstanceFiniFn_t iffn;
+  TritonModelInstanceExecFn_t iefn;
 
   // Backend initialize and finalize functions, optional
   RETURN_IF_ERROR(GetEntrypoint(
@@ -160,17 +187,27 @@ TritonBackend::LoadBackendLibrary()
       handle, "TRITONBACKEND_ModelFinalize", true /* optional */,
       reinterpret_cast<void**>(&mffn)));
 
-  // Model execute function, required
+  // Model instance initialize and finalize functions, optional
   RETURN_IF_ERROR(GetEntrypoint(
-      handle, "TRITONBACKEND_ModelExecute", false /* optional */,
-      reinterpret_cast<void**>(&mefn)));
+      handle, "TRITONBACKEND_ModelInstanceInitialize", true /* optional */,
+      reinterpret_cast<void**>(&iifn)));
+  RETURN_IF_ERROR(GetEntrypoint(
+      handle, "TRITONBACKEND_ModelInstanceFinalize", true /* optional */,
+      reinterpret_cast<void**>(&iffn)));
+
+  // Model instance execute function, required
+  RETURN_IF_ERROR(GetEntrypoint(
+      handle, "TRITONBACKEND_ModelInstanceExecute", false /* optional */,
+      reinterpret_cast<void**>(&iefn)));
 
   dlhandle_ = handle;
   backend_init_fn_ = bifn;
   backend_fini_fn_ = bffn;
   model_init_fn_ = mifn;
   model_fini_fn_ = mffn;
-  model_exec_fn_ = mefn;
+  inst_init_fn_ = iifn;
+  inst_fini_fn_ = iffn;
+  inst_exec_fn_ = iefn;
 
   return Status::Success;
 }
@@ -178,10 +215,24 @@ TritonBackend::LoadBackendLibrary()
 Status
 TritonBackend::UnloadBackendLibrary()
 {
-  if ((dlhandle_ != nullptr) && (dlclose(dlhandle_) != 0)) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unable to unload backend library: " + std::string(dlerror()));
+  bool enable_unload = true;
+
+  // For memory leak debugging do not unload the shared library so
+  // that it is available for stack trace generation when the server
+  // exits.
+  const char* dstr = getenv("TRITONSERVER_DISABLE_BACKEND_UNLOAD");
+  if (dstr != nullptr) {
+    enable_unload = (atoi(dstr) == 0);
+    LOG_VERBOSE(1) << "Disable shared-library unload for backend '" << Name()
+                   << "'";
+  }
+
+  if (enable_unload) {
+    if ((dlhandle_ != nullptr) && (dlclose(dlhandle_) != 0)) {
+      return Status(
+          Status::Code::INTERNAL,
+          "unable to unload backend library: " + std::string(dlerror()));
+    }
   }
 
   ClearHandles();
@@ -192,6 +243,14 @@ TritonBackend::UnloadBackendLibrary()
 extern "C" {
 
 TRITONSERVER_Error*
+TRITONBACKEND_ApiVersion(uint32_t* major, uint32_t* minor)
+{
+  *major = TRITONBACKEND_API_VERSION_MAJOR;
+  *minor = TRITONBACKEND_API_VERSION_MINOR;
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_BackendName(TRITONBACKEND_Backend* backend, const char** name)
 {
   TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
@@ -200,10 +259,50 @@ TRITONBACKEND_BackendName(TRITONBACKEND_Backend* backend, const char** name)
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_BackendApiVersion(
-    TRITONBACKEND_Backend* backend, uint32_t* api_version)
+TRITONBACKEND_BackendConfig(
+    TRITONBACKEND_Backend* backend, TRITONSERVER_Message** backend_config)
 {
-  *api_version = TRITONBACKEND_API_VERSION;
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  *backend_config = const_cast<TRITONSERVER_Message*>(
+      reinterpret_cast<const TRITONSERVER_Message*>(&tb->BackendConfig()));
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_BackendExecutionPolicy(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_ExecutionPolicy* policy)
+{
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  *policy = tb->ExecutionPolicy();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_BackendSetExecutionPolicy(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_ExecutionPolicy policy)
+{
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  tb->SetExecutionPolicy(policy);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_BackendArtifacts(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_ArtifactType* artifact_type,
+    const char** location)
+{
+  TritonBackend* tb = reinterpret_cast<TritonBackend*>(backend);
+  *artifact_type = TRITONBACKEND_ARTIFACT_FILESYSTEM;
+  *location = tb->Directory().c_str();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_BackendMemoryManager(
+    TRITONBACKEND_Backend* backend, TRITONBACKEND_MemoryManager** manager)
+{
+  static TritonMemoryManager gMemoryManager;
+  *manager = reinterpret_cast<TRITONBACKEND_MemoryManager*>(&gMemoryManager);
   return nullptr;  // success
 }
 
@@ -230,14 +329,15 @@ TRITONBACKEND_BackendSetState(TRITONBACKEND_Backend* backend, void* state)
 //
 Status
 TritonBackendManager::CreateBackend(
-    const std::string& name, const std::string& path,
+    const std::string& name, const std::string& dir, const std::string& libpath,
+    const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
   static TritonBackendManager singleton_manager;
 
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
-  const auto& itr = singleton_manager.backend_map_.find(path);
+  const auto& itr = singleton_manager.backend_map_.find(libpath);
   if (itr != singleton_manager.backend_map_.end()) {
     // Found in map. If the weak_ptr is still valid that means that
     // there are other models using the backend and we just reuse that
@@ -252,8 +352,9 @@ TritonBackendManager::CreateBackend(
     singleton_manager.backend_map_.erase(itr);
   }
 
-  RETURN_IF_ERROR(TritonBackend::Create(name, path, backend));
-  singleton_manager.backend_map_.insert({path, *backend});
+  RETURN_IF_ERROR(TritonBackend::Create(
+      name, dir, libpath, backend_cmdline_config, backend));
+  singleton_manager.backend_map_.insert({libpath, *backend});
 
   return Status::Success;
 }

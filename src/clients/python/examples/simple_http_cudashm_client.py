@@ -29,9 +29,10 @@ import argparse
 import numpy as np
 import sys
 from builtins import range
-import tritonhttpclient
-import tritonshmutils.cuda_shared_memory as cudashm
-import tritonclientutils as utils
+
+import tritonclient.http as httpclient
+import tritonclient.utils.cuda_shared_memory as cudashm
+from tritonclient import utils
 
 FLAGS = None
 
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
 
     try:
-        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
+        triton_client = httpclient.InferenceServerClient(url=FLAGS.url,
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))
@@ -113,19 +114,17 @@ if __name__ == '__main__':
 
     # Set the parameters to use data from shared memory
     inputs = []
-    inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
     inputs[-1].set_shared_memory("input0_data", input_byte_size)
 
-    inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
     inputs[-1].set_shared_memory("input1_data", input_byte_size)
 
     outputs = []
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0',
-                                                   binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
     outputs[-1].set_shared_memory("output0_data", output_byte_size)
 
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
     outputs[-1].set_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,
@@ -152,10 +151,12 @@ if __name__ == '__main__':
         sys.exit(1)
 
     for i in range(16):
-        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
-              str(output0_data[0][i]))
-        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
-              str(output1_data[0][i]))
+        print(
+            str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
+            str(output0_data[0][i]))
+        print(
+            str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
+            str(output1_data[0][i]))
         if (input0_data[i] + input1_data[i]) != output0_data[0][i]:
             print("cudashm infer error: incorrect sum")
             sys.exit(1)

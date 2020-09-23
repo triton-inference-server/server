@@ -28,87 +28,53 @@
 
 namespace nvidia { namespace inferenceserver {
 
-DataType
+inference::DataType
 ConvertTrtTypeToDataType(nvinfer1::DataType trt_type)
 {
   switch (trt_type) {
     case nvinfer1::DataType::kFLOAT:
-      return TYPE_FP32;
+      return inference::DataType::TYPE_FP32;
     case nvinfer1::DataType::kHALF:
-      return TYPE_FP16;
+      return inference::DataType::TYPE_FP16;
     case nvinfer1::DataType::kINT8:
-      return TYPE_INT8;
+      return inference::DataType::TYPE_INT8;
     case nvinfer1::DataType::kINT32:
-      return TYPE_INT32;
+      return inference::DataType::TYPE_INT32;
     case nvinfer1::DataType::kBOOL:
-      return TYPE_BOOL;
+      return inference::DataType::TYPE_BOOL;
   }
 
-  return TYPE_INVALID;
+  return inference::DataType::TYPE_INVALID;
 }
 
-MemoryFormat
-ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt)
+bool
+UseTensorRTv2API(const nvinfer1::ICudaEngine* engine)
 {
-  switch (trt_fmt) {
-    case nvinfer1::TensorFormat::kLINEAR:
-      return MemoryFormat::LINEAR;
-    case nvinfer1::TensorFormat::kCHW2:
-      return MemoryFormat::CHW2;
-    case nvinfer1::TensorFormat::kCHW4:
-      return MemoryFormat::CHW4;
-    case nvinfer1::TensorFormat::kHWC8:
-      return MemoryFormat::HCW8;
-    case nvinfer1::TensorFormat::kCHW16:
-      return MemoryFormat::CHW16;
-    case nvinfer1::TensorFormat::kCHW32:
-      return MemoryFormat::CHW32;
-  }
-
-  return MemoryFormat::INVALID;
-}
-
-const std::string
-MemoryFormat_Name(MemoryFormat fmt)
-{
-  switch (fmt) {
-    case MemoryFormat::LINEAR:
-      return "LINEAR";
-    case MemoryFormat::CHW2:
-      return "CHW2";
-    case MemoryFormat::CHW4:
-      return "CHW4";
-    case MemoryFormat::HCW8:
-      return "HCW8";
-    case MemoryFormat::CHW16:
-      return "CHW16";
-    case MemoryFormat::CHW32:
-      return "CHW32";
-    case MemoryFormat::INVALID:
-      return "INVALID";
-  }
-
-  return "INVALID";
+  // In order to use TensorRT V2 API, engine must contain
+  // an explicit batch dimension. Detecting the presence of
+  // an implicit batch dimension to detect whether or not
+  // to use the TensorRT V2 API.
+  return !engine->hasImplicitBatchDimension();
 }
 
 std::pair<bool, nvinfer1::DataType>
-ConvertDataTypeToTrtType(const DataType& dtype)
+ConvertDataTypeToTrtType(const inference::DataType& dtype)
 {
   nvinfer1::DataType trt_type = nvinfer1::DataType::kFLOAT;
   switch (dtype) {
-    case TYPE_FP32:
+    case inference::DataType::TYPE_FP32:
       trt_type = nvinfer1::DataType::kFLOAT;
       break;
-    case TYPE_FP16:
+    case inference::DataType::TYPE_FP16:
       trt_type = nvinfer1::DataType::kHALF;
       break;
-    case TYPE_INT8:
+    case inference::DataType::TYPE_INT8:
       trt_type = nvinfer1::DataType::kINT8;
       break;
-    case TYPE_INT32:
+    case inference::DataType::TYPE_INT32:
       trt_type = nvinfer1::DataType::kINT32;
       break;
-    case TYPE_BOOL:
+    case inference::DataType::TYPE_BOOL:
       trt_type = nvinfer1::DataType::kBOOL;
       break;
     default:
@@ -133,23 +99,38 @@ CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
   return true;
 }
 
+bool
+CompareDims(const nvinfer1::Dims& ldims, const nvinfer1::Dims& rdims)
+{
+  if (ldims.nbDims != rdims.nbDims) {
+    return false;
+  }
+
+  for (int i = 0; i < ldims.nbDims; ++i) {
+    if (ldims.d[i] != rdims.d[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 Status
 CompareDimsSupported(
     const std::string& model_name, const std::string& binding_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
-    const bool supports_batching, const bool is_dynamic,
+    const bool supports_batching, const bool contains_explicit_batch,
     const bool compare_exact)
 {
   // If the model configuration expects batching support in the model,
   // then the first dimension must be -1.
-  if (supports_batching && is_dynamic) {
-    if ((model_dims.nbDims == 0) || (model_dims.d[0] != -1)) {
+  if (supports_batching && contains_explicit_batch) {
+    if ((model_dims.nbDims == 0)) {
       return Status(
           Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + binding_name +
               "': for the model to support batching the shape should have at "
-              "least 1 dimension and the first dimension must be -1; but shape "
-              "expected by the model is " +
+              "least 1 dimension; but shape expected by the model is " +
               DimsDebugString(model_dims));
     }
 
@@ -163,7 +144,7 @@ CompareDimsSupported(
     if (succ) {
       for (int i = 0; i < full_dims.size(); ++i) {
         const int64_t model_dim = model_dims.d[i];
-        if (compare_exact || (model_dim != -1)) {
+        if (compare_exact || ((model_dim != -1) && (full_dims[i] != -1))) {
           succ &= (model_dim == full_dims[i]);
         }
       }
@@ -188,7 +169,7 @@ CompareDimsSupported(
     if (succ) {
       for (int i = 0; i < dims.size(); ++i) {
         const int64_t model_dim = model_dims.d[i];
-        if (compare_exact || (model_dim != -1)) {
+        if (compare_exact || ((model_dim != -1) && (dims[i] != -1))) {
           succ &= (model_dim == dims[i]);
         }
       }
@@ -261,26 +242,24 @@ MaximumDims(
   }
 
   if (support_batching) {
-    if (max_batch_size > max_profile_dims.d[0]) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "unexpected configuration maximum batch size " +
-              std::to_string(max_batch_size) + " binding maximum is " +
-              std::to_string(max_profile_dims.d[0]));
-    }
-    max_dims->emplace_back(max_batch_size);
+    int this_batch_size = max_batch_size > max_profile_dims.d[0]
+                              ? max_profile_dims.d[0]
+                              : max_batch_size;
+    max_dims->emplace_back(this_batch_size);
   }
 
   for (int i = 0; i < dims.size(); ++i) {
     if (dims[i] == WILDCARD_DIM) {
       max_dims->emplace_back(max_profile_dims.d[i + nonbatch_start_idx]);
-    } else if (dims[i] <= max_profile_dims.d[i + nonbatch_start_idx]) {
-      max_dims->emplace_back(dims[i]);
     } else {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "can not maximize dimension " + DimsListToString(dims) + " to " +
-              DimsDebugString(max_profile_dims) + " due to  incompatibility.");
+      if (dims[i] <= max_profile_dims.d[i + nonbatch_start_idx]) {
+        max_dims->emplace_back(dims[i]);
+      } else {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "can not maximize dimension " + DimsListToString(dims) + " to " +
+                DimsDebugString(max_profile_dims) + " due to incompatibility.");
+      }
     }
   }
   return Status::Success;
@@ -390,6 +369,16 @@ DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims)
     }
   }
   return true;
+}
+
+int64_t
+GetElementCount(const nvinfer1::Dims& dims)
+{
+  int64_t count = 1;
+  for (int i = 0; i < dims.nbDims; ++i) {
+    count *= dims.d[i];
+  }
+  return count;
 }
 
 bool

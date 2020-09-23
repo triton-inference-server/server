@@ -30,7 +30,7 @@ instance_group {
   count: 1
   kind: KIND_CPU
 }
-default_model_filename: "no_batch.onnx"
+default_model_filename: "model.onnx"
 optimization {
   input_pinned_memory {
     enable: true
@@ -39,3 +39,4 @@ optimization {
     enable: true
   }
 }
+backend: "onnxruntime"

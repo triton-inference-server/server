@@ -36,7 +36,7 @@
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
 #include "src/core/status.h"
-#include "src/core/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -59,11 +59,11 @@ class InferenceRequest {
    public:
     Input();
     Input(
-        const std::string& name, const DataType datatype,
+        const std::string& name, const inference::DataType datatype,
         const std::vector<int64_t>& shape);
     Input(
-        const std::string& name, const DataType datatype, const int64_t* shape,
-        const uint64_t dim_count);
+        const std::string& name, const inference::DataType datatype,
+        const int64_t* shape, const uint64_t dim_count);
 
     // The name of the input tensor. There is no mutable operator for
     // the name because it is used in a InferenceRequest map and a
@@ -71,7 +71,7 @@ class InferenceRequest {
     const std::string& Name() const { return name_; }
 
     // Data type of the input tensor.
-    DataType DType() const { return datatype_; }
+    inference::DataType DType() const { return datatype_; }
 
     // The original shape of the input tensor.
     const std::vector<int64_t>& OriginalShape() const
@@ -143,7 +143,7 @@ class InferenceRequest {
         std::ostream& out, const InferenceRequest::Input& input);
 
     std::string name_;
-    DataType datatype_;
+    inference::DataType datatype_;
     std::vector<int64_t> original_shape_;
     std::vector<int64_t> shape_;
     std::vector<int64_t> shape_with_batch_dim_;
@@ -292,10 +292,10 @@ class InferenceRequest {
   // Add an original input to the request. If 'input' is non-null
   // return a pointer to the newly added input.
   Status AddOriginalInput(
-      const std::string& name, const DataType datatype, const int64_t* shape,
-      const uint64_t dim_count, Input** input = nullptr);
+      const std::string& name, const inference::DataType datatype,
+      const int64_t* shape, const uint64_t dim_count, Input** input = nullptr);
   Status AddOriginalInput(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape, Input** input = nullptr);
 
   // Remove a single original input or all inputs.
@@ -304,9 +304,13 @@ class InferenceRequest {
 
   // Add an override input to the request. If 'input' is non-null
   // return a pointer to the newly added input.
+  // FIXME passing batch size is special handling for backend API.
+  // For override input, the 'shape' is without batch dimension for
+  // backends that implemented w/o backend API (which need correct
+  // input.Shape()), but backend API uses input.ShapeWithBatchDim().
   Status AddOverrideInput(
-      const std::string& name, const DataType datatype,
-      const std::vector<int64_t>& shape,
+      const std::string& name, const inference::DataType datatype,
+      const int64_t batch_size, const std::vector<int64_t>& shape,
       std::shared_ptr<Input>* input = nullptr);
 
   // Add an override input to the request.
@@ -355,7 +359,8 @@ class InferenceRequest {
   // The response will be passed to 'delegator' and 'delegator' must call the
   // InferenceResponse::Send() to send the response.
   Status SetResponseDelegator(
-      std::function<void(std::unique_ptr<InferenceResponse>&&)>&& delegator)
+      std::function<void(
+          std::unique_ptr<InferenceResponse>&&, const uint32_t)>&& delegator)
   {
     response_delegator_ = std::move(delegator);
     return response_factory_.SetResponseDelegator(response_delegator_);
@@ -507,7 +512,8 @@ class InferenceRequest {
   std::vector<std::function<void()>> release_callbacks_;
 
   // Delegator to be invoked on sending responses.
-  std::function<void(std::unique_ptr<InferenceResponse>&&)> response_delegator_;
+  std::function<void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>
+      response_delegator_;
 
   // The response factory associated with this request.
   InferenceResponseFactory response_factory_;

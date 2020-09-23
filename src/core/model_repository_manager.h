@@ -107,7 +107,7 @@ class ModelRepositoryManager {
     std::string model_name_;
     Status status_;
     bool checked_;
-    ModelConfig model_config_;
+    inference::ModelConfig model_config_;
     std::set<int64_t> loaded_versions_;
     std::set<DependencyNode*> missing_upstreams_;
     std::unordered_map<DependencyNode*, std::set<int64_t>> upstreams_;
@@ -124,6 +124,8 @@ class ModelRepositoryManager {
   /// if model control is enabled.
   /// \param strict_model_config If false attempt to autofill missing required
   /// information in each model configuration.
+  /// \param backend_cmdline_config_map The backend configuration setting
+  /// specified on the command-line.
   /// \param tf_gpu_memory_fraction The portion of GPU memory to be reserved
   /// for TensorFlow models.
   /// \param tf_allow_soft_placement If true instruct TensorFlow to use CPU
@@ -142,9 +144,9 @@ class ModelRepositoryManager {
       InferenceServer* server, const std::string& server_version,
       const std::set<std::string>& repository_paths,
       const std::set<std::string>& startup_models,
-      const bool strict_model_config, const float tf_gpu_memory_fraction,
-      const bool tf_allow_soft_placement,
-      const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
+      const bool strict_model_config,
+      const BackendCmdlineConfigMap& backend_cmdline_config_map,
+      const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
       const bool polling_enabled, const bool model_control_enabled,
       const double min_compute_capability,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
@@ -281,7 +283,8 @@ class ModelRepositoryManager {
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
-  Status GetModelConfig(const std::string& name, ModelConfig* model_config);
+  Status GetModelConfig(
+      const std::string& name, inference::ModelConfig* model_config);
 
   /// Get the models to be loaded / unloaded based on the model loaded in
   /// previous iteration.
@@ -298,6 +301,9 @@ class ModelRepositoryManager {
   /// \return True if the node is ready. False otherwise.
   bool CheckNode(DependencyNode* node);
 
+  Status CircularcyCheck(
+      DependencyNode* current_node, const DependencyNode* start_node);
+
   /// Get the list of versions to be loaded for a named model based on version
   /// policy. Version directories that are not numerically named,
   /// or that have zero prefix will be ignored.
@@ -309,7 +315,7 @@ class ModelRepositoryManager {
   /// \return The error status.
   Status VersionsToLoad(
       const std::string model_repository_path, const std::string& name,
-      const ModelConfig& model_config, std::set<int64_t>* versions);
+      const inference::ModelConfig& model_config, std::set<int64_t>* versions);
 
   const std::set<std::string> repository_paths_;
   const BackendConfigMap backend_config_map_;

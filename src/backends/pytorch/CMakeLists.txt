@@ -48,6 +48,15 @@ add_library(
   ${LIBTORCH_SRCS} ${LIBTORCH_HDRS}
 )
 set_target_properties(libtorch-backend-library PROPERTIES CXX_STANDARD 14)
+
+# Need to turn off unused-but-set-variable due to Torchvision
+# Need to turn off unknown-pragmas due to ATen OpenMP
+set_target_properties(
+  libtorch-backend-library
+  PROPERTIES COMPILE_FLAGS
+    "-Wno-unknown-pragmas -Wno-unused-but-set-variable"
+)
+
 add_dependencies(libtorch-backend-library proto-library)
 target_include_directories(libtorch-backend-library PRIVATE ${TRITON_PYTORCH_INCLUDE_PATHS})
 
@@ -60,3 +69,8 @@ if(${TRITON_ENABLE_METRICS})
     PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif() # TRITON_ENABLE_METRICS
+
+target_link_libraries(
+  libtorch-backend-library
+  PUBLIC triton-core-serverapi   # from repo-core
+)

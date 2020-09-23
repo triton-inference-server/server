@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@ fi
 REPODIR=/data/inferenceserver/${REPO_VERSION}
 TRTEXEC=/usr/src/tensorrt/bin/trtexec
 MODEL="deeprecommender"
+PROTOCOLS="grpc http"
 
 rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 
@@ -45,12 +46,8 @@ rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 # Test minimum latency
 #
 STATIC_BATCH=1
-DYNAMIC_BATCH=1
 INSTANCE_CNT=1
-
-# Copy TF Model
-rm -fr tfmodels && mkdir -p tfmodels && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
+CONCURRENCY=1
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
@@ -60,51 +57,56 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
+$TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
-# Create the TFTRT plan from TF
-rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
-    (cd tftrt_models/deeprecommender_graphdef_trt && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        echo "optimization { execution_accelerators {" >> config.pbtxt
-        echo "gpu_execution_accelerator : [ {" >> config.pbtxt
-        echo "name : \"tensorrt\" " >> config.pbtxt
-        echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt)
+OPTIMIZED_MODEL_NAMES="deeprecommender_graphdef_trt"
+
+# Create optimized models (TF-TRT and ONNX-TRT)
+rm -fr optimized_model_store && mkdir optimized_model_store
+for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
+    BASE_MODEL=$(echo ${MODEL_NAME} | cut -d '_' -f 1,2)
+    cp -r $REPODIR/perf_model_store/${BASE_MODEL} optimized_model_store/${MODEL_NAME}
+    CONFIG_PATH="optimized_model_store/${MODEL_NAME}/config.pbtxt"
+    sed -i "s/^name: \"${BASE_MODEL}\"/name: \"${MODEL_NAME}\"/" ${CONFIG_PATH}
+    echo "optimization { execution_accelerators {" >> ${CONFIG_PATH}
+    echo "gpu_execution_accelerator : [ {" >> ${CONFIG_PATH}
+    echo "name : \"tensorrt\" " >> ${CONFIG_PATH}
+    echo "} ]" >> ${CONFIG_PATH}
+    echo "}}" >> ${CONFIG_PATH}
+done
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt; do
+for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
-    if [ "$FRAMEWORK" == "graphdef" ]; then
-        REPO=`pwd`/tfmodels
-    elif [ "$FRAMEWORK" == "plan" ]; then
+    if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
+    elif [[ "$FRAMEWORK" == *"_trt" ]]; then
+        REPO=`pwd`/optimized_model_store
     else
-        REPO=`pwd`/tftrt_models
+        REPO=$REPODIR/perf_model_store
     fi
-    MODEL_NAME=${MODEL_NAME} \
-            MODEL_FRAMEWORK=${FRAMEWORK} \
-            MODEL_PATH="$REPO/${MODEL_NAME}" \
-            STATIC_BATCH_SIZES=${STATIC_BATCH} \
-            DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-            INSTANCE_COUNTS=${INSTANCE_CNT} \
-            bash -x run_test.sh
+    for PROTOCOL in $PROTOCOLS; do
+        MODEL_NAME=${MODEL_NAME} \
+                MODEL_FRAMEWORK=${FRAMEWORK} \
+                MODEL_PATH="$REPO/${MODEL_NAME}" \
+                STATIC_BATCH_SIZES=${STATIC_BATCH} \
+                DYNAMIC_BATCH_SIZES=1 \
+                PERF_CLIENT_PROTOCOL=${PROTOCOL} \
+                INSTANCE_COUNTS=${INSTANCE_CNT} \
+                CONCURRENCY=${CONCURRENCY} \
+                bash -x run_test.sh
+    done
 done
 
 #
-# Test large static batch = 1024 w/ 2 instances
+# Test large static batch = 256 w/ 2 instances
 #
-STATIC_BATCH=1024
-DYNAMIC_BATCH=1
+STATIC_BATCH=256
 INSTANCE_CNT=2
-
-# Copy TF Model
-rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
+CONCURRENCY=4
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
@@ -114,91 +116,30 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
+$TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
-# Create the TFTRT plan from TF
-rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
-    (cd tftrt_models/deeprecommender_graphdef_trt && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        echo "optimization { execution_accelerators {" >> config.pbtxt
-        echo "gpu_execution_accelerator : [ {" >> config.pbtxt
-        echo "name : \"tensorrt\" " >> config.pbtxt
-        echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt)
-
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt; do
+for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
-    if [ "$FRAMEWORK" == "graphdef" ]; then
-        REPO=`pwd`/tfmodels
-    elif [ "$FRAMEWORK" == "plan" ]; then
+    if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
+    elif [[ "$FRAMEWORK" == *"_trt" ]]; then
+        REPO=`pwd`/optimized_model_store
     else
-        REPO=`pwd`/tftrt_models
+        REPO=$REPODIR/perf_model_store
     fi
-    MODEL_NAME=${MODEL_NAME} \
-            MODEL_FRAMEWORK=${FRAMEWORK} \
-            MODEL_PATH="$REPO/${MODEL_NAME}" \
-            STATIC_BATCH_SIZES=${STATIC_BATCH} \
-            DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-            INSTANCE_COUNTS=${INSTANCE_CNT} \
-            bash -x run_test.sh
-done
-
-#
-# Test dynamic batcher 64 w/ 2 instances
-#
-STATIC_BATCH=1
-DYNAMIC_BATCH=64
-INSTANCE_CNT=2
-
-# Copy TF Model
-rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
-
-# Create the TensorRT plan from TF
-rm -fr tensorrt_models && mkdir tensorrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
-    (cd tensorrt_models/deeprecommender_plan && \
-        sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
-        sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
-        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
-
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
-         --uffInput=Placeholder,1,1,17736\
-         --batch=${DYNAMIC_BATCH} --output=fc5/Relu --verbose \
-         --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
-
-# Create the TFTRT plan from TF
-rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
-    (cd tftrt_models/deeprecommender_graphdef_trt && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        echo "optimization { execution_accelerators {" >> config.pbtxt
-        echo "gpu_execution_accelerator : [ {" >> config.pbtxt
-        echo "name : \"tensorrt\" " >> config.pbtxt
-        echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt)
-
-# Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt; do
-    MODEL_NAME=${MODEL}_${FRAMEWORK}
-    if [ "$FRAMEWORK" == "graphdef" ]; then
-        REPO=`pwd`/tfmodels
-    elif [ "$FRAMEWORK" == "plan" ]; then
-        REPO=`pwd`/tensorrt_models
-    else
-        REPO=`pwd`/tftrt_models
-    fi
-    MODEL_NAME=${MODEL_NAME} \
-            MODEL_FRAMEWORK=${FRAMEWORK} \
-            MODEL_PATH="$REPO/${MODEL_NAME}" \
-            STATIC_BATCH_SIZES=${STATIC_BATCH} \
-            DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
-            INSTANCE_COUNTS=${INSTANCE_CNT} \
-            bash -x run_test.sh
+    for PROTOCOL in $PROTOCOLS; do
+        MODEL_NAME=${MODEL_NAME} \
+                MODEL_FRAMEWORK=${FRAMEWORK} \
+                MODEL_PATH="$REPO/${MODEL_NAME}" \
+                STATIC_BATCH_SIZES=${STATIC_BATCH} \
+                DYNAMIC_BATCH_SIZES=1 \
+                PERF_CLIENT_PROTOCOL=${PROTOCOL} \
+                INSTANCE_COUNTS=${INSTANCE_CNT} \
+                CONCURRENCY=${CONCURRENCY} \
+                bash -x run_test.sh
+    done
 done

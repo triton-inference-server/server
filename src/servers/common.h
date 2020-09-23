@@ -27,7 +27,7 @@
 
 #include <iostream>
 #include <string>
-#include "src/core/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -74,6 +74,14 @@ namespace nvidia { namespace inferenceserver {
       TRITONSERVER_ErrorDelete(err__);                            \
       exit(1);                                                    \
     }                                                             \
+  } while (false)
+
+#define IGNORE_ERR(X)                  \
+  do {                                 \
+    TRITONSERVER_Error* err__ = (X);   \
+    if (err__ != nullptr) {            \
+      TRITONSERVER_ErrorDelete(err__); \
+    }                                  \
   } while (false)
 
 #ifdef TRITON_ENABLE_GPU

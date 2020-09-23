@@ -30,8 +30,8 @@ import argparse
 import numpy as np
 import sys
 
-import tritonhttpclient
-from tritonclientutils import InferenceServerException
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -50,13 +50,12 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
 
-    request_count=2
+    request_count = 2
     try:
         # Need to specify large enough concurrency to issue all the
         # inference requests to the server in parallel.
-        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose,
-                                                         concurrency=request_count)
+        triton_client = httpclient.InferenceServerClient(
+            url=FLAGS.url, verbose=FLAGS.verbose, concurrency=request_count)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -66,8 +65,8 @@ if __name__ == '__main__':
     # Infer
     inputs = []
     outputs = []
-    inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "INT32"))
-    inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -79,17 +78,16 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=True)
     inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0',
-                                                   binary_data=True))
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
-                                                   binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
     async_requests = []
 
     for i in range(request_count):
         # Asynchronous inference call.
-        async_requests.append(triton_client.async_infer(model_name=model_name,
-                                                inputs=inputs,
-                                                outputs=outputs))
+        async_requests.append(
+            triton_client.async_infer(model_name=model_name,
+                                      inputs=inputs,
+                                      outputs=outputs))
 
     for async_request in async_requests:
         # Get the result from the initiated asynchronous inference request.
@@ -101,10 +99,12 @@ if __name__ == '__main__':
         output0_data = result.as_numpy('OUTPUT0')
         output1_data = result.as_numpy('OUTPUT1')
         for i in range(16):
-            print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
-                  " = " + str(output0_data[0][i]))
-            print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
-                  " = " + str(output1_data[0][i]))
+            print(
+                str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
+                " = " + str(output0_data[0][i]))
+            print(
+                str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
+                " = " + str(output1_data[0][i]))
             if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
                 print("async infer error: incorrect sum")
                 sys.exit(1)

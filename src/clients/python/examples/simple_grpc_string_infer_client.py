@@ -28,7 +28,7 @@
 import argparse
 import numpy as np
 
-import tritongrpcclient
+import tritonclient.grpc as grpcclient
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = tritongrpcclient.InferenceServerClient(url=FLAGS.url,
+        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
@@ -57,8 +57,8 @@ if __name__ == '__main__':
 
     inputs = []
     outputs = []
-    inputs.append(tritongrpcclient.InferInput('INPUT0', [1, 16], "BYTES"))
-    inputs.append(tritongrpcclient.InferInput('INPUT1', [1, 16], "BYTES"))
+    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "BYTES"))
+    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "BYTES"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -77,8 +77,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data)
     inputs[1].set_data_from_numpy(input1_data)
 
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
@@ -89,10 +89,12 @@ if __name__ == '__main__':
     output1_data = results.as_numpy('OUTPUT1')
 
     for i in range(16):
-        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
-              str(output0_data[0][i]))
-        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
-              str(output1_data[0][i]))
+        print(
+            str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
+            str(output0_data[0][i]))
+        print(
+            str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
+            str(output1_data[0][i]))
 
         # Convert result from string to int to check result
         r0 = int(output0_data[0][i])

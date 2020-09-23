@@ -45,6 +45,9 @@ if(${TRITON_ENABLE_GRPC})
       grpc_client.h common.h ipc.h
   )
 
+  set(TRITON_CLIENT_HEADER_FLAT 0)
+  configure_file(grpc_client.h.in grpc_client.h @ONLY)
+
   add_library(
       grpc-client-library EXCLUDE_FROM_ALL OBJECT
       ${REQUEST_SRCS} ${REQUEST_HDRS}
@@ -57,14 +60,19 @@ if(${TRITON_ENABLE_GRPC})
       model-config-library grpc-library proto-library
   )
 
-  # libgrpcclient.a
+  target_link_libraries(
+    grpc-client-library
+    PUBLIC
+      triton-common-json        # from repo-common
+  )
+
+  # libgrpcclient_static.a
   add_library(
       grpcclient_static STATIC
       $<TARGET_OBJECTS:grpc-library>
       $<TARGET_OBJECTS:model-config-library>
       $<TARGET_OBJECTS:proto-library>
       $<TARGET_OBJECTS:grpc-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::grpcclient_static ALIAS grpcclient_static
@@ -83,6 +91,7 @@ if(${TRITON_ENABLE_GRPC})
       grpcclient_static
       PRIVATE gRPC::grpc++
       PRIVATE gRPC::grpc
+      PRIVATE triton-common-json
       PUBLIC protobuf::libprotobuf
       PUBLIC Threads::Threads
   )
@@ -94,7 +103,6 @@ if(${TRITON_ENABLE_GRPC})
       $<TARGET_OBJECTS:model-config-library>
       $<TARGET_OBJECTS:proto-library>
       $<TARGET_OBJECTS:grpc-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::grpcclient ALIAS grpcclient
@@ -122,6 +130,7 @@ if(${TRITON_ENABLE_GRPC})
       grpcclient
       PRIVATE gRPC::grpc++
       PRIVATE gRPC::grpc
+      PRIVATE triton-common-json
       PUBLIC protobuf::libprotobuf
       PUBLIC Threads::Threads
   )
@@ -135,25 +144,74 @@ if(${TRITON_ENABLE_GRPC})
       ARCHIVE DESTINATION lib
   )
 
+
+  if (NOT WIN32)
+     install(
+         FILES
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib/libcares.a
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgpr.a
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgrpc.a
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgrpc++.a
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libaddress_sorting.a
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/lib/libprotobuf.a
+         DESTINATION lib
+     )
+  else()
+     install(
+         FILES
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib/cares.lib
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/gpr.lib
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/grpc.lib
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/grpc++.lib
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/address_sorting.lib
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/lib/libprotobuf.lib
+         DESTINATION lib
+     )
+  endif() # NOT WIN32
+
+  set(TRITON_CLIENT_HEADER_FLAT 1)
+  configure_file(grpc_client.h.in grpc_client_flat.h @ONLY)
+
+  install(
+      FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/grpc_client_flat.h
+      RENAME grpc_client.h
+      DESTINATION include
+  )
+
   install(
       FILES
       ${CMAKE_CURRENT_SOURCE_DIR}/common.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/grpc_client.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/ipc.h
       DESTINATION include
   )
 
   install(
       FILES
       ${CMAKE_CURRENT_BINARY_DIR}/../../../core/model_config.pb.h
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../core/grpc_service.grpc.pb.h
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../core/grpc_service.pb.h
       DESTINATION include
   )
+
+  install(
+      DIRECTORY
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/include/
+      ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/include/
+      DESTINATION include
+  )
+
 endif() # TRITON_ENABLE_GRPC
 
 if(${TRITON_ENABLE_HTTP})
   #
   # libhttpclient.so and libhttpclient_static.a
   #
-  find_package(CURL CONFIG REQUIRED)
+  if(${TRITON_CURL_WITHOUT_CONFIG})
+    find_package(CURL REQUIRED)
+  else()
+    find_package(CURL CONFIG REQUIRED)
+  endif() # TRITON_CURL_WITHOUT_CONFIG
   message(STATUS "Using curl ${CURL_VERSION}")
   add_definitions(-DCURL_STATICLIB)
 
@@ -170,6 +228,9 @@ if(${TRITON_ENABLE_HTTP})
       http_client.h common.h ipc.h cencode.h
   )
 
+  set(TRITON_CLIENT_HEADER_FLAT 0)
+  configure_file(http_client.h.in http_client.h @ONLY)
+
   add_library(
       http-client-library EXCLUDE_FROM_ALL OBJECT
       ${REQUEST_SRCS} ${REQUEST_HDRS}
@@ -183,11 +244,16 @@ if(${TRITON_ENABLE_HTTP})
     target_include_directories(http-client-library PUBLIC ${CUDA_INCLUDE_DIRS})
   endif() # TRITON_ENABLE_GPU
 
+  target_link_libraries(
+    http-client-library
+    PUBLIC
+      triton-common-json        # from repo-common
+  )
+
   # libhttpclient_static.a
   add_library(
       httpclient_static STATIC
       $<TARGET_OBJECTS:http-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::httpclient_static ALIAS httpclient_static
@@ -204,6 +270,7 @@ if(${TRITON_ENABLE_HTTP})
   )
   target_link_libraries(
       httpclient_static
+      PRIVATE triton-common-json
       PRIVATE CURL::libcurl
       PUBLIC Threads::Threads
   )
@@ -212,7 +279,6 @@ if(${TRITON_ENABLE_HTTP})
   add_library(
       httpclient SHARED
       $<TARGET_OBJECTS:http-client-library>
-      $<TARGET_OBJECTS:triton-json-library>
   )
   add_library(
       TRITON::httpclient ALIAS httpclient
@@ -238,14 +304,38 @@ if(${TRITON_ENABLE_HTTP})
   )
   target_link_libraries(
       httpclient
+      PRIVATE triton-common-json
       PRIVATE CURL::libcurl
       PUBLIC Threads::Threads
+  )
+
+  set(TRITON_CLIENT_HEADER_FLAT 1)
+  configure_file(http_client.h.in http_client_flat.h @ONLY)
+
+  if (NOT WIN32)
+     install(
+         FILES
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../curl/install/lib/libcurl.a
+         DESTINATION lib
+     )
+  else()
+     install(
+         FILES
+         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../curl/install/lib/libcurl.lib
+         DESTINATION lib
+     )
+  endif() # NOT WIN32
+
+  install(
+      FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/http_client_flat.h
+      RENAME http_client.h
+      DESTINATION include
   )
 
   install(
       FILES
       ${CMAKE_CURRENT_SOURCE_DIR}/common.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/http_client.h
       DESTINATION include
   )
 

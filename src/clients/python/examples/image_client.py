@@ -32,11 +32,11 @@ import sys
 from functools import partial
 import os
 
-import tritongrpcclient
-import tritongrpcclient.model_config_pb2 as mc
-import tritonhttpclient
-from tritonclientutils import triton_to_np_dtype
-from tritonclientutils import InferenceServerException
+import tritonclient.grpc as grpcclient
+import tritonclient.grpc.model_config_pb2 as mc
+import tritonclient.http as httpclient
+from tritonclient.utils import triton_to_np_dtype
+from tritonclient.utils import InferenceServerException
 
 if sys.version_info >= (3, 0):
     import queue
@@ -45,6 +45,7 @@ else:
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -263,7 +264,7 @@ def postprocess(results, output_name, batch_size, batching):
         raise Exception("expected {} results, got {}".format(
             batch_size, len(output_array)))
 
-    # Include special handling for non-batching models 
+    # Include special handling for non-batching models
     for results in output_array:
         if not batching:
             results = [results]
@@ -281,25 +282,23 @@ def requestGenerator(batched_image_data, input_name, output_name, dtype, FLAGS):
     inputs = []
     if FLAGS.protocol.lower() == "grpc":
         inputs.append(
-            tritongrpcclient.InferInput(input_name, batched_image_data.shape,
-                                        dtype))
+            grpcclient.InferInput(input_name, batched_image_data.shape, dtype))
         inputs[0].set_data_from_numpy(batched_image_data)
     else:
         inputs.append(
-            tritonhttpclient.InferInput(input_name, batched_image_data.shape,
-                                        dtype))
+            httpclient.InferInput(input_name, batched_image_data.shape, dtype))
         inputs[0].set_data_from_numpy(batched_image_data, binary_data=True)
 
     outputs = []
     if FLAGS.protocol.lower() == "grpc":
         outputs.append(
-            tritongrpcclient.InferRequestedOutput(output_name,
-                                                  class_count=FLAGS.classes))
+            grpcclient.InferRequestedOutput(output_name,
+                                            class_count=FLAGS.classes))
     else:
         outputs.append(
-            tritonhttpclient.InferRequestedOutput(output_name,
-                                                  binary_data=True,
-                                                  class_count=FLAGS.classes))
+            httpclient.InferRequestedOutput(output_name,
+                                            binary_data=True,
+                                            class_count=FLAGS.classes))
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
@@ -383,16 +382,14 @@ if __name__ == '__main__':
     try:
         if FLAGS.protocol.lower() == "grpc":
             # Create gRPC client for communicating with the server
-            triton_client = tritongrpcclient.InferenceServerClient(
+            triton_client = grpcclient.InferenceServerClient(
                 url=FLAGS.url, verbose=FLAGS.verbose)
         else:
             # Specify large enough concurrency to handle the
             # the number of requests.
             concurrency = 20 if FLAGS.async_set else 1
-            triton_client = tritonhttpclient.InferenceServerClient(
-                                            url=FLAGS.url,
-                                            verbose=FLAGS.verbose,
-                                            concurrency=concurrency)
+            triton_client = httpclient.InferenceServerClient(
+                url=FLAGS.url, verbose=FLAGS.verbose, concurrency=concurrency)
     except Exception as e:
         print("client creation failed: " + str(e))
         sys.exit(1)
@@ -439,8 +436,9 @@ if __name__ == '__main__':
     image_data = []
     for filename in filenames:
         img = Image.open(filename)
-        image_data.append(preprocess(img, format, dtype, c, h, w,
-                                     FLAGS.scaling, FLAGS.protocol.lower()))
+        image_data.append(
+            preprocess(img, format, dtype, c, h, w, FLAGS.scaling,
+                       FLAGS.protocol.lower()))
 
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just
@@ -459,9 +457,7 @@ if __name__ == '__main__':
     sent_count = 0
 
     if FLAGS.streaming:
-        triton_client.start_stream(
-            partial(completion_callback, user_data))
-
+        triton_client.start_stream(partial(completion_callback, user_data))
 
     while not last_request:
         input_filenames = []

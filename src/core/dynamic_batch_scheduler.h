@@ -65,12 +65,7 @@ class DynamicBatchScheduler : public Scheduler {
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-      const bool preserve_ordering,
-      const std::set<int32_t>& preferred_batch_sizes,
-      const uint64_t max_queue_delay_microseconds,
-      const ModelQueuePolicy& default_queue_policy,
-      const uint32_t priority_level,
-      const ModelQueuePolicyMap& queue_policy_map,
+      const inference::ModelDynamicBatching& batcher_config,
       std::unique_ptr<Scheduler>* scheduler);
 
   ~DynamicBatchScheduler();
@@ -87,7 +82,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
-      const ModelQueuePolicy& default_queue_policy,
+      const inference::ModelQueuePolicy& default_queue_policy,
       const uint32_t priority_levels,
       const ModelQueuePolicyMap& queue_policy_map);
   void SchedulerThread(
@@ -149,8 +144,10 @@ class DynamicBatchScheduler : public Scheduler {
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
 
-  // Per completion-id queues to store the ready requests
-  std::deque<std::unique_ptr<InferenceResponse>> completion_queue_;
+  // Per completion-id queues to store the ready responses
+  std::deque<
+      std::vector<std::pair<std::unique_ptr<InferenceResponse>, uint32_t>>>
+      completion_queue_;
   // Lock to protect the completion_queues_
   std::mutex completion_queue_mtx_;
 };

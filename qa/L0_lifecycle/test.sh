@@ -68,6 +68,13 @@ python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -94,6 +101,13 @@ python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -122,6 +136,13 @@ python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -150,6 +171,13 @@ python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -187,6 +215,13 @@ python $LC_TEST LifeCycleTest.test_parse_error_modelfail >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -214,6 +249,13 @@ python $LC_TEST LifeCycleTest.test_parse_error_modelfail_nostrict >>$CLIENT_LOG 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -251,6 +293,13 @@ python $LC_TEST LifeCycleTest.test_parse_error_no_model_config >>$CLIENT_LOG 2>&
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -291,6 +340,13 @@ python $LC_TEST LifeCycleTest.test_init_error_modelfail >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -327,6 +383,13 @@ python $LC_TEST LifeCycleTest.test_parse_error_model_no_version >>$CLIENT_LOG 2>
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -358,6 +421,13 @@ python $LC_TEST LifeCycleTest.test_parse_ignore_zero_prefixed_version >>$CLIENT_
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -395,6 +465,13 @@ python $LC_TEST LifeCycleTest.test_dynamic_model_load_unload >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -426,6 +503,13 @@ python $LC_TEST LifeCycleTest.test_dynamic_model_load_unload_disabled >>$CLIENT_
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -456,6 +540,13 @@ python $LC_TEST LifeCycleTest.test_dynamic_version_load_unload >>$CLIENT_LOG 2>&
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -487,6 +578,13 @@ python $LC_TEST LifeCycleTest.test_dynamic_version_load_unload_disabled >>$CLIEN
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -524,6 +622,13 @@ python $LC_TEST LifeCycleTest.test_dynamic_model_modify >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -554,6 +659,13 @@ python $LC_TEST LifeCycleTest.test_dynamic_file_delete >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -590,6 +702,13 @@ python $LC_TEST LifeCycleTest.test_multiple_model_repository_polling >>$CLIENT_L
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -628,6 +747,13 @@ python $LC_TEST LifeCycleTest.test_multiple_model_repository_control >>$CLIENT_L
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -639,7 +765,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_model_control
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel ; do
+for i in onnx ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -662,6 +788,13 @@ python $LC_TEST LifeCycleTest.test_model_control >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -674,7 +807,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0
 # Ensemble models in the second repository
-for i in graphdef savedmodel ; do
+for i in plan onnx ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -692,8 +825,8 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
-             --load-model=graphdef_float32_float32_float32 \
-             --load-model=simple_savedmodel_float32_float32_float32"
+             --load-model=plan_float32_float32_float32 \
+             --load-model=simple_onnx_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -707,6 +840,13 @@ python $LC_TEST LifeCycleTest.test_multiple_model_repository_control_startup_mod
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -750,6 +890,13 @@ python $LC_TEST LifeCycleTest.test_model_repository_index >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -868,17 +1015,6 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
-
-# python unittest seems to swallow ImportError and still return 0 exit
-# code. So need to explicitly check CLIENT_LOG to make sure we see
-# some running tests
-set +e
-grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    RET=1
-fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

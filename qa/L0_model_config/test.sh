@@ -86,8 +86,7 @@ for modelpath in \
         autofill_noplatform_success/tensorrt/empty_config_variable/1     \
         autofill_noplatform_success/tensorrt/no_config_variable/1 \
         autofill_noplatform_success/tensorrt/hint_for_no_batch/1 \
-        autofill_noplatform_success/tensorrt/multi_prof_max_bs/1 \
-        autofill_noplatform_success/tensorrt/multi_prof_no_batch/1 ; do
+        autofill_noplatform_success/tensorrt/multi_prof_max_bs/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32/1/model.plan \
        $modelpath/.
@@ -114,6 +113,9 @@ for modelpath in \
        autofill_noplatform/ensemble/invalid_batch_size/invalid_batch_size/1 \
        autofill_noplatform/ensemble/invalid_batch_size/fp32_dim1_batch2/1 \
        autofill_noplatform/ensemble/invalid_batch_size/fp32_dim1_batch4/1 \
+       autofill_noplatform/ensemble/invalid_decoupled_branching/invalid_decoupled_branching/1 \
+       autofill_noplatform/ensemble/invalid_decoupled_branching/int32_dim1_nobatch_output2/1 \
+       autofill_noplatform/ensemble/invalid_decoupled_branching_2/invalid_decoupled_branching_2/1 \
        autofill_noplatform/ensemble/inconsistent_shape/inconsistent_shape/1 \
        autofill_noplatform/ensemble/inconsistent_shape/fp32_dim1_batch4/1 \
        autofill_noplatform/ensemble/inconsistent_shape/fp32_dim3_batch4/1 \
@@ -130,6 +132,7 @@ for modelpath in \
        autofill_noplatform/ensemble/unmapped_input/unmapped_input/1 \
        autofill_noplatform/ensemble/unmapped_input/fp32_dim1_batch4/1 \
        autofill_noplatform/ensemble/unmapped_input/fp32_dim1_batch4_input4/1 \
+       autofill_noplatform/ensemble/unmapped_input/fp32_dim1_batch4_output3/1 \
        autofill_noplatform/ensemble/circular_dependency/circular_dependency/1 \
        autofill_noplatform/ensemble/circular_dependency/circular_dependency_2/1 \
        autofill_noplatform/ensemble/no_required_version/no_required_version/1 \
@@ -152,6 +155,15 @@ for modelpath in \
    mkdir -p $modelpath
    cp ./libidentity.so $modelpath/libcustom.so
 done
+
+for modelpath in \
+        autofill_noplatform/ensemble/invalid_decoupled_branching/repeat_int32/1 \
+        autofill_noplatform/ensemble/invalid_decoupled_branching_2/repeat_int32/1; do
+    mkdir -p $modelpath
+    cp ./libtriton_repeat.so $modelpath/libtriton_repeat.so
+done
+    
+    
 
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1
@@ -255,17 +267,17 @@ done
 for TRIAL in $TRIALS; do
     # Run all tests that require no autofill but that add the platform
     # to the model config before running the test. These are tested on
-    # all platforms except custom
-    if [ $TRIAL == "custom" ]; then
+    # all platforms except custom and TensorRT plan
+    if [ $TRIAL == "custom" ] || [ $TRIAL == "tensorrt_plan" ]; then
         continue
     fi
 
-    for TARGET in `ls noautofill_platform_not_custom`; do
+    for TARGET in `ls noautofill_platform_special_io`; do
         SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
-        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_not_custom_${TRIAL}_${TARGET}.log
+        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_special_io_${TRIAL}_${TARGET}.log
 
         rm -fr models && mkdir models
-        cp -r noautofill_platform_not_custom/$TARGET models/.
+        cp -r noautofill_platform_special_io/$TARGET models/.
 
         CONFIG=models/$TARGET/config.pbtxt
         EXPECTEDS=models/$TARGET/expected*
@@ -277,7 +289,7 @@ for TRIAL in $TRIALS; do
             cat $CONFIG
         fi
 
-        echo -e "Test platform $TRIAL on noautofill_platform_not_custom/$TARGET" >> $CLIENT_LOG
+        echo -e "Test platform $TRIAL on noautofill_platform_special_io/$TARGET" >> $CLIENT_LOG
 
         # We expect all the tests to fail with one of the expected
         # error messages
@@ -301,7 +313,7 @@ for TRIAL in $TRIALS; do
             done
 
             if [ "$EXFOUND" == "0" ]; then
-                echo -e "*** FAILED: platform $TRIAL noautofill_platform_not_custom/$TARGET" >> $CLIENT_LOG
+                echo -e "*** FAILED: platform $TRIAL noautofill_platform_special_io/$TARGET" >> $CLIENT_LOG
                 RET=1
             fi
         fi

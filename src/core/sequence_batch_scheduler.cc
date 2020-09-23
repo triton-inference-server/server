@@ -39,7 +39,7 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 SequenceBatchScheduler::Create(
-    const ModelConfig& config, const uint32_t runner_cnt,
+    const inference::ModelConfig& config, const uint32_t runner_cnt,
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
     const StandardRunFunc& OnSchedule,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
@@ -150,9 +150,10 @@ namespace {
 
 Status
 GetBooleanOverrideInputs(
-    const std::string& tensor_name, const DataType tensor_datatype,
-    const float fp32_false_value, const float fp32_true_value,
-    const int32_t int32_false_value, const int32_t int32_true_value,
+    const std::string& tensor_name, const bool support_batching,
+    const inference::DataType tensor_datatype, const float fp32_false_value,
+    const float fp32_true_value, const int32_t int32_false_value,
+    const int32_t int32_true_value,
     std::shared_ptr<InferenceRequest::Input>* true_override,
     std::shared_ptr<InferenceRequest::Input>* false_override)
 {
@@ -160,6 +161,10 @@ GetBooleanOverrideInputs(
   int64_t memory_type_id;
 
   const std::vector<int64_t> tensor_shape{1};
+  std::vector<int64_t> tensor_shape_with_batch_dim{1};
+  if (support_batching) {
+    tensor_shape_with_batch_dim.push_back(1);
+  }
   const size_t size_p = GetDataTypeByteSize(tensor_datatype);
 
   auto true_p =
@@ -186,7 +191,7 @@ GetBooleanOverrideInputs(
         "failed to allocate sequence control signal in CPU memory");
   }
 
-  if (tensor_datatype == DataType::TYPE_INT32) {
+  if (tensor_datatype == inference::DataType::TYPE_INT32) {
     *(reinterpret_cast<int32_t*>(true_p_ptr)) = int32_true_value;
     *(reinterpret_cast<int32_t*>(false_p_ptr)) = int32_false_value;
   } else {
@@ -197,11 +202,13 @@ GetBooleanOverrideInputs(
   auto ltrue_override = std::make_shared<InferenceRequest::Input>(
       tensor_name, tensor_datatype, tensor_shape);
   *ltrue_override->MutableShape() = ltrue_override->OriginalShape();
+  *ltrue_override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
   RETURN_IF_ERROR(ltrue_override->SetData(true_p));
 
   auto lfalse_override = std::make_shared<InferenceRequest::Input>(
       tensor_name, tensor_datatype, tensor_shape);
   *lfalse_override->MutableShape() = lfalse_override->OriginalShape();
+  *lfalse_override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
   RETURN_IF_ERROR(lfalse_override->SetData(false_p));
 
   *true_override = std::move(ltrue_override);
@@ -214,7 +221,7 @@ GetBooleanOverrideInputs(
 
 Status
 SequenceBatchScheduler::CreateBooleanControlTensors(
-    const ModelConfig& config,
+    const inference::ModelConfig& config,
     std::shared_ptr<ControlInputs>* start_input_overrides,
     std::shared_ptr<ControlInputs>* end_input_overrides,
     std::shared_ptr<ControlInputs>* startend_input_overrides,
@@ -230,7 +237,7 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
   *notready_input_overrides = std::make_shared<ControlInputs>();
 
   std::string tensor_name;
-  DataType tensor_datatype;
+  inference::DataType tensor_datatype;
   int32_t int32_false_value, int32_true_value;
   float fp32_false_value, fp32_true_value;
 
@@ -238,7 +245,7 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
   {
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
     if (!tensor_name.empty()) {
@@ -246,9 +253,9 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       std::shared_ptr<InferenceRequest::Input> false_override;
 
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
-          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
-          int32_false_value, int32_true_value, &true_override,
-          &false_override));
+          tensor_name, config.max_batch_size() != 0, tensor_datatype,
+          fp32_false_value, fp32_true_value, int32_false_value,
+          int32_true_value, &true_override, &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(false_override);
@@ -262,7 +269,7 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
   {
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
     if (!tensor_name.empty()) {
@@ -270,9 +277,9 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       std::shared_ptr<InferenceRequest::Input> false_override;
 
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
-          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
-          int32_false_value, int32_true_value, &true_override,
-          &false_override));
+          tensor_name, config.max_batch_size() != 0, tensor_datatype,
+          fp32_false_value, fp32_true_value, int32_false_value,
+          int32_true_value, &true_override, &false_override));
 
       (*start_input_overrides)->emplace_back(false_override);
       (*end_input_overrides)->emplace_back(true_override);
@@ -286,7 +293,7 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
   {
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
     if (!tensor_name.empty()) {
@@ -294,9 +301,9 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       std::shared_ptr<InferenceRequest::Input> false_override;
 
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
-          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
-          int32_false_value, int32_true_value, &true_override,
-          &false_override));
+          tensor_name, config.max_batch_size() != 0, tensor_datatype,
+          fp32_false_value, fp32_true_value, int32_false_value,
+          int32_true_value, &true_override, &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(true_override);
@@ -677,16 +684,16 @@ SequenceBatch::SequenceBatch(
 }
 
 bool
-SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
+SequenceBatch::CreateCorrelationIDControl(const inference::ModelConfig& config)
 {
   // If model wants CORRID control then get the name of the input
   // tensor and initialize the override structure for each sequence
   // slot that is used to communicate the correlation ID.
   std::string correlation_id_tensor_name;
-  DataType correlation_id_datatype;
+  inference::DataType correlation_id_datatype;
   Status corrid_status = GetTypedSequenceControlProperties(
       config.sequence_batching(), config.name(),
-      ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+      inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
       false /* required */, &correlation_id_tensor_name,
       &correlation_id_datatype);
   if (!corrid_status.IsOk()) {
@@ -697,19 +704,24 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
   }
 
   if (!correlation_id_tensor_name.empty()) {
-    if ((correlation_id_datatype != TYPE_UINT64) &&
-        (correlation_id_datatype != TYPE_INT64) &&
-        (correlation_id_datatype != TYPE_UINT32) &&
-        (correlation_id_datatype != TYPE_INT32)) {
+    if ((correlation_id_datatype != inference::DataType::TYPE_UINT64) &&
+        (correlation_id_datatype != inference::DataType::TYPE_INT64) &&
+        (correlation_id_datatype != inference::DataType::TYPE_UINT32) &&
+        (correlation_id_datatype != inference::DataType::TYPE_INT32)) {
       LOG_ERROR << "unexpected control data type, expected TYPE_UINT64, "
                    "TYPE_INT64, TYPE_UINT32 or TYPE_INT32 for "
-                << ModelSequenceBatching_Control_Kind_Name(
-                       ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID)
+                << inference::ModelSequenceBatching_Control_Kind_Name(
+                       inference::ModelSequenceBatching::Control::
+                           CONTROL_SEQUENCE_CORRID)
                 << " for " << config.name();
       return false;
     }
 
     const std::vector<int64_t> tensor_shape{1};
+    std::vector<int64_t> tensor_shape_with_batch_dim{1};
+    if (config.max_batch_size() != 0) {
+      tensor_shape_with_batch_dim.push_back(1);
+    }
     const size_t size_p = GetDataTypeByteSize(correlation_id_datatype);
 
     for (size_t b = 0; b < seq_slot_cnt_; ++b) {
@@ -732,6 +744,7 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
       auto override = std::make_shared<InferenceRequest::Input>(
           correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
       *override->MutableShape() = override->OriginalShape();
+      *override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
       corrid_status = override->SetData(corrid_p);
       if (!corrid_status.IsOk()) {
         LOG_ERROR << "failed creating CORRID control for sequence-batch "
@@ -793,7 +806,7 @@ SequenceBatch::SetControlTensors(
 
 DirectSequenceBatch::DirectSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
-    const size_t seq_slot_cnt, const ModelConfig& config,
+    const size_t seq_slot_cnt, const inference::ModelConfig& config,
     const Scheduler::StandardInitFunc& OnInit,
     const Scheduler::StandardWarmupFunc& OnWarmup,
     const Scheduler::StandardRunFunc& OnSchedule,
@@ -924,8 +937,8 @@ DirectSequenceBatch::SchedulerThread(
   size_t delay_cnt = 0;
   if (dstr != nullptr) {
     delay_cnt = atoi(dstr);
-    LOG_INFO << "Delaying scheduler thread " << batcher_idx_ << " until "
-             << delay_cnt << " queued requests...";
+    LOG_VERBOSE(1) << "Delaying scheduler thread " << batcher_idx_ << " until "
+                   << delay_cnt << " queued requests...";
   }
 
   // For testing this scheduler thread to be the last to release the
@@ -935,8 +948,9 @@ DirectSequenceBatch::SchedulerThread(
     const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
     if (dstr != nullptr) {
       backend_release_wait_milliseconds = atoi(dstr);
-      LOG_INFO << "Delaying scheduler backend release for " << batcher_idx_
-               << ": " << backend_release_wait_milliseconds << "ms";
+      LOG_VERBOSE(1) << "Delaying scheduler backend release for "
+                     << batcher_idx_ << ": "
+                     << backend_release_wait_milliseconds << "ms";
     }
   }
 
@@ -961,9 +975,9 @@ DirectSequenceBatch::SchedulerThread(
         if (!base_->DelayScheduler(batcher_idx_, total_size, delay_cnt)) {
           delay_cnt = 0;
         }
-        LOG_INFO << "Delaying scheduler thread " << batcher_idx_ << " until "
-                 << delay_cnt
-                 << " queued requests, current total = " << total_size;
+        LOG_VERBOSE(1) << "Delaying scheduler thread " << batcher_idx_
+                       << " until " << delay_cnt
+                       << " queued requests, current total = " << total_size;
       } else {
         RequiredEqualInputs required_equal_inputs;
         InferenceRequest* null_irequest = nullptr;
@@ -1167,7 +1181,7 @@ DirectSequenceBatch::SchedulerThread(
 
 OldestSequenceBatch::OldestSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
-    const size_t seq_slot_cnt, const ModelConfig& config,
+    const size_t seq_slot_cnt, const inference::ModelConfig& config,
     const Scheduler::StandardInitFunc& OnInit,
     const Scheduler::StandardWarmupFunc& OnWarmup,
     const Scheduler::StandardRunFunc& OnSchedule,
@@ -1327,7 +1341,8 @@ OldestSequenceBatch::Enqueue(
     std::unique_ptr<InferenceRequest>& request)
 {
   // Queue the new request... if there isn't already a request in
-  // flight then send one to the dynamic batcher immediately.
+  // flight for this sequence then send one to the dynamic batcher
+  // immediately.
   bool in_flight;
   {
     std::lock_guard<std::mutex> lock(mu_);

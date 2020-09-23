@@ -247,8 +247,8 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
         input.first, input.second.DType(), input.second.Shape(), &new_input);
 
     // Must normalize shape here...
-    *new_input->MutableShape() = new_input->OriginalShape();
-    *new_input->MutableShapeWithBatchDim() = new_input->OriginalShape();
+    *new_input->MutableShape() = input.second.Shape();
+    *new_input->MutableShapeWithBatchDim() = input.second.ShapeWithBatchDim();
 
     new_input->SetData(data);
   }
@@ -285,8 +285,8 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
         input.first, input.second.DType(), input.second.Shape(), &new_input);
 
     // Must normalize shape here...
-    *new_input->MutableShape() = new_input->OriginalShape();
-    *new_input->MutableShapeWithBatchDim() = new_input->OriginalShape();
+    *new_input->MutableShape() = input.second.Shape();
+    *new_input->MutableShapeWithBatchDim() = input.second.ShapeWithBatchDim();
 
     // Note that the input that have max byte size will be responsible for
     // holding the artifical data, while other inputs will hold a reference to
@@ -346,8 +346,9 @@ InferenceRequest::ImmutableInput(
 
 Status
 InferenceRequest::AddOriginalInput(
-    const std::string& name, const DataType datatype, const int64_t* shape,
-    const uint64_t dim_count, InferenceRequest::Input** input)
+    const std::string& name, const inference::DataType datatype,
+    const int64_t* shape, const uint64_t dim_count,
+    InferenceRequest::Input** input)
 {
   const auto& pr = original_inputs_.emplace(
       std::piecewise_construct, std::forward_as_tuple(name),
@@ -357,8 +358,6 @@ InferenceRequest::AddOriginalInput(
         Status::Code::INVALID_ARG,
         "input '" + name + "' already exists in request");
   }
-
-  LOG_VERBOSE(1) << "add original input: " << *this;
 
   if (input != nullptr) {
     *input = std::addressof(pr.first->second);
@@ -370,7 +369,7 @@ InferenceRequest::AddOriginalInput(
 
 Status
 InferenceRequest::AddOriginalInput(
-    const std::string& name, const DataType datatype,
+    const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& shape, InferenceRequest::Input** input)
 {
   return AddOriginalInput(name, datatype, &shape[0], shape.size(), input);
@@ -399,13 +398,20 @@ InferenceRequest::RemoveAllOriginalInputs()
 
 Status
 InferenceRequest::AddOverrideInput(
-    const std::string& name, const DataType datatype,
-    const std::vector<int64_t>& shape,
+    const std::string& name, const inference::DataType datatype,
+    const int64_t batch_size, const std::vector<int64_t>& shape,
     std::shared_ptr<InferenceRequest::Input>* input)
 {
   std::shared_ptr<Input> i = std::make_shared<Input>(name, datatype, shape);
   *(i->MutableShape()) = i->OriginalShape();
-  *(i->MutableShapeWithBatchDim()) = i->OriginalShape();
+  if (batch_size > 0) {
+    *(i->MutableShapeWithBatchDim()) = {batch_size};
+    i->MutableShapeWithBatchDim()->insert(
+        i->MutableShapeWithBatchDim()->end(), i->OriginalShape().begin(),
+        i->OriginalShape().end());
+  } else {
+    *(i->MutableShapeWithBatchDim()) = i->OriginalShape();
+  }
 
   RETURN_IF_ERROR(AddOverrideInput(i));
   if (input != nullptr) {
@@ -500,7 +506,7 @@ InferenceRequest::PrepareForInference()
 Status
 InferenceRequest::Normalize()
 {
-  const ModelConfig& model_config = backend_raw_->Config();
+  const inference::ModelConfig& model_config = backend_raw_->Config();
 
   // Initialize the requested outputs to be used during inference. If
   // original_requested_outputs_ is empty assume all outputs specified
@@ -514,7 +520,7 @@ InferenceRequest::Normalize()
     // Validate if the original requested output name exists in the
     // model configuration.
     for (const auto& output_name : original_requested_outputs_) {
-      const ModelOutput* output_config;
+      const inference::ModelOutput* output_config;
       RETURN_IF_ERROR(backend_raw_->GetOutput(output_name, &output_config));
     }
   }
@@ -549,7 +555,7 @@ InferenceRequest::Normalize()
 
       // For a shape tensor, keep the tensor's shape as it is and mark
       // that the input is a shape tensor.
-      const ModelInput* input_config;
+      const inference::ModelInput* input_config;
       RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
       if (input_config->is_shape_tensor()) {
         *input.MutableShape() = input.OriginalShape();
@@ -593,7 +599,7 @@ InferenceRequest::Normalize()
   // Verify that each input shape is valid for the model, make
   // adjustments for reshapes and find the total tensor size.
   for (auto& pr : original_inputs_) {
-    const ModelInput* input_config;
+    const inference::ModelInput* input_config;
     RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
 
     auto& input = pr.second;
@@ -712,13 +718,13 @@ InferenceRequest::ReportStatisticsWithDuration(
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
-    backend_raw_->MutableStatsAggregator()->UpdateSuccess(
+    backend_raw_->MutableStatsAggregator()->UpdateSuccessWithDuration(
         metric_reporter, std::max(1U, batch_size_), request_start_ns_,
         queue_start_ns_, compute_start_ns, request_end_ns,
         compute_input_duration_ns, compute_infer_duration_ns,
         compute_output_duration_ns);
     if (secondary_stats_aggregator_ != nullptr) {
-      secondary_stats_aggregator_->UpdateSuccess(
+      secondary_stats_aggregator_->UpdateSuccessWithDuration(
           nullptr /* metric_reporter */, std::max(1U, batch_size_),
           request_start_ns_, queue_start_ns_, compute_start_ns, request_end_ns,
           compute_input_duration_ns, compute_infer_duration_ns,
@@ -741,8 +747,8 @@ InferenceRequest::ReportStatisticsWithDuration(
 InferenceRequest::Input::Input() : data_(new MemoryReference) {}
 
 InferenceRequest::Input::Input(
-    const std::string& name, const DataType datatype, const int64_t* shape,
-    const uint64_t dim_count)
+    const std::string& name, const inference::DataType datatype,
+    const int64_t* shape, const uint64_t dim_count)
     : name_(name), datatype_(datatype),
       original_shape_(shape, shape + dim_count), is_shape_tensor_(false),
       data_(new MemoryReference)
@@ -750,7 +756,7 @@ InferenceRequest::Input::Input(
 }
 
 InferenceRequest::Input::Input(
-    const std::string& name, const DataType datatype,
+    const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& shape)
     : name_(name), datatype_(datatype), original_shape_(shape),
       is_shape_tensor_(false), data_(new MemoryReference)
@@ -857,6 +863,7 @@ operator<<(std::ostream& out, const InferenceRequest::Input& input)
   out << "input: " << input.Name()
       << ", type: " << DataTypeToProtocolString(input.DType())
       << ", original shape: " << DimsListToString(input.OriginalShape())
+      << ", batch + shape: " << DimsListToString(input.ShapeWithBatchDim())
       << ", shape: " << DimsListToString(input.Shape());
   if (input.IsShapeTensor()) {
     out << ", is_shape_tensor: True";

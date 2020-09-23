@@ -106,7 +106,7 @@ WarmupRequestComplete(
 
 Status
 InferenceBackend::GetInput(
-    const std::string& name, const ModelInput** input) const
+    const std::string& name, const inference::ModelInput** input) const
 {
   const auto itr = input_map_.find(name);
   if (itr == input_map_.end()) {
@@ -121,7 +121,7 @@ InferenceBackend::GetInput(
 
 Status
 InferenceBackend::GetOutput(
-    const std::string& name, const ModelOutput** output) const
+    const std::string& name, const inference::ModelOutput** output) const
 {
   const auto itr = output_map_.find(name);
   if (itr == output_map_.end()) {
@@ -136,7 +136,7 @@ InferenceBackend::GetOutput(
 
 Status
 InferenceBackend::SetModelConfig(
-    const std::string& path, const ModelConfig& config)
+    const std::string& path, const inference::ModelConfig& config)
 {
   config_ = config;
   RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
@@ -253,20 +253,10 @@ InferenceBackend::SetConfiguredScheduler(
         enforce_equal_shape_tensors, &scheduler));
   } else if (config_.has_dynamic_batching()) {
     // Dynamic batcher
-    std::set<int32_t> preferred_batch_sizes;
-    for (const auto size : config_.dynamic_batching().preferred_batch_size()) {
-      preferred_batch_sizes.insert(size);
-    }
-
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
         OnWarmup, OnRun, true /* dynamic_batching_enabled */,
-        enforce_equal_shape_tensors,
-        config_.dynamic_batching().preserve_ordering(), preferred_batch_sizes,
-        config_.dynamic_batching().max_queue_delay_microseconds(),
-        config_.dynamic_batching().default_queue_policy(),
-        config_.dynamic_batching().priority_levels(),
-        config_.dynamic_batching().priority_queue_policy(), &scheduler));
+        enforce_equal_shape_tensors, config_.dynamic_batching(), &scheduler));
   } else {
     // Default scheduler. Use dynamic batch scheduler (with batching
     // disabled) as the default scheduler.
@@ -285,11 +275,12 @@ InferenceBackend::SetConfiguredScheduler(
 
 Status
 InferenceBackend::Init(
-    const std::string& path, const ModelConfig& config,
+    const std::string& path, const inference::ModelConfig& config,
     const std::string& platform)
 {
   RETURN_IF_ERROR(
       ValidateModelConfig(config, platform, min_compute_capability_));
+  RETURN_IF_ERROR(ValidateModelIOConfig(config));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
   return Status::Success;
@@ -366,11 +357,12 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       }
 
       switch (input_meta.second.input_data_type_case()) {
-        case ModelWarmup_Input::InputDataTypeCase::kZeroData:
+        case inference::ModelWarmup_Input::InputDataTypeCase::kZeroData:
           max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
           break;
-        case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
-          if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+        case inference::ModelWarmup_Input::InputDataTypeCase::kRandomData: {
+          if (input_meta.second.data_type() ==
+              inference::DataType::TYPE_STRING) {
             max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
           } else {
             max_random_byte_size =
@@ -421,18 +413,20 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 
         const char* allocated_ptr;
         switch (input_meta.second.input_data_type_case()) {
-          case ModelWarmup_Input::InputDataTypeCase::kZeroData:
+          case inference::ModelWarmup_Input::InputDataTypeCase::kZeroData:
             allocated_ptr = zero_buffer;
             break;
-          case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
-            if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+          case inference::ModelWarmup_Input::InputDataTypeCase::kRandomData: {
+            if (input_meta.second.data_type() ==
+                inference::DataType::TYPE_STRING) {
               allocated_ptr = zero_buffer;
             } else {
               allocated_ptr = random_buffer;
             }
             break;
           }
-          case ModelWarmup_Input::InputDataTypeCase::kInputDataFile: {
+          case inference::ModelWarmup_Input::InputDataTypeCase::
+              kInputDataFile: {
             // For data provided from file, we can set buffer in first pass
             warmup_data.provided_data_.emplace_back(new std::string());
             auto input_data = warmup_data.provided_data_.back().get();
@@ -440,7 +434,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                 JoinPath({model_dir_, kWarmupDataFolder,
                           input_meta.second.input_data_file()}),
                 input_data));
-            if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+            if (input_meta.second.data_type() ==
+                inference::DataType::TYPE_STRING) {
               batch_byte_size = input_data->size();
             } else if (((size_t)batch_byte_size) > input_data->size()) {
               return Status(
@@ -461,7 +456,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                                                "' to have input_data_type set");
         }
 
-        const ModelInput* input_config;
+        const inference::ModelInput* input_config;
         bool is_original_input =
             GetInput(input_meta.first, &input_config).IsOk();
         InferenceRequest::Input* input = nullptr;
@@ -481,7 +476,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
         } else {
           input_sps.emplace_back();
           RETURN_IF_ERROR(lrequest->AddOverrideInput(
-              input_meta.first, input_meta.second.data_type(), input_meta_shape,
+              input_meta.first, input_meta.second.data_type(),
+              (config_.max_batch_size() != 0 ? 1 : 0), input_meta_shape,
               &input_sps.back()));
           input = input_sps.back().get();
         }

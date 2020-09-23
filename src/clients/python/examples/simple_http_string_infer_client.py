@@ -29,7 +29,7 @@ import argparse
 import numpy as np
 import sys
 
-import tritonhttpclient
+import tritonclient.http as httpclient
 
 
 def TestIdentityInference(np_array, binary_data):
@@ -37,11 +37,11 @@ def TestIdentityInference(np_array, binary_data):
     inputs = []
     outputs = []
 
-    inputs.append(tritonhttpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
+    inputs.append(httpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
     inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
 
     outputs.append(
-        tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=binary_data))
+        httpclient.InferRequestedOutput('OUTPUT0', binary_data=binary_data))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
@@ -49,7 +49,7 @@ def TestIdentityInference(np_array, binary_data):
     if (np_array.dtype == np.object):
         if binary_data:
             if not np.array_equal(np_array,
-                        np.char.decode(results.as_numpy('OUTPUT0'))):
+                                  np.char.decode(results.as_numpy('OUTPUT0'))):
                 print(results.as_numpy('OUTPUT0'))
                 sys.exit(1)
         else:
@@ -58,8 +58,7 @@ def TestIdentityInference(np_array, binary_data):
                 sys.exit(1)
     else:
         encoded_results = np.char.encode(
-            results.as_numpy('OUTPUT0').astype(str)
-            )
+            results.as_numpy('OUTPUT0').astype(str))
         if not np.array_equal(np_array, encoded_results):
             print(encoded_results)
             sys.exit(1)
@@ -82,7 +81,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
+        triton_client = httpclient.InferenceServerClient(url=FLAGS.url,
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
@@ -92,8 +91,8 @@ if __name__ == '__main__':
 
     inputs = []
     outputs = []
-    inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "BYTES"))
-    inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "BYTES"))
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "BYTES"))
+    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "BYTES"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -112,8 +111,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=True)
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
                                                    binary_data=False))
 
     results = triton_client.infer(model_name=model_name,
@@ -125,10 +124,12 @@ if __name__ == '__main__':
     output1_data = results.as_numpy('OUTPUT1')
 
     for i in range(16):
-        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
-              str(output0_data[0][i]))
-        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
-              str(output1_data[0][i]))
+        print(
+            str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
+            str(output0_data[0][i]))
+        print(
+            str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
+            str(output1_data[0][i]))
 
         # Convert result from string to int to check result
         r0 = int(output0_data[0][i])

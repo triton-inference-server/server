@@ -1,0 +1,22 @@
+name: "batch_input_less_source1"
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+batch_input [
+  {
+    kind: BATCH_ACCUMULATED_ELEMENT_COUNT
+    target_name: "BATCH_INPUT"
+    data_type: TYPE_FP32
+  }
+]

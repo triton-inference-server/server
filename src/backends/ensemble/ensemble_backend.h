@@ -44,7 +44,7 @@ class EnsembleBackend : public InferenceBackend {
 
   Status Init(
       InferenceServer* const server, const std::string& path,
-      const ModelConfig& config);
+      const inference::ModelConfig& config);
 
  private:
   // Override InferenceBackend::Run() to return proper error if

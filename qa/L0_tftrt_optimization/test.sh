@@ -145,7 +145,7 @@ for MODEL in \
         RET=1
     fi
 
-    grep "failed to load '${MODEL}_invalid_param' version 1: Invalid argument: failed to convert max_workspace_size_bytes 'abc' to integral number" $SERVER_LOG
+    grep "failed to load '${MODEL}_invalid_param' version 1: Invalid argument: failed to convert 'abc' to long long integral number" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected invalid parameter 'abc' returns error\n***"
         RET=1
@@ -190,6 +190,13 @@ for MODEL in \
         echo -e "\n***\n*** Test Failed\n***"
         cat $CLIENT_LOG
         RET=1
+    else
+        check_test_results $CLIENT_LOG 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
 
     set -e

@@ -31,8 +31,8 @@ import numpy as np
 import sys
 import queue
 
-import tritongrpcclient
-from tritonclientutils import InferenceServerException
+import tritonclient.grpc as grpcclient
+from tritonclient.utils import InferenceServerException
 
 FLAGS = None
 
@@ -45,7 +45,7 @@ class UserData:
 
 # Define the callback function. Note the last two parameters should be
 # result and error. InferenceServerClient would povide the results of an
-# inference as tritongrpcclient.InferResult in result. For successful
+# inference as grpcclient.InferResult in result. For successful
 # inference, error will be None, otherwise it will be an object of
 # tritonclientutils.InferenceServerException holding the error details
 def callback(user_data, result, error):
@@ -88,22 +88,20 @@ if __name__ == '__main__':
     input_data = np.arange(start=data_offset,
                            stop=data_offset + repeat_count,
                            dtype=np.int32)
-    input_data = np.expand_dims(input_data, axis=0)
-    delay_data = (np.ones([1, repeat_count], dtype=np.uint32)) * delay_time
-    wait_data = np.array([[wait_time]], dtype=np.uint32)
+    delay_data = (np.ones([repeat_count], dtype=np.uint32)) * delay_time
+    wait_data = np.array([wait_time], dtype=np.uint32)
 
     # Initialize the data.
     inputs = []
-    inputs.append(tritongrpcclient.InferInput('IN', [1, repeat_count], "INT32"))
+    inputs.append(grpcclient.InferInput('IN', [repeat_count], "INT32"))
     inputs[-1].set_data_from_numpy(input_data)
-    inputs.append(
-        tritongrpcclient.InferInput('DELAY', [1, repeat_count], "UINT32"))
+    inputs.append(grpcclient.InferInput('DELAY', [repeat_count], "UINT32"))
     inputs[-1].set_data_from_numpy(delay_data)
-    inputs.append(tritongrpcclient.InferInput('WAIT', [1, 1], "UINT32"))
+    inputs.append(grpcclient.InferInput('WAIT', [1], "UINT32"))
     inputs[-1].set_data_from_numpy(wait_data)
 
     outputs = []
-    outputs.append(tritongrpcclient.InferRequestedOutput('OUT'))
+    outputs.append(grpcclient.InferRequestedOutput('OUT'))
 
     result_list = []
 
@@ -112,7 +110,7 @@ if __name__ == '__main__':
     # It is advisable to use client object within with..as clause
     # when sending streaming requests. This ensures the client
     # is closed when the block inside with exits.
-    with tritongrpcclient.InferenceServerClient(
+    with grpcclient.InferenceServerClient(
             url=FLAGS.url, verbose=FLAGS.verbose) as triton_client:
         try:
             # Establish stream

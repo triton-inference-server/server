@@ -39,6 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
+EXPECTED_NUM_TESTS="3"
 
 # S3 credentials are necessary for this test. Pass via ENV variables
 aws configure set default.region $AWS_DEFAULT_REGION && \
@@ -48,7 +49,11 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 # S3 bucket path (Point to bucket when testing cloud storage)
 BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
 
-# Make test bucket
+# Cleanup S3 test bucket if exists (due to test failure)
+aws s3 rm $BUCKET_URL --recursive --include "*" && \
+    aws s3 rb $BUCKET_URL || true
+
+# Make S3 test bucket
 aws s3 mb "${BUCKET_URL}"
 
 # Remove Slash in BUCKET_URL
@@ -56,7 +61,7 @@ BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_TIMEOUT=360
+SERVER_TIMEOUT=420
 
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
@@ -152,11 +157,14 @@ for ENV_VAR in "env" "env_dummy" "config"; do
             cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
         done
 
+        # Copy custom model
+        cp -r /opt/tritonserver/qa/custom_models/custom_float32_float32_float32/ models/
+
         # Copy models with string inputs and remove nobatch (bs=1) models
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object/ models/
         rm -rf models/*nobatch*
 
-        for FW in graphdef savedmodel netdef onnx libtorch plan; do
+        for FW in graphdef savedmodel netdef onnx libtorch plan custom; do
             for MC in `ls models/${FW}*/config.pbtxt`; do
                 echo "instance_group [ { kind: ${KIND} }]" >> $MC
             done
@@ -201,21 +209,18 @@ for ENV_VAR in "env" "env_dummy" "config"; do
 
             set +e
 
-            # python unittest seems to swallow ImportError and still return 0
-            # exit code. So need to explicitly check CLIENT_LOG to make sure
-            # we see some running tests
             python $INFER_TEST >$CLIENT_LOG 2>&1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Failed\n***"
                 RET=1
-            fi
-
-            grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                echo -e "\n***\n*** Test Failed To Run\n***"
-                RET=1
+            else
+                check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+                if [ $? -ne 0 ]; then
+                    cat $CLIENT_LOG
+                    echo -e "\n***\n*** Test Result Verification Failed\n***"
+                    RET=1
+                fi
             fi
 
             set -e
@@ -234,6 +239,44 @@ for ENV_VAR in "env" "env_dummy" "config"; do
     done
 done
 
+# Test with polling enabled
+SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --model-control-mode=poll"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# copy contents of /models into S3 bucket and wait for them to be loaded.
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+sleep 600
+
+set +e
+
+python $INFER_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Clean up bucket
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 aws s3 rb "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then

@@ -28,7 +28,7 @@ instance_group {
   count: 1
   kind: KIND_CPU
 }
-default_model_filename: "vnetsavedmodel"
+default_model_filename: "model.savedmodel"
 optimization {
   input_pinned_memory {
     enable: true
@@ -37,3 +37,4 @@ optimization {
     enable: true
   }
 }
+backend: "tensorflow"

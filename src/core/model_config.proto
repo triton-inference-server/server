@@ -28,9 +28,9 @@
 
 syntax = "proto3";
 
-package nvidia.inferenceserver;
+package inference;
 
-//@@.. cpp:namespace:: nvidia::inferenceserver
+//@@.. cpp:namespace:: inference
 
 //@@
 //@@.. cpp:enum:: DataType
@@ -157,13 +157,14 @@ message ModelInstanceGroup
 
   //@@  .. cpp:var:: string profile (repeated)
   //@@
-  //@@     For TensorRT models, using inputs with dynamic shape, this
+  //@@     For TensorRT models containing multiple optimization profile, this
   //@@     parameter specifies a set of optimization profiles available to this
   //@@     instance group. The inference server will choose the optimal profile
   //@@     based on the shapes of the input tensors. This field should lie
   //@@     between 0 and <TotalNumberOfOptimizationProfilesInPlanModel> - 1
   //@@     and be specified only for TensorRT backend, otherwise an error will
-  //@@     be generated.
+  //@@     be generated. If not specified, the server will select the first
+  //@@     optimization profile by default.
   //@@
   repeated string profile = 5;
 }
@@ -329,6 +330,129 @@ message ModelOutput
   bool is_shape_tensor = 6;
 }
 
+//@@  .. cpp:var:: message BatchInput
+//@@
+//@@     A batch input is an additional input that must be added by
+//@@     the backend based on all the requests in a batch.
+//@@
+message BatchInput
+{
+  //@@
+  //@@    .. cpp:enum:: Kind
+  //@@
+  //@@       The kind of the batch input.
+  //@@
+  enum Kind {
+    //@@      .. cpp:enumerator:: Kind::BATCH_ELEMENT_COUNT = 0
+    //@@
+    //@@         The element count of the 'source_input' will be added as
+    //@@         input with shape [1].
+    //@@
+    BATCH_ELEMENT_COUNT = 0;
+
+    //@@      .. cpp:enumerator:: Kind::BATCH_ACCUMULATED_ELEMENT_COUNT = 1
+    //@@
+    //@@         The accumulated element count of the 'source_input' will be
+    //@@         added as input with shape [1]. For example, if there is a
+    //@@         batch of two request, each with 2 elements, an input of value
+    //@@         2 will be added to the first request, and an input of value
+    //@@         4 will be added to the second request.
+    //@@
+    BATCH_ACCUMULATED_ELEMENT_COUNT = 1;
+
+    //@@      .. cpp:enumerator::
+    //@@         Kind::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO = 2
+    //@@
+    //@@         The accumulated element count of the 'source_input' will be
+    //@@         added as input with shape [1], except for the first request
+    //@@         in the batch. For the first request in the batch, the input
+    //@@         will have shape [2] where the first element is value 0.
+    //@@
+    BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO = 2;
+
+    //@@      .. cpp:enumerator:: Kind::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE = 3
+    //@@
+    //@@         Among the requests in the batch, the max element count of the
+    //@@         'source_input' will be added as input with shape
+    //@@         [max_element_count] for the first request in the batch.
+    //@@         For other requests, such input will be with shape [0].
+    //@@         The data of the tensor will be uninitialized.
+    //@@
+    BATCH_MAX_ELEMENT_COUNT_AS_SHAPE = 3;
+  }
+
+  //@@    .. cpp:var:: Kind kind
+  //@@
+  //@@       The kind of this batch input.
+  //@@
+  Kind kind = 1;
+
+  //@@    .. cpp:var:: string target_name (repeated)
+  //@@
+  //@@       The name of the model inputs that the backend will create
+  //@@       for this batch input.
+  //@@
+  repeated string target_name = 2;
+
+  //@@    .. cpp:var:: DataType data_type
+  //@@
+  //@@       The input's datatype. The data type can be TYPE_INT32 or
+  //@@       TYPE_FP32.
+  //@@
+  DataType data_type = 3;
+
+  //@@    .. cpp:var:: string source_input (repeated)
+  //@@
+  //@@       The backend derives the value for each batch input from one or
+  //@@       more other inputs. 'source_input' gives the names of those
+  //@@       inputs.
+  //@@
+  repeated string source_input = 4;
+}
+
+//@@.. cpp:var:: message BatchOutput
+//@@
+//@@   A batch output is an output produced by the model that must be handled
+//@@   differently by the backend based on all the requests in a batch.
+//@@
+message BatchOutput
+{
+  //@@
+  //@@  .. cpp:enum:: Kind
+  //@@
+  //@@     The kind of the batch output.
+  //@@
+  enum Kind {
+    //@@    .. cpp:enumerator:: Kind::BATCH_SCATTER_WITH_INPUT_SHAPE = 0
+    //@@
+    //@@       The output should be scattered according to the shape of
+    //@@       'source_input'. The dynamic dimension of the output will
+    //@@       be set to the value of the same dimension in the input.
+    //@@
+    BATCH_SCATTER_WITH_INPUT_SHAPE = 0;
+  }
+
+  //@@  .. cpp:var:: string target_name (repeated)
+  //@@
+  //@@     The name of the outputs to be produced by this batch output
+  //@@     specification.
+  //@@
+  repeated string target_name = 1;
+
+  //@@  .. cpp:var:: Kind kind
+  //@@
+  //@@     The kind of this batch output.
+  //@@
+  Kind kind = 2;
+
+  //@@  .. cpp:var:: string source_input (repeated)
+  //@@
+  //@@     The backend derives each batch output from one or more inputs.
+  //@@     'source_input' gives the names of those inputs.
+  //@@
+  repeated string source_input = 3;
+}
+
 //@@
 //@@.. cpp:var:: message ModelVersionPolicy
 //@@
@@ -467,6 +591,74 @@ message ModelOptimizationPolicy
   //@@
   message Cuda
   {
+    //@@    .. cpp:var:: message GraphSpec
+    //@@
+    //@@       Specification of the CUDA graph to be captured.
+    //@@
+    message GraphSpec
+    {
+      //@@      .. cpp:var:: message Dims
+      //@@
+      //@@         Specification of tensor dimension.
+      //@@
+      message Shape
+      {
+        //@@        .. cpp:var:: int64 dim (repeated)
+        //@@
+        //@@           The dimension.
+        //@@
+        repeated int64 dim = 1;
+      }
+
+      message LowerBound
+      {
+        //@@      .. cpp:var:: int32 batch_size
+        //@@
+        //@@         The batch size of the CUDA graph. If 'max_batch_size' is 0,
+        //@@         'batch_size' must be set to 0. Otherwise, 'batch_size' must
+        //@@         be set to value between 1 and 'max_batch_size'.
+        //@@
+        int32 batch_size = 1;
+
+        //@@      .. cpp:var:: map<string, Shape> input
+        //@@
+        //@@         The specification of the inputs. 'Shape' is the shape of
+        //@@         the input without batching dimension.
+        //@@
+        map<string, Shape> input = 2;
+      }
+
+      //@@      .. cpp:var:: int32 batch_size
+      //@@
+      //@@         The batch size of the CUDA graph. If 'max_batch_size' is 0,
+      //@@         'batch_size' must be set to 0. Otherwise, 'batch_size' must
+      //@@         be set to value between 1 and 'max_batch_size'.
+      //@@
+      int32 batch_size = 1;
+
+      //@@      .. cpp:var:: map<string, Shape> input
+      //@@
+      //@@         The specification of the inputs. 'Shape' is the shape of the
+      //@@         input without batching dimension.
+      //@@
+      map<string, Shape> input = 2;
+
+      //@@      .. cpp:var:: LowerBound graph_lower_bound
+      //@@
+      //@@         Specify the lower bound of the CUDA graph. Optional.
+      //@@         If specified, the graph can be used for input shapes and
+      //@@         batch sizes that are in closed interval between the lower
+      //@@         bound specification and graph specification. For dynamic
+      //@@         shape model, this allows CUDA graphs to be launched
+      //@@         frequently without capturing all possible shape combinations.
+      //@@         However, using graph for shape combinations different from
+      //@@         the one used for capturing introduces uninitialized data for
+      //@@         execution and it may distort the inference result if
+      //@@         the model is sensitive to uninitialized data.
+      //@@
+      LowerBound graph_lower_bound = 3;
+    }
+
     //@@    .. cpp:var:: bool graphs
     //@@
     //@@       Use CUDA graphs API to capture model operations and execute
@@ -483,6 +675,15 @@ message ModelOptimizationPolicy
     //@@       Currently only recognized by TensorRT backend.
     //@@
     bool busy_wait_events = 2;
+
+    //@@    .. cpp:var:: GraphSpec graph_spec (repeated)
+    //@@
+    //@@       Specification of the CUDA graph to be captured. If not specified
+    //@@       and 'graphs' is true, the default CUDA graphs will be captured
+    //@@       based on model settings.
+    //@@       Currently only recognized by TensorRT backend.
+    //@@
+    repeated GraphSpec graph_spec = 3;
   }
 
   //@@
@@ -1242,6 +1443,20 @@ message ModelConfig
   //@@     The outputs produced by the model.
   //@@
   repeated ModelOutput output = 6;
+
+  //@@  .. cpp:var:: BatchInput batch_input (repeated)
+  //@@
+  //@@     The model input(s) that the server should use to communicate
+  //@@     batch related values to the model.
+  //@@
+  repeated BatchInput batch_input = 20;
+
+  //@@  .. cpp:var:: BatchOutput batch_output (repeated)
+  //@@
+  //@@     The outputs produced by the model that requires special handling
+  //@@     by the model backend.
+  //@@
+  repeated BatchOutput batch_output = 21;
 
   //@@  .. cpp:var:: ModelOptimizationPolicy optimization
   //@@

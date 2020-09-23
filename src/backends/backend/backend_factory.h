@@ -26,6 +26,7 @@
 #pragma once
 
 #include "src/backends/backend/triton_model.h"
+#include "src/core/filesystem.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 
@@ -35,31 +36,25 @@ namespace nvidia { namespace inferenceserver {
 // mechanisms. Will be unnecessary once we transition to new arch.
 class TritonBackendFactory {
  public:
-  struct Config : public BackendConfig {
-  };
-
   static Status Create(
-      const std::shared_ptr<BackendConfig>& backend_config,
+      InferenceServer* server,
+      const BackendCmdlineConfigMap& cmdline_config_map,
       std::unique_ptr<TritonBackendFactory>* factory)
   {
     LOG_VERBOSE(1) << "Create TritonBackendFactory";
-
-    auto triton_backend_config =
-        std::static_pointer_cast<Config>(backend_config);
-    factory->reset(new TritonBackendFactory(triton_backend_config));
+    factory->reset(new TritonBackendFactory(server, cmdline_config_map));
     return Status::Success;
   }
 
   Status CreateBackend(
       const std::string& model_repository_path, const std::string& model_name,
-      const int64_t version, const ModelConfig& model_config,
-      const double min_compute_capability,
+      const int64_t version, const inference::ModelConfig& model_config,
       std::unique_ptr<InferenceBackend>* backend)
   {
     std::unique_ptr<TritonModel> model;
     RETURN_IF_ERROR(TritonModel::Create(
-        model_repository_path, model_name, version, model_config,
-        min_compute_capability, &model));
+        server_, model_repository_path, cmdline_config_map_, model_name,
+        version, model_config, &model));
     backend->reset(model.release());
     return Status::Success;
   }
@@ -69,12 +64,15 @@ class TritonBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonBackendFactory);
 
-  TritonBackendFactory(const std::shared_ptr<Config>& backend_config)
-      : backend_config_(backend_config)
+  TritonBackendFactory(
+      InferenceServer* server,
+      const BackendCmdlineConfigMap& cmdline_config_map)
+      : server_(server), cmdline_config_map_(cmdline_config_map)
   {
   }
 
-  const std::shared_ptr<Config> backend_config_;
+  InferenceServer* server_;
+  const BackendCmdlineConfigMap cmdline_config_map_;
 };
 
 }}  // namespace nvidia::inferenceserver

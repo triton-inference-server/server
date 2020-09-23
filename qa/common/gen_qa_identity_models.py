@@ -34,6 +34,7 @@ import gen_ensemble_model_utils as emu
 FLAGS = None
 np_dtype_string = np.dtype(object)
 
+
 def np_to_model_dtype(np_dtype):
     if np_dtype == np.bool:
         return "TYPE_BOOL"
@@ -58,6 +59,7 @@ def np_to_model_dtype(np_dtype):
     elif np_dtype == np_dtype_string:
         return "TYPE_STRING"
     return None
+
 
 def np_to_tf_dtype(np_dtype):
     if np_dtype == np.bool:
@@ -84,6 +86,7 @@ def np_to_tf_dtype(np_dtype):
         return tf.string
     return None
 
+
 def np_to_c2_dtype(np_dtype):
     if np_dtype == np.bool:
         return c2core.DataType.BOOL
@@ -109,6 +112,7 @@ def np_to_c2_dtype(np_dtype):
         return c2core.DataType.STRING
     return None
 
+
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.bool:
         return trt.bool
@@ -121,6 +125,7 @@ def np_to_trt_dtype(np_dtype):
     elif np_dtype == np.float32:
         return trt.float32
     return None
+
 
 def np_to_onnx_dtype(np_dtype):
     if np_dtype == np.bool:
@@ -147,6 +152,7 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
+
 def np_to_torch_dtype(np_dtype):
     if np_dtype == np.bool:
         return torch.bool
@@ -161,7 +167,7 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np.uint8:
         return torch.uint8
     elif np_dtype == np.uint16:
-        return None # Not supported in Torch
+        return None  # Not supported in Torch
     elif np_dtype == np.float16:
         return None
     elif np_dtype == np.float32:
@@ -169,10 +175,11 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np.float64:
         return torch.double
     elif np_dtype == np_dtype_string:
-        return None # Not supported in Torch
+        return None  # Not supported in Torch
 
-def create_tf_modelfile(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+
+def create_tf_modelfile(create_savedmodel, models_dir, model_version, io_cnt,
+                        max_batch, dtype, shape):
 
     if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -185,15 +192,19 @@ def create_tf_modelfile(
         input_name = "INPUT{}".format(io_num)
         output_name = "OUTPUT{}".format(io_num)
         if max_batch == 0:
-            tin = tf.placeholder(tf_dtype, tu.shape_to_tf_shape(shape), input_name)
+            tin = tf.placeholder(tf_dtype, tu.shape_to_tf_shape(shape),
+                                 input_name)
         else:
-            tin = tf.placeholder(tf_dtype, [None,] + tu.shape_to_tf_shape(shape), input_name)
+            tin = tf.placeholder(tf_dtype, [
+                None,
+            ] + tu.shape_to_tf_shape(shape), input_name)
         toutput = tf.identity(tin, name=output_name)
 
     # Use model name based on io_cnt and non-batching variant
     if create_savedmodel:
         model_name = tu.get_zero_model_name(
-            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", io_cnt, dtype)
+            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", io_cnt,
+            dtype)
     else:
         model_name = tu.get_zero_model_name(
             "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype)
@@ -203,7 +214,7 @@ def create_tf_modelfile(
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     if create_savedmodel:
         with tf.Session() as sess:
@@ -212,19 +223,26 @@ def create_tf_modelfile(
             for io_num in range(io_cnt):
                 input_name = "INPUT{}".format(io_num)
                 output_name = "OUTPUT{}".format(io_num)
-                input_tensor = tf.get_default_graph().get_tensor_by_name(input_name + ":0")
-                output_tensor = tf.get_default_graph().get_tensor_by_name(output_name + ":0")
+                input_tensor = tf.get_default_graph().get_tensor_by_name(
+                    input_name + ":0")
+                output_tensor = tf.get_default_graph().get_tensor_by_name(
+                    output_name + ":0")
                 input_dict[input_name] = input_tensor
                 output_dict[output_name] = output_tensor
-            tf.saved_model.simple_save(sess, model_version_dir + "/model.savedmodel",
-                                       inputs=input_dict, outputs=output_dict)
+            tf.saved_model.simple_save(sess,
+                                       model_version_dir + "/model.savedmodel",
+                                       inputs=input_dict,
+                                       outputs=output_dict)
     else:
         with tf.Session() as sess:
-            graph_io.write_graph(sess.graph.as_graph_def(), model_version_dir,
-                                 "model.graphdef", as_text=False)
+            graph_io.write_graph(sess.graph.as_graph_def(),
+                                 model_version_dir,
+                                 "model.graphdef",
+                                 as_text=False)
 
-def create_tf_modelconfig(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+
+def create_tf_modelconfig(create_savedmodel, models_dir, model_version, io_cnt,
+                          max_batch, dtype, shape):
 
     if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -234,7 +252,8 @@ def create_tf_modelconfig(
     # Use a different model name for the non-batching variant
     if create_savedmodel:
         model_name = tu.get_zero_model_name(
-            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", io_cnt, dtype)
+            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", io_cnt,
+            dtype)
     else:
         model_name = tu.get_zero_model_name(
             "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype)
@@ -244,9 +263,10 @@ def create_tf_modelconfig(
 name: "{}"
 platform: "{}"
 max_batch_size: {}
-'''.format(model_name,
-           "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
-           max_batch)
+'''.format(
+        model_name,
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
+        max_batch)
 
     for io_num in range(io_cnt):
         config += '''
@@ -264,20 +284,20 @@ output [
     dims: [ {} ]
   }}
 ]
-'''.format(io_num, np_to_model_dtype(dtype), shape_str,
-           io_num, np_to_model_dtype(dtype), shape_str)
+'''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
+           np_to_model_dtype(dtype), shape_str)
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
 
-def create_netdef_modelfile(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+def create_netdef_modelfile(create_savedmodel, models_dir, model_version,
+                            io_cnt, max_batch, dtype, shape):
 
     if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -299,7 +319,7 @@ def create_netdef_modelfile(
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(model_version_dir + "/model.netdef", "wb") as f:
         f.write(predict_net.Proto().SerializeToString())
@@ -307,8 +327,8 @@ def create_netdef_modelfile(
         f.write(model.InitProto().SerializeToString())
 
 
-def create_netdef_modelconfig(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+def create_netdef_modelconfig(create_savedmodel, models_dir, model_version,
+                              io_cnt, max_batch, dtype, shape):
 
     if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -340,43 +360,43 @@ output [
     dims: [ {} ]
   }}
 ]
-'''.format(io_num, np_to_model_dtype(dtype), shape_str,
-           io_num, np_to_model_dtype(dtype), shape_str)
+'''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
+           np_to_model_dtype(dtype), shape_str)
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
 
-
-def create_ensemble_modelfile(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
-    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype,
-                                    shape, shape, shape):
+def create_ensemble_modelfile(create_savedmodel, models_dir, model_version,
+                              io_cnt, max_batch, dtype, shape):
+    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype, shape,
+                                          shape, shape):
         return
 
-    emu.create_identity_ensemble_modelfile(
-        "zero", models_dir, model_version, max_batch,
-        dtype, [shape] * io_cnt, [shape] * io_cnt)
+    emu.create_identity_ensemble_modelfile("zero", models_dir, model_version,
+                                           max_batch, dtype, [shape] * io_cnt,
+                                           [shape] * io_cnt)
 
 
-def create_ensemble_modelconfig(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
-    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype,
-                                    shape, shape, shape):
+def create_ensemble_modelconfig(create_savedmodel, models_dir, model_version,
+                                io_cnt, max_batch, dtype, shape):
+    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype, shape,
+                                          shape, shape):
         return
 
-    emu.create_identity_ensemble_modelconfig(
-        "zero", models_dir, model_version, max_batch, dtype,
-        [shape] * io_cnt, [shape] * io_cnt, [shape] * io_cnt, [shape] * io_cnt)
+    emu.create_identity_ensemble_modelconfig("zero", models_dir, model_version,
+                                             max_batch, dtype, [shape] * io_cnt,
+                                             [shape] * io_cnt, [shape] * io_cnt,
+                                             [shape] * io_cnt)
 
 
-def create_onnx_modelfile(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+def create_onnx_modelfile(create_savedmodel, models_dir, model_version, io_cnt,
+                          max_batch, dtype, shape):
 
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -384,8 +404,8 @@ def create_onnx_modelfile(
     onnx_dtype = np_to_onnx_dtype(dtype)
 
     # Create the model
-    model_name = tu.get_zero_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
-                                   io_cnt, dtype)
+    model_name = tu.get_zero_model_name(
+        "onnx_nobatch" if max_batch == 0 else "onnx", io_cnt, dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     batch_dim = [] if max_batch == 0 else [None]
@@ -401,14 +421,21 @@ def create_onnx_modelfile(
         in_name = "INPUT{}".format(io_num)
         out_name = "OUTPUT{}".format(io_num)
 
-        onnx_inputs.append(onnx.helper.make_tensor_value_info(in_name, onnx_dtype, batch_dim + in_shape))
-        onnx_outputs.append(onnx.helper.make_tensor_value_info(out_name, onnx_dtype, batch_dim + out_shape))
-        onnx_nodes.append(onnx.helper.make_node("Identity", [in_name], [out_name]))
+        onnx_inputs.append(
+            onnx.helper.make_tensor_value_info(in_name, onnx_dtype,
+                                               batch_dim + in_shape))
+        onnx_outputs.append(
+            onnx.helper.make_tensor_value_info(out_name, onnx_dtype,
+                                               batch_dim + out_shape))
+        onnx_nodes.append(
+            onnx.helper.make_node("Identity", [in_name], [out_name]))
 
-    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs, onnx_outputs)
+    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
+                                         onnx_outputs)
     if FLAGS.onnx_opset > 0:
         model_opset = onnx.helper.make_operatorsetid("", FLAGS.onnx_opset)
-        model_def = onnx.helper.make_model(graph_proto, producer_name="triton",
+        model_def = onnx.helper.make_model(graph_proto,
+                                           producer_name="triton",
                                            opset_imports=[model_opset])
     else:
         model_def = onnx.helper.make_model(graph_proto, producer_name="triton")
@@ -416,99 +443,124 @@ def create_onnx_modelfile(
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelconfig(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+def create_onnx_modelconfig(create_savedmodel, models_dir, model_version,
+                            io_cnt, max_batch, dtype, shape):
 
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     # Use a different model name for the non-batching variant
-    model_name = tu.get_zero_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
-                                   io_cnt, dtype)
+    model_name = tu.get_zero_model_name(
+        "onnx_nobatch" if max_batch == 0 else "onnx", io_cnt, dtype)
     config_dir = models_dir + "/" + model_name
 
-    config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
-            emu.repeat(dtype, io_cnt), emu.repeat(shape, io_cnt), emu.repeat(shape, io_cnt),
-            emu.repeat(dtype, io_cnt), emu.repeat(shape, io_cnt), emu.repeat(shape, io_cnt),
-            emu.repeat(None, io_cnt), force_tensor_number_suffix=True)
+    config = emu.create_general_modelconfig(model_name,
+                                            "onnxruntime_onnx",
+                                            max_batch,
+                                            emu.repeat(dtype, io_cnt),
+                                            emu.repeat(shape, io_cnt),
+                                            emu.repeat(shape, io_cnt),
+                                            emu.repeat(dtype, io_cnt),
+                                            emu.repeat(shape, io_cnt),
+                                            emu.repeat(shape, io_cnt),
+                                            emu.repeat(None, io_cnt),
+                                            force_tensor_number_suffix=True)
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
 
-def create_libtorch_modelfile(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+def create_libtorch_modelfile(create_savedmodel, models_dir, model_version,
+                              io_cnt, max_batch, dtype, shape):
 
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
+                                          shape):
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
 
-    model_name = tu.get_zero_model_name("libtorch_nobatch" if max_batch == 0 else "libtorch",
-                                   io_cnt, dtype)
+    model_name = tu.get_zero_model_name(
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     torch_shape = [abs(s) for s in shape]
     # Create the model
     if io_cnt == 1:
+
         class IdentityNet(nn.Module):
+
             def __init__(self):
                 super(IdentityNet, self).__init__()
+
             def forward(self, input0):
                 return input0
     elif io_cnt == 2:
+
         class IdentityNet(nn.Module):
+
             def __init__(self):
                 super(IdentityNet, self).__init__()
+
             def forward(self, input0, input1):
                 return input0, input1
     elif io_cnt == 3:
+
         class IdentityNet(nn.Module):
+
             def __init__(self):
                 super(IdentityNet, self).__init__()
+
             def forward(self, input0, input1, input2):
                 return input0, input1, input2
     elif io_cnt == 4:
+
         class IdentityNet(nn.Module):
+
             def __init__(self):
                 super(IdentityNet, self).__init__()
+
             def forward(self, input0, input1, input2, input3):
                 return input0, input1, input2, input3
+
     identityModel = IdentityNet()
-    example_inputs = [torch.zeros(torch_shape, dtype=torch_dtype) for i in range(io_cnt)]
-    traced = torch.jit.trace(identityModel, tuple(example_inputs[i] for i in range(io_cnt)))
+    example_inputs = [
+        torch.zeros(torch_shape, dtype=torch_dtype) for i in range(io_cnt)
+    ]
+    traced = torch.jit.trace(identityModel,
+                             tuple(example_inputs[i] for i in range(io_cnt)))
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_libtorch_modelconfig(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+def create_libtorch_modelconfig(create_savedmodel, models_dir, model_version,
+                                io_cnt, max_batch, dtype, shape):
 
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
+                                          shape):
         return
 
     # Unpack version policy
     version_policy_str = "{ latest { num_versions: 1 }}"
 
     # Use a different model name for the non-batching variant
-    model_name = tu.get_zero_model_name("libtorch_nobatch" if max_batch == 0 else "libtorch",
-                                   io_cnt, dtype)
+    model_name = tu.get_zero_model_name(
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
     shape_str = tu.shape_to_dims_str(shape)
 
     config_dir = models_dir + "/" + model_name
@@ -535,39 +587,41 @@ output [
     dims: [ {} ]
   }}
 ]
-'''.format(io_num, np_to_model_dtype(dtype), shape_str,
-           io_num, np_to_model_dtype(dtype), shape_str)
+'''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
+           np_to_model_dtype(dtype), shape_str)
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
 
-def create_plan_modelfile(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch,
-        dtype, shape, profile_max_size):
+def create_plan_modelfile(create_savedmodel, models_dir, model_version, io_cnt,
+                          max_batch, dtype, shape, profile_max_size):
 
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     # generate models with different configuration to ensure test coverage
     if dtype != np.float32:
-        create_plan_dynamic_rf_modelfile(
-            models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size)
+        create_plan_dynamic_rf_modelfile(models_dir, model_version, io_cnt,
+                                         max_batch, dtype, shape,
+                                         profile_max_size)
     else:
-        create_plan_dynamic_modelfile(
-            models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size)
+        create_plan_dynamic_modelfile(models_dir, model_version, io_cnt,
+                                      max_batch, dtype, shape, profile_max_size)
 
-def create_plan_dynamic_rf_modelfile(
-        models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
+
+def create_plan_dynamic_rf_modelfile(models_dir, model_version, io_cnt,
+                                     max_batch, dtype, shape, profile_max_size):
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
         shape_with_batchsize = [i for i in shape]
     else:
@@ -576,7 +630,8 @@ def create_plan_dynamic_rf_modelfile(
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
     for io_num in range(io_cnt):
-        in_node = network.add_input("INPUT{}".format(io_num), trt_dtype, shape_with_batchsize)
+        in_node = network.add_input("INPUT{}".format(io_num), trt_dtype,
+                                    shape_with_batchsize)
         in_node.allowed_formats = 1 << int(trt_memory_format)
 
         out_node = network.add_identity(in_node)
@@ -610,10 +665,10 @@ def create_plan_dynamic_rf_modelfile(
 
     profile = builder.create_optimization_profile()
     for io_num in range(io_cnt):
-        profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
+        profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape,
+                          max_shape)
 
-
-    flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
+    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
         if (dt == trt.int8):
@@ -621,11 +676,10 @@ def create_plan_dynamic_rf_modelfile(
         elif (dt == trt.float16):
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config = builder.create_builder_config()
-    config.flags=flags
+    config.flags = flags
     config.max_workspace_size = 1 << 20
     config.add_optimization_profile(profile)
-    engine = builder.build_engine(network,config)
-
+    engine = builder.build_engine(network, config)
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
@@ -634,7 +688,7 @@ def create_plan_dynamic_rf_modelfile(
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
@@ -643,8 +697,9 @@ def create_plan_dynamic_rf_modelfile(
     del builder
 
 
-def create_plan_shape_tensor_modelfile(
-        models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
+def create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt,
+                                       max_batch, dtype, shape,
+                                       profile_max_size):
     # Note that resize layer does not support int tensors.
     # The model takes two inputs (INPUT and DUMMY_INPUT)
     # and produce two outputs.
@@ -656,7 +711,8 @@ def create_plan_shape_tensor_modelfile(
 
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
         shape_with_batchsize = len(shape)
         dummy_shape = [-1] * shape_with_batchsize
@@ -667,9 +723,11 @@ def create_plan_shape_tensor_modelfile(
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
     for io_num in range(io_cnt):
-        in_node = network.add_input("INPUT{}".format(io_num), trt.int32, [shape_with_batchsize])
+        in_node = network.add_input("INPUT{}".format(io_num), trt.int32,
+                                    [shape_with_batchsize])
         in_node.allowed_formats = 1 << int(trt_memory_format)
-        dummy_in_node = network.add_input("DUMMY_INPUT{}".format(io_num), trt_dtype, dummy_shape)
+        dummy_in_node = network.add_input("DUMMY_INPUT{}".format(io_num),
+                                          trt_dtype, dummy_shape)
         dummy_in_node.allowed_formats = 1 << int(trt_memory_format)
         resize_layer = network.add_resize(dummy_in_node)
         resize_layer.set_input(1, in_node)
@@ -709,24 +767,24 @@ def create_plan_shape_tensor_modelfile(
 
     profile = builder.create_optimization_profile()
     for io_num in range(io_cnt):
-        profile.set_shape_input("INPUT{}".format(io_num),min_shape, opt_shape, max_shape)
-        profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
+        profile.set_shape_input("INPUT{}".format(io_num), min_shape, opt_shape,
+                                max_shape)
+        profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape,
+                          max_shape)
 
     config.add_optimization_profile(profile)
 
-
-    flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
+    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
         if (dt == trt.int8):
             flags |= 1 << int(trt.BuilderFlag.INT8)
         elif (dt == trt.float16):
             flags |= 1 << int(trt.BuilderFlag.FP16)
-    config.flags=flags
+    config.flags = flags
 
     config.max_workspace_size = 1 << 20
-    engine = builder.build_engine(network,config)
-
+    engine = builder.build_engine(network, config)
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
@@ -735,7 +793,7 @@ def create_plan_shape_tensor_modelfile(
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
@@ -744,12 +802,13 @@ def create_plan_shape_tensor_modelfile(
     del builder
 
 
-def create_plan_dynamic_modelfile(
-        models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
+def create_plan_dynamic_modelfile(models_dir, model_version, io_cnt, max_batch,
+                                  dtype, shape, profile_max_size):
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
         shape_with_batchsize = [i for i in shape]
     else:
@@ -757,7 +816,8 @@ def create_plan_dynamic_modelfile(
 
     trt_dtype = np_to_trt_dtype(dtype)
     for io_num in range(io_cnt):
-        in_node = network.add_input("INPUT{}".format(io_num), trt_dtype, shape_with_batchsize)
+        in_node = network.add_input("INPUT{}".format(io_num), trt_dtype,
+                                    shape_with_batchsize)
         out_node = network.add_identity(in_node)
         out_node.get_output(0).name = "OUTPUT{}".format(io_num)
         network.mark_output(out_node.get_output(0))
@@ -782,11 +842,12 @@ def create_plan_dynamic_modelfile(
 
     profile = builder.create_optimization_profile()
     for io_num in range(io_cnt):
-        profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
+        profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape,
+                          max_shape)
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
     config.max_workspace_size = 1 << 20
-    engine = builder.build_engine(network,config)
+    engine = builder.build_engine(network, config)
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
@@ -795,7 +856,7 @@ def create_plan_dynamic_modelfile(
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
@@ -804,8 +865,8 @@ def create_plan_dynamic_modelfile(
     del builder
 
 
-def create_plan_modelconfig(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+def create_plan_modelconfig(create_savedmodel, models_dir, model_version,
+                            io_cnt, max_batch, dtype, shape):
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
@@ -814,8 +875,6 @@ def create_plan_modelconfig(
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
     config_dir = models_dir + "/" + model_name
-
-
 
     if FLAGS.tensorrt_shape_io:
         shape_tensor_dim = len(shape)
@@ -853,10 +912,9 @@ output [
     is_shape_tensor: true
   }}
 ]
-'''.format(io_num, np_to_model_dtype(dtype), shape_str,
-           io_num, shape_tensor_dim,
-           io_num, np_to_model_dtype(dtype), shape_str,
-           io_num, shape_tensor_dim)
+'''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
+            shape_tensor_dim, io_num, np_to_model_dtype(dtype), shape_str,
+            io_num, shape_tensor_dim)
 
     else:
         config = '''
@@ -881,113 +939,178 @@ output [
     dims: [ {} ]
   }}
 ]
-'''.format(io_num, np_to_model_dtype(dtype), shape_str,
-           io_num, np_to_model_dtype(dtype), shape_str)
+'''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
+            np_to_model_dtype(dtype), shape_str)
 
     try:
         os.makedirs(config_dir)
     except OSError as ex:
-        pass # ignore existing dir
+        pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-def create_shape_tensor_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
+
+def create_shape_tensor_models(models_dir,
+                               dtype,
+                               shape,
+                               io_cnt=1,
+                               no_batch=True):
     model_version = 1
 
-    create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-    create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt, 8, dtype, shape, 32)
+    create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype,
+                            shape)
+    create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt, 8,
+                                       dtype, shape, 32)
     if no_batch:
-        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-        create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt, 0, dtype, shape, 32)
+        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0,
+                                dtype, shape)
+        create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt, 0,
+                                           dtype, shape, 32)
 
 
 def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
     model_version = 1
 
     if FLAGS.graphdef:
-        create_tf_modelconfig(False, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_tf_modelfile(False, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_tf_modelconfig(False, models_dir, model_version, io_cnt, 8,
+                              dtype, shape)
+        create_tf_modelfile(False, models_dir, model_version, io_cnt, 8, dtype,
+                            shape)
         if no_batch:
-            create_tf_modelconfig(False, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_tf_modelfile(False, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_tf_modelconfig(False, models_dir, model_version, io_cnt, 0,
+                                  dtype, shape)
+            create_tf_modelfile(False, models_dir, model_version, io_cnt, 0,
+                                dtype, shape)
 
     if FLAGS.savedmodel:
-        create_tf_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_tf_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_tf_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype,
+                              shape)
+        create_tf_modelfile(True, models_dir, model_version, io_cnt, 8, dtype,
+                            shape)
         if no_batch:
-            create_tf_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_tf_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_tf_modelconfig(True, models_dir, model_version, io_cnt, 0,
+                                  dtype, shape)
+            create_tf_modelfile(True, models_dir, model_version, io_cnt, 0,
+                                dtype, shape)
 
     if FLAGS.netdef:
-        create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_netdef_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 8,
+                                  dtype, shape)
+        create_netdef_modelfile(True, models_dir, model_version, io_cnt, 8,
+                                dtype, shape)
         if no_batch:
-            create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_netdef_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_netdef_modelconfig(True, models_dir, model_version, io_cnt,
+                                      0, dtype, shape)
+            create_netdef_modelfile(True, models_dir, model_version, io_cnt, 0,
+                                    dtype, shape)
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_onnx_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 8,
+                                dtype, shape)
+        create_onnx_modelfile(True, models_dir, model_version, io_cnt, 8, dtype,
+                              shape)
         if no_batch:
-            create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_onnx_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 0,
+                                    dtype, shape)
+            create_onnx_modelfile(True, models_dir, model_version, io_cnt, 0,
+                                  dtype, shape)
 
     if FLAGS.libtorch:
-        create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 8,
+                                    dtype, shape)
+        create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 8,
+                                  dtype, shape)
         if no_batch:
-            create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_libtorch_modelconfig(True, models_dir, model_version, io_cnt,
+                                        0, dtype, shape)
+            create_libtorch_modelfile(True, models_dir, model_version, io_cnt,
+                                      0, dtype, shape)
 
     if FLAGS.tensorrt:
-        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_plan_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape, 32)
+        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8,
+                                dtype, shape)
+        create_plan_modelfile(True, models_dir, model_version, io_cnt, 8, dtype,
+                              shape, 32)
         if no_batch:
-            create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_plan_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape, 32)
+            create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0,
+                                    dtype, shape)
+            create_plan_modelfile(True, models_dir, model_version, io_cnt, 0,
+                                  dtype, shape, 32)
 
     if FLAGS.tensorrt_big:
-        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_plan_modelfile(True, models_dir, model_version, io_cnt, 8,
-                              dtype, shape, 16 * 1024 * 1024)
+        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8,
+                                dtype, shape)
+        create_plan_modelfile(True, models_dir, model_version, io_cnt, 8, dtype,
+                              shape, 16 * 1024 * 1024)
         if no_batch:
-            create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0,
+                                    dtype, shape)
             create_plan_modelfile(True, models_dir, model_version, io_cnt, 0,
                                   dtype, shape, 16 * 1024 * 1024)
 
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
-        create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_ensemble_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 8,
+                                    dtype, shape)
+        create_ensemble_modelfile(True, models_dir, model_version, io_cnt, 8,
+                                  dtype, shape)
         if no_batch:
-            create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_ensemble_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_ensemble_modelconfig(True, models_dir, model_version, io_cnt,
+                                        0, dtype, shape)
+            create_ensemble_modelfile(True, models_dir, model_version, io_cnt,
+                                      0, dtype, shape)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir', type=str, required=True,
+    parser.add_argument('--models_dir',
+                        type=str,
+                        required=True,
                         help='Top-level model directory')
-    parser.add_argument('--graphdef', required=False, action='store_true',
+    parser.add_argument('--graphdef',
+                        required=False,
+                        action='store_true',
                         help='Generate GraphDef models')
-    parser.add_argument('--savedmodel', required=False, action='store_true',
+    parser.add_argument('--savedmodel',
+                        required=False,
+                        action='store_true',
                         help='Generate SavedModel models')
-    parser.add_argument('--netdef', required=False, action='store_true',
+    parser.add_argument('--netdef',
+                        required=False,
+                        action='store_true',
                         help='Generate NetDef models')
-    parser.add_argument('--onnx', required=False, action='store_true',
+    parser.add_argument('--onnx',
+                        required=False,
+                        action='store_true',
                         help='Generate Onnx Runtime Onnx models')
-    parser.add_argument('--onnx_opset', type=int, required=False, default=0,
-                        help='Opset used for Onnx models. Default is to use ONNXRT default')
-    parser.add_argument('--libtorch', required=False, action='store_true',
+    parser.add_argument(
+        '--onnx_opset',
+        type=int,
+        required=False,
+        default=0,
+        help='Opset used for Onnx models. Default is to use ONNXRT default')
+    parser.add_argument('--libtorch',
+                        required=False,
+                        action='store_true',
                         help='Generate Pytorch LibTorch models')
-    parser.add_argument('--tensorrt', required=False, action='store_true',
+    parser.add_argument('--tensorrt',
+                        required=False,
+                        action='store_true',
                         help='Generate TensorRT PLAN models')
-    parser.add_argument('--tensorrt-big', required=False, action='store_true',
-                        help='Generate TensorRT PLAN models w/ opt profile with large max')
-    parser.add_argument('--tensorrt-shape-io', required=False, action='store_true',
-                        help='Generate TensorRT PLAN models w/ shape tensor i/o')
-    parser.add_argument('--ensemble', required=False, action='store_true',
+    parser.add_argument(
+        '--tensorrt-big',
+        required=False,
+        action='store_true',
+        help='Generate TensorRT PLAN models w/ opt profile with large max')
+    parser.add_argument(
+        '--tensorrt-shape-io',
+        required=False,
+        action='store_true',
+        help='Generate TensorRT PLAN models w/ shape tensor i/o')
+    parser.add_argument('--ensemble',
+                        required=False,
+                        action='store_true',
                         help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
 
@@ -1013,12 +1136,14 @@ if __name__ == '__main__':
     if FLAGS.tensorrt_big:
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
     elif FLAGS.tensorrt_shape_io:
-        create_shape_tensor_models(FLAGS.models_dir, np.float32, [-1,-1], io_cnt=1)
+        create_shape_tensor_models(FLAGS.models_dir,
+                                   np.float32, [-1, -1],
+                                   io_cnt=1)
     else:
         create_models(FLAGS.models_dir, np.bool, [-1], io_cnt=1)
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=3)
-        create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=1)
-        create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=3)
+        create_models(FLAGS.models_dir, np.float16, [-1, -1], io_cnt=1)
+        create_models(FLAGS.models_dir, np.float16, [-1, -1], io_cnt=3)
         create_models(FLAGS.models_dir, np_dtype_string, [-1], io_cnt=1)
-        create_models(FLAGS.models_dir, np_dtype_string, [-1,-1], io_cnt=3)
+        create_models(FLAGS.models_dir, np_dtype_string, [-1, -1], io_cnt=3)

@@ -34,8 +34,12 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "src/core/tritonserver.h"
 #include "src/servers/common.h"
+#include "triton/core/tritonserver.h"
+
+static_assert(
+    TRITON_MIN_COMPUTE_CAPABILITY >= 1.0,
+    "Invalid TRITON_MIN_COMPUTE_CAPABILITY specified");
 
 namespace ni = nvidia::inferenceserver;
 
@@ -492,6 +496,17 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
       "setting verbose logging level");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetBackendDirectory(
+          server_options, "/opt/tritonserver/backends"),
+      "setting backend directory");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetStrictModelConfig(server_options, true),
+      "setting strict model configuration");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
+          server_options, TRITON_MIN_COMPUTE_CAPABILITY),
+      "setting minimum supported CUDA compute capability");
 
   TRITONSERVER_Server* server_ptr = nullptr;
   FAIL_IF_ERR(

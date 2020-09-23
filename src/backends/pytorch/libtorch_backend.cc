@@ -63,41 +63,41 @@ LibTorchBackend::Context::~Context()
 }
 
 std::pair<bool, torch::ScalarType>
-ConvertDataTypeToTorchType(const DataType& dtype)
+ConvertDataTypeToTorchType(const inference::DataType& dtype)
 {
   torch::ScalarType type = torch::kInt;
   switch (dtype) {
-    case TYPE_BOOL:
+    case inference::DataType::TYPE_BOOL:
       type = torch::kBool;
       break;
-    case TYPE_UINT8:
+    case inference::DataType::TYPE_UINT8:
       type = torch::kByte;
       break;
-    case TYPE_INT8:
+    case inference::DataType::TYPE_INT8:
       type = torch::kChar;
       break;
-    case TYPE_INT16:
+    case inference::DataType::TYPE_INT16:
       type = torch::kShort;
       break;
-    case TYPE_INT32:
+    case inference::DataType::TYPE_INT32:
       type = torch::kInt;
       break;
-    case TYPE_INT64:
+    case inference::DataType::TYPE_INT64:
       type = torch::kLong;
       break;
-    case TYPE_FP16:
+    case inference::DataType::TYPE_FP16:
       type = torch::kHalf;
       break;
-    case TYPE_FP32:
+    case inference::DataType::TYPE_FP32:
       type = torch::kFloat;
       break;
-    case TYPE_FP64:
+    case inference::DataType::TYPE_FP64:
       type = torch::kDouble;
       break;
-    case TYPE_UINT16:
-    case TYPE_UINT32:
-    case TYPE_UINT64:
-    case TYPE_STRING:
+    case inference::DataType::TYPE_UINT16:
+    case inference::DataType::TYPE_UINT32:
+    case inference::DataType::TYPE_UINT64:
+    case inference::DataType::TYPE_STRING:
     default:
       return std::make_pair(false, type);
   }
@@ -105,30 +105,30 @@ ConvertDataTypeToTorchType(const DataType& dtype)
   return std::make_pair(true, type);
 }
 
-DataType
+inference::DataType
 ConvertTorchTypeToDataType(const torch::ScalarType& ttype)
 {
   switch (ttype) {
     case torch::kBool:
-      return TYPE_BOOL;
+      return inference::DataType::TYPE_BOOL;
     case torch::kByte:
-      return TYPE_UINT8;
+      return inference::DataType::TYPE_UINT8;
     case torch::kChar:
-      return TYPE_INT8;
+      return inference::DataType::TYPE_INT8;
     case torch::kShort:
-      return TYPE_INT16;
+      return inference::DataType::TYPE_INT16;
     case torch::kInt:
-      return TYPE_INT32;
+      return inference::DataType::TYPE_INT32;
     case torch::kLong:
-      return TYPE_INT64;
+      return inference::DataType::TYPE_INT64;
     case torch::kHalf:
-      return TYPE_FP16;
+      return inference::DataType::TYPE_FP16;
     case torch::kFloat:
-      return TYPE_FP32;
+      return inference::DataType::TYPE_FP32;
     case torch::kDouble:
-      return TYPE_FP64;
+      return inference::DataType::TYPE_FP64;
     default:
-      return TYPE_FP32;
+      return inference::DataType::TYPE_FP32;
   }
 }
 
@@ -141,7 +141,7 @@ LibTorchBackend::CreateExecutionContexts(
   // Create a context for each instance.
   for (const auto& group : Config().instance_group()) {
     for (int c = 0; c < group.count(); c++) {
-      if (group.kind() == ModelInstanceGroup::KIND_CPU) {
+      if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
@@ -273,7 +273,7 @@ LibTorchBackend::CreateExecutionContext(
 
 Status
 LibTorchBackend::Context::ValidateInputs(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios)
 {
   std::string deliminator = "__";
   int ip_index = 0;
@@ -283,7 +283,7 @@ LibTorchBackend::Context::ValidateInputs(
     if (!pr.first) {
       return Status(
           Status::Code::INTERNAL,
-          "unsupported datatype " + DataType_Name(io.data_type()) +
+          "unsupported datatype " + inference::DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
     } else {
       const std::string& name = io.name();
@@ -311,7 +311,7 @@ LibTorchBackend::Context::ValidateInputs(
 
 Status
 LibTorchBackend::Context::ValidateControlInputs(
-    const ModelSequenceBatching& batching)
+    const inference::ModelSequenceBatching& batching)
 {
   std::string deliminator = "__";
   int ip_index = 0;
@@ -341,7 +341,7 @@ LibTorchBackend::Context::ValidateControlInputs(
 
 Status
 LibTorchBackend::Context::ValidateOutputs(
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+    const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios)
 {
   std::string deliminator = "__";
   int op_index;
@@ -351,7 +351,7 @@ LibTorchBackend::Context::ValidateOutputs(
     if (!pr.first) {
       return Status(
           Status::Code::INTERNAL,
-          "unsupported datatype " + DataType_Name(io.data_type()) +
+          "unsupported datatype " + inference::DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
     } else {
       const std::string& name = io.name();
@@ -401,7 +401,7 @@ LibTorchBackend::Context::SetInputTensors(
     }
     batchn_shape.insert(
         batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
-    const DataType datatype = repr_input->DType();
+    const inference::DataType datatype = repr_input->DType();
 
     int ip_index = input_index_map_[input_name];
 
@@ -409,7 +409,7 @@ LibTorchBackend::Context::SetInputTensors(
     if (!torch_dtype.first) {
       return Status(
           Status::Code::INTERNAL, "Failed to convert DataType '" +
-                                      DataType_Name(datatype) +
+                                      inference::DataType_Name(datatype) +
                                       "' to Torch datatype");
     }
 
@@ -432,8 +432,8 @@ LibTorchBackend::Context::SetInputTensors(
         input_buffers->back()->MutableBuffer(&memory_type, &memory_type_id);
 
     collector->ProcessTensor(
-        input_name, datatype, batch1_shape, input_buffer, total_byte_size,
-        memory_type, memory_type_id);
+        input_name, datatype, input_buffer, total_byte_size, memory_type,
+        memory_type_id);
 
     torch::TensorOptions options{torch_dtype.second};
     auto updated_options = (memory_type == TRITONSERVER_MEMORY_GPU)
@@ -475,12 +475,12 @@ LibTorchBackend::Context::ReadOutputTensors(
     const std::string& name = output.name();
     int op_index = (*output_index_map)[name];
 
-    const ModelOutput* output_config;
+    const inference::ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
     // Checked at initialization time to make sure that STRING is not
     // being used for an output, so can just assume fixed-sized here.
-    const DataType dtype = output_config->data_type();
+    const inference::DataType dtype = output_config->data_type();
 
     const char* output_buffer = nullptr;
     size_t byte_size = 0;
@@ -510,20 +510,22 @@ LibTorchBackend::Context::ReadOutputTensors(
 Status
 LibTorchBackend::Context::GetOutputTensor(
     std::vector<torch::Tensor>* outputs_, const int& op_index,
-    const std::string& name, const DataType dtype, const char** content,
-    size_t* byte_size, std::vector<int64_t>* content_shape)
+    const std::string& name, const inference::DataType dtype,
+    const char** content, size_t* byte_size,
+    std::vector<int64_t>* content_shape)
 {
   try {
     torch::Tensor output_flat = (*outputs_)[op_index].contiguous().flatten();
 
     // verify output datatype matches datatype from model config
-    DataType rec_dtype = ConvertTorchTypeToDataType(output_flat.scalar_type());
+    inference::DataType rec_dtype =
+        ConvertTorchTypeToDataType(output_flat.scalar_type());
     if (dtype != rec_dtype) {
       return Status(
           Status::Code::INVALID_ARG,
-          "unexpected datatype " + DataType_Name(rec_dtype) +
+          "unexpected datatype " + inference::DataType_Name(rec_dtype) +
               " for inference output '" + name + "', expecting " +
-              DataType_Name(dtype));
+              inference::DataType_Name(dtype));
     }
 
     *byte_size = output_flat.nbytes();

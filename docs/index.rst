@@ -25,8 +25,8 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-NVIDIA Triton Inference Server
-==============================
+Triton Inference Server
+=======================
 
 .. ifconfig:: "dev" in release
 
@@ -66,6 +66,7 @@ NVIDIA Triton Inference Server
    :caption: Developer Guide
 
    architecture
+   backend
    custom_operation
    http_grpc_api
    library_api

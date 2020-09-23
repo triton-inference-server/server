@@ -30,13 +30,12 @@
 
 ARG BASE_IMAGE=tritonserver
 ARG BUILD_IMAGE=tritonserver_build
-ARG CBE_IMAGE=tritonserver_cbe
 ARG CLIENT_IMAGE=tritonserver_client
 
 ############################################################################
-## Build test utilities and custom backends in the BUILD_IMAGE since
-## it has already been configured correctly and has some existing
-## build artifacts. Copy artifacts into QA area.
+## Build tests in the BUILD_IMAGE since it has already been configured
+## correctly and has some existing build artifacts. Copy artifacts
+## into QA area.
 ############################################################################
 FROM ${BUILD_IMAGE} AS build
 
@@ -50,11 +49,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 RUN cd builddir && \
-    make -j16 test-util custom-backend
+    make -j16 test-util
 
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
+    cp -r /workspace/src/backends/backend/examples/models/repeat_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/backends/backend/examples/models/square_int32 qa/L0_decoupled/models/ && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_go_client/models && \
@@ -68,8 +69,7 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_shared_memory/models/. && \
     mkdir qa/L0_cuda_shared_memory/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
-    mkdir qa/L0_cmdline_trace/models && \
-    cp -r docs/examples/model_repository/simple qa/L0_cmdline_trace/models/. && \
+    cp -r /workspace/docs/examples/model_repository/simple qa/L0_client_timeout/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc/models && \
@@ -78,6 +78,8 @@ RUN mkdir -p qa/common && \
     cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_http/models && \
     mkdir qa/L0_https/models && \
     cp -r docs/examples/model_repository/simple qa/L0_https/models/. && \
+    mkdir qa/L0_secure_grpc/models && \
+    cp -r docs/examples/model_repository/simple qa/L0_secure_grpc/models/. && \
     cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_client/ && \
     cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \
@@ -89,107 +91,114 @@ RUN if [ -f /workspace/builddir/test-util/install/bin/caffe2plan ]; then \
     fi
 
 RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/custom_models/custom_int32_int32_int32/1/. && \
     mkdir -p qa/custom_models/custom_nobatch_int32_int32_int32/1 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/custom_models/custom_nobatch_int32_int32_int32/1/. && \
     mkdir -p qa/custom_models/custom_float32_float32_float32/1 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/custom_models/custom_float32_float32_float32/1/. && \
     mkdir -p qa/custom_models/custom_nobatch_float32_float32_float32/1 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
     mkdir -p qa/L0_grpc/models/simple_custom/1 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/L0_grpc/models/simple_custom/1/. && \
     mkdir -p qa/L0_http/models/simple_custom/1 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/L0_http/models/simple_custom/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/L0_simple_ensemble/models/simple/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/2 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/L0_simple_ensemble/models/simple/2/. && \
     mkdir -p qa/L0_multiple_ports/models/simple/1 && \
-    cp builddir/custom-backend/install/lib/libaddsub.so \
+    cp builddir/test-util/install/lib/libaddsub.so \
         qa/L0_multiple_ports/models/simple/1/.
 
 RUN mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \
-    cp builddir/custom-backend/install/lib/libimagepreprocess.so \
+    cp builddir/test-util/install/lib/libimagepreprocess.so \
         qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/.
 
 RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1 && \
-    cp builddir/custom-backend/install/lib/libimagepreprocess.so \
+    cp builddir/test-util/install/lib/libimagepreprocess.so \
         qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1/.
 
 RUN mkdir -p qa/L0_backend_identity/models && \
     cp -r src/backends/backend/examples/models/identity_fp32 qa/L0_backend_identity/models/. && \
     mkdir -p qa/L0_backend_identity/models/identity_fp32/1 && \
-    cp builddir/server/install/backends/libtriton_identity.so \
+    cp /opt/tritonserver/backends/identity/libtriton_identity.so \
         qa/L0_backend_identity/models/identity_fp32/1/.
 
 RUN mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
-    cp builddir/custom-backend/install/lib/libsequence.so \
+    cp builddir/test-util/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
+    mkdir -p qa/L0_client_timeout/models/simple_sequence/1 && \
+    cp builddir/test-util/install/lib/libsequence.so \
+        qa/L0_client_timeout/models/simple_sequence/1/. && \
     mkdir -p qa/L0_grpc/models/simple_sequence/1 && \
-    cp builddir/custom-backend/install/lib/libsequence.so \
+    cp builddir/test-util/install/lib/libsequence.so \
         qa/L0_grpc/models/simple_sequence/1/. && \
     mkdir -p qa/L0_grpc/models_dyna/simple_sequence/1 && \
-    cp builddir/custom-backend/install/lib/libdyna_sequence.so \
+    cp builddir/test-util/install/lib/libdyna_sequence.so \
         qa/L0_grpc/models_dyna/simple_sequence/1/. && \
     mkdir -p qa/L0_http/models/simple_sequence/1 && \
-    cp builddir/custom-backend/install/lib/libsequence.so \
+    cp builddir/test-util/install/lib/libsequence.so \
         qa/L0_http/models/simple_sequence/1/. && \
     mkdir -p qa/L0_http/models_dyna/simple_sequence/1 && \
-    cp builddir/custom-backend/install/lib/libdyna_sequence.so \
+    cp builddir/test-util/install/lib/libdyna_sequence.so \
         qa/L0_http/models_dyna/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
-    cp builddir/custom-backend/install/lib/libsequence.so \
+    cp builddir/test-util/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \
     mkdir -p qa/custom_models/custom_dyna_sequence_int32/1 && \
-    cp builddir/custom-backend/install/lib/libdyna_sequence.so \
+    cp builddir/test-util/install/lib/libdyna_sequence.so \
         qa/custom_models/custom_dyna_sequence_int32/1/.
 
-RUN cp builddir/custom-backend/install/lib/libidentity.so \
+RUN cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_infer/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_infer_variable/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_infer_reshape/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_infer_zero/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_sequence_batcher/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_savedmodel_shape/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_perf_nomodel/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_perf_client/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_large_payload/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_model_config/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_model_queue/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_simple_lib/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_pinned_memory/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_io/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_warmup/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_cmdline_trace/. && \
-    cp builddir/custom-backend/install/lib/libidentity.so \
+    cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_batcher/. && \
+    cp builddir/test-util/install/lib/libidentity.so \
+        qa/L0_client_timeout/. && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_infer_cudashm && \
     cp -r qa/L0_infer/. qa/L0_infer_cudashm && \
+    mkdir -p qa/L0_infer_valgrind && \
+    cp -r qa/L0_infer/. qa/L0_infer_valgrind && \
     mkdir -p qa/L0_trt_shape_tensors_shm && \
     cp -r qa/L0_trt_shape_tensors/. qa/L0_trt_shape_tensors_shm && \
     mkdir -p qa/L0_trt_shape_tensors_cudashm && \
@@ -198,14 +207,39 @@ RUN cp builddir/custom-backend/install/lib/libidentity.so \
     cp -r qa/L0_batcher/. qa/L0_batcher_shm && \
     mkdir -p qa/L0_batcher_cudashm && \
     cp -r qa/L0_batcher/. qa/L0_batcher_cudashm && \
+    mkdir -p qa/L0_batcher_valgrind && \
+    cp -r qa/L0_batcher/. qa/L0_batcher_valgrind && \
     mkdir -p qa/L0_sequence_batcher_shm && \
     cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_shm && \
     mkdir -p qa/L0_sequence_batcher_cudashm && \
     cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_cudashm && \
+    mkdir -p qa/L0_sequence_batcher_valgrind && \
+    cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_valgrind && \
     mkdir -p qa/L0_perf_nomodel_shm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_shm && \
     mkdir -p qa/L0_perf_nomodel_cudashm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm
+
+RUN cp /opt/tritonserver/backends/repeat/libtriton_repeat.so \
+        qa/L0_model_config/.
+
+RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
+    cp /opt/tritonserver/backends/repeat/libtriton_repeat.so \
+        qa/L0_decoupled/models/repeat_int32/1/.
+RUN mkdir -p qa/L0_decoupled/models/square_int32/1 && \
+    cp /opt/tritonserver/backends/square/libtriton_square.so \
+        qa/L0_decoupled/models/square_int32/1/.
+RUN mkdir -p qa/L0_decoupled/models/identity_int32/1 && \
+    cp /opt/tritonserver/backends/identity/libtriton_identity.so \
+        qa/L0_decoupled/models/identity_int32/1/.
+RUN mkdir -p qa/L0_decoupled/models/custom_nobatch_int32_int32_int32/1 && \
+    cp builddir/test-util/install/lib/libaddsub.so \
+        qa/L0_decoupled/models/custom_nobatch_int32_int32_int32/1/.
+RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
+    mkdir -p qa/L0_decoupled/models/fan_repeat/1 && \
+    mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
+    mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
+    mkdir -p qa/L0_decoupled/models/nested_square/1
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.
@@ -229,15 +263,6 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/python/triton*.whl qa/pkgs/.
 
 ############################################################################
-## Copy artifacts from custom backend container
-############################################################################
-FROM ${CBE_IMAGE} AS cbe
-
-WORKDIR /workspace
-COPY --from=client /workspace/qa/ qa/
-RUN (cd qa/L0_custom_backend && tar xzf /workspace/*.custombackend.tar.gz)
-
-############################################################################
 ## Create CI enabled image
 ############################################################################
 FROM $BASE_IMAGE
@@ -259,7 +284,8 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
         exit 1; \
     fi
 
-# go client requires golang
+# go client requires golang and CI/QA for memcheck requires valgrind
+# wkhtmltox, xfonts-75dpi, xfonts-base are dependencies of pdfkit
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               libopencv-dev \
@@ -272,8 +298,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               swig \
                               golang-go \
                               nginx \
-                              protobuf-compiler && \
-    rm -rf /var/lib/apt/lists/*
+                              protobuf-compiler \
+                              valgrind \
+                              xfonts-75dpi \
+                              xfonts-base && \
+    rm -rf /var/lib/apt/lists/* && \
+    wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \
+    dpkg -i wkhtmltox_0.12.6-1.bionic_amd64.deb && \
+    rm -rf wkhtmltox_0.12.6-1.bionic_amd64.deb
 
 # CI/QA expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
@@ -290,13 +322,16 @@ RUN go get github.com/golang/protobuf/protoc-gen-go && \
 # user should own all artifacts in case CI is run using triton-server
 # user.
 WORKDIR /opt/tritonserver
-COPY --chown=1000:1000 --from=cbe /workspace/qa/ qa/
+COPY --chown=1000:1000 --from=client /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
 # install the tritonserver/triton python client APIs.
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
-    pip3 install --upgrade qa/pkgs/triton*.whl
+    find qa/pkgs/ -maxdepth 1 -type f -name \
+    "tritonclient-*-manylinux1_x86_64.whl" | xargs printf -- '%s[all]' | \
+    xargs pip3 install --upgrade
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
+
 ENV GOPATH /root/go
 ENV PATH $PATH:$GOPATH/bin

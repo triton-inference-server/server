@@ -36,26 +36,11 @@ cmake_minimum_required (VERSION 3.5)
 set(
   TENSORFLOW_SRCS
   autofill.cc
-  base_backend.cc
-  graphdef_backend.cc
-  graphdef_backend_factory.cc
-  savedmodel_backend.cc
-  savedmodel_backend_factory.cc
-  tf_utils.cc
-  tf_virtual_device.cc
 )
 
 set(
   TENSORFLOW_HDRS
   autofill.h
-  base_backend.h
-  graphdef_backend.h
-  graphdef_backend_factory.h
-  savedmodel_backend.h
-  savedmodel_backend_factory.h
-  tensorflow_backend_tf.h
-  tf_utils.h
-  tf_virtual_device.h
 )
 
 add_library(
@@ -63,12 +48,8 @@ add_library(
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
 )
 add_dependencies(tensorflow-backend-library proto-library)
-if(${TRITON_ENABLE_GPU})
-  target_include_directories(tensorflow-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
-endif() # TRITON_ENABLE_GPU
-if(${TRITON_ENABLE_METRICS})
-  target_include_directories(
-    tensorflow-backend-library
-    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-endif() # TRITON_ENABLE_METRICS
+
+target_link_libraries(
+  tensorflow-backend-library
+  PUBLIC triton-core-serverapi   # from repo-core
+)

@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 #include "src/core/ensemble_utils.h"
 
 #include <set>
+#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
@@ -41,10 +42,10 @@ namespace {
 /// of the ensemble tensor and which model they are inferred from.
 struct TensorNode {
   TensorNode(
-      const std::string& model_name, const bool batching, const DataType& type,
-      const DimsList& dims, const bool is_decoupled)
-      : model_name_(model_name), type_(type), dims_(dims),
-        is_decoupled_(is_decoupled), decouple_label_(0), visited_(false)
+      const std::string& model_name, const bool batching,
+      const inference::DataType& type, const DimsList& dims)
+      : model_name_(model_name), type_(type), dims_(dims), is_decoupled_(false),
+        decouple_label_(0), visited_(false)
   {
     // Expand dims to full shape, which includes batch dimension if exist
     if (batching) {
@@ -53,8 +54,15 @@ struct TensorNode {
     full_dims_.MergeFrom(dims_);
   }
 
+  // Constructor for symbolic nodes
+  TensorNode(const std::string& model_name)
+      : model_name_(model_name), is_decoupled_(false), decouple_label_(0),
+        visited_(false)
+  {
+  }
+
   std::string model_name_;
-  DataType type_;
+  inference::DataType type_;
   DimsList dims_;
   DimsList full_dims_;
   bool is_decoupled_;
@@ -62,6 +70,9 @@ struct TensorNode {
   bool visited_;
   std::vector<TensorNode*> prev_nodes_;
   std::vector<TensorNode*> next_nodes_;
+  // A symbolic node to keep track of the decouple label of nodes that
+  // are outputs of the same step.
+  std::shared_ptr<TensorNode> sibling_node_;
 };
 
 /// Validate if the data type and the shape of two TensorNode object are
@@ -79,10 +90,10 @@ ValidateTensorConsistency(
   if (lhs.type_ != rhs.type_) {
     return Status(
         Status::Code::INVALID_ARG,
-        message + "inconsistent data type: " + DataType_Name(lhs.type_) +
-            " is inferred from model " + lhs.model_name_ + " while " +
-            DataType_Name(rhs.type_) + " is inferred from model " +
-            rhs.model_name_);
+        message + "inconsistent data type: " +
+            inference::DataType_Name(lhs.type_) + " is inferred from model " +
+            lhs.model_name_ + " while " + inference::DataType_Name(rhs.type_) +
+            " is inferred from model " + rhs.model_name_);
   }
 
   // Shapes must match or either one uses variable size shape, if one uses
@@ -106,8 +117,8 @@ ValidateTensorConsistency(
 
 Status
 ValidateTensorMapping(
-    const std::string& ensemble, const ModelEnsembling::Step& step,
-    const ModelConfig& model_config,
+    const std::string& ensemble, const inference::ModelEnsembling::Step& step,
+    const inference::ModelConfig& model_config,
     std::unordered_map<std::string, TensorNode>* ensemble_tensors)
 {
   const bool batching = (model_config.max_batch_size() > 0);
@@ -125,14 +136,13 @@ ValidateTensorMapping(
               " in model " + step.model_name());
     }
   }
-  bool is_decoupled = model_config.model_transaction_policy().decoupled();
   for (const auto& model_input : model_config.input()) {
     size_t mapped_cnt = 0;
     for (const auto& input_map : step.input_map()) {
       if (model_input.name() == input_map.first) {
         TensorNode model_tensor(
             step.model_name(), batching, model_input.data_type(),
-            model_input.dims(), is_decoupled);
+            model_input.dims());
         auto it = ensemble_tensors->find(input_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -176,13 +186,14 @@ ValidateTensorMapping(
               " in model " + step.model_name());
     }
   }
+  std::shared_ptr<TensorNode> sibling_node(new TensorNode(step.model_name()));
   for (const auto& output_map : step.output_map()) {
     size_t mapped_cnt = 0;
     for (const auto& model_output : model_config.output()) {
       if (model_output.name() == output_map.first) {
         TensorNode model_tensor(
             step.model_name(), batching, model_output.data_type(),
-            model_output.dims(), is_decoupled);
+            model_output.dims());
         auto it = ensemble_tensors->find(output_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -190,9 +201,11 @@ ValidateTensorMapping(
               "in ensemble " + ensemble + ", ensemble tensor " +
                   output_map.second + ": "));
         } else {
-          ensemble_tensors->emplace(
-              std::make_pair(output_map.second, model_tensor));
+          it = ensemble_tensors
+                   ->emplace(std::make_pair(output_map.second, model_tensor))
+                   .first;
         }
+        it->second.sibling_node_ = sibling_node;
         mapped_cnt++;
       }
     }
@@ -206,8 +219,10 @@ ValidateTensorMapping(
   }
 
   // link ensemble tensors
+  bool is_decoupled = model_config.model_transaction_policy().decoupled();
   for (const auto& output_map : step.output_map()) {
     auto& node = ensemble_tensors->find(output_map.second)->second;
+    node.is_decoupled_ = is_decoupled;
     for (const auto& input_map : step.input_map()) {
       auto& prev_node = ensemble_tensors->find(input_map.second)->second;
       node.prev_nodes_.push_back(&prev_node);
@@ -217,56 +232,50 @@ ValidateTensorMapping(
   return Status::Success;
 }
 
+}  // namespace
+
 Status
 ValidateEnsembleConfig(
-    ModelRepositoryManager::DependencyNode* ensemble,
-    std::unordered_map<
-        std::string, std::pair<ModelRepositoryManager::DependencyNode*, bool>>*
-        ensembles,
-    std::deque<std::string>* ensemble_dependency)
+    ModelRepositoryManager* model_repository_manager,
+    ModelRepositoryManager::DependencyNode* ensemble)
 {
-  const auto& ensemble_name = ensemble->model_name_;
-  if (!ensemble->missing_upstreams_.empty()) {
-    std::string name_list;
-    for (auto it = ensemble->missing_upstreams_.begin();
-         it != ensemble->missing_upstreams_.end(); it++) {
-      if (it != ensemble->missing_upstreams_.begin()) {
-        name_list += ", ";
-      }
-      name_list += (*it)->model_name_;
-    }
-    return Status(
-        Status::Code::INVALID_ARG,
-        "ensemble " + ensemble_name +
-            " contains models that are not available: " + name_list);
+  const auto& ensemble_config = ensemble->model_config_;
+  if (!ensemble_config.has_ensemble_scheduling()) {
+    return Status::Success;
   }
 
-  const auto& ensemble_config = ensemble->model_config_;
+  const auto& ensemble_name = ensemble->model_name_;
   const bool batching = (ensemble_config.max_batch_size() > 0);
   std::unordered_map<std::string, TensorNode> ensemble_tensors;
   for (const auto& input : ensemble_config.input()) {
     const auto& dims =
         input.has_reshape() ? input.reshape().shape() : input.dims();
-    TensorNode input_node(
-        ensemble_name, batching, input.data_type(), dims,
-        false /* is_decoupled */);
+    TensorNode input_node(ensemble_name, batching, input.data_type(), dims);
     ensemble_tensors.emplace(std::make_pair(input.name(), input_node));
   }
+
+  TensorNode sink_node(ensemble_name);
   for (const auto& output : ensemble_config.output()) {
     const auto& dims =
         output.has_reshape() ? output.reshape().shape() : output.dims();
-    TensorNode output_node(
-        ensemble_name, batching, output.data_type(), dims,
-        false /* is_decoupled */);
-    ensemble_tensors.emplace(std::make_pair(output.name(), output_node));
+    TensorNode output_node(ensemble_name, batching, output.data_type(), dims);
+    auto it =
+        ensemble_tensors.emplace(std::make_pair(output.name(), output_node))
+            .first;
+    sink_node.prev_nodes_.emplace_back(&(it->second));
+    it->second.next_nodes_.emplace_back(&sink_node);
   }
 
   for (const auto& step : ensemble_config.ensemble_scheduling().step()) {
     const auto& model_name = step.model_name();
-    ModelConfig model_config;
+    inference::ModelConfig model_config;
     for (auto& node : ensemble->upstreams_) {
       if (model_name == node.first->model_name_) {
-        model_config = node.first->model_config_;
+        // Obtain completed config from backend instance
+        std::shared_ptr<InferenceBackend> backend;
+        RETURN_IF_ERROR(model_repository_manager->GetInferenceBackend(
+            model_name, -1, &backend));
+        model_config = backend->Config();
         break;
       }
     }
@@ -282,42 +291,6 @@ ValidateEnsembleConfig(
               ", but it contains model " + model_name +
               " which only allows maximum batch size to be " +
               std::to_string(model_config.max_batch_size()));
-    }
-
-    if (model_config.has_ensemble_scheduling()) {
-      bool found = false;
-      for (const auto& name : *ensemble_dependency) {
-        if (name == model_name) {
-          found = true;
-          break;
-        }
-      }
-      if (found) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            "circular dependency between ensembles: " + model_name +
-                " -> ... -> " + ensemble_name + " -> " + model_name);
-      }
-
-      auto it = ensembles->find(model_name);
-      // if can't find the name in ensemble, it is either non-ensemble model
-      // or ensemble that is not affected in current change. Thus it is not
-      // possible to cause circular dependency
-      if (it != ensembles->end()) {
-        if (it->second.second == false) {
-          ensemble_dependency->push_back(ensemble_name);
-          it->second.first->status_ = ValidateEnsembleConfig(
-              it->second.first, ensembles, ensemble_dependency);
-          it->second.second = true;
-          ensemble_dependency->pop_back();
-          if (!it->second.first->status_.IsOk()) {
-            return Status(
-                Status::Code::INVALID_ARG,
-                "ensemble " + ensemble_name + " depends on " + model_name +
-                    " which contains invalid model config");
-          }
-        }
-      }
     }
 
     RETURN_IF_ERROR(ValidateTensorMapping(
@@ -358,8 +331,22 @@ ValidateEnsembleConfig(
                     "models");
           }
         }
-        next_node->decouple_label_ =
-            next_node->is_decoupled_ ? ++decouple_label : prev_decouple_label;
+        if (next_node->sibling_node_ != nullptr) {
+          if (next_node->sibling_node_->visited_) {
+            next_node->decouple_label_ =
+                next_node->sibling_node_->decouple_label_;
+          } else {
+            next_node->decouple_label_ = next_node->is_decoupled_
+                                             ? ++decouple_label
+                                             : prev_decouple_label;
+            next_node->sibling_node_->decouple_label_ =
+                next_node->decouple_label_;
+            next_node->sibling_node_->visited_ = true;
+          }
+        } else {
+          next_node->decouple_label_ =
+              next_node->is_decoupled_ ? ++decouple_label : prev_decouple_label;
+        }
         next_node->visited_ = true;
         current_iterators.push_back(next_node);
       }
@@ -370,34 +357,6 @@ ValidateEnsembleConfig(
       decouple_label != 0);
 
   return Status::Success;
-}
-
-}  // namespace
-
-void
-ValidateEnsembleConfig(
-    std::set<ModelRepositoryManager::DependencyNode*>* affected_ensembles)
-{
-  // map from ensemble name to <node, has_validated> pair
-  std::unordered_map<
-      std::string, std::pair<ModelRepositoryManager::DependencyNode*, bool>>
-      ensembles;
-
-  for (const auto& node : (*affected_ensembles)) {
-    ensembles.emplace(
-        std::make_pair(node->model_name_, std::make_pair(node, false)));
-  }
-
-  std::deque<std::string> ensemble_dependency;
-  for (auto& pair : ensembles) {
-    if (pair.second.second) {
-      continue;
-    }
-    // return not ok status if ensemble config is not valid
-    pair.second.first->status_ = ValidateEnsembleConfig(
-        pair.second.first, &ensembles, &ensemble_dependency);
-    pair.second.second = true;
-  }
 }
 
 }}  // namespace nvidia::inferenceserver

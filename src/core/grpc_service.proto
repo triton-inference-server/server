@@ -26,9 +26,9 @@
 
 syntax = "proto3";
 
-package nvidia.inferenceserver;
+package inference;
 
-//@@.. cpp:namespace:: nvidia::inferenceserver
+//@@.. cpp:namespace:: inference
 
 import "model_config.proto";
 
@@ -454,26 +454,12 @@ message InferParameter
 //@@
 //@@.. cpp:var:: message InferTensorContents
 //@@
-//@@   The data contained in a tensor. For a given data type the
-//@@   tensor contents can be represented in "raw" bytes form or in
-//@@   the repeated type that matches the tensor's data type. Protobuf
-//@@   oneof is not used because oneofs cannot contain repeated fields.
+//@@   The data contained in a tensor represented by the repeated type
+//@@   that matches the tensor's data type. Protobuf oneof is not used
+//@@   because oneofs cannot contain repeated fields.
 //@@
 message InferTensorContents
 {
-  //@@
-  //@@  .. cpp:var:: bytes raw_contents
-  //@@
-  //@@     Raw representation of the tensor contents. The size of this
-  //@@     content must match what is expected by the tensor's shape
-  //@@     and data type. The raw data must be the flattened, one-dimensional,
-  //@@     row-major order of the tensor elements without any stride or padding
-  //@@     between the elements. Note that the FP16 data type must be
-  //@@     represented as raw content as there is no standard support for a
-  //@@     16-bit float type.
-  //@@
-  bytes raw_contents = 1;
-
   //@@
   //@@  .. cpp:var:: bool bool_contents (repeated)
   //@@
@@ -481,7 +467,7 @@ message InferTensorContents
   //@@     expected by the tensor's shape. The contents must be the flattened,
   //@@     one-dimensional, row-major order of the tensor elements.
   //@@
-  repeated bool bool_contents = 2;
+  repeated bool bool_contents = 1;
 
   //@@
   //@@  .. cpp:var:: int32 int_contents (repeated)
@@ -491,7 +477,7 @@ message InferTensorContents
   //@@     must be the flattened, one-dimensional, row-major order of the
   //@@     tensor elements.
   //@@
-  repeated int32 int_contents = 3;
+  repeated int32 int_contents = 2;
 
   //@@
   //@@  .. cpp:var:: int64 int64_contents (repeated)
@@ -500,7 +486,7 @@ message InferTensorContents
   //@@     is expected by the tensor's shape. The contents must be the
   //@@     flattened, one-dimensional, row-major order of the tensor elements.
   //@@
-  repeated int64 int64_contents = 4;
+  repeated int64 int64_contents = 3;
 
   //@@
   //@@  .. cpp:var:: uint32 uint_contents (repeated)
@@ -510,7 +496,7 @@ message InferTensorContents
   //@@     must be the flattened, one-dimensional, row-major order of the
   //@@     tensor elements.
   //@@
-  repeated uint32 uint_contents = 5;
+  repeated uint32 uint_contents = 4;
 
   //@@
   //@@  .. cpp:var:: uint64 uint64_contents (repeated)
@@ -519,7 +505,7 @@ message InferTensorContents
   //@@     is expected by the tensor's shape. The contents must be the
   //@@     flattened, one-dimensional, row-major order of the tensor elements.
   //@@
-  repeated uint64 uint64_contents = 6;
+  repeated uint64 uint64_contents = 5;
 
   //@@
   //@@  .. cpp:var:: float fp32_contents (repeated)
@@ -528,7 +514,7 @@ message InferTensorContents
   //@@     expected by the tensor's shape. The contents must be the flattened,
   //@@     one-dimensional, row-major order of the tensor elements.
   //@@
-  repeated float fp32_contents = 7;
+  repeated float fp32_contents = 6;
 
   //@@
   //@@  .. cpp:var:: double fp64_contents (repeated)
@@ -537,7 +523,7 @@ message InferTensorContents
   //@@     expected by the tensor's shape. The contents must be the flattened,
   //@@     one-dimensional, row-major order of the tensor elements.
   //@@
-  repeated double fp64_contents = 8;
+  repeated double fp64_contents = 7;
 
   //@@
   //@@  .. cpp:var:: bytes byte_contents (repeated)
@@ -546,7 +532,7 @@ message InferTensorContents
   //@@     expected by the tensor's shape. The contents must be the flattened,
   //@@     one-dimensional, row-major order of the tensor elements.
   //@@
-  repeated bytes byte_contents = 9;
+  repeated bytes byte_contents = 8;
 }
 
 //@@
@@ -590,9 +576,11 @@ message ModelInferRequest
     //@@
     map<string, InferParameter> parameters = 4;
 
-    //@@    .. cpp:var:: InferTensorContents
+    //@@    .. cpp:var:: InferTensorContents contents
     //@@
-    //@@       The input tensor data.
+    //@@       The tensor contents using a data-type format. This field
+    //@@       must not be specified if tensor contents are being specified
+    //@@       in ModelInferRequest.raw_input_contents.
     //@@
     InferTensorContents contents = 5;
   }
@@ -659,6 +647,31 @@ message ModelInferRequest
   //@@     returned.
   //@@
   repeated InferRequestedOutputTensor outputs = 6;
+
+  //@@
+  //@@  .. cpp:var:: bytes raw_input_contents
+  //@@
+  //@@     The data contained in an input tensor can be represented in
+  //@@     "raw" bytes form or in the repeated type that matches the
+  //@@     tensor's data type. Using the "raw" bytes form will
+  //@@     typically allow higher performance due to the way protobuf
+  //@@     allocation and reuse interacts with GRPC. For example, see
+  //@@     https://github.com/grpc/grpc/issues/23231.
+  //@@
+  //@@     To use the raw representation 'raw_input_contents' must be
+  //@@     initialized with data for each tensor in the same order as
+  //@@     'inputs'. For each tensor, the size of this content must
+  //@@     match what is expected by the tensor's shape and data
+  //@@     type. The raw data must be the flattened, one-dimensional,
+  //@@     row-major order of the tensor elements without any stride
+  //@@     or padding between the elements. Note that the FP16 data
+  //@@     type must be represented as raw content as there is no
+  //@@     specific data type for a 16-bit float type.
+  //@@
+  //@@     If this field is specified then InferInputTensor::contents
+  //@@     must not be specified for any input tensor.
+  //@@
+  repeated bytes raw_input_contents = 7;
 }
 
 //@@
@@ -702,9 +715,11 @@ message ModelInferResponse
     //@@
     map<string, InferParameter> parameters = 4;
 
-    //@@    .. cpp:var:: InferTensorContents
+    //@@    .. cpp:var:: InferTensorContents contents
     //@@
-    //@@       The output tensor data.
+    //@@       The tensor contents using a data-type format. This field
+    //@@       must not be specified if tensor contents are being specified
+    //@@       in ModelInferResponse.raw_output_contents.
     //@@
     InferTensorContents contents = 5;
   }
@@ -739,6 +754,31 @@ message ModelInferResponse
   //@@     The output tensors holding inference results.
   //@@
   repeated InferOutputTensor outputs = 5;
+
+  //@@
+  //@@  .. cpp:var:: bytes raw_output_contents
+  //@@
+  //@@     The data contained in an output tensor can be represented in
+  //@@     "raw" bytes form or in the repeated type that matches the
+  //@@     tensor's data type. Using the "raw" bytes form will
+  //@@     typically allow higher performance due to the way protobuf
+  //@@     allocation and reuse interacts with GRPC. For example, see
+  //@@     https://github.com/grpc/grpc/issues/23231.
+  //@@
+  //@@     To use the raw representation 'raw_output_contents' must be
+  //@@     initialized with data for each tensor in the same order as
+  //@@     'outputs'. For each tensor, the size of this content must
+  //@@     match what is expected by the tensor's shape and data
+  //@@     type. The raw data must be the flattened, one-dimensional,
+  //@@     row-major order of the tensor elements without any stride
+  //@@     or padding between the elements. Note that the FP16 data
+  //@@     type must be represented as raw content as there is no
+  //@@     specific data type for a 16-bit float type.
+  //@@
+  //@@     If this field is specified then InferOutputTensor::contents
+  //@@     must not be specified for any output tensor.
+  //@@
+  repeated bytes raw_output_contents = 6;
 }
 
 //@@

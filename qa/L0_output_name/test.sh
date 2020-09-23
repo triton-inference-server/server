@@ -39,6 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 OP_NAME_TEST_PY=output_name_test.py
 CLIENT_LOG="./client.log"
+EXPECTED_NUM_TESTS="1"
 DATADIR=`pwd`/models
 
 rm -rf $DATADIR
@@ -67,7 +68,15 @@ set +e
 python $OP_NAME_TEST_PY OutputNameValidationTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
+else
+    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
+
 set -e
 
 kill $SERVER_PID

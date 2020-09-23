@@ -29,8 +29,7 @@ import argparse
 import numpy as np
 
 import grpc
-from tritongrpcclient import grpc_service_pb2
-from tritongrpcclient import grpc_service_pb2_grpc
+from tritonclient.grpc import service_pb2, service_pb2_grpc
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -59,10 +58,10 @@ if __name__ == '__main__':
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     # Generate the request
-    request = grpc_service_pb2.ModelInferRequest()
+    request = service_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
 
@@ -71,13 +70,13 @@ if __name__ == '__main__':
     input1_data = [1 for i in range(16)]
 
     # Populate the inputs in inference request
-    input0 = grpc_service_pb2.ModelInferRequest().InferInputTensor()
+    input0 = service_pb2.ModelInferRequest().InferInputTensor()
     input0.name = "INPUT0"
     input0.datatype = "INT8"
     input0.shape.extend([1, 16])
     input0.contents.int_contents[:] = input0_data
 
-    input1 = grpc_service_pb2.ModelInferRequest().InferInputTensor()
+    input1 = service_pb2.ModelInferRequest().InferInputTensor()
     input1.name = "INPUT1"
     input1.datatype = "INT8"
     input1.shape.extend([1, 16])
@@ -85,33 +84,37 @@ if __name__ == '__main__':
     request.inputs.extend([input0, input1])
 
     # Populate the outputs in the inference request
-    output0 = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output0 = service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output0.name = "OUTPUT0"
 
-    output1 = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output1 = service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output1.name = "OUTPUT1"
     request.outputs.extend([output0, output1])
 
     response = grpc_stub.ModelInfer(request)
 
     output_results = []
+    index = 0
     for output in response.outputs:
         shape = []
         for value in output.shape:
             shape.append(value)
         output_results.append(
-            np.frombuffer(output.contents.raw_contents, dtype=np.int32))
+            np.frombuffer(response.raw_output_contents[index], dtype=np.int32))
         output_results[-1] = np.resize(output_results[-1], shape)
+        index += 1
 
     if len(output_results) != 2:
         print("expected two output results")
         sys.exit(1)
 
     for i in range(16):
-        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
-              str(output_results[0][0][i]))
-        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
-              str(output_results[1][0][i]))
+        print(
+            str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
+            str(output_results[0][0][i]))
+        print(
+            str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
+            str(output_results[1][0][i]))
         if (input0_data[i] + input1_data[i]) != output_results[0][0][i]:
             print("sync infer error: incorrect sum")
             sys.exit(1)
@@ -124,5 +127,6 @@ if __name__ == '__main__':
     try:
         response = grpc_stub.ModelInfer(request)
     except Exception as e:
-        if "failed to get model version from specified version string 'wrong_specification'" in e.__str__():
+        if "failed to get model version from specified version string 'wrong_specification'" in e.__str__(
+        ):
             print('PASS: explicit int8')

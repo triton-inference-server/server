@@ -28,7 +28,6 @@
 STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
 DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
-REQUIRED_CONCURRENCY=${REQUIRED_CONCURRENCY:=0}
 
 PERF_CLIENT=../clients/perf_client
 REPORTER=../common/reporter.py
@@ -53,15 +52,11 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             MAX_BATCH=${STATIC_BATCH} && \
                 (( $DYNAMIC_BATCH > $STATIC_BATCH )) && \
                 MAX_BATCH=${DYNAMIC_BATCH}
-            CONCURRENCY=$(( $INSTANCE_CNT * $DYNAMIC_BATCH * 2 ))
-            if (( $CONCURRENCY < $REQUIRED_CONCURRENCY )); then
-                CONCURRENCY=$REQUIRED_CONCURRENCY
-            fi
 
             if (( $DYNAMIC_BATCH > 1 )); then
-                NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_dbatch${DYNAMIC_BATCH}_instance${INSTANCE_CNT}
+                NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_dbatch${DYNAMIC_BATCH}_instance${INSTANCE_CNT}_${PERF_CLIENT_PROTOCOL}
             else
-                NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}
+                NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}_${PERF_CLIENT_PROTOCOL}
             fi
 
             rm -fr models && mkdir -p models && \
@@ -86,9 +81,9 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
 
             # Run the model once to warm up. Some frameworks do
             # optimization on the first requests.
-            $PERF_CLIENT -v -i grpc -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
+            $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
 
-            $PERF_CLIENT -v -i grpc -m $MODEL_NAME -p5000 \
+            $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
                          -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                          -f ${NAME}.csv >> ${NAME}.log 2>&1
             if (( $? != 0 )); then
@@ -103,7 +98,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
 
             echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
             echo -e "\"s_benchmark_name\":\"deeprecommender\"," >> ${NAME}.tjson
-            echo -e "\"s_protocol\":\"grpc\"," >> ${NAME}.tjson
+            echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${NAME}.tjson
             echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >> ${NAME}.tjson
             echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
             echo -e "\"l_concurrency\":${CONCURRENCY}," >> ${NAME}.tjson

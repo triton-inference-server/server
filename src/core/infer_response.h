@@ -30,10 +30,11 @@
 #include <string>
 #include <vector>
 #include "src/core/constants.h"
+#include "src/core/infer_parameter.h"
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
 #include "src/core/status.h"
-#include "src/core/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -51,8 +52,8 @@ class InferenceResponseFactory {
       const ResponseAllocator* allocator, void* alloc_userp,
       TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
-      const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
-          delegator)
+      const std::function<void(
+          std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
       : backend_(backend), id_(id), allocator_(allocator),
         alloc_userp_(alloc_userp), response_fn_(response_fn),
         response_userp_(response_userp), response_delegator_(delegator)
@@ -60,8 +61,8 @@ class InferenceResponseFactory {
   }
 
   Status SetResponseDelegator(
-      const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
-          delegator)
+      const std::function<void(
+          std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
   {
     response_delegator_ = delegator;
     return Status::Success;
@@ -71,7 +72,7 @@ class InferenceResponseFactory {
   Status CreateResponse(std::unique_ptr<InferenceResponse>* response) const;
 
   // Send a "null" response with 'flags'.
-  Status SendFlags(const uint32_t flags);
+  Status SendFlags(const uint32_t flags) const;
 
  private:
   // The backend associated with this factory. For normal
@@ -99,7 +100,8 @@ class InferenceResponseFactory {
   void* response_userp_;
 
   // Delegator to be invoked on sending responses.
-  std::function<void(std::unique_ptr<InferenceResponse>&&)> response_delegator_;
+  std::function<void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>
+      response_delegator_;
 };
 
 //
@@ -111,7 +113,7 @@ class InferenceResponse {
   class Output {
    public:
     Output(
-        const std::string& name, const DataType datatype,
+        const std::string& name, const inference::DataType datatype,
         const std::vector<int64_t>& shape, const ResponseAllocator* allocator,
         void* alloc_userp)
         : name_(name), datatype_(datatype), shape_(shape),
@@ -120,7 +122,7 @@ class InferenceResponse {
     {
     }
     Output(
-        const std::string& name, const DataType datatype,
+        const std::string& name, const inference::DataType datatype,
         std::vector<int64_t>&& shape, const ResponseAllocator* allocator,
         void* alloc_userp)
         : name_(name), datatype_(datatype), shape_(std::move(shape)),
@@ -135,7 +137,7 @@ class InferenceResponse {
     const std::string& Name() const { return name_; }
 
     // Data type of the output tensor.
-    DataType DType() const { return datatype_; }
+    inference::DataType DType() const { return datatype_; }
 
     // The shape of the output tensor.
     const std::vector<int64_t>& Shape() const { return shape_; }
@@ -143,7 +145,8 @@ class InferenceResponse {
     // Reshape the output tensor. This function must only be called
     // for outputs that have respace specified in the model
     // configuration.
-    void Reshape(const bool has_batch_dim, const ModelOutput* output_config);
+    void Reshape(
+        const bool has_batch_dim, const inference::ModelOutput* output_config);
 
     // Get information about the buffer allocated for this output
     // tensor's data. If no buffer is allocated 'buffer' will return
@@ -179,7 +182,7 @@ class InferenceResponse {
         std::ostream& out, const InferenceResponse::Output& output);
 
     std::string name_;
-    DataType datatype_;
+    inference::DataType datatype_;
     std::vector<int64_t> shape_;
 
     // The response allocator and user pointer.
@@ -202,23 +205,43 @@ class InferenceResponse {
       const ResponseAllocator* allocator, void* alloc_userp,
       TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
-      const std::function<void(std::unique_ptr<InferenceResponse>&&)>&
-          delegator);
+      const std::function<void(
+          std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator);
+
+  // "null" InferenceResponse is a special instance of InferenceResponse which
+  // contains minimal information for calling InferenceResponse::Send,
+  // InferenceResponse::NullResponse. nullptr will be passed as response in
+  // 'response_fn'.
+  InferenceResponse(
+      TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+      void* response_userp);
 
   const std::string& Id() const { return id_; }
   const std::string& ModelName() const;
   int64_t ActualModelVersion() const;
   const Status& ResponseStatus() const { return status_; }
 
+  // The response parameters.
+  const std::deque<InferenceParameter>& Parameters() const
+  {
+    return parameters_;
+  }
+
+  // Add an parameter to the response.
+  Status AddParameter(const char* name, const char* value);
+  Status AddParameter(const char* name, const int64_t value);
+  Status AddParameter(const char* name, const bool value);
+
+  // The response outputs.
   const std::deque<Output>& Outputs() const { return outputs_; }
 
   // Add an output to the response. If 'output' is non-null
   // return a pointer to the newly added output.
   Status AddOutput(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape, Output** output = nullptr);
   Status AddOutput(
-      const std::string& name, const DataType datatype,
+      const std::string& name, const inference::DataType datatype,
       std::vector<int64_t>&& shape, Output** output = nullptr);
 
   // Get the classification label associated with an output. Return
@@ -257,12 +280,15 @@ class InferenceResponse {
   // every response.
   std::string id_;
 
-  // The result tensors. Use a deque so that there is no reallocation
-  // with the resulting copies.
-  std::deque<Output> outputs_;
-
   // Error status for the response.
   Status status_;
+
+  // The parameters of the response. Use a deque so that there is no
+  // reallocation.
+  std::deque<InferenceParameter> parameters_;
+
+  // The result tensors. Use a deque so that there is no reallocation.
+  std::deque<Output> outputs_;
 
   // The response allocator and user pointer.
   const ResponseAllocator* allocator_;
@@ -273,7 +299,10 @@ class InferenceResponse {
   void* response_userp_;
 
   // Delegator to be invoked on sending responses.
-  std::function<void(std::unique_ptr<InferenceResponse>&&)> response_delegator_;
+  std::function<void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>
+      response_delegator_;
+
+  bool null_response_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceResponse& response);

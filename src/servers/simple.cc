@@ -35,8 +35,8 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include "src/core/tritonserver.h"
 #include "src/servers/common.h"
+#include "triton/core/tritonserver.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -505,6 +505,16 @@ main(int argc, char** argv)
   }
 #endif  // TRITON_ENABLE_GPU
 
+  // Check API version.
+  uint32_t api_version_major, api_version_minor;
+  FAIL_IF_ERR(
+      TRITONSERVER_ApiVersion(&api_version_major, &api_version_minor),
+      "getting Triton API version");
+  if ((TRITONSERVER_API_VERSION_MAJOR != api_version_major) ||
+      (TRITONSERVER_API_VERSION_MINOR > api_version_minor)) {
+    FAIL("triton server API version mismatch");
+  }
+
   // Create the server...
   TRITONSERVER_ServerOptions* server_options = nullptr;
   FAIL_IF_ERR(
@@ -517,6 +527,22 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
       "setting verbose logging level");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetBackendDirectory(
+          server_options, "/opt/tritonserver/backends"),
+      "setting backend directory");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetStrictModelConfig(server_options, true),
+      "setting strict model configuration");
+#ifdef TRITON_ENABLE_GPU
+  double min_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
+#else
+  double min_compute_capability = 0;
+#endif  // TRITON_ENABLE_GPU
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
+          server_options, min_compute_capability),
+      "setting minimum supported CUDA compute capability");
 
   TRITONSERVER_Server* server_ptr = nullptr;
   FAIL_IF_ERR(

@@ -56,7 +56,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${DATADIR} --model-repository=ensemble_model_repository"
 SERVER_LOG="./inference_server.log"
 
-ERROR_STRING="error | Request count: 0 | : 0 infer/sec\|: 0 usec"
+ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 
 source ../common/util.sh
 
@@ -554,7 +554,7 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-# Fix me: Uncomment after fixing DLIS-1054 
+# Fix me: Uncomment after fixing DLIS-1054
 ## Testing with very large concurrencies and large dataset
 #INPUT_DATA_OPTION="--input-data $SEQ_JSONDATAFILE "
 #for i in {1..9}; do

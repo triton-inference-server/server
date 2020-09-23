@@ -44,10 +44,12 @@ Status GetModelVersionFromPath(const std::string& path, int64_t* version);
 /// 'tensor_name' as empty-string if the control is not mapped to any
 /// tensor.
 Status GetBooleanSequenceControlProperties(
-    const ModelSequenceBatching& batcher, const std::string& model_name,
-    const ModelSequenceBatching::Control::Kind control_kind,
-    const bool required, std::string* tensor_name, DataType* tensor_datatype,
-    float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
+    const inference::ModelSequenceBatching& batcher,
+    const std::string& model_name,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
+    const bool required, std::string* tensor_name,
+    inference::DataType* tensor_datatype, float* fp32_false_value,
+    float* fp32_true_value, int32_t* int32_false_value,
     int32_t* int32_true_value);
 
 /// Get the tensor name and datatype for a non-boolean sequence
@@ -57,9 +59,11 @@ Status GetBooleanSequenceControlProperties(
 /// tensor. 'tensor_datatype' returns the required datatype for the
 /// control.
 Status GetTypedSequenceControlProperties(
-    const ModelSequenceBatching& batcher, const std::string& model_name,
-    const ModelSequenceBatching::Control::Kind control_kind,
-    const bool required, std::string* tensor_name, DataType* tensor_datatype);
+    const inference::ModelSequenceBatching& batcher,
+    const std::string& model_name,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
+    const bool required, std::string* tensor_name,
+    inference::DataType* tensor_datatype);
 
 /// Read a ModelConfig and normalize it as expected by model backends.
 /// \param path The full-path to the directory containing the
@@ -75,9 +79,11 @@ Status GetTypedSequenceControlProperties(
 Status GetNormalizedModelConfig(
     const std::string& path, const BackendConfigMap& backend_config_map,
     const bool autofill, const double min_compute_capability,
-    ModelConfig* config);
+    inference::ModelConfig* config);
 
-/// Validate that a model is specified correctly.
+/// Validate that a model is specified correctly, except for model inputs
+/// and outputs. ValidateModelIOConfig() should be called to
+/// validate model inputs and outputs.
 /// \param config The model configuration to validate.
 /// \param expected_platform If non-empty the model will be checked
 /// to make sure its platform matches this value.
@@ -86,8 +92,14 @@ Status GetNormalizedModelConfig(
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
 Status ValidateModelConfig(
-    const ModelConfig& config, const std::string& expected_platform,
+    const inference::ModelConfig& config, const std::string& expected_platform,
     const double min_compute_capability);
+
+/// Validate that a model inputs and outputs are specified correctly.
+/// \param config The model configuration to validate.
+/// \return The error status. A non-OK status indicates the configuration
+/// is not valid.
+Status ValidateModelIOConfig(const inference::ModelConfig& config);
 
 /// Validate that input is specified correctly in a model
 /// configuration.
@@ -97,7 +109,8 @@ Status ValidateModelConfig(
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
 Status ValidateModelInput(
-    const ModelInput& io, int32_t max_batch_size, const std::string& platform);
+    const inference::ModelInput& io, int32_t max_batch_size,
+    const std::string& platform);
 
 /// Validate that an input matches one of the allowed input names.
 /// \param io The model input.
@@ -105,7 +118,7 @@ Status ValidateModelInput(
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
 Status CheckAllowedModelInput(
-    const ModelInput& io, const std::set<std::string>& allowed);
+    const inference::ModelInput& io, const std::set<std::string>& allowed);
 
 /// Validate that an output is specified correctly in a model
 /// configuration.
@@ -115,7 +128,8 @@ Status CheckAllowedModelInput(
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
 Status ValidateModelOutput(
-    const ModelOutput& io, int32_t max_batch_size, const std::string& platform);
+    const inference::ModelOutput& io, int32_t max_batch_size,
+    const std::string& platform);
 
 /// Validate that an output matches one of the allowed output names.
 /// \param io The model output.
@@ -123,7 +137,14 @@ Status ValidateModelOutput(
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
 Status CheckAllowedModelOutput(
-    const ModelOutput& io, const std::set<std::string>& allowed);
+    const inference::ModelOutput& io, const std::set<std::string>& allowed);
+
+/// Validate that a model batch inputs and batch outputs are specified
+/// correctly.
+/// \param config The model configuration to validate..
+/// \return The error status. A non-OK status indicates the batch inputs or
+/// batch outputs are not valid.
+Status ValidateBatchIO(const inference::ModelConfig& config);
 
 /// Parse the 'value' of the parameter 'key' into a boolean value.
 /// \param key The name of the parameter.
@@ -159,7 +180,19 @@ Status GetProfileIndex(const std::string& profile_name, int* profile_index);
 /// \param json Returns the equivalent JSON.
 /// \return The error status.
 Status ModelConfigToJson(
-    const ModelConfig& config, const uint32_t config_version,
+    const inference::ModelConfig& config, const uint32_t config_version,
     std::string* json_str);
+
+/// Convert a model configuration JSON to the equivalent protobuf.
+/// \param config The JSON model configuration.
+/// \param config_version The model configuration will be returned in
+/// a format matching this version. If the configuration cannot be
+/// represented in the requested version's format then an error will
+/// be returned.
+/// \param protobuf Returns the equivalent protobuf.
+/// \return The error status.
+Status JsonToModelConfig(
+    const std::string& json_config, const uint32_t config_version,
+    inference::ModelConfig* protobuf_config);
 
 }}  // namespace nvidia::inferenceserver

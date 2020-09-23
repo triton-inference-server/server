@@ -29,8 +29,10 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include "src/backends/backend/tritonbackend.h"
+#include "src/core/model_config.h"
+#include "src/core/server_message.h"
 #include "src/core/status.h"
+#include "triton/core/tritonbackend.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -43,22 +45,48 @@ class TritonBackend {
       TRITONBACKEND_Model* model);
   typedef TRITONSERVER_Error* (*TritonModelFiniFn_t)(
       TRITONBACKEND_Model* model);
-  typedef TRITONSERVER_Error* (*TritonModelExecFn_t)(
-      TRITONBACKEND_Model* model, TRITONBACKEND_Request** requests,
+  typedef TRITONSERVER_Error* (*TritonModelInstanceInitFn_t)(
+      TRITONBACKEND_ModelInstance* instance);
+  typedef TRITONSERVER_Error* (*TritonModelInstanceFiniFn_t)(
+      TRITONBACKEND_ModelInstance* instance);
+  typedef TRITONSERVER_Error* (*TritonModelInstanceExecFn_t)(
+      TRITONBACKEND_ModelInstance* instance, TRITONBACKEND_Request** requests,
       const uint32_t request_cnt);
 
   static Status Create(
-      const std::string& name, const std::string& path,
+      const std::string& name, const std::string& dir,
+      const std::string& libpath,
+      const BackendCmdlineConfig& backend_cmdline_config,
       std::shared_ptr<TritonBackend>* backend);
   ~TritonBackend();
 
   const std::string& Name() const { return name_; }
+  const std::string& Directory() const { return dir_; }
+  const TritonServerMessage& BackendConfig() const { return backend_config_; }
+
+  TRITONBACKEND_ExecutionPolicy ExecutionPolicy() const { return exec_policy_; }
+  void SetExecutionPolicy(const TRITONBACKEND_ExecutionPolicy policy)
+  {
+    exec_policy_ = policy;
+  }
+
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
   TritonModelInitFn_t ModelInitFn() const { return model_init_fn_; }
   TritonModelFiniFn_t ModelFiniFn() const { return model_fini_fn_; }
-  TritonModelExecFn_t ModelExecFn() const { return model_exec_fn_; }
+  TritonModelInstanceInitFn_t ModelInstanceInitFn() const
+  {
+    return inst_init_fn_;
+  }
+  TritonModelInstanceFiniFn_t ModelInstanceFiniFn() const
+  {
+    return inst_fini_fn_;
+  }
+  TritonModelInstanceExecFn_t ModelInstanceExecFn() const
+  {
+    return inst_exec_fn_;
+  }
 
  private:
   typedef TRITONSERVER_Error* (*TritonBackendInitFn_t)(
@@ -66,7 +94,10 @@ class TritonBackend {
   typedef TRITONSERVER_Error* (*TritonBackendFiniFn_t)(
       TRITONBACKEND_Backend* backend);
 
-  TritonBackend(const std::string& name, const std::string& path);
+  TritonBackend(
+      const std::string& name, const std::string& dir,
+      const std::string& libpath, const TritonServerMessage& backend_config);
+
   void ClearHandles();
   Status LoadBackendLibrary();
   Status UnloadBackendLibrary();
@@ -74,8 +105,15 @@ class TritonBackend {
   // The name of the backend.
   const std::string name_;
 
+  // Full path to the directory holding backend shared library and
+  // other artifacts.
+  const std::string dir_;
+
   // Full path to the backend shared library.
-  const std::string path_;
+  const std::string libpath_;
+
+  // Backend configuration as JSON
+  TritonServerMessage backend_config_;
 
   // dlopen / dlsym handles
   void* dlhandle_;
@@ -83,7 +121,12 @@ class TritonBackend {
   TritonBackendFiniFn_t backend_fini_fn_;
   TritonModelInitFn_t model_init_fn_;
   TritonModelFiniFn_t model_fini_fn_;
-  TritonModelExecFn_t model_exec_fn_;
+  TritonModelInstanceInitFn_t inst_init_fn_;
+  TritonModelInstanceFiniFn_t inst_fini_fn_;
+  TritonModelInstanceExecFn_t inst_exec_fn_;
+
+  // Execution policy
+  TRITONBACKEND_ExecutionPolicy exec_policy_;
 
   // Opaque state associated with the backend.
   void* state_;
@@ -95,7 +138,9 @@ class TritonBackend {
 class TritonBackendManager {
  public:
   static Status CreateBackend(
-      const std::string& name, const std::string& path,
+      const std::string& name, const std::string& dir,
+      const std::string& libpath,
+      const BackendCmdlineConfig& backend_cmdline_config,
       std::shared_ptr<TritonBackend>* backend);
 
  private:

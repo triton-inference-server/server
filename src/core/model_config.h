@@ -28,7 +28,7 @@
 #include <google/protobuf/any.pb.h>
 #include <stdint.h>
 #include "src/core/model_config.pb.h"
-#include "src/core/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -38,6 +38,12 @@ using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 /// The type for the metric_tags map.
 using MetricTagsMap = ::google::protobuf::Map<
     ::google::protobuf::string, ::google::protobuf::string>;
+
+// Map from backend name to list of setting=value pairs of cmdline
+// settings for the backend.
+using BackendCmdlineConfig = std::vector<std::pair<std::string, std::string>>;
+using BackendCmdlineConfigMap =
+    std::unordered_map<std::string, BackendCmdlineConfig>;
 
 /// The type from platform name to the backend configuration for that
 /// platform. The configuration is determined primarily by
@@ -79,6 +85,23 @@ enum Platform {
 #endif  // TRITON_ENABLE_PYTORCH
 };
 
+/// Enumeration for the different backend types.
+enum BackendType {
+  BACKEND_TYPE_UNKNOWN = 0,
+#ifdef TRITON_ENABLE_TENSORRT
+  BACKEND_TYPE_TENSORRT = 1,
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORFLOW
+  BACKEND_TYPE_TENSORFLOW = 2,
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+  BACKEND_TYPE_ONNXRUNTIME = 3,
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
+  BACKEND_TYPE_PYTORCH = 4
+#endif  // TRITON_ENABLE_PYTORCH
+};
+
 /// Get the number of elements in a shape.
 /// \param dims The shape.
 /// \return The number of elements, or -1 if the number of elements
@@ -98,20 +121,20 @@ int64_t GetElementCount(const std::vector<int64_t>& dims);
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
 /// wilcard dimensions.
-int64_t GetElementCount(const ModelInput& mio);
+int64_t GetElementCount(const inference::ModelInput& mio);
 
 /// Get the number of elements in the shape of a model output.
 /// \param mio The model output.
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
 /// wilcard dimensions.
-int64_t GetElementCount(const ModelOutput& mio);
+int64_t GetElementCount(const inference::ModelOutput& mio);
 
 /// Are values of a datatype fixed-size, or variable-sized.
 /// \param dtype The data-type.
 /// \return True if datatype values are fixed-sized, false if
 /// variable-sized.
-bool IsFixedSizeDataType(const DataType dtype);
+bool IsFixedSizeDataType(const inference::DataType dtype);
 
 /// Get the size of objects of a given datatype in bytes.
 /// \param dtype The data-type.
@@ -119,7 +142,7 @@ bool IsFixedSizeDataType(const DataType dtype);
 /// size cannot be determine (for example, values of type TYPE_STRING
 /// have variable length and so size cannot be determine just from the
 /// type).
-size_t GetDataTypeByteSize(const DataType dtype);
+size_t GetDataTypeByteSize(const inference::DataType dtype);
 
 /// Get the size, in bytes, of a tensor based on datatype and
 /// shape.
@@ -127,7 +150,7 @@ size_t GetDataTypeByteSize(const DataType dtype);
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const DataType& dtype, const DimsList& dims);
+int64_t GetByteSize(const inference::DataType& dtype, const DimsList& dims);
 
 /// Get the size, in bytes, of a tensor based on datatype and
 /// shape.
@@ -135,7 +158,8 @@ int64_t GetByteSize(const DataType& dtype, const DimsList& dims);
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
+int64_t GetByteSize(
+    const inference::DataType& dtype, const std::vector<int64_t>& dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
 /// and shape. A tensor that has empty shape [] and non-zero
@@ -147,7 +171,8 @@ int64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
 int64_t GetByteSize(
-    const int batch_size, const DataType& dtype, const DimsList& dims);
+    const int batch_size, const inference::DataType& dtype,
+    const DimsList& dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
 /// and shape. A tensor that has empty shape [] and non-zero
@@ -159,20 +184,20 @@ int64_t GetByteSize(
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
 int64_t GetByteSize(
-    const int batch_size, const DataType& dtype,
+    const int batch_size, const inference::DataType& dtype,
     const std::vector<int64_t>& dims);
 
 /// Get the size, in bytes, of a tensor based on ModelInput.
 /// \param mio The ModelInput protobuf.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const ModelInput& mio);
+int64_t GetByteSize(const inference::ModelInput& mio);
 
 /// Get the size, in bytes, of a tensor based on ModelOutput.
 /// \param mio The ModelOutput protobuf.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(const ModelOutput& mio);
+int64_t GetByteSize(const inference::ModelOutput& mio);
 
 /// Get the Platform value for a platform name.
 /// \param platform_name The platform name.
@@ -180,11 +205,23 @@ int64_t GetByteSize(const ModelOutput& mio);
 /// is not recognized.
 Platform GetPlatform(const std::string& platform_name);
 
+/// Get the BackendType value for a platform name.
+/// \param platform_name The platform name.
+/// \return The BackendType or BackendType::UNKNOWN if the platform string
+/// is not recognized.
+BackendType GetBackendTypeFromPlatform(const std::string& platform_name);
+
+/// Get the BackendType value for a backend name.
+/// \param backend_name The backend name.
+/// \return The BackendType or BackendType::UNKNOWN if the platform string
+/// is not recognized.
+BackendType GetBackendType(const std::string& backend_name);
+
 /// Get the CPU thread nice level associate with a model
 /// configuration's priority.
 /// \param config The model configuration.
 /// \return The nice level.
-int GetCpuNiceLevel(const ModelConfig& config);
+int GetCpuNiceLevel(const inference::ModelConfig& config);
 
 /// Compare two model configuration shapes for equality. Wildcard
 /// dimensions (that is, dimensions with size WILDCARD_DIM) are
@@ -242,29 +279,29 @@ std::string DimsListToString(
 /// Get the server protocol string representation of a datatype.
 /// \param dtype The data type.
 /// \return The string representation.
-const char* DataTypeToProtocolString(const DataType dtype);
+const char* DataTypeToProtocolString(const inference::DataType dtype);
 
 /// Get the datatype corresponding to a server protocol string
 /// representation of a datatype.
 /// \param dtype string representation.
 /// \return The data type.
-DataType ProtocolStringToDataType(const std::string& dtype);
+inference::DataType ProtocolStringToDataType(const std::string& dtype);
 
 /// Get the datatype corresponding to a server protocol string
 /// representation of a datatype.
 /// \param dtype Pointer to string.
 /// \param len Length of the string.
 /// \return The data type.
-DataType ProtocolStringToDataType(const char* dtype, size_t len);
+inference::DataType ProtocolStringToDataType(const char* dtype, size_t len);
 
 /// Get the Triton server data type corresponding to a data type.
 /// \param dtype The data type.
 /// \return The Triton server data type.
-TRITONSERVER_DataType DataTypeToTriton(const DataType dtype);
+TRITONSERVER_DataType DataTypeToTriton(const inference::DataType dtype);
 
 /// Get the data type corresponding to a Triton server data type.
 /// \param dtype The Triton server data type.
 /// \return The data type.
-DataType TritonToDataType(const TRITONSERVER_DataType dtype);
+inference::DataType TritonToDataType(const TRITONSERVER_DataType dtype);
 
 }}  // namespace nvidia::inferenceserver

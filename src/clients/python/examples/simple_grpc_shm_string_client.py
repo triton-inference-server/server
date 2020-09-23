@@ -30,9 +30,9 @@ import numpy as np
 import sys
 from builtins import range
 
-import tritongrpcclient as grpcclient
-import tritonshmutils.shared_memory as shm
-import tritonclientutils as utils
+import tritonclient.grpc as grpcclient
+from tritonclient import utils
+import tritonclient.utils.shared_memory as shm
 
 FLAGS = None
 
@@ -82,10 +82,10 @@ if __name__ == '__main__':
     in1n = np.array([str(x) for x in in1.flatten()], dtype=object)
     input1_data = in1n.reshape(in1.shape)
 
-    expected_sum = np.array([str(x)
-                             for x in np.add(in0, in1).flatten()], dtype=object)
-    expected_diff = np.array([str(x)
-                             for x in np.subtract(in0, in1).flatten()], dtype=object)
+    expected_sum = np.array([str(x) for x in np.add(in0, in1).flatten()],
+                            dtype=object)
+    expected_diff = np.array([str(x) for x in np.subtract(in0, in1).flatten()],
+                             dtype=object)
     expected_sum_serialized = utils.serialize_byte_tensor(expected_sum)
     expected_diff_serialized = utils.serialize_byte_tensor(expected_diff)
 

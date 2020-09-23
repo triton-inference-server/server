@@ -28,8 +28,8 @@
 
 nic::Error
 ModelParser::Init(
-    const ni::ModelMetadataResponse& metadata, const ni::ModelConfig& config,
-    const std::string& model_version,
+    const inference::ModelMetadataResponse& metadata,
+    const inference::ModelConfig& config, const std::string& model_version,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     std::unique_ptr<TritonClientWrapper>& client_wrapper)
 {
@@ -54,6 +54,8 @@ ModelParser::Init(
   }
 
   max_batch_size_ = config.max_batch_size();
+
+  is_decoupled_ = config.model_transaction_policy().decoupled();
 
   // Get the information about inputs from metadata
   for (const auto& input : metadata.inputs()) {
@@ -127,7 +129,7 @@ ModelParser::Init(
 
 nic::Error
 ModelParser::GetEnsembleSchedulerType(
-    const ni::ModelConfig& config, const std::string& model_version,
+    const inference::ModelConfig& config, const std::string& model_version,
     std::unique_ptr<TritonClientWrapper>& client_wrapper, bool* is_sequential)
 {
   if (config.has_sequence_batching()) {
@@ -136,7 +138,7 @@ ModelParser::GetEnsembleSchedulerType(
 
   if (config.platform() == "ensemble") {
     for (const auto& step : config.ensemble_scheduling().step()) {
-      ni::ModelConfigResponse model_config;
+      inference::ModelConfigResponse model_config;
       std::string step_version;
       if (step.model_version() != -1) {
         step_version = std::to_string(step.model_version());
@@ -192,6 +194,10 @@ ModelParser::Init(
     max_batch_size_ = bs_itr->value.GetInt();
   }
 
+  const auto txn_itr = config.FindMember("model_transaction_policy");
+  if (txn_itr != config.MemberEnd()) {
+    is_decoupled_ = txn_itr->value["decoupled"].GetBool();
+  }
 
   // Get the information about inputs from metadata
   const auto inputs_itr = metadata.FindMember("inputs");

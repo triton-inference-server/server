@@ -27,21 +27,113 @@
 #include "src/backends/backend/triton_model.h"
 
 #include <vector>
-#include "src/backends/backend/tritonbackend.h"
+#include "src/backends/backend/triton_model_instance.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_message.h"
+#include "triton/core/tritonbackend.h"
+#include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+Status
+BackendConfiguration(
+    const BackendCmdlineConfig& config, const std::string& key,
+    std::string* val)
+{
+  for (const auto& pr : config) {
+    if (pr.first == key) {
+      *val = pr.second;
+      return Status::Success;
+    }
+  }
+
+  return Status(
+      Status::Code::INTERNAL,
+      std::string("unable to find common backend configuration for '") + key +
+          "'");
+}
+
+Status
+ParseStringToDouble(const std::string& str, double* val)
+{
+  try {
+    *val = std::stod(str);
+  }
+  catch (...) {
+    return Status(
+        Status::Code::INTERNAL,
+        "unable to parse common backend configuration as double");
+  }
+
+  return Status::Success;
+}
+
+Status
+ParseStringToBool(const std::string& str, bool* val)
+{
+  try {
+    std::string lowercase_str{str};
+    std::transform(
+        lowercase_str.begin(), lowercase_str.end(), lowercase_str.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+    *val = (lowercase_str == "true");
+  }
+  catch (...) {
+    return Status(
+        Status::Code::INTERNAL,
+        "unable to parse common backend configuration as bool");
+  }
+
+  return Status::Success;
+}
+
+}  // namespace
+
 Status
 TritonModel::Create(
-    const std::string& model_repository_path, const std::string& model_name,
-    const int64_t version, const ModelConfig& model_config,
-    const double min_compute_capability, std::unique_ptr<TritonModel>* model)
+    InferenceServer* server, const std::string& model_repository_path,
+    const BackendCmdlineConfigMap& backend_cmdline_config_map,
+    const std::string& model_name, const int64_t version,
+    const inference::ModelConfig& model_config,
+    std::unique_ptr<TritonModel>* model)
 {
   model->reset();
+
+  // Get some internal configuration values needed for initialization.
+  std::string backend_dir;
+#ifdef TRITON_ENABLE_GPU
+  double min_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
+#else
+  double min_compute_capability = 0;
+#endif  // TRITON_ENABLE_GPU
+  bool auto_complete_config = false;
+  {
+    const auto& itr = backend_cmdline_config_map.find(std::string());
+    if (itr == backend_cmdline_config_map.end()) {
+      return Status(
+          Status::Code::INTERNAL,
+          "unable to find common backend configuration");
+    }
+
+    RETURN_IF_ERROR(
+        BackendConfiguration(itr->second, "backend-directory", &backend_dir));
+
+    std::string min_compute_capability_str;
+    RETURN_IF_ERROR(BackendConfiguration(
+        itr->second, "min-compute-capability", &min_compute_capability_str));
+    RETURN_IF_ERROR(ParseStringToDouble(
+        min_compute_capability_str, &min_compute_capability));
+
+    std::string auto_complete_config_str;
+    RETURN_IF_ERROR(BackendConfiguration(
+        itr->second, "auto-complete-config", &auto_complete_config_str));
+    RETURN_IF_ERROR(
+        ParseStringToBool(auto_complete_config_str, &auto_complete_config));
+  }
 
   // The model configuration must specify a backend. The name of the
   // corresponding shared library must be libtriton_<backend>.so.
@@ -51,25 +143,50 @@ TritonModel::Create(
         "must specify 'backend' for '" + model_config.name() + "'");
   }
 
-  const std::string backend_libname =
-      "libtriton_" + model_config.backend() + ".so";
+  // Localize the content of the model repository corresponding to
+  // 'model_name'. This model holds a handle to the localized content
+  // so that it persists as long as the model is loaded.
+  std::shared_ptr<LocalizedDirectory> localized_model_dir;
+  RETURN_IF_ERROR(LocalizeDirectory(
+      JoinPath({model_repository_path, model_name}), &localized_model_dir));
+
+  std::string backend_name = model_config.backend();
+  if (model_config.backend() == "tensorflow") {
+    backend_name += "1";
+    const auto& itr = backend_cmdline_config_map.find(model_config.backend());
+    if (itr != backend_cmdline_config_map.end()) {
+      std::string tf_version_str;
+      if (BackendConfiguration(itr->second, "version", &tf_version_str)
+              .IsOk()) {
+        if ((tf_version_str != "1") && (tf_version_str != "2")) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "unexpected TensorFlow library version '" + tf_version_str +
+                  "', expects 1 or 2.");
+        }
+        backend_name = model_config.backend() + tf_version_str;
+      }
+    }
+  }
+
+  const std::string backend_libname = "libtriton_" + backend_name + ".so";
 
   // Get the path to the backend shared library. Search path is
   // version directory, model directory, global backend directory.
-  const auto version_path =
-      JoinPath({model_repository_path, model_name, std::to_string(version)});
-  const auto model_path = JoinPath({model_repository_path, model_name});
-  const std::string global_path =
-      "/opt/tritonserver/backends";  // FIXME need cmdline flag
+  const auto model_path = localized_model_dir->Path();
+  const auto version_path = JoinPath({model_path, std::to_string(version)});
+  const std::string global_path = JoinPath({backend_dir, backend_name});
   const std::vector<std::string> search_paths = {version_path, model_path,
                                                  global_path};
 
+  std::string backend_libdir;
   std::string backend_libpath;
   for (const auto& path : search_paths) {
     const auto full_path = JoinPath({path, backend_libname});
     bool exists = false;
     RETURN_IF_ERROR(FileExists(full_path, &exists));
     if (exists) {
+      backend_libdir = path;
       backend_libpath = full_path;
       break;
     }
@@ -83,60 +200,82 @@ TritonModel::Create(
                                        model_path + ", " + global_path);
   }
 
-  // Find the backend
+  // Find/create the backend
+  BackendCmdlineConfig empty_backend_cmdline_config;
+  const BackendCmdlineConfig* config;
+  const auto& itr = backend_cmdline_config_map.find(model_config.backend());
+  if (itr == backend_cmdline_config_map.end()) {
+    config = &empty_backend_cmdline_config;
+  } else {
+    config = &itr->second;
+  }
+
   std::shared_ptr<TritonBackend> backend;
   RETURN_IF_ERROR(TritonBackendManager::CreateBackend(
-      model_config.backend(), backend_libpath, &backend));
+      model_config.backend(), backend_libdir, backend_libpath, *config,
+      &backend));
 
   // Create and initialize the model.
-  std::unique_ptr<TritonModel> local_model(
-      new TritonModel(model_path, backend, min_compute_capability));
-  RETURN_IF_ERROR(
-      local_model->Init(version_path, model_config, "" /* platform */));
+  std::unique_ptr<TritonModel> local_model(new TritonModel(
+      server, localized_model_dir, backend, min_compute_capability,
+      auto_complete_config));
+  // If request for auto completion, Init() will be postponed until
+  // UpdateModelConfig() is called as Init() assumes the model config
+  // is well-formed.
+  // FIXME: the backend never calls SetModelConfig then Init will not be called,
+  // need to revisit this once all backends are moved over and we can get rid of
+  // the InferenceBackend class.
+  if (auto_complete_config) {
+    RETURN_IF_ERROR(local_model->SetModelConfig(version_path, model_config));
+  } else {
+    RETURN_IF_ERROR(
+        local_model->Init(version_path, model_config, "" /* platform */));
+  }
 
-  TRITONBACKEND_Model* triton_model =
-      reinterpret_cast<TRITONBACKEND_Model*>(local_model.get());
-  TritonBackend::TritonModelExecFn_t model_exec_fn = backend->ModelExecFn();
+  TritonModel* raw_local_model = local_model.get();
 
   // Model initialization is optional... The TRITONBACKEND_Model
   // object is this TritonModel object.
   if (backend->ModelInitFn() != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(triton_model));
+    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(
+        reinterpret_cast<TRITONBACKEND_Model*>(raw_local_model)));
   }
+  local_model->initialized_ = true;
 
-  // Create a scheduler with 1 thread. The backend is already
-  // initialized so there is no need to have the scheduler thread call
-  // any initialization.
+  // Create and initialize the model instances for this model.
+  RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
+      raw_local_model, model_config, &local_model->instances_));
+
+  // Create a scheduler with 1 thread per instance. The backend is
+  // already initialized so there is no need to have the scheduler
+  // thread call any initialization.
   RETURN_IF_ERROR(local_model->SetConfiguredScheduler(
-      1 /* runner_cnt */,
+      local_model->instances_.size() /* runner_cnt */,
       /* Initialization callback */
       [](uint32_t runner_idx) -> Status { return Status::Success; },
       /* Run callback */
-      [model_exec_fn, triton_model, backend](
+      [raw_local_model, backend](
           uint32_t runner_idx,
           std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
-        // There is only a single thread calling this function so can
-        // use a static vector to avoid needing to malloc each time.
-        static std::vector<TRITONBACKEND_Request*> triton_requests(1024);
+        // Use a thread local vector to avoid needing to malloc each
+        // time an inference is run.
+        thread_local std::vector<TRITONBACKEND_Request*> triton_requests(1024);
         triton_requests.clear();
         for (auto& r : requests) {
           triton_requests.push_back(
               reinterpret_cast<TRITONBACKEND_Request*>(r.release()));
         }
 
-        // We don't want the backend used by this model to unload
-        // while exec_fn is running (can happen if model is unloaded
-        // during the request and then that request is released in
-        // exec_fn as the last reference to the model. So we hold a
-        // copy of the backend here... This convoluted flow will be
-        // cleaned up once legacy InferenceBackend is replaced with
-        // TritonModel.
-        std::shared_ptr<TritonBackend> backendx = backend;
+        TRITONBACKEND_ModelInstance* triton_model_instance =
+            reinterpret_cast<TRITONBACKEND_ModelInstance*>(
+                raw_local_model->instances_[runner_idx].get());
+        TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
+            backend->ModelInstanceExecFn();
 
         // If there is an error then we retain ownership of 'requests'
         // and must send error responses.
-        TRITONSERVER_Error* err = model_exec_fn(
-            triton_model, &triton_requests[0], triton_requests.size());
+        TRITONSERVER_Error* err = inst_exec_fn(
+            triton_model_instance, &triton_requests[0], triton_requests.size());
         if (err != nullptr) {
           Status status = Status(
               TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
@@ -158,17 +297,100 @@ TritonModel::Create(
   return Status::Success;
 }
 
+Status
+TritonModel::UpdateModelConfig(
+    const uint32_t config_version, TRITONSERVER_Message* updated_config_message)
+{
+  if (initialized_) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "model config can not be set once model is initialized");
+  }
+  const char* buffer;
+  size_t byte_size;
+  RETURN_IF_TRITONSERVER_ERROR(TRITONSERVER_MessageSerializeToJson(
+      updated_config_message, &buffer, &byte_size));
+  inference::ModelConfig updated_config;
+  RETURN_IF_ERROR(
+      JsonToModelConfig({buffer, byte_size}, config_version, &updated_config));
+  auto config = Config();
+  config.set_max_batch_size(updated_config.max_batch_size());
+
+  auto inputs_config = config.mutable_input();
+  *inputs_config = updated_config.input();
+  auto outputs_config = config.mutable_output();
+  *outputs_config = updated_config.output();
+
+  RETURN_IF_ERROR(Init(
+      JoinPath({LocalizedModelPath(), std::to_string(Version())}), config,
+      "" /* platform */));
+  return Status::Success;
+}
+
+void
+TritonModel::WarmUp(uint32_t runner_idx, WarmupData& sample)
+{
+  std::vector<TRITONBACKEND_Request*> triton_requests(1024);
+  triton_requests.clear();
+  for (auto& request : sample.requests_) {
+    // Capture timestamp before run to avoid incorrect accumulation from
+    // sequential warmup runs
+#ifdef TRITON_ENABLE_STATS
+    request->CaptureRequestStartNs();
+#endif  // TRITON_ENABLE_STATS
+    request->CaptureQueueStartNs();
+    triton_requests.push_back(
+        reinterpret_cast<TRITONBACKEND_Request*>(request.release()));
+  }
+  TRITONBACKEND_ModelInstance* triton_model_instance =
+      reinterpret_cast<TRITONBACKEND_ModelInstance*>(
+          instances_[runner_idx].get());
+  TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
+      backend_->ModelInstanceExecFn();
+
+  // If there is an error then we retain ownership of 'requests'
+  // and must send error responses.
+  TRITONSERVER_Error* err = inst_exec_fn(
+      triton_model_instance, &triton_requests[0], triton_requests.size());
+  if (err != nullptr) {
+    Status status = Status(
+        TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
+        TRITONSERVER_ErrorMessage(err));
+    for (TRITONBACKEND_Request* tr : triton_requests) {
+      std::unique_ptr<InferenceRequest> ur(
+          reinterpret_cast<InferenceRequest*>(tr));
+      InferenceRequest::RespondIfError(ur, status, true /* release_requests */);
+    }
+
+    TRITONSERVER_ErrorDelete(err);
+  }
+}
+
 TritonModel::TritonModel(
-    const std::string& model_path,
+    InferenceServer* server,
+    const std::shared_ptr<LocalizedDirectory>& localized_model_dir,
     const std::shared_ptr<TritonBackend>& backend,
-    const double min_compute_capability)
-    : InferenceBackend(min_compute_capability), model_path_(model_path),
-      backend_(backend), state_(nullptr)
+    const double min_compute_capability, const bool auto_complete_config)
+    : InferenceBackend(min_compute_capability), server_(server),
+      auto_complete_config_(auto_complete_config),
+      localized_model_dir_(localized_model_dir), backend_(backend),
+      state_(nullptr), initialized_(false)
 {
 }
 
 TritonModel::~TritonModel()
 {
+  // Need to explicitly delete the scheduler from InferenceBackend
+  // base class to make sure that all scheduler threads have returned
+  // from running in the backend code... This convoluted flow will be
+  // cleaned up once legacy InferenceBackend is completed replaced by
+  // TritonModel.
+  scheduler_.reset();
+
+  // Explicitly delete/finalize all model instances before finalizing
+  // the model itself.
+  instances_.clear();
+
   // Model finalization is optional... The TRITONBACKEND_Model
   // object is this TritonModel object.
   if (backend_->ModelFiniFn() != nullptr) {
@@ -200,10 +422,13 @@ TRITONBACKEND_ModelVersion(TRITONBACKEND_Model* model, uint64_t* version)
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_ModelRepositoryPath(TRITONBACKEND_Model* model, const char** path)
+TRITONBACKEND_ModelRepository(
+    TRITONBACKEND_Model* model, TRITONBACKEND_ArtifactType* artifact_type,
+    const char** location)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
-  *path = tm->ModelPath().c_str();
+  *artifact_type = TRITONBACKEND_ARTIFACT_FILESYSTEM;
+  *location = tm->LocalizedModelPath().c_str();
   return nullptr;  // success
 }
 
@@ -225,6 +450,38 @@ TRITONBACKEND_ModelConfig(
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(std::move(model_config_json)));
 
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelAutoCompleteConfig(
+    TRITONBACKEND_Model* model, bool* auto_complete_config)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *auto_complete_config = tm->AutoCompleteConfig();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelSetConfig(
+    TRITONBACKEND_Model* model, const uint32_t config_version,
+    TRITONSERVER_Message* model_config)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  Status status = tm->UpdateModelConfig(config_version, model_config);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelServer(
+    TRITONBACKEND_Model* model, TRITONSERVER_Server** server)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  *server = reinterpret_cast<TRITONSERVER_Server*>(tm->Server());
   return nullptr;  // success
 }
 
@@ -281,14 +538,69 @@ TRITONBACKEND_RequestInputCount(TRITONBACKEND_Request* request, uint32_t* count)
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_RequestInputName(
+    TRITONBACKEND_Request* request, const uint32_t index,
+    const char** input_name)
+{
+  *input_name = nullptr;
+
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  const auto& inputs = tr->ImmutableInputs();
+  if (index >= inputs.size()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("out of bounds index ") + std::to_string(index) +
+         ": request has " + std::to_string(inputs.size()) + " inputs")
+            .c_str());
+  }
+
+  // The request inputs are not allowed to change once the request
+  // makes it to the backend, so it is ok to just iterate through the
+  // map. This linear search is the best we can do given the need for
+  // the inputs to be in a map and given the typical small number of
+  // inputs is better than having every request maintain the inputs as
+  // both map and vector.
+  uint32_t cnt = 0;
+  for (const auto& pr : inputs) {
+    if (cnt++ == index) {
+      InferenceRequest::Input* in = pr.second;
+      *input_name = in->Name().c_str();
+      break;
+    }
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_RequestInput(
+    TRITONBACKEND_Request* request, const char* name,
+    TRITONBACKEND_Input** input)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  const auto& inputs = tr->ImmutableInputs();
+  const auto& itr = inputs.find(name);
+  if (itr == inputs.end()) {
+    *input = nullptr;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("unknown request input name ") + name).c_str());
+  }
+
+  InferenceRequest::Input* in = itr->second;
+  *input = reinterpret_cast<TRITONBACKEND_Input*>(in);
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestInputByIndex(
     TRITONBACKEND_Request* request, const uint32_t index,
     TRITONBACKEND_Input** input)
 {
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   const auto& inputs = tr->ImmutableInputs();
   if (index >= inputs.size()) {
-    *input = nullptr;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         (std::string("out of bounds index ") + std::to_string(index) +
@@ -315,27 +627,6 @@ TRITONBACKEND_RequestInput(
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_RequestInputByName(
-    TRITONBACKEND_Request* request, const char* name,
-    TRITONBACKEND_Input** input)
-{
-  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
-  const auto& inputs = tr->ImmutableInputs();
-  const auto& itr = inputs.find(name);
-  if (itr == inputs.end()) {
-    *input = nullptr;
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        (std::string("unknown request input name ") + name).c_str());
-  }
-
-  InferenceRequest::Input* in = itr->second;
-  *input = reinterpret_cast<TRITONBACKEND_Input*>(in);
-
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
 TRITONBACKEND_RequestOutputCount(
     TRITONBACKEND_Request* request, uint32_t* count)
 {
@@ -349,10 +640,11 @@ TRITONBACKEND_RequestOutputName(
     TRITONBACKEND_Request* request, const uint32_t index,
     const char** output_name)
 {
+  *output_name = nullptr;
+
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   const auto& routputs = tr->ImmutableRequestedOutputs();
   if (index >= routputs.size()) {
-    *output_name = nullptr;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         (std::string("out of bounds index ") + std::to_string(index) +
@@ -473,6 +765,45 @@ TRITONBACKEND_ResponseDelete(TRITONBACKEND_Response* response)
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_ResponseSetStringParameter(
+    TRITONBACKEND_Response* response, const char* name, const char* value)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+  Status status = tr->AddParameter(name, value);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseSetIntParameter(
+    TRITONBACKEND_Response* response, const char* name, const int64_t value)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+  Status status = tr->AddParameter(name, value);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ResponseSetBoolParameter(
+    TRITONBACKEND_Response* response, const char* name, const bool value)
+{
+  InferenceResponse* tr = reinterpret_cast<InferenceResponse*>(response);
+  Status status = tr->AddParameter(name, value);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_ResponseOutput(
     TRITONBACKEND_Response* response, TRITONBACKEND_Output** output,
     const char* name, const TRITONSERVER_DataType datatype,
@@ -545,7 +876,7 @@ TRITONBACKEND_InputProperties(
     *dims_count = ti->ShapeWithBatchDim().size();
   }
   if (byte_size != nullptr) {
-    *byte_size = GetByteSize(ti->DType(), ti->ShapeWithBatchDim());
+    *byte_size = ti->Data()->TotalByteSize();
   }
   if (buffer_count != nullptr) {
     *buffer_count = ti->DataBufferCount();

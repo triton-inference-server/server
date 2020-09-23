@@ -105,7 +105,6 @@ InferenceServer::InferenceServer()
 
   tf_soft_placement_enabled_ = true;
   tf_gpu_memory_fraction_ = 0.0;
-  tf_vgpu_memory_limits_ = {};
 
   inflight_request_counter_ = 0;
 }
@@ -117,7 +116,17 @@ InferenceServer::Init()
 
   ready_state_ = ServerReadyState::SERVER_INITIALIZING;
 
-  LOG_INFO << "Initializing Triton Inference Server";
+  if (LOG_INFO_IS_ON) {
+    LOG_INFO << "Initializing Triton Inference Server";
+    LOG_INFO << "  id: '" << id_ << "'";
+    LOG_INFO << "  version: '" << version_ << "'";
+    std::string exts;
+    for (const auto& ext : extensions_) {
+      exts.append(" ");
+      exts.append(ext);
+    }
+    LOG_INFO << "  extensions: " << exts;
+  }
 
   if (model_repository_paths_.empty()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
@@ -168,9 +177,10 @@ InferenceServer::Init()
       (model_control_mode_ == ModelControlMode::MODE_EXPLICIT);
   status = ModelRepositoryManager::Create(
       this, version_, model_repository_paths_, startup_models_,
-      strict_model_config_, tf_gpu_memory_fraction_, tf_soft_placement_enabled_,
-      tf_vgpu_memory_limits_, polling_enabled, model_control_enabled,
-      min_supported_compute_capability_, &model_repository_manager_);
+      strict_model_config_, backend_cmdline_config_map_,
+      tf_gpu_memory_fraction_, tf_soft_placement_enabled_, polling_enabled,
+      model_control_enabled, min_supported_compute_capability_,
+      &model_repository_manager_);
   if (!status.IsOk()) {
     if (model_repository_manager_ == nullptr) {
       ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
@@ -188,9 +198,9 @@ InferenceServer::Init()
 }
 
 Status
-InferenceServer::Stop()
+InferenceServer::Stop(const bool force)
 {
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
+  if (!force && (ready_state_ != ServerReadyState::SERVER_READY)) {
     return Status::Success;
   }
 

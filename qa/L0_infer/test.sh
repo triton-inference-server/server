@@ -39,6 +39,29 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
+EXPECTED_NUM_TESTS="42"
+
+if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
+    TEST_SYSTEM_SHARED_MEMORY="0"
+fi
+
+if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
+    TEST_CUDA_SHARED_MEMORY="0"
+fi
+
+if [ -z "$TEST_VALGRIND" ]; then
+    TEST_VALGRIND="0"
+else
+    LEAKCHECK_LOG_BASE="./valgrind_test"
+    LEAKCHECK=/usr/bin/valgrind
+    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
+    SERVER_TIMEOUT=1200
+    rm -f $LEAKCHECK_LOG_BASE*
+fi
+
+if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
+    EXPECTED_NUM_TESTS="29"
+fi
 
 MODELDIR=`pwd`/models
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -65,12 +88,13 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom python"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
+
 
 for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
@@ -88,23 +112,55 @@ for TARGET in cpu gpu; do
 
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
-      if [ "$BACKEND" != "custom" ]; then
+      if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
-      else
+      elif [ "$BACKEND" == "custom" ]; then
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.
+      elif [ "$BACKEND" == "python" ]; then
+        # We will be using ONNX models config.pbtxt and tweak them to make them
+        # appropriate for Python backend
+        onnx_models=`find ${DATADIR}/qa_model_repository/ -maxdepth 1 -type d -regex '.*onnx_.*'`
+
+        # Types that need to use SubAdd instead of AddSub
+        swap_types="float32 int32 int16 int8"
+        for onnx_model in $onnx_models; do
+          python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
+          mkdir -p models/$python_model/1/
+          # Remove platform and use Python as the backend
+          cat $onnx_model/config.pbtxt | sed 's/platform:.*//g' | sed 's/version_policy.*/backend:\ "python"/g' | sed 's/onnx/python/g' > models/$python_model/config.pbtxt
+          cp $onnx_model/output0_labels.txt models/$python_model
+
+          is_swap_type="0"
+
+          # Check whether this model needs to be swapped
+          for swap_type in $swap_types; do
+            model_type="$swap_type"_"$swap_type"_"$swap_type"
+            model_name=python_$model_type
+            model_name_nobatch=python_nobatch_$model_type
+            if [ $python_model == $model_name ] || [ $python_model == $model_name_nobatch ]; then
+                cp ../python_models/sub_add/model.py models/$python_model/1/
+                is_swap_type="1"
+            fi
+          done
+
+          # Use the AddSub model if it doesn't need to be swapped
+          if [ $is_swap_type == "0" ]; then
+                cp ../python_models/add_sub/model.py models/$python_model/1/
+          fi
+        done
       fi
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
       if [[ $BACKENDS == *"custom"* ]]; then
         for BACKEND in $BACKENDS; do
-          if [ "$BACKEND" != "custom" ]; then
+          if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
               cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
                 models/.
-          else
+          elif [ "$BACKEND" == "custom" ]; then
             cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
               models/.
           fi
@@ -132,9 +188,13 @@ for TARGET in cpu gpu; do
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" != "plan" ]; then
+      if [ "$FW" != "plan" ] && [ "$FW" != "python" ];then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
+        done
+      elif [ "$FW" == "python" ]; then
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: KIND_CPU }]" >> $MC
         done
       fi
     done
@@ -159,7 +219,15 @@ for TARGET in cpu gpu; do
               sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
     fi
 
-    run_server
+    # Check if running a memory leak check
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.log
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else  
+        run_server
+    fi
+
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
@@ -168,31 +236,39 @@ for TARGET in cpu gpu; do
 
     set +e
 
-    # python unittest seems to swallow ImportError and still return 0
-    # exit code. So need to explicitly check CLIENT_LOG to make sure
-    # we see some running tests
     python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
         RET=1
+    else
+        check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
 
-    grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed To Run\n***"
-        RET=1
-    fi
 
     set -e
 
     kill $SERVER_PID
     wait $SERVER_PID
+
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        check_valgrind_log $LEAKCHECK_LOG 
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
 done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET

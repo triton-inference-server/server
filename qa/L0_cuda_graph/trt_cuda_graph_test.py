@@ -30,19 +30,28 @@ sys.path.append("../common")
 import unittest
 import numpy as np
 import infer_util as iu
+import test_util as tu
 from tritonclientutils import *
 
-class TrtCudaGraphTest(unittest.TestCase):
+
+class TrtCudaGraphTest(tu.TestResultCollector):
+
     def setUp(self):
         self.dtype_ = np.float32
         self.model_name_ = 'plan'
 
     def _check_infer(self, tensor_shape, batch_size=1):
         try:
-            iu.infer_exact(self, self.model_name_, (batch_size,) + tensor_shape,
-                            batch_size, self.dtype_, self.dtype_, self.dtype_,
-                            model_version=1, use_http_json_tensors=False,
-                            use_grpc=False, use_streaming=False)
+            iu.infer_exact(self,
+                           self.model_name_, (batch_size,) + tensor_shape,
+                           batch_size,
+                           self.dtype_,
+                           self.dtype_,
+                           self.dtype_,
+                           model_version=1,
+                           use_http_json_tensors=False,
+                           use_grpc=False,
+                           use_streaming=False)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -53,9 +62,10 @@ class TrtCudaGraphTest(unittest.TestCase):
         self._check_infer(tensor_shape, 5)
 
     def test_dynamic_shape(self):
-        tensor_shape = (20,)
+        tensor_shape = (16,)
         self._check_infer(tensor_shape)
         # Inference that should not have CUDA graph captured
+        self._check_infer((20,))
         self._check_infer(tensor_shape, 5)
 
 

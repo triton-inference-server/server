@@ -41,6 +41,7 @@ CLIENT_LOG="./client.log"
 ZERO_OUT_TEST=zero_out_test.py
 CUDA_OP_TEST=cuda_op_test.py
 MOD_OP_TEST=mod_op_test.py
+VISION_OP_TEST=vision_op_test.py
 ONNX_OP_TEST=onnx_op_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -53,7 +54,7 @@ RET=0
 
 # Must explicitly set LD_LIBRARY_PATH so that the custom operations
 # can find libtensorflow_framework.so and pytorch library.
-LD_LIBRARY_PATH=/opt/tritonserver/lib/tensorflow:/opt/tritonserver/lib/pytorch:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1:/opt/tritonserver/lib/pytorch:$LD_LIBRARY_PATH
 
 # Tensorflow
 SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops"
@@ -114,6 +115,13 @@ fi
 set +e
 
 python $MOD_OP_TEST -v -m libtorch_modulo >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $VISION_OP_TEST -v -m libtorch_visionop >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"

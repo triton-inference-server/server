@@ -37,122 +37,273 @@ import os
 
 np_dtype_string = np.dtype(object)
 
-TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+TEST_SYSTEM_SHARED_MEMORY = bool(
+    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
+                                                  0)))
 
-class InferZeroTest(unittest.TestCase):
+
+class InferZeroTest(tu.TestResultCollector):
 
     def _full_zero(self, dtype, shapes):
         # 'shapes' is list of shapes, one for each input.
 
         # For validation assume any shape can be used...
-        if tu.validate_for_tf_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
+        if tu.validate_for_tf_model(dtype, dtype, dtype, shapes[0], shapes[0],
+                                    shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                batch_shapes = [[bs,] + shape for shape in shapes]
-                iu.infer_zero(self, 'graphdef', bs, dtype, batch_shapes, batch_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-                iu.infer_zero(self, 'savedmodel', bs, dtype, batch_shapes, batch_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                batch_shapes = [[
+                    bs,
+                ] + shape for shape in shapes]
+                iu.infer_zero(
+                    self,
+                    'graphdef',
+                    bs,
+                    dtype,
+                    batch_shapes,
+                    batch_shapes,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                iu.infer_zero(
+                    self,
+                    'savedmodel',
+                    bs,
+                    dtype,
+                    batch_shapes,
+                    batch_shapes,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
-            iu.infer_zero(self, 'graphdef_nobatch', 1, dtype, shapes, shapes,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            iu.infer_zero(self, 'savedmodel_nobatch', 1, dtype, shapes, shapes,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            iu.infer_zero(self,
+                          'graphdef_nobatch',
+                          1,
+                          dtype,
+                          shapes,
+                          shapes,
+                          use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                          use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            iu.infer_zero(self,
+                          'savedmodel_nobatch',
+                          1,
+                          dtype,
+                          shapes,
+                          shapes,
+                          use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                          use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if tu.validate_for_c2_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
+        if tu.validate_for_c2_model(dtype, dtype, dtype, shapes[0], shapes[0],
+                                    shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                batch_shapes = [[bs, ] + shape for shape in shapes]
-                iu.infer_zero(self, 'netdef', bs, dtype, batch_shapes, batch_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                batch_shapes = [[
+                    bs,
+                ] + shape for shape in shapes]
+                iu.infer_zero(
+                    self,
+                    'netdef',
+                    bs,
+                    dtype,
+                    batch_shapes,
+                    batch_shapes,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
-            iu.infer_zero(self, 'netdef_nobatch', 1, dtype, shapes, shapes,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            iu.infer_zero(self,
+                          'netdef_nobatch',
+                          1,
+                          dtype,
+                          shapes,
+                          shapes,
+                          use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                          use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if tu.validate_for_onnx_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
+        if tu.validate_for_onnx_model(dtype, dtype, dtype, shapes[0], shapes[0],
+                                      shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                batch_shapes = [[bs, ] + shape for shape in shapes]
-                iu.infer_zero(self, 'onnx', bs, dtype, batch_shapes, batch_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                batch_shapes = [[
+                    bs,
+                ] + shape for shape in shapes]
+                iu.infer_zero(
+                    self,
+                    'onnx',
+                    bs,
+                    dtype,
+                    batch_shapes,
+                    batch_shapes,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
-            iu.infer_zero(self, 'onnx_nobatch', 1, dtype, shapes, shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            iu.infer_zero(self,
+                          'onnx_nobatch',
+                          1,
+                          dtype,
+                          shapes,
+                          shapes,
+                          use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                          use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
         for name in ["simple_zero", "sequence_zero", "fan_zero"]:
             if tu.validate_for_ensemble_model(name, dtype, dtype, dtype,
-                                        shapes[0], shapes[0], shapes[0]):
+                                              shapes[0], shapes[0], shapes[0]):
                 # model that supports batching
                 for bs in (1, 8):
-                    batch_shapes = [[bs, ] + shape for shape in shapes]
-                    iu.infer_zero(self, name, bs, dtype, batch_shapes, batch_shapes,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                    batch_shapes = [[
+                        bs,
+                    ] + shape for shape in shapes]
+                    iu.infer_zero(
+                        self,
+                        name,
+                        bs,
+                        dtype,
+                        batch_shapes,
+                        batch_shapes,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
                 # model that does not support batching
-                iu.infer_zero(self, name + '_nobatch', 1, dtype, shapes, shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                iu.infer_zero(
+                    self,
+                    name + '_nobatch',
+                    1,
+                    dtype,
+                    shapes,
+                    shapes,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     def test_ff1_sanity(self):
-        self._full_zero(np.float32, ([1,],))
+        self._full_zero(np.float32, ([
+            1,
+        ],))
+
     def test_ff1(self):
-        self._full_zero(np.float32, ([0,],))
+        self._full_zero(np.float32, ([
+            0,
+        ],))
+
     def test_ff3_sanity(self):
-        self._full_zero(np.float32, ([1,],[2,],[1,]))
+        self._full_zero(np.float32, ([
+            1,
+        ], [
+            2,
+        ], [
+            1,
+        ]))
+
     def test_ff3_0(self):
-        self._full_zero(np.float32, ([0,],[0,],[0,]))
+        self._full_zero(np.float32, ([
+            0,
+        ], [
+            0,
+        ], [
+            0,
+        ]))
+
     def test_ff3_1(self):
-        self._full_zero(np.float32, ([0,],[0,],[1,]))
+        self._full_zero(np.float32, ([
+            0,
+        ], [
+            0,
+        ], [
+            1,
+        ]))
+
     def test_ff3_2(self):
-        self._full_zero(np.float32, ([0,],[1,],[0,]))
+        self._full_zero(np.float32, ([
+            0,
+        ], [
+            1,
+        ], [
+            0,
+        ]))
+
     def test_ff3_3(self):
-        self._full_zero(np.float32, ([1,],[0,],[0,]))
+        self._full_zero(np.float32, ([
+            1,
+        ], [
+            0,
+        ], [
+            0,
+        ]))
+
     def test_ff3_4(self):
-        self._full_zero(np.float32, ([1,],[0,],[1,]))
+        self._full_zero(np.float32, ([
+            1,
+        ], [
+            0,
+        ], [
+            1,
+        ]))
 
     def test_hh1_sanity(self):
         self._full_zero(np.float16, ([2, 2],))
+
     def test_hh1_0(self):
         self._full_zero(np.float16, ([1, 0],))
+
     def test_hh1_1(self):
         self._full_zero(np.float16, ([0, 1],))
+
     def test_hh1_2(self):
         self._full_zero(np.float16, ([0, 0],))
 
     def test_hh3_sanity(self):
-        self._full_zero(np.float16, ([2, 2],[2, 2],[1, 1]))
+        self._full_zero(np.float16, ([2, 2], [2, 2], [1, 1]))
+
     def test_hh3_0(self):
-        self._full_zero(np.float16, ([0, 0],[0, 0],[0, 0]))
+        self._full_zero(np.float16, ([0, 0], [0, 0], [0, 0]))
+
     def test_hh3_1(self):
-        self._full_zero(np.float16, ([0, 1],[0, 1],[2,3]))
+        self._full_zero(np.float16, ([0, 1], [0, 1], [2, 3]))
+
     def test_hh3_2(self):
-        self._full_zero(np.float16, ([1, 0],[1, 3],[0, 1]))
+        self._full_zero(np.float16, ([1, 0], [1, 3], [0, 1]))
+
     def test_hh3_3(self):
-        self._full_zero(np.float16, ([1, 1],[3, 0],[0, 0]))
+        self._full_zero(np.float16, ([1, 1], [3, 0], [0, 0]))
+
     def test_hh3_4(self):
-        self._full_zero(np.float16, ([1, 1],[0, 6],[2, 2]))
+        self._full_zero(np.float16, ([1, 1], [0, 6], [2, 2]))
 
     def test_oo1_sanity(self):
-        self._full_zero(np_dtype_string, ([2,],))
+        self._full_zero(np_dtype_string, ([
+            2,
+        ],))
+
     def test_oo1(self):
-        self._full_zero(np_dtype_string, ([0,],))
+        self._full_zero(np_dtype_string, ([
+            0,
+        ],))
 
     def test_oo3_sanity(self):
-        self._full_zero(np_dtype_string, ([2, 2],[2, 2],[1, 1]))
+        self._full_zero(np_dtype_string, ([2, 2], [2, 2], [1, 1]))
+
     def test_oo3_0(self):
-        self._full_zero(np_dtype_string, ([0, 0],[0, 0],[0, 0]))
+        self._full_zero(np_dtype_string, ([0, 0], [0, 0], [0, 0]))
+
     def test_oo3_1(self):
-        self._full_zero(np_dtype_string, ([0, 1],[0, 1],[2,3]))
+        self._full_zero(np_dtype_string, ([0, 1], [0, 1], [2, 3]))
+
     def test_oo3_2(self):
-        self._full_zero(np_dtype_string, ([1, 0],[1, 3],[0, 1]))
+        self._full_zero(np_dtype_string, ([1, 0], [1, 3], [0, 1]))
+
     def test_oo3_3(self):
-        self._full_zero(np_dtype_string, ([1, 1],[3, 0],[0, 0]))
+        self._full_zero(np_dtype_string, ([1, 1], [3, 0], [0, 0]))
+
     def test_oo3_4(self):
-        self._full_zero(np_dtype_string, ([1, 1],[0, 6],[2, 2]))
+        self._full_zero(np_dtype_string, ([1, 1], [0, 6], [2, 2]))
 
     def test_bb1_sanity(self):
-        self._full_zero(np.bool, ([10,],))
+        self._full_zero(np.bool, ([
+            10,
+        ],))
+
     def test_bb1_0(self):
-        self._full_zero(np.bool, ([0,],))
+        self._full_zero(np.bool, ([
+            0,
+        ],))
+
 
 if __name__ == '__main__':
     unittest.main()

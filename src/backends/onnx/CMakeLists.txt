@@ -32,19 +32,11 @@ cmake_minimum_required (VERSION 3.5)
 set(
   ONNXRUNTIME_SRCS
   autofill.cc
-  loader.cc
-  onnx_backend_factory.cc
-  onnx_backend.cc
-  onnx_utils.cc
 )
 
 set(
   ONNXRUNTIME_HDRS
   autofill.h
-  loader.h
-  onnx_backend_factory.h
-  onnx_backend.h
-  onnx_utils.h
 )
 
 add_library(
@@ -52,14 +44,8 @@ add_library(
   ${ONNXRUNTIME_SRCS} ${ONNXRUNTIME_HDRS}
 )
 add_dependencies(onnxruntime-backend-library proto-library)
-target_include_directories(onnxruntime-backend-library PRIVATE ${TRITON_ONNXRUNTIME_INCLUDE_PATHS})
 
-if(${TRITON_ENABLE_GPU})
-  target_include_directories(onnxruntime-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
-endif() # TRITON_ENABLE_GPU
-if(${TRITON_ENABLE_METRICS})
-  target_include_directories(
-    onnxruntime-backend-library
-    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-endif() # TRITON_ENABLE_METRICS
+target_link_libraries(
+  onnxruntime-backend-library
+  PUBLIC triton-core-serverapi   # from repo-core
+)

@@ -35,7 +35,7 @@ import (
 	"log"
 	"time"
 
-	triton "./nvidia_inferenceserver"
+	triton "nvidia_inferenceserver"
 
 	"google.golang.org/grpc"
 )
@@ -98,7 +98,7 @@ func ModelMetadataRequest(client triton.GRPCInferenceServiceClient, modelName st
 
 	// Create status request for a given model
 	modelMetadataRequest := triton.ModelMetadataRequest{
-		Name: modelName,
+		Name:    modelName,
 		Version: modelVersion,
 	}
 	// Submit modelMetadata request to server
@@ -114,43 +114,40 @@ func ModelInferRequest(client triton.GRPCInferenceServiceClient, rawInput [][]by
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Create request input tensors 
-	inferInputs := []*triton.ModelInferRequest_InferInputTensor {
+	// Create request input tensors
+	inferInputs := []*triton.ModelInferRequest_InferInputTensor{
 		&triton.ModelInferRequest_InferInputTensor{
-			Name: "INPUT0",
+			Name:     "INPUT0",
 			Datatype: "INT32",
-			Shape: []int64{1, 16},
-			Contents: &triton.InferTensorContents{
-				RawContents: rawInput[0],
-			},
+			Shape:    []int64{1, 16},
 		},
 		&triton.ModelInferRequest_InferInputTensor{
-			Name: "INPUT1",
+			Name:     "INPUT1",
 			Datatype: "INT32",
-			Shape: []int64{1, 16},
-			Contents: &triton.InferTensorContents{
-				RawContents: rawInput[1],
-			},		
-		},		
+			Shape:    []int64{1, 16},
+		},
 	}
 
-	// Create request input output tensors 
-	inferOutputs := []*triton.ModelInferRequest_InferRequestedOutputTensor {
+	// Create request input output tensors
+	inferOutputs := []*triton.ModelInferRequest_InferRequestedOutputTensor{
 		&triton.ModelInferRequest_InferRequestedOutputTensor{
 			Name: "OUTPUT0",
 		},
 		&triton.ModelInferRequest_InferRequestedOutputTensor{
 			Name: "OUTPUT1",
-		},		
+		},
 	}
 
 	// Create inference request for specific model/version
 	modelInferRequest := triton.ModelInferRequest{
 		ModelName:    modelName,
 		ModelVersion: modelVersion,
-		Inputs:    	  inferInputs,
+		Inputs:       inferInputs,
 		Outputs:      inferOutputs,
 	}
+
+	modelInferRequest.RawInputContents = append(modelInferRequest.RawInputContents, rawInput[0])
+	modelInferRequest.RawInputContents = append(modelInferRequest.RawInputContents, rawInput[1])
 
 	// Submit inference request to server
 	modelInferResponse, err := client.ModelInfer(ctx, &modelInferRequest)
@@ -189,12 +186,8 @@ func readInt32(fourBytes []byte) int32 {
 
 // Convert output's raw bytes into int32 data (assumes Little Endian)
 func Postprocess(inferResponse *triton.ModelInferResponse) [][]int32 {
-	var outputs []*triton.ModelInferResponse_InferOutputTensor
-	outputs = inferResponse.Outputs
-	output0 := outputs[0]
-	output1 := outputs[1]
-	outputBytes0 := output0.Contents.RawContents
-	outputBytes1 := output1.Contents.RawContents
+	outputBytes0 := inferResponse.RawOutputContents[0]
+	outputBytes1 := inferResponse.RawOutputContents[1]
 
 	outputData0 := make([]int32, outputSize)
 	outputData1 := make([]int32, outputSize)
@@ -254,8 +247,8 @@ func main() {
 	for i := 0; i < outputSize; i++ {
 		fmt.Printf("%d + %d = %d\n", inputData0[i], inputData1[i], outputData0[i])
 		fmt.Printf("%d - %d = %d\n", inputData0[i], inputData1[i], outputData1[i])
-		if ((inputData0[i] + inputData1[i] != outputData0[i]) ||
-				inputData0[i] - inputData1[i] != outputData1[i]) {
+		if (inputData0[i]+inputData1[i] != outputData0[i]) ||
+			inputData0[i]-inputData1[i] != outputData1[i] {
 			log.Fatalf("Incorrect results from inference")
 		}
 	}

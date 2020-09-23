@@ -29,11 +29,15 @@
 #include <string>
 #include "src/backends/backend/triton_backend_manager.h"
 #include "src/core/backend.h"
+#include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
+
+class InferenceServer;
+class TritonModelInstance;
 
 //
 // Represents a model.
@@ -44,32 +48,61 @@ namespace nvidia { namespace inferenceserver {
 class TritonModel : public InferenceBackend {
  public:
   static Status Create(
-      const std::string& model_repository_path, const std::string& model_name,
-      const int64_t version, const ModelConfig& model_config,
-      const double min_compute_capability, std::unique_ptr<TritonModel>* model);
+      InferenceServer* server, const std::string& model_repository_path,
+      const BackendCmdlineConfigMap& backend_cmdline_config_map,
+      const std::string& model_name, const int64_t version,
+      const inference::ModelConfig& model_config,
+      std::unique_ptr<TritonModel>* model);
   ~TritonModel();
 
-  const std::string& ModelPath() const { return model_path_; }
+  const std::string& LocalizedModelPath() const
+  {
+    return localized_model_dir_->Path();
+  }
+  InferenceServer* Server() { return server_; }
+  bool AutoCompleteConfig() const { return auto_complete_config_; }
+  Status UpdateModelConfig(
+      const uint32_t config_version,
+      TRITONSERVER_Message* updated_config_message);
   const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
+
+  void WarmUp(uint32_t runner_idx, WarmupData& sample) override;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModel);
 
   TritonModel(
-      const std::string& model_path,
+      InferenceServer* server,
+      const std::shared_ptr<LocalizedDirectory>& localized_model_dir,
       const std::shared_ptr<TritonBackend>& backend,
-      const double min_compute_capability);
+      const double min_compute_capability, const bool auto_complete_config);
 
-  // Full path to the repo directory holding the model
-  const std::string model_path_;
+  // The server object that owns this model. The model holds this as a
+  // raw pointer because the lifetime of the server is guaranteed to
+  // be longer than the lifetime of a model owned by the server.
+  InferenceServer* server_;
+
+  // Whether the backend should attempt to auto-complete the model config.
+  const bool auto_complete_config_;
+
+  // The localized repo directory holding the model. If localization
+  // required creation of a temporary local copy then that copy will
+  // persist as along as this object is retained by this model.
+  std::shared_ptr<LocalizedDirectory> localized_model_dir_;
 
   // Backend used by this model.
   std::shared_ptr<TritonBackend> backend_;
 
+  // The model instances for this model.
+  std::vector<std::unique_ptr<TritonModelInstance>> instances_;
+
   // Opaque state associated with this model.
   void* state_;
+
+  // Whether the model is initialized.
+  bool initialized_;
 };
 
 }}  // namespace nvidia::inferenceserver

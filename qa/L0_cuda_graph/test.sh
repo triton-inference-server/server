@@ -77,6 +77,13 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -126,6 +133,13 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -135,7 +149,7 @@ if [ `grep -c "Context with profile 0 \[0\] is being executed for " $SERVER_LOG`
     RET=1
 fi
 
-if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "0" ]; then
+if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "6" ]; then
     echo -e "\n***\n*** Failed. Expected no CUDA graphs are captured\n***"
     RET=1
 fi

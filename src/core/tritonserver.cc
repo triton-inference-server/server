@@ -24,11 +24,12 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
+#include "src/core/infer_parameter.h"
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
 #include "src/core/infer_stats.h"
@@ -43,10 +44,12 @@
 #include "src/core/server_message.h"
 #include "src/core/status.h"
 
-#define TRITONJSON_STATUSTYPE Status
-#define TRITONJSON_STATUSRETURN(M) return Status(Status::Code::INTERNAL, (M))
-#define TRITONJSON_STATUSSUCCESS Status::Success
-#include "src/core/json.h"
+#define TRITONJSON_STATUSTYPE nvidia::inferenceserver::Status
+#define TRITONJSON_STATUSRETURN(M)        \
+  return nvidia::inferenceserver::Status( \
+      nvidia::inferenceserver::Status::Code::INTERNAL, (M))
+#define TRITONJSON_STATUSSUCCESS nvidia::inferenceserver::Status::Success
+#include "triton/common/triton_json.h"
 
 namespace ni = nvidia::inferenceserver;
 
@@ -174,7 +177,13 @@ class TritonServerOptions {
   void SetExitOnError(bool b) { exit_on_error_ = b; }
 
   bool StrictModelConfig() const { return strict_model_config_; }
-  void SetStrictModelConfig(bool b) { strict_model_config_ = b; }
+  void SetStrictModelConfig(bool b)
+  {
+    strict_model_config_ = b;
+    // Note the condition is reverted due to setting name is different
+    AddBackendConfig(
+        std::string(), "auto-complete-config", b ? "false" : "true");
+  }
 
   uint64_t PinnedMemoryPoolByteSize() const { return pinned_memory_pool_size_; }
   void SetPinnedMemoryPoolByteSize(uint64_t s) { pinned_memory_pool_size_ = s; }
@@ -196,6 +205,8 @@ class TritonServerOptions {
   void SetMinSupportedComputeCapability(double c)
   {
     min_compute_capability_ = c;
+    AddBackendConfig(
+        std::string(), "min-compute-capability", std::to_string(c));
   }
 
   bool StrictReadiness() const { return strict_readiness_; }
@@ -210,23 +221,30 @@ class TritonServerOptions {
   bool GpuMetrics() const { return gpu_metrics_; }
   void SetGpuMetrics(bool b) { gpu_metrics_ = b; }
 
+  const std::string& BackendDir() const { return backend_dir_; }
+  void SetBackendDir(const std::string& bd)
+  {
+    backend_dir_ = bd;
+    AddBackendConfig(std::string(), "backend-directory", bd);
+  }
+
+  // The backend config map is a map from backend name to the
+  // setting=value pairs for that backend. The empty backend name ("")
+  // is used to communicate configuration information that is used
+  // internally.
+  const ni::BackendCmdlineConfigMap& BackendCmdlineConfigMap() const
+  {
+    return backend_cmdline_config_map_;
+  }
+  TRITONSERVER_Error* AddBackendConfig(
+      const std::string& backend_name, const std::string& setting,
+      const std::string& value);
+
   bool TensorFlowSoftPlacement() const { return tf_soft_placement_; }
   void SetTensorFlowSoftPlacement(bool b) { tf_soft_placement_ = b; }
 
   float TensorFlowGpuMemoryFraction() const { return tf_gpu_mem_fraction_; }
   void SetTensorFlowGpuMemoryFraction(float f) { tf_gpu_mem_fraction_ = f; }
-
-  const std::map<int, std::pair<int, uint64_t>>& TensorFlowVgpuMemoryLimits()
-      const
-  {
-    return tf_vgpu_memory_limits_;
-  }
-  void AddTensorFlowVgpuMemoryLimits(
-      int gpu_device, int num_vgpus, uint64_t per_vgpu_memory_mbytes)
-  {
-    tf_vgpu_memory_limits_[gpu_device] =
-        std::make_pair(num_vgpus, per_vgpu_memory_mbytes);
-  }
 
  private:
   std::string server_id_;
@@ -242,10 +260,11 @@ class TritonServerOptions {
   uint64_t pinned_memory_pool_size_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_compute_capability_;
+  std::string backend_dir_;
+  ni::BackendCmdlineConfigMap backend_cmdline_config_map_;
 
   bool tf_soft_placement_;
   float tf_gpu_mem_fraction_;
-  std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limits_;
 };
 
 TritonServerOptions::TritonServerOptions()
@@ -259,7 +278,8 @@ TritonServerOptions::TritonServerOptions()
 #else
       min_compute_capability_(0),
 #endif  // TRITON_ENABLE_GPU
-      tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
+      backend_dir_("/opt/tritonserver/backends"), tf_soft_placement_(true),
+      tf_gpu_mem_fraction_(0)
 {
 #ifndef TRITON_ENABLE_METRICS
   metrics_ = false;
@@ -271,12 +291,71 @@ TritonServerOptions::TritonServerOptions()
 #endif  // TRITON_ENABLE_METRICS_GPU
 }
 
-#define SetDurationStat(DOC, PARENT, STAT_NAME, COUNT, NS)               \
-  do {                                                                   \
-    ni::TritonJson::Value dstat(DOC, ni::TritonJson::ValueType::OBJECT); \
-    dstat.AddUInt("count", (COUNT));                                     \
-    dstat.AddUInt("ns", (NS));                                           \
-    PARENT.Add(STAT_NAME, std::move(dstat));                             \
+TRITONSERVER_Error*
+ParseBoolOption(std::string arg, bool* val)
+{
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  if ((arg == "true") || (arg == "on") || (arg == "1")) {
+    *val = true;
+    return nullptr;  // success
+  }
+  if ((arg == "false") || (arg == "off") || (arg == "0")) {
+    *val = false;
+    return nullptr;  // success
+  }
+
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INVALID_ARG,
+      std::string("invalid value for bool option: '" + arg + "'").c_str());
+}
+
+TRITONSERVER_Error*
+ParseFloatOption(const std::string arg, float* val)
+{
+  try {
+    *val = std::stof(arg);
+  }
+  catch (const std::invalid_argument& ia) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("invalid value for float option: '" + arg + "'").c_str());
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TritonServerOptions::AddBackendConfig(
+    const std::string& backend_name, const std::string& setting,
+    const std::string& value)
+{
+  ni::BackendCmdlineConfig& cc = backend_cmdline_config_map_[backend_name];
+  cc.push_back(std::make_pair(setting, value));
+
+  // FIXME this TF specific parsing and option setting and also the
+  // corresponding functions in InferenceServer should be removed or
+  // moved to backend once TF backend is moved to TritonBackend.
+  if (backend_name == "tensorflow") {
+    if (setting == "allow-soft-placement") {
+      return ParseBoolOption(value, &tf_soft_placement_);
+    } else if (setting == "gpu-memory-fraction") {
+      return ParseFloatOption(value, &tf_gpu_mem_fraction_);
+    }
+  }
+
+  return nullptr;  // success
+}
+
+#define SetDurationStat(DOC, PARENT, STAT_NAME, COUNT, NS)   \
+  do {                                                       \
+    triton::common::TritonJson::Value dstat(                 \
+        DOC, triton::common::TritonJson::ValueType::OBJECT); \
+    dstat.AddUInt("count", (COUNT));                         \
+    dstat.AddUInt("ns", (NS));                               \
+    PARENT.Add(STAT_NAME, std::move(dstat));                 \
   } while (false)
 
 }  // namespace
@@ -284,6 +363,17 @@ TritonServerOptions::TritonServerOptions()
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+//
+// TRITONSERVER API Version
+//
+TRITONSERVER_Error*
+TRITONSERVER_ApiVersion(uint32_t* major, uint32_t* minor)
+{
+  *major = TRITONSERVER_API_VERSION_MAJOR;
+  *minor = TRITONSERVER_API_VERSION_MINOR;
+  return nullptr;  // success
+}
 
 //
 // TRITONSERVER_DataType
@@ -329,7 +419,7 @@ TRITONSERVER_DataType
 TRITONSERVER_StringToDataType(const char* dtype)
 {
   const size_t len = strlen(dtype);
-  return DataTypeToTriton(ni::ProtocolStringToDataType(dtype, len));
+  return ni::DataTypeToTriton(ni::ProtocolStringToDataType(dtype, len));
 }
 
 uint32_t
@@ -382,6 +472,48 @@ TRITONSERVER_MemoryTypeString(TRITONSERVER_MemoryType memtype)
 }
 
 //
+// TRITONSERVER_ParameterType
+//
+const char*
+TRITONSERVER_ParameterTypeString(TRITONSERVER_ParameterType paramtype)
+{
+  switch (paramtype) {
+    case TRITONSERVER_PARAMETER_STRING:
+      return "STRING";
+    case TRITONSERVER_PARAMETER_INT:
+      return "INT";
+    case TRITONSERVER_PARAMETER_BOOL:
+      return "BOOL";
+    default:
+      break;
+  }
+
+  return "<invalid>";
+}
+
+//
+// TRITONSERVER_InstanceGroupKind
+//
+const char*
+TRITONSERVER_InstanceGroupKindString(TRITONSERVER_InstanceGroupKind kind)
+{
+  switch (kind) {
+    case TRITONSERVER_INSTANCEGROUPKIND_AUTO:
+      return "AUTO";
+    case TRITONSERVER_INSTANCEGROUPKIND_CPU:
+      return "CPU";
+    case TRITONSERVER_INSTANCEGROUPKIND_GPU:
+      return "GPU";
+    case TRITONSERVER_INSTANCEGROUPKIND_MODEL:
+      return "MODEL";
+    default:
+      break;
+  }
+
+  return "<invalid>";
+}
+
+//
 // TRITONSERVER_Log
 //
 bool
@@ -409,22 +541,22 @@ TRITONSERVER_LogMessage(
   switch (level) {
     case TRITONSERVER_LOG_INFO:
       LOG_INFO_FL(filename, line) << msg;
-      break;
+      return nullptr;
     case TRITONSERVER_LOG_WARN:
       LOG_WARNING_FL(filename, line) << msg;
-      break;
+      return nullptr;
     case TRITONSERVER_LOG_ERROR:
       LOG_ERROR_FL(filename, line) << msg;
-      break;
+      return nullptr;
     case TRITONSERVER_LOG_VERBOSE:
       LOG_VERBOSE_FL(1, filename, line) << msg;
-      break;
+      return nullptr;
+    default:
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          std::string("unknown logging level '" + std::to_string(level) + "'")
+              .c_str());
   }
-
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("unknown logging level '" + std::to_string(level) + "'")
-          .c_str());
 }
 
 //
@@ -492,6 +624,15 @@ TRITONSERVER_ResponseAllocatorDelete(TRITONSERVER_ResponseAllocator* allocator)
 //
 // TRITONSERVER_Message
 //
+TRITONSERVER_Error*
+TRITONSERVER_MessageNewFromSerializedJson(
+    TRITONSERVER_Message** message, const char* base, size_t byte_size)
+{
+  *message = reinterpret_cast<TRITONSERVER_Message*>(
+      new ni::TritonServerMessage({base, byte_size}));
+  return nullptr;
+}
+
 TRITONSERVER_Error*
 TRITONSERVER_MessageDelete(TRITONSERVER_Message* message)
 {
@@ -916,35 +1057,23 @@ TRITONSERVER_ServerOptionsSetGpuMetrics(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsSetTensorFlowSoftPlacement(
-    TRITONSERVER_ServerOptions* options, bool soft_placement)
+TRITONSERVER_ServerOptionsSetBackendDirectory(
+    TRITONSERVER_ServerOptions* options, const char* backend_dir)
 {
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
-  loptions->SetTensorFlowSoftPlacement(soft_placement);
+  loptions->SetBackendDir(backend_dir);
   return nullptr;  // Success
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
-    TRITONSERVER_ServerOptions* options, float fraction)
+TRITONSERVER_ServerOptionsSetBackendConfig(
+    TRITONSERVER_ServerOptions* options, const char* backend_name,
+    const char* setting, const char* value)
 {
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
-  loptions->SetTensorFlowGpuMemoryFraction(fraction);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
-    TRITONSERVER_ServerOptions* options, int gpu_device, int num_vgpus,
-    uint64_t per_vgpu_memory_mbytes)
-{
-  TritonServerOptions* loptions =
-      reinterpret_cast<TritonServerOptions*>(options);
-  loptions->AddTensorFlowVgpuMemoryLimits(
-      gpu_device, num_vgpus, per_vgpu_memory_mbytes);
-  return nullptr;  // Success
+  return loptions->AddBackendConfig(backend_name, setting, value);
 }
 
 //
@@ -1252,6 +1381,45 @@ TRITONSERVER_InferenceResponseId(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseParameterCount(
+    TRITONSERVER_InferenceResponse* inference_response, uint32_t* count)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  const auto& parameters = lresponse->Parameters();
+  *count = parameters.size();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseParameter(
+    TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
+    const char** name, TRITONSERVER_ParameterType* type, const void** vvalue)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  const auto& parameters = lresponse->Parameters();
+  if (index >= parameters.size()) {
+    return TritonServerError::Create(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "out of bounds index " + std::to_string(index) +
+            std::string(": response has ") + std::to_string(parameters.size()) +
+            " parameters");
+  }
+
+  const ni::InferenceParameter& param = parameters[index];
+
+  *name = param.Name().c_str();
+  *type = param.Type();
+  *vvalue = param.ValuePointer();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_InferenceResponseOutputCount(
     TRITONSERVER_InferenceResponse* inference_response, uint32_t* count)
 {
@@ -1286,7 +1454,7 @@ TRITONSERVER_InferenceResponseOutput(
   const ni::InferenceResponse::Output& output = outputs[index];
 
   *name = output.Name().c_str();
-  *datatype = DataTypeToTriton(output.DType());
+  *datatype = ni::DataTypeToTriton(output.DType());
 
   const std::vector<int64_t>& oshape = output.Shape();
   *shape = &oshape[0];
@@ -1357,16 +1525,19 @@ TRITONSERVER_ServerNew(
       loptions->MinSupportedComputeCapability());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
+  lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
+
+  // FIXME these should be removed once all backends use
+  // BackendConfig.
   lserver->SetTensorFlowSoftPlacementEnabled(
       loptions->TensorFlowSoftPlacement());
   lserver->SetTensorFlowGPUMemoryFraction(
       loptions->TensorFlowGpuMemoryFraction());
-  lserver->SetTensorFlowVGPUMemoryLimits(
-      loptions->TensorFlowVgpuMemoryLimits());
 
   ni::Status status = lserver->Init();
   if (!status.IsOk()) {
     if (loptions->ExitOnError()) {
+      lserver->Stop(true /* force */);
       delete lserver;
       RETURN_IF_STATUS_ERROR(status);
     }
@@ -1472,6 +1643,8 @@ TRITONSERVER_ServerModelTransactionProperties(
     *voidp = nullptr;
   }
 
+  *txn_flags = 0;
+
   std::shared_ptr<ni::InferenceBackend> backend;
   RETURN_IF_STATUS_ERROR(
       lserver->GetInferenceBackend(model_name, model_version, &backend));
@@ -1491,7 +1664,8 @@ TRITONSERVER_ServerMetadata(
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  ni::TritonJson::Value metadata(ni::TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value metadata(
+      triton::common::TritonJson::ValueType::OBJECT);
 
   // Just store string reference in JSON object since it will be
   // serialized to another buffer before lserver->Id() or
@@ -1500,7 +1674,8 @@ TRITONSERVER_ServerMetadata(
   RETURN_IF_STATUS_ERROR(
       metadata.AddStringRef("version", lserver->Version().c_str()));
 
-  ni::TritonJson::Value extensions(metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value extensions(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   const std::vector<const char*>& exts = lserver->Extensions();
   for (const auto ext : exts) {
     RETURN_IF_STATUS_ERROR(extensions.AppendStringRef(ext));
@@ -1528,14 +1703,16 @@ TRITONSERVER_ServerModelMetadata(
   RETURN_IF_STATUS_ERROR(
       lserver->ModelReadyVersions(model_name, &ready_versions));
 
-  ni::TritonJson::Value metadata(ni::TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value metadata(
+      triton::common::TritonJson::ValueType::OBJECT);
 
   // Can use string ref in this function even though model can be
   // unloaded and config becomes invalid, because TritonServeMessage
   // serializes the json when it is constructed below.
   RETURN_IF_STATUS_ERROR(metadata.AddStringRef("name", model_name));
 
-  ni::TritonJson::Value versions(metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value versions(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   if (model_version != -1) {
     RETURN_IF_STATUS_ERROR(
         versions.AppendString(std::move(std::to_string(model_version))));
@@ -1557,18 +1734,19 @@ TRITONSERVER_ServerModelMetadata(
         metadata.AddStringRef("platform", model_config.backend().c_str()));
   }
 
-  ni::TritonJson::Value inputs(metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value inputs(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   for (const auto& io : model_config.input()) {
-    ni::TritonJson::Value io_metadata(
-        metadata, ni::TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value io_metadata(
+        metadata, triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef("name", io.name().c_str()));
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef(
         "datatype", ni::DataTypeToProtocolString(io.data_type())));
 
     // Input shape. If the model supports batching then must include
     // '-1' for the batch dimension.
-    ni::TritonJson::Value io_metadata_shape(
-        metadata, ni::TritonJson::ValueType::ARRAY);
+    triton::common::TritonJson::Value io_metadata_shape(
+        metadata, triton::common::TritonJson::ValueType::ARRAY);
     if (model_config.max_batch_size() >= 1) {
       RETURN_IF_STATUS_ERROR(io_metadata_shape.AppendInt(-1));
     }
@@ -1582,18 +1760,19 @@ TRITONSERVER_ServerModelMetadata(
   }
   RETURN_IF_STATUS_ERROR(metadata.Add("inputs", std::move(inputs)));
 
-  ni::TritonJson::Value outputs(metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value outputs(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   for (const auto& io : model_config.output()) {
-    ni::TritonJson::Value io_metadata(
-        metadata, ni::TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value io_metadata(
+        metadata, triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef("name", io.name().c_str()));
     RETURN_IF_STATUS_ERROR(io_metadata.AddStringRef(
         "datatype", ni::DataTypeToProtocolString(io.data_type())));
 
     // Output shape. If the model supports batching then must include
     // '-1' for the batch dimension.
-    ni::TritonJson::Value io_metadata_shape(
-        metadata, ni::TritonJson::ValueType::ARRAY);
+    triton::common::TritonJson::Value io_metadata_shape(
+        metadata, triton::common::TritonJson::ValueType::ARRAY);
     if (model_config.max_batch_size() >= 1) {
       RETURN_IF_STATUS_ERROR(io_metadata_shape.AppendInt(-1));
     }
@@ -1625,7 +1804,7 @@ TRITONSERVER_ServerModelStatistics(
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   auto model_name_string = std::string(model_name);
-  std::map<std::string, std::vector<int64_t>> ready_model_versions;
+  std::map<std::string, std::vector<int64_t> > ready_model_versions;
   if (model_name_string.empty()) {
     RETURN_IF_STATUS_ERROR(lserver->ModelReadyVersions(&ready_model_versions));
   } else {
@@ -1667,10 +1846,11 @@ TRITONSERVER_ServerModelStatistics(
 
   // Can use string ref in this function because TritonServeMessage
   // serializes the json when it is constructed below.
-  ni::TritonJson::Value metadata(ni::TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value metadata(
+      triton::common::TritonJson::ValueType::OBJECT);
 
-  ni::TritonJson::Value model_stats_json(
-      metadata, ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value model_stats_json(
+      metadata, triton::common::TritonJson::ValueType::ARRAY);
   for (const auto& mv_pair : ready_model_versions) {
     for (const auto& version : mv_pair.second) {
       std::shared_ptr<ni::InferenceBackend> backend;
@@ -1681,8 +1861,8 @@ TRITONSERVER_ServerModelStatistics(
       const auto& infer_batch_stats =
           backend->StatsAggregator().ImmutableInferBatchStats();
 
-      ni::TritonJson::Value inference_stats(
-          metadata, ni::TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value inference_stats(
+          metadata, triton::common::TritonJson::ValueType::OBJECT);
       SetDurationStat(
           metadata, inference_stats, "success", infer_stats.success_count_,
           infer_stats.request_duration_ns_);
@@ -1702,11 +1882,11 @@ TRITONSERVER_ServerModelStatistics(
           metadata, inference_stats, "compute_output",
           infer_stats.success_count_, infer_stats.compute_output_duration_ns_);
 
-      ni::TritonJson::Value batch_stats(
-          metadata, ni::TritonJson::ValueType::ARRAY);
+      triton::common::TritonJson::Value batch_stats(
+          metadata, triton::common::TritonJson::ValueType::ARRAY);
       for (const auto& batch : infer_batch_stats) {
-        ni::TritonJson::Value batch_stat(
-            metadata, ni::TritonJson::ValueType::OBJECT);
+        triton::common::TritonJson::Value batch_stat(
+            metadata, triton::common::TritonJson::ValueType::OBJECT);
         RETURN_IF_STATUS_ERROR(batch_stat.AddUInt("batch_size", batch.first));
         SetDurationStat(
             metadata, batch_stat, "compute_input", batch.second.count_,
@@ -1720,8 +1900,8 @@ TRITONSERVER_ServerModelStatistics(
         RETURN_IF_STATUS_ERROR(batch_stats.Append(std::move(batch_stat)));
       }
 
-      ni::TritonJson::Value model_stat(
-          metadata, ni::TritonJson::ValueType::OBJECT);
+      triton::common::TritonJson::Value model_stat(
+          metadata, triton::common::TritonJson::ValueType::OBJECT);
       RETURN_IF_STATUS_ERROR(
           model_stat.AddStringRef("name", mv_pair.first.c_str()));
       RETURN_IF_STATUS_ERROR(
@@ -1765,8 +1945,8 @@ TRITONSERVER_ServerModelConfig(
       lserver->GetInferenceBackend(model_name, model_version, &backend));
 
   std::string model_config_json;
-  RETURN_IF_STATUS_ERROR(
-      ModelConfigToJson(backend->Config(), config_version, &model_config_json));
+  RETURN_IF_STATUS_ERROR(ni::ModelConfigToJson(
+      backend->Config(), config_version, &model_config_json));
 
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new ni::TritonServerMessage(std::move(model_config_json)));
@@ -1788,11 +1968,12 @@ TRITONSERVER_ServerModelIndex(
 
   // Can use string ref in this function because TritonServeMessage
   // serializes the json when it is constructed below.
-  ni::TritonJson::Value repository_index_json(ni::TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value repository_index_json(
+      triton::common::TritonJson::ValueType::ARRAY);
 
   for (const auto& in : index) {
-    ni::TritonJson::Value model_index(
-        repository_index_json, ni::TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value model_index(
+        repository_index_json, triton::common::TritonJson::ValueType::OBJECT);
     RETURN_IF_STATUS_ERROR(model_index.AddStringRef("name", in.name_.c_str()));
     if (!in.name_only_) {
       if (in.version_ >= 0) {

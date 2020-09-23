@@ -224,12 +224,22 @@ RequestRateManager::Infer(
               it->second.delayed_));
           ctx->infer_client_->ClientInferStat(
               &(thread_stat->contexts_stat_[0]));
+        } else {
+          return;
         }
       }
     }
     ctx->inflight_request_cnt_--;
   };
 
+  if (streaming_) {
+    // Decoupled models should not collect client side statistics
+    thread_stat->status_ = ctx->infer_client_->StartStream(
+        callback_func, (!parser_->IsDecoupled()));
+    if (!thread_stat->status_.IsOk()) {
+      return;
+    }
+  }
 
   // run inferencing until receiving exit signal to maintain server load.
   do {

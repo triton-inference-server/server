@@ -37,7 +37,7 @@ namespace nvidia { namespace inferenceserver {
 Status
 EnsembleBackend::Init(
     InferenceServer* const server, const std::string& path,
-    const ModelConfig& config)
+    const inference::ModelConfig& config)
 {
   RETURN_IF_ERROR(InferenceBackend::Init(path, config, kEnsemblePlatform));
 

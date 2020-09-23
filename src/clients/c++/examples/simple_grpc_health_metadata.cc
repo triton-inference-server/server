@@ -135,7 +135,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  ni::ServerMetadataResponse server_metadata;
+  inference::ServerMetadataResponse server_metadata;
   FAIL_IF_ERR(
       client->ServerMetadata(&server_metadata, http_headers),
       "unable to get server metadata");
@@ -145,7 +145,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  ni::ModelMetadataResponse model_metadata;
+  inference::ModelMetadataResponse model_metadata;
   FAIL_IF_ERR(
       client->ModelMetadata(
           &model_metadata, model_name, model_version, http_headers),
@@ -156,7 +156,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  ni::ModelConfigResponse model_config;
+  inference::ModelConfigResponse model_config;
   FAIL_IF_ERR(
       client->ModelConfig(
           &model_config, model_name, model_version, http_headers),

@@ -68,6 +68,22 @@ class PlanBackend : public InferenceBackend {
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
   friend std::ostream& operator<<(std::ostream&, const PlanBackend&);
 
+#ifdef TRITON_ENABLE_CUDA_GRAPH
+  struct GraphSpec {
+    GraphSpec() : batch_size_(0), lower_bound_batch_size_(0), captured_(false)
+    {
+    }
+    int batch_size_;
+    std::map<std::string, std::vector<int64_t>> shapes_;
+    int lower_bound_batch_size_;
+    std::map<std::string, std::vector<int64_t>> lower_bound_shapes_;
+    bool captured_;
+  };
+  Status InitializeGraphSpecs(
+      std::vector<GraphSpec>* graph_specs, bool* allow_inexact_match);
+  Status ValidateGraphSpec(const GraphSpec& graph_spec);
+#endif
+
   Status DuplicateWarmupRequests(
       const std::vector<std::unique_ptr<InferenceRequest>>& warmup_requests,
       std::vector<std::unique_ptr<InferenceRequest>>* requests);
@@ -86,28 +102,41 @@ class PlanBackend : public InferenceBackend {
     struct TensorRTContext;
 
     Status ValidateInputs(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios,
         const std::set<std::string>& allowed_shape_tensors);
     Status ValidateOutputs(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios,
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>& ios,
         const std::set<std::string>& allowed_shape_tensors);
 
     Status InitializeExecuteInputBinding(
-        const std::string& input_name, const DataType input_datatype,
-        const DimsList& input_dims, const bool is_control = false);
+        const std::string& input_name, const inference::DataType input_datatype,
+        const DimsList& input_dims, const bool is_control = false,
+        const bool is_ragged = false);
     Status InitializeShapeInputBinding(
-        const std::string& input_name, const DataType input_datatype,
+        const std::string& input_name, const inference::DataType input_datatype,
         const DimsList& input_dims);
-    Status InitializeSequenceControlInputBindings(const ModelConfig& config);
+    Status InitializeSequenceControlInputBindings(
+        const inference::ModelConfig& config);
+    Status InitializeBatchInputBindings(const inference::ModelConfig& config);
     Status InitializeConfigExecuteInputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status InitializeConfigShapeInputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelInput>& ios);
     Status InitializeConfigExecuteOutputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
+            ios);
     Status InitializeConfigShapeOutputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
-    bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
+        const ::google::protobuf::RepeatedPtrField<inference::ModelOutput>&
+            ios);
+    Status InitializeBatchOutputBindings(const inference::ModelConfig& config);
+    Status GetProfileDimensions(
+        const int io_index, const int profile_index, TensorRTContext* context);
+#ifdef TRITON_ENABLE_CUDA_GRAPH
+    bool BuildCudaGraph(
+        TensorRTContext* trt_context, const GraphSpec& graph_spec);
+    bool BuildCudaGraphV2(
+        TensorRTContext* trt_context, const GraphSpec& graph_spec);
+#endif
 
     Status InitOptimizationProfiles(
         const ::google::protobuf::RepeatedPtrField<std::string>& profile_names);
@@ -149,20 +178,38 @@ class PlanBackend : public InferenceBackend {
     // context can have multiple of this struct if multiple optimization
     // profiles is specified.
     struct TensorRTContext {
-      TensorRTContext(const std::string& profile_name, int binding_cnts)
-          : profile_name_(profile_name), context_(nullptr),
+      TensorRTContext(
+          const std::string& profile_name, const int profile_idx,
+          const int binding_cnts, const int event_set_cnts)
+          : profile_name_(profile_name), profile_idx_(profile_idx),
+            context_(nullptr), cuda_graph_execs_(event_set_cnts),
             min_dims_(binding_cnts), max_dims_(binding_cnts),
             opt_dims_(binding_cnts), min_shapes_(binding_cnts),
-            max_shapes_(binding_cnts), opt_shapes_(binding_cnts)
+            max_shapes_(binding_cnts), opt_shapes_(binding_cnts),
+            is_dynamic_per_binding_(binding_cnts)
       {
       }
       std::string profile_name_;
+      int profile_idx_;
       nvinfer1::IExecutionContext* context_;
+
+      // Struct that holds cudaGraphExec_t and the dimensions of the inputs
+      // used to capture the graph
+      struct CudaGraph {
+        CudaGraph() : cuda_graph_exec_(nullptr) {}
+        std::vector<int64_t> lower_bound_key_;
+        // Store in the order of the bindng index
+        std::vector<std::vector<int64_t>> input_dims_;
+        cudaGraphExec_t cuda_graph_exec_;
+      };
 
       // The CUDA graphs captured for the model for different
       // batch-sizes.
-      std::unordered_map<int, cudaGraph_t> cuda_graphs_;
-      std::unordered_map<int, cudaGraphExec_t> cuda_graph_execs_;
+      std::vector<cudaGraph_t> cuda_graphs_;
+      // The key is packed input dimensions prepended by batch size, so that
+      // uniqueness is guaranteed and the CUDA graphs are sorted to provide
+      // convinence to find the closest CUDA graph in the future.
+      std::vector<std::map<std::vector<int64_t>, CudaGraph>> cuda_graph_execs_;
 
       // Min Dimensions per bindings
       std::vector<nvinfer1::Dims> min_dims_;
@@ -184,6 +231,9 @@ class PlanBackend : public InferenceBackend {
 
       // The number of shape values
       size_t nb_shape_values_;
+
+      // Whether or not the binding contains a dynamic shape
+      std::vector<bool> is_dynamic_per_binding_;
     };
 
     // A group of CUDA events that signals different stages of the request.
@@ -208,9 +258,31 @@ class PlanBackend : public InferenceBackend {
         const std::unique_ptr<InferenceRequest>& request,
         std::map<int, std::vector<int32_t>>* request_shape_values);
 
-    std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
-        size_t total_batch_size, const InferenceRequest& input_request,
-        const std::map<int, std::vector<int32_t>>& request_shape_values);
+    Status GetMostOptimizedProfile(
+        size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        const std::map<int, std::vector<int32_t>>& request_shape_values,
+        std::map<int, PlanBackend::Context::TensorRTContext>::iterator* citr);
+
+    Status EvaluateTensorRTContext(
+        std::map<int, PlanBackend::Context::TensorRTContext>::iterator& citr,
+        size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        const std::map<int, std::vector<int32_t>>& request_shape_values,
+        int64_t* error_distance);
+
+    Status SetBindingDimensions(
+        const std::string& input_name, const std::vector<int64_t>& shape,
+        const TensorRTContext& trt_context, const size_t io_index,
+        const size_t binding_index, std::vector<int64_t>* input_dims);
+    Status SetCudaGraphShape(
+        TensorRTContext* trt_context, const GraphSpec& graph_spec,
+        std::vector<int64_t>* cuda_graph_key,
+        TensorRTContext::CudaGraph* cuda_graph);
+    void FindClosestCudaGraph(
+        const TensorRTContext& trt_context,
+        const std::vector<int64_t>& cuda_graph_key,
+        const TensorRTContext::CudaGraph** cuda_graph, bool* found_exact);
 
     // The engine used for the context. If the model uses dynamic shape, then
     // the CUDA engine is owned by the context. Otherwise, the engine is shared
@@ -275,8 +347,8 @@ class PlanBackend : public InferenceBackend {
     // Is set true if the configuration supports batching
     bool support_batching_;
 
-    // Is set true if the loaded model has one or more dynamic shaped inputs
-    bool is_dynamic_;
+    // Whether inexact match is allowed for finding CUDA graph
+    bool allow_inexact_match_;
 
     // The total number of bindings
     int total_bindings_;
@@ -288,9 +360,30 @@ class PlanBackend : public InferenceBackend {
 
     // The maximum possible size of the TensorRT tensor and the corresponding
     // allocated GPU buffer across all optimization
-    // profile. The array sizes are equal to Context::num_expected_bindings_
-    std::vector<uint64_t> byte_sizes_;
-    std::vector<void*> buffers_;
+    // profile.
+    using BatchInputData =
+        std::pair<inference::BatchInput, std::unique_ptr<AllocatedMemory>>;
+    struct IOBindingInfo {
+      IOBindingInfo()
+          : byte_size_(0), buffer_(nullptr), buffer_is_ragged_(false),
+            is_linear_format_(true), format_element_size_(0)
+      {
+      }
+      uint64_t byte_size_;
+      void* buffer_;
+      bool buffer_is_ragged_;
+      bool is_linear_format_;
+      size_t format_element_size_;
+      // Instructions on constructing the batch input and the CPU buffer for
+      // storing mutable data
+      std::shared_ptr<BatchInputData> batch_input_;
+      // Store the pair of input name to look up and output shape
+      // for output scattering
+      std::pair<std::string, std::vector<int64_t>> io_shape_mapping_;
+    };
+
+    // The array sizes are equal to Context::num_expected_bindings_
+    std::vector<IOBindingInfo> io_binding_infos_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
     // engine. This is used to match the TensorRT context execution declaration

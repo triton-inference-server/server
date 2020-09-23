@@ -36,10 +36,12 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 
-#define TRITONJSON_STATUSTYPE Status
-#define TRITONJSON_STATUSRETURN(M) return Status(Status::Code::INTERNAL, (M))
-#define TRITONJSON_STATUSSUCCESS Status::Success
-#include "src/core/json.h"
+#define TRITONJSON_STATUSTYPE nvidia::inferenceserver::Status
+#define TRITONJSON_STATUSRETURN(M)        \
+  return nvidia::inferenceserver::Status( \
+      nvidia::inferenceserver::Status::Code::INTERNAL, (M))
+#define TRITONJSON_STATUSSUCCESS nvidia::inferenceserver::Status::Success
+#include "triton/common/triton_json.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -69,7 +71,7 @@ struct EnsembleTensor {
 /// the ensemble configuration is not valid.
 Status
 BuildEnsembleGraph(
-    const ModelConfig& config,
+    const inference::ModelConfig& config,
     std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph)
 {
   keyed_ensemble_graph.clear();
@@ -149,7 +151,7 @@ BuildEnsembleGraph(
 }
 
 Status
-ValidateEnsembleSchedulingConfig(const ModelConfig& config)
+ValidateEnsembleSchedulingConfig(const inference::ModelConfig& config)
 {
   if (config.platform() != kEnsemblePlatform) {
     return Status(
@@ -268,7 +270,7 @@ ValidateIOShape(
         Status::Code::INVALID_ARG, message_prefix + "must specify 'name'");
   }
 
-  if (io.data_type() == DataType::TYPE_INVALID) {
+  if (io.data_type() == inference::DataType::TYPE_INVALID) {
     return Status(
         Status::Code::INVALID_ARG, "model output must specify 'data_type'");
   }
@@ -396,10 +398,12 @@ GetModelVersionFromPath(const std::string& path, int64_t* version)
 
 Status
 GetBooleanSequenceControlProperties(
-    const ModelSequenceBatching& batcher, const std::string& model_name,
-    const ModelSequenceBatching::Control::Kind control_kind,
-    const bool required, std::string* tensor_name, DataType* tensor_datatype,
-    float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
+    const inference::ModelSequenceBatching& batcher,
+    const std::string& model_name,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
+    const bool required, std::string* tensor_name,
+    inference::DataType* tensor_datatype, float* fp32_false_value,
+    float* fp32_true_value, int32_t* int32_false_value,
     int32_t* int32_true_value)
 {
   // Make sure same tensor is not configured for multiple controls
@@ -431,7 +435,8 @@ GetBooleanSequenceControlProperties(
           return Status(
               Status::Code::INVALID_ARG,
               "sequence batching specifies multiple " +
-                  ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  inference::ModelSequenceBatching_Control_Kind_Name(
+                      control_kind) +
                   " tensors for " + model_name);
         }
 
@@ -444,7 +449,8 @@ GetBooleanSequenceControlProperties(
                 Status::Code::INVALID_ARG,
                 "sequence batching specifies both 'int32_false_true' and "
                 "'fp32_false_true' for " +
-                    ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
                     " for " + model_name);
           }
 
@@ -453,12 +459,13 @@ GetBooleanSequenceControlProperties(
                 Status::Code::INVALID_ARG,
                 "sequence batching control 'int32_false_true' must have "
                 "exactly 2 entries for " +
-                    ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
                     " for " + model_name);
           }
 
           if (tensor_datatype != nullptr) {
-            *tensor_datatype = DataType::TYPE_INT32;
+            *tensor_datatype = inference::DataType::TYPE_INT32;
           }
           if (int32_false_value != nullptr) {
             *int32_false_value = c.int32_false_true(0);
@@ -472,7 +479,8 @@ GetBooleanSequenceControlProperties(
                 Status::Code::INVALID_ARG,
                 "sequence batching must specify either 'int32_false_true' or "
                 "'fp32_false_true' for " +
-                    ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
                     " for " + model_name);
           }
 
@@ -481,12 +489,13 @@ GetBooleanSequenceControlProperties(
                 Status::Code::INVALID_ARG,
                 "sequence batching control 'fp32_false_true' must have exactly "
                 "2 entries for " +
-                    ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
                     " for " + model_name);
           }
 
           if (tensor_datatype != nullptr) {
-            *tensor_datatype = DataType::TYPE_FP32;
+            *tensor_datatype = inference::DataType::TYPE_FP32;
           }
           if (fp32_false_value != nullptr) {
             *fp32_false_value = c.fp32_false_true(0);
@@ -504,7 +513,7 @@ GetBooleanSequenceControlProperties(
       return Status(
           Status::Code::INVALID_ARG,
           "sequence batching control tensor must specify a " +
-              ModelSequenceBatching_Control_Kind_Name(control_kind) +
+              inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
               " value for " + model_name);
     }
 
@@ -516,9 +525,11 @@ GetBooleanSequenceControlProperties(
 
 Status
 GetTypedSequenceControlProperties(
-    const ModelSequenceBatching& batcher, const std::string& model_name,
-    const ModelSequenceBatching::Control::Kind control_kind,
-    const bool required, std::string* tensor_name, DataType* tensor_datatype)
+    const inference::ModelSequenceBatching& batcher,
+    const std::string& model_name,
+    const inference::ModelSequenceBatching::Control::Kind control_kind,
+    const bool required, std::string* tensor_name,
+    inference::DataType* tensor_datatype)
 {
   // Make sure same tensor is not configured for multiple controls
   std::set<std::string> seen_tensors;
@@ -549,7 +560,8 @@ GetTypedSequenceControlProperties(
           return Status(
               Status::Code::INVALID_ARG,
               "sequence batching specifies multiple " +
-                  ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  inference::ModelSequenceBatching_Control_Kind_Name(
+                      control_kind) +
                   " tensors for " + model_name);
         }
 
@@ -565,7 +577,8 @@ GetTypedSequenceControlProperties(
               Status::Code::INVALID_ARG,
               "sequence batching must not specify either 'int32_false_true' "
               "nor 'fp32_false_true' for " +
-                  ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  inference::ModelSequenceBatching_Control_Kind_Name(
+                      control_kind) +
                   " for " + model_name);
         }
       }
@@ -577,7 +590,7 @@ GetTypedSequenceControlProperties(
       return Status(
           Status::Code::INVALID_ARG,
           "sequence batching control tensor must specify a " +
-              ModelSequenceBatching_Control_Kind_Name(control_kind) +
+              inference::ModelSequenceBatching_Control_Kind_Name(control_kind) +
               " value for " + model_name);
     }
 
@@ -591,7 +604,7 @@ Status
 GetNormalizedModelConfig(
     const std::string& path, const BackendConfigMap& backend_config_map,
     const bool autofill, const double min_compute_capability,
-    ModelConfig* config)
+    inference::ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
   const auto config_path = JoinPath({path, kModelConfigPbTxt});
@@ -603,87 +616,111 @@ GetNormalizedModelConfig(
     RETURN_IF_ERROR(ReadTextProto(config_path, config));
   }
 
-  // For now, both 'backend' and 'platform' cannot be listed in the
-  // config. If backend is given then just leave platform empty and
-  // don't perform autofill or attempt to adjust default model
-  // filename.
-  if (!config->platform().empty() && !config->backend().empty()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "cannot specify both 'backend' and 'platform' for model '" +
-            config->name() + "'");
+  // If the model name is not given in the configuration, set if based
+  // on the model path.
+  const std::string model_name(BaseName(path));
+  if (config->name().empty()) {
+    config->set_name(model_name);
   }
 
-  if (config->backend().empty()) {
-    // Autofill if requested...
-    if (autofill) {
-      const std::string model_name(BaseName(path));
-      std::unique_ptr<AutoFill> af;
-      RETURN_IF_ERROR(AutoFill::Create(
-          model_name, backend_config_map, std::string(path), *config, &af));
-      RETURN_IF_ERROR(af->Fix(config));
+  // FIXME need to check other Triton components on how they retrieve model
+  // config. The new workflow will let model backend contains the most updated
+  // config after the model is loaded, in other word, should always retrieve
+  // config with backend.Config().
+  // Autofill if requested...
+  if (autofill) {
+    std::unique_ptr<AutoFill> af;
+    RETURN_IF_ERROR(AutoFill::Create(
+        model_name, backend_config_map, std::string(path), *config, &af));
+    RETURN_IF_ERROR(af->Fix(config));
 
-      LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
-    }
+    LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
+  }
 
-    if (config->platform().empty()) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "must specify platform for model '" + config->name() + "'");
-    }
-
-    // If 'default_model_filename' is not specified set it appropriately
-    // based upon 'platform'.
-    if (config->default_model_filename().empty()) {
+  // Fill backend if platform is set for non-custom backend
+  if (config->backend().empty() && !config->platform().empty()) {
 #ifdef TRITON_ENABLE_TENSORFLOW
-      if (config->platform() == kTensorFlowGraphDefPlatform) {
-        config->set_default_model_filename(kTensorFlowGraphDefFilename);
-      } else if (config->platform() == kTensorFlowSavedModelPlatform) {
-        config->set_default_model_filename(kTensorFlowSavedModelFilename);
-      } else
+    if ((config->platform() == kTensorFlowGraphDefPlatform) ||
+        (config->platform() == kTensorFlowSavedModelPlatform)) {
+      config->set_backend(kTensorFlowBackend);
+    }
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+    if (config->platform() == kOnnxRuntimeOnnxPlatform) {
+      config->set_backend(kOnnxRuntimeBackend);
+    }
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+    // FIXME: "else if ()" other supported frameworks once they are ported
+    // to use backend API.
+  }
+
+  // FIXME: Add other supported frameworks once they are ported
+  // to use backend API.
+  // // Fill platform if backend is set for non-custom backend
+  // if (!config->backend().empty() && config->platform().empty()) {
+  //   // tensorflow can't be filled as platform is not unique
+  // }
+  if (!config->backend().empty() && config->platform().empty()) {
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+    if (config->backend() == kOnnxRuntimeBackend) {
+      config->set_platform(kOnnxRuntimeOnnxPlatform);
+    }
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+  }
+
+  // If 'default_model_filename' is not specified set it appropriately
+  // based upon 'platform'.
+  if (config->default_model_filename().empty()) {
+#ifdef TRITON_ENABLE_TENSORFLOW
+    if (config->platform() == kTensorFlowGraphDefPlatform) {
+      config->set_default_model_filename(kTensorFlowGraphDefFilename);
+    } else if (config->platform() == kTensorFlowSavedModelPlatform) {
+      config->set_default_model_filename(kTensorFlowSavedModelFilename);
+    } else
 #endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
-          if (config->platform() == kTensorRTPlanPlatform) {
-        config->set_default_model_filename(kTensorRTPlanFilename);
-      } else
+        if (config->platform() == kTensorRTPlanPlatform) {
+      config->set_default_model_filename(kTensorRTPlanFilename);
+    } else
 #endif  // TRITON_ENABLE_TENSORRT
 #ifdef TRITON_ENABLE_CAFFE2
-          if (config->platform() == kCaffe2NetDefPlatform) {
-        config->set_default_model_filename(kCaffe2NetDefFilename);
-      } else
+        if (config->platform() == kCaffe2NetDefPlatform) {
+      config->set_default_model_filename(kCaffe2NetDefFilename);
+    } else
 #endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_ONNXRUNTIME
-          if (config->platform() == kOnnxRuntimeOnnxPlatform) {
-        config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
-      } else
+        if (config->platform() == kOnnxRuntimeOnnxPlatform) {
+      config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
+    } else
 #endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
-          if (config->platform() == kPyTorchLibTorchPlatform) {
-        config->set_default_model_filename(kPyTorchLibTorchFilename);
-      } else
+        if (config->platform() == kPyTorchLibTorchPlatform) {
+      config->set_default_model_filename(kPyTorchLibTorchFilename);
+    } else
 #endif  // TRITON_ENABLE_PYTORCH
 #ifdef TRITON_ENABLE_CUSTOM
-          if (config->platform() == kCustomPlatform) {
-        config->set_default_model_filename(kCustomFilename);
-      } else
+        if (config->platform() == kCustomPlatform) {
+      config->set_default_model_filename(kCustomFilename);
+    } else
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
-          if (config->platform() == kEnsemblePlatform) {
-        // No actual model file is needed to be loaded for ensemble.
-      } else
+        if (config->platform() == kEnsemblePlatform) {
+      // No actual model file is needed to be loaded for ensemble.
+    } else
 #endif  // TRITON_ENABLE_ENSEMBLE
-      {
-        return Status(
-            Status::Code::INTERNAL, "unexpected platform type " +
-                                        config->platform() + " for " +
-                                        config->name());
-      }
+        if (config->backend().empty()) {
+      // If backend is empty, we expect known platform. Otherwise, it is
+      // user-provided backend.
+      return Status(
+          Status::Code::INTERNAL, "unexpected platform type " +
+                                      config->platform() + " for " +
+                                      config->name());
     }
   }
 
   // If version_policy is not specified, default to Latest 1 version.
   if (!config->has_version_policy()) {
-    ModelVersionPolicy::Latest latest;
+    inference::ModelVersionPolicy::Latest latest;
     latest.set_num_versions(1);
     config->mutable_version_policy()->mutable_latest()->CopyFrom(latest);
   }
@@ -691,17 +728,18 @@ GetNormalizedModelConfig(
   // If dynamic batching is specified...
   if (config->has_dynamic_batching()) {
     // If preferred batch size is not specified choose
-    // automatically. For now we just choose 4, 8 as those are
-    // generally good values for GPUs.
+    // automatically. For now we just choose 4, 8, and max batch size
+    // as those are generally good values for GPUs.
     if (config->dynamic_batching().preferred_batch_size().size() == 0) {
-      if (config->max_batch_size() >= 4) {
-        config->mutable_dynamic_batching()->mutable_preferred_batch_size()->Add(
-            4);
+      auto mutable_preferred_batch_sie =
+          config->mutable_dynamic_batching()->mutable_preferred_batch_size();
+      if (config->max_batch_size() > 4) {
+        mutable_preferred_batch_sie->Add(4);
       }
-      if (config->max_batch_size() >= 8) {
-        config->mutable_dynamic_batching()->mutable_preferred_batch_size()->Add(
-            8);
+      if (config->max_batch_size() > 8) {
+        mutable_preferred_batch_sie->Add(8);
       }
+      mutable_preferred_batch_sie->Add(config->max_batch_size());
     }
   }
 
@@ -711,6 +749,25 @@ GetNormalizedModelConfig(
     if (config->sequence_batching().max_sequence_idle_microseconds() == 0) {
       config->mutable_sequence_batching()->set_max_sequence_idle_microseconds(
           SEQUENCE_IDLE_DEFAULT_MICROSECONDS);
+    }
+
+    if (config->sequence_batching().has_oldest()) {
+      // If preferred batch size is not specified choose
+      // automatically. For now we just choose 4, 8, and max batch size
+      // as those are generally good values for GPUs.
+      if (config->sequence_batching().oldest().preferred_batch_size().size() ==
+          0) {
+        auto mutable_preferred_batch_sie = config->mutable_sequence_batching()
+                                               ->mutable_oldest()
+                                               ->mutable_preferred_batch_size();
+        if (config->max_batch_size() > 4) {
+          mutable_preferred_batch_sie->Add(4);
+        }
+        if (config->max_batch_size() > 8) {
+          mutable_preferred_batch_sie->Add(8);
+        }
+        mutable_preferred_batch_sie->Add(config->max_batch_size());
+      }
     }
   }
 
@@ -727,7 +784,7 @@ GetNormalizedModelConfig(
 
     // Make sure there is at least one instance_group.
     if (config->instance_group().size() == 0) {
-      ModelInstanceGroup* group = config->add_instance_group();
+      inference::ModelInstanceGroup* group = config->add_instance_group();
       group->set_name(config->name());
     }
 
@@ -755,20 +812,20 @@ GetNormalizedModelConfig(
 
       // For KIND_AUTO... if there are no GPUs or if any of the listed
       // 'gpu's are not present, then use KIND_CPU.
-      if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
+      if (group.kind() == inference::ModelInstanceGroup::KIND_AUTO) {
         if (supported_gpus.empty()) {
-          group.set_kind(ModelInstanceGroup::KIND_CPU);
+          group.set_kind(inference::ModelInstanceGroup::KIND_CPU);
         } else {
           for (const int32_t gid : group.gpus()) {
             if (supported_gpus.find(gid) == supported_gpus.end()) {
-              group.set_kind(ModelInstanceGroup::KIND_CPU);
+              group.set_kind(inference::ModelInstanceGroup::KIND_CPU);
               break;
             }
           }
         }
 
-        if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
-          group.set_kind(ModelInstanceGroup::KIND_GPU);
+        if (group.kind() == inference::ModelInstanceGroup::KIND_AUTO) {
+          group.set_kind(inference::ModelInstanceGroup::KIND_GPU);
         }
       }
 
@@ -778,7 +835,7 @@ GetNormalizedModelConfig(
       }
 
       // GPUs
-      if ((group.kind() == ModelInstanceGroup::KIND_GPU) &&
+      if ((group.kind() == inference::ModelInstanceGroup::KIND_GPU) &&
           (group.gpus().size() == 0)) {
         for (auto d : supported_gpus) {
           group.add_gpus(d);
@@ -791,8 +848,134 @@ GetNormalizedModelConfig(
 }
 
 Status
+ValidateModelIOConfig(const inference::ModelConfig& config)
+{
+  Status status;
+  for (const auto& io : config.input()) {
+    status = ValidateModelInput(io, config.max_batch_size(), config.platform());
+    if (!status.IsOk()) {
+      return Status(
+          status.StatusCode(), status.Message() + " for " + config.name());
+    }
+  }
+  for (const auto& io : config.output()) {
+    status =
+        ValidateModelOutput(io, config.max_batch_size(), config.platform());
+    if (!status.IsOk()) {
+      return Status(
+          status.StatusCode(), status.Message() + " for " + config.name());
+    }
+  }
+  status = ValidateBatchIO(config);
+  if (!status.IsOk()) {
+    return Status(
+        status.StatusCode(), status.Message() + " for " + config.name());
+  }
+  return Status::Success;
+}
+
+Status
+ValidateBatchIO(const inference::ModelConfig& config)
+{
+  if (
+#ifdef TRITON_ENABLE_CUSTOM
+      (config.platform() != kCustomPlatform) &&
+#endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_TENSORRT
+      (config.platform() != kTensorRTPlanPlatform) &&
+#endif  // TRITON_ENABLE_TENSORRT
+      ((config.batch_input_size() != 0) || (config.batch_output_size() != 0))) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "batch inputs and batch outputs are only supported for custom "
+        "platform and TensorRT platform");
+  }
+
+  std::set<std::string> input_names;
+  std::set<std::string> output_names;
+  for (const auto& io : config.input()) {
+    input_names.emplace(io.name());
+  }
+  for (const auto& io : config.output()) {
+    output_names.emplace(io.name());
+  }
+  for (const auto& batch_io : config.batch_input()) {
+    switch (batch_io.kind()) {
+      case inference::BatchInput::BATCH_ELEMENT_COUNT:
+      case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT:
+      case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO:
+      case inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
+        if (batch_io.source_input_size() != 1) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "batch input kind '" +
+                  inference::BatchInput::Kind_Name(batch_io.kind()) +
+                  "' expects 1 source input, got " +
+                  std::to_string(batch_io.source_input_size()));
+        }
+        break;
+      }
+      default:
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown batch input kind '" +
+                inference::BatchInput::Kind_Name(batch_io.kind()) + "'");
+    }
+    for (const auto& source_name : batch_io.source_input()) {
+      if (input_names.find(source_name) == input_names.end()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown source input name '" + source_name + "'");
+      }
+    }
+  }
+
+  for (const auto& batch_io : config.batch_output()) {
+    switch (batch_io.kind()) {
+      case inference::BatchOutput::BATCH_SCATTER_WITH_INPUT_SHAPE: {
+        if (batch_io.source_input_size() != 1) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "batch output kind '" +
+                  inference::BatchOutput::Kind_Name(batch_io.kind()) +
+                  "' expects 1 source input, got " +
+                  std::to_string(batch_io.source_input_size()));
+        }
+        break;
+      }
+      default:
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown batch output kind '" +
+                inference::BatchOutput::Kind_Name(batch_io.kind()) + "'");
+    }
+    for (const auto& source_name : batch_io.source_input()) {
+      if (input_names.find(source_name) == input_names.end()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown source input name '" + source_name + "'");
+      }
+    }
+    std::set<std::string> target_names;
+    for (const auto& target_name : batch_io.target_name()) {
+      if (output_names.find(target_name) == output_names.end()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unknown target output name '" + target_name + "'");
+      }
+      if (target_names.emplace(target_name).second == false) {
+        return Status(
+            Status::Code::INVALID_ARG, "target output name '" + target_name +
+                                           "' can only be specified once");
+      }
+    }
+  }
+  return Status::Success;
+}
+
+Status
 ValidateModelConfig(
-    const ModelConfig& config, const std::string& expected_platform,
+    const inference::ModelConfig& config, const std::string& expected_platform,
     const double min_compute_capability)
 {
   if (config.name().empty()) {
@@ -800,17 +983,36 @@ ValidateModelConfig(
         Status::Code::INVALID_ARG, "model configuration must specify 'name'");
   }
 
-  if (!config.platform().empty() && !config.backend().empty()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "cannot specify both 'backend' and 'platform' for model '" +
-            config.name() + "'");
-  }
-
   if (config.platform().empty() && config.backend().empty()) {
     return Status(
         Status::Code::INVALID_ARG,
         "must specify 'platform' or 'backend' for '" + config.name() + "'");
+  }
+
+  // Ensure both platform and backend are referring to known backend,
+  // or both referring to unknown backend for user-provided backend.
+  if (GetBackendTypeFromPlatform(config.platform()) !=
+      GetBackendType(config.backend())) {
+    switch (GetBackendTypeFromPlatform(config.platform())) {
+#ifdef TRITON_ENABLE_TENSORRT
+      case BackendType::BACKEND_TYPE_TENSORRT:
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+      case BackendType::BACKEND_TYPE_ONNXRUNTIME:
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
+      case BackendType::BACKEND_TYPE_PYTORCH:
+#endif  // TRITON_ENABLE_PYTORCH
+        // FIXME: Do nothing for above type until they are ported with backend
+        // API
+        break;
+      default:
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unexpected 'platform' and 'backend' pair, got:" +
+                config.platform() + ", " + config.backend());
+        break;
+    }
   }
 
   if (config.max_batch_size() < 0) {
@@ -840,23 +1042,6 @@ ValidateModelConfig(
     return Status(
         Status::Code::INVALID_ARG,
         "must specify 'version policy' for " + config.name());
-  }
-
-  Status status;
-  for (const auto& io : config.input()) {
-    status = ValidateModelInput(io, config.max_batch_size(), config.platform());
-    if (!status.IsOk()) {
-      return Status(
-          status.StatusCode(), status.Message() + " for " + config.name());
-    }
-  }
-  for (const auto& io : config.output()) {
-    status =
-        ValidateModelOutput(io, config.max_batch_size(), config.platform());
-    if (!status.IsOk()) {
-      return Status(
-          status.StatusCode(), status.Message() + " for " + config.name());
-    }
   }
 
   // If dynamic batching is specified make sure the preferred batch
@@ -912,7 +1097,8 @@ ValidateModelConfig(
       const auto& default_policy =
           config.dynamic_batching().default_queue_policy();
       if ((default_policy.default_timeout_microseconds() != 0) &&
-          (default_policy.timeout_action() == ModelQueuePolicy::DELAY)) {
+          (default_policy.timeout_action() ==
+           inference::ModelQueuePolicy::DELAY)) {
         return Status(
             Status::Code::INVALID_ARG,
             "Queue policy can not have DELAY as timeout action when "
@@ -924,7 +1110,8 @@ ValidateModelConfig(
       for (const auto& policy :
            config.dynamic_batching().priority_queue_policy()) {
         if ((policy.second.default_timeout_microseconds() != 0) &&
-            (policy.second.timeout_action() == ModelQueuePolicy::DELAY)) {
+            (policy.second.timeout_action() ==
+             inference::ModelQueuePolicy::DELAY)) {
           return Status(
               Status::Code::INVALID_ARG,
               "Queue policy can not have DELAY as timeout action when "
@@ -944,34 +1131,37 @@ ValidateModelConfig(
     std::string tensor_name;
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
 
     // Check CORRID control and make sure it is one of the allowed types.
-    DataType tensor_datatype;
+    inference::DataType tensor_datatype;
     RETURN_IF_ERROR(GetTypedSequenceControlProperties(
         batcher, config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+        inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
         false /* required */, &tensor_name, &tensor_datatype));
     if (!tensor_name.empty()) {
-      if ((tensor_datatype != TYPE_UINT64) && (tensor_datatype != TYPE_INT64) &&
-          (tensor_datatype != TYPE_UINT32) && (tensor_datatype != TYPE_INT32)) {
+      if ((tensor_datatype != inference::DataType::TYPE_UINT64) &&
+          (tensor_datatype != inference::DataType::TYPE_INT64) &&
+          (tensor_datatype != inference::DataType::TYPE_UINT32) &&
+          (tensor_datatype != inference::DataType::TYPE_INT32)) {
         return Status(
             Status::Code::INVALID_ARG,
             "unexpected data type for control " +
-                ModelSequenceBatching_Control_Kind_Name(
-                    ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID) +
+                inference::ModelSequenceBatching_Control_Kind_Name(
+                    inference::ModelSequenceBatching::Control::
+                        CONTROL_SEQUENCE_CORRID) +
                 " for " + config.name() +
                 ". Allowed data types are TYPE_UINT64, TYPE_INT64, TYPE_UINT32 "
                 "and TYPE_INT32");
@@ -1038,7 +1228,7 @@ ValidateModelConfig(
 
     for (const auto& group : config.instance_group()) {
       // KIND_MODEL is supported only on TensorFlow.
-      if (group.kind() == ModelInstanceGroup::KIND_MODEL) {
+      if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         if (group.gpus().size() > 0) {
           return Status(
               Status::Code::INVALID_ARG,
@@ -1057,7 +1247,7 @@ ValidateModelConfig(
                   " has kind KIND_MODEL which is supported only on TensorFlow "
                   "models");
         }
-      } else if (group.kind() == ModelInstanceGroup::KIND_GPU) {
+      } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
 #ifndef TRITON_ENABLE_GPU
         return Status(
             Status::Code::INVALID_ARG,
@@ -1101,7 +1291,7 @@ ValidateModelConfig(
           }
         }
 #endif  // !TRITON_ENABLE_GPU
-      } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
+      } else if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         if (group.gpus().size() > 0) {
           return Status(
               Status::Code::INVALID_ARG,
@@ -1149,12 +1339,13 @@ ValidateModelConfig(
 
 Status
 ValidateModelInput(
-    const ModelInput& io, int32_t max_batch_size, const std::string& platform)
+    const inference::ModelInput& io, int32_t max_batch_size,
+    const std::string& platform)
 {
   RETURN_IF_ERROR(ValidateIOShape(io, max_batch_size, "model input "));
 
-  if (((io.format() == ModelInput::FORMAT_NHWC) ||
-       (io.format() == ModelInput::FORMAT_NCHW)) &&
+  if (((io.format() == inference::ModelInput::FORMAT_NHWC) ||
+       (io.format() == inference::ModelInput::FORMAT_NCHW)) &&
       (io.dims_size() != 3)) {
     return Status(
         Status::Code::INVALID_ARG, "model input NHWC/NCHW require 3 dims");
@@ -1174,10 +1365,14 @@ ValidateModelInput(
 #ifdef TRITON_ENABLE_CUSTOM
       (platform != kCustomPlatform) &&
 #endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_TENSORRT
+      (platform != kTensorRTPlanPlatform) &&
+#endif  // TRITON_ENABLE_TENSORRT
       io.allow_ragged_batch()) {
     return Status(
         Status::Code::INVALID_ARG,
-        "ragged-batch input tensors are only supported for custom platform");
+        "ragged-batch input tensors are only supported for custom platform"
+        " and TensorRT platform");
   }
 
   return Status::Success;
@@ -1185,7 +1380,7 @@ ValidateModelInput(
 
 Status
 CheckAllowedModelInput(
-    const ModelInput& io, const std::set<std::string>& allowed)
+    const inference::ModelInput& io, const std::set<std::string>& allowed)
 {
   if (allowed.find(io.name()) == allowed.end()) {
     std::string astr;
@@ -1205,7 +1400,8 @@ CheckAllowedModelInput(
 
 Status
 ValidateModelOutput(
-    const ModelOutput& io, int32_t max_batch_size, const std::string& platform)
+    const inference::ModelOutput& io, int32_t max_batch_size,
+    const std::string& platform)
 {
   RETURN_IF_ERROR(ValidateIOShape(io, max_batch_size, "model output "));
 
@@ -1224,7 +1420,7 @@ ValidateModelOutput(
 
 Status
 CheckAllowedModelOutput(
-    const ModelOutput& io, const std::set<std::string>& allowed)
+    const inference::ModelOutput& io, const std::set<std::string>& allowed)
 {
   if (allowed.find(io.name()) == allowed.end()) {
     std::string astr;
@@ -1352,7 +1548,7 @@ ValidateModelConfigInt64()
 {
   // Must initialize a dummy ModelConfig so that all fields are
   // visited.
-  ModelConfig config;
+  inference::ModelConfig config;
 
   std::set<std::string> int64_fields;
   RETURN_IF_ERROR(CollectInt64Fields(&config, "ModelConfig", &int64_fields));
@@ -1379,7 +1575,10 @@ ValidateModelConfigInt64()
       "ModelConfig::sequence_batching::oldest::max_queue_delay_microseconds",
       "ModelConfig::sequence_batching::max_sequence_idle_microseconds",
       "ModelConfig::ensemble_scheduling::step::model_version",
-      "ModelConfig::model_warmup::inputs::value::dims"};
+      "ModelConfig::model_warmup::inputs::value::dims",
+      "ModelConfig::optimization::cuda::graph_spec::input::value::dim",
+      "ModelConfig::optimization::cuda::graph_spec::graph_lower_bound::input::"
+      "value::dim"};
 
   if (int64_fields != expected) {
     return Status(
@@ -1391,9 +1590,10 @@ ValidateModelConfigInt64()
 
 Status
 FixInt(
-    TritonJson::Value& document, TritonJson::Value& io, const std::string& name)
+    triton::common::TritonJson::Value& document,
+    triton::common::TritonJson::Value& io, const std::string& name)
 {
-  TritonJson::Value str_value;
+  triton::common::TritonJson::Value str_value;
   if (!io.Find(name.c_str(), &str_value)) {
     return Status::Success;
   }
@@ -1418,15 +1618,17 @@ FixInt(
 
 Status
 FixIntArray(
-    TritonJson::Value& document, TritonJson::Value& io, const std::string& name)
+    triton::common::TritonJson::Value& document,
+    triton::common::TritonJson::Value& io, const std::string& name)
 {
-  TritonJson::Value fixed_shape_array(document, TritonJson::ValueType::ARRAY);
+  triton::common::TritonJson::Value fixed_shape_array(
+      document, triton::common::TritonJson::ValueType::ARRAY);
 
   if (!io.Find(name.c_str())) {
     return Status::Success;
   }
 
-  TritonJson::Value shape_array;
+  triton::common::TritonJson::Value shape_array;
   RETURN_IF_ERROR(io.MemberAsArray(name.c_str(), &shape_array));
   for (size_t i = 0; i < shape_array.ArraySize(); ++i) {
     std::string str;
@@ -1446,17 +1648,18 @@ FixIntArray(
   }
 
   shape_array.Swap(fixed_shape_array);
+  fixed_shape_array.Release();
 
   return Status::Success;
 }
 
 Status
 FixObjectArray(
-    TritonJson::Value& document, TritonJson::Value& arr,
-    const std::string& name)
+    triton::common::TritonJson::Value& document,
+    triton::common::TritonJson::Value& arr, const std::string& name)
 {
   for (size_t i = 0; i < arr.ArraySize(); ++i) {
-    TritonJson::Value obj;
+    triton::common::TritonJson::Value obj;
     RETURN_IF_ERROR(arr.IndexAsObject(i, &obj));
     RETURN_IF_ERROR(FixInt(document, obj, name));
   }
@@ -1468,7 +1671,7 @@ FixObjectArray(
 
 Status
 ModelConfigToJson(
-    const ModelConfig& config, const uint32_t config_version,
+    const inference::ModelConfig& config, const uint32_t config_version,
     std::string* json_str)
 {
   // Currently only support 'config_version' 1, which is the json
@@ -1507,20 +1710,20 @@ ModelConfigToJson(
   // represented as strings. Protobuf doesn't provide an option to
   // disable this (sigh) so we need to fix it up here as we want the
   // json representation of the config to be reasonable json...
-  TritonJson::Value config_json;
+  triton::common::TritonJson::Value config_json;
   config_json.Parse(config_json_str);
 
   // Fix input::dims, input::reshape::shape, output::dims,
   // output::reshape::shape
   for (std::string name : {"input", "output"}) {
-    TritonJson::Value ios;
+    triton::common::TritonJson::Value ios;
     RETURN_IF_ERROR(config_json.MemberAsArray(name.c_str(), &ios));
     for (size_t i = 0; i < ios.ArraySize(); ++i) {
-      TritonJson::Value io;
+      triton::common::TritonJson::Value io;
       RETURN_IF_ERROR(ios.IndexAsObject(i, &io));
       RETURN_IF_ERROR(FixIntArray(config_json, io, "dims"));
 
-      TritonJson::Value reshape;
+      triton::common::TritonJson::Value reshape;
       if (io.Find("reshape", &reshape)) {
         RETURN_IF_ERROR(FixIntArray(config_json, reshape, "shape"));
       }
@@ -1529,9 +1732,9 @@ ModelConfigToJson(
 
   // Fix version_policy::specific::versions
   {
-    TritonJson::Value vp;
+    triton::common::TritonJson::Value vp;
     if (config_json.Find("version_policy", &vp)) {
-      TritonJson::Value specific;
+      triton::common::TritonJson::Value specific;
       if (vp.Find("specific", &specific)) {
         RETURN_IF_ERROR(FixIntArray(config_json, specific, "versions"));
       }
@@ -1542,21 +1745,21 @@ ModelConfigToJson(
   // dynamic_batching::default_queue_policy::default_timeout_microseconds,
   // dynamic_batching::priority_queue_policy::value::default_timeout_microseconds
   {
-    TritonJson::Value db;
+    triton::common::TritonJson::Value db;
     if (config_json.Find("dynamic_batching", &db)) {
       RETURN_IF_ERROR(FixInt(config_json, db, "max_queue_delay_microseconds"));
-      TritonJson::Value dqp;
+      triton::common::TritonJson::Value dqp;
       if (db.Find("default_queue_policy", &dqp)) {
         RETURN_IF_ERROR(
             FixInt(config_json, dqp, "default_timeout_microseconds"));
       }
-      TritonJson::Value pqp;
+      triton::common::TritonJson::Value pqp;
       if (db.Find("priority_queue_policy", &pqp)) {
         // Iterate over each member in 'pqp' and fix...
         std::vector<std::string> members;
         RETURN_IF_ERROR(pqp.Members(&members));
         for (const auto& m : members) {
-          TritonJson::Value el;
+          triton::common::TritonJson::Value el;
           RETURN_IF_ERROR(pqp.MemberAsObject(m.c_str(), &el));
           RETURN_IF_ERROR(
               FixInt(config_json, el, "default_timeout_microseconds"));
@@ -1568,11 +1771,11 @@ ModelConfigToJson(
   // Fix sequence_batching::oldest::max_queue_delay_microseconds,
   // sequence_batching::max_sequence_idle_microseconds
   {
-    TritonJson::Value sb;
+    triton::common::TritonJson::Value sb;
     if (config_json.Find("sequence_batching", &sb)) {
       RETURN_IF_ERROR(
           FixInt(config_json, sb, "max_sequence_idle_microseconds"));
-      TritonJson::Value oldest;
+      triton::common::TritonJson::Value oldest;
       if (sb.Find("oldest", &oldest)) {
         RETURN_IF_ERROR(
             FixInt(config_json, oldest, "max_queue_delay_microseconds"));
@@ -1582,9 +1785,9 @@ ModelConfigToJson(
 
   // Fix ensemble_scheduling::step::model_version.
   {
-    TritonJson::Value ens;
+    triton::common::TritonJson::Value ens;
     if (config_json.Find("ensemble_scheduling", &ens)) {
-      TritonJson::Value step;
+      triton::common::TritonJson::Value step;
       if (ens.Find("step", &step)) {
         RETURN_IF_ERROR(FixObjectArray(config_json, step, "model_version"));
       }
@@ -1593,17 +1796,17 @@ ModelConfigToJson(
 
   // Fix model_warmup::inputs::value::dims.
   {
-    TritonJson::Value warmups;
+    triton::common::TritonJson::Value warmups;
     if (config_json.Find("model_warmup", &warmups)) {
       for (size_t i = 0; i < warmups.ArraySize(); ++i) {
-        TritonJson::Value warmup;
+        triton::common::TritonJson::Value warmup;
         RETURN_IF_ERROR(warmups.IndexAsObject(i, &warmup));
-        TritonJson::Value inputs;
+        triton::common::TritonJson::Value inputs;
         if (warmup.Find("inputs", &inputs)) {
           std::vector<std::string> members;
           RETURN_IF_ERROR(inputs.Members(&members));
           for (const auto& m : members) {
-            TritonJson::Value input;
+            triton::common::TritonJson::Value input;
             RETURN_IF_ERROR(inputs.MemberAsObject(m.c_str(), &input));
             RETURN_IF_ERROR(FixIntArray(config_json, input, "dims"));
           }
@@ -1613,10 +1816,34 @@ ModelConfigToJson(
   }
 
   // Convert fixed json back the string...
-  TritonJson::WriteBuffer buffer;
+  triton::common::TritonJson::WriteBuffer buffer;
   config_json.Write(&buffer);
   *json_str = std::move(buffer.MutableContents());
 
+  return Status::Success;
+}
+
+Status
+JsonToModelConfig(
+    const std::string& json_config, const uint32_t config_version,
+    inference::ModelConfig* protobuf_config)
+{
+  // Currently only support 'config_version' 1, which is the json
+  // representation of the ModelConfig protobuf matches the representation in
+  // ModelConfigToJson().
+  if (config_version != 1) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        std::string("model configuration version ") +
+            std::to_string(config_version) +
+            " not supported, supported versions are: 1");
+  }
+
+  ::google::protobuf::util::JsonParseOptions options;
+  options.case_insensitive_enum_parsing = true;
+  options.ignore_unknown_fields = false;
+  ::google::protobuf::util::JsonStringToMessage(
+      json_config, protobuf_config, options);
   return Status::Success;
 }
 

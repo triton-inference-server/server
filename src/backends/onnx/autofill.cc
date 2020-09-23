@@ -26,265 +26,30 @@
 
 #include "src/backends/onnx/autofill.h"
 
-#include "src/backends/onnx/loader.h"
-#include "src/backends/onnx/onnx_utils.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
-#include "src/core/logging.h"
 #include "src/core/model_config.h"
+#include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-template <class ModelIO>
-void
-SetIOConfig(
-    const std::string& name, const OnnxTensorInfo& info, bool batching,
-    ModelIO* config_io)
-{
-  config_io->set_name(name);
-
-  // only set type and shape if they are not set
-  if (config_io->data_type() == DataType::TYPE_INVALID) {
-    config_io->set_data_type(ConvertFromOnnxDataType(info.type_));
-  }
-
-  if (config_io->dims_size() == 0) {
-    // Skip batching dimension
-    size_t idx = (batching) ? 1 : 0;
-    for (; idx < info.dims_.size(); ++idx) {
-      config_io->mutable_dims()->Add(info.dims_[idx]);
-    }
-
-    // If tensor dims are empty then must use a reshape for the
-    // tensor, since 'dims' is not allowed to be empty.
-    if (config_io->dims_size() == 0) {
-      config_io->mutable_dims()->Add(1);
-      config_io->mutable_reshape();
-    }
-  }
-}
-
-Status
-ValidateIOInfoType(
-    const std::string& model_name, const OnnxTensorInfoMap& infos)
-{
-  // Validate all tensors are in supported data type
-  for (const auto& io_info : infos) {
-    if (ConvertFromOnnxDataType(io_info.second.type_) ==
-        DataType::TYPE_INVALID) {
-      return Status(
-          Status::Code::INTERNAL, "unable to autofill for '" + model_name +
-                                      "', unsupported data-type '" +
-                                      OnnxDataTypeName(io_info.second.type_) +
-                                      "'");
-    }
-  }
-  return Status::Success;
-}
-
-}  // namespace
-
 class AutoFillOnnxImpl : public AutoFill {
  public:
-  AutoFillOnnxImpl(
-      const std::string& model_name, const std::string& onnx_filename)
-      : AutoFill(model_name), onnx_filename_(onnx_filename)
-  {
-  }
+  AutoFillOnnxImpl(const std::string& model_name) : AutoFill(model_name) {}
 
-  Status Fix(ModelConfig* config) override;
-
-  Status SetConfigFromOrtSession(OrtSession* session, OrtAllocator* allocator);
-
- private:
-  Status FixBatchingSupport(ModelConfig* config);
-  Status FixInputConfig(ModelConfig* config);
-  Status FixOutputConfig(ModelConfig* config);
-
-  Status SetBatchingSupport();
-
-  const std::string onnx_filename_;
-  bool model_support_batching_;
-  OnnxTensorInfoMap input_infos_;
-  OnnxTensorInfoMap output_infos_;
+  Status Fix(inference::ModelConfig* config) override;
 };
 
 Status
-AutoFillOnnxImpl::Fix(ModelConfig* config)
+AutoFillOnnxImpl::Fix(inference::ModelConfig* config)
 {
   config->set_platform(kOnnxRuntimeOnnxPlatform);
+  config->set_backend(kOnnxRuntimeBackend);
 
   // Set name if not already set.
   if (config->name().empty()) {
     config->set_name(model_name_);
-  }
-
-  if (config->default_model_filename().empty()) {
-    config->set_default_model_filename(onnx_filename_);
-  }
-
-  // Validate and fill 'max_batch_size' based on model info and config hint
-  RETURN_IF_ERROR(FixBatchingSupport(config));
-
-  // Validate and fill inputs
-  RETURN_IF_ERROR(ValidateIOInfoType(model_name_, input_infos_));
-  RETURN_IF_ERROR(FixInputConfig(config));
-
-  // Validate and fill outputs
-  RETURN_IF_ERROR(ValidateIOInfoType(model_name_, output_infos_));
-  RETURN_IF_ERROR(FixOutputConfig(config));
-
-  return Status::Success;
-}
-
-Status
-AutoFillOnnxImpl::FixBatchingSupport(ModelConfig* config)
-{
-  if (!model_support_batching_ && (config->max_batch_size() > 0)) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unable to autofill for '" + model_name_ +
-            "', configuration specified max-batch " +
-            std::to_string(config->max_batch_size()) +
-            " but model session does not support batching");
-  }
-
-  // 'model_support_batching' is set to be true when all model inputs have
-  // variable size first dimension, but it is not necessary to be the case
-  // (i.e. non-batch model with variable size tensors). As 'max_batch_size == 0'
-  // from existing config is also ambiguous, it can be either unspecified or
-  // no-batch, autofill will check specified input/output (if any) for hint.
-  if (model_support_batching_ && (config->max_batch_size() == 0)) {
-    bool config_batch_hint = false;
-    if ((config->input_size() != 0) || (config->output_size() != 0)) {
-      for (const auto& io : config->input()) {
-        if (!io.dims().empty()) {
-          // look up corresponding io info from model
-          const auto it = input_infos_.find(io.name());
-          if (it != input_infos_.end()) {
-            bool should_batch =
-                (static_cast<int>(it->second.dims_.size()) ==
-                 (io.dims_size() + 1));
-            // inconsistent hint
-            if (config_batch_hint &&
-                (model_support_batching_ != should_batch)) {
-              return Status(
-                  Status::Code::INTERNAL,
-                  "unable to autofill for '" + model_name_ +
-                      "', model tensor configurations are contradicting " +
-                      "each other in terms of whether batching is supported");
-            }
-            config_batch_hint = true;
-            model_support_batching_ = should_batch;
-          }
-        }
-      }
-      for (const auto& io : config->output()) {
-        if (!io.dims().empty()) {
-          // look up corresponding io info from model
-          const auto it = output_infos_.find(io.name());
-          if (it != output_infos_.end()) {
-            bool should_batch =
-                (static_cast<int>(it->second.dims_.size()) ==
-                 (io.dims_size() + 1));
-            // inconsistent hint
-            if (config_batch_hint &&
-                (model_support_batching_ != should_batch)) {
-              return Status(
-                  Status::Code::INTERNAL,
-                  "unable to autofill for '" + model_name_ +
-                      "', model tensor configurations are contradicting " +
-                      "each other in terms of whether batching is supported");
-            }
-            config_batch_hint = true;
-            model_support_batching_ = should_batch;
-          }
-        }
-      }
-    }
-  }
-
-  if (config->max_batch_size() == 0) {
-    config->set_max_batch_size(model_support_batching_ ? 1 : 0);
-  }
-  return Status::Success;
-}
-
-Status
-AutoFillOnnxImpl::FixInputConfig(ModelConfig* config)
-{
-  if (config->input_size() == 0) {
-    // fill all corresponding i/o tensors
-    for (const auto& io_info : input_infos_) {
-      ModelInput* config_io = config->add_input();
-      SetIOConfig(
-          io_info.first, io_info.second, model_support_batching_, config_io);
-    }
-  } else {
-    for (auto& io : *(config->mutable_input())) {
-      const auto it = input_infos_.find(io.name());
-      if (it != input_infos_.end()) {
-        SetIOConfig(it->first, it->second, model_support_batching_, &io);
-      }
-    }
-  }
-  return Status::Success;
-}
-
-Status
-AutoFillOnnxImpl::FixOutputConfig(ModelConfig* config)
-{
-  if (config->output_size() == 0) {
-    // fill all corresponding i/o tensors
-    for (const auto& io_info : output_infos_) {
-      ModelOutput* config_io = config->add_output();
-      SetIOConfig(
-          io_info.first, io_info.second, model_support_batching_, config_io);
-    }
-  } else {
-    for (auto& io : *(config->mutable_output())) {
-      const auto it = output_infos_.find(io.name());
-      if (it != output_infos_.end()) {
-        SetIOConfig(it->first, it->second, model_support_batching_, &io);
-      }
-    }
-  }
-  return Status::Success;
-}
-
-Status
-AutoFillOnnxImpl::SetConfigFromOrtSession(
-    OrtSession* session, OrtAllocator* allocator)
-{
-  RETURN_IF_ERROR(InputInfos(session, allocator, input_infos_));
-  RETURN_IF_ERROR(OutputInfos(session, allocator, output_infos_));
-
-  RETURN_IF_ERROR(SetBatchingSupport());
-  return Status::Success;
-}
-
-Status
-AutoFillOnnxImpl::SetBatchingSupport()
-{
-  model_support_batching_ = true;
-
-  // iterate over all input tensors
-  for (const auto& io_info : input_infos_) {
-    const auto& dims = io_info.second.dims_;
-    if ((dims.size() == 0) || (dims[0] != -1)) {
-      model_support_batching_ = false;
-    }
-  }
-
-  // iterate over all output tensors
-  for (const auto& io_info : output_infos_) {
-    const auto& dims = io_info.second.dims_;
-    if ((dims.size() == 0) || (dims[0] != -1)) {
-      model_support_batching_ = false;
-    }
   }
 
   return Status::Success;
@@ -296,157 +61,40 @@ AutoFillOnnx::Create(
     std::unique_ptr<AutoFill>* autofill,
     const std::vector<std::string>& op_libraries)
 {
-  std::unique_ptr<AutoFillOnnxImpl> local_autofill;
-
   std::set<std::string> version_dirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &version_dirs));
 
+  // There must be at least one version directory that we can inspect to
+  // attempt to determine the platform. For now we allow multiple versions
+  // and only inspect the first verison directory to ensure it is valid.
+  // We can add more aggressive checks later.
   if (version_dirs.size() == 0) {
     return Status(
         Status::Code::INTERNAL, "unable to autofill for '" + model_name +
                                     "' due to no version directories");
   }
 
-  // Create resource wrapper to manage release of resource
-  OrtSessionOptions* session_options;
+  const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
-  RETURN_IF_ORT_ERROR(ort_api->CreateSessionOptions(&session_options));
+  std::set<std::string> files;
+  RETURN_IF_ERROR(
+      GetDirectoryFiles(version_path, true /* skip_hidden_files */, &files));
 
-  // Does nothing if op_libraries is empty
-  for (const auto& lib_filename : op_libraries) {
-    void* library_handle = nullptr;  // leak this, no harm.
-    RETURN_IF_ORT_ERROR(ort_api->RegisterCustomOpsLibrary(
-        session_options, lib_filename.c_str(), &library_handle));
-  }
-
-  OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
-      session_options, ort_api->ReleaseSessionOptions);
-  RETURN_IF_ORT_ERROR(ort_api->SetIntraOpNumThreads(session_options, 1));
-  // enable basic graph optimization (Quicker loading)
-  RETURN_IF_ORT_ERROR(ort_api->SetSessionGraphOptimizationLevel(
-      session_options, ORT_ENABLE_BASIC));
-
-  OrtSession* session = nullptr;
-
-  // All versions should share the same model configuration, thus use the first
-  // one that can be loaded successfully.
-  Status status;
-  bool unsupported_opset = false;
-  bool found = false;
-  OrtStatus* ort_status;
-  const std::string opset_error(
-      "onnx runtime error " + std::to_string(ORT_NOT_IMPLEMENTED));
-
-  for (const auto& version : version_dirs) {
-    const auto version_path = JoinPath({model_path, version});
-
-    // First try loading models that are contained in a single file.
-    {
-      std::set<std::string> onnx_files;
-      RETURN_IF_ERROR(GetDirectoryFiles(
-          version_path, true /* skip_hidden_files */, &onnx_files));
-
-      for (auto file : onnx_files) {
-        const auto onnx_path = JoinPath({version_path, file});
-        std::string onnx_file_content;
-        status = ReadTextFile(onnx_path, &onnx_file_content);
-        if (!status.IsOk()) {
-          continue;
-        }
-
-        status = OnnxLoader::LoadSession(
-            std::make_pair(true, std::move(onnx_file_content)), session_options,
-            &session);
-        if (status.IsOk()) {
-          local_autofill.reset(new AutoFillOnnxImpl(model_name, file));
-          found = true;
-          break;
-        } else if (
-            (status.Message().compare(0, opset_error.size(), opset_error)) ==
-            0) {
-          local_autofill.reset(new AutoFillOnnxImpl(model_name, file));
-          unsupported_opset = true;
-          // no break in case there is a valid version
-        } else {
-          LOG_VERBOSE(1) << "failed to load " << onnx_path << ": "
-                         << status.AsString();
-        }
-      }
-
-      if (found) {
-        break;
-      }
-    }
-
-    // Next try loading models that are contained in a directory.
-    {
-      std::set<std::string> onnx_dirs;
-      RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &onnx_dirs));
-
-      for (auto dir : onnx_dirs) {
-        const auto onnx_path = JoinPath({version_path, dir});
-        std::string local_onnx_path;
-        status = DownloadFileFolder(onnx_path, &local_onnx_path);
-        if (!status.IsOk()) {
-          LOG_VERBOSE(1) << "failed to download " << onnx_path << ": "
-                         << status.AsString();
-          continue;
-        }
-
-        status = OnnxLoader::LoadSession(
-            std::make_pair(false, local_onnx_path), session_options, &session);
-
-        DestroyFileFolder(local_onnx_path);
-
-        if (status.IsOk()) {
-          local_autofill.reset(new AutoFillOnnxImpl(model_name, dir));
-          found = true;
-          break;
-        } else if (
-            (status.Message().compare(0, opset_error.size(), opset_error)) ==
-            0) {
-          local_autofill.reset(new AutoFillOnnxImpl(model_name, dir));
-          unsupported_opset = true;
-          // no break in case there is a valid version
-        } else {
-          LOG_VERBOSE(1) << "failed to load " << local_onnx_path << ": "
-                         << status.AsString();
-        }
-      }
-
-      if (found) {
-        break;
-      }
+  // If find a file or directory named with the default onnx name then
+  // assume it is an onnx model.
+  if (files.find(kOnnxRuntimeOnnxFilename) == files.end()) {
+    std::set<std::string> dirs;
+    RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &dirs));
+    if (dirs.find(kOnnxRuntimeOnnxFilename) == dirs.end()) {
+      return Status(
+          Status::Code::INTERNAL,
+          "unable to autofill for '" + model_name +
+              "', unable to find onnx file or directory named '" +
+              kOnnxRuntimeOnnxFilename + "'");
     }
   }
 
-  // If it is due to unsupported opset, return success with limited autofill
-  // capability
-  if (!found && unsupported_opset) {
-    *autofill = std::move(local_autofill);
-    return Status::Success;
-  }
-
-  // Return if none of the version can be loaded successfully
-  // due to reasons other than unsupported opset
-  if (!found) {
-    return Status(
-        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
-                                    "', unable to find onnx file");
-  }
-
-  OrtAllocator* allocator;
-  ort_status = ort_api->GetAllocatorWithDefaultOptions(&allocator);
-
-  if (ort_status == nullptr) {
-    status = local_autofill->SetConfigFromOrtSession(session, allocator);
-  }
-  OnnxLoader::UnloadSession(session);
-
-  RETURN_IF_ORT_ERROR(ort_status);
-  RETURN_IF_ERROR(status);
-
-  *autofill = std::move(local_autofill);
+  autofill->reset(new AutoFillOnnxImpl(model_name));
   return Status::Success;
 }
 

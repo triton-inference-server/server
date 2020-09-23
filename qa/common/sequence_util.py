@@ -33,6 +33,7 @@ import threading
 import unittest
 import numpy as np
 import infer_util as iu
+import test_util as tu
 from functools import partial
 
 import tritongrpcclient as grpcclient
@@ -42,28 +43,38 @@ import tritonshmutils.cuda_shared_memory as cudashm
 from tritonclientutils import *
 
 if sys.version_info >= (3, 0):
-  import queue
+    import queue
 else:
-  import Queue as queue
+    import Queue as queue
 
-_test_system_shared_memory = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-_test_cuda_shared_memory = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+_test_system_shared_memory = bool(
+    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+_test_cuda_shared_memory = bool(
+    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+_test_valgrind = bool(
+    int(os.environ.get('TEST_VALGRIND', 0)))
 
 _max_sequence_idle_ms = 5000
+_valgrind_delay_ms = 50
 
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = None
 
+
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
+
 
 # Callback function used for async_stream_infer()
 def completion_callback(user_data, result, error):
     # passing error raise and handling out
     user_data._completed_requests.put((result, error))
 
-class SequenceBatcherTestUtil(unittest.TestCase):
+
+class SequenceBatcherTestUtil(tu.TestResultCollector):
+
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
         self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
@@ -72,7 +83,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
     def clear_deferred_exceptions(self):
         global _deferred_exceptions
         with _deferred_exceptions_lock:
-          _deferred_exceptions = []
+            _deferred_exceptions = []
 
     def add_deferred_exception(self, ex):
         global _deferred_exceptions
@@ -93,8 +104,12 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             if len(_deferred_exceptions) == 0:
                 raise Exception("Unexpected inference success")
 
-    def precreate_register_regions(self, value_list, dtype, i,
-                                batch_size=1, tensor_shape=(1,)):
+    def precreate_register_regions(self,
+                                   value_list,
+                                   dtype,
+                                   i,
+                                   batch_size=1,
+                                   tensor_shape=(1,)):
         if _test_system_shared_memory or _test_cuda_shared_memory:
             shm_region_handles = []
             for j, value in enumerate(value_list):
@@ -102,7 +117,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 # so we conservatively assume 64 bytes for each
                 # element of the output
                 if dtype == np.object:
-                    output_byte_size = 4 # size of empty string
+                    output_byte_size = 4  # size of empty string
                 else:
                     output_byte_size = 0
 
@@ -111,7 +126,8 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 for b in range(batch_size):
                     if dtype == np.object:
                         in0 = np.full(tensor_shape, value, dtype=np.int32)
-                        in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                        dtype=object)
                         in0 = in0n.reshape(tensor_shape)
                         output_byte_size += 64 * in0.size
                     else:
@@ -119,39 +135,53 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         output_byte_size += np.dtype(dtype).itemsize * in0.size
                     input_list.append(in0)
 
-                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (dtype == np.object) else input_list
+                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (
+                    dtype == np.object) else input_list
                 input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
 
                 # create shared memory regions and copy data for input values
-                ip_name = 'ip{}{}'.format(i,j)
-                op_name = 'op{}{}_data'.format(i,j)
+                ip_name = 'ip{}{}'.format(i, j)
+                op_name = 'op{}{}_data'.format(i, j)
                 if _test_system_shared_memory:
                     shm_ip_handle = shm.create_shared_memory_region(
-                        ip_name, '/'+ip_name, input_byte_size)
+                        ip_name, '/' + ip_name, input_byte_size)
                     shm_op_handle = shm.create_shared_memory_region(
-                        op_name, '/'+op_name, output_byte_size)
+                        op_name, '/' + op_name, output_byte_size)
                     shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                    self.triton_client_.register_system_shared_memory(ip_name, '/'+ip_name, input_byte_size)
-                    self.triton_client_.register_system_shared_memory(op_name, '/'+op_name, output_byte_size)
+                    self.triton_client_.register_system_shared_memory(
+                        ip_name, '/' + ip_name, input_byte_size)
+                    self.triton_client_.register_system_shared_memory(
+                        op_name, '/' + op_name, output_byte_size)
                 elif _test_cuda_shared_memory:
                     shm_ip_handle = cudashm.create_shared_memory_region(
                         ip_name, input_byte_size, 0)
                     shm_op_handle = cudashm.create_shared_memory_region(
                         op_name, output_byte_size, 0)
-                    cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                    self.triton_client_.register_cuda_shared_memory(ip_name, cudashm.get_raw_handle(shm_ip_handle), 0, input_byte_size)
-                    self.triton_client_.register_cuda_shared_memory(op_name, cudashm.get_raw_handle(shm_op_handle), 0, output_byte_size)
-                shm_region_handles.append((ip_name, input_byte_size, shm_ip_handle))
-                shm_region_handles.append((op_name, output_byte_size, shm_op_handle))
+                    cudashm.set_shared_memory_region(shm_ip_handle,
+                                                     input_list_tmp)
+                    self.triton_client_.register_cuda_shared_memory(
+                        ip_name, cudashm.get_raw_handle(shm_ip_handle), 0,
+                        input_byte_size)
+                    self.triton_client_.register_cuda_shared_memory(
+                        op_name, cudashm.get_raw_handle(shm_op_handle), 0,
+                        output_byte_size)
+                shm_region_handles.append(
+                    (ip_name, input_byte_size, shm_ip_handle))
+                shm_region_handles.append(
+                    (op_name, output_byte_size, shm_op_handle))
             return shm_region_handles
         else:
             return []
 
     # Returns (name, byte size, shm_handle)
-    def precreate_register_shape_tensor_regions(self, value_list, dtype, i,
-                                            batch_size=1, tensor_shape=(1,)):
+    def precreate_register_shape_tensor_regions(self,
+                                                value_list,
+                                                dtype,
+                                                i,
+                                                batch_size=1,
+                                                tensor_shape=(1,)):
         self.assertFalse(_test_cuda_shared_memory,
-                        "Shape tensors does not support CUDA shared memory")
+                         "Shape tensors does not support CUDA shared memory")
         if _test_system_shared_memory:
             shm_region_handles = []
             for j, (shape_value, value) in enumerate(value_list):
@@ -161,61 +191,84 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 for b in range(batch_size):
                     if dtype == np.object:
                         in0 = np.full(tensor_shape, value, dtype=np.int32)
-                        in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                        dtype=object)
                         in0 = in0n.reshape(tensor_shape)
                     else:
                         in0 = np.full(tensor_shape, value, dtype=dtype)
                     input_list.append(in0)
 
                 # Only one shape tensor input per batch
-                shape_input_list.append(np.full(tensor_shape, shape_value, dtype=np.int32))
+                shape_input_list.append(
+                    np.full(tensor_shape, shape_value, dtype=np.int32))
 
-                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (dtype == np.object) else input_list
+                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (
+                    dtype == np.object) else input_list
                 input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
-                shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
+                shape_input_byte_size = sum(
+                    [i0.nbytes for i0 in shape_input_list])
                 shape_output_byte_size = shape_input_byte_size
                 output_byte_size = np.dtype(dtype).itemsize + 2
                 resized_output_byte_size = 32 * shape_value
 
                 # create shared memory regions and copy data for input values
-                ip_name = 'ip{}{}'.format(i,j)
-                shape_ip_name = 'shape_ip{}{}'.format(i,j)
-                shape_op_name = 'shape_op{}{}'.format(i,j)
-                op_name = 'op{}{}'.format(i,j)
-                resized_op_name = 'resized_op{}{}'.format(i,j)
-                
+                ip_name = 'ip{}{}'.format(i, j)
+                shape_ip_name = 'shape_ip{}{}'.format(i, j)
+                shape_op_name = 'shape_op{}{}'.format(i, j)
+                op_name = 'op{}{}'.format(i, j)
+                resized_op_name = 'resized_op{}{}'.format(i, j)
+
                 shm_ip_handle = shm.create_shared_memory_region(
-                    ip_name, '/'+ip_name, input_byte_size)
+                    ip_name, '/' + ip_name, input_byte_size)
                 shm_shape_ip_handle = shm.create_shared_memory_region(
-                    shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
+                    shape_ip_name, '/' + shape_ip_name, shape_input_byte_size)
                 shm_shape_op_handle = shm.create_shared_memory_region(
-                    shape_op_name, '/'+shape_op_name, shape_output_byte_size)
+                    shape_op_name, '/' + shape_op_name, shape_output_byte_size)
                 shm_op_handle = shm.create_shared_memory_region(
-                    op_name, '/'+op_name, output_byte_size)
+                    op_name, '/' + op_name, output_byte_size)
                 shm_resized_op_handle = shm.create_shared_memory_region(
-                    resized_op_name, '/'+resized_op_name, resized_output_byte_size)
+                    resized_op_name, '/' + resized_op_name,
+                    resized_output_byte_size)
                 shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                shm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
-                self.triton_client_.register_system_shared_memory(ip_name, '/'+ip_name, input_byte_size)
-                self.triton_client_.register_system_shared_memory(shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
-                self.triton_client_.register_system_shared_memory(shape_op_name, '/'+shape_op_name, shape_output_byte_size)
-                self.triton_client_.register_system_shared_memory(op_name, '/'+op_name, output_byte_size)
-                self.triton_client_.register_system_shared_memory(resized_op_name, '/'+resized_op_name, resized_output_byte_size)
-                
-                shm_region_handles.append((ip_name, input_byte_size, shm_ip_handle))
-                shm_region_handles.append((shape_ip_name, shape_input_byte_size, shm_shape_ip_handle))
-                shm_region_handles.append((shape_op_name, shape_output_byte_size, shm_shape_op_handle))
-                shm_region_handles.append((op_name, output_byte_size, shm_op_handle))
-                shm_region_handles.append((resized_op_name, resized_output_byte_size, shm_resized_op_handle))
+                shm.set_shared_memory_region(shm_shape_ip_handle,
+                                             shape_input_list)
+                self.triton_client_.register_system_shared_memory(
+                    ip_name, '/' + ip_name, input_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    shape_ip_name, '/' + shape_ip_name, shape_input_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    shape_op_name, '/' + shape_op_name, shape_output_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    op_name, '/' + op_name, output_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    resized_op_name, '/' + resized_op_name,
+                    resized_output_byte_size)
+
+                shm_region_handles.append(
+                    (ip_name, input_byte_size, shm_ip_handle))
+                shm_region_handles.append(
+                    (shape_ip_name, shape_input_byte_size, shm_shape_ip_handle))
+                shm_region_handles.append(
+                    (shape_op_name, shape_output_byte_size,
+                     shm_shape_op_handle))
+                shm_region_handles.append(
+                    (op_name, output_byte_size, shm_op_handle))
+                shm_region_handles.append(
+                    (resized_op_name, resized_output_byte_size,
+                     shm_resized_op_handle))
             return shm_region_handles
         else:
             return []
 
     # Returns (name, byte size, shm_handle)
-    def precreate_register_dynaseq_shape_tensor_regions(self, value_list, dtype, i,
-                                            batch_size=1, tensor_shape=(1,)):
+    def precreate_register_dynaseq_shape_tensor_regions(self,
+                                                        value_list,
+                                                        dtype,
+                                                        i,
+                                                        batch_size=1,
+                                                        tensor_shape=(1,)):
         self.assertFalse(_test_cuda_shared_memory,
-                        "Shape tensors does not support CUDA shared memory")
+                         "Shape tensors does not support CUDA shared memory")
         if _test_system_shared_memory:
             shm_region_handles = []
             for j, (shape_value, value) in enumerate(value_list):
@@ -226,61 +279,85 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 for b in range(batch_size):
                     if dtype == np.object:
                         dummy_in0 = np.full(tensor_shape, value, dtype=np.int32)
-                        dummy_in0n = np.array([str(x) for x in dummy_in0.reshape(in0.size)], dtype=object)
+                        dummy_in0n = np.array(
+                            [str(x) for x in dummy_in0.reshape(in0.size)],
+                            dtype=object)
                         dummy_in0 = dummy_in0n.reshape(tensor_shape)
                     else:
                         dummy_in0 = np.full(tensor_shape, value, dtype=dtype)
                     dummy_input_list.append(dummy_in0)
-                    in0 =  np.full(tensor_shape, value, dtype=np.int32)
+                    in0 = np.full(tensor_shape, value, dtype=np.int32)
                     input_list.append(in0)
 
                 # Only one shape tensor input per batch
-                shape_input_list.append(np.full(tensor_shape, shape_value, dtype=np.int32))
+                shape_input_list.append(
+                    np.full(tensor_shape, shape_value, dtype=np.int32))
 
-                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (dtype == np.object) else input_list
+                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (
+                    dtype == np.object) else input_list
                 input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
-                shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
-                dummy_input_byte_size = sum([i0.nbytes for i0 in dummy_input_list])
+                shape_input_byte_size = sum(
+                    [i0.nbytes for i0 in shape_input_list])
+                dummy_input_byte_size = sum(
+                    [i0.nbytes for i0 in dummy_input_list])
                 shape_output_byte_size = shape_input_byte_size
                 output_byte_size = np.dtype(np.int32).itemsize + 2
                 resized_output_byte_size = 32 * shape_value
 
                 # create shared memory regions and copy data for input values
-                ip_name = 'ip{}{}'.format(i,j)
-                shape_ip_name = 'shape_ip{}{}'.format(i,j)
-                dummy_ip_name = 'dummy_ip{}{}'.format(i,j)
-                shape_op_name = 'shape_op{}{}'.format(i,j)
-                op_name = 'op{}{}'.format(i,j)
-                resized_op_name = 'resized_op{}{}'.format(i,j)
+                ip_name = 'ip{}{}'.format(i, j)
+                shape_ip_name = 'shape_ip{}{}'.format(i, j)
+                dummy_ip_name = 'dummy_ip{}{}'.format(i, j)
+                shape_op_name = 'shape_op{}{}'.format(i, j)
+                op_name = 'op{}{}'.format(i, j)
+                resized_op_name = 'resized_op{}{}'.format(i, j)
 
                 shm_ip_handle = shm.create_shared_memory_region(
-                    ip_name, '/'+ip_name, input_byte_size)
+                    ip_name, '/' + ip_name, input_byte_size)
                 shm_shape_ip_handle = shm.create_shared_memory_region(
-                    shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
+                    shape_ip_name, '/' + shape_ip_name, shape_input_byte_size)
                 shm_dummy_ip_handle = shm.create_shared_memory_region(
-                    dummy_ip_name, '/'+dummy_ip_name, dummy_input_byte_size)
+                    dummy_ip_name, '/' + dummy_ip_name, dummy_input_byte_size)
                 shm_shape_op_handle = shm.create_shared_memory_region(
-                    shape_op_name, '/'+shape_op_name, shape_output_byte_size)
+                    shape_op_name, '/' + shape_op_name, shape_output_byte_size)
                 shm_op_handle = shm.create_shared_memory_region(
-                    op_name, '/'+op_name, output_byte_size)
+                    op_name, '/' + op_name, output_byte_size)
                 shm_resized_op_handle = shm.create_shared_memory_region(
-                    resized_op_name, '/'+resized_op_name, resized_output_byte_size)
+                    resized_op_name, '/' + resized_op_name,
+                    resized_output_byte_size)
                 shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                shm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
-                shm.set_shared_memory_region(shm_dummy_ip_handle, dummy_input_list)
-                self.triton_client_.register_system_shared_memory(ip_name, '/'+ip_name, input_byte_size)
-                self.triton_client_.register_system_shared_memory(shape_ip_name, '/'+shape_ip_name, shape_input_byte_size)
-                self.triton_client_.register_system_shared_memory(dummy_ip_name, '/'+dummy_ip_name, dummy_input_byte_size)
-                self.triton_client_.register_system_shared_memory(shape_op_name, '/'+shape_op_name, shape_output_byte_size)
-                self.triton_client_.register_system_shared_memory(op_name, '/'+op_name, output_byte_size)
-                self.triton_client_.register_system_shared_memory(resized_op_name, '/'+resized_op_name, resized_output_byte_size)
+                shm.set_shared_memory_region(shm_shape_ip_handle,
+                                             shape_input_list)
+                shm.set_shared_memory_region(shm_dummy_ip_handle,
+                                             dummy_input_list)
+                self.triton_client_.register_system_shared_memory(
+                    ip_name, '/' + ip_name, input_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    shape_ip_name, '/' + shape_ip_name, shape_input_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    dummy_ip_name, '/' + dummy_ip_name, dummy_input_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    shape_op_name, '/' + shape_op_name, shape_output_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    op_name, '/' + op_name, output_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    resized_op_name, '/' + resized_op_name,
+                    resized_output_byte_size)
 
-                shm_region_handles.append((ip_name, input_byte_size, shm_ip_handle))
-                shm_region_handles.append((shape_ip_name, shape_input_byte_size, shm_shape_ip_handle))
-                shm_region_handles.append((dummy_ip_name, dummy_input_byte_size, shm_dummy_ip_handle))
-                shm_region_handles.append((shape_op_name, shape_output_byte_size, shm_shape_op_handle))
-                shm_region_handles.append((op_name, output_byte_size, shm_op_handle))
-                shm_region_handles.append((resized_op_name, resized_output_byte_size, shm_resized_op_handle))
+                shm_region_handles.append(
+                    (ip_name, input_byte_size, shm_ip_handle))
+                shm_region_handles.append(
+                    (shape_ip_name, shape_input_byte_size, shm_shape_ip_handle))
+                shm_region_handles.append(
+                    (dummy_ip_name, dummy_input_byte_size, shm_dummy_ip_handle))
+                shm_region_handles.append(
+                    (shape_op_name, shape_output_byte_size,
+                     shm_shape_op_handle))
+                shm_region_handles.append(
+                    (op_name, output_byte_size, shm_op_handle))
+                shm_region_handles.append(
+                    (resized_op_name, resized_output_byte_size,
+                     shm_resized_op_handle))
             return shm_region_handles
         else:
             return []
@@ -295,9 +372,18 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             elif _test_cuda_shared_memory:
                 cudashm.destroy_shared_memory_region(shm_tmp_handle[2])
 
-    def check_sequence(self, trial, model_name, input_dtype, correlation_id,
-                       sequence_thresholds, values, expected_result,
-                       protocol, batch_size=1, sequence_name="<unknown>", tensor_shape=(1,)):
+    def check_sequence(self,
+                       trial,
+                       model_name,
+                       input_dtype,
+                       correlation_id,
+                       sequence_thresholds,
+                       values,
+                       expected_result,
+                       protocol,
+                       batch_size=1,
+                       sequence_name="<unknown>",
+                       tensor_shape=(1,)):
         """Perform sequence of inferences. The 'values' holds a list of
         tuples, one for each inference with format:
 
@@ -307,7 +393,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         if (("savedmodel" not in trial) and ("graphdef" not in trial) and
             ("netdef" not in trial) and ("custom" not in trial) and
             ("onnx" not in trial) and ("libtorch" not in trial) and
-	    ("plan" not in trial)):
+            ("plan" not in trial)):
             self.assertFalse(True, "unknown trial type: " + trial)
 
         # Can only send the request exactly once since it is a
@@ -320,12 +406,14 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         if protocol == "streaming":
             configs.append(("localhost:8001", "grpc", True))
 
-        self.assertFalse(_test_system_shared_memory and _test_cuda_shared_memory,
-                        "Cannot set both System and CUDA shared memory flags to 1")
+        self.assertFalse(
+            _test_system_shared_memory and _test_cuda_shared_memory,
+            "Cannot set both System and CUDA shared memory flags to 1")
 
         self.assertEqual(len(configs), 1)
 
-        full_shape = tensor_shape if "nobatch" in trial else (batch_size,) + tensor_shape
+        full_shape = tensor_shape if "nobatch" in trial else (
+            batch_size,) + tensor_shape
 
         # create and register shared memory output region in advance,
         # knowing that this function will not be called concurrently.
@@ -334,28 +422,42 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             self.triton_client_.unregister_cuda_shared_memory()
             output_byte_size = 512
             if _test_system_shared_memory:
-                shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
-                self.triton_client_.register_system_shared_memory("output_data", "/output", output_byte_size)
+                shm_op_handle = shm.create_shared_memory_region(
+                    "output_data", "/output", output_byte_size)
+                self.triton_client_.register_system_shared_memory(
+                    "output_data", "/output", output_byte_size)
             elif _test_cuda_shared_memory:
-                shm_op_handle = cudashm.create_shared_memory_region("output_data", output_byte_size, 0)
-                self.triton_client_.register_cuda_shared_memory("output_data", cudashm.get_raw_handle(shm_op_handle), 0, output_byte_size)
+                shm_op_handle = cudashm.create_shared_memory_region(
+                    "output_data", output_byte_size, 0)
+                self.triton_client_.register_cuda_shared_memory(
+                    "output_data", cudashm.get_raw_handle(shm_op_handle), 0,
+                    output_byte_size)
             shm_ip_handles = []
-
 
         for config in configs:
             client_utils = grpcclient if config[1] == "grpc" else httpclient
 
-            triton_client = client_utils.InferenceServerClient(config[0], verbose=True)
+            triton_client = client_utils.InferenceServerClient(config[0],
+                                                               verbose=True)
             if config[2]:
                 user_data = UserData()
-                triton_client.start_stream(partial(completion_callback, user_data))
+                triton_client.start_stream(
+                    partial(completion_callback, user_data))
             # Execute the sequence of inference...
             try:
                 seq_start_ms = int(round(time.time() * 1000))
 
                 INPUT = "INPUT__0" if trial.startswith("libtorch") else "INPUT"
-                OUTPUT = "OUTPUT__0" if trial.startswith("libtorch") else "OUTPUT"
+                OUTPUT = "OUTPUT__0" if trial.startswith(
+                    "libtorch") else "OUTPUT"
                 for flag_str, value, thresholds, delay_ms in values:
+                    if _test_valgrind:
+                        if delay_ms is not None:
+                            delay_ms[0] = max(_valgrind_delay_ms, delay_ms[0])
+                            delay_ms[1] = max(_valgrind_delay_ms, delay_ms[1])
+                        else:
+                            delay_ms = (_valgrind_delay_ms, _valgrind_delay_ms)
+
                     if delay_ms is not None:
                         time.sleep(delay_ms[0] / 1000.0)
 
@@ -368,54 +470,78 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     # Construct request IOs
                     inputs = []
                     outputs = []
-                    inputs.append(client_utils.InferInput(INPUT, full_shape,
-                            np_to_triton_dtype(input_dtype)))
+                    inputs.append(
+                        client_utils.InferInput(
+                            INPUT, full_shape, np_to_triton_dtype(input_dtype)))
                     outputs.append(client_utils.InferRequestedOutput(OUTPUT))
                     if input_dtype == np.object:
                         in0 = np.full(full_shape, value, dtype=np.int32)
-                        in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                        dtype=object)
                         in0 = in0n.reshape(full_shape)
                     else:
                         in0 = np.full(full_shape, value, dtype=input_dtype)
 
                     # create input shared memory and copy input data values into it
                     if _test_system_shared_memory or _test_cuda_shared_memory:
-                        input_list_tmp = iu.serialize_byte_tensor_list([in0]) if (input_dtype == np.object) else [in0]
-                        input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                        input_list_tmp = iu.serialize_byte_tensor_list(
+                            [in0]) if (input_dtype == np.object) else [in0]
+                        input_byte_size = sum(
+                            [i0.nbytes for i0 in input_list_tmp])
                         ip_name = "ip{}".format(len(shm_ip_handles))
                         if _test_system_shared_memory:
-                            shm_ip_handles.append(shm.create_shared_memory_region(ip_name, "/"+ip_name, input_byte_size))
-                            shm.set_shared_memory_region(shm_ip_handles[-1], input_list_tmp)
-                            triton_client.register_system_shared_memory(ip_name, "/"+ip_name, input_byte_size)
+                            shm_ip_handles.append(
+                                shm.create_shared_memory_region(
+                                    ip_name, "/" + ip_name, input_byte_size))
+                            shm.set_shared_memory_region(
+                                shm_ip_handles[-1], input_list_tmp)
+                            triton_client.register_system_shared_memory(
+                                ip_name, "/" + ip_name, input_byte_size)
                         elif _test_cuda_shared_memory:
-                            shm_ip_handles.append(cudashm.create_shared_memory_region(ip_name, input_byte_size, 0))
-                            cudashm.set_shared_memory_region(shm_ip_handles[-1], input_list_tmp)
-                            triton_client.register_cuda_shared_memory(ip_name, cudashm.get_raw_handle(shm_ip_handles[-1]), 0, input_byte_size)
+                            shm_ip_handles.append(
+                                cudashm.create_shared_memory_region(
+                                    ip_name, input_byte_size, 0))
+                            cudashm.set_shared_memory_region(
+                                shm_ip_handles[-1], input_list_tmp)
+                            triton_client.register_cuda_shared_memory(
+                                ip_name,
+                                cudashm.get_raw_handle(shm_ip_handles[-1]), 0,
+                                input_byte_size)
 
                         inputs[0].set_shared_memory(ip_name, input_byte_size)
-                        outputs[0].set_shared_memory("output_data", output_byte_size)
+                        outputs[0].set_shared_memory("output_data",
+                                                     output_byte_size)
                     else:
                         inputs[0].set_data_from_numpy(in0)
 
                     start_ms = int(round(time.time() * 1000))
 
                     if config[2]:
-                        triton_client.async_stream_infer(model_name, inputs,
-                            outputs=outputs, sequence_id=correlation_id,
-                            sequence_start=seq_start, sequence_end=seq_end)
+                        triton_client.async_stream_infer(
+                            model_name,
+                            inputs,
+                            outputs=outputs,
+                            sequence_id=correlation_id,
+                            sequence_start=seq_start,
+                            sequence_end=seq_end)
                         (results, error) = user_data._completed_requests.get()
                         if error is not None:
                             raise error
                     else:
-                        results = triton_client.infer(model_name, inputs,
-                            outputs=outputs, sequence_id=correlation_id,
-                            sequence_start=seq_start, sequence_end=seq_end)
+                        results = triton_client.infer(
+                            model_name,
+                            inputs,
+                            outputs=outputs,
+                            sequence_id=correlation_id,
+                            sequence_start=seq_start,
+                            sequence_end=seq_end)
 
                     end_ms = int(round(time.time() * 1000))
 
                     # Get value of "OUTPUT", for shared memory, need to get it via
                     # shared memory utils
-                    if (not _test_system_shared_memory) and (not _test_cuda_shared_memory):
+                    if (not _test_system_shared_memory) and (
+                            not _test_cuda_shared_memory):
                         out = results.as_numpy(OUTPUT)
                     else:
                         output = results.get_output(OUTPUT)
@@ -425,9 +551,11 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                             output_shape = output.shape
                         output_type = input_dtype
                         if _test_system_shared_memory:
-                            out = shm.get_contents_as_numpy(shm_op_handle, output_type, output_shape)
+                            out = shm.get_contents_as_numpy(
+                                shm_op_handle, output_type, output_shape)
                         else:
-                            out = cudashm.get_contents_as_numpy(shm_op_handle, output_type, output_shape)
+                            out = cudashm.get_contents_as_numpy(
+                                shm_op_handle, output_type, output_shape)
                     result = out[0] if "nobatch" in trial else out[0][0]
                     print("{}: {}".format(sequence_name, result))
 
@@ -437,11 +565,14 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         if lt_ms is not None:
                             self.assertTrue((end_ms - start_ms) < lt_ms,
                                             "expected less than " + str(lt_ms) +
-                                            "ms response time, got " + str(end_ms - start_ms) + " ms")
+                                            "ms response time, got " +
+                                            str(end_ms - start_ms) + " ms")
                         if gt_ms is not None:
-                            self.assertTrue((end_ms - start_ms) > gt_ms,
-                                            "expected greater than " + str(gt_ms) +
-                                            "ms response time, got " + str(end_ms - start_ms) + " ms")
+                            self.assertTrue(
+                                (end_ms - start_ms) > gt_ms,
+                                "expected greater than " + str(gt_ms) +
+                                "ms response time, got " +
+                                str(end_ms - start_ms) + " ms")
                     if delay_ms is not None:
                         time.sleep(delay_ms[1] / 1000.0)
 
@@ -457,12 +588,14 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     gt_ms = sequence_thresholds[1]
                     if lt_ms is not None:
                         self.assertTrue((seq_end_ms - seq_start_ms) < lt_ms,
-                                        "sequence expected less than " + str(lt_ms) +
-                                        "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
+                                        "sequence expected less than " +
+                                        str(lt_ms) + "ms response time, got " +
+                                        str(seq_end_ms - seq_start_ms) + " ms")
                     if gt_ms is not None:
                         self.assertTrue((seq_end_ms - seq_start_ms) > gt_ms,
-                                        "sequence expected greater than " + str(gt_ms) +
-                                        "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
+                                        "sequence expected greater than " +
+                                        str(gt_ms) + "ms response time, got " +
+                                        str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
                 self.add_deferred_exception(ex)
             if config[2]:
@@ -476,10 +609,18 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             for shm_ip_handle in shm_ip_handles:
                 destroy_func(shm_ip_handle)
 
-    def check_sequence_async(self, trial, model_name, input_dtype, correlation_id,
-                             sequence_thresholds, values, expected_result,
-                             shm_region_handles, batch_size=1,
-                             sequence_name="<unknown>", tensor_shape=(1,)):
+    def check_sequence_async(self,
+                             trial,
+                             model_name,
+                             input_dtype,
+                             correlation_id,
+                             sequence_thresholds,
+                             values,
+                             expected_result,
+                             shm_region_handles,
+                             batch_size=1,
+                             sequence_name="<unknown>",
+                             tensor_shape=(1,)):
         """Perform sequence of inferences using stream async run.
         The 'values' holds a list of tuples, one for each inference with format:
 
@@ -489,16 +630,19 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         if (("savedmodel" not in trial) and ("graphdef" not in trial) and
             ("netdef" not in trial) and ("custom" not in trial) and
             ("onnx" not in trial) and ("libtorch" not in trial) and
-	    ("plan" not in trial)):
+            ("plan" not in trial)):
             self.assertFalse(True, "unknown trial type: " + trial)
 
-        self.assertFalse(_test_system_shared_memory and _test_cuda_shared_memory,
-                        "Cannot set both System and CUDA shared memory flags to 1")
+        self.assertFalse(
+            _test_system_shared_memory and _test_cuda_shared_memory,
+            "Cannot set both System and CUDA shared memory flags to 1")
 
-        full_shape = tensor_shape if "nobatch" in trial else (batch_size,) + tensor_shape
+        full_shape = tensor_shape if "nobatch" in trial else (
+            batch_size,) + tensor_shape
 
         client_utils = grpcclient
-        triton_client = client_utils.InferenceServerClient("localhost:8001", verbose=True)
+        triton_client = client_utils.InferenceServerClient("localhost:8001",
+                                                           verbose=True)
         user_data = UserData()
         triton_client.start_stream(partial(completion_callback, user_data))
         # Execute the sequence of inference...
@@ -518,30 +662,38 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 # Construct request IOs
                 inputs = []
                 outputs = []
-                inputs.append(client_utils.InferInput(INPUT, full_shape,
-                        np_to_triton_dtype(input_dtype)))
+                inputs.append(
+                    client_utils.InferInput(INPUT, full_shape,
+                                            np_to_triton_dtype(input_dtype)))
                 outputs.append(client_utils.InferRequestedOutput(OUTPUT))
 
                 if not (_test_system_shared_memory or _test_cuda_shared_memory):
                     if input_dtype == np.object:
                         in0 = np.full(full_shape, value, dtype=np.int32)
-                        in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                        dtype=object)
                         in0 = in0n.reshape(full_shape)
                     else:
                         in0 = np.full(full_shape, value, dtype=input_dtype)
                     inputs[0].set_data_from_numpy(in0)
                 else:
-                    offset = 2*sent_count
-                    inputs[0].set_shared_memory(shm_region_handles[offset][0], shm_region_handles[offset][1])
-                    outputs[0].set_shared_memory(shm_region_handles[offset+1][0], shm_region_handles[offset+1][1])
+                    offset = 2 * sent_count
+                    inputs[0].set_shared_memory(shm_region_handles[offset][0],
+                                                shm_region_handles[offset][1])
+                    outputs[0].set_shared_memory(
+                        shm_region_handles[offset + 1][0],
+                        shm_region_handles[offset + 1][1])
 
                 if pre_delay_ms is not None:
                     time.sleep(pre_delay_ms / 1000.0)
 
-                triton_client.async_stream_infer(model_name, inputs,
-                    outputs=outputs, sequence_id=correlation_id,
-                    sequence_start=seq_start, sequence_end=seq_end)
-                sent_count+=1
+                triton_client.async_stream_infer(model_name,
+                                                 inputs,
+                                                 outputs=outputs,
+                                                 sequence_id=correlation_id,
+                                                 sequence_start=seq_start,
+                                                 sequence_end=seq_end)
+                sent_count += 1
 
             # Wait for the results in the order sent
             result = None
@@ -552,20 +704,25 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     raise error
                 # Get value of "OUTPUT", for shared memory, need to get it via
                 # shared memory utils
-                if (not _test_system_shared_memory) and (not _test_cuda_shared_memory):
+                if (not _test_system_shared_memory) and (
+                        not _test_cuda_shared_memory):
                     out = results.as_numpy(OUTPUT)
                 else:
                     output = results.get_output(OUTPUT)
-                    offset = 2*processed_count+1
+                    offset = 2 * processed_count + 1
                     output_shape = output.shape
                     output_type = input_dtype
                     if _test_system_shared_memory:
-                        out = shm.get_contents_as_numpy(shm_region_handles[offset][2], output_type, output_shape)
+                        out = shm.get_contents_as_numpy(
+                            shm_region_handles[offset][2], output_type,
+                            output_shape)
                     else:
-                        out = cudashm.get_contents_as_numpy(shm_region_handles[offset][2], output_type, output_shape)
+                        out = cudashm.get_contents_as_numpy(
+                            shm_region_handles[offset][2], output_type,
+                            output_shape)
                 result = out[0] if "nobatch" in trial else out[0][0]
                 print("{}: {}".format(sequence_name, result))
-                processed_count+=1
+                processed_count += 1
 
             seq_end_ms = int(round(time.time() * 1000))
 
@@ -579,36 +736,44 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 gt_ms = sequence_thresholds[1]
                 if lt_ms is not None:
                     self.assertTrue((seq_end_ms - seq_start_ms) < lt_ms,
-                                    "sequence expected less than " + str(lt_ms) +
-                                    "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
+                                    "sequence expected less than " +
+                                    str(lt_ms) + "ms response time, got " +
+                                    str(seq_end_ms - seq_start_ms) + " ms")
                 if gt_ms is not None:
                     self.assertTrue((seq_end_ms - seq_start_ms) > gt_ms,
-                                    "sequence expected greater than " + str(gt_ms) +
-                                    "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
+                                    "sequence expected greater than " +
+                                    str(gt_ms) + "ms response time, got " +
+                                    str(seq_end_ms - seq_start_ms) + " ms")
         except Exception as ex:
             self.add_deferred_exception(ex)
         triton_client.stop_stream()
 
     # This sequence util only sends inference via streaming scenario
-    def check_sequence_shape_tensor_io(self, model_name, input_dtype, correlation_id,
-                             sequence_thresholds, values, expected_result,
-                             shm_region_handles, using_dynamic_batcher=False,
-                             sequence_name="<unknown>"):
-
+    def check_sequence_shape_tensor_io(self,
+                                       model_name,
+                                       input_dtype,
+                                       correlation_id,
+                                       sequence_thresholds,
+                                       values,
+                                       expected_result,
+                                       shm_region_handles,
+                                       using_dynamic_batcher=False,
+                                       sequence_name="<unknown>"):
         """Perform sequence of inferences using async run. The 'values' holds
         a list of tuples, one for each inference with format:
 
         (flag_str, shape_value, value, pre_delay_ms)
 
         """
-        tensor_shape = (1,1)
+        tensor_shape = (1, 1)
         # shape tensor is 1-D tensor that doesn't contain batch size as first value
         shape_tensor_shape = (1,)
         self.assertFalse(_test_cuda_shared_memory,
-                        "Shape tensors does not support CUDA shared memory")
+                         "Shape tensors does not support CUDA shared memory")
 
         client_utils = grpcclient
-        triton_client = client_utils.InferenceServerClient("localhost:8001", verbose=True)
+        triton_client = client_utils.InferenceServerClient("localhost:8001",
+                                                           verbose=True)
         user_data = UserData()
         triton_client.start_stream(partial(completion_callback, user_data))
         # Execute the sequence of inference...
@@ -628,36 +793,55 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 inputs = []
                 outputs = []
                 # input order: input, shape(, dummy)
-                inputs.append(client_utils.InferInput("INPUT", tensor_shape,
-                        np_to_triton_dtype(np.int32 if using_dynamic_batcher else input_dtype)))
-                inputs.append(client_utils.InferInput("SHAPE_INPUT", shape_tensor_shape,
-                        np_to_triton_dtype(np.int32)))
+                inputs.append(
+                    client_utils.InferInput(
+                        "INPUT", tensor_shape,
+                        np_to_triton_dtype(np.int32 if using_dynamic_batcher
+                                           else input_dtype)))
+                inputs.append(
+                    client_utils.InferInput("SHAPE_INPUT", shape_tensor_shape,
+                                            np_to_triton_dtype(np.int32)))
                 if using_dynamic_batcher:
-                    inputs.append(client_utils.InferInput("DUMMY_INPUT", tensor_shape,
+                    inputs.append(
+                        client_utils.InferInput(
+                            "DUMMY_INPUT", tensor_shape,
                             np_to_triton_dtype(input_dtype)))
                 # output order: shape, output, resized
-                outputs.append(client_utils.InferRequestedOutput("SHAPE_OUTPUT"))
+                outputs.append(
+                    client_utils.InferRequestedOutput("SHAPE_OUTPUT"))
                 outputs.append(client_utils.InferRequestedOutput("OUTPUT"))
-                outputs.append(client_utils.InferRequestedOutput("RESIZED_OUTPUT"))
+                outputs.append(
+                    client_utils.InferRequestedOutput("RESIZED_OUTPUT"))
 
                 # Set IO values
-                shape_values.append(np.full(shape_tensor_shape, shape_value, dtype=np.int32))
+                shape_values.append(
+                    np.full(shape_tensor_shape, shape_value, dtype=np.int32))
                 if not _test_system_shared_memory:
                     if using_dynamic_batcher:
                         if input_dtype == np.object:
-                            dummy_in0 = np.full(tensor_shape, value, dtype=np.int32)
-                            dummy_in0n = np.array([str(x) for x in in0.reshape(dummy_in0.size)], dtype=object)
+                            dummy_in0 = np.full(tensor_shape,
+                                                value,
+                                                dtype=np.int32)
+                            dummy_in0n = np.array(
+                                [str(x) for x in in0.reshape(dummy_in0.size)],
+                                dtype=object)
                             dummy_in0 = dummy_in0n.reshape(tensor_shape)
                         else:
-                            dummy_in0 = np.full(tensor_shape, value, dtype=input_dtype)
+                            dummy_in0 = np.full(tensor_shape,
+                                                value,
+                                                dtype=input_dtype)
                         in0 = np.full(tensor_shape, value, dtype=np.int32)
                     else:
                         if input_dtype == np.object:
                             in0 = np.full(tensor_shape, value, dtype=np.int32)
-                            in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                            in0n = np.array(
+                                [str(x) for x in in0.reshape(in0.size)],
+                                dtype=object)
                             in0 = in0n.reshape(tensor_shape)
                         else:
-                            in0 = np.full(tensor_shape, value, dtype=input_dtype)
+                            in0 = np.full(tensor_shape,
+                                          value,
+                                          dtype=input_dtype)
 
                     inputs[0].set_data_from_numpy(in0)
                     inputs[1].set_data_from_numpy(shape_values[-1])
@@ -665,24 +849,31 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         inputs[2].set_data_from_numpy(dummy_in0)
                 else:
                     if using_dynamic_batcher:
-                        input_offset = 6*sent_count
-                        output_offset = 6*sent_count + 3
+                        input_offset = 6 * sent_count
+                        output_offset = 6 * sent_count + 3
                     else:
-                        input_offset = 5*sent_count
-                        output_offset = 5*sent_count + 2
+                        input_offset = 5 * sent_count
+                        output_offset = 5 * sent_count + 2
                     for i in range(len(inputs)):
-                        inputs[i].set_shared_memory(shm_region_handles[input_offset+i][0], shm_region_handles[input_offset+i][1])
+                        inputs[i].set_shared_memory(
+                            shm_region_handles[input_offset + i][0],
+                            shm_region_handles[input_offset + i][1])
                     for i in range(len(outputs)):
-                        outputs[i].set_shared_memory(shm_region_handles[output_offset+i][0], shm_region_handles[output_offset+i][1])
+                        outputs[i].set_shared_memory(
+                            shm_region_handles[output_offset + i][0],
+                            shm_region_handles[output_offset + i][1])
 
                 if pre_delay_ms is not None:
                     time.sleep(pre_delay_ms / 1000.0)
 
-                triton_client.async_stream_infer(model_name, inputs,
-                    outputs=outputs, sequence_id=correlation_id,
-                    sequence_start=seq_start, sequence_end=seq_end)
+                triton_client.async_stream_infer(model_name,
+                                                 inputs,
+                                                 outputs=outputs,
+                                                 sequence_id=correlation_id,
+                                                 sequence_start=seq_start,
+                                                 sequence_end=seq_end)
 
-                sent_count+=1
+                sent_count += 1
 
             # Wait for the results in the order sent
             result = None
@@ -697,21 +888,25 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     out = results.as_numpy("OUTPUT")
                 else:
                     output = results.get_output("OUTPUT")
-                    output_offset = 6*processed_count+4 if using_dynamic_batcher else 5*processed_count+3
+                    output_offset = 6 * processed_count + 4 if using_dynamic_batcher else 5 * processed_count + 3
                     output_shape = output.shape
                     output_type = np.int32 if using_dynamic_batcher else np.float32
-                    out = shm.get_contents_as_numpy(shm_region_handles[output_offset][2], output_type, output_shape)
+                    out = shm.get_contents_as_numpy(
+                        shm_region_handles[output_offset][2], output_type,
+                        output_shape)
                 result = out[0][0]
 
                 # Validate the (debatched) shape of the resized output matches
                 # with the shape input values
                 resized_shape = results.get_output("RESIZED_OUTPUT").shape[1:]
-                self.assertTrue(np.array_equal(resized_shape, shape_values[processed_count]),
-                                "{}, {}, slot {}, expected: {}, got {}".format(
-                                model_name, "RESIZED_OUTPUT", processed_count, shape_values[processed_count],
-                                resized_shape))
+                self.assertTrue(
+                    np.array_equal(resized_shape,
+                                   shape_values[processed_count]),
+                    "{}, {}, slot {}, expected: {}, got {}".format(
+                        model_name, "RESIZED_OUTPUT", processed_count,
+                        shape_values[processed_count], resized_shape))
                 print("{}: {}".format(sequence_name, result))
-                processed_count+=1
+                processed_count += 1
 
             seq_end_ms = int(round(time.time() * 1000))
 
@@ -725,12 +920,14 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 gt_ms = sequence_thresholds[1]
                 if lt_ms is not None:
                     self.assertTrue((seq_end_ms - seq_start_ms) < lt_ms,
-                                    "sequence expected less than " + str(lt_ms) +
-                                    "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
+                                    "sequence expected less than " +
+                                    str(lt_ms) + "ms response time, got " +
+                                    str(seq_end_ms - seq_start_ms) + " ms")
                 if gt_ms is not None:
                     self.assertTrue((seq_end_ms - seq_start_ms) > gt_ms,
-                                    "sequence expected greater than " + str(gt_ms) +
-                                    "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
+                                    "sequence expected greater than " +
+                                    str(gt_ms) + "ms response time, got " +
+                                    str(seq_end_ms - seq_start_ms) + " ms")
         except Exception as ex:
             self.add_deferred_exception(ex)
         triton_client.stop_stream()
@@ -741,39 +938,46 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         # Skip the sequence batching check on ensemble model
         if config.platform != "ensemble":
             bconfig = config.sequence_batching
-            self.assertEqual(bconfig.max_sequence_idle_microseconds, _max_sequence_idle_ms * 1000) # 5 secs
+            self.assertEqual(bconfig.max_sequence_idle_microseconds,
+                             _max_sequence_idle_ms * 1000)  # 5 secs
 
     def check_status(self, model_name, batch_exec, exec_cnt, infer_cnt):
         stats = self.triton_client_.get_inference_statistics(model_name, "1")
         self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
         self.assertEqual(stats.model_stats[0].name, model_name,
                          "expect model stats for model {}".format(model_name))
-        self.assertEqual(stats.model_stats[0].version, "1",
-                         "expect model stats for model {} version 1".format(model_name))
+        self.assertEqual(
+            stats.model_stats[0].version, "1",
+            "expect model stats for model {} version 1".format(model_name))
 
         if batch_exec is not None:
             batch_stats = stats.model_stats[0].batch_stats
             print(batch_stats)
-            self.assertEqual(len(batch_stats), len(batch_exec),
-                             "expected {} different batch-sizes, got {}".format(
-                               len(batch_exec), len(batch_stats)))
+            self.assertEqual(
+                len(batch_stats), len(batch_exec),
+                "expected {} different batch-sizes, got {}".format(
+                    len(batch_exec), len(batch_stats)))
 
             for batch_stat in batch_stats:
                 bs = batch_stat.batch_size
                 bc = batch_stat.compute_infer.count
-                self.assertTrue(bs in batch_exec,
-                                "did not find expected batch-size {}".format(bs))
+                self.assertTrue(
+                    bs in batch_exec,
+                    "did not find expected batch-size {}".format(bs))
                 # Get count from one of the stats
-                self.assertEqual(bc, batch_exec[bs],
-                                 "expected model-execution-count {} for batch size {}, got {}".format(
-                                   batch_exec[bs], bs, bc))
+                self.assertEqual(
+                    bc, batch_exec[bs],
+                    "expected model-execution-count {} for batch size {}, got {}"
+                    .format(batch_exec[bs], bs, bc))
 
         actual_exec_cnt = stats.model_stats[0].execution_count
-        self.assertEqual(actual_exec_cnt, exec_cnt,
-                        "expected model-exec-count {}, got {}".format(
-                                exec_cnt, actual_exec_cnt))
+        self.assertEqual(
+            actual_exec_cnt, exec_cnt,
+            "expected model-exec-count {}, got {}".format(
+                exec_cnt, actual_exec_cnt))
 
         actual_infer_cnt = stats.model_stats[0].inference_count
-        self.assertEqual(actual_infer_cnt, infer_cnt,
-                         "expected model-inference-count {}, got {}".format(
-                                 infer_cnt, actual_infer_cnt))
+        self.assertEqual(
+            actual_infer_cnt, infer_cnt,
+            "expected model-inference-count {}, got {}".format(
+                infer_cnt, actual_infer_cnt))

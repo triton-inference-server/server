@@ -26,6 +26,13 @@
 
 #include "src/backends/pytorch/libtorch_backend_factory.h"
 
+#include <torchvision/DeformConv.h>
+#include <torchvision/PSROIAlign.h>
+#include <torchvision/PSROIPool.h>
+#include <torchvision/ROIAlign.h>
+#include <torchvision/ROIPool.h>
+#include <torchvision/empty_tensor_op.h>
+#include <torchvision/nms.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -53,7 +60,7 @@ LibTorchBackendFactory::Create(
 
 Status
 LibTorchBackendFactory::CreateBackend(
-    const std::string& path, const ModelConfig& model_config,
+    const std::string& path, const inference::ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {

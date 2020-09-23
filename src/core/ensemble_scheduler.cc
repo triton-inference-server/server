@@ -43,19 +43,99 @@ class EnsembleContext;
 
 using IterationCount = size_t;
 
+// Request tracker is passed as 'userp' in RequestRelease function and used
+// to manage the lifecycle of the ensemble request
+class RequestTracker {
+ public:
+  explicit RequestTracker(
+      std::unique_ptr<InferenceRequest>&& request, uint64_t compute_start_ns,
+      MetricModelReporter* metric_reporter,
+      InferenceStatsAggregator* stats_aggregator)
+      : inflight_request_counter_(1), request_(std::move(request)),
+        compute_start_ns_(compute_start_ns), metric_reporter_(metric_reporter),
+        stats_aggregator_(stats_aggregator), status_(Status::Success)
+  {
+  }
+
+  std::unique_ptr<InferenceRequest>& Request() { return request_; }
+
+  InferenceStatsAggregator& ContextStatsAggregator()
+  {
+    return context_stats_aggregator_;
+  }
+
+  void IncrementCounter()
+  {
+    std::lock_guard<std::mutex> lk(mtx_);
+    inflight_request_counter_++;
+  }
+
+  bool DecrementCounter()
+  {
+    std::lock_guard<std::mutex> lk(mtx_);
+    inflight_request_counter_--;
+    if (inflight_request_counter_ == 0) {
+#ifdef TRITON_ENABLE_STATS
+      const auto& infer_stats = context_stats_aggregator_.ImmutableInferStats();
+      request_->ReportStatisticsWithDuration(
+          metric_reporter_, status_.IsOk(), compute_start_ns_,
+          infer_stats.compute_input_duration_ns_,
+          infer_stats.compute_infer_duration_ns_,
+          infer_stats.compute_output_duration_ns_);
+      if (status_.IsOk()) {
+        stats_aggregator_->UpdateInferBatchStatsWithDuration(
+            metric_reporter_, std::max(1U, request_->BatchSize()),
+            infer_stats.compute_input_duration_ns_,
+            infer_stats.compute_infer_duration_ns_,
+            infer_stats.compute_output_duration_ns_);
+      }
+#endif
+      InferenceRequest::Release(
+          std::move(request_), TRITONSERVER_REQUEST_RELEASE_ALL);
+    }
+    return (inflight_request_counter_ == 0);
+  }
+
+  void SetStatus(const Status& status)
+  {
+    std::lock_guard<std::mutex> lk(mtx_);
+    status_ = status;
+  }
+
+ private:
+  std::mutex mtx_;
+  uint32_t inflight_request_counter_;
+  std::unique_ptr<InferenceRequest> request_;
+  uint64_t compute_start_ns_;
+  MetricModelReporter* metric_reporter_;
+  InferenceStatsAggregator* stats_aggregator_;
+  InferenceStatsAggregator context_stats_aggregator_;
+  Status status_;
+};
+
 // Step is used as 'userp' and keeps ensemble context alive
 // until no more internal requests are inflight.
 // Step contains metadata, and status for the
 // internal infer request
 struct Step {
-  Step(size_t step_idx)
-      : response_flags_(0), infer_status_(nullptr), step_idx_(step_idx)
+  Step(size_t step_idx, uint64_t correlation_id, uint32_t flags)
+      : correlation_id_(correlation_id), flags_(flags), response_flags_(0),
+        infer_status_(nullptr), step_idx_(step_idx)
   {
   }
 
   std::shared_ptr<EnsembleContext> ctx_;
   std::unique_ptr<InferenceRequest> request_;
-  std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>> output_map_;
+  uint64_t correlation_id_;
+  uint32_t flags_;
+
+  std::mutex output_mtx_;
+  // Different output map to avoid address conflict from different memory types
+  std::unordered_map<uintptr_t, std::shared_ptr<AllocatedMemory>>
+      cpu_output_map_;
+  std::unordered_map<
+      int64_t, std::unordered_map<uintptr_t, std::shared_ptr<AllocatedMemory>>>
+      gpu_output_map_;
   std::set<std::pair<std::string, IterationCount>> updated_tensors_;
   uint32_t response_flags_;
   TRITONSERVER_Error* infer_status_;
@@ -64,6 +144,28 @@ struct Step {
 };
 
 struct TensorData {
+  struct Metadata {
+    Metadata() = default;
+    Metadata(
+        std::unique_ptr<InferenceRequest::Input>&& data, size_t reference_count)
+        : data_(std::move(data)), remaining_reference_count_(reference_count),
+          parameter_override_(false)
+    {
+    }
+    Metadata(
+        std::unique_ptr<InferenceRequest::Input>&& data, size_t reference_count,
+        uint64_t correlation_id, uint32_t flags)
+        : data_(std::move(data)), remaining_reference_count_(reference_count),
+          parameter_override_(true), correlation_id_(correlation_id),
+          flags_(flags)
+    {
+    }
+    std::unique_ptr<InferenceRequest::Input> data_;
+    size_t remaining_reference_count_;
+    bool parameter_override_;
+    uint64_t correlation_id_;
+    uint32_t flags_;
+  };
   TensorData() = default;
   TensorData(size_t outgoing_steps_count)
       : current_iteration_(0), outgoing_steps_count_(outgoing_steps_count),
@@ -74,8 +176,18 @@ struct TensorData {
   IterationCount AddTensor(std::unique_ptr<InferenceRequest::Input>&& tensor)
   {
     tensor_.emplace(
+        current_iteration_, Metadata(std::move(tensor), outgoing_steps_count_));
+    return current_iteration_++;
+  }
+
+  IterationCount AddTensor(
+      std::unique_ptr<InferenceRequest::Input>&& tensor,
+      uint64_t correlation_id, uint32_t flags)
+  {
+    tensor_.emplace(
         current_iteration_,
-        std::make_pair(std::move(tensor), outgoing_steps_count_));
+        Metadata(
+            std::move(tensor), outgoing_steps_count_, correlation_id, flags));
     return current_iteration_++;
   }
 
@@ -83,10 +195,7 @@ struct TensorData {
   // A container is used to handle the decoupled case
   // where variable number of tensors will be produced.
   // map 'iteration count' to pair of <tensor, remaining outgoing count>
-  std::unordered_map<
-      IterationCount,
-      std::pair<std::unique_ptr<InferenceRequest::Input>, size_t>>
-      tensor_;
+  std::unordered_map<IterationCount, Metadata> tensor_;
   size_t current_iteration_;
   size_t outgoing_steps_count_;
   size_t batch_size_;
@@ -184,11 +293,6 @@ class EnsembleContext {
       const std::set<std::pair<std::string, IterationCount>>& updated_tensors,
       std::unique_ptr<InferenceResponse>* response);
 
-  MetricModelReporter* metric_reporter_;
-  InferenceStatsAggregator* stats_aggregator_;
-  InferenceStatsAggregator context_stats_aggregator_;
-  uint64_t compute_start_ns_;
-
   InferenceServer* is_;
 
   EnsembleInfo* info_;
@@ -222,7 +326,7 @@ class EnsembleContext {
 
   // Objects related to the ensemble infer request
   Status ensemble_status_;
-  std::unique_ptr<InferenceRequest> request_;
+  RequestTracker* request_tracker_;
 
   // The allocator that will be used to allocate buffers for the
   // inference result tensors.
@@ -237,12 +341,15 @@ EnsembleContext::EnsembleContext(
     InferenceStatsAggregator* stats_aggregator, InferenceServer* is,
     EnsembleInfo* info, std::unique_ptr<InferenceRequest>& request,
     cudaStream_t stream)
-    : metric_reporter_(metric_reporter), stats_aggregator_(stats_aggregator),
-      is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
-      request_(std::move(request)),
+    : is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
       allocator_(nullptr, TRITONSERVER_ResponseAllocatorDelete)
 {
-  INFER_STATS_SET_TIMESTAMP(compute_start_ns_);
+  uint64_t compute_start_ns = 0;
+  INFER_STATS_SET_TIMESTAMP(compute_start_ns);
+  request_tracker_ = new RequestTracker(
+      std::move(request), compute_start_ns, metric_reporter, stats_aggregator);
+
+  auto& lrequest = request_tracker_->Request();
 
   // Obtain backend handles of all models in ensemble request such that
   // they have the same lifetime as the ensemble request to avoid unloading
@@ -271,7 +378,7 @@ EnsembleContext::EnsembleContext(
   for (const auto& ensemble_output : info_->ensemble_output_shape_) {
     ignored_tensor.insert(ensemble_output.first);
   }
-  for (const auto& requested_output : request_->ImmutableRequestedOutputs()) {
+  for (const auto& requested_output : lrequest->ImmutableRequestedOutputs()) {
     ignored_tensor.erase(requested_output);
   }
   if (ignored_tensor.empty()) {
@@ -311,7 +418,7 @@ EnsembleContext::EnsembleContext(
   }
 
   for (const auto& pair : *tensor_to_step_) {
-    const auto& requested_outputs = request_->ImmutableRequestedOutputs();
+    const auto& requested_outputs = lrequest->ImmutableRequestedOutputs();
     // For requested outputs, add 1 to outgoing count as the ensemble itself
     // isn't counted as step.
     if (requested_outputs.find(pair.first) != requested_outputs.end()) {
@@ -322,12 +429,12 @@ EnsembleContext::EnsembleContext(
   }
 
   if (ensemble_status_.IsOk()) {
-    request_id_ = request_->Id();
-    correlation_id_ = request_->CorrelationId();
-    flags_ = request_->Flags();
-    priority_ = request_->Priority();
+    request_id_ = lrequest->Id();
+    correlation_id_ = lrequest->CorrelationId();
+    flags_ = lrequest->Flags();
+    priority_ = lrequest->Priority();
 
-    for (const auto& pr : request_->ImmutableInputs()) {
+    for (const auto& pr : lrequest->ImmutableInputs()) {
       const InferenceRequest::Input* input = pr.second;
       auto it = tensor_data_.find(input->Name());
       if (it != tensor_data_.end()) {
@@ -335,8 +442,8 @@ EnsembleContext::EnsembleContext(
         // Shape() represents reshaped value without batch dimension,
         // thus need to fill it if necessary.
         std::unique_ptr<InferenceRequest::Input> tensor;
-        if (request_->BatchSize() != 0) {
-          std::vector<int64_t> shape{request_->BatchSize()};
+        if (lrequest->BatchSize() != 0) {
+          std::vector<int64_t> shape{lrequest->BatchSize()};
           shape.insert(
               shape.end(), input->Shape().begin(), input->Shape().end());
           tensor.reset(new InferenceRequest::Input(
@@ -347,7 +454,7 @@ EnsembleContext::EnsembleContext(
         }
         tensor->SetData(input->Data());
         tensor_data.AddTensor(std::move(tensor));
-        tensor_data.batch_size_ = request_->BatchSize();
+        tensor_data.batch_size_ = lrequest->BatchSize();
       } else {
         ensemble_status_ = Status(
             Status::Code::INVALID_ARG,
@@ -378,10 +485,6 @@ EnsembleContext::ResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* allocated_memory_type,
     int64_t* allocated_memory_type_id)
 {
-  auto tensor_data_map = reinterpret_cast<
-      std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>>*>(
-      userp);
-
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
@@ -393,8 +496,16 @@ EnsembleContext::ResponseAlloc(
   if ((mutable_buffer != nullptr) || (byte_size == 0)) {
     if (byte_size != 0) {
       *buffer = static_cast<void*>(mutable_buffer);
+      auto step = reinterpret_cast<Step*>(userp);
+      std::lock_guard<std::mutex> lk(step->output_mtx_);
+      if (*allocated_memory_type == TRITONSERVER_MEMORY_GPU) {
+        step->gpu_output_map_[*allocated_memory_type_id].emplace(
+            reinterpret_cast<uintptr_t>(*buffer), std::move(allocated_buffer));
+      } else {
+        step->cpu_output_map_.emplace(
+            reinterpret_cast<uintptr_t>(*buffer), std::move(allocated_buffer));
+      }
     }
-    tensor_data_map->emplace(tensor_name, std::move(allocated_buffer));
     LOG_VERBOSE(1) << "Internal response allocation: " << tensor_name
                    << ", size " << byte_size << ", addr " << *buffer
                    << ", memory type " << *allocated_memory_type << ", type id "
@@ -423,6 +534,10 @@ EnsembleContext::RequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    auto request_tracker = reinterpret_cast<RequestTracker*>(userp);
+    if (request_tracker->DecrementCounter()) {
+      delete request_tracker;
+    }
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(request),
         "deleting ensemble inference request");
@@ -433,68 +548,142 @@ void
 EnsembleContext::ResponseComplete(
     TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
-  if (response == nullptr) {
-    return;
-  }
-
   auto step_ptr = std::unique_ptr<Step>(reinterpret_cast<Step*>(userp));
   step_ptr->response_flags_ = flags;
 
-  auto err = TRITONSERVER_InferenceResponseError(response);
-  if (err == nullptr) {
+  if (response != nullptr) {
+    auto err = TRITONSERVER_InferenceResponseError(response);
     uint32_t count;
-    err = TRITONSERVER_InferenceResponseOutputCount(response, &count);
+    bool parameter_override = false;
+    uint64_t correlation_id = 0;
+    uint32_t flags = 0;
     if (err == nullptr) {
-      std::lock_guard<std::mutex> lock(step_ptr->ctx_->mutex_);
-      auto& output_to_tensor =
-          step_ptr->ctx_->info_->steps_[step_ptr->step_idx_].output_to_tensor_;
-      for (uint32_t idx = 0; idx < count; idx++) {
-        const char* name;
-        TRITONSERVER_DataType datatype;
-        const int64_t* shape;
-        uint64_t dim_count;
-        const void* base;
-        size_t byte_size;
-        TRITONSERVER_MemoryType memory_type;
-        int64_t memory_type_id;
-        void* userp;
-        err = TRITONSERVER_InferenceResponseOutput(
-            response, idx, &name, &datatype, &shape, &dim_count, &base,
-            &byte_size, &memory_type, &memory_type_id, &userp);
-        if (err == nullptr) {
-          auto it = output_to_tensor.find(name);
-          if (it != output_to_tensor.end()) {
-            std::unique_ptr<InferenceRequest::Input> tensor(
-                new InferenceRequest::Input(
-                    it->second, TritonToDataType(datatype), shape, dim_count));
-            tensor->SetData(std::move(step_ptr->output_map_[it->first]));
-
-            auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
-            step_ptr->updated_tensors_.emplace(
-                it->second, tensor_data.AddTensor(std::move(tensor)));
-          } else {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL,
-                std::string(
-                    "internal response header specified output '" +
-                    std::string(name) +
-                    "' that does not map to any ensemble tensors")
-                    .c_str());
+      err = TRITONSERVER_InferenceResponseParameterCount(response, &count);
+      if (err == nullptr) {
+        for (uint32_t idx = 0; idx < count; idx++) {
+          const char* name;
+          TRITONSERVER_ParameterType type;
+          const void* vvalue;
+          err = TRITONSERVER_InferenceResponseParameter(
+              response, idx, &name, &type, &vvalue);
+          if (err == nullptr) {
+            if (!strcmp(name, "sequence_id")) {
+              if (type != TRITONSERVER_PARAMETER_INT) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "expect paremeter 'sequence_id' to be "
+                    "TRITONSERVER_PARAMETER_INT");
+              } else {
+                correlation_id = *reinterpret_cast<const uint64_t*>(vvalue);
+                parameter_override = true;
+              }
+            } else if (!strcmp(name, "sequence_start")) {
+              if (type != TRITONSERVER_PARAMETER_BOOL) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "expect paremeter 'sequence_start' to be "
+                    "TRITONSERVER_PARAMETER_BOOL");
+              } else {
+                if (*reinterpret_cast<const bool*>(vvalue)) {
+                  flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+                }
+                parameter_override = true;
+              }
+            } else if (!strcmp(name, "sequence_end")) {
+              if (type != TRITONSERVER_PARAMETER_BOOL) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "expect paremeter 'sequence_end' to be "
+                    "TRITONSERVER_PARAMETER_BOOL");
+              } else {
+                if (*reinterpret_cast<const bool*>(vvalue)) {
+                  flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+                }
+                parameter_override = true;
+              }
+            }
           }
-        }
-        if (err != nullptr) {
-          break;
         }
       }
     }
-  }
+    if (err == nullptr) {
+      err = TRITONSERVER_InferenceResponseOutputCount(response, &count);
+      if (err == nullptr) {
+        std::lock_guard<std::mutex> lock(step_ptr->ctx_->mutex_);
+        auto& output_to_tensor =
+            step_ptr->ctx_->info_->steps_[step_ptr->step_idx_]
+                .output_to_tensor_;
+        for (uint32_t idx = 0; idx < count; idx++) {
+          const char* name;
+          TRITONSERVER_DataType datatype;
+          const int64_t* shape;
+          uint64_t dim_count;
+          const void* base;
+          size_t byte_size;
+          TRITONSERVER_MemoryType memory_type;
+          int64_t memory_type_id;
+          void* userp;
+          err = TRITONSERVER_InferenceResponseOutput(
+              response, idx, &name, &datatype, &shape, &dim_count, &base,
+              &byte_size, &memory_type, &memory_type_id, &userp);
+          if (err == nullptr) {
+            auto it = output_to_tensor.find(name);
+            if (it != output_to_tensor.end()) {
+              std::unique_ptr<InferenceRequest::Input> tensor(
+                  new InferenceRequest::Input(
+                      it->second, TritonToDataType(datatype), shape,
+                      dim_count));
 
-  if (err != nullptr) {
-    step_ptr->infer_status_ = err;
+              if (byte_size != 0) {
+                std::lock_guard<std::mutex> output_lk(step_ptr->output_mtx_);
+                if (memory_type == TRITONSERVER_MEMORY_GPU) {
+                  auto& gpu_output_map =
+                      step_ptr->gpu_output_map_[memory_type_id];
+                  auto it =
+                      gpu_output_map.find(reinterpret_cast<uintptr_t>(base));
+                  tensor->SetData(std::move(it->second));
+                  gpu_output_map.erase(it);
+                } else {
+                  auto it = step_ptr->cpu_output_map_.find(
+                      reinterpret_cast<uintptr_t>(base));
+                  tensor->SetData(std::move(it->second));
+                  step_ptr->cpu_output_map_.erase(it);
+                }
+              }
+
+              auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
+              if (parameter_override) {
+                step_ptr->updated_tensors_.emplace(
+                    it->second, tensor_data.AddTensor(
+                                    std::move(tensor), correlation_id, flags));
+              } else {
+                step_ptr->updated_tensors_.emplace(
+                    it->second,
+                    tensor_data.AddTensor(
+                        std::move(tensor), step_ptr->correlation_id_,
+                        step_ptr->flags_));
+              }
+            } else {
+              LOG_VERBOSE(1)
+                  << "in ensemble, an internal response header specified "
+                     "output '"
+                  << name << "' that does not map to any ensemble tensors";
+            }
+          }
+          if (err != nullptr) {
+            break;
+          }
+        }
+      }
+    }
+
+    if (err != nullptr) {
+      step_ptr->infer_status_ = err;
+    }
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(response),
+        "deleting inference response");
   }
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseDelete(response),
-      "deleting inference response");
 
   EnsembleContext::Proceed(step_ptr->ctx_, step_ptr);
   // Expecting more responses
@@ -639,25 +828,42 @@ EnsembleContext::InitStep(
   // multiple inputs in the same step.
   std::map<TensorData*, size_t*> releasing_tensors;
 
-  // Set inputs in request and prepare input map
+  // Set inputs in request, prepare input map,
+  // and set overridden parameter if any.
+  auto correlation_id = correlation_id_;
+  auto flags = flags_;
+  bool parameter_set = false;
   for (const auto& pair : istep.input_to_tensor_) {
     auto& tensor_data = tensor_data_[pair.second];
     auto& tensor = tensor_data.tensor_[iteration_count];
 
     // If the actual shape and config shape agree with each other without
     // considering batch size, non-batch / batch conversion are not required.
-    const ModelInput* input_config;
+    const inference::ModelInput* input_config;
     backend->GetInput(pair.first, &input_config);
     auto shape = ReshapeTensorDims(
         input_config->dims(), allow_batching, tensor_data.batch_size_,
-        tensor.first->OriginalShape());
+        tensor.data_->OriginalShape());
 
     InferenceRequest::Input* input;
     RETURN_IF_ERROR(irequest->AddOriginalInput(
-        pair.first, tensor.first->DType(), shape, &input));
-    RETURN_IF_ERROR(input->SetData(tensor.first->Data()));
+        pair.first, tensor.data_->DType(), shape, &input));
+    RETURN_IF_ERROR(input->SetData(tensor.data_->Data()));
 
-    releasing_tensors.emplace(&tensor_data, &tensor.second);
+    releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
+
+    if (tensor.parameter_override_) {
+      if (parameter_set && ((correlation_id != tensor.correlation_id_) ||
+                            (flags != tensor.flags_))) {
+        LOG_ERROR << "Different set of response parameters are set for '"
+                  << istep.model_name_ << "'. Parameter correlation ID "
+                  << correlation_id << ", flags " << flags << " is used.";
+        continue;
+      }
+      correlation_id = tensor.correlation_id_;
+      flags = tensor.flags_;
+      parameter_set = true;
+    }
   }
 
   // Prune the tensor if it is not needed by other steps
@@ -672,19 +878,20 @@ EnsembleContext::InitStep(
     irequest->AddOriginalRequestedOutput(pair.first);
   }
 
-  step->reset(new Step(step_idx));
+  step->reset(new Step(step_idx, correlation_id, flags));
 
   irequest->SetId(request_id_);
-  irequest->SetCorrelationId(correlation_id_);
-  irequest->SetFlags(flags_);
+  irequest->SetCorrelationId(correlation_id);
+  irequest->SetFlags(flags);
   irequest->SetPriority(priority_);
 #ifdef TRITON_ENABLE_STATS
-  irequest->SetSecondaryStatsAggregator(&context_stats_aggregator_);
+  irequest->SetSecondaryStatsAggregator(
+      &request_tracker_->ContextStatsAggregator());
 #endif
   irequest->SetResponseCallback(
-      reinterpret_cast<ResponseAllocator*>(allocator_.get()),
-      &(*step)->output_map_, ResponseComplete, step->get());
-  irequest->SetReleaseCallback(RequestComplete, step->get());
+      reinterpret_cast<ResponseAllocator*>(allocator_.get()), step->get(),
+      ResponseComplete, step->get());
+  irequest->SetReleaseCallback(RequestComplete, request_tracker_);
 
   RETURN_IF_ERROR(irequest->PrepareForInference());
 
@@ -745,7 +952,7 @@ Status
 EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
 {
   // Do nothing if the ensemble is finished
-  if (request_ == nullptr) {
+  if (request_tracker_ == nullptr) {
     return ensemble_status_;
   }
 
@@ -755,29 +962,17 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
         ensemble_status_.StatusCode(), "in ensemble '" + info_->ensemble_name_ +
                                            "', " + ensemble_status_.Message());
   }
-#ifdef TRITON_ENABLE_STATS
-  const auto& infer_stats = context_stats_aggregator_.ImmutableInferStats();
-  request_->ReportStatisticsWithDuration(
-      metric_reporter_, ensemble_status_.IsOk(), compute_start_ns_,
-      infer_stats.compute_input_duration_ns_,
-      infer_stats.compute_infer_duration_ns_,
-      infer_stats.compute_output_duration_ns_);
-  if (ensemble_status_.IsOk()) {
-    stats_aggregator_->UpdateInferBatchStatsWithDuration(
-        metric_reporter_, std::max(1U, request_->BatchSize()),
-        infer_stats.compute_input_duration_ns_,
-        infer_stats.compute_infer_duration_ns_,
-        infer_stats.compute_output_duration_ns_);
-  }
-#endif
 
   if (ensemble_status_.IsOk()) {
-    if (info_->is_decoupled_ && (response != nullptr)) {
-      InferenceResponse::Send(
-          std::move(response), TRITONSERVER_RESPONSE_COMPLETE_NONE);
-    }
-    if (inflight_step_counter_ != 0) {
-      return ensemble_status_;
+    if (info_->is_decoupled_) {
+      if (response != nullptr) {
+        InferenceResponse::Send(std::move(response), 0 /* flags */);
+      }
+      if (inflight_step_counter_ != 0) {
+        return ensemble_status_;
+      }
+      request_tracker_->Request()->ResponseFactory().SendFlags(
+          TRITONSERVER_RESPONSE_COMPLETE_FINAL);
     } else {
       InferenceResponse::Send(
           std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
@@ -788,13 +983,18 @@ EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
           std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
           ensemble_status_);
     } else {
-      InferenceRequest::RespondIfError(request_, ensemble_status_);
+      InferenceRequest::RespondIfError(
+          request_tracker_->Request(), ensemble_status_);
     }
   }
 
-  InferenceRequest::Release(
-      std::move(request_), TRITONSERVER_REQUEST_RELEASE_ALL);
-
+  // Reach here when the ensemble execution comes to the end, 'ensemble_status_'
+  // at this point is representative.
+  request_tracker_->SetStatus(ensemble_status_);
+  if (request_tracker_->DecrementCounter()) {
+    delete request_tracker_;
+  }
+  request_tracker_ = nullptr;
   return ensemble_status_;
 }
 
@@ -807,7 +1007,8 @@ EnsembleContext::CheckAndSetEnsembleOutput(
   // Check if updated tensor is one of the ensemble output and if all outputs
   // have tensor of the same iteration count
   bool ready = false;
-  const auto& requested_outputs = request_->ImmutableRequestedOutputs();
+  auto& lrequest = request_tracker_->Request();
+  const auto& requested_outputs = lrequest->ImmutableRequestedOutputs();
   for (const auto updated_tensor : updated_tensors) {
     if (requested_outputs.find(updated_tensor.first) ==
         requested_outputs.end()) {
@@ -840,7 +1041,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
         "ensemble steps can be made");
   }
 
-  RETURN_IF_ERROR(request_->ResponseFactory().CreateResponse(response));
+  RETURN_IF_ERROR(lrequest->ResponseFactory().CreateResponse(response));
 
   bool cuda_async_copy = false;
   std::map<TensorData*, size_t*> releasing_tensors;
@@ -853,18 +1054,18 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     auto& tensor = tensor_data.tensor_[iteration_count];
 
     auto shape = ReshapeTensorDims(
-        output_pair.second, (request_->BatchSize() != 0),
-        tensor_data.batch_size_, tensor.first->OriginalShape());
+        output_pair.second, (lrequest->BatchSize() != 0),
+        tensor_data.batch_size_, tensor.data_->OriginalShape());
 
     InferenceResponse::Output* output;
     RETURN_IF_ERROR((*response)->AddOutput(
-        output_pair.first, tensor.first->DType(), shape, &output));
+        output_pair.first, tensor.data_->DType(), shape, &output));
 
     // Use the memory type of the memory block as preferred memory type
     TRITONSERVER_MemoryType dst_memory_type;
     int64_t dst_memory_type_id;
     size_t content_size;
-    tensor.first->Data()->BufferAt(
+    tensor.data_->Data()->BufferAt(
         0, &content_size, &dst_memory_type, &dst_memory_type_id);
 
     void* buffer;
@@ -885,7 +1086,7 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
-    const char* content = tensor.first->Data()->BufferAt(
+    const char* content = tensor.data_->Data()->BufferAt(
         content_idx, &content_size, &src_memory_type, &src_memory_type_id);
     bool cuda_used = false;
     while (content != nullptr) {
@@ -897,11 +1098,21 @@ EnsembleContext::CheckAndSetEnsembleOutput(
 
       content_offset += content_size;
       content_idx++;
-      content = tensor.first->Data()->BufferAt(
+      content = tensor.data_->Data()->BufferAt(
           content_idx, &content_size, &src_memory_type, &src_memory_type_id);
     }
 
-    releasing_tensors.emplace(&tensor_data, &tensor.second);
+    releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
+
+    if (tensor.parameter_override_) {
+      (*response)->AddParameter("sequence_id", (int64_t)tensor.correlation_id_);
+      (*response)->AddParameter(
+          "sequence_start",
+          (tensor.flags_ & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START) != 0);
+      (*response)->AddParameter(
+          "sequence_end",
+          (tensor.flags_ & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END) != 0);
+    }
   }
 
   if (cuda_async_copy) {
@@ -936,8 +1147,12 @@ EnsembleContext::ScheduleSteps(
       // Need to check the ensemble_status_ to ensure the FinishEnsemble()
       // is called only once.
       if (context->ensemble_status_.IsOk()) {
+        context->request_tracker_->IncrementCounter();
         context->ensemble_status_ = context->is_->InferAsync(step->request_);
         if (!context->ensemble_status_.IsOk()) {
+          // The request is not sent to server properly, shouldn't expect its
+          // release function get called.
+          context->request_tracker_->DecrementCounter();
           context->ensemble_status_ = context->FinishEnsemble();
           break;
         }
@@ -952,7 +1167,7 @@ EnsembleContext::ScheduleSteps(
 Status
 EnsembleScheduler::Create(
     InferenceStatsAggregator* const stats_aggregator,
-    InferenceServer* const server, const ModelConfig& config,
+    InferenceServer* const server, const inference::ModelConfig& config,
     std::unique_ptr<Scheduler>* scheduler)
 {
   scheduler->reset(new EnsembleScheduler(stats_aggregator, server, config));
@@ -962,6 +1177,11 @@ EnsembleScheduler::Create(
 Status
 EnsembleScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
+  // Queue timer starts at the beginning of the queueing and
+  // scheduling process
+  INFER_TRACE_ACTIVITY(
+      request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
+      request->CaptureQueueStartNs());
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
       metric_reporter_.get(), stats_aggregator_, is_, info_.get(), request,
       stream_));
@@ -971,7 +1191,7 @@ EnsembleScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 
 EnsembleScheduler::EnsembleScheduler(
     InferenceStatsAggregator* const stats_aggregator,
-    InferenceServer* const server, const ModelConfig& config)
+    InferenceServer* const server, const inference::ModelConfig& config)
     : stats_aggregator_(stats_aggregator), is_(server), stream_(nullptr)
 {
 #ifdef TRITON_ENABLE_GPU

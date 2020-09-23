@@ -28,9 +28,10 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:20.06-py3
-ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.06-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:20.06-tf1-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:20.08-py3
+ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.08-py3
+ARG TENSORFLOW1_IMAGE=nvcr.io/nvidia/tensorflow:20.08-tf1-py3
+ARG TENSORFLOW2_IMAGE=nvcr.io/nvidia/tensorflow:20.08-tf2-py3
 
 ############################################################################
 ## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
@@ -62,11 +63,8 @@ RUN cd pytorch && \
 ############################################################################
 FROM ${BASE_IMAGE} AS tritonserver_onnx
 
-# Currently the prebuilt Onnx Runtime library is built on CUDA 9, thus it
-# needs to be built from source
-
 # Onnx Runtime release version
-ARG ONNX_RUNTIME_VERSION=1.3.0
+ARG ONNX_RUNTIME_VERSION=1.4.0
 
 WORKDIR /workspace
 
@@ -83,14 +81,6 @@ ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 
 # Copy patches into container...
 COPY build/onnxruntime /tmp/trtis/build/onnxruntime
-
-# Patch for cudnn.
-RUN patch -i /tmp/trtis/build/onnxruntime/cudnn.patch \
-    /workspace/onnxruntime/onnxruntime/core/providers/cuda/rnn/cudnn_rnn_base.h
-
-# Patch build to use the CUDA Runtime version of CUB.
-RUN sed -i 's/${PROJECT_SOURCE_DIR}\/external\/cub//' \
-    /workspace/onnxruntime/cmake/onnxruntime_providers.cmake
 
 RUN sed -i "s/backend-test-tools.*//" ${SCRIPT_DIR}/install_onnx.sh
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
@@ -148,24 +138,26 @@ RUN echo "import onnx; print(onnx.__version__)" | python3 > /workspace/ort_onnx_
 ############################################################################
 ## TensorFlow stage: Use TensorFlow container
 ############################################################################
-FROM ${TENSORFLOW_IMAGE} AS tritonserver_tf
+FROM ${TENSORFLOW1_IMAGE} AS tritonserver_tf1
+FROM ${TENSORFLOW2_IMAGE} AS tritonserver_tf2
 
 ############################################################################
 ## Build stage: Build inference server
 ############################################################################
 FROM ${BASE_IMAGE} AS tritonserver_build
 
-ARG TRITON_VERSION=2.1.0dev
-ARG TRITON_CONTAINER_VERSION=20.07dev
+ARG TRITON_VERSION=2.4.0dev
+ARG TRITON_CONTAINER_VERSION=20.10dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
+# python3-dev is needed by Torchvision
+# python3-pip is needed by python backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
             automake \
             build-essential \
-            cmake \
             git \
             libgoogle-glog0v5 \
             libre2-dev \
@@ -175,6 +167,9 @@ RUN apt-get update && \
             rapidjson-dev \
             libb64-dev \
             patchelf \
+            python3-dev \
+            python3-pip \
+            python3-setuptools \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
@@ -189,21 +184,44 @@ RUN apt-get update && \
     fi && \
     rm -rf /var/lib/apt/lists/*
 
+# Install dependencies for protobuf code generation in Python
+RUN pip3 install --upgrade wheel setuptools && \
+    pip3 install grpcio-tools
+
+# Server build requires recent version of CMake (FetchContent required)
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+      gpg --dearmor - |  \
+      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends cmake
+
 # TensorFlow libraries. Install the monolithic libtensorflow_trtis and
 # create links from libtensorflow_framework.so and
 # libtensorflow_cc.so.  Custom TF operations link against
 # libtensorflow_framework.so so it must be present (and that
 # functionality is provided by libtensorflow_trtis.so).
-COPY --from=tritonserver_tf \
+COPY --from=tritonserver_tf1 \
      /usr/local/lib/tensorflow/libtensorflow_trtis.so.1 \
-     /opt/tritonserver/lib/tensorflow/
-RUN cd /opt/tritonserver/lib/tensorflow && \
+     /opt/tritonserver/backends/tensorflow1/
+RUN cd /opt/tritonserver/backends/tensorflow1 && \
     patchelf --set-rpath '$ORIGIN' libtensorflow_trtis.so.1 && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_trtis.so && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so.1 && \
     ln -sf libtensorflow_framework.so.1 libtensorflow_framework.so && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_cc.so.1 && \
     ln -sf libtensorflow_cc.so.1 libtensorflow_cc.so
+
+COPY --from=tritonserver_tf2 \
+     /usr/local/lib/tensorflow/libtensorflow_triton.so.2 \
+     /opt/tritonserver/backends/tensorflow2/
+RUN cd /opt/tritonserver/backends/tensorflow2 && \
+    patchelf --set-rpath '$ORIGIN' libtensorflow_triton.so.2 && \
+    ln -sf libtensorflow_triton.so.2 libtensorflow_triton.so && \
+    ln -sf libtensorflow_triton.so.2 libtensorflow_framework.so.2 && \
+    ln -sf libtensorflow_framework.so.2 libtensorflow_framework.so && \
+    ln -sf libtensorflow_triton.so.2 libtensorflow_cc.so.2 && \
+    ln -sf libtensorflow_cc.so.2 libtensorflow_cc.so
 
 # Caffe2 libraries
 COPY --from=tritonserver_pytorch \
@@ -223,7 +241,7 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/triton
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tritonserver/lib/pytorch/
 
-# LibTorch headers and libraries
+# LibTorch and Torchvision headers and libraries
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
      /opt/tritonserver/include/torch
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
@@ -234,6 +252,10 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/li
       /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
      /opt/tritonserver/lib/pytorch/
+COPY --from=tritonserver_pytorch /opt/pytorch/vision/torchvision/csrc \
+    /opt/tritonserver/include/torchvision/torchvision/
+COPY --from=tritonserver_pytorch /opt/pytorch/vision/build/libtorchvision.so \
+    /opt/tritonserver/lib/pytorch/
 RUN cd /opt/tritonserver/lib/pytorch && \
     for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
@@ -242,7 +264,7 @@ RUN cd /opt/tritonserver/lib/pytorch && \
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
-ARG ONNX_RUNTIME_VERSION=1.3.0
+ARG ONNX_RUNTIME_VERSION=1.4.0
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
@@ -254,32 +276,32 @@ COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/pr
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
-     /opt/tritonserver/lib/onnx/
-RUN cd /opt/tritonserver/lib/onnx && \
+     /opt/tritonserver/backends/onnxruntime/
+RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
 ARG OPENVINO_VERSION=2020.2
 COPY --from=tritonserver_onnx /workspace/build/Release/external/ngraph/lib/libovep_ngraph.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libngraph.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/plugins.xml \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_lp_transformations.so \
-     /opt/tritonserver/lib/onnx/
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
-     /opt/tritonserver/lib/onnx/
-RUN cd /opt/tritonserver/lib/onnx && \
+     /opt/tritonserver/backends/onnxruntime/
+RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libtbb.so.2 libtbb.so && \
     for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
@@ -303,6 +325,10 @@ COPY --from=tritonserver_onnx /workspace/build/Release/testdata/custom_op_librar
 # - Need to find CUDA stubs if they are available since some backends
 # may need to link against them. This is identical to the logic in TF
 # container nvbuild.sh
+ARG TRITON_COMMON_REPO_TAG=main
+ARG TRITON_CORE_REPO_TAG=main
+ARG TRITON_BACKEND_REPO_TAG=main
+
 RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.so | wc -l) && \
     if [[ "$LIBCUDA_FOUND" -eq 0 ]]; then \
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/stubs; \
@@ -311,6 +337,9 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
+                  -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+                  -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+                  -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
                   -DTRITON_ENABLE_GRPC=ON \
                   -DTRITON_ENABLE_HTTP=ON \
                   -DTRITON_ENABLE_METRICS=ON \
@@ -329,19 +358,107 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_PYTORCH=ON \
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
-                  -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch" \
-                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
+                  -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
+                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/backends/tensorflow1;/opt/tritonserver/backends/tensorflow2;/opt/tritonserver/lib/pytorch" \
                   ../build && \
             make -j16 server && \
             mkdir -p /opt/tritonserver/include && \
             cp -r server/install/bin /opt/tritonserver/. && \
             cp -r server/install/lib /opt/tritonserver/. && \
-            cp -r server/install/include /opt/tritonserver/include/tritonserver) && \
-    (cd /opt/tritonserver && ln -sf /workspace/qa qa) && \
-    (cd /opt/tritonserver/lib && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/lib/tensorflow && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/lib/pytorch && chmod ugo-w+rx *) && \
-    (cd /opt/tritonserver/lib/onnx && chmod ugo-w+rx *)
+            cp -r server/install/include/triton /opt/tritonserver/include/.) && \
+    (cd /opt/tritonserver && ln -sf /workspace/qa qa)
+
+# Build the backends.
+#
+ARG TRITON_EXAMPLE_BACKEND_TAG=main
+RUN for BE in identity repeat square; do \
+        rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+            (cd /tmp/triton_backends && \
+                 git clone --single-branch --depth=1 -b ${TRITON_EXAMPLE_BACKEND_TAG} \
+                     https://github.com/triton-inference-server/${BE}_backend.git) && \
+            (cd /tmp/triton_backends/${BE}_backend && \
+                 mkdir build && cd build && \
+                 cmake -DCMAKE_BUILD_TYPE=Release \
+                       -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+                       -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+                       -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+                       -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
+                 make -j16 install && \
+                 mkdir -p /opt/tritonserver/backends && \
+                 cp -r install/backends/${BE} /opt/tritonserver/backends/.); \
+    done
+
+ARG TRITON_ONNXRUNTIME_BACKEND_TAG=main
+RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+    (cd /tmp/triton_backends && \
+         git clone --single-branch --depth=1 -b ${TRITON_ONNXRUNTIME_BACKEND_TAG} \
+             https://github.com/triton-inference-server/onnxruntime_backend.git) && \
+    (cd /tmp/triton_backends/onnxruntime_backend && \
+         mkdir build && cd build && \
+         cmake -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+               -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+               -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} \
+               -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON \
+               -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON \
+               -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
+               -DTRITON_ONNXRUNTIME_LIB_PATHS="/opt/tritonserver/backends/onnxruntime" .. && \
+         make -j16 install && \
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/onnxruntime /opt/tritonserver/backends/.)
+
+ARG TRITON_TENSORFLOW1_BACKEND_TAG=main
+RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+    (cd /tmp/triton_backends && \
+         git clone --single-branch --depth=1 -b ${TRITON_TENSORFLOW1_BACKEND_TAG} \
+             https://github.com/triton-inference-server/tensorflow_backend.git) && \
+    (cd /tmp/triton_backends/tensorflow_backend && \
+         mkdir build && cd build && \
+         cmake -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+               -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+               -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} \
+               -DTRITON_TENSORFLOW_VERSION="1" .. \
+               -DTRITON_TENSORFLOW_LIB_PATHS="/opt/tritonserver/backends/tensorflow1" .. && \
+         make -j16 install && \
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/tensorflow1 /opt/tritonserver/backends/.)
+
+ARG TRITON_TENSORFLOW2_BACKEND_TAG=main
+RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+    (cd /tmp/triton_backends && \
+         git clone --single-branch --depth=1 -b ${TRITON_TENSORFLOW2_BACKEND_TAG} \
+             https://github.com/triton-inference-server/tensorflow_backend.git) && \
+    (cd /tmp/triton_backends/tensorflow_backend && \
+         mkdir build && cd build && \
+         cmake -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+               -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+               -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} \
+               -DTRITON_TENSORFLOW_VERSION="2" .. \
+               -DTRITON_TENSORFLOW_LIB_PATHS="/opt/tritonserver/backends/tensorflow2" .. && \
+         make -j16 install && \
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/tensorflow2 /opt/tritonserver/backends/.)
+
+ARG TRITON_PYTHON_BACKEND_TAG=main
+RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+    (cd /tmp/triton_backends && \
+         git clone --single-branch --depth=1 -b ${TRITON_PYTHON_BACKEND_TAG} \
+             https://github.com/triton-inference-server/python_backend.git) && \
+    (cd /tmp/triton_backends/python_backend && \
+         mkdir build && cd build && \
+         cmake -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+               -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+               -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
+         make -j16 install && \
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/python /opt/tritonserver/backends/.)
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -357,8 +474,8 @@ ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRITON_VERSION=2.1.0dev
-ARG TRITON_CONTAINER_VERSION=20.07dev
+ARG TRITON_VERSION=2.4.0dev
+ARG TRITON_CONTAINER_VERSION=20.10dev
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -367,6 +484,10 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
+
+# Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom
+# ops from that path
+ENV LD_LIBRARY_PATH /opt/tritonserver/lib/pytorch/:$LD_LIBRARY_PATH
 
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -415,11 +536,12 @@ RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 LICENSE .
 COPY --chown=1000:1000 --from=tritonserver_onnx /data/dldt/openvino_${OPENVINO_VERSION}/LICENSE LICENSE.openvino
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
-COPY --chown=1000:1000 --from=tritonserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
+# TF1 and TF2 use the same license
+COPY --chown=1000:1000 --from=tritonserver_tf1 /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
 COPY --chown=1000:1000 --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib lib
-COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/include/tritonserver/tritonserver.h include/
+COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends backends
 
 # Get ONNX version supported
 COPY --chown=1000:1000 --from=tritonserver_onnx /workspace/ort_onnx_version.txt ort_onnx_version.txt
@@ -442,3 +564,4 @@ ENV NVIDIA_BUILD_ID ${NVIDIA_BUILD_ID:-<unknown>}
 LABEL com.nvidia.build.id="${NVIDIA_BUILD_ID}"
 ARG NVIDIA_BUILD_REF
 LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
+

@@ -60,7 +60,7 @@ class ModelParser {
       : inputs_(std::make_shared<ModelTensorMap>()),
         outputs_(std::make_shared<ModelTensorMap>()),
         composing_models_map_(std::make_shared<ComposingModelMap>()),
-        scheduler_type_(NONE), max_batch_size_(0)
+        scheduler_type_(NONE), max_batch_size_(0), is_decoupled_(false)
   {
   }
 
@@ -74,8 +74,8 @@ class ModelParser {
   /// \param client_wrapper The wrapped triton client object.
   /// \return Error object indicating success or failure.
   nic::Error Init(
-      const ni::ModelMetadataResponse& metadata, const ni::ModelConfig& config,
-      const std::string& model_version,
+      const inference::ModelMetadataResponse& metadata,
+      const inference::ModelConfig& config, const std::string& model_version,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       std::unique_ptr<TritonClientWrapper>& client_wrapper);
 
@@ -110,6 +110,10 @@ class ModelParser {
   /// \return The maximum supported batch size.
   size_t MaxBatchSize() const { return max_batch_size_; }
 
+  /// Returns whether or not the model is decoupled
+  /// \return the truth value of whether the model is decoupled
+  bool IsDecoupled() const { return is_decoupled_; }
+
   /// Get the details about the model inputs.
   /// \return The map with tensor_name and the tensor details
   /// stored as key-value pair.
@@ -131,7 +135,7 @@ class ModelParser {
 
  private:
   nic::Error GetEnsembleSchedulerType(
-      const ni::ModelConfig& config, const std::string& model_version,
+      const inference::ModelConfig& config, const std::string& model_version,
       std::unique_ptr<TritonClientWrapper>& client_wrapper,
       bool* is_sequential);
 
@@ -149,4 +153,5 @@ class ModelParser {
   std::string model_version_;
   ModelSchedulerType scheduler_type_;
   size_t max_batch_size_;
+  bool is_decoupled_;
 };

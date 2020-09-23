@@ -39,9 +39,12 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "src/core/constants.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
+
+constexpr char kInferHeaderContentLengthHTTPHeader[] =
+    "Inference-Header-Content-Length";
+constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 
 class InferResult;
 class InferRequest;
@@ -154,7 +157,7 @@ struct InferOptions {
   explicit InferOptions(const std::string& model_name)
       : model_name_(model_name), model_version_(""), request_id_(""),
         sequence_id_(0), sequence_start_(false), sequence_end_(false),
-        priority_(0), timeout_(0)
+        priority_(0), server_timeout_(0), client_timeout_(0)
   {
   }
   /// The name of the model to run inference.
@@ -188,11 +191,20 @@ struct InferOptions {
   /// will handle the request using default setting for the model.
   uint64_t priority_;
   /// The timeout value for the request, in microseconds. If the request
-  /// cannot be completed within the time the server can take a
+  /// cannot be completed within the time by the server can take a
   /// model-specific action such as terminating the request. If not
   /// provided, the server will handle the request using default setting
   /// for the model.
-  uint64_t timeout_;
+  uint64_t server_timeout_;
+  // The maximum end-to-end time, in microseconds, the request is allowed
+  // to take. Note the HTTP library only offer the precision upto
+  // milliseconds. The client will abort request when the specified time
+  // elapses. The request will return error with message "Deadline Exceeded".
+  // The default value is 0 which means client will wait for the
+  // response from the server. This option is not supported for streaming
+  // requests. Instead see 'stream_timeout' argument in
+  // InferenceServerGrpcClient::StartStream().
+  uint64_t client_timeout_;
 };
 
 //==============================================================================

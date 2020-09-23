@@ -53,16 +53,9 @@
 #ifdef TRITON_ENABLE_ENSEMBLE
 #include "src/backends/ensemble/ensemble_backend_factory.h"
 #endif  // TRITON_ENABLE_ENSEMBLE
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-#include "src/backends/onnx/onnx_backend_factory.h"
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
 #include "src/backends/pytorch/libtorch_backend_factory.h"
 #endif  // TRITON_ENABLE_PYTORCH
-#ifdef TRITON_ENABLE_TENSORFLOW
-#include "src/backends/tensorflow/graphdef_backend_factory.h"
-#include "src/backends/tensorflow/savedmodel_backend_factory.h"
-#endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
 #include "src/backends/tensorrt/plan_backend_factory.h"
 #endif  // TRITON_ENABLE_TENSORRT
@@ -105,56 +98,8 @@ void
 BuildBackendConfigMap(
     const std::string& version, const bool strict_model_config,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-    const std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limit_mb,
     BackendConfigMap* backend_configs)
 {
-#ifdef TRITON_ENABLE_TENSORFLOW
-  //// Tensorflow GraphDef and SavedModel
-  {
-    auto graphdef_config = std::make_shared<GraphDefBackendFactory::Config>();
-    graphdef_config->autofill = !strict_model_config;
-
-    if (tf_gpu_memory_fraction == 0.0) {
-      graphdef_config->allow_gpu_memory_growth = true;
-    } else {
-      graphdef_config->allow_gpu_memory_growth = false;
-      graphdef_config->per_process_gpu_memory_fraction = tf_gpu_memory_fraction;
-    }
-
-#ifdef TRITON_ENABLE_GPU
-    int device_cnt = 0;
-    cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
-    if ((cuerr == cudaErrorNoDevice) ||
-        (cuerr == cudaErrorInsufficientDriver)) {
-      device_cnt = 0;
-    } else if (cuerr != cudaSuccess) {
-      LOG_ERROR << "unable to get number of CUDA devices while building "
-                   "BackendConfigMap: ("
-                << cuerr << ") " << cudaGetErrorString(cuerr);
-      device_cnt = 0;
-    }
-
-    if (!tf_vgpu_memory_limit_mb.empty()) {
-      for (int device = 0; device < device_cnt; device++) {
-        auto device_mapping = tf_vgpu_memory_limit_mb.find(device);
-        if (device_mapping != tf_vgpu_memory_limit_mb.end()) {
-          graphdef_config->memory_limit_mb[device] = std::vector<float>(
-              device_mapping->second.first, device_mapping->second.second);
-        } else {
-          graphdef_config->memory_limit_mb[device] = {};
-        }
-      }
-      graphdef_config->per_process_gpu_memory_fraction = 0.0;
-    }
-#endif  // TRITON_ENABLE_GPU
-
-    graphdef_config->allow_soft_placement = tf_allow_soft_placement;
-
-    (*backend_configs)[kTensorFlowGraphDefPlatform] = graphdef_config;
-    (*backend_configs)[kTensorFlowSavedModelPlatform] = graphdef_config;
-  }
-#endif  // TRITON_ENABLE_TENSORFLOW
-
 #ifdef TRITON_ENABLE_CAFFE2
   //// Caffe NetDef
   {
@@ -172,15 +117,6 @@ BuildBackendConfigMap(
     (*backend_configs)[kTensorRTPlanPlatform] = plan_config;
   }
 #endif  // TRITON_ENABLE_TENSORRT
-
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-  //// OnnxRuntime Onnx
-  {
-    auto onnx_config = std::make_shared<OnnxBackendFactory::Config>();
-    onnx_config->autofill = !strict_model_config;
-    (*backend_configs)[kOnnxRuntimeOnnxPlatform] = onnx_config;
-  }
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 
 #ifdef TRITON_ENABLE_PYTORCH
   //// PyTorch LibTorch
@@ -304,7 +240,7 @@ struct ModelRepositoryManager::ModelInfo {
   // so that we have more information on whether the model reload
   // is necessary
   int64_t mtime_nsec_;
-  ModelConfig model_config_;
+  inference::ModelConfig model_config_;
   Platform platform_;
   std::string model_repository_path_;
 };
@@ -313,18 +249,19 @@ class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
       InferenceServer* server, const double min_compute_capability,
-      const BackendConfigMap& backend_map,
+      const BackendConfigMap& backend_config_map,
+      const BackendCmdlineConfigMap& backend_cmdline_config_map,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
-  ~BackendLifeCycle() = default;
+  ~BackendLifeCycle() { map_.clear(); }
 
   // Start loading model backends with specified versions asynchronously.
   // If 'force_unload', all versions that are being served will
   // be unloaded before loading the specified versions.
   Status AsyncLoad(
       const std::string& repository_path, const std::string& model_name,
-      const std::set<int64_t>& versions, const ModelConfig& model_config,
-      bool force_unload = true,
+      const std::set<int64_t>& versions,
+      const inference::ModelConfig& model_config, bool force_unload = true,
       std::function<void(int64_t, ModelReadyState, size_t)> OnComplete =
           nullptr);
 
@@ -356,7 +293,8 @@ class ModelRepositoryManager::BackendLifeCycle {
   struct BackendInfo {
     BackendInfo(
         const std::string& repository_path, const ModelReadyState state,
-        const ActionType next_action, const ModelConfig& model_config)
+        const ActionType next_action,
+        const inference::ModelConfig& model_config)
         : repository_path_(repository_path),
           platform_(GetPlatform(model_config.platform())), state_(state),
           next_action_(next_action), model_config_(model_config)
@@ -376,7 +314,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     ActionType next_action_;
     // callback function that will be triggered when there is no next action
     std::function<void()> OnComplete_;
-    ModelConfig model_config_;
+    inference::ModelConfig model_config_;
 
     std::shared_ptr<InferenceBackend> backend_;
   };
@@ -420,16 +358,9 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::unique_ptr<TritonBackendFactory> triton_backend_factory_;
   std::unique_ptr<CustomBackendFactory> custom_factory_;
 #endif  // TRITON_ENABLE_CUSTOM
-#ifdef TRITON_ENABLE_TENSORFLOW
-  std::unique_ptr<GraphDefBackendFactory> graphdef_factory_;
-  std::unique_ptr<SavedModelBackendFactory> savedmodel_factory_;
-#endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
   std::unique_ptr<PlanBackendFactory> plan_factory_;
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-  std::unique_ptr<OnnxBackendFactory> onnx_factory_;
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
   std::unique_ptr<LibTorchBackendFactory> libtorch_factory_;
 #endif  // TRITON_ENABLE_PYTORCH
@@ -441,30 +372,16 @@ class ModelRepositoryManager::BackendLifeCycle {
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
     InferenceServer* server, const double min_compute_capability,
-    const BackendConfigMap& backend_map,
+    const BackendConfigMap& backend_config_map,
+    const BackendCmdlineConfigMap& backend_cmdline_config_map,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
       new BackendLifeCycle(min_compute_capability));
-
-#ifdef TRITON_ENABLE_TENSORFLOW
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kTensorFlowGraphDefPlatform)->second;
-    RETURN_IF_ERROR(GraphDefBackendFactory::Create(
-        config, &(local_life_cycle->graphdef_factory_)));
-  }
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kTensorFlowSavedModelPlatform)->second;
-    RETURN_IF_ERROR(SavedModelBackendFactory::Create(
-        config, &(local_life_cycle->savedmodel_factory_)));
-  }
-#endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_CAFFE2
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kCaffe2NetDefPlatform)->second;
+        backend_config_map.find(kCaffe2NetDefPlatform)->second;
     RETURN_IF_ERROR(NetDefBackendFactory::Create(
         config, &(local_life_cycle->netdef_factory_)));
   }
@@ -472,23 +389,15 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #ifdef TRITON_ENABLE_TENSORRT
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kTensorRTPlanPlatform)->second;
+        backend_config_map.find(kTensorRTPlanPlatform)->second;
     RETURN_IF_ERROR(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kOnnxRuntimeOnnxPlatform)->second;
-    RETURN_IF_ERROR(
-        OnnxBackendFactory::Create(config, &(local_life_cycle->onnx_factory_)));
-  }
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kPyTorchLibTorchPlatform)->second;
+        backend_config_map.find(kPyTorchLibTorchPlatform)->second;
     RETURN_IF_ERROR(LibTorchBackendFactory::Create(
         config, &(local_life_cycle->libtorch_factory_)));
   }
@@ -496,20 +405,20 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #ifdef TRITON_ENABLE_CUSTOM
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kCustomPlatform)->second;
+        backend_config_map.find(kCustomPlatform)->second;
     RETURN_IF_ERROR(CustomBackendFactory::Create(
         config, &(local_life_cycle->custom_factory_)));
   }
   {
-    const std::shared_ptr<BackendConfig> config;
     RETURN_IF_ERROR(TritonBackendFactory::Create(
-        config, &(local_life_cycle->triton_backend_factory_)));
+        server, backend_cmdline_config_map,
+        &(local_life_cycle->triton_backend_factory_)));
   }
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
   {
     const std::shared_ptr<BackendConfig>& config =
-        backend_map.find(kEnsemblePlatform)->second;
+        backend_config_map.find(kEnsemblePlatform)->second;
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
         server, config, &(local_life_cycle->ensemble_factory_)));
   }
@@ -679,8 +588,8 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
 Status
 ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     const std::string& repository_path, const std::string& model_name,
-    const std::set<int64_t>& versions, const ModelConfig& model_config,
-    bool force_unload,
+    const std::set<int64_t>& versions,
+    const inference::ModelConfig& model_config, bool force_unload,
     std::function<void(int64_t, ModelReadyState, size_t)> OnComplete)
 {
   LOG_VERBOSE(1) << "AsyncLoad() '" << model_name << "'";
@@ -861,7 +770,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
       {backend_info->repository_path_, model_name, std::to_string(version)});
   // make copy of the current model config in case model config in backend info
   // is updated (another poll) during the creation of backend handle
-  ModelConfig model_config;
+  inference::ModelConfig model_config;
   {
     std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
     model_config = backend_info->model_config_;
@@ -876,22 +785,11 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 #ifdef TRITON_ENABLE_CUSTOM
   if (!model_config.backend().empty()) {
     status = triton_backend_factory_->CreateBackend(
-        backend_info->repository_path_, model_name, version, model_config,
-        min_compute_capability_, &is);
+        backend_info->repository_path_, model_name, version, model_config, &is);
   } else
 #endif  // TRITON_ENABLE_CUSTOM
   {
     switch (backend_info->platform_) {
-#ifdef TRITON_ENABLE_TENSORFLOW
-      case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
-        status = graphdef_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        break;
-      case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
-        status = savedmodel_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        break;
-#endif  // TRITON_ENABLE_TENSORFLOW
 #ifdef TRITON_ENABLE_TENSORRT
       case Platform::PLATFORM_TENSORRT_PLAN:
         status = plan_factory_->CreateBackend(
@@ -904,12 +802,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             version_path, model_config, min_compute_capability_, &is);
         break;
 #endif  // TRITON_ENABLE_CAFFE2
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-      case Platform::PLATFORM_ONNXRUNTIME_ONNX:
-        status = onnx_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        break;
-#endif  // TRITON_ENABLE_ONNXRUNTIME
 #ifdef TRITON_ENABLE_PYTORCH
       case Platform::PLATFORM_PYTORCH_LIBTORCH:
         status = libtorch_factory_->CreateBackend(
@@ -1037,8 +929,8 @@ ModelRepositoryManager::Create(
     InferenceServer* server, const std::string& server_version,
     const std::set<std::string>& repository_paths,
     const std::set<std::string>& startup_models, const bool strict_model_config,
+    const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-    const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
     const bool polling_enabled, const bool model_control_enabled,
     const double min_compute_capability,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
@@ -1064,11 +956,12 @@ ModelRepositoryManager::Create(
 
   BuildBackendConfigMap(
       server_version, strict_model_config, tf_gpu_memory_fraction,
-      tf_allow_soft_placement, tf_memory_limit_mb, &backend_config_map);
+      tf_allow_soft_placement, &backend_config_map);
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
-      server, min_compute_capability, backend_config_map, &life_cycle));
+      server, min_compute_capability, backend_config_map,
+      backend_cmdline_config_map, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
@@ -1164,7 +1057,7 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
   UpdateDependencyGraph(added, deleted, modified);
 
   for (const auto& name : deleted) {
-    ModelConfig model_config;
+    inference::ModelConfig model_config;
     std::set<int64_t> versions;
     std::string empty_path;
     // Utilize "force_unload" of AsyncLoad()
@@ -1195,7 +1088,7 @@ ModelRepositoryManager::LoadModelByDependency()
     loaded_models.clear();
     // Unload invalid models first
     for (auto& invalid_model : set_pair.second) {
-      ModelConfig model_config;
+      inference::ModelConfig model_config;
       std::set<int64_t> versions;
       std::string empty_path;
       // Utilize "force_unload" of AsyncLoad()
@@ -1406,7 +1299,7 @@ ModelRepositoryManager::LoadUnloadModels(
   // In all cases, should unload them and remove from 'infos_' explicitly.
   for (const auto& name : deleted) {
     infos_.erase(name);
-    ModelConfig model_config;
+    inference::ModelConfig model_config;
     std::set<int64_t> versions;
     std::string empty_path;
     // Utilize "force_unload" of AsyncLoad()
@@ -1427,7 +1320,7 @@ ModelRepositoryManager::UnloadAllModels()
 {
   Status status;
   // Reload an empty version list to cause the model to unload.
-  ModelConfig model_config;
+  inference::ModelConfig model_config;
   std::set<int64_t> versions;
   std::string empty_path;
   for (const auto& name_info : infos_) {
@@ -1640,7 +1533,7 @@ ModelRepositoryManager::Poll(
     Status status = Status::Success;
     if (model_poll_state != STATE_UNMODIFIED) {
       model_info.reset(new ModelInfo());
-      ModelConfig& model_config = model_info->model_config_;
+      inference::ModelConfig& model_config = model_info->model_config_;
       model_info->mtime_nsec_ = mtime_ns;
       model_info->model_repository_path_ = repository;
 
@@ -1651,8 +1544,14 @@ ModelRepositoryManager::Poll(
           full_path, backend_config_map_, autofill_, min_compute_capability_,
           &model_config);
       if (status.IsOk()) {
+        // Note that the model inputs and outputs are not validated until
+        // the model backend is intialized as they may not be auto-completed
+        // until backend is intialized.
         status = ValidateModelConfig(
             model_config, std::string(), min_compute_capability_);
+        if (status.IsOk() && (!autofill_)) {
+          status = ValidateModelIOConfig(model_config);
+        }
       }
       if (status.IsOk()) {
         model_info->platform_ = GetPlatform(model_config.platform());
@@ -1799,9 +1698,50 @@ ModelRepositoryManager::UpdateDependencyGraph(
   }
 
 #ifdef TRITON_ENABLE_ENSEMBLE
-  ValidateEnsembleConfig(&affected_ensembles);
+  // After the dependency graph is updated, check ensemble dependencies
+  for (auto& ensemble : affected_ensembles) {
+    if (ensemble->status_.IsOk()) {
+      if (!ensemble->missing_upstreams_.empty()) {
+        std::string name_list;
+        for (auto it = ensemble->missing_upstreams_.begin();
+            it != ensemble->missing_upstreams_.end(); it++) {
+          if (it != ensemble->missing_upstreams_.begin()) {
+            name_list += ", ";
+          }
+          name_list += (*it)->model_name_;
+        }
+        ensemble->status_ = Status(
+            Status::Code::INVALID_ARG,
+            "ensemble " + ensemble->model_name_ +
+                " contains models that are not available: " + name_list);
+      } else {
+        ensemble->status_ = CircularcyCheck(ensemble, ensemble);
+      }
+    }
+  }
 #endif  // TRITON_ENABLE_ENSEMBLE
+  return Status::Success;
+}
 
+Status
+ModelRepositoryManager::CircularcyCheck(
+    DependencyNode* current_node, const DependencyNode* start_node)
+{
+  for (auto& downstream : current_node->downstreams_) {
+    if (downstream->model_name_ == start_node->model_name_) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "circular dependency between ensembles: " + start_node->model_name_ +
+              " -> ... -> " + current_node->model_name_ + " -> " +
+              start_node->model_name_);
+    } else {
+      const auto status = CircularcyCheck(downstream, start_node);
+      if (!status.IsOk() && current_node->status_.IsOk()) {
+        current_node->status_ = status;
+        return status;
+      }
+    }
+  }
   return Status::Success;
 }
 
@@ -1863,7 +1803,7 @@ ModelRepositoryManager::ConnectDependencyGraph(DependencyNode* updated_node)
 
 Status
 ModelRepositoryManager::GetModelConfig(
-    const std::string& name, ModelConfig* model_config)
+    const std::string& name, inference::ModelConfig* model_config)
 {
   const auto itr = infos_.find(name);
   if (itr == infos_.end()) {
@@ -1924,7 +1864,7 @@ bool
 ModelRepositoryManager::CheckNode(DependencyNode* node)
 {
   bool node_ready = true;
-  // if the node failed on validation, mark as ready as we know
+  // if the node is in invalid status, mark as ready as we know
   // it should not be loaded
   if (node->status_.IsOk()) {
     for (auto& upstream : node->upstreams_) {
@@ -1962,6 +1902,13 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
         break;
       }
     }
+#ifdef TRITON_ENABLE_ENSEMBLE
+    // Validate ensemble config if the node is ready. By this point, the
+    // depending models are loaded and their configs are completed
+    if (node_ready && node->status_.IsOk()) {
+      node->status_ = ValidateEnsembleConfig(this, node);
+    }
+#endif  // TRITON_ENABLE_ENSEMBLE
   }
   return node_ready;
 }
@@ -1969,7 +1916,7 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
 Status
 ModelRepositoryManager::VersionsToLoad(
     const std::string model_repository_path, const std::string& name,
-    const ModelConfig& model_config, std::set<int64_t>* versions)
+    const inference::ModelConfig& model_config, std::set<int64_t>* versions)
 {
   versions->clear();
 

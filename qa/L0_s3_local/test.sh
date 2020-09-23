@@ -42,8 +42,9 @@ PERF_CLIENT=../clients/perf_client
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
-MODELDIR="qa_model_repository"
-cp -r $DATADIR $MODELDIR
+MODELDIR="models"
+rm -rf ./$MODELDIR && mkdir $MODELDIR
+cp -r $DATADIR/*_float32_float32_float32 $MODELDIR/.
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
@@ -77,10 +78,19 @@ MINIO_PID=$!
 export AWS_ACCESS_KEY_ID=minio && \
     export AWS_SECRET_ACCESS_KEY=miniostorage
 
-# create and add data to bucket
-python -m pip install awscli-local && \
-    awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket1.0 && \
-    awslocal s3 sync $MODELDIR s3://demo-bucket1.0
+# Force version to 0.7 to prevent failures due to version changes
+python -m pip install awscli-local==0.07
+
+# Needed to set correct port for awscli-local
+ENDPOINT_FLAG="--endpoint-url=http://localhost:4572"
+
+# Cleanup bucket if exists
+awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
+    awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0 || true
+
+# Create and add data to bucket
+awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
+    awslocal $ENDPOINT_FLAG s3 sync $MODELDIR s3://demo-bucket1.0
 
 RET=0
 
@@ -167,6 +177,10 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Destroy bucket
+awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
+    awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
 
 # Kill minio server
 kill $MINIO_PID

@@ -46,7 +46,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
-    const ModelQueuePolicy& default_queue_policy,
+    const inference::ModelQueuePolicy& default_queue_policy,
     const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
       dynamic_batching_enabled_(dynamic_batching_enabled),
@@ -77,11 +77,17 @@ DynamicBatchScheduler::Create(
     const uint64_t max_queue_delay_microseconds,
     std::unique_ptr<Scheduler>* scheduler)
 {
+  inference::ModelDynamicBatching batcher_config;
+  batcher_config.set_preserve_ordering(preserve_ordering);
+  for (const auto& bs : preferred_batch_sizes) {
+    batcher_config.add_preferred_batch_size(bs);
+  }
+  batcher_config.set_max_queue_delay_microseconds(max_queue_delay_microseconds);
+
   return Create(
       runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
-      preferred_batch_sizes, max_queue_delay_microseconds, ModelQueuePolicy(),
-      0, ModelQueuePolicyMap(), scheduler);
+      dynamic_batching_enabled, enforce_equal_shape_tensors, batcher_config,
+      scheduler);
 }
 
 Status
@@ -90,18 +96,21 @@ DynamicBatchScheduler::Create(
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
     const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const bool preserve_ordering,
-    const std::set<int32_t>& preferred_batch_sizes,
-    const uint64_t max_queue_delay_microseconds,
-    const ModelQueuePolicy& default_queue_policy,
-    const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map,
+    const inference::ModelDynamicBatching& batcher_config,
     std::unique_ptr<Scheduler>* scheduler)
 {
+  std::set<int32_t> preferred_batch_sizes;
+  for (const auto size : batcher_config.preferred_batch_size()) {
+    preferred_batch_sizes.insert(size);
+  }
+
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
       runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
-      preferred_batch_sizes, max_queue_delay_microseconds, default_queue_policy,
-      priority_levels, queue_policy_map);
+      dynamic_batching_enabled, enforce_equal_shape_tensors,
+      batcher_config.preserve_ordering(), preferred_batch_sizes,
+      batcher_config.max_queue_delay_microseconds(),
+      batcher_config.default_queue_policy(), batcher_config.priority_levels(),
+      batcher_config.priority_queue_policy());
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
   // Create one scheduler thread for each requested runner. Associate
@@ -247,8 +256,8 @@ DynamicBatchScheduler::SchedulerThread(
     const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
     if (dstr != nullptr) {
       backend_release_wait_milliseconds = atoi(dstr);
-      LOG_INFO << "Delaying scheduler backend release for " << runner_id << ": "
-               << backend_release_wait_milliseconds << "ms";
+      LOG_VERBOSE(1) << "Delaying scheduler backend release for " << runner_id
+                     << ": " << backend_release_wait_milliseconds << "ms";
     }
   }
 
@@ -259,8 +268,8 @@ DynamicBatchScheduler::SchedulerThread(
     const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER");
     if (dstr != nullptr) {
       delay_cnt = atoi(dstr);
-      LOG_INFO << "Delaying scheduler thread " << runner_id << " until "
-               << delay_cnt << " queued requests...";
+      LOG_VERBOSE(1) << "Delaying scheduler thread " << runner_id << " until "
+                     << delay_cnt << " queued requests...";
     }
   }
 
@@ -289,9 +298,9 @@ DynamicBatchScheduler::SchedulerThread(
         if (queue_.Size() >= delay_cnt) {
           delay_cnt = 0;
         }
-        LOG_INFO << "Delaying scheduler thread " << runner_id << " until "
-                 << delay_cnt
-                 << " queued requests, current total = " << queue_.Size();
+        LOG_VERBOSE(1) << "Delaying scheduler thread " << runner_id << " until "
+                       << delay_cnt
+                       << " queued requests, current total = " << queue_.Size();
       } else if (queue_.Empty()) {
         wait_microseconds = default_wait_microseconds;
       } else if (dynamic_batching_enabled_) {
@@ -327,11 +336,12 @@ DynamicBatchScheduler::SchedulerThread(
               completion_queue_.emplace_back();
               auto queue_slot = &completion_queue_.back();
               request->SetResponseDelegator(
-                  [this,
-                   queue_slot](std::unique_ptr<InferenceResponse>&& response) {
+                  [this, queue_slot](
+                      std::unique_ptr<InferenceResponse>&& response,
+                      const uint32_t flags) {
                     {
                       std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      (*queue_slot) = std::move(response);
+                      queue_slot->emplace_back(std::move(response), flags);
                     }
                     FinalizeResponses();
                   });
@@ -372,11 +382,12 @@ DynamicBatchScheduler::SchedulerThread(
               completion_queue_.emplace_back();
               auto queue_slot = &completion_queue_.back();
               request->SetResponseDelegator(
-                  [this,
-                   queue_slot](std::unique_ptr<InferenceResponse>&& response) {
+                  [this, queue_slot](
+                      std::unique_ptr<InferenceResponse>&& response,
+                      const uint32_t flags) {
                     {
                       std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      (*queue_slot) = std::move(response);
+                      queue_slot->emplace_back(std::move(response), flags);
                     }
                     FinalizeResponses();
                   });
@@ -586,22 +597,29 @@ DynamicBatchScheduler::FinalizeResponses()
   static std::mutex finalize_mtx;
   std::lock_guard<std::mutex> lock(finalize_mtx);
   // Finalize the completed payloads in-order as far as possible
-  std::deque<std::unique_ptr<InferenceResponse>> responses;
+  std::deque<std::pair<std::unique_ptr<InferenceResponse>, const uint32_t>>
+      responses;
   {
     std::lock_guard<std::mutex> queue_lock(completion_queue_mtx_);
-    while (true) {
-      // No response left or ready
-      if (completion_queue_.empty() || (completion_queue_.front() == nullptr)) {
-        break;
+    while (!completion_queue_.empty() && !completion_queue_.front().empty()) {
+      bool response_complete = false;
+      for (auto& response_pair : completion_queue_.front()) {
+        // Assuming FINAL flag is set only in the last response of the request
+        response_complete =
+            ((response_pair.second & TRITONSERVER_RESPONSE_COMPLETE_FINAL) !=
+             0);
+        responses.emplace_back(std::move(response_pair));
       }
-      responses.emplace_back(std::move(completion_queue_.front()));
-      completion_queue_.pop_front();
+      if (response_complete) {
+        completion_queue_.pop_front();
+      } else {
+        completion_queue_.front().clear();
+      }
     }
   }
 
   for (auto& response : responses) {
-    InferenceResponse::Send(
-        std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
+    InferenceResponse::Send(std::move(response.first), response.second);
   }
 }
 
