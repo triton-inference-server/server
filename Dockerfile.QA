@@ -80,7 +80,7 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_https/models/. && \
     mkdir qa/L0_secure_grpc/models && \
     cp -r docs/examples/model_repository/simple qa/L0_secure_grpc/models/. && \
-    cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_client/ && \
+    cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_analyzer/ && \
     cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \
     cp /workspace/builddir/test-util/install/bin/memory_test qa/L0_memory/.
@@ -122,9 +122,9 @@ RUN mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x
     cp builddir/test-util/install/lib/libimagepreprocess.so \
         qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/.
 
-RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1 && \
+RUN mkdir -p qa/L0_perf_analyzer/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1 && \
     cp builddir/test-util/install/lib/libimagepreprocess.so \
-        qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1/.
+        qa/L0_perf_analyzer/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1/.
 
 RUN mkdir -p qa/L0_backend_identity/models && \
     cp -r src/backends/backend/examples/models/identity_fp32 qa/L0_backend_identity/models/. && \
@@ -172,7 +172,7 @@ RUN cp builddir/test-util/install/lib/libidentity.so \
     cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_perf_nomodel/. && \
     cp builddir/test-util/install/lib/libidentity.so \
-        qa/L0_perf_client/. && \
+        qa/L0_perf_analyzer/. && \
     cp builddir/test-util/install/lib/libidentity.so \
         qa/L0_large_payload/. && \
     cp builddir/test-util/install/lib/libidentity.so \
@@ -256,7 +256,7 @@ FROM ${CLIENT_IMAGE} AS client
 WORKDIR /workspace
 COPY --from=build /workspace/qa/ qa/
 RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
-    cp install/bin/* qa/clients/. && \
+    cp -a install/bin/* qa/clients/. && \
     cp install/lib/libgrpcclient.so qa/clients/. && \
     cp install/lib/libhttpclient.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \

@@ -26,12 +26,12 @@
 
 #include <getopt.h>
 
-#include "src/clients/c++/perf_client/concurrency_manager.h"
-#include "src/clients/c++/perf_client/custom_load_manager.h"
-#include "src/clients/c++/perf_client/inference_profiler.h"
-#include "src/clients/c++/perf_client/model_parser.h"
-#include "src/clients/c++/perf_client/perf_utils.h"
-#include "src/clients/c++/perf_client/request_rate_manager.h"
+#include "src/clients/c++/perf_analyzer/concurrency_manager.h"
+#include "src/clients/c++/perf_analyzer/custom_load_manager.h"
+#include "src/clients/c++/perf_analyzer/inference_profiler.h"
+#include "src/clients/c++/perf_analyzer/model_parser.h"
+#include "src/clients/c++/perf_analyzer/perf_utils.h"
+#include "src/clients/c++/perf_analyzer/request_rate_manager.h"
 
 volatile bool early_exit = false;
 
@@ -40,7 +40,7 @@ SignalHandler(int signum)
 {
   std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
   // Upon invoking the SignalHandler for the first time early_exit flag is
-  // invoked and client waits for in-flight inferences to complete before
+  // invoked and analyzer waits for in-flight inferences to complete before
   // exiting. On the second invocation, the program exits immediately.
   if (!early_exit) {
     std::cout << "Waiting for in-flight inferences to complete." << std::endl;
@@ -52,9 +52,9 @@ SignalHandler(int signum)
 }
 
 //==============================================================================
-// Perf Client
+// Perf Analyzer
 //
-// Perf client provides various metrics to measure the performance of
+// Perf Analyzer provides various metrics to measure the performance of
 // the inference server. It can either be used to measure the throughput,
 // latency and time distribution under specific setting (i.e. fixed batch size
 // and fixed concurrent requests), or be used to generate throughput-latency
@@ -63,10 +63,10 @@ SignalHandler(int signum)
 //
 // The following data is collected and used as part of the metrics:
 // - Throughput (infer/sec):
-//     The number of inference processed per second as seen by the client.
+//     The number of inference processed per second as seen by the analyzer.
 //     The number of inference is measured by the multiplication of the number
 //     of requests and their batch size. And the total time is the time elapsed
-//     from when the client starts sending requests to when the client received
+//     from when the analyzer starts sending requests to when it received
 //     all responses.
 // - Latency (usec):
 //     The average elapsed time between when a request is sent and
@@ -75,9 +75,9 @@ SignalHandler(int signum)
 //     average value.
 //
 // There are broadly three ways to load server for the data collection using
-// perf_client:
+// perf_analyzer:
 // - Maintaining Target Concurrency:
-//     In this setting, the client will maintain a target number of concurrent
+//     In this setting, the analyzer will maintain a target number of concurrent
 //     requests sent to the server (see --concurrency-range option) while
 //     taking measurements.
 //     The number of requests will be the total number of requests sent within
@@ -88,23 +88,23 @@ SignalHandler(int signum)
 //     the following data measured by the server will also be reported
 //     in this setting:
 //     - Concurrent request: the number of concurrent requests as specified
-//         in --concurrency-range option. Note, for running perf client for
+//         in --concurrency-range option. Note, for running perf analyzer for
 //         a single concurrency, user must specify --concurrency-range
 //         <'start'>, omitting 'end' and 'step' values.
 //     - Batch size: the batch size of each request as specified in -b option
 //     - Inference count: batch size * number of inference requests
 //     - Cumulative time: the total time between request received and
-//         response sent on the requests sent by perf client.
+//         response sent on the requests sent by perf analyzer.
 //     - Average Cumulative time: cumulative time / number of inference requests
 //     - Compute time: the total time it takes to run inferencing including time
 //         copying input tensors to GPU memory, time executing the model,
 //         and time copying output tensors from GPU memory for the requests
-//         sent by perf client.
+//         sent by perf analyzer.
 //     - Average compute time: compute time / number of inference requests
 //     - Queue time: the total time it takes to wait for an available model
-//         instance for the requests sent by perf client.
+//         instance for the requests sent by perf analyzer.
 //     - Average queue time: queue time / number of inference requests
-//     If all fields of --concurrency-range are specified, the client will
+//     If all fields of --concurrency-range are specified, the analyzer will
 //     perform the following procedure:
 //       1. Follows the procedure in fixed concurrent request mode using
 //          k concurrent requests (k starts at 'start').
@@ -121,9 +121,9 @@ SignalHandler(int signum)
 //
 // - Maintaining Target Request Rate:
 //     This mode is enabled only when --request-rate-range option is specified.
-//     Unlike above, here the client will try to maintain a target rate of
+//     Unlike above, here the analyzer will try to maintain a target rate of
 //     requests issued to the server while taking measurements. Rest of the
-//     behaviour of client is identical as above. It is important to note that
+//     behaviour of analyzer is identical as above. It is important to note that
 //     even though over a  sufficiently large interval the rate of requests
 //     will tend to the target request rate, the actual request rate for a small
 //     time interval will depend upon the selected request distribution
@@ -134,7 +134,7 @@ SignalHandler(int signum)
 //     that there are periods of bursts and nulls in request generation.
 //     Additionally, 'poisson' distribution mimics the real-world traffic and
 //     can be used to obtain measurements for a realistic-load.
-//     With each request-rate, the client also reports the 'Delayed Request
+//     With each request-rate, the analyzer also reports the 'Delayed Request
 //     Count' which gives an idea of how many requests missed their schedule as
 //     specified by the distribution. Users can use --max-threads to increase
 //     the number of threads which might help in dispatching requests as per
@@ -144,25 +144,27 @@ SignalHandler(int signum)
 //
 // - Following User Provided Request Delivery Schedule:
 //     This mode is enabled only when --request-intervals option is specified.
-//     In this case, client will try to dispatch the requests to the server with
-//     time intervals between successive requests specified in a user provided
-//     file. This file should contain time intervals in microseconds in each new
-//     line. Client will loop around the values to produce a consistent load for
-//     measurements. Once, the readings are stabilized then the final statistics
-//     will be reported. The statistics will include 'Delayed Request Count' for
-//     the requests that missed their schedule. As described before, users can
-//     tune --max-threads to allow client in keeping up with the schedule. This
-//     mode will help user in analyzing the performance of the server under
-//     different custom settings which may be of interest.
+//     In this case, analyzer will try to dispatch the requests to the server
+//     with time intervals between successive requests specified in a user
+//     provided file. This file should contain time intervals in microseconds in
+//     each new line. Analyzer will loop around the values to produce a
+//     consistent load for measurements. Once, the readings are stabilized then
+//     the final statistics will be reported. The statistics will include
+//     'Delayed Request Count' for the requests that missed their schedule. As
+//     described before, users can tune --max-threads to allow analyzer in
+//     keeping up with the schedule. This mode will help user in analyzing the
+//     performance of the server under different custom settings which may be of
+//     interest.
 //
-// By default, perf_client will maintain target concurrency while measuring the
-// performance.
+// By default, perf_analyzer will maintain target concurrency while measuring
+// the performance.
 //
 // Options:
 // -b: batch size for each request sent.
-// --concurrency-range: The range of concurrency levels perf_client will use.
+// --concurrency-range: The range of concurrency levels perf_analyzer will use.
 //    A concurrency level indicates the number of concurrent requests in queue.
-// --request-rate-range: The range of request rates perf_client will use to load
+// --request-rate-range: The range of request rates perf_analyzer will use to
+// load
 //    the server.
 // --request-intervals: File containing time intervals (in microseconds) to use
 //    between successive requests.
@@ -268,7 +270,7 @@ Usage(char** argv, const std::string& msg = std::string())
       << std::setw(9) << std::left << " -m: "
       << FormatMessage(
              "This is a required argument and is used to specify the model"
-             " against which to run perf_client.",
+             " against which to run perf_analyzer.",
              9)
       << std::endl;
   std::cerr << std::setw(9) << std::left << " -x: "
@@ -288,26 +290,26 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
   std::cerr
       << FormatMessage(
-             " --async (-a): Enables asynchronous mode in perf_client. "
-             "By default, perf_client will use synchronous API to "
+             " --async (-a): Enables asynchronous mode in perf_analyzer. "
+             "By default, perf_analyzer will use synchronous API to "
              "request inference. However, if the model is sequential "
              "then default mode is asynchronous. Specify --sync to "
              "operate sequential models in synchronous mode. In synchronous "
-             "mode, perf_client will start threads equal to the concurrency "
+             "mode, perf_analyzer will start threads equal to the concurrency "
              "level. Use asynchronous mode to limit the number of threads, yet "
              "maintain the concurrency.",
              18)
       << std::endl;
   std::cerr << FormatMessage(
-                   " --sync: Force enables synchronous mode in perf_client. "
-                   "Can be used to operate perf_client with sequential model "
+                   " --sync: Force enables synchronous mode in perf_analyzer. "
+                   "Can be used to operate perf_analyzer with sequential model "
                    "in synchronous mode.",
                    18)
             << std::endl;
   std::cerr
       << FormatMessage(
              " --measurement-interval (-p): Indicates the time interval used "
-             "for each measurement in milliseconds. The perf client will "
+             "for each measurement in milliseconds. The perf analyzer will "
              "sample a time interval specified by -p and take measurement over "
              "the requests completed within that time interval. The default "
              "value is 5000 msec.",
@@ -316,10 +318,11 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << FormatMessage(
              " --concurrency-range <start:end:step>: Determines the range of "
-             "concurrency levels covered by the perf_client. The perf_client "
+             "concurrency levels covered by the perf_analyzer. The "
+             "perf_analyzer "
              "will start from the concurrency level of 'start' and go till "
              "'end' with a stride of 'step'. The default value of 'end' and "
-             "'step' are 1. If 'end' is not specified then perf_client will "
+             "'step' are 1. If 'end' is not specified then perf_analyzer will "
              "run for a single concurrency level determined by 'start'. If "
              "'end' is set as 0, then the concurrency limit will be "
              "incremented by 'step' till latency threshold is met. 'end' and "
@@ -330,17 +333,18 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << FormatMessage(
              " --request-rate-range <start:end:step>: Determines the range of "
-             "request rates for load generated by client. This option can take "
-             "floating-point values. The search along the request rate range "
-             "is enabled only when using this option. If not specified, then "
-             "client will search along the concurrency-range. The perf_client "
-             "will start from the request rate of 'start' and go till "
-             "'end' with a stride of 'step'. The default values of 'start', "
-             "'end' and 'step' are all 1.0. If 'end' is not specified then "
-             "perf_client will run for a single request rate as determined by "
-             "'start'. If 'end' is set as 0.0, then the request rate will be "
-             "incremented by 'step' till latency threshold is met. 'end' and "
-             "--latency-threshold can not be both 0 simultaneously.",
+             "request rates for load generated by analyzer. This option can "
+             "take floating-point values. The search along the request rate "
+             "range is enabled only when using this option. If not specified, "
+             "then analyzer will search along the concurrency-range. The "
+             "perf_analyzer will start from the request rate of 'start' and go "
+             "till 'end' with a stride of 'step'. The default values of "
+             "'start', 'end' and 'step' are all 1.0. If 'end' is not specified "
+             "then perf_analyzer will run for a single request rate as "
+             "determined by 'start'. If 'end' is set as 0.0, then the request "
+             "rate will be incremented by 'step' till latency threshold is "
+             "met. 'end' and --latency-threshold can not be both 0 "
+             "simultaneously.",
              18)
       << std::endl;
   std::cerr
@@ -357,12 +361,12 @@ Usage(char** argv, const std::string& msg = std::string())
       << FormatMessage(
              " --request-intervals: Specifies a path to a file containing time "
              "intervals in microseconds. Each time interval should be in a new "
-             "line. The client will try to maintain time intervals between "
+             "line. The analyzer will try to maintain time intervals between "
              "successive generated requests to be as close as possible in this "
              "file. This option can be used to apply custom load to server "
-             "with a certain pattern of interest. The client will loop around "
-             "the file if the duration of execution exceeds to that accounted "
-             "for by the intervals. This option can not be used with "
+             "with a certain pattern of interest. The analyzer will loop "
+             "around the file if the duration of execution exceeds to that "
+             "accounted for by the intervals. This option can not be used with "
              "--request-rate-range or --concurrency-range.",
              18)
       << std::endl;
@@ -387,14 +391,15 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
 
 
-  std::cerr << FormatMessage(
-                   " --latency-threshold (-l): Sets the limit on the observed "
-                   "latency. Client will terminate the concurrency search once "
-                   "the measured latency exceeds this threshold. By default, "
-                   "latency threshold is set 0 and the perf_client will run "
-                   "for entire --concurrency-range.",
-                   18)
-            << std::endl;
+  std::cerr
+      << FormatMessage(
+             " --latency-threshold (-l): Sets the limit on the observed "
+             "latency. Analyzer will terminate the concurrency search once "
+             "the measured latency exceeds this threshold. By default, "
+             "latency threshold is set 0 and the perf_analyzer will run "
+             "for entire --concurrency-range.",
+             18)
+      << std::endl;
   std::cerr
       << FormatMessage(
              " --max-threads: Sets the maximum number of threads that will be "
@@ -418,9 +423,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << FormatMessage(
                    " --max-trials (-r): Indicates the maximum number of "
                    "measurements for each concurrency level visited during "
-                   "search. The perf client will take multiple measurements "
+                   "search. The perf analyzer will take multiple measurements "
                    "and report the measurement until it is stable. The perf "
-                   "client will abort if the measurement is still unstable "
+                   "analyzer will abort if the measurement is still unstable "
                    "after the maximum number of measurements. The default "
                    "value is 10.",
                    18)
@@ -454,12 +459,12 @@ Usage(char** argv, const std::string& msg = std::string())
              "inputs. The text file should contain all strings needed by "
              "batch-1, each in a new line, listed in row-major order. When "
              "pointing to a json file, user must adhere to the format "
-             "described in /docs/perf_client.rst. By specifying json data, "
+             "described in /docs/perf_analyzer.rst. By specifying json data, "
              "users can control data used with every request. Multiple data "
-             "streams can be specified for a sequence model and the client "
+             "streams can be specified for a sequence model and the analyzer "
              "will select a data stream in a round-robin fashion for every new "
              "sequence. Muliple json files can also be provided (--input-data "
-             "json_file1 --input-data json-file2 and so on) and the client "
+             "json_file1 --input-data json-file2 and so on) and the analyzer "
              "will append data streams from each file. Default is \"random\".",
              18)
       << std::endl;
@@ -476,7 +481,7 @@ Usage(char** argv, const std::string& msg = std::string())
              "memory region to allocate per output tensor. Only needed when "
              "one or more of the outputs are of string type and/or variable "
              "shape. The value should be larger than the size of the largest "
-             "output tensor the model is expected to return. The client will "
+             "output tensor the model is expected to return. The analyzer will "
              "use the following formula to calculate the total shared memory "
              "to allocate: output_shared_memory_size * number_of_outputs * "
              "batch_size. Defaults to 100KB.",
@@ -502,14 +507,14 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr << FormatMessage(
                    " --string-length: Specifies the length of the random "
-                   "strings to be generated by the client for string input. "
+                   "strings to be generated by the analyzer for string input. "
                    "This option is ignored if --input-data points to a "
                    "directory. Default is 128.",
                    18)
             << std::endl;
   std::cerr << FormatMessage(
-                   " --string-data: If provided, client will use this string "
-                   "to initialize string input buffers. The perf client will "
+                   " --string-data: If provided, analyzer will use this string "
+                   "to initialize string input buffers. The perf analyzer will "
                    "replicate the given string to build tensors of required "
                    "shape. --string-length will not have any effect. This "
                    "option is ignored if --input-data points to a directory.",
@@ -931,7 +936,7 @@ main(int argc, char** argv)
   }
   if (sequence_length == 0) {
     sequence_length = 20;
-    std::cerr << "WARNING: using an invalid sequence length. Perf client will"
+    std::cerr << "WARNING: using an invalid sequence length. Perf Analyzer will"
               << " use default value if it is measuring on sequence model."
               << std::endl;
   }

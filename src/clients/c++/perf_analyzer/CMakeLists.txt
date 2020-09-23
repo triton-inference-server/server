@@ -27,13 +27,13 @@
 cmake_minimum_required (VERSION 3.5)
 
 if(WIN32)
-  message("Currently, CMake will not build perf_client because it uses functionalities that "
+  message("Currently, CMake will not build perf_analyzer because it uses functionalities that "
 		      "are UNIX specific.")
 else()
 
 set(
-  PERF_CLIENT_SRCS
-  perf_client.cc
+  PERF_ANALYZER_SRCS
+  main.cc
   model_parser.cc
   perf_utils.cc
   load_manager.cc
@@ -47,7 +47,7 @@ set(
 )
 
 set(
-  PERF_CLIENT_HDRS
+  PERF_ANALYZER_HDRS
   model_parser.h
   perf_utils.h
   load_manager.h
@@ -57,17 +57,17 @@ set(
   custom_load_manager.h
   triton_client_wrapper.h
   inference_profiler.h
- ../examples/shm_utils.h
+  ../examples/shm_utils.h
 )
 
 add_executable(
-  perf_client
-  ${PERF_CLIENT_SRCS}
-  ${PERF_CLIENT_HDRS}
+  perf_analyzer
+  ${PERF_ANALYZER_SRCS}
+  ${PERF_ANALYZER_HDRS}
   $<TARGET_OBJECTS:json-utils-library>
 )
 target_link_libraries(
-  perf_client
+  perf_analyzer
   PRIVATE triton-common-json        # from repo-common
   PRIVATE model-config-library
   PRIVATE TRITON::grpcclient_static
@@ -77,14 +77,19 @@ target_link_libraries(
 
 # If gpu is enabled then compile with CUDA dependencies
 if(${TRITON_ENABLE_GPU})
-  target_include_directories(perf_client PRIVATE ${CUDA_INCLUDE_DIRS})
-  target_link_libraries(perf_client PRIVATE ${CUDA_LIBRARIES})
+  target_include_directories(perf_analyzer PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(perf_analyzer PRIVATE ${CUDA_LIBRARIES})
 endif()
 
 
 install(
-  TARGETS perf_client
+  TARGETS perf_analyzer
   RUNTIME DESTINATION bin
 )
+
+# Creating perf_client link to perf_analyzer binary for backwards compatibility.
+install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ./perf_analyzer perf_client
+  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin/)")
+install(CODE "message(\"-- Created symlink: perf_client -> ./perf_analyzer\")")
 
 endif()

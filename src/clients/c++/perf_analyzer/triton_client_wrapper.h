@@ -27,7 +27,7 @@
 
 #include <string>
 
-#include "src/clients/c++/perf_client/perf_utils.h"
+#include "src/clients/c++/perf_analyzer/perf_utils.h"
 
 using ModelIdentifier = std::pair<std::string, std::string>;
 

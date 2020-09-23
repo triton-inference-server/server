@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/c++/perf_client/custom_load_manager.h"
+#include "src/clients/c++/perf_analyzer/custom_load_manager.h"
 
 nic::Error
 CustomLoadManager::Create(

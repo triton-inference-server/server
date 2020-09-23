@@ -102,7 +102,7 @@ if (NOT WIN32)
   )
   if(NOT ${TRITON_CLIENT_SKIP_EXAMPLES})
     set(X86LINUX_WHEEL_DEPENDS
-        perf_client
+        perf_analyzer
         ${X86LINUX_WHEEL_DEPENDS}
     )
   endif() # TRITON_CLIENT_SKIP_EXAMPLES
@@ -121,7 +121,7 @@ if (NOT WIN32)
     ARGS
       "${CMAKE_CURRENT_BINARY_DIR}/x86_linux/"
       "true"
-      ${CMAKE_CURRENT_BINARY_DIR}/../../c++/perf_client/perf_client
+      ${CMAKE_CURRENT_BINARY_DIR}/../../c++/perf_analyzer/perf_analyzer
     DEPENDS ${X86LINUX_WHEEL_DEPENDS}
   )
 
