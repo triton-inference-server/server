@@ -87,7 +87,7 @@ install(
   RUNTIME DESTINATION bin
 )
 
-# Linking perf_analyzer to 
+# Creating perf_client link to perf_analyzer binary for backwards compatibility.
 install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ./perf_analyzer perf_client
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin/)")
 install(CODE "message(\"-- Created symlink: perf_client -> ./perf_analyzer\")")
