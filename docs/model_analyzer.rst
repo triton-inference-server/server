@@ -30,8 +30,8 @@
 Model Analyzer
 --------------
 
-The Triton Model Analyzer is a tool that uses :ref:`perf\_client
-<section-perf-client>` to apply load to your model while measure GPU
+The Triton Model Analyzer is a tool that uses :ref:`perf\_analyzer
+<section-perf-analyzer>` to apply load to your model while measure GPU
 memory and compute utilization. The Model Analyzer is specifically
 useful for characterizing the GPU memory requirements for your model
 under different batching and model instance configurations. Once you

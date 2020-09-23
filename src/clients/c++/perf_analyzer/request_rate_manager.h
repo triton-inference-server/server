@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/perf_client/load_manager.h"
+#include "src/clients/c++/perf_analyzer/load_manager.h"
 
 #include <condition_variable>
 #include <thread>
@@ -37,7 +37,7 @@
 /// distribution models the real-world traffic patterns.
 ///
 /// An instance of this load manager will be created at the beginning of the
-/// perf client and it will be used to simulate load with different target
+/// perf analyzer and it will be used to simulate load with different target
 /// requests per second values and to collect per-request statistic.
 ///
 /// Detail:
