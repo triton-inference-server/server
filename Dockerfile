@@ -356,7 +356,6 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON \
                   -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON \
                   -DTRITON_ENABLE_PYTORCH=ON \
-                  -DTRITON_ENABLE_PYTHON=ON \
                   -DTRITON_ENABLE_ENSEMBLE=ON \
                   -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
                   -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6" \
@@ -366,7 +365,6 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             mkdir -p /opt/tritonserver/include && \
             cp -r server/install/bin /opt/tritonserver/. && \
             cp -r server/install/lib /opt/tritonserver/. && \
-            cp -r server/install/backends /opt/tritonserver/. && \
             cp -r server/install/include/triton /opt/tritonserver/include/.) && \
     (cd /opt/tritonserver && ln -sf /workspace/qa qa)
 
@@ -445,6 +443,22 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          make -j16 install && \
          mkdir -p /opt/tritonserver/backends && \
          cp -r install/backends/tensorflow2 /opt/tritonserver/backends/.)
+
+ARG TRITON_PYTHON_BACKEND_TAG=main
+RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
+    (cd /tmp/triton_backends && \
+         git clone --single-branch --depth=1 -b ${TRITON_PYTHON_BACKEND_TAG} \
+             https://github.com/triton-inference-server/python_backend.git) && \
+    (cd /tmp/triton_backends/python_backend && \
+         mkdir build && cd build && \
+         cmake -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+               -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+               -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+               -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
+         make -j16 install && \
+         mkdir -p /opt/tritonserver/backends && \
+         cp -r install/backends/python /opt/tritonserver/backends/.)
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -550,3 +564,4 @@ ENV NVIDIA_BUILD_ID ${NVIDIA_BUILD_ID:-<unknown>}
 LABEL com.nvidia.build.id="${NVIDIA_BUILD_ID}"
 ARG NVIDIA_BUILD_REF
 LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
+

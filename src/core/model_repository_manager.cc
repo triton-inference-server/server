@@ -1698,14 +1698,50 @@ ModelRepositoryManager::UpdateDependencyGraph(
   }
 
 #ifdef TRITON_ENABLE_ENSEMBLE
-  // FIXME: ensemble config validation will not work with new auto-completion
-  // workflow as the model I/O is completed only after the backend is loaded,
-  // but the validation requires model I/O before attempting to load the models.
-  // Thus the validation needs to be postponed until the ensemble is ready to
-  // be loaded, when all depending models are loaded.
-  ValidateEnsembleConfig(&affected_ensembles);
+  // After the dependency graph is updated, check ensemble dependencies
+  for (auto& ensemble : affected_ensembles) {
+    if (ensemble->status_.IsOk()) {
+      if (!ensemble->missing_upstreams_.empty()) {
+        std::string name_list;
+        for (auto it = ensemble->missing_upstreams_.begin();
+            it != ensemble->missing_upstreams_.end(); it++) {
+          if (it != ensemble->missing_upstreams_.begin()) {
+            name_list += ", ";
+          }
+          name_list += (*it)->model_name_;
+        }
+        ensemble->status_ = Status(
+            Status::Code::INVALID_ARG,
+            "ensemble " + ensemble->model_name_ +
+                " contains models that are not available: " + name_list);
+      } else {
+        ensemble->status_ = CircularcyCheck(ensemble, ensemble);
+      }
+    }
+  }
 #endif  // TRITON_ENABLE_ENSEMBLE
+  return Status::Success;
+}
 
+Status
+ModelRepositoryManager::CircularcyCheck(
+    DependencyNode* current_node, const DependencyNode* start_node)
+{
+  for (auto& downstream : current_node->downstreams_) {
+    if (downstream->model_name_ == start_node->model_name_) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "circular dependency between ensembles: " + start_node->model_name_ +
+              " -> ... -> " + current_node->model_name_ + " -> " +
+              start_node->model_name_);
+    } else {
+      const auto status = CircularcyCheck(downstream, start_node);
+      if (!status.IsOk() && current_node->status_.IsOk()) {
+        current_node->status_ = status;
+        return status;
+      }
+    }
+  }
   return Status::Success;
 }
 
@@ -1828,7 +1864,7 @@ bool
 ModelRepositoryManager::CheckNode(DependencyNode* node)
 {
   bool node_ready = true;
-  // if the node failed on validation, mark as ready as we know
+  // if the node is in invalid status, mark as ready as we know
   // it should not be loaded
   if (node->status_.IsOk()) {
     for (auto& upstream : node->upstreams_) {
@@ -1866,6 +1902,13 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
         break;
       }
     }
+#ifdef TRITON_ENABLE_ENSEMBLE
+    // Validate ensemble config if the node is ready. By this point, the
+    // depending models are loaded and their configs are completed
+    if (node_ready && node->status_.IsOk()) {
+      node->status_ = ValidateEnsembleConfig(this, node);
+    }
+#endif  // TRITON_ENABLE_ENSEMBLE
   }
   return node_ready;
 }

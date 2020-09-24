@@ -132,6 +132,7 @@ for modelpath in \
        autofill_noplatform/ensemble/unmapped_input/unmapped_input/1 \
        autofill_noplatform/ensemble/unmapped_input/fp32_dim1_batch4/1 \
        autofill_noplatform/ensemble/unmapped_input/fp32_dim1_batch4_input4/1 \
+       autofill_noplatform/ensemble/unmapped_input/fp32_dim1_batch4_output3/1 \
        autofill_noplatform/ensemble/circular_dependency/circular_dependency/1 \
        autofill_noplatform/ensemble/circular_dependency/circular_dependency_2/1 \
        autofill_noplatform/ensemble/no_required_version/no_required_version/1 \

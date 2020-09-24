@@ -70,12 +70,18 @@ class PlanBackend : public InferenceBackend {
 
 #ifdef TRITON_ENABLE_CUDA_GRAPH
   struct GraphSpec {
-    GraphSpec() : batch_size_(0), captured_(false) {}
+    GraphSpec() : batch_size_(0), lower_bound_batch_size_(0), captured_(false)
+    {
+    }
     int batch_size_;
     std::map<std::string, std::vector<int64_t>> shapes_;
+    int lower_bound_batch_size_;
+    std::map<std::string, std::vector<int64_t>> lower_bound_shapes_;
     bool captured_;
   };
-  Status InitializeGraphSpecs(std::vector<GraphSpec>* graph_specs);
+  Status InitializeGraphSpecs(
+      std::vector<GraphSpec>* graph_specs, bool* allow_inexact_match);
+  Status ValidateGraphSpec(const GraphSpec& graph_spec);
 #endif
 
   Status DuplicateWarmupRequests(
@@ -191,6 +197,7 @@ class PlanBackend : public InferenceBackend {
       // used to capture the graph
       struct CudaGraph {
         CudaGraph() : cuda_graph_exec_(nullptr) {}
+        std::vector<int64_t> lower_bound_key_;
         // Store in the order of the bindng index
         std::vector<std::vector<int64_t>> input_dims_;
         cudaGraphExec_t cuda_graph_exec_;
@@ -266,8 +273,8 @@ class PlanBackend : public InferenceBackend {
 
     Status SetBindingDimensions(
         const std::string& input_name, const std::vector<int64_t>& shape,
-        const TensorRTContext& trt_context, const size_t binding_idx,
-        const size_t io_idx, std::vector<int64_t>* input_dims);
+        const TensorRTContext& trt_context, const size_t io_index,
+        const size_t binding_index, std::vector<int64_t>* input_dims);
     Status SetCudaGraphShape(
         TensorRTContext* trt_context, const GraphSpec& graph_spec,
         std::vector<int64_t>* cuda_graph_key,
@@ -353,18 +360,30 @@ class PlanBackend : public InferenceBackend {
 
     // The maximum possible size of the TensorRT tensor and the corresponding
     // allocated GPU buffer across all optimization
-    // profile. The array sizes are equal to Context::num_expected_bindings_
-    std::vector<uint64_t> byte_sizes_;
-    std::vector<void*> buffers_;
-    std::vector<bool> buffer_is_ragged_;
-    // Instructions on constructing the batch input and the CPU buffer for
-    // storing mutable data
+    // profile.
     using BatchInputData =
         std::pair<inference::BatchInput, std::unique_ptr<AllocatedMemory>>;
-    std::vector<std::shared_ptr<BatchInputData>> batch_inputs_;
-    // Store the pair of input name to look up and output shape
-    // for output scattering
-    std::vector<std::pair<std::string, std::vector<int64_t>>> io_shape_mapping_;
+    struct IOBindingInfo {
+      IOBindingInfo()
+          : byte_size_(0), buffer_(nullptr), buffer_is_ragged_(false),
+            is_linear_format_(true), format_element_size_(0)
+      {
+      }
+      uint64_t byte_size_;
+      void* buffer_;
+      bool buffer_is_ragged_;
+      bool is_linear_format_;
+      size_t format_element_size_;
+      // Instructions on constructing the batch input and the CPU buffer for
+      // storing mutable data
+      std::shared_ptr<BatchInputData> batch_input_;
+      // Store the pair of input name to look up and output shape
+      // for output scattering
+      std::pair<std::string, std::vector<int64_t>> io_shape_mapping_;
+    };
+
+    // The array sizes are equal to Context::num_expected_bindings_
+    std::vector<IOBindingInfo> io_binding_infos_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
     // engine. This is used to match the TensorRT context execution declaration
@@ -374,10 +393,6 @@ class PlanBackend : public InferenceBackend {
 
     // The request details of the ongoing model execution
     std::unique_ptr<Payload> payload_;
-
-    // map from binding_index to pair of index of full dims to
-    // be padded and the padding offset.
-    std::unordered_map<int, std::pair<int, int64_t>> padding_info_;
   };
 
   // CUDA engine shared across all model instances on the same device.

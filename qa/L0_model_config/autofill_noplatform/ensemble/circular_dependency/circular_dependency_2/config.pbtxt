@@ -5,6 +5,7 @@ ensemble_scheduling {
   step [
     {
       model_name: "circular_dependency"
+      model_version: -1
       input_map {
         key: "data"
         value: "input"

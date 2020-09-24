@@ -36,7 +36,7 @@ source ../common/util.sh
 
 rm -fr *.log ./models
 
-cp /opt/tritonserver/lib/python/runtime/triton_python_backend_utils.py .
+cp /opt/tritonserver/backends/python/triton_python_backend_utils.py .
 
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py

@@ -109,9 +109,9 @@ The Triton Inference Server exposes performance information in two
 ways: by :ref:`Prometheus metrics <section-metrics>` and by the
 :ref:`statistics endpoint <section-http-and-grpc-api>`.
 
-A client application, :ref:`perf\_client <section-perf-client>`,
+A client application, :ref:`perf\_analyzer <section-perf-analyzer>`,
 allows you to measure the performance of an individual model using a
-synthetic load. The perf\_client application is designed to show you
+synthetic load. The perf\_analyzer application is designed to show you
 the tradeoff of latency vs. throughput.
 
 How can I fully utilize the GPU with Triton Inference Server?

@@ -143,3 +143,11 @@ install(
   TARGETS memory_test
   RUNTIME DESTINATION bin
 )
+
+add_subdirectory(custom/sdk custom/sdk)
+add_subdirectory(custom/addsub custom/addsub)
+add_subdirectory(custom/identity custom/identity)
+add_subdirectory(custom/image_preprocess custom/image_preprocess)
+add_subdirectory(custom/param custom/param)
+add_subdirectory(custom/sequence custom/sequence)
+add_subdirectory(custom/dyna_sequence custom/dyna_sequence)

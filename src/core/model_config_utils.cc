@@ -727,17 +727,13 @@ GetNormalizedModelConfig(
 
   // If dynamic batching is specified...
   if (config->has_dynamic_batching()) {
-    // If preferred batch size is not specified choose
-    // automatically. For now we just choose 4, 8 as those are
-    // generally good values for GPUs.
+    // If preferred batch size is not specified set it to
+    // max-batch-size.
     if (config->dynamic_batching().preferred_batch_size().size() == 0) {
-      if (config->max_batch_size() >= 4) {
-        config->mutable_dynamic_batching()->mutable_preferred_batch_size()->Add(
-            4);
-      }
-      if (config->max_batch_size() >= 8) {
-        config->mutable_dynamic_batching()->mutable_preferred_batch_size()->Add(
-            8);
+      auto mutable_preferred_batch_size =
+          config->mutable_dynamic_batching()->mutable_preferred_batch_size();
+      if (config->max_batch_size() > 0) {
+        mutable_preferred_batch_size->Add(config->max_batch_size());
       }
     }
   }
@@ -748,6 +744,21 @@ GetNormalizedModelConfig(
     if (config->sequence_batching().max_sequence_idle_microseconds() == 0) {
       config->mutable_sequence_batching()->set_max_sequence_idle_microseconds(
           SEQUENCE_IDLE_DEFAULT_MICROSECONDS);
+    }
+
+    if (config->sequence_batching().has_oldest()) {
+      // If preferred batch size is not specified set it to
+      // max-batch-size.
+      if (config->sequence_batching().oldest().preferred_batch_size().size() ==
+          0) {
+        auto mutable_preferred_batch_size =
+            config->mutable_sequence_batching()
+                ->mutable_oldest()
+                ->mutable_preferred_batch_size();
+        if (config->max_batch_size() > 0) {
+          mutable_preferred_batch_size->Add(config->max_batch_size());
+        }
+      }
     }
   }
 
@@ -1556,7 +1567,9 @@ ValidateModelConfigInt64()
       "ModelConfig::sequence_batching::max_sequence_idle_microseconds",
       "ModelConfig::ensemble_scheduling::step::model_version",
       "ModelConfig::model_warmup::inputs::value::dims",
-      "ModelConfig::optimization::cuda::graph_spec::input::value::dim"};
+      "ModelConfig::optimization::cuda::graph_spec::input::value::dim",
+      "ModelConfig::optimization::cuda::graph_spec::graph_lower_bound::input::"
+      "value::dim"};
 
   if (int64_fields != expected) {
     return Status(

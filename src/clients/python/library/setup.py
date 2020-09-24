@@ -86,7 +86,7 @@ data_files = [
     ("", ["LICENSE.txt"]),
 ]
 if IS_MANYLINUX_BUILD:
-    data_files += [("bin", ["perf_client"])]
+    data_files += [("bin", ["perf_analyzer", "perf_client"])]
 
 setup(
     name='tritonclient',

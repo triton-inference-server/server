@@ -105,9 +105,11 @@ function main() {
         "${WHLDIR}/tritonclient/utils/cuda_shared_memory/."
     fi
   
-    # Copies the pre-compiled perf_client binary
+    # Copies the pre-compiled perf_analyzer binary
     if [ -f $3 ]; then
       cp $3 "${WHLDIR}"
+      # Create a symbolic link for backwards compatibility
+      (cd $WHLDIR; ln -sf ./perf_analyzer perf_client)
     fi
   fi
   

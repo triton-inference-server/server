@@ -45,18 +45,18 @@ multiple models on a single GPU.
 
 Unless you already have a client application suitable for measuring
 the performance of your model on Triton, you should familiarize
-yourself with :ref:`perf\_client <section-perf-client>`. The
-perf\_client application is an essential tool for optimizing your
+yourself with :ref:`perf\_analyzer <section-perf-analyzer>`. The
+perf\_analyzer application is an essential tool for optimizing your
 model's performance.
 
 As a running example demonstrating the optimization features and
 options, we will use a Caffe2 ResNet50 model that you can obtain by
 following the :ref:`section-quickstart`. As a baseline we use
-perf\_client to determine the performance of the model using a `basic
+perf\_analyzer to determine the performance of the model using a `basic
 model configuration that does not enable any performance features
 <https://github.com/triton-inference-server/server/blob/master/docs/examples/model_repository/resnet50_netdef/config.pbtxt>`_::
 
-  $ perf_client -m resnet50_netdef --percentile=95 --concurrency-range 1:4
+  $ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 1:4
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 1, 159 infer/sec, latency 6701 usec
@@ -72,7 +72,7 @@ concurrent request Triton is idle during the time when the response is
 returned to the client and the next request is received at the
 server. Throughput increases with a concurrency of 2 because Triton
 overlaps the processing of one request with the communication of the
-other. Because we are running perf\_client on the same system as
+other. Because we are running perf\_analyzer on the same system as
 Triton, 2 requests are enough to completely hide the communication
 latency.
 
@@ -99,9 +99,9 @@ configuration file for resnet50\_netdef, and then restart Triton::
 
 The dynamic batcher allows Triton to handle a higher number of
 concurrent requests because those requests are combined for
-inference. So run perf\_client with request concurrency from 1 to 8::
+inference. So run perf\_analyzer with request concurrency from 1 to 8::
 
-  $ perf_client -m resnet50_netdef --percentile=95 --concurrency-range 1:8
+  $ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 1:8
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 1, 154.2 infer/sec, latency 6662 usec
@@ -125,16 +125,16 @@ preferred sizes can be given but in this case we just have one)::
 
   dynamic_batching { preferred_batch_size: [ 4 ]}
 
-Instead of having perf\_client collect data for a range of request
+Instead of having perf\_analyzer collect data for a range of request
 concurrency values we can instead use a simple rule that typically
-applies when perf\_client is running on the same system as Triton. The
+applies when perf\_analyzer is running on the same system as Triton. The
 rule is that for maximum throughput set the request concurrency to be
 2 * <preferred batch size> * <model instance count>. We will discuss
 model instances :ref:`below <section-opt-model-instances>`, for now we
 are working with one model instance. So for preferred-batch-size 4 we
-want to run perf\_client with request concurrency of 2 * 4 * 1 = 8::
+want to run perf\_analyzer with request concurrency of 2 * 4 * 1 = 8::
 
-  $ perf_client -m resnet50_netdef --percentile=95 --concurrency-range 8
+  $ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 8
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 8, 420.2 infer/sec, latency 19524 usec
@@ -153,7 +153,7 @@ allows overlap of memory transfer operations (for example, CPU to/from
 GPU) with inference compute. Multiple instances also improve GPU
 utilization by allowing more inference work to be executed
 simultaneously on the GPU. Smaller models may benefit from more than
-two instances; you can use perf\_client to experiment.
+two instances; you can use perf\_analyzer to experiment.
 
 To specify two instances of the resnet50\_netdef model: stop Triton,
 remove any dynamic batching settings you may have previously added to
@@ -163,9 +163,9 @@ the model configuration file, and then restart Triton::
 
   instance_group [ { count: 2 }]
 
-Now run perf\_client using the same options as for the baseline::
+Now run perf\_analyzer using the same options as for the baseline::
 
-  $ perf_client -m resnet50_netdef --percentile=95 --concurrency-range 1:4
+  $ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 1:4
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 1, 129.4 infer/sec, latency 8434 usec
@@ -183,10 +183,10 @@ instances, for example::
   dynamic_batching { preferred_batch_size: [ 4 ] }
   instance_group [ { count: 2 }]
 
-When we run perf\_client with the same options used for just the
+When we run perf\_analyzer with the same options used for just the
 dynamic batcher above::
 
-  $ perf_client -m resnet50_netdef --percentile=95 --concurrency-range 8
+  $ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 8
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 8, 409.2 infer/sec, latency 24284 usec
@@ -196,7 +196,7 @@ occurs because for this model the dynamic batcher alone is capable of
 fully utilizing the GPU and so adding additional model instances does
 not provide any performance advantage. In general the benefit of the
 dynamic batcher and multiple instances is model specific, so you
-should experiment with perf\_client to determine the settings that
+should experiment with perf\_analyzer to determine the settings that
 best satisfy your throughput and latency requirements.
 
 Framework-Specific Optimization
@@ -217,11 +217,11 @@ One especially powerful optimization is to use
 ONNX model. As an example of TensorRT optimization applied to an ONNX
 model, we will use an ONNX DenseNet model that you can obtain by
 following the :ref:`section-quickstart`. As a baseline we use
-perf\_client to determine the performance of the model using a `basic
+perf\_analyzer to determine the performance of the model using a `basic
 model configuration that does not enable any performance features
 <https://github.com/triton-inference-server/server/blob/master/docs/examples/model_repository/densenet_onnx/config.pbtxt>`_::
 
-  $ perf_client -m densenet_onnx --percentile=95 --concurrency-range 1:4
+  $ perf_analyzer -m densenet_onnx --percentile=95 --concurrency-range 1:4
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 1, 113.2 infer/sec, latency 8939 usec
@@ -240,9 +240,9 @@ restart Triton::
 As Triton starts you should check the console output and wait until
 Triton prints the "Staring endpoints" message. ONNX model loading can
 be significantly slower when TensorRT optimization is enabled.  Now
-run perf\_client using the same options as for the baseline::
+run perf\_analyzer using the same options as for the baseline::
 
-  $ perf_client -m densenet_onnx --percentile=95 --concurrency-range 1:4
+  $ perf_analyzer -m densenet_onnx --percentile=95 --concurrency-range 1:4
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 1, 190.6 infer/sec, latency 5384 usec
@@ -281,11 +281,11 @@ model configuration protobuf.
 As an example of TensorRT optimization applied to a TensorFlow model,
 we will use a TensorFlow Inception model that you can obtain by
 following the :ref:`section-quickstart`. As a baseline we use
-perf\_client to determine the performance of the model using a `basic
+perf\_analyzer to determine the performance of the model using a `basic
 model configuration that does not enable any performance features
 <https://github.com/triton-inference-server/server/blob/master/docs/examples/model_repository/inception_graphdef/config.pbtxt>`_::
 
-  $ perf_client -m inception_graphdef --percentile=95 --concurrency-range 1:4
+  $ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 1, 105.6 infer/sec, latency 12865 usec
@@ -297,13 +297,13 @@ To enable TensorRT optimization for the model: stop Triton, add the
 lines from above to the end of the model configuration file, and then
 restart Triton. As Triton starts you should check the console output
 and wait until the server prints the "Staring endpoints" message. Now
-run perf\_client using the same options as for the baseline. Note that
-the first run of perf\_client might timeout because the TensorRT
+run perf\_analyzer using the same options as for the baseline. Note that
+the first run of perf\_analyzer might timeout because the TensorRT
 optimization is performed when the inference request is received and
-may take significant time. If this happens just run perf\_client
+may take significant time. If this happens just run perf\_analyzer
 again::
 
-  $ perf_client -m inception_graphdef --percentile=95 --concurrency-range 1:4
+  $ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
   ...
   Inferences/Second vs. Client p95 Batch Latency
   Concurrency: 1, 172 infer/sec, latency 6912 usec
@@ -335,9 +335,9 @@ The options are described in detail in the
 model configuration protobuf.
 
 You can follow the steps described above for TensorRT to see how this
-automatic FP16 optimization benefits a model by using perf\_client to
+automatic FP16 optimization benefits a model by using perf\_analyzer to
 evaluate the model's performance with and without the optimization.
 
 .. include:: model_analyzer.rst
-.. include:: perf_client.rst
+.. include:: perf_analyzer.rst
 .. include:: trace.rst
