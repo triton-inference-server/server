@@ -699,7 +699,7 @@ ModelRepositoryManager::BackendLifeCycle::Load(
 
   switch (backend_info->state_) {
     case ModelReadyState::READY:
-      LOG_VERBOSE(1) << "re-loading: " << model_name << ":" << version;
+      LOG_INFO << "re-loading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::UNLOADING;
       backend_info->state_reason_.clear();
       backend_info->next_action_ = ActionType::LOAD;
@@ -711,7 +711,7 @@ ModelRepositoryManager::BackendLifeCycle::Load(
       backend_info->next_action_ = ActionType::LOAD;
       break;
     default:
-      LOG_VERBOSE(1) << "loading: " << model_name << ":" << version;
+      LOG_INFO << "loading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::LOADING;
       backend_info->state_reason_.clear();
       {
@@ -893,8 +893,8 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
           }));
       backend_info->state_ = ModelReadyState::READY;
       backend_info->state_reason_.clear();
-      LOG_VERBOSE(1) << "successfully loaded '" << model_name << "' version "
-                     << version;
+      LOG_INFO << "successfully loaded '" << model_name << "' version "
+               << version;
     } else {
       LOG_ERROR << "failed to load '" << model_name << "' version " << version
                 << ": " << status.AsString();
@@ -1704,7 +1704,7 @@ ModelRepositoryManager::UpdateDependencyGraph(
       if (!ensemble->missing_upstreams_.empty()) {
         std::string name_list;
         for (auto it = ensemble->missing_upstreams_.begin();
-            it != ensemble->missing_upstreams_.end(); it++) {
+             it != ensemble->missing_upstreams_.end(); it++) {
           if (it != ensemble->missing_upstreams_.begin()) {
             name_list += ", ";
           }
