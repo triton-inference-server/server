@@ -46,7 +46,7 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
-#include "triton/common/triton_utils.h"
+#include "triton/common/table_printer.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include "src/core/cuda_memory_manager.h"
@@ -124,7 +124,7 @@ InferenceServer::PrintBackendAndModelSummary()
   triton::common::TablePrinter::Create(&backends_table, backend_headers);
   auto backend_state = TritonBackendManager::BackendState();
 
-  for (const auto& backend_pair : backend_state) {
+  for (const auto& backend_pair : *backend_state) {
     std::vector<std::string> backend_record;
 
     // Backend Name
@@ -134,10 +134,10 @@ InferenceServer::PrintBackendAndModelSummary()
     for (const auto& backend_field : backend_pair.second) {
       backend_record.emplace_back(backend_field);
     }
-    backends_table->insert_row(backend_record);
+    backends_table->InsertRow(backend_record);
   }
   std::unique_ptr<std::string> backends_table_string =
-      backends_table->print_table();
+      backends_table->PrintTable();
   LOG_INFO << *backends_table_string;
 
   // Models Summary
@@ -161,7 +161,7 @@ InferenceServer::PrintBackendAndModelSummary()
       model_record.emplace_back(model_name);
       model_record.emplace_back("-");
       model_record.emplace_back("Not loaded: No model version was found");
-      models_table->insert_row(model_record);
+      models_table->InsertRow(model_record);
     } else {
       for (const auto& model_map : model_version_map) {
         std::vector<std::string> model_record;
@@ -177,12 +177,11 @@ InferenceServer::PrintBackendAndModelSummary()
         model_record.emplace_back(model_name);
         model_record.emplace_back(model_version);
         model_record.emplace_back(model_status);
-        models_table->insert_row(model_record);
+        models_table->InsertRow(model_record);
       }
     }
   }
-  std::unique_ptr<std::string> models_table_string =
-      models_table->print_table();
+  std::unique_ptr<std::string> models_table_string = models_table->PrintTable();
   LOG_INFO << *models_table_string;
 }
 

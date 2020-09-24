@@ -327,9 +327,12 @@ TRITONBACKEND_BackendSetState(TRITONBACKEND_Backend* backend, void* state)
 //
 // TritonBackendManager
 //
-
-std::unordered_map<std::string, std::vector<std::string>>
-    TritonBackendManager::backend_state_;
+TritonBackendManager&
+TritonBackendManager::Instance_()
+{
+  static TritonBackendManager triton_backend_manager;
+  return triton_backend_manager;
+}
 
 Status
 TritonBackendManager::CreateBackend(
@@ -337,9 +340,8 @@ TritonBackendManager::CreateBackend(
     const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
-  static TritonBackendManager singleton_manager;
-
-  std::lock_guard<std::mutex> lock(singleton_manager.m_);
+  TritonBackendManager& singleton_manager = Instance_();
+  std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
   const auto& itr = singleton_manager.backend_map_.find(libpath);
   if (itr != singleton_manager.backend_map_.end()) {
@@ -360,19 +362,34 @@ TritonBackendManager::CreateBackend(
       name, dir, libpath, backend_cmdline_config, backend));
   singleton_manager.backend_map_.insert({libpath, *backend});
 
-  const char* backend_config;
-  size_t backend_config_size;
-  (*backend)->BackendConfig().Serialize(&backend_config, &backend_config_size);
-  backend_state_.insert(
-      {name, std::vector<std::string>{libpath, backend_config}});
-
   return Status::Success;
 }
 
-const std::unordered_map<std::string, std::vector<std::string>>&
+std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
 TritonBackendManager::BackendState()
 {
-  return TritonBackendManager::backend_state_;
+  TritonBackendManager& singleton_manager = Instance_();
+  std::lock_guard<std::mutex> lock(singleton_manager.mu_);
+
+  auto backend_map = singleton_manager.backend_map_;
+
+  std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
+      backend_state(
+          new std::unordered_map<std::string, std::vector<std::string>>);
+  for (const auto& backend_pair : backend_map) {
+    auto libpath = backend_pair.first;
+    auto backend = backend_pair.second.lock();
+
+    if (backend != nullptr) {
+      const char* backend_config;
+      size_t backend_config_size;
+      backend->BackendConfig().Serialize(&backend_config, &backend_config_size);
+      backend_state->insert(
+          {backend->Name(), std::vector<std::string>{libpath, backend_config}});
+    }
+  }
+
+  return backend_state;
 }
 
 }}  // namespace nvidia::inferenceserver
