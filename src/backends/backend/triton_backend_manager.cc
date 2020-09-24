@@ -328,18 +328,8 @@ TRITONBACKEND_BackendSetState(TRITONBACKEND_Backend* backend, void* state)
 // TritonBackendManager
 //
 
-TritonBackendManager&
-TritonBackendManager::Instance()
-{
-  static TritonBackendManager triton_backend_manager{};
-  return triton_backend_manager;
-}
-
-const std::unordered_map<std::string, std::weak_ptr<TritonBackend>>&
-TritonBackendManager::BackendMap()
-{
-  return backend_map_;
-}
+std::unordered_map<std::string, std::vector<std::string>>
+    TritonBackendManager::backend_state_;
 
 Status
 TritonBackendManager::CreateBackend(
@@ -347,9 +337,9 @@ TritonBackendManager::CreateBackend(
     const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
-  TritonBackendManager& singleton_manager = TritonBackendManager::Instance();
+  static TritonBackendManager singleton_manager;
 
-  std::lock_guard<std::mutex> lock(singleton_manager.Mutex());
+  std::lock_guard<std::mutex> lock(singleton_manager.m_);
 
   const auto& itr = singleton_manager.backend_map_.find(libpath);
   if (itr != singleton_manager.backend_map_.end()) {
@@ -370,7 +360,19 @@ TritonBackendManager::CreateBackend(
       name, dir, libpath, backend_cmdline_config, backend));
   singleton_manager.backend_map_.insert({libpath, *backend});
 
+  const char* backend_config;
+  size_t backend_config_size;
+  (*backend)->BackendConfig().Serialize(&backend_config, &backend_config_size);
+  backend_state_.insert(
+      {name, std::vector<std::string>{libpath, backend_config}});
+
   return Status::Success;
+}
+
+const std::unordered_map<std::string, std::vector<std::string>>&
+TritonBackendManager::BackendState()
+{
+  return TritonBackendManager::backend_state_;
 }
 
 }}  // namespace nvidia::inferenceserver

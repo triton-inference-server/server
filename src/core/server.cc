@@ -36,6 +36,7 @@
 #include <utility>
 #include <vector>
 
+#include "src/backends/backend/triton_backend_manager.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
@@ -45,10 +46,6 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
-#include "src/core/server.h"
-
-#include "src/backends/backend/triton_backend_manager.h"
-
 #include "triton/common/triton_utils.h"
 
 #ifdef TRITON_ENABLE_GPU
@@ -114,8 +111,35 @@ InferenceServer::InferenceServer()
 }
 
 void
-InferenceServer::PrintSummary()
+InferenceServer::PrintBackendAndModelSummary()
 {
+  // Backends Summary
+  std::unique_ptr<triton::common::TablePrinter> backends_table;
+
+  std::vector<std::string> backend_headers;
+  backend_headers.emplace_back("Backend");
+  backend_headers.emplace_back("Config");
+  backend_headers.emplace_back("Path");
+
+  triton::common::TablePrinter::Create(&backends_table, backend_headers);
+  auto backend_state = TritonBackendManager::BackendState();
+
+  for (const auto& backend_pair : backend_state) {
+    std::vector<std::string> backend_record;
+
+    // Backend Name
+    backend_record.emplace_back(backend_pair.first);
+
+    // Backend config and lib path
+    for (const auto& backend_field : backend_pair.second) {
+      backend_record.emplace_back(backend_field);
+    }
+    backends_table->insert_row(backend_record);
+  }
+  std::unique_ptr<std::string> backends_table_string =
+      backends_table->print_table();
+  LOG_INFO << *backends_table_string;
+
   // Models Summary
   auto model_states = model_repository_manager_->BackendStates();
 
@@ -128,18 +152,19 @@ InferenceServer::PrintSummary()
   triton::common::TablePrinter::Create(&models_table, model_headers);
 
   for (const auto& model_state : model_states) {
-    std::vector<std::string> model_record;
     auto model_version_map = model_state.second;
     std::string model_name = model_state.first;
 
     // If model_version_map size is zero, no version is found for this model
     if (model_version_map.size() == 0) {
+      std::vector<std::string> model_record;
       model_record.emplace_back(model_name);
       model_record.emplace_back("-");
       model_record.emplace_back("Not loaded: No model version was found");
       models_table->insert_row(model_record);
     } else {
       for (const auto& model_map : model_version_map) {
+        std::vector<std::string> model_record;
         std::string model_version = std::to_string(model_map.first);
         auto model_status_pair = model_map.second;
         std::string model_status =
@@ -159,42 +184,6 @@ InferenceServer::PrintSummary()
   std::unique_ptr<std::string> models_table_string =
       models_table->print_table();
   LOG_INFO << *models_table_string;
-
-  // Backends Summary
-  std::unique_ptr<triton::common::TablePrinter> backends_table;
-
-  std::vector<std::string> backend_headers;
-  backend_headers.emplace_back("Backend");
-  backend_headers.emplace_back("Path");
-  backend_headers.emplace_back("Config");
-
-  triton::common::TablePrinter::Create(&backends_table, backend_headers);
-  TritonBackendManager& triton_backend_manager =
-      TritonBackendManager::Instance();
-
-  std::lock_guard<std::mutex> lock(triton_backend_manager.Mutex());
-  auto backend_map = triton_backend_manager.BackendMap();
-
-  for (const auto& backend_pair : backend_map) {
-    std::vector<std::string> backend_record;
-    auto backend = backend_pair.second.lock();
-    if (backend != nullptr) {
-      backend_record.emplace_back(backend->Name());
-      const char* config_message;
-      size_t config_message_size;
-      backend->BackendConfig().Serialize(&config_message, &config_message_size);
-      backend_record.emplace_back(std::string(config_message));
-    } else {
-      std::string not_found_msg = "NA";
-      backend_record.emplace_back(not_found_msg);
-      backend_record.emplace_back(not_found_msg);
-    }
-    backend_record.emplace_back(backend_pair.first);
-    backends_table->insert_row(backend_record);
-  }
-  std::unique_ptr<std::string> backends_table_string =
-      backends_table->print_table();
-  LOG_INFO << *backends_table_string;
 }
 
 Status
@@ -203,18 +192,6 @@ InferenceServer::Init()
   Status status;
 
   ready_state_ = ServerReadyState::SERVER_INITIALIZING;
-
-  if (LOG_INFO_IS_ON) {
-    LOG_INFO << "Initializing Triton Inference Server";
-    LOG_INFO << "  id: '" << id_ << "'";
-    LOG_INFO << "  version: '" << version_ << "'";
-    std::string exts;
-    for (const auto& ext : extensions_) {
-      exts.append(" ");
-      exts.append(ext);
-    }
-    LOG_INFO << "  extensions: " << exts;
-  }
 
   if (model_repository_paths_.empty()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
@@ -277,12 +254,11 @@ InferenceServer::Init()
       // failure is due to a model not loading correctly so we just
       // continue if not exiting on error.
       ready_state_ = ServerReadyState::SERVER_READY;
-      PrintSummary();
+      PrintBackendAndModelSummary();
     }
   } else {
     ready_state_ = ServerReadyState::SERVER_READY;
-    status = Status::Success;
-    PrintSummary();
+    PrintBackendAndModelSummary();
   }
 
   return status;

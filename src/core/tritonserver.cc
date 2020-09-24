@@ -1542,7 +1542,17 @@ TRITONSERVER_ServerNew(
   std::unique_ptr<triton::common::TablePrinter> options_table;
   triton::common::TablePrinter::Create(&options_table, options_headers);
   options_table->insert_row(
-      std::vector<std::string>{"server_id", loptions->ServerId()});
+      std::vector<std::string>{"server_id", lserver->Id()});
+  options_table->insert_row(
+      std::vector<std::string>{"server_version", lserver->Version()});
+
+  auto extensions = lserver->Extensions();
+  std::string exts;
+  for (const auto& ext : extensions) {
+    exts.append(ext);
+  }
+  options_table->insert_row(
+      std::vector<std::string>{"server_extensions", exts});
 
   size_t i = 0;
   for (const auto& model_repository_path : loptions->ModelRepositoryPaths()) {
