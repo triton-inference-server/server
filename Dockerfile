@@ -186,7 +186,7 @@ RUN apt-get update && \
 
 # Install dependencies for protobuf code generation in Python
 RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install grpcio-tools
+    pip3 install grpcio-tools grpcio-channelz
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
@@ -444,7 +444,7 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          mkdir -p /opt/tritonserver/backends && \
          cp -r install/backends/tensorflow2 /opt/tritonserver/backends/.)
 
-ARG TRITON_PYTHON_BACKEND_TAG=main
+ARG TRITON_PYTHON_BACKEND_TAG=imant-graceful
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
     (cd /tmp/triton_backends && \
          git clone --single-branch --depth=1 -b ${TRITON_PYTHON_BACKEND_TAG} \
