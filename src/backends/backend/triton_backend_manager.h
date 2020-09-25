@@ -149,10 +149,9 @@ class TritonBackendManager {
           std::unordered_map<std::string, std::vector<std::string>>>*
           backend_state);
 
-  TritonBackendManager(){};
-
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonBackendManager);
+  TritonBackendManager() = default;
   static TritonBackendManager& Singleton();
   std::mutex mu_;
   std::unordered_map<std::string, std::weak_ptr<TritonBackend>> backend_map_;
