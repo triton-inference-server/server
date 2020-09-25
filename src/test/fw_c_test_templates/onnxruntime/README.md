@@ -1,3 +1,4 @@
+<!--
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -23,48 +24,26 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
 
-cmake_minimum_required (VERSION 3.5)
-project (fw_c_test)
+# ONNX Runtime C API Template
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Wunused-result -Werror")
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+A simple [ONNX Runtime](https://github.com/microsoft/onnxruntime) template to run ONNX models directly using the native C API. 
+Use a recent cmake to build and install the example in a local directory.
 
-include_directories("${PROJECT_SOURCE_DIR}/../..")
-include_directories("${PROJECT_BINARY_DIR}")
+```
+$ mkdir build
+$ cd build
+$ cmake -DTRITON_ENABLE_GPU=1 \
+        -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
+        -DTRITON_ONNXRUNTIME_LIB_PATHS="/opt/tritonserver/backends/onnxruntime" ..
+$ make install
+```
 
-#
-# ONNXRuntime C test/template
-#
-add_executable(onnxruntime_c_test onnxruntime_c_test.cc)
-target_include_directories(onnxruntime_c_test PRIVATE ${TRITON_ONNXRUNTIME_INCLUDE_PATHS})
+Modify `onnxruntime_c_test.cc` as necessary for your model/test case and
+run the test using the following command where 'model_path' is the 
+complete path to your onnx model.
 
-if(${TRITON_ENABLE_GPU})
-  find_package(CUDA REQUIRED)
-  message(STATUS "Using CUDA ${CUDA_VERSION}")
-
-  set(CUDA_NVCC_FLAGS -std=c++11)
-  target_include_directories(onnxruntime_c_test PRIVATE ${CUDA_INCLUDE_DIRS})
-  target_compile_definitions(
-    onnxruntime_c_test
-    PRIVATE TRITON_ENABLE_GPU=1
-  )
-endif() # TRITON_ENABLE_GPU
-
-set(TRITON_ONNXRUNTIME_LDFLAGS "")
-FOREACH(p ${TRITON_ONNXRUNTIME_LIB_PATHS})
-  set(TRITON_ONNXRUNTIME_LDFLAGS ${TRITON_ONNXRUNTIME_LDFLAGS} "-L${p}")
-ENDFOREACH(p)
-target_link_libraries(onnxruntime_c_test
-    PRIVATE ${TRITON_ONNXRUNTIME_LDFLAGS}
-    -lonnxruntime)
-
-if(${TRITON_ENABLE_GPU})
-  target_link_libraries(onnxruntime_c_test PRIVATE ${CUDA_LIBRARIES})
-endif() # TRITON_ENABLE_GPU
-
-install(
-  TARGETS onnxruntime_c_test
-  RUNTIME DESTINATION bin
-)
+```
+onnxruntime_c_test -m <model_path>
+```

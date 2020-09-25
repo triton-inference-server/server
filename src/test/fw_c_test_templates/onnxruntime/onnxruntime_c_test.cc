@@ -166,6 +166,6 @@ main(int argc, char* argv[])
   ort_api->ReleaseSession(session);
   ort_api->ReleaseSessionOptions(session_options);
   ort_api->ReleaseEnv(env);
-  printf("Done!\n");
+  printf("Ran Successfully!\n");
   return 0;
 }
