@@ -328,7 +328,7 @@ TRITONBACKEND_BackendSetState(TRITONBACKEND_Backend* backend, void* state)
 // TritonBackendManager
 //
 TritonBackendManager&
-TritonBackendManager::Instance_()
+TritonBackendManager::Singleton()
 {
   static TritonBackendManager triton_backend_manager;
   return triton_backend_manager;
@@ -340,7 +340,7 @@ TritonBackendManager::CreateBackend(
     const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
-  TritonBackendManager& singleton_manager = Instance_();
+  TritonBackendManager& singleton_manager = Singleton();
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
   const auto& itr = singleton_manager.backend_map_.find(libpath);
@@ -365,16 +365,18 @@ TritonBackendManager::CreateBackend(
   return Status::Success;
 }
 
-std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
-TritonBackendManager::BackendState()
+Status
+TritonBackendManager::BackendState(
+    std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>*
+        backend_state)
 {
-  TritonBackendManager& singleton_manager = Instance_();
+  TritonBackendManager& singleton_manager = Singleton();
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
   auto backend_map = singleton_manager.backend_map_;
 
   std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
-      backend_state(
+      backend_state_map(
           new std::unordered_map<std::string, std::vector<std::string>>);
   for (const auto& backend_pair : backend_map) {
     auto libpath = backend_pair.first;
@@ -384,12 +386,13 @@ TritonBackendManager::BackendState()
       const char* backend_config;
       size_t backend_config_size;
       backend->BackendConfig().Serialize(&backend_config, &backend_config_size);
-      backend_state->insert(
+      backend_state_map->insert(
           {backend->Name(), std::vector<std::string>{libpath, backend_config}});
     }
   }
+  *backend_state = std::move(backend_state_map);
 
-  return backend_state;
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

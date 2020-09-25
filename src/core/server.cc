@@ -110,19 +110,20 @@ InferenceServer::InferenceServer()
   inflight_request_counter_ = 0;
 }
 
-void
+Status
 InferenceServer::PrintBackendAndModelSummary()
 {
   // Backends Summary
-  std::unique_ptr<triton::common::TablePrinter> backends_table;
-
   std::vector<std::string> backend_headers;
   backend_headers.emplace_back("Backend");
   backend_headers.emplace_back("Config");
   backend_headers.emplace_back("Path");
 
-  triton::common::TablePrinter::Create(&backends_table, backend_headers);
-  auto backend_state = TritonBackendManager::BackendState();
+  triton::common::TablePrinter backends_table(backend_headers);
+
+  std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
+      backend_state;
+  RETURN_IF_ERROR(TritonBackendManager::BackendState(&backend_state));
 
   for (const auto& backend_pair : *backend_state) {
     std::vector<std::string> backend_record;
@@ -134,11 +135,10 @@ InferenceServer::PrintBackendAndModelSummary()
     for (const auto& backend_field : backend_pair.second) {
       backend_record.emplace_back(backend_field);
     }
-    backends_table->InsertRow(backend_record);
+    backends_table.InsertRow(backend_record);
   }
-  std::unique_ptr<std::string> backends_table_string =
-      backends_table->PrintTable();
-  LOG_INFO << *backends_table_string;
+  std::string backends_table_string = backends_table.PrintTable();
+  LOG_INFO << backends_table_string;
 
   // Models Summary
   auto model_states = model_repository_manager_->BackendStates();
@@ -148,8 +148,7 @@ InferenceServer::PrintBackendAndModelSummary()
   model_headers.emplace_back("Version");
   model_headers.emplace_back("Status");
 
-  std::unique_ptr<triton::common::TablePrinter> models_table;
-  triton::common::TablePrinter::Create(&models_table, model_headers);
+  triton::common::TablePrinter models_table(model_headers);
 
   for (const auto& model_state : model_states) {
     auto model_version_map = model_state.second;
@@ -161,7 +160,7 @@ InferenceServer::PrintBackendAndModelSummary()
       model_record.emplace_back(model_name);
       model_record.emplace_back("-");
       model_record.emplace_back("Not loaded: No model version was found");
-      models_table->InsertRow(model_record);
+      models_table.InsertRow(model_record);
     } else {
       for (const auto& model_map : model_version_map) {
         std::vector<std::string> model_record;
@@ -177,12 +176,14 @@ InferenceServer::PrintBackendAndModelSummary()
         model_record.emplace_back(model_name);
         model_record.emplace_back(model_version);
         model_record.emplace_back(model_status);
-        models_table->InsertRow(model_record);
+        models_table.InsertRow(model_record);
       }
     }
   }
-  std::unique_ptr<std::string> models_table_string = models_table->PrintTable();
-  LOG_INFO << *models_table_string;
+  std::string models_table_string = models_table.PrintTable();
+  LOG_INFO << models_table_string;
+
+  return Status::Success;
 }
 
 Status

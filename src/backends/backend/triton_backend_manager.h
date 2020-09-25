@@ -144,19 +144,18 @@ class TritonBackendManager {
       const BackendCmdlineConfig& backend_cmdline_config,
       std::shared_ptr<TritonBackend>* backend);
 
-  static std::unique_ptr<
-      std::unordered_map<std::string, std::vector<std::string>>>
-  BackendState();
+  static Status BackendState(
+      std::unique_ptr<
+          std::unordered_map<std::string, std::vector<std::string>>>*
+          backend_state);
 
   TritonBackendManager(){};
 
  private:
-  static std::unordered_map<std::string, std::vector<std::string>>
-      backend_state_;
-  static TritonBackendManager& Instance_();
+  DISALLOW_COPY_AND_ASSIGN(TritonBackendManager);
+  static TritonBackendManager& Singleton();
   std::mutex mu_;
   std::unordered_map<std::string, std::weak_ptr<TritonBackend>> backend_map_;
-  DISALLOW_COPY_AND_ASSIGN(TritonBackendManager);
 };
 
 }}  // namespace nvidia::inferenceserver
