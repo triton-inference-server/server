@@ -44,9 +44,7 @@ BATCHER_TEST=batcher_test.py
 VERIFY_TIMESTAMPS=verify_timestamps.py
 
 # Add valgrind flag check
-if [ -z "$TEST_VALGRIND" ]; then
-    TEST_VALGRIND="0"
-else
+if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
     SERVER_TIMEOUT=3600

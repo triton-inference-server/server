@@ -42,20 +42,19 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
 
-if [ -z "$TEST_VALGRIND" ]; then
-    TEST_VALGRIND="0"
-else
+if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
     SERVER_TIMEOUT=1200
     rm -f *.valgrind.log
 
     # Shortened tests due valgrind overhead
-    MODEL_TRIALS="0 2 v"
+    MODEL_TRIALS="0 v"
     NO_DELAY_TESTS="test_simple_sequence \
+                      test_no_sequence_start \
                       test_batch_size"
-    DELAY_TESTS="test_backlog_fill_no_end \
-                    test_backlog_same_correlation_id_no_end \
+    DELAY_TESTS="test_backlog_same_correlation_id_no_end \
+                    test_backlog_fill_no_end \
                     test_backlog_sequence_timeout \
                     test_half_batch \
                     test_skip_batch \
@@ -140,24 +139,23 @@ for BACKEND in $BACKENDS; do
 done
 
 for MODEL in $MODELS; do
-    if [[ -z "$TEST_VALGRIND" ]]; then
-        cp -r $MODEL models1/. && \
-            (cd models1/$(basename $MODEL) && \
-                sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-                sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-                sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
-        cp -r $MODEL models4/. && \
-            (cd models4/$(basename $MODEL) && \
-                sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
-                sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
-                sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
-    fi
+  if [[ ! "$TEST_VALGRIND" -eq 1 ]]; then
+    cp -r $MODEL models1/. && \
+      (cd models1/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+    cp -r $MODEL models4/. && \
+      (cd models4/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
     cp -r $MODEL models2/. && \
-        (cd models2/$(basename $MODEL) && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
-            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
-            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
-    
+      (cd models2/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
+  fi
 done
 
 MODELS=""
