@@ -166,6 +166,16 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+# Test with the base path in url.
+$SIMPLE_INFER_CLIENT_PY -u localhost:8000/base_path -v >> ${CLIENT_LOG}.base_path_url 2>&1
+if [ $? -eq 0 ]; then
+    cat ${CLIENT_LOG}.base_path_url
+    RET=1
+fi
+if [ $(cat ${CLIENT_LOG}.base_path_url | grep "POST /base_path/v2/models/simple/infer" | wc -l) -eq 0 ]; then
+    cat ${CLIENT_LOG}.base_path_url
+    RET=1
+fi
 
 for i in \
    $SIMPLE_INFER_CLIENT \
@@ -199,6 +209,18 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.reuse
     RET=1
 fi
+
+# Test with the base path in url.
+$SIMPLE_INFER_CLIENT -u localhost:8000/base_path -v >> ${CLIENT_LOG}.c++.base_path_url 2>&1
+if [ $? -eq 0 ]; then
+    cat ${CLIENT_LOG}.c++.base_path_url
+    RET=1
+fi
+if [ $(cat ${CLIENT_LOG}.c++.base_path_url | grep "POST /base_path/v2/models/simple/infer" | wc -l) -eq 0 ]; then
+    cat ${CLIENT_LOG}.c++.base_path_url
+    RET=1
+fi
+
 
 set -e
 
