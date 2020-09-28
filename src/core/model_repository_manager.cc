@@ -1704,7 +1704,7 @@ ModelRepositoryManager::UpdateDependencyGraph(
       if (!ensemble->missing_upstreams_.empty()) {
         std::string name_list;
         for (auto it = ensemble->missing_upstreams_.begin();
-            it != ensemble->missing_upstreams_.end(); it++) {
+             it != ensemble->missing_upstreams_.end(); it++) {
           if (it != ensemble->missing_upstreams_.begin()) {
             name_list += ", ";
           }
