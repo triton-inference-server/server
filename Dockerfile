@@ -444,7 +444,7 @@ RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
          mkdir -p /opt/tritonserver/backends && \
          cp -r install/backends/tensorflow2 /opt/tritonserver/backends/.)
 
-ARG TRITON_PYTHON_BACKEND_TAG=imant-graceful
+ARG TRITON_PYTHON_BACKEND_TAG=main
 RUN rm -fr /tmp/triton_backends && mkdir -p /tmp/triton_backends && \
     (cd /tmp/triton_backends && \
          git clone --single-branch --depth=1 -b ${TRITON_PYTHON_BACKEND_TAG} \
