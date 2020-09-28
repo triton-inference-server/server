@@ -238,7 +238,8 @@ endif() # TRITON_ENABLE_S3
 target_link_libraries(
   server-library
   PUBLIC
-    triton-core-backendapi  # from repo-core
-    triton-core-serverapi   # from repo-core
-    triton-common-json      # from repo-common
+    triton-core-backendapi           # from repo-core
+    triton-core-serverapi            # from repo-core
+    triton-common-json               # from repo-common
+    triton-common-table-printer      # from repo-common
 )

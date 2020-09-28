@@ -29,6 +29,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include "src/core/constants.h"
 #include "src/core/model_config.h"
 #include "src/core/server_message.h"
 #include "src/core/status.h"
@@ -143,7 +144,15 @@ class TritonBackendManager {
       const BackendCmdlineConfig& backend_cmdline_config,
       std::shared_ptr<TritonBackend>* backend);
 
+  static Status BackendState(
+      std::unique_ptr<
+          std::unordered_map<std::string, std::vector<std::string>>>*
+          backend_state);
+
  private:
+  DISALLOW_COPY_AND_ASSIGN(TritonBackendManager);
+  TritonBackendManager() = default;
+  static TritonBackendManager& Singleton();
   std::mutex mu_;
   std::unordered_map<std::string, std::weak_ptr<TritonBackend>> backend_map_;
 };
