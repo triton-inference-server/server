@@ -145,16 +145,16 @@ for MODEL in $MODELS; do
         sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
-    cp -r $MODEL models4/. && \
-      (cd models4/$(basename $MODEL) && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
-        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
-        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
     cp -r $MODEL models2/. && \
       (cd models2/$(basename $MODEL) && \
         sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
+    cp -r $MODEL models4/. && \
+      (cd models4/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
   fi
 done
 
