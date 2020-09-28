@@ -112,7 +112,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Trigger non-graceful terminal of Triton
+# Trigger non-graceful termination of Triton
 kill -9 $SERVER_PID
 
 # Wait 10 seconds so that Python gRPC server can detect non-graceful exit
