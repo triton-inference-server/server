@@ -186,7 +186,7 @@ RUN apt-get update && \
 
 # Install dependencies for protobuf code generation in Python
 RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install grpcio-tools
+    pip3 install grpcio-tools grpcio-channelz
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
