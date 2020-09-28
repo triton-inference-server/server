@@ -1028,14 +1028,16 @@ PlanBackend::Context::InitializeExecuteInputBinding(
       }
       if (!io_binding_info.is_linear_format_) {
         // FIXME case where vectorized dim is first dimension
-        byte_size = io_binding_info.format_element_size_ * context.context_->getStrides(io_index).d[0] *
+        byte_size = io_binding_info.format_element_size_ *
+                    context.context_->getStrides(io_index).d[0] *
                     context.max_dims_[io_index].d[0];
       }
     } else {
       byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
       if (!io_binding_info.is_linear_format_) {
         // FIXME case where vectorized dim is first dimension
-        byte_size = io_binding_info.format_element_size_ * context.context_->getStrides(io_index).d[0] *
+        byte_size = io_binding_info.format_element_size_ *
+                    context.context_->getStrides(io_index).d[0] *
                     model_config_dims[0];
       }
     }
