@@ -192,10 +192,10 @@ class InferenceServerClient:
                  ssl_options=None,
                  ssl_context_factory=None,
                  insecure=False):
-        if not url.startswith("http://") and not url.startswith("https://"):
-            scheme = "https://" if ssl else "http://"
-            url = scheme + url   
-        self._parsed_url = URL(url)
+        if url.startswith("http://") or url.startswith("https://"):
+            raise_error("url should not include the scheme")
+        scheme = "https://" if ssl else "http://"
+        self._parsed_url = URL(scheme + url)
         self._base_uri = self._parsed_url.request_uri.rstrip('/')
         self._client_stub = HTTPClient.from_url(
             self._parsed_url,
