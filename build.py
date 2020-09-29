@@ -104,7 +104,7 @@ def untar(targetdir, tarfile):
 def gitclone(cwd, repo, tag, subdir):
     log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
     p = subprocess.Popen([
-        'git', 'clone', '--single-branch', '--depth=1', '-b', tag,
+        'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b', tag,
         'https://github.com/triton-inference-server/{}.git'.format(repo), subdir
     ],
                          cwd=cwd)
