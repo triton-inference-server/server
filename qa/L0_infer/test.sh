@@ -49,9 +49,7 @@ if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
     TEST_CUDA_SHARED_MEMORY="0"
 fi
 
-if [ -z "$TEST_VALGRIND" ]; then
-    TEST_VALGRIND="0"
-else
+if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_LOG_BASE="./valgrind_test"
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
