@@ -171,12 +171,14 @@ RUN apt-get update && \
             python3-setuptools \
             rapidjson-dev \
             software-properties-common \
+            unzip \
             wget \
             zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # grpcio-tools grpcio-channelz are needed by python backend
-RUN pip3 install --upgrade wheel setuptools docker && \
+RUN pip3 install --upgrade pip && \
+    pip3 install --upgrade wheel setuptools docker && \
     pip3 install grpcio-tools grpcio-channelz
 
 # Server build requires recent version of CMake (FetchContent required)
