@@ -1,0 +1,19 @@
+name: "resnet_torchscript"
+platform: "pytorch_libtorch"
+max_batch_size: 32
+input [
+  {
+    name: "input__0"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [3,224,224 ]
+  }
+]
+output [
+  {
+    name: "output__0"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+    label_filename: "resnet_labels.txt"
+  }
+]
