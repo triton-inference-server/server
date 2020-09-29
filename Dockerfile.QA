@@ -49,6 +49,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 RUN cd builddir && \
+    cmake -DTRITON_ENABLE_GPU=ON ../build && \
     make -j16 test-util
 
 # Update the qa/ directory with test executables, models, etc.
