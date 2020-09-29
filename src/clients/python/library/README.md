@@ -33,9 +33,9 @@ installation is different from the linux-specific installation. The components
 included within generic tritonclient package are:
 - http
 - grpc [ `service_pb2`, `service_pb2_grpc`, `model_config_pb2` ]
-- utils [ x86-linux distribution will include `shared_memory` and `cuda_shared_memory`]
+- utils [ linux distribution will include `shared_memory` and `cuda_shared_memory`]
 
-Apart from the above library, x86-linux distribution will include a
+Apart from the above library, linux distribution will include a
 pre-compiled perf_analyzer binary For further information regarding
 perf_analyzer, refer to docs
 [here](https://github.com/triton-inference-server/server/blob/master/docs/perf_analyzer.rst).
