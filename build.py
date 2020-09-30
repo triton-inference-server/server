@@ -62,6 +62,7 @@ def log(msg, force=False):
         except Exception:
             print('<failed to log>', file=sys.stderr)
 
+
 def log_verbose(msg):
     if FLAGS.verbose:
         log(msg, force=True)
@@ -104,8 +105,9 @@ def untar(targetdir, tarfile):
 def gitclone(cwd, repo, tag, subdir):
     log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
     p = subprocess.Popen([
-        'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b', tag,
-        'https://github.com/triton-inference-server/{}.git'.format(repo), subdir
+        'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
+        tag, 'https://github.com/triton-inference-server/{}.git'.format(repo),
+        subdir
     ],
                          cwd=cwd)
     p.wait()
@@ -268,6 +270,17 @@ def dali_cmake_args():
     ]
 
 
+def create_dockerfile_build(ddir, dockerfile_name):
+    df = '''
+FROM tritonserver_builder_image AS build
+FROM tritonserver_buildbase
+COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
+'''
+    mkdir(ddir)
+    with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
+        dfile.write(df)
+
+
 def container_build(container_version):
     # Set the docker build-args based on 'container_version'
     if container_version in CONTAINER_VERSION_MAP:
@@ -276,6 +289,10 @@ def container_build(container_version):
             container_version][1]
     else:
         fail('unsupported container version {}'.format(container_version))
+
+    # The build and install directories within the container.
+    build_dir = os.path.join(os.sep, 'tmp', 'tritonbuild')
+    install_dir = os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
 
     # We can't use docker module for building container because it
     # doesn't stream output and it also seems to handle cache-from
@@ -355,19 +372,15 @@ def container_build(container_version):
         #
         # --container-version changes to --upstream-container-version
         #
-        # --build-dir is added/overridden to /tmp/tritonbuild
+        # --build-dir is added/overridden to 'build_dir'
         #
-        # --install-dir is added/overridden to
-        # --/tmp/tritonbuild/install
+        # --install-dir is added/overridden to 'install_dir'
         runargs = [
             a.replace('--container-version', '--upstream-container-version')
             for a in sys.argv[1:]
         ]
-        runargs += ['--build-dir', os.path.join(os.sep, 'tmp', 'tritonbuild')]
-        runargs += [
-            '--install-dir',
-            os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
-        ]
+        runargs += ['--build-dir', build_dir]
+        runargs += ['--install-dir', install_dir]
 
         log_verbose('run {}'.format(runargs))
         container = client.containers.run(
@@ -386,7 +399,8 @@ def container_build(container_version):
             for ln in container.logs(stream=True):
                 log_verbose(ln)
         ret = container.wait()
-        fail_if(ret['StatusCode'] != 0, 'tritonserver_builder failed: {}'.format(ret))
+        fail_if(ret['StatusCode'] != 0,
+                'tritonserver_builder failed: {}'.format(ret))
 
         # It is possible to copy the install artifacts from the
         # container at this point (and, for example put them in the
@@ -395,27 +409,45 @@ def container_build(container_version):
         # container which is created below.
         #mkdir(FLAGS.install_dir)
         #tarfilename = os.path.join(FLAGS.install_dir, 'triton.tar')
-        #install_tar, stat_tar = container.get_archive(
-        #    os.path.join(os.sep, 'tmp', 'tritonbuild', 'install'))
+        #install_tar, stat_tar = container.get_archive(install_dir)
         #with open(tarfilename, 'wb') as taroutfile:
         #    for d in install_tar:
         #        taroutfile.write(d)
         #untar(FLAGS.install_dir, tarfilename)
 
         # Build is complete, save the container as the
-        # tritonserver_build image.
+        # tritonserver_build image. We must to this in two steps:
+        #
+        #   1. Commit the container as image
+        #   "tritonserver_builder_image". This image can't be used
+        #   directly because it binds the /var/run/docker.sock mount
+        #   and so you would need to always run with that mount
+        #   specified... so it can be used this way but very
+        #   inconvenient.
+        #
+        #   2. Perform a docker build to create "tritonserver_build"
+        #   from "tritonserver_builder_image" that is essentially
+        #   identical but removes the mount.
         try:
-            client.images.remove('tritonserver_build', force=True)
+            client.images.remove('tritonserver_builder_image', force=True)
         except docker.errors.ImageNotFound:
             pass  # ignore
 
-        container.commit('tritonserver_build', 'latest')
+        container.commit('tritonserver_builder_image', 'latest')
         container.remove(force=True)
+
+        create_dockerfile_build(FLAGS.build_dir, 'Dockerfile.build')
+        p = subprocess.Popen([
+            'docker', 'build', '-t', 'tritonserver_build', '-f',
+            os.path.join(FLAGS.build_dir, 'Dockerfile.build'), '.'
+        ])
+        p.wait()
+        fail_if(p.returncode != 0, 'docker build tritonserver_build failed')
 
         # Final base image... this is a multi-stage build that uses
         # the install artifacts from the tritonserver_build container.
-        baseargs = ['docker', 'build', '-f', 'Dockerfile']
-        p = subprocess.Popen(baseargs + buildargs + ['-t', 'tritonserver', '.'])
+        p = subprocess.Popen(['docker', 'build', '-f', 'Dockerfile'] +
+                             buildargs + ['-t', 'tritonserver', '.'])
         p.wait()
         fail_if(p.returncode != 0, 'docker build tritonserver failed')
 
