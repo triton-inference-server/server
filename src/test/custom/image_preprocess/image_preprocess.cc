@@ -24,9 +24,22 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <opencv2/core/version.hpp>
+#if CV_MAJOR_VERSION == 2
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#elif CV_MAJOR_VERSION >= 3
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#endif
+
+#if CV_MAJOR_VERSION == 4
+#define GET_TRANSFORMATION_CODE(x) cv::COLOR_##x
+#else
+#define GET_TRANSFORMATION_CODE(x) CV_##x
+#endif
 #include <string>
 
 #include "src/core/model_config.h"
@@ -332,15 +345,15 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
 
   cv::Mat sample;
   if ((img.channels() == 3) && (c == 1)) {
-    cv::cvtColor(img, sample, CV_BGR2GRAY);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGR2GRAY));
   } else if ((img.channels() == 4) && (c == 1)) {
-    cv::cvtColor(img, sample, CV_BGRA2GRAY);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGRA2GRAY));
   } else if ((img.channels() == 3) && (c == 3)) {
-    cv::cvtColor(img, sample, CV_BGR2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGR2RGB));
   } else if ((img.channels() == 4) && (c == 3)) {
-    cv::cvtColor(img, sample, CV_BGRA2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGRA2RGB));
   } else if ((img.channels() == 1) && (c == 3)) {
-    cv::cvtColor(img, sample, CV_GRAY2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(GRAY2RGB));
   } else {
     return kOpenCV;
   }
