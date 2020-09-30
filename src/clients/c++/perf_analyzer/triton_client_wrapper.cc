@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/c++/perf_client/triton_client_wrapper.h"
+#include "src/clients/c++/perf_analyzer/triton_client_wrapper.h"
 
 #include "src/clients/c++/examples/json_utils.h"
 

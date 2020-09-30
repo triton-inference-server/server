@@ -124,7 +124,7 @@ if __name__ == '__main__':
     parser.add_argument('--csv',
                         type=argparse.FileType('r'),
                         required=False,
-                        help='perf_client generated CSV')
+                        help='perf_analyzer generated CSV')
     parser.add_argument('file', type=argparse.FileType('r'))
     FLAGS = parser.parse_args()
 

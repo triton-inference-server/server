@@ -33,12 +33,12 @@ installation is different from the linux-specific installation. The components
 included within generic tritonclient package are:
 - http
 - grpc [ `service_pb2`, `service_pb2_grpc`, `model_config_pb2` ]
-- utils [ x86-linux distribution will include `shared_memory` and `cuda_shared_memory`]
+- utils [ linux distribution will include `shared_memory` and `cuda_shared_memory`]
 
-Apart from the above library, x86-linux distribution will include a
-pre-compiled perf_client binary For further information regarding
-perf_client, refer to docs
-[here](https://github.com/triton-inference-server/server/blob/master/docs/perf_client.rst).
+Apart from the above library, linux distribution will include a
+pre-compiled perf_analyzer binary For further information regarding
+perf_analyzer, refer to docs
+[here](https://github.com/triton-inference-server/server/blob/master/docs/perf_analyzer.rst).
 
 Note the following packages are deprecated and will be removed in future releases:
 - tritongrpcclient
@@ -49,8 +49,8 @@ Note the following packages are deprecated and will be removed in future release
 
 ## Installation
 
-Install dependencies needed by the perf_client binary shipped with the
-package. This step can be skipped if perf_client is not needed.
+Install dependencies needed by the perf_analyzer binary shipped with the
+package. This step can be skipped if perf_analyzer is not needed.
 
 ```bash
 sudo apt update
@@ -69,7 +69,7 @@ pip install tritonclient[all]
 There are two optional packages available, namely, `grpc` and
 `http`. [`all`] installs dependencies for both the protocols.
 
-The perf_client is installed in the system configuration specific
+The perf_analyzer is installed in the system configuration specific
 `bin` directory.
 
 ## Usage
@@ -78,9 +78,9 @@ Refer to the examples
 [here](https://github.com/triton-inference-server/server/tree/master/src/clients/python/examples)
 for the usage of library.
 
-Use the following command to get the detailed usage for perf_client
+Use the following command to get the detailed usage for perf_analyzer
 binary.
 
 ```bash
-perf_client -h
+perf_analyzer -h
 ```

@@ -105,9 +105,11 @@ function main() {
         "${WHLDIR}/tritonclient/utils/cuda_shared_memory/."
     fi
   
-    # Copies the pre-compiled perf_client binary
+    # Copies the pre-compiled perf_analyzer binary
     if [ -f $3 ]; then
       cp $3 "${WHLDIR}"
+      # Create a symbolic link for backwards compatibility
+      (cd $WHLDIR; ln -sf ./perf_analyzer perf_client)
     fi
   fi
   
@@ -119,7 +121,13 @@ function main() {
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
   if [ "$2" = true ] ; then
-    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name=manylinux1_x86_64
+    PLATFORM=`uname -m`
+    if [ "$PLATFORM" = "aarch64" ] ; then
+      PLATFORM_NAME="linux_aarch64"
+    else
+      PLATFORM_NAME="manylinux1_x86_64"
+    fi
+    VERSION=$VERSION python${PYVER} setup.py bdist_wheel --plat-name $PLATFORM_NAME
   else
     VERSION=$VERSION python${PYVER} setup.py bdist_wheel
   fi

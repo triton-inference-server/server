@@ -36,6 +36,7 @@
 #include <utility>
 #include <vector>
 
+#include "src/backends/backend/triton_backend_manager.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
@@ -45,7 +46,7 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
-#include "src/core/server.h"
+#include "triton/common/table_printer.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include "src/core/cuda_memory_manager.h"
@@ -110,23 +111,87 @@ InferenceServer::InferenceServer()
 }
 
 Status
+InferenceServer::PrintBackendAndModelSummary()
+{
+  // Backends Summary
+  std::vector<std::string> backend_headers;
+  backend_headers.emplace_back("Backend");
+  backend_headers.emplace_back("Config");
+  backend_headers.emplace_back("Path");
+
+  triton::common::TablePrinter backends_table(backend_headers);
+
+  std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
+      backend_state;
+  RETURN_IF_ERROR(TritonBackendManager::BackendState(&backend_state));
+
+  for (const auto& backend_pair : *backend_state) {
+    std::vector<std::string> backend_record;
+
+    // Backend Name
+    backend_record.emplace_back(backend_pair.first);
+
+    // Backend config and lib path
+    for (const auto& backend_field : backend_pair.second) {
+      backend_record.emplace_back(backend_field);
+    }
+    backends_table.InsertRow(backend_record);
+  }
+  std::string backends_table_string = backends_table.PrintTable();
+  LOG_INFO << backends_table_string;
+
+  // Models Summary
+  auto model_states = model_repository_manager_->BackendStates();
+
+  std::vector<std::string> model_headers;
+  model_headers.emplace_back("Model");
+  model_headers.emplace_back("Version");
+  model_headers.emplace_back("Status");
+
+  triton::common::TablePrinter models_table(model_headers);
+
+  for (const auto& model_state : model_states) {
+    auto model_version_map = model_state.second;
+    std::string model_name = model_state.first;
+
+    // If model_version_map size is zero, no version is found for this model
+    if (model_version_map.size() == 0) {
+      std::vector<std::string> model_record;
+      model_record.emplace_back(model_name);
+      model_record.emplace_back("-");
+      model_record.emplace_back("Not loaded: No model version was found");
+      models_table.InsertRow(model_record);
+    } else {
+      for (const auto& model_map : model_version_map) {
+        std::vector<std::string> model_record;
+        std::string model_version = std::to_string(model_map.first);
+        auto model_status_pair = model_map.second;
+        std::string model_status =
+            ModelReadyStateString(model_status_pair.first);
+
+        if (model_status_pair.second != "") {
+          model_status += ": " + model_status_pair.second;
+        }
+
+        model_record.emplace_back(model_name);
+        model_record.emplace_back(model_version);
+        model_record.emplace_back(model_status);
+        models_table.InsertRow(model_record);
+      }
+    }
+  }
+  std::string models_table_string = models_table.PrintTable();
+  LOG_INFO << models_table_string;
+
+  return Status::Success;
+}
+
+Status
 InferenceServer::Init()
 {
   Status status;
 
   ready_state_ = ServerReadyState::SERVER_INITIALIZING;
-
-  if (LOG_INFO_IS_ON) {
-    LOG_INFO << "Initializing Triton Inference Server";
-    LOG_INFO << "  id: '" << id_ << "'";
-    LOG_INFO << "  version: '" << version_ << "'";
-    std::string exts;
-    for (const auto& ext : extensions_) {
-      exts.append(" ");
-      exts.append(ext);
-    }
-    LOG_INFO << "  extensions: " << exts;
-  }
 
   if (model_repository_paths_.empty()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
@@ -189,12 +254,14 @@ InferenceServer::Init()
       // failure is due to a model not loading correctly so we just
       // continue if not exiting on error.
       ready_state_ = ServerReadyState::SERVER_READY;
+      PrintBackendAndModelSummary();
     }
-    return status;
+  } else {
+    ready_state_ = ServerReadyState::SERVER_READY;
+    PrintBackendAndModelSummary();
   }
 
-  ready_state_ = ServerReadyState::SERVER_READY;
-  return Status::Success;
+  return status;
 }
 
 Status
