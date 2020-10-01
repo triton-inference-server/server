@@ -655,29 +655,35 @@ COPY --chown=1000:1000 LICENSE .
 COPY --chown=1000:1000 VERSION .
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backends backends
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib/pytorch lib/pytorch
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/onnxruntime/* backends/onnxruntime/
+'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
+           argmap['BASE_IMAGE'])
 
+    if len(FLAGS.backend) > 0:
+        df += '''
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backends backends
+'''
+
+    df += '''
 # Get ONNX version supported
 RUN export ONNX_VERSION=`cat backends/onnxruntime/ort_onnx_version.txt`
 
 # Extra defensive wiring for CUDA Compat lib
-RUN ln -sf ${{_CUDA_COMPAT_PATH}}/lib.real ${{_CUDA_COMPAT_PATH}}/lib \
- && echo ${{_CUDA_COMPAT_PATH}}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
+RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
+ && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
  && ldconfig \
- && rm -f ${{_CUDA_COMPAT_PATH}}/lib
+ && rm -f ${_CUDA_COMPAT_PATH}/lib
 
 COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tritonserver
 ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 
 ARG NVIDIA_BUILD_ID
-ENV NVIDIA_BUILD_ID ${{NVIDIA_BUILD_ID:-<unknown>}}
-LABEL com.nvidia.build.id="${{NVIDIA_BUILD_ID}}"
+ENV NVIDIA_BUILD_ID ${NVIDIA_BUILD_ID:-<unknown>}
+LABEL com.nvidia.build.id="${NVIDIA_BUILD_ID}"
 ARG NVIDIA_BUILD_REF
-LABEL com.nvidia.build.ref="${{NVIDIA_BUILD_REF}}"
-'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
-           argmap['BASE_IMAGE'])
+LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
+'''
 
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
