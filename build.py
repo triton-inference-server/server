@@ -351,9 +351,9 @@ ARG OPENVINO_VERSION
 ENV INTEL_OPENVINO_DIR=/opt/intel/openvino_${{OPENVINO_VERSION}}.287
 ENV InferenceEngine_DIR=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/share
 ENV IE_PLUGINS_PATH=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/lib/intel64
-ENV LD_LIBRARY_PATH=/opt/intel/opencl:${{INTEL_OPENVINO_DIR}}/inference_engine/external/gna/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/mkltiny_lnx/lib:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/omp/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/tbb/lib:${{IE_PLUGINS_PATH}}:${{LD_LIBRARY_PATH}}
+ENV LD_LIBRARY_PATH=/opt/intel/opencl:${{INTEL_OPENVINO_DIR}}/inference_engine/external/gna/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/mkltiny_lnx/lib:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/omp/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/tbb/lib:$IE_PLUGINS_PATH:$LD_LIBRARY_PATH
 ENV OpenCV_DIR=${{INTEL_OPENVINO_DIR}}/opencv/share/OpenCV
-ENV LD_LIBRARY_PATH=${{INTEL_OPENVINO_DIR}}/opencv/lib:${{INTEL_OPENVINO_DIR}}/opencv/share/OpenCV/3rdparty/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=${{INTEL_OPENVINO_DIR}}/opencv/lib:${{INTEL_OPENVINO_DIR}}/opencv/share/OpenCV/3rdparty/lib:$LD_LIBRARY_PATH
 ENV HDDL_INSTALL_DIR=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/hddl
 ENV LD_LIBRARY_PATH=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/hddl/lib:$LD_LIBRARY_PATH
 ENV LANG en_US.UTF-8
