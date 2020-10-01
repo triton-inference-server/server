@@ -209,13 +209,13 @@ def backend_repo(be):
     return '{}_backend'.format(be)
 
 
-def backend_cmake_args(components, be, install_dir):
+def backend_cmake_args(images, components, be, install_dir):
     if be == 'onnxruntime':
         args = onnxruntime_cmake_args()
     elif be == 'tensorflow1':
-        args = tensorflow_cmake_args(1)
+        args = tensorflow_cmake_args(1, images)
     elif be == 'tensorflow2':
-        args = tensorflow_cmake_args(2)
+        args = tensorflow_cmake_args(2, images)
     elif be == 'python':
         args = []
     elif be == 'dali':
@@ -255,9 +255,15 @@ def onnxruntime_cmake_args():
     ]
 
 
-def tensorflow_cmake_args(ver):
-    image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
-        FLAGS.upstream_container_version, ver)
+def tensorflow_cmake_args(ver, images):
+    # If a specific TF image is specified use it, otherwise pull from
+    # NGC.
+    image_name = "tensorflow{}".format(ver)
+    if image_name in images:
+        image = images[image_name]
+    else:
+        image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
+            FLAGS.upstream_container_version, ver)
     return [
         '-DTRITON_TENSORFLOW_VERSION={}'.format(ver),
         '-DTRITON_TENSORFLOW_DOCKER_IMAGE={}'.format(image)
@@ -690,7 +696,7 @@ LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
         dfile.write(df)
 
 
-def container_build():
+def container_build(images):
     # Set the docker build-args based on container version
     if FLAGS.container_version in CONTAINER_VERSION_MAP:
         onnx_runtime_version = CONTAINER_VERSION_MAP[FLAGS.container_version][0]
@@ -707,20 +713,25 @@ def container_build():
     # doesn't stream output and it also seems to handle cache-from
     # incorrectly which leads to excessive rebuilds in the multistage
     # build.
+    if 'base' in images:
+        base_image = images['base']
+    else:
+        base_image = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
+            FLAGS.container_version)
+
+    if 'pytorch' in images:
+        pytorch_image = images['pytorch']
+    else:
+        pytorch_image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
+            FLAGS.container_version)
+
     dockerfileargmap = {
-        'TRITON_VERSION':
-            FLAGS.version,
-        'TRITON_CONTAINER_VERSION':
-            FLAGS.container_version,
-        'BASE_IMAGE':
-            'nvcr.io/nvidia/tritonserver:{}-py3'.format(FLAGS.container_version
-                                                       ),
-        'PYTORCH_IMAGE':
-            'nvcr.io/nvidia/pytorch:{}-py3'.format(FLAGS.container_version),
-        'ONNX_RUNTIME_VERSION':
-            onnx_runtime_version,
-        'ONNX_RUNTIME_OPENVINO_VERSION':
-            onnx_runtime_openvino_version
+        'TRITON_VERSION': FLAGS.version,
+        'TRITON_CONTAINER_VERSION': FLAGS.container_version,
+        'BASE_IMAGE': base_image,
+        'PYTORCH_IMAGE': pytorch_image,
+        'ONNX_RUNTIME_VERSION': onnx_runtime_version,
+        'ONNX_RUNTIME_OPENVINO_VERSION': onnx_runtime_openvino_version
     }
 
     cachefrommap = [
@@ -931,6 +942,13 @@ if __name__ == '__main__':
         help=
         'The Triton container version. If specified, Docker will be used for the build and component versions will be set automatically.'
     )
+    parser.add_argument(
+        '--image',
+        action='append',
+        required=False,
+        help=
+        'Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "tensorflow1", "tensorflow2", or "pytorch".'
+    )
 
     parser.add_argument('--enable-logging',
                         action="store_true",
@@ -1001,6 +1019,8 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
 
+    if FLAGS.image is None:
+        FLAGS.image = []
     if FLAGS.repo_tag is None:
         FLAGS.repo_tag = []
     if FLAGS.backend is None:
@@ -1010,11 +1030,24 @@ if __name__ == '__main__':
     if FLAGS.filesystem is None:
         FLAGS.filesystem = []
 
+    # Initialize map of docker images.
+    images = {}
+    for img in FLAGS.image:
+        parts = img.split(',')
+        fail_if(
+            len(parts) != 2,
+            '--image must specific <image-name>,<full-image-registry>')
+        fail_if(
+            parts[0] not in ['base', 'pytorch', 'tensorflow1', 'tensorflow2'],
+            'unsupported value for --image')
+        log('image "{}": "{}"'.format(parts[0], parts[1]))
+        images[parts[0]] = parts[1]
+
     # If --container-version is specified then we perform the actual
-    #  build within a build container and then from that create a
-    #  tritonserver container holding the results of the build.
+    # build within a build container and then from that create a
+    # tritonserver container holding the results of the build.
     if FLAGS.container_version is not None:
-        container_build()
+        container_build(images)
         sys.exit(0)
 
     log('Building Triton Inference Server')
@@ -1079,7 +1112,7 @@ if __name__ == '__main__':
         gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be)
         mkdir(repo_build_dir)
         cmake(repo_build_dir,
-              backend_cmake_args(components, be, repo_install_dir))
+              backend_cmake_args(images, components, be, repo_install_dir))
         makeinstall(repo_build_dir)
 
         backend_install_dir = os.path.join(FLAGS.install_dir, 'backends', be)
