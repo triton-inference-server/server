@@ -115,6 +115,12 @@ def gitclone(cwd, repo, tag, subdir):
             'git clone of repo "{}" at tag "{}" failed'.format(repo, tag))
 
 
+def prebuild_command():
+    p = subprocess.Popen(FLAGS.container_prebuild_command.split())
+    p.wait()
+    fail_if(p.returncode != 0, 'container prebuild cmd failed')
+
+
 def cmake(cwd, args):
     log_verbose('cmake {}'.format(args))
     p = subprocess.Popen([
@@ -797,12 +803,20 @@ def container_build(images):
         # --build-dir is added/overridden to 'build_dir'
         #
         # --install-dir is added/overridden to 'install_dir'
+        #
+        # --container-prebuild-command needs to be quoted correctly
         runargs = [
             a.replace('--container-version', '--upstream-container-version')
             for a in sys.argv[1:]
         ]
         runargs += ['--build-dir', build_dir]
         runargs += ['--install-dir', install_dir]
+        for idx, arg in enumerate(runargs):
+            if arg == '--container-prebuild-command':
+                runargs[idx + 1] = '"{}"'.format(runargs[idx + 1])
+            elif arg.startswith('--container-prebuild-command='):
+                runargs[idx] = '--container-prebuild-command="{}"'.format(
+                    runargs[idx][len('--container-prebuild-command='):])
 
         log_verbose('run {}'.format(runargs))
         container = client.containers.run(
@@ -943,6 +957,13 @@ if __name__ == '__main__':
         'The Triton container version. If specified, Docker will be used for the build and component versions will be set automatically.'
     )
     parser.add_argument(
+        '--container-prebuild-command',
+        type=str,
+        required=False,
+        help=
+        'When performing a container build, this command will be executed within the container just before the build it performed.'
+    )
+    parser.add_argument(
         '--image',
         action='append',
         required=False,
@@ -1049,6 +1070,13 @@ if __name__ == '__main__':
     if FLAGS.container_version is not None:
         container_build(images)
         sys.exit(0)
+
+    # If there is a container pre-build command, and this invocation
+    # is being done within the build container, then run the pre-build
+    # command.
+    if (FLAGS.container_prebuild_command
+            is not None) and (FLAGS.upstream_container_version is not None):
+        prebuild_command()
 
     log('Building Triton Inference Server')
 
