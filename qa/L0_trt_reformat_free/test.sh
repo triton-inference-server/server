@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,7 +54,7 @@ rm -f *.log*
 
 RET=0
 
-# TrtReformatTest
+# TrtReformatFreeTest
 CLIENT_LOG="./test_reformat_free.client.log"
 SERVER_LOG="./test_reformat_free.inference_server.log"
 
@@ -66,13 +66,13 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $TRT_TEST TrtReformatTest >>$CLIENT_LOG 2>&1
+python $TRT_TEST TrtReformatFreeTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $CLIENT_LOG 4
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
