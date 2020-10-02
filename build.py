@@ -547,13 +547,6 @@ COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/ngraph/lib/li
      /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tritonserver/backends/onnxruntime/
-# FIXME remove if not needed
-# COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/plugins.xml \
-#      /opt/tritonserver/backends/onnxruntime/
-# COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
-#      /opt/tritonserver/backends/onnxruntime/
-# COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine_lp_transformations.so \
-#      /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /opt/intel/openvino/licensing \
      /opt/tritonserver/backends/onnxruntime/LICENSE.openvino
 RUN cd /opt/tritonserver/backends/onnxruntime && \
