@@ -50,7 +50,7 @@ FLAGS = None
 # Map from container version to corresponding component versions
 # container-version -> (ort version, ort openvino version)
 CONTAINER_VERSION_MAP = {
-    '20.08': ('1.4.0', '2020.2'),
+    '20.08': ('1.5.1', '2020.4'),
     '20.09': ('1.5.1', '2020.4')
 }
 
@@ -363,7 +363,7 @@ RUN wget https://apt.repos.intel.com/openvino/2020/GPG-PUB-KEY-INTEL-OPENVINO-20
     cd /etc/apt/sources.list.d && \
     echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \ 
     apt update && \
-    apt -y install intel-openvino-dev-ubuntu18-2020.4.287
+    apt -y install intel-openvino-dev-ubuntu18-${{ONNX_RUNTIME_OPENVINO_VERSION}}.287
 # Text replacement to skip installing CMake via distribution
 # as it downgrades the version (need >= 3.11.0)
 RUN cd ${{INTEL_OPENVINO_DIR}}/install_dependencies && \
