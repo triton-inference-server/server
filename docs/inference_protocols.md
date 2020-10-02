@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,22 +26,38 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# HTTP/REST and GRPC Protocol
+# Inference Protocols and APIs
 
-This directory contains documents related to the HTTP/REST and GRPC
-protocols used by Triton. Triton uses the [KFServing community
-standard inference
+Clients can communicate with Triton using either an HTTP/REST or GRPC
+protocol, or by a C API.
+
+## HTTP/REST and GRPC Protocols
+
+Triton exposes both HTTP/REST and GRPC endpoints based on [standard
+inference
 protocols](https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2)
-plus several extensions that are defined in the following documents:
+that have been proposed by the [KFServing
+project](https://github.com/kubeflow/kfserving). To fully enable all
+capabilities Triton also implements a number [HTTP/REST and GRPC
+extensions](https://github.com/triton-inference-server/server/tree/master/docs/protocol).
+to the KFServing inference protocol.
 
-- [Binary tensor data extension](./extension_binary_data.md)
-- [Classification extension](./extension_classification.md)
-- [Model configuration extension](./extension_model_configuration.md)
-- [Model repository extension](./extension_model_repository.md)
-- [Schedule policy extension](./extension_schedule_policy.md)
-- [Sequence extension](./extension_sequence.md)
-- [Shared-memory extension](./extension_shared_memory.md)
-- [Statistics extension](./extension_statistics.md)
+The HTTP/REST and GRPC protcols provide endpoints to check server and
+model health, metadata and statistics. Additional endpoints allow
+model loading and unloading, and inferencing. See the KFServing and
+extension documentation for details.
 
-For the GRPC protocol the [protobuf
-specification](../../src/core/grpc_service.proto) is also available.
+## C API
+
+The Triton Inference Server provides a backwards-compatible C API that
+allows Triton to be linked directly into a C/C++ application. The API
+is documented in
+[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+
+A simple example using the C API can be found in
+[simple.cc](../src/servers/simple.cc).  A more complicated example can
+be found in the source that implements the HTTP/REST and GRPC
+endpoints for Triton. These endpoints use the C API to communicate
+with the core of Triton. The primary source files for the endpoints
+are [grpc_server.cc](../src/servers/grpc_server.cc) and
+[http_server.cc](../src/servers/http_server.cc).

@@ -28,11 +28,11 @@
 
 # Contribution Rules
 
-- The code style convention is enforced by clang-format. See the
-  Developer Guide for instructions on how to ensure your contributions
-  conform. In general please follow the existing conventions in the
-  relevant file, submodule, module, and project when you add new code
-  or when you extend/fix existing functionality.
+- The code style convention is enforced by clang-format. See below on
+  how to ensure your contributions conform. In general please follow
+  the existing conventions in the relevant file, submodule, module,
+  and project when you add new code or when you extend/fix existing
+  functionality.
 
 - Avoid introducing unnecessary complexity into existing code so that
   maintainability and readability are preserved.
@@ -70,6 +70,20 @@
 
 - Thanks in advance for your patience as we review your contributions;
   we do appreciate them!
+
+# Coding Convention
+
+Use clang-format to format all source files (\*.h, \*.cc, \*.proto) to
+a consistent format. You should run clang-format on all source files
+before submitting a pull request::
+
+  $ apt-get install clang-format clang-format-6.0
+
+For convenience there is a format.py script in tools/ that can be used
+to clang-format all files within the repo::
+
+  $ cd .../triton-inference-server    # top-level of repo
+  $ python3 format.py *
 
 # Contributor License Agreement (CLA)
 

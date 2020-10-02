@@ -459,13 +459,14 @@ Usage(char** argv, const std::string& msg = std::string())
              "inputs. The text file should contain all strings needed by "
              "batch-1, each in a new line, listed in row-major order. When "
              "pointing to a json file, user must adhere to the format "
-             "described in /docs/perf_analyzer.rst. By specifying json data, "
-             "users can control data used with every request. Multiple data "
-             "streams can be specified for a sequence model and the analyzer "
-             "will select a data stream in a round-robin fashion for every new "
-             "sequence. Muliple json files can also be provided (--input-data "
-             "json_file1 --input-data json-file2 and so on) and the analyzer "
-             "will append data streams from each file. Default is \"random\".",
+             "described in the Performance Analyzer documentation. By "
+             "specifying json data users can control data used with every "
+             "request. Multiple data streams can be specified for a sequence "
+             "model and the analyzer will select a data stream in a "
+             "round-robin fashion for every new sequence. Muliple json files "
+             "can also be provided (--input-data json_file1 --input-data "
+             "json-file2 and so on) and the analyzer will append data streams "
+             "from each file. Default is \"random\".",
              18)
       << std::endl;
   std::cerr << FormatMessage(
