@@ -45,7 +45,6 @@ DATADIR="./models"
 
 rm -rf ${DATADIR}
 mkdir -p ${DATADIR}
-# FIXME proper model repository
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32-4-32 ${DATADIR}/
 
 SERVER=/opt/tritonserver/bin/tritonserver
