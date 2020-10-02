@@ -574,10 +574,6 @@ def create_dockerfile_build(ddir, dockerfile_name, argmap):
 FROM tritonserver_builder_image AS build
 FROM tritonserver_buildbase
 COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
-
-# Copy ONNX custom op library and model (Needed for testing)
-COPY --from=build /workspace/qa/L0_custom_ops/custom_op_test.onnx \
-    /workspace/qa/L0_custom_ops/
 '''
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
