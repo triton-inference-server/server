@@ -26,188 +26,26 @@
 
 cmake_minimum_required (VERSION 3.18)
 
-project(tritonlibtorchbackend LANGUAGES C CXX)
-
 #
-# Options
+# LibTorch backend
 #
-option(TRITON_ENABLE_GPU "Enable GPU support in backend" ON)
-option(TRITON_ENABLE_STATS "Include statistics collections in backend" ON)
-set(TRITON_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to Torch includes")
-set(TRITON_PYTORCH_LIB_PATHS "" CACHE PATH "Paths to Torch libraries")
-
-set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
-set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
-set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-#
-# Dependencies
-#
-# FetchContent's composibility isn't very good. We must include the
-# transitive closure of all repos so that we can override the tag.
-#
-include(FetchContent)
-
-FetchContent_Declare(
-  repo-common
-  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
-  GIT_SHALLOW ON
+set(
+  LIBTORCH_SRCS
+  autofill.cc
 )
-FetchContent_Declare(
-  repo-core
-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
-  GIT_TAG ${TRITON_CORE_REPO_TAG}
-  GIT_SHALLOW ON
-)
-FetchContent_Declare(
-  repo-backend
-  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
-  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
-  GIT_SHALLOW ON
-)
-FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
-#
-# CUDA
-#
-if(${TRITON_ENABLE_GPU})
-  find_package(CUDAToolkit REQUIRED)
-endif() # TRITON_ENABLE_GPU
-
-#
-# Shared library implementing the Triton Backend API
-#
-configure_file(libtriton_libtorch.ldscript libtriton_libtorch.ldscript COPYONLY)
-
-add_library(
-  triton-libtorch-backend SHARED
-  libtorch.cc
-  libtorch_utils.cc
-  libtorch_utils.h
+set(
+  LIBTORCH_HDRS
+  autofill.h
 )
 
 add_library(
-  TritonLibTorchBackend::triton-libtorch-backend ALIAS triton-libtorch-backend
+  libtorch-backend-library EXCLUDE_FROM_ALL OBJECT
+  ${LIBTORCH_SRCS} ${LIBTORCH_HDRS}
 )
-
-target_include_directories(
-  triton-libtorch-backend
-  PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${TRITON_PYTORCH_INCLUDE_PATHS}
-)
-
-target_compile_features(triton-libtorch-backend PRIVATE cxx_std_11)
-target_compile_options(
-  triton-libtorch-backend PRIVATE
-  $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
-)
-
-if(${TRITON_ENABLE_GPU})
-  target_compile_definitions(
-    triton-libtorch-backend
-    PRIVATE TRITON_ENABLE_GPU=1
-  )
-endif() # TRITON_ENABLE_GPU
-
-set_target_properties(
-  triton-libtorch-backend
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    OUTPUT_NAME triton_libtorch
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}"
-    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_libtorch.ldscript
-    LINK_FLAGS "-Wl,--version-script libtriton_libtorch.ldscript"
-)
-
-# Need to turn off unused-but-set-variable due to Torchvision
-# Need to turn off unknown-pragmas due to ATen OpenMP
-set_target_properties(
-  triton-libtorch-backend
-  PROPERTIES COMPILE_FLAGS
-    "-Wno-unknown-pragmas -Wno-unused-but-set-variable"
-)
-
-set(TRITON_PYTORCH_LDFLAGS "")
-FOREACH(p ${TRITON_PYTORCH_LIB_PATHS})
-  set(TRITON_PYTORCH_LDFLAGS ${TRITON_PYTORCH_LDFLAGS} "-L${p}")
-ENDFOREACH(p)
+add_dependencies(libtorch-backend-library proto-library)
 
 target_link_libraries(
-  triton-libtorch-backend
-  PRIVATE
-    triton-core-serverapi  # from repo-core
-    triton-core-backendapi # from repo-core
-    triton-backend-utils   # from repo-backend
-    ${TRITON_PYTORCH_LDFLAGS}
-    PUBLIC -ltorch
-    PUBLIC -ltorch_cpu
-    PUBLIC -ltorch_cuda
-    PUBLIC -ltorchvision
+  libtorch-backend-library
+  PUBLIC triton-core-serverapi   # from repo-core
 )
-
-if(${TRITON_ENABLE_GPU})
-  target_link_libraries(
-    triton-libtorch-backend
-    PRIVATE
-      CUDA::cudart
-  )
-endif() # TRITON_ENABLE_GPU
-#
-# Install
-#
-include(GNUInstallDirs)
-set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/TritonLibTorchBackend)
-
-install(
-  TARGETS
-    triton-libtorch-backend
-  EXPORT
-    triton-libtorch-backend-targets
-  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/pytorch
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/pytorch
-)
-
-install(
-  EXPORT
-    triton-libtorch-backend-targets
-  FILE
-    TritonLibTorchBackendTargets.cmake
-  NAMESPACE
-    TritonLibTorchBackend::
-  DESTINATION
-    ${INSTALL_CONFIGDIR}
-)
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(
-  ${CMAKE_CURRENT_LIST_DIR}/TritonLibTorchBackendConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/TritonLibTorchBackendConfig.cmake
-  INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
-)
-
-install(
-  FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/TritonLibTorchBackendConfig.cmake
-  DESTINATION ${INSTALL_CONFIGDIR}
-)
-
-#
-# Export from build tree
-#
-export(
-  EXPORT triton-libtorch-backend-targets
-  FILE ${CMAKE_CURRENT_BINARY_DIR}/TritonLibTorchBackendTargets.cmake
-  NAMESPACE TritonLibTorchBackend::
-)
-
-export(PACKAGE TritonLibTorchBackend)
