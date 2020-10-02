@@ -211,7 +211,7 @@ def core_cmake_args(components, backends, install_dir):
                 fail('unknown core backend {}'.format(be))
 
     cargs.append(
-        '-DTRITON_EXTRA_LIB_PATHS=/opt/tritonserver/lib;/opt/tritonserver/lib/pytorch'
+        '-DTRITON_EXTRA_LIB_PATHS=/opt/tritonserver/lib;/opt/tritonserver/lib/pytorch;/opt/tritonserver/backends/pytorch'
     )
     cargs.append('/workspace/build')
     return cargs
@@ -257,6 +257,7 @@ def backend_cmake_args(images, components, be, install_dir):
 def pytorch_cmake_args():
     return [
         '-DTRITON_PYTORCH_INCLUDE_PATHS=/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6',
+        '-DTRITON_PYTORCH_LIB_PATHS=/opt/tritonserver/backends/pytorch'
     ]
 
 
@@ -500,18 +501,20 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/triton
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
      /opt/tritonserver/include/torch
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
-      /opt/tritonserver/lib/pytorch/
+      /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cpu.so \
-      /opt/tritonserver/lib/pytorch/
+      /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cuda.so \
-      /opt/tritonserver/lib/pytorch/
+      /opt/tritonserver/backends/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
+     /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/pytorch/vision/torchvision/csrc \
     /opt/tritonserver/include/torchvision/torchvision/
 COPY --from=tritonserver_pytorch /opt/pytorch/vision/build/libtorchvision.so \
-    /opt/tritonserver/lib/pytorch/
+    /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE \
-    /opt/tritonserver/lib/pytorch/
-RUN cd /opt/tritonserver/lib/pytorch && \
+    /opt/tritonserver/backends/pytorch/
+RUN cd /opt/tritonserver/backends/pytorch && \
     for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
     done
@@ -648,7 +651,7 @@ ENV PATH /opt/tritonserver/bin:${{PATH}}
         df += '''
 # Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom
 # ops from that path
-ENV LD_LIBRARY_PATH /opt/tritonserver/lib/pytorch/:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH /opt/tritonserver/backends/pytorch/:$LD_LIBRARY_PATH
 '''
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1

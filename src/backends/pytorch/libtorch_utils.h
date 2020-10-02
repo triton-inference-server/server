@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,44 +23,28 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #pragma once
 
-#include "src/core/constants.h"
-#include "src/core/model_config.h"
-#include "src/core/status.h"
+#include <torch/script.h>  // One-stop header for TorchScript
+#include "triton/core/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace backend { namespace pytorch {
 
-class InferenceBackend;
+#define RESPOND_ALL_AND_RETURN_IF_ERROR(RESPONSES, RESPONSES_COUNT, X) \
+  do {                                                                 \
+    TRITONSERVER_Error* raarie_err__ = (X);                            \
+    if (raarie_err__ != nullptr) {                                     \
+      SendErrorForResponses(RESPONSES, RESPONSES_COUNT, raarie_err__); \
+      return;                                                          \
+    }                                                                  \
+  } while (false)
 
-class LibTorchBackendFactory {
- public:
-  struct Config : public BackendConfig {
-    // Autofill missing required model configuration settings based on
-    // model definition file.
-    bool autofill;
-  };
+TRITONSERVER_DataType ConvertTorchTypeToDataType(
+    const torch::ScalarType& ttype);
+std::pair<bool, torch::ScalarType> ConvertDataTypeToTorchType(
+    TRITONSERVER_DataType dtype);
+std::pair<bool, torch::ScalarType> ModelConfigDataTypeToTorchType(
+    const std::string& data_type_str);
 
-  static Status Create(
-      const std::shared_ptr<BackendConfig>& backend_config,
-      std::unique_ptr<LibTorchBackendFactory>* factory);
-
-  Status CreateBackend(
-      const std::string& path, const inference::ModelConfig& model_config,
-      const double min_compute_capability,
-      std::unique_ptr<InferenceBackend>* backend);
-
-  ~LibTorchBackendFactory() = default;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(LibTorchBackendFactory);
-
-  LibTorchBackendFactory(const std::shared_ptr<Config>& backend_config)
-      : backend_config_(backend_config)
-  {
-  }
-
-  const std::shared_ptr<Config> backend_config_;
-};
-
-}}  // namespace nvidia::inferenceserver
+}}}  // namespace triton::backend::pytorch
