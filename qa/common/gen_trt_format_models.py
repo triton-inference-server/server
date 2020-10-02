@@ -5,6 +5,7 @@ import numpy as np
 import tensorrt as trt
 import test_util as tu
 
+
 def np_to_model_dtype(np_dtype):
     if np_dtype == np.bool:
         return "TYPE_BOOL"
@@ -30,6 +31,7 @@ def np_to_model_dtype(np_dtype):
         return "TYPE_STRING"
     return None
 
+
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.bool:
         return trt.bool
@@ -43,7 +45,9 @@ def np_to_trt_dtype(np_dtype):
         return trt.float32
     return None
 
+
 def trt_format_to_string(trt_format):
+    # FIXME uncomment the following formats once TRT used is up-to-date
     # if trt_format == trt.TensorFormat.CDHW32:
     #     return "CDHW32"
     # if trt_format == trt.TensorFormat.DHWC8:
@@ -54,8 +58,8 @@ def trt_format_to_string(trt_format):
         return "CHW32"
     if trt_format == trt.TensorFormat.LINEAR:
         return "LINEAR"
-    if trt_format == trt.TensorFormat.HWC:
-        return "HWC"
+    # if trt_format == trt.TensorFormat.HWC:
+    #     return "HWC"
     if trt_format == trt.TensorFormat.CHW4:
         return "CHW4"
     if trt_format == trt.TensorFormat.HWC8:
@@ -64,14 +68,20 @@ def trt_format_to_string(trt_format):
         return "CHW16"
     return "INVALID"
 
-def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
-                                     input_shape, output0_shape, output1_shape,
-                                     input_dtype, output0_dtype, output1_dtype,
-                                     input_memory_format, output_memory_format,
-                                     min_dim, max_dim):
-    # This format only supports INT8
-    if input_dtype != np.int8 and input_memory_format != trt.TensorFormat.CHW4:
-        return
+
+def create_plan_dynamic_modelfile(models_dir,
+                                  max_batch,
+                                  model_version,
+                                  input_shape,
+                                  output0_shape,
+                                  output1_shape,
+                                  input_dtype,
+                                  output0_dtype,
+                                  output1_dtype,
+                                  input_memory_format,
+                                  output_memory_format,
+                                  min_dim=1,
+                                  max_dim=64):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
     trt_output0_dtype = np_to_trt_dtype(output0_dtype)
     trt_output1_dtype = np_to_trt_dtype(output1_dtype)
@@ -104,10 +114,10 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
     out0.get_output(0).dtype = trt_output0_dtype
     out1.get_output(0).dtype = trt_output1_dtype
 
-    in0.allowed_formats = 1 << int(trt_memory_format)
-    in1.allowed_formats = 1 << int(trt_memory_format)
-    out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
-    out1.get_output(0).allowed_formats = 1 << int(trt_memory_format)
+    in0.allowed_formats = 1 << int(trt_input_memory_format)
+    in1.allowed_formats = 1 << int(trt_input_memory_format)
+    out0.get_output(0).allowed_formats = 1 << int(trt_output_memory_format)
+    out1.get_output(0).allowed_formats = 1 << int(trt_output_memory_format)
 
     if (trt_input_dtype == trt.int8):
         in0.dynamic_range = (-128.0, 127.0)
@@ -152,11 +162,10 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
 
     # Use a different model name for different kinds of models
     base_name = "plan_nobatch" if max_batch == 0 else "plan"
-    base_name += "_" + trt_format_to_string(input_memory_format) + "_" + trt_format_to_string(output_memory_format)
-    model_name = tu.get_model_name(base_name,
-                                   input_dtype, output0_dtype, output1_dtype)
-    if min_dim != 1 or max_dim != 32:
-        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
+    base_name += "_" + trt_format_to_string(
+        input_memory_format) + "_" + trt_format_to_string(output_memory_format)
+    model_name = tu.get_model_name(base_name, input_dtype, output0_dtype,
+                                   output1_dtype)
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -171,13 +180,11 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
     del engine
     del builder
 
+
 def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
-                                   input_shape, output0_shape, output1_shape,
-                                   input_dtype, output0_dtype, output1_dtype,
-                                   input_memory_format, output_memory_format):
-    # This format only supports FP16
-    if input_dtype != np.float16 and input_memory_format != trt.TensorFormat.CHW2:
-        return
+                                input_shape, output0_shape, output1_shape,
+                                input_dtype, output0_dtype, output1_dtype,
+                                input_memory_format, output_memory_format):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
     trt_output0_dtype = np_to_trt_dtype(output0_dtype)
     trt_output1_dtype = np_to_trt_dtype(output1_dtype)
@@ -231,9 +238,10 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
     engine = builder.build_engine(network, config)
 
     base_name = "plan_nobatch" if max_batch == 0 else "plan"
-    base_name += "_" + trt_format_to_string(input_memory_format) + "_" + trt_format_to_string(output_memory_format)
-    model_name = tu.get_model_name(base_name,
-                                   input_dtype, output0_dtype, output1_dtype)
+    base_name += "_" + trt_format_to_string(
+        input_memory_format) + "_" + trt_format_to_string(output_memory_format)
+    model_name = tu.get_model_name(base_name, input_dtype, output0_dtype,
+                                   output1_dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -247,20 +255,12 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
     del engine
     del builder
 
-def create_plan_modelconfig(models_dir,
-                            max_batch,
-                            model_version,
-                            input_shape,
-                            output0_shape,
-                            output1_shape,
-                            input_dtype,
-                            output0_dtype,
-                            output1_dtype,
-                            input_memory_format, output_memory_format,
-                            output0_label_cnt,
-                            version_policy,
-                            min_dim=1,
-                            max_dim=32):
+
+def create_plan_modelconfig(models_dir, max_batch, model_version, input_shape,
+                            output0_shape, output1_shape, input_dtype,
+                            output0_dtype, output1_dtype, input_memory_format,
+                            output_memory_format, output0_label_cnt,
+                            version_policy):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                      input_shape, output0_shape, output1_shape):
@@ -280,18 +280,14 @@ def create_plan_modelconfig(models_dir,
 
     # Use a different model name for different kinds of models
     base_name = "plan_nobatch" if max_batch == 0 else "plan"
-    base_name += "_" + trt_format_to_string(input_memory_format) + "_" + trt_format_to_string(output_memory_format)
-    model_name = tu.get_model_name(base_name,
-                                   input_dtype, output0_dtype, output1_dtype)
-    if min_dim != 1 or max_dim != 32:
-        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
+    base_name += "_" + trt_format_to_string(
+        input_memory_format) + "_" + trt_format_to_string(output_memory_format)
+    model_name = tu.get_model_name(base_name, input_dtype, output0_dtype,
+                                   output1_dtype)
 
     config_dir = models_dir + "/" + model_name
     if -1 in input_shape:
-        # Selects the sixth profile for FP32 datatype
-        # Note the min and max shapes of first and sixth
-        # profile are identical.
-        profile_index = 6 if input_dtype == np.float32 else 0
+        profile_index = 0
         config = '''
 name: "{}"
 platform: "tensorrt_plan"
@@ -384,45 +380,34 @@ output [
         for l in range(output0_label_cnt):
             lfile.write("label" + str(l) + "\n")
 
-def create_plan_model(models_dir,
-                          max_batch,
-                          model_version,
-                          input_shape,
-                          output0_shape,
-                          output1_shape,
-                          input_dtype,
-                          output0_dtype,
-                          output1_dtype,
-                          input_memory_format, output_memory_format,
-                          min_dim=1,
-                          max_dim=32):
+
+def create_plan_model(models_dir, max_batch, model_version, input_shape,
+                      output0_shape, output1_shape, input_dtype, output0_dtype,
+                      output1_dtype, input_memory_format, output_memory_format):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                      input_shape, output0_shape, output1_shape):
         return
 
     # FIXME hard coded value
-    create_plan_modelconfig(models_dir, max_batch, model_version,
-                                input_shape, output0_shape,
-                                output1_shape, input_dtype,
-                                output0_dtype, output1_dtype,
-                                input_memory_format, output_memory_format,
-                                26, None)
+    create_plan_modelconfig(models_dir, max_batch, model_version, input_shape,
+                            output0_shape, output1_shape, input_dtype,
+                            output0_dtype, output1_dtype, input_memory_format,
+                            output_memory_format, 26, None)
 
     if (not tu.shape_is_fixed(input_shape) or
             not tu.shape_is_fixed(output0_shape) or
             not tu.shape_is_fixed(output1_shape)):
         create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
-                                     input_shape, output0_shape, output1_shape,
-                                     input_dtype, output0_dtype, output1_dtype,
-                                     input_memory_format, output_memory_format,
-                                     min_dim, max_dim)
+                                      input_shape, output0_shape, output1_shape,
+                                      input_dtype, output0_dtype, output1_dtype,
+                                      input_memory_format, output_memory_format)
     else:
         create_plan_fixed_modelfile(models_dir, max_batch, model_version,
-                                    input_shape, output0_shape,
-                                    output1_shape, input_dtype,
-                                    output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape,
+                                    input_dtype, output0_dtype, output1_dtype,
                                     input_memory_format, output_memory_format)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -445,46 +430,23 @@ if __name__ == '__main__':
     import tensorrt as trt
     import test_util as tu
 
-    # Tests with models that accept fixed-shape input/output tensors
-    if not FLAGS.variable:
-        # reformat-free input
-        create_plan_model(FLAGS.models_dir,
-                                0,
-                                1, (13, 2, 1), (13, 2, 1), (13, 2, 1),
-                                np.float16,
-                                np.float16,
-                                np.float16,
-                                trt.TensorFormat.CHW2,
-                                trt.TensorFormat.LINEAR)
-        create_plan_model(FLAGS.models_dir,
-                                8,
-                                1, (13, 2, 1), (13, 2, 1), (13, 2, 1),
-                                np.float16,
-                                np.float16,
-                                np.float16,
-                                trt.TensorFormat.CHW2,
-                                trt.TensorFormat.LINEAR)
-        
-        create_plan_model(FLAGS.models_dir,
-                                0,
-                                1, (-1, 2, 1), (-1, 2, 1), (-1, 2, 1),
-                                np.float16,
-                                np.float16,
-                                np.float16,
-                                trt.TensorFormat.CHW4,
-                                trt.TensorFormat.LINEAR)
-        create_plan_model(FLAGS.models_dir,
-                                8,
-                                1, (-1, 2, 1), (-1, 2, 1), (-1, 2, 1),
-                                np.float16,
-                                np.float16,
-                                np.float16,
-                                trt.TensorFormat.CHW4,
-                                trt.TensorFormat.LINEAR)
+    # reformat-free input
+    # Fixed shape
+    create_plan_model(FLAGS.models_dir, 0, 1, (13, 2, 1), (13, 2, 1),
+                      (13, 2, 1), np.float16, np.float16, np.float16,
+                      trt.TensorFormat.CHW2, trt.TensorFormat.LINEAR)
+    create_plan_model(FLAGS.models_dir, 8, 1, (13, 2, 1), (13, 2, 1),
+                      (13, 2, 1), np.float16, np.float16, np.float16,
+                      trt.TensorFormat.CHW2, trt.TensorFormat.LINEAR)
 
-        # reformat-free output
-        # reformat-free I/O
+    # Dynamic shape
+    # FIXME The generated model inputs are LINEAR format instead of CHW32 format
+    create_plan_model(FLAGS.models_dir, 0, 1, (-1, 2, 1), (-1, 2, 1),
+                      (-1, 2, 1), np.float32, np.float32, np.float32,
+                      trt.TensorFormat.CHW32, trt.TensorFormat.LINEAR)
+    create_plan_model(FLAGS.models_dir, 8, 1, (-1, 2, 1), (-1, 2, 1),
+                      (-1, 2, 1), np.float32, np.float32, np.float32,
+                      trt.TensorFormat.CHW32, trt.TensorFormat.LINEAR)
 
-    # FIXME
-    # Tests with models that accept variable-shape input/output tensors
-    # if FLAGS.variable:
+    # reformat-free output
+    # reformat-free I/O

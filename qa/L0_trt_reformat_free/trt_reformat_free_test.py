@@ -40,34 +40,44 @@ import tritonhttpclient
 import tritonclient.utils.shared_memory as shm
 from tritonclientutils import InferenceServerException
 
+
 def div_up(a, b):
     return (a + b - 1) // b
+
 
 def reformat(format, tensor_np):
     if format == "CHW2":
         factor = 2
-    if format == "CHW4":
-        factor = 4
+    if format == "CHW32":
+        factor = 32
     shape = list(tensor_np.shape) + [factor]
     shape[-4] = div_up(shape[-4], factor)
     reformatted_tensor_np = np.empty(shape, tensor_np.dtype)
     if len(tensor_np.shape) == 3:
         batch = [(tensor_np, reformatted_tensor_np)]
     elif len(tensor_np.shape) == 4:
-        batch = [(tensor_np[idx], reformatted_tensor_np[idx]) for idx in range(tensor_np.shape[0])]
+        batch = [(tensor_np[idx], reformatted_tensor_np[idx])
+                 for idx in range(tensor_np.shape[0])]
     else:
-        raise ValueError("Unexpected numpy shape {} for testing reformat-free input".format(tensor_np.shape))
+        raise ValueError(
+            "Unexpected numpy shape {} for testing reformat-free input".format(
+                tensor_np.shape))
     for (tensor, reformatted_tensor) in batch:
         for c in range(tensor.shape[0]):
             for h in range(tensor.shape[1]):
-                for w in range(tensor.shape[factor]):
-                    reformatted_tensor[c//factor][h][w][c%factor] = tensor[c][h][w]
+                for w in range(tensor.shape[2]):
+                    reformatted_tensor[c //
+                                       factor][h][w][c %
+                                                     factor] = tensor[c][h][w]
     return reformatted_tensor_np
 
+
 class TrtReformatFreeTest(tu.TestResultCollector):
+
     def add_reformat_free_data_as_shared_memory(self, name, tensor, tensor_np):
         byte_size = tensor_np.size * tensor_np.dtype.itemsize
-        self.shm_handles.append(shm.create_shared_memory_region(name, name, byte_size))
+        self.shm_handles.append(
+            shm.create_shared_memory_region(name, name, byte_size))
         # Put data values into shared memory
         shm.set_shared_memory_region(self.shm_handles[-1], [tensor_np])
         # Register shared memory with Triton Server
@@ -77,8 +87,9 @@ class TrtReformatFreeTest(tu.TestResultCollector):
 
     def setUp(self):
         self.shm_handles = []
-        self.triton_client = tritonhttpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+        self.triton_client = tritonhttpclient.InferenceServerClient(
+            "localhost:8000", verbose=True)
+
     def tearDown(self):
         self.triton_client.unregister_system_shared_memory()
         for handle in self.shm_handles:
@@ -95,34 +106,38 @@ class TrtReformatFreeTest(tu.TestResultCollector):
         # from what is used as data
         inputs = []
         inputs.append(tritonhttpclient.InferInput('INPUT0', [13, 2, 1], "FP16"))
-        self.add_reformat_free_data_as_shared_memory("input0", inputs[-1], reformatted_input_np)
+        self.add_reformat_free_data_as_shared_memory("input0", inputs[-1],
+                                                     reformatted_input_np)
         inputs.append(tritonhttpclient.InferInput('INPUT1', [13, 2, 1], "FP16"))
-        self.add_reformat_free_data_as_shared_memory("input1", inputs[-1], reformatted_input_np)
+        self.add_reformat_free_data_as_shared_memory("input1", inputs[-1],
+                                                     reformatted_input_np)
 
         outputs = []
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
+        outputs.append(
+            tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+        outputs.append(
+            tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
 
         results = self.triton_client.infer(model_name=model_name,
-                                    inputs=inputs,
-                                    outputs=outputs)
+                                           inputs=inputs,
+                                           outputs=outputs)
         # Validate the results by comparing with precomputed values.
         output0_np = results.as_numpy('OUTPUT0')
         output1_np = results.as_numpy('OUTPUT1')
         self.assertTrue(
-                    np.array_equal(output0_np, expected_output0_np),
-                    "OUTPUT0 expected: {}, got {}".format(
-                        expected_output0_np, output0_np))
+            np.array_equal(output0_np, expected_output0_np),
+            "OUTPUT0 expected: {}, got {}".format(expected_output0_np,
+                                                  output0_np))
         self.assertTrue(
-                    np.array_equal(output1_np, expected_output1_np),
-                    "OUTPUT0 expected: {}, got {}".format(
-                        expected_output1_np, output1_np))
-
+            np.array_equal(output1_np, expected_output1_np),
+            "OUTPUT0 expected: {}, got {}".format(expected_output1_np,
+                                                  output1_np))
 
     def test_chw2_input(self):
         model_name = "plan_CHW2_LINEAR_float16_float16_float16"
         for bs in [1, 8]:
-            input_np = np.arange(26 * bs, dtype=np.float16).reshape((bs, 13, 2, 1))
+            input_np = np.arange(26 * bs, dtype=np.float16).reshape(
+                (bs, 13, 2, 1))
             expected_output0_np = input_np + input_np
             expected_output1_np = input_np - input_np
             reformatted_input_np = reformat("CHW2", input_np)
@@ -130,100 +145,120 @@ class TrtReformatFreeTest(tu.TestResultCollector):
             # Note that the tensor metadata used for inference input is different
             # from what is used as data
             inputs = []
-            inputs.append(tritonhttpclient.InferInput('INPUT0', [bs, 13, 2, 1], "FP16"))
-            self.add_reformat_free_data_as_shared_memory("input0"+str(bs), inputs[-1], reformatted_input_np)
-            inputs.append(tritonhttpclient.InferInput('INPUT1', [bs, 13, 2, 1], "FP16"))
-            self.add_reformat_free_data_as_shared_memory("input1"+str(bs), inputs[-1], reformatted_input_np)
+            inputs.append(
+                tritonhttpclient.InferInput('INPUT0', [bs, 13, 2, 1], "FP16"))
+            self.add_reformat_free_data_as_shared_memory(
+                "input0" + str(bs), inputs[-1], reformatted_input_np)
+            inputs.append(
+                tritonhttpclient.InferInput('INPUT1', [bs, 13, 2, 1], "FP16"))
+            self.add_reformat_free_data_as_shared_memory(
+                "input1" + str(bs), inputs[-1], reformatted_input_np)
 
             outputs = []
-            outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-            outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
+            outputs.append(
+                tritonhttpclient.InferRequestedOutput('OUTPUT0',
+                                                      binary_data=True))
+            outputs.append(
+                tritonhttpclient.InferRequestedOutput('OUTPUT1',
+                                                      binary_data=True))
 
             results = self.triton_client.infer(model_name=model_name,
-                                        inputs=inputs,
-                                        outputs=outputs)
+                                               inputs=inputs,
+                                               outputs=outputs)
             # Validate the results by comparing with precomputed values.
             output0_np = results.as_numpy('OUTPUT0')
             output1_np = results.as_numpy('OUTPUT1')
             self.assertTrue(
-                        np.array_equal(output0_np, expected_output0_np),
-                        "OUTPUT0 expected: {}, got {}".format(
-                            expected_output0_np, output0_np))
+                np.array_equal(output0_np, expected_output0_np),
+                "OUTPUT0 expected: {}, got {}".format(expected_output0_np,
+                                                      output0_np))
             self.assertTrue(
-                        np.array_equal(output1_np, expected_output1_np),
-                        "OUTPUT0 expected: {}, got {}".format(
-                            expected_output1_np, output1_np))
+                np.array_equal(output1_np, expected_output1_np),
+                "OUTPUT0 expected: {}, got {}".format(expected_output1_np,
+                                                      output1_np))
 
-
-    def test_nobatch_chw4_input(self):
-        model_name = "plan_nobatch_CHW4_LINEAR_int8_int8_int8"
-        input_np = np.arange(26, dtype=np.int8).reshape((13, 2, 1))
+    def test_nobatch_chw32_input(self):
+        model_name = "plan_nobatch_CHW32_LINEAR_float32_float32_float32"
+        input_np = np.arange(26, dtype=np.float32).reshape((13, 2, 1))
         expected_output0_np = input_np + input_np
         expected_output1_np = input_np - input_np
-        reformatted_input_np = reformat("CHW4", input_np)
+        # FIXME Can't generate reformat-free model of this specification
+        reformatted_input_np = input_np  #reformat("CHW32", input_np)
 
         # Note that the tensor metadata used for inference input is different
         # from what is used as data
         inputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT0', [13, 2, 1], "INT8"))
-        self.add_reformat_free_data_as_shared_memory("input0", inputs[-1], reformatted_input_np)
-        inputs.append(tritonhttpclient.InferInput('INPUT1', [13, 2, 1], "INT8"))
-        self.add_reformat_free_data_as_shared_memory("input1", inputs[-1], reformatted_input_np)
+        inputs.append(tritonhttpclient.InferInput('INPUT0', [13, 2, 1], "FP32"))
+        self.add_reformat_free_data_as_shared_memory("input0", inputs[-1],
+                                                     reformatted_input_np)
+        inputs.append(tritonhttpclient.InferInput('INPUT1', [13, 2, 1], "FP32"))
+        self.add_reformat_free_data_as_shared_memory("input1", inputs[-1],
+                                                     reformatted_input_np)
 
         outputs = []
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
+        outputs.append(
+            tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+        outputs.append(
+            tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
 
         results = self.triton_client.infer(model_name=model_name,
-                                    inputs=inputs,
-                                    outputs=outputs)
+                                           inputs=inputs,
+                                           outputs=outputs)
         # Validate the results by comparing with precomputed values.
         output0_np = results.as_numpy('OUTPUT0')
         output1_np = results.as_numpy('OUTPUT1')
         self.assertTrue(
-                    np.array_equal(output0_np, expected_output0_np),
-                    "OUTPUT0 expected: {}, got {}".format(
-                        expected_output0_np, output0_np))
+            np.array_equal(output0_np, expected_output0_np),
+            "OUTPUT0 expected: {}, got {}".format(expected_output0_np,
+                                                  output0_np))
         self.assertTrue(
-                    np.array_equal(output1_np, expected_output1_np),
-                    "OUTPUT0 expected: {}, got {}".format(
-                        expected_output1_np, output1_np))
+            np.array_equal(output1_np, expected_output1_np),
+            "OUTPUT0 expected: {}, got {}".format(expected_output1_np,
+                                                  output1_np))
 
-
-    def test_chw4_input(self):
-        model_name = "plan_CHW4_LINEAR_int8_int8_int8"
+    def test_chw32_input(self):
+        model_name = "plan_CHW32_LINEAR_float32_float32_float32"
         for bs in [1, 8]:
-            input_np = np.arange(26 * bs, dtype=np.int8).reshape((bs, 13, 2, 1))
+            input_np = np.arange(26 * bs, dtype=np.float32).reshape(
+                (bs, 13, 2, 1))
             expected_output0_np = input_np + input_np
             expected_output1_np = input_np - input_np
-            reformatted_input_np = reformat("CHW4", input_np)
+            reformatted_input_np = reformat("CHW32", input_np)
 
             # Note that the tensor metadata used for inference input is different
             # from what is used as data
             inputs = []
-            inputs.append(tritonhttpclient.InferInput('INPUT0', [bs, 13, 2, 1], "INT8"))
-            self.add_reformat_free_data_as_shared_memory("input0"+str(bs), inputs[-1], reformatted_input_np)
-            inputs.append(tritonhttpclient.InferInput('INPUT1', [bs, 13, 2, 1], "INT8"))
-            self.add_reformat_free_data_as_shared_memory("input1"+str(bs), inputs[-1], reformatted_input_np)
+            inputs.append(
+                tritonhttpclient.InferInput('INPUT0', [bs, 13, 2, 1], "FP32"))
+            self.add_reformat_free_data_as_shared_memory(
+                "input0" + str(bs), inputs[-1], reformatted_input_np)
+            inputs.append(
+                tritonhttpclient.InferInput('INPUT1', [bs, 13, 2, 1], "FP32"))
+            self.add_reformat_free_data_as_shared_memory(
+                "input1" + str(bs), inputs[-1], reformatted_input_np)
 
             outputs = []
-            outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-            outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
+            outputs.append(
+                tritonhttpclient.InferRequestedOutput('OUTPUT0',
+                                                      binary_data=True))
+            outputs.append(
+                tritonhttpclient.InferRequestedOutput('OUTPUT1',
+                                                      binary_data=True))
 
             results = self.triton_client.infer(model_name=model_name,
-                                        inputs=inputs,
-                                        outputs=outputs)
+                                               inputs=inputs,
+                                               outputs=outputs)
             # Validate the results by comparing with precomputed values.
             output0_np = results.as_numpy('OUTPUT0')
             output1_np = results.as_numpy('OUTPUT1')
             self.assertTrue(
-                        np.array_equal(output0_np, expected_output0_np),
-                        "OUTPUT0 expected: {}, got {}".format(
-                            expected_output0_np, output0_np))
+                np.array_equal(output0_np, expected_output0_np),
+                "OUTPUT0 expected: {}, got {}".format(expected_output0_np,
+                                                      output0_np))
             self.assertTrue(
-                        np.array_equal(output1_np, expected_output1_np),
-                        "OUTPUT0 expected: {}, got {}".format(
-                            expected_output1_np, output1_np))
+                np.array_equal(output1_np, expected_output1_np),
+                "OUTPUT0 expected: {}, got {}".format(expected_output1_np,
+                                                      output1_np))
 
 
 if __name__ == '__main__':
