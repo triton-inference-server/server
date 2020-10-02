@@ -335,6 +335,9 @@ WORKDIR /workspace
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/workspace/cmake-3.14.3-Linux-x86_64/bin:/opt/miniconda/bin:$PATH
 ENV LD_LIBRARY_PATH /opt/miniconda/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
+# The Onnx Runtime dockerfile is the collection of steps in 
+# https://github.com/microsoft/onnxruntime/tree/v1.5.1/dockerfiles
+
 # Install common dependencies
 RUN apt-get update && \
     apt-get install -y sudo git bash unattended-upgrades
