@@ -52,14 +52,14 @@ def trt_format_to_string(trt_format):
     #     return "CDHW32"
     # if trt_format == trt.TensorFormat.DHWC8:
     #     return "DHWC8"
+    # if trt_format == trt.TensorFormat.HWC:
+    #     return "HWC"
     if trt_format == trt.TensorFormat.CHW2:
         return "CHW2"
     if trt_format == trt.TensorFormat.CHW32:
         return "CHW32"
     if trt_format == trt.TensorFormat.LINEAR:
         return "LINEAR"
-    # if trt_format == trt.TensorFormat.HWC:
-    #     return "HWC"
     if trt_format == trt.TensorFormat.CHW4:
         return "CHW4"
     if trt_format == trt.TensorFormat.HWC8:
@@ -259,8 +259,7 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
 def create_plan_modelconfig(models_dir, max_batch, model_version, input_shape,
                             output0_shape, output1_shape, input_dtype,
                             output0_dtype, output1_dtype, input_memory_format,
-                            output_memory_format, output0_label_cnt,
-                            version_policy):
+                            output_memory_format, version_policy):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                      input_shape, output0_shape, output1_shape):
@@ -310,7 +309,6 @@ output [
     name: "OUTPUT0"
     data_type: {}
     dims: [ {} ]
-    label_filename: "output0_labels.txt"
    }},
   {{
     name: "OUTPUT1"
@@ -376,10 +374,6 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-    with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(output0_label_cnt):
-            lfile.write("label" + str(l) + "\n")
-
 
 def create_plan_model(models_dir, max_batch, model_version, input_shape,
                       output0_shape, output1_shape, input_dtype, output0_dtype,
@@ -389,11 +383,10 @@ def create_plan_model(models_dir, max_batch, model_version, input_shape,
                                      input_shape, output0_shape, output1_shape):
         return
 
-    # FIXME hard coded value
     create_plan_modelconfig(models_dir, max_batch, model_version, input_shape,
                             output0_shape, output1_shape, input_dtype,
                             output0_dtype, output1_dtype, input_memory_format,
-                            output_memory_format, 26, None)
+                            output_memory_format, None)
 
     if (not tu.shape_is_fixed(input_shape) or
             not tu.shape_is_fixed(output0_shape) or
@@ -415,20 +408,7 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='Top-level model directory')
-    parser.add_argument('--variable',
-                        required=False,
-                        action='store_true',
-                        help='Used variable-shape tensors for input/output')
-    # parser.add_argument('--ensemble',
-    #                     required=False,
-    #                     action='store_true',
-    #                     help='Generate ensemble models against the models' +
-    #                     ' in all platforms. Note that the models generated' +
-    #                     ' are not completed.')
     FLAGS, unparsed = parser.parse_known_args()
-
-    import tensorrt as trt
-    import test_util as tu
 
     # reformat-free input
     # Fixed shape

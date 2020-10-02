@@ -102,8 +102,9 @@ class TrtReformatFreeTest(tu.TestResultCollector):
         expected_output1_np = input_np - input_np
         reformatted_input_np = reformat("CHW2", input_np)
 
-        # Note that the tensor metadata used for inference input is different
-        # from what is used as data
+        # Use shared memory to bypass the shape check in client library, because
+        # for non-linear format tensor, the data buffer is padded and thus the
+        # data byte size may not match what is calculated from tensor shape
         inputs = []
         inputs.append(tritonhttpclient.InferInput('INPUT0', [13, 2, 1], "FP16"))
         self.add_reformat_free_data_as_shared_memory("input0", inputs[-1],
@@ -142,8 +143,10 @@ class TrtReformatFreeTest(tu.TestResultCollector):
             expected_output1_np = input_np - input_np
             reformatted_input_np = reformat("CHW2", input_np)
 
-            # Note that the tensor metadata used for inference input is different
-            # from what is used as data
+            # Use shared memory to bypass the shape check in client library,
+            # because for non-linear format tensor, the data buffer is padded
+            # and thus the data byte size may not match what is calculated from
+            # tensor shape
             inputs = []
             inputs.append(
                 tritonhttpclient.InferInput('INPUT0', [bs, 13, 2, 1], "FP16"))
@@ -185,8 +188,9 @@ class TrtReformatFreeTest(tu.TestResultCollector):
         # FIXME Can't generate reformat-free model of this specification
         reformatted_input_np = input_np  #reformat("CHW32", input_np)
 
-        # Note that the tensor metadata used for inference input is different
-        # from what is used as data
+        # Use shared memory to bypass the shape check in client library, because
+        # for non-linear format tensor, the data buffer is padded and thus the
+        # data byte size may not match what is calculated from tensor shape
         inputs = []
         inputs.append(tritonhttpclient.InferInput('INPUT0', [13, 2, 1], "FP32"))
         self.add_reformat_free_data_as_shared_memory("input0", inputs[-1],
@@ -225,8 +229,10 @@ class TrtReformatFreeTest(tu.TestResultCollector):
             expected_output1_np = input_np - input_np
             reformatted_input_np = reformat("CHW32", input_np)
 
-            # Note that the tensor metadata used for inference input is different
-            # from what is used as data
+            # Use shared memory to bypass the shape check in client library,
+            # because for non-linear format tensor, the data buffer is padded
+            # and thus the data byte size may not match what is calculated from
+            # tensor shape
             inputs = []
             inputs.append(
                 tritonhttpclient.InferInput('INPUT0', [bs, 13, 2, 1], "FP32"))

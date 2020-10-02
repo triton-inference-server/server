@@ -44,9 +44,7 @@ TRT_TEST=trt_reformat_free_test.py
 DATADIR="./models"
 
 rm -rf ${DATADIR}
-mkdir -p ${DATADIR}
-# FIXME
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32-4-32 ${DATADIR}/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_trt_format_model_repository/ ${DATADIR}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
@@ -56,9 +54,9 @@ rm -f *.log*
 
 RET=0
 
-# TrtReformatTest.test_reformat_free_input
-CLIENT_LOG="./test_reformat_free_input.client.log"
-SERVER_LOG="./test_reformat_free_input.inference_server.log"
+# TrtReformatTest
+CLIENT_LOG="./test_reformat_free.client.log"
+SERVER_LOG="./test_reformat_free.inference_server.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
