@@ -44,10 +44,10 @@ def np_to_trt_dtype(np_dtype):
     return None
 
 def trt_format_to_string(trt_format):
-    if trt_format == trt.TensorFormat.CDHW32:
-        return "CDHW32"
-    if trt_format == trt.TensorFormat.DHWC8:
-        return "DHWC8"
+    # if trt_format == trt.TensorFormat.CDHW32:
+    #     return "CDHW32"
+    # if trt_format == trt.TensorFormat.DHWC8:
+    #     return "DHWC8"
     if trt_format == trt.TensorFormat.CHW2:
         return "CHW2"
     if trt_format == trt.TensorFormat.CHW32:
@@ -124,7 +124,9 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
     engine = builder.build_engine(network, config)
 
     # FIXME descriptive name
-    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+    base_name = "plan_nobatch" if max_batch == 0 else "plan"
+    base_name += "_" + trt_format_to_string(input_memory_format) + "_" + trt_format_to_string(output_memory_format)
+    model_name = tu.get_model_name(base_name,
                                    input_dtype, output0_dtype, output1_dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
