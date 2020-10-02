@@ -64,20 +64,27 @@ def is_unbounded_growth(summary):
     
     """
     # Estimate allocation ratef from total bytes over allocations (~second derivative)
-    cumulatives = summary['mem_heap_B']
+    totals = summary['mem_heap_B']
 
-    # Compute differences
-    allocs_mb = [float(cumulatives[i] - cumulatives[i-1])/1e6 for i in range(1, len(cumulatives))]
-    alloc_rate_mb = [allocs_mb[i] - allocs_mb[i-1] for i in range(1, len(allocs_mb))]
-    average_alloc_rate_mb = sum(alloc_rate_mb)/len(alloc_rate_mb)
+    if len(totals) < 5:
+        print("Error: Not enough snapshots")
+        return False
+
+    # Don't start measuring from the first snapshot
+    start = len(totals)//3
+
+    # Compute change in allocation rate 
+    alloc_rate_start = float(totals[start] - totals[start - 1])/1e6
+    alloc_rate_end = float(totals[-1] - totals[-2])/1e6
+    alloc_rate_mb = (alloc_rate_end - alloc_rate_start)/(len(totals) - 2)  
     
-    print("ESTIMATED ALLOC RATE: %f MB/snapshot"%average_alloc_rate_mb)
+    print("ESTIMATED ALLOC RATE: %f MB/snapshot"%alloc_rate_mb)
 
-    return (average_alloc_rate_mb > MAX_ALLOWED_ALLOC_RATE)
+    return (alloc_rate_mb > MAX_ALLOWED_ALLOC_RATE)
 
 if __name__ == '__main__':
     summary = parse_massif_out(sys.argv[1])
-    if (is_unbounded_growth(summary)):
+    if is_unbounded_growth(summary):
         sys.exit(1)
     else:
         sys.exit(0)
