@@ -150,7 +150,131 @@ if [ `grep -c "Context with profile 0 \[0\] is being executed for " $SERVER_LOG`
 fi
 
 if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "6" ]; then
-    echo -e "\n***\n*** Failed. Expected no CUDA graphs are captured\n***"
+    echo -e "\n***\n*** Failed. Expected 6 CUDA graphs are captured\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# TrtCudaGraphTest.test_range_fixed_shape
+rm -rf ${DATADIR} && mkdir -p ${DATADIR}
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_float32_float32_float32 ${DATADIR}/
+# Make sure only one version is present
+rm -rf ${DATADIR}/plan_float32_float32_float32/3
+
+CLIENT_LOG="./range_fixed_shape.client.log"
+SERVER_LOG="./range_fixed_shape.inference_server.log"
+echo "optimization { \
+    cuda { \
+        graphs: true \
+        graph_spec [ { \
+            batch_size: 4 \
+            graph_lower_bound { \
+                batch_size: 2 \
+            } \
+} ] } }" >> ${DATADIR}/plan_float32_float32_float32/config.pbtxt
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $TRT_CUDA_GRAPH_TEST TrtCudaGraphTest.test_range_fixed_shape>>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+set +e
+if [ `grep -c "Context with profile default \[0\] is being executed for " $SERVER_LOG` != "2" ]; then
+    echo -e "\n***\n*** Failed. Expected only 2 execution without CUDA graph\n***"
+    RET=1
+fi
+
+if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 CUDA graphs are captured\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# TrtCudaGraphTest.test_range_dynamic_shape
+# plan_float32_float32_float32 models with dynamic shapes has 6 profiles
+# min, opt, max, idx
+# [1, 1], [1, 16], [8, 33], 0 (*)
+# [1, 1], [2, 16], [7, 32], 1
+# [1, 1], [3, 16], [6, 32], 2
+# [1, 1], [4, 16], [5, 32], 3
+# [5, 1], [6, 16], [8, 32], 4 (*)
+# [6, 1], [6, 16], [8, 32], 5 (*)
+# [1, 1], [1, 16], [8, 32], 6
+rm -rf ${DATADIR} && mkdir -p ${DATADIR}
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32 ${DATADIR}/
+
+CLIENT_LOG="./range_dynamic_shape.client.log"
+SERVER_LOG="./range_dynamic_shape.inference_server.log"
+sed -i "s/profile:.*/profile: [\"0\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt
+echo "optimization { \
+    cuda { \
+        graphs: true \
+        graph_spec [ { \
+            batch_size: 4 \
+            input { key: \"INPUT0\" value: {dim : [16]} } \
+            input { key: \"INPUT1\" value: {dim : [16]} } \
+            graph_lower_bound { \
+                batch_size: 2 \
+                input { key: \"INPUT0\" value: {dim : [8]} } \
+                input { key: \"INPUT1\" value: {dim : [8]} } \
+            } \
+} ] } }" >> ${DATADIR}/plan_float32_float32_float32/config.pbtxt
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $TRT_CUDA_GRAPH_TEST TrtCudaGraphTest.test_range_dynamic_shape>>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+set +e
+if [ `grep -c "Context with profile 0 \[0\] is being executed for " $SERVER_LOG` != "4" ]; then
+    echo -e "\n***\n*** Failed. Expected 4 execution without CUDA graph\n***"
+    RET=1
+fi
+
+if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 CUDA graphs are captured\n***"
     RET=1
 fi
 set -e
