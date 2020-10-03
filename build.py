@@ -546,15 +546,16 @@ RUN cd /opt/tritonserver/backends/onnxruntime && \
         patchelf --set-rpath '$ORIGIN' $i; \
     done
 
+WORKDIR /workspace
+RUN rm -fr *
+COPY . .
+
 # Copy ONNX custom op library and model (Needed for testing)
 COPY --from=tritonserver_onnx /workspace/build/Release/libcustom_op_library.so \
     /workspace/qa/L0_custom_ops/
 COPY --from=tritonserver_onnx /workspace/build/Release/testdata/custom_op_library/custom_op_test.onnx \
     /workspace/qa/L0_custom_ops/
 
-WORKDIR /workspace
-RUN rm -fr *
-COPY . .
 ENTRYPOINT []
 
 ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
