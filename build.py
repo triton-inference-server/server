@@ -48,11 +48,13 @@ NONCORE_BACKENDS = [
 FLAGS = None
 
 # Map from container version to corresponding component versions
-# container-version -> (ort version, ort openvino version)
+# container-version -> (upstream container version, ort version, ort openvino version)
 CONTAINER_VERSION_MAP = {
-    '20.08': ('1.4.0', '2020.2'),
-    '20.09': ('1.5.1', '2020.4'), # version for release ('1.4.0', '2020.2')
-    '20.10': ('1.5.1', '2020.4')
+    '20.08': ('20.08', '1.4.0', '2020.2'),  # 2.2.0
+    '20.09': ('20.09', '1.4.0', '2020.2'),  # 2.3.0
+    '20.10dev': ('20.09', '1.5.1', '2020.4'),  # 2.4.0dev
+    '20.10': ('20.10', '1.5.1', '2020.4'),  # 2.4.0
+    '20.11dev': ('20.09', '1.5.1', '2020.4')  # 2.5.0dev
 }
 
 
@@ -336,7 +338,7 @@ WORKDIR /workspace
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/workspace/cmake-3.14.3-Linux-x86_64/bin:/opt/miniconda/bin:$PATH
 ENV LD_LIBRARY_PATH /opt/miniconda/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
-# The Onnx Runtime dockerfile is the collection of steps in 
+# The Onnx Runtime dockerfile is the collection of steps in
 # https://github.com/microsoft/onnxruntime/tree/v1.5.1/dockerfiles
 
 # Install common dependencies
@@ -365,7 +367,7 @@ ENV LANG en_US.UTF-8
 RUN wget https://apt.repos.intel.com/openvino/2020/GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
     apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2020 && rm GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
     cd /etc/apt/sources.list.d && \
-    echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \ 
+    echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \
     apt update && \
     apt -y install intel-openvino-dev-ubuntu18-${{ONNX_RUNTIME_OPENVINO_VERSION}}.287
 # Text replacement to skip installing CMake via distribution
@@ -715,9 +717,14 @@ LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
 def container_build(images):
     # Set the docker build-args based on container version
     if FLAGS.container_version in CONTAINER_VERSION_MAP:
-        onnx_runtime_version = CONTAINER_VERSION_MAP[FLAGS.container_version][0]
+        if FLAGS.upstream_container_version is not None:
+            upstream_container_version = FLAGS.upstream_container_version
+        else:
+            upstream_container_version = CONTAINER_VERSION_MAP[
+                FLAGS.container_version][0]
+        onnx_runtime_version = CONTAINER_VERSION_MAP[FLAGS.container_version][1]
         onnx_runtime_openvino_version = CONTAINER_VERSION_MAP[
-            FLAGS.container_version][1]
+            FLAGS.container_version][2]
     else:
         fail('unsupported container version {}'.format(FLAGS.container_version))
 
@@ -733,13 +740,13 @@ def container_build(images):
         base_image = images['base']
     else:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
-            FLAGS.container_version)
+            upstream_container_version)
 
     if 'pytorch' in images:
         pytorch_image = images['pytorch']
     else:
         pytorch_image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
-            FLAGS.container_version)
+            upstream_container_version)
 
     dockerfileargmap = {
         'TRITON_VERSION': FLAGS.version,
@@ -808,19 +815,30 @@ def container_build(images):
         # Next run build.py inside the container with the same flags
         # as was used to run this instance, except:
         #
-        # --container-version changes to --upstream-container-version
+        # --container-version is removed so that a direct build is
+        # performed within the container
         #
         # --build-dir is added/overridden to 'build_dir'
         #
         # --install-dir is added/overridden to 'install_dir'
         #
         # --container-prebuild-command needs to be quoted correctly
-        runargs = [
-            a.replace('--container-version', '--upstream-container-version')
-            for a in sys.argv[1:]
-        ]
+        runargs = []
+        skip_arg = False
+        for a in sys.argv[1:]:
+            if skip_arg:
+                skip_arg = False
+                continue
+            if a == '--container-version':
+                skip_arg = True
+                continue
+            elif a.startswith('--container-version='):
+                continue
+            runargs.append(a)
+
         runargs += ['--build-dir', build_dir]
         runargs += ['--install-dir', install_dir]
+
         for idx, arg in enumerate(runargs):
             if arg == '--container-prebuild-command':
                 runargs[idx + 1] = '"{}"'.format(runargs[idx + 1])
@@ -909,12 +927,6 @@ def container_build(images):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    # Used internally for docker build, not intended for direct use
-    parser.add_argument('--upstream-container-version',
-                        type=str,
-                        required=False,
-                        help=argparse.SUPPRESS)
-
     group_qv = parser.add_mutually_exclusive_group()
     group_qv.add_argument('-q',
                           '--quiet',
@@ -964,7 +976,14 @@ if __name__ == '__main__':
         type=str,
         required=False,
         help=
-        'The Triton container version. If specified, Docker will be used for the build and component versions will be set automatically.'
+        'The Triton container version. When this argument is given Docker will be used for the build.'
+    )
+    parser.add_argument(
+        '--upstream-container-version',
+        type=str,
+        required=False,
+        help=
+        'The upstream container version to use when performing a container build. If not specified the upstream container version will be chosen automaticallly based on --container-version.'
     )
     parser.add_argument(
         '--container-prebuild-command',
@@ -1081,11 +1100,10 @@ if __name__ == '__main__':
         container_build(images)
         sys.exit(0)
 
-    # If there is a container pre-build command, and this invocation
-    # is being done within the build container, then run the pre-build
-    # command.
-    if (FLAGS.container_prebuild_command
-            is not None) and (FLAGS.upstream_container_version is not None):
+    # If there is a container pre-build command assume this invocation
+    # is being done within the build container and so run the
+    # pre-build command.
+    if (FLAGS.container_prebuild_command):
         prebuild_command()
 
     log('Building Triton Inference Server')
