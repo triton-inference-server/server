@@ -1783,8 +1783,11 @@ PlanBackend::Context::BuildCudaGraphV2(
 
   std::vector<int64_t> cuda_graph_key;
   auto cuda_graph = TensorRTContext::CudaGraph();
-  if (!SetCudaGraphShape(trt_context, graph_spec, &cuda_graph_key, &cuda_graph)
-           .IsOk()) {
+  auto status =
+      SetCudaGraphShape(trt_context, graph_spec, &cuda_graph_key, &cuda_graph);
+  if (!status.IsOk()) {
+    LOG_ERROR << "Failed to set cuda graph shape for " << name_
+              << status.Message();
     return false;
   }
 
@@ -1896,7 +1899,7 @@ PlanBackend::Context::SetCudaGraphShape(
         } else {
           cuda_graph->input_dims_.emplace_back();
           cuda_graph->input_dims_.back().push_back(batch_size);
-          lower_bound_key.push_back(batch_size);
+          lower_bound_key.push_back(lower_bound_key[0]);
         }
         auto& shape = cuda_graph->input_dims_.back();
         shape.insert(shape.end(), it->second.begin(), it->second.end());
