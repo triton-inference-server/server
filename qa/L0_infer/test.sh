@@ -67,9 +67,9 @@ OPTDIR=${OPTDIR:="/opt"}
 SERVER=${OPTDIR}/tritonserver/bin/tritonserver
 BACKEND_DIR=${OPTDIR}/tritonserver/backends
 TF_VERSION=${TF_VERSION:=1}
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --exit-timeout-secs=120"
 
 # Allow more time to exit. Ensemble brings in too many models
+SERVER_ARGS_EXTRA="--exit-timeout-secs=120 --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
