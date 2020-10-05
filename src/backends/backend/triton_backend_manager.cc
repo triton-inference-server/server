@@ -327,14 +327,20 @@ TRITONBACKEND_BackendSetState(TRITONBACKEND_Backend* backend, void* state)
 //
 // TritonBackendManager
 //
+TritonBackendManager&
+TritonBackendManager::Singleton()
+{
+  static TritonBackendManager triton_backend_manager;
+  return triton_backend_manager;
+}
+
 Status
 TritonBackendManager::CreateBackend(
     const std::string& name, const std::string& dir, const std::string& libpath,
     const BackendCmdlineConfig& backend_cmdline_config,
     std::shared_ptr<TritonBackend>* backend)
 {
-  static TritonBackendManager singleton_manager;
-
+  TritonBackendManager& singleton_manager = Singleton();
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
   const auto& itr = singleton_manager.backend_map_.find(libpath);
@@ -355,6 +361,36 @@ TritonBackendManager::CreateBackend(
   RETURN_IF_ERROR(TritonBackend::Create(
       name, dir, libpath, backend_cmdline_config, backend));
   singleton_manager.backend_map_.insert({libpath, *backend});
+
+  return Status::Success;
+}
+
+Status
+TritonBackendManager::BackendState(
+    std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>*
+        backend_state)
+{
+  TritonBackendManager& singleton_manager = Singleton();
+  std::lock_guard<std::mutex> lock(singleton_manager.mu_);
+
+  auto backend_map = singleton_manager.backend_map_;
+
+  std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
+      backend_state_map(
+          new std::unordered_map<std::string, std::vector<std::string>>);
+  for (const auto& backend_pair : backend_map) {
+    auto libpath = backend_pair.first;
+    auto backend = backend_pair.second.lock();
+
+    if (backend != nullptr) {
+      const char* backend_config;
+      size_t backend_config_size;
+      backend->BackendConfig().Serialize(&backend_config, &backend_config_size);
+      backend_state_map->insert(
+          {backend->Name(), std::vector<std::string>{libpath, backend_config}});
+    }
+  }
+  *backend_state = std::move(backend_state_map);
 
   return Status::Success;
 }
