@@ -366,14 +366,16 @@ class PlanBackend : public InferenceBackend {
     struct IOBindingInfo {
       IOBindingInfo()
           : byte_size_(0), buffer_(nullptr), buffer_is_ragged_(false),
-            is_linear_format_(true), format_element_size_(0)
+            is_linear_format_(true), vectorized_dim_(-1),
+            components_per_element_(1)
       {
       }
       uint64_t byte_size_;
       void* buffer_;
       bool buffer_is_ragged_;
       bool is_linear_format_;
-      size_t format_element_size_;
+      int vectorized_dim_;
+      int components_per_element_;
       // Instructions on constructing the batch input and the CPU buffer for
       // storing mutable data
       std::shared_ptr<BatchInputData> batch_input_;
