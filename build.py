@@ -528,6 +528,10 @@ COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/pr
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${{ONNX_RUNTIME_VERSION}} \
      /opt/tritonserver/backends/onnxruntime/
+COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime_providers_shared.so \
+     /opt/tritonserver/backends/onnxruntime/
+COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime_providers_tensorrt.so \
+     /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/LICENSE \
      /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/ort_onnx_version.txt \
