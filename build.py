@@ -325,63 +325,55 @@ RUN cd pytorch && \
     pip install --no-cache-dir -v .
 
 ############################################################################
-## Onnx Runtime stage: Build Onnx Runtime with up-to-date CUDA, CUDNN
+## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
 ############################################################################
 FROM ${{BASE_IMAGE}} AS tritonserver_onnx
 
 # Onnx Runtime release version from top of file
 ARG ONNX_RUNTIME_VERSION
-ARG ONNXRUNTIME_REPO=https://github.com/Microsoft/onnxruntime
 
 WORKDIR /workspace
 
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/workspace/cmake-3.14.3-Linux-x86_64/bin:/opt/miniconda/bin:$PATH
-ENV LD_LIBRARY_PATH /opt/miniconda/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-
-# The Onnx Runtime dockerfile is the collection of steps in
-# https://github.com/microsoft/onnxruntime/tree/v1.5.1/dockerfiles
-
-# Install common dependencies
+# Get release version of Onnx Runtime
 RUN apt-get update && \
-    apt-get install -y sudo git bash unattended-upgrades
-# Dependencies for OpenVINO
-RUN apt-get install -y apt-transport-https ca-certificates zip x11-apps \
-        lsb-core wget cpio libboost-python-dev libpng-dev zlib1g-dev libnuma1 \
-        ocl-icd-libopencl1 clinfo libboost-filesystem1.65-dev \
-        libboost-thread1.65-dev protobuf-compiler libprotoc-dev autoconf \
-        automake libtool libjson-c-dev ocl-icd-libopencl1
-RUN unattended-upgrade
+    apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN git clone -b rel-${{ONNX_RUNTIME_VERSION}} --recursive https://github.com/Microsoft/onnxruntime && \
+    (cd onnxruntime && \
+            git submodule update --init --recursive)
+
+ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
+
+# Copy patches into container...
+COPY build/onnxruntime /tmp/trtis/build/onnxruntime
+
+RUN sed -i "s/backend-test-tools.*//" ${{SCRIPT_DIR}}/install_onnx.sh
+RUN cp -r ${{SCRIPT_DIR}} /tmp/scripts && \
+    ${{SCRIPT_DIR}}/install_ubuntu.sh -p 3.6 -o 18.04 && ${{SCRIPT_DIR}}/install_deps.sh -p 3.6
+
+ENV PATH /usr/bin:$PATH
+RUN cmake --version
 
 # Install OpenVINO
+# https://github.com/microsoft/onnxruntime/blob/master/tools/ci_build/github/linux/docker/Dockerfile.ubuntu_openvino
 ARG ONNX_RUNTIME_OPENVINO_VERSION
-ENV INTEL_OPENVINO_DIR=/opt/intel/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}.287
-ENV InferenceEngine_DIR=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/share
-ENV IE_PLUGINS_PATH=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/lib/intel64
-ENV LD_LIBRARY_PATH=/opt/intel/opencl:${{INTEL_OPENVINO_DIR}}/inference_engine/external/gna/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/mkltiny_lnx/lib:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/omp/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/tbb/lib:$IE_PLUGINS_PATH:$LD_LIBRARY_PATH
-ENV OpenCV_DIR=${{INTEL_OPENVINO_DIR}}/opencv/share/OpenCV
-ENV LD_LIBRARY_PATH=${{INTEL_OPENVINO_DIR}}/opencv/lib:${{INTEL_OPENVINO_DIR}}/opencv/share/OpenCV/3rdparty/lib:$LD_LIBRARY_PATH
-ENV HDDL_INSTALL_DIR=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/hddl
-ENV LD_LIBRARY_PATH=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/hddl/lib:$LD_LIBRARY_PATH
-ENV LANG en_US.UTF-8
-
-RUN wget https://apt.repos.intel.com/openvino/2020/GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
-    apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2020 && rm GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
-    cd /etc/apt/sources.list.d && \
-    echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \
-    apt update && \
-    apt -y install intel-openvino-dev-ubuntu18-${{ONNX_RUNTIME_OPENVINO_VERSION}}.287
-# Text replacement to skip installing CMake via distribution
+# Nested text replacement to skip installing CMake via distribution
 # as it downgrades the version (need >= 3.11.0)
-RUN cd ${{INTEL_OPENVINO_DIR}}/install_dependencies && \
-    sed -i 's/cmake//' install_openvino_dependencies.sh && \
-    ./install_openvino_dependencies.sh
+RUN sed -i 's/\\.\\/install_dependencies\\.sh/sed -i "s\\/cmake \\\\\\\\\\\\\\\\\\/\\\\\\\\\\\\\\\\\\/" install_dependencies\\.sh\\n\\.\\/install_dependencies\\.sh/' /tmp/scripts/install_openvino.sh
+RUN /tmp/scripts/install_openvino.sh -o ${{ONNX_RUNTIME_OPENVINO_VERSION}}
+ENV INTEL_OPENVINO_DIR /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}
+ENV LD_LIBRARY_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_OPENVINO_DIR/deployment_tools/:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:$INTEL_OPENVINO_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
 
-RUN wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-gmmlib_19.3.2_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-igc-core_1.0.2597_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-igc-opencl_1.0.2597_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-opencl_19.41.14441_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-ocloc_19.41.14441_amd64.deb && \
-    sudo dpkg -i *.deb && ldconfig && rm -rf *.deb
+ENV PYTHONPATH $INTEL_OPENVINO_DIR/tools:$PYTHONPATH
+ENV IE_PLUGINS_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64
+
+RUN wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-gmmlib_19.1.1_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-core_1.0.2-1787_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-opencl_1.0.2-1787_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-opencl_19.15.12831_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-ocloc_19.15.12831_amd64.deb && \
+    sudo dpkg -i *.deb && rm -rf *.deb
 
 # Allow configure to pick up GDK and CuDNN where it expects it.
 # (Note: $CUDNN_VERSION is defined by NVidia's base image)
@@ -391,32 +383,23 @@ RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
     mkdir -p /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64 && \
     ln -s /etc/alternatives/libcudnn_so /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64/libcudnn.so
 
-# Install ONNX Runtime
-RUN git clone -b rel-${{ONNX_RUNTIME_VERSION}} --recursive ${{ONNXRUNTIME_REPO}} onnxruntime && \
-    (cd onnxruntime && \
-            git submodule update --init --recursive)
-RUN /bin/sh onnxruntime/dockerfiles/scripts/install_common_deps.sh
-RUN cd /workspace/onnxruntime/cmake/external/onnx && python3 setup.py install
-
-ENV PATH /usr/bin:$PATH
-RUN cmake --version
-
+# Build files will be in /workspace/build
 ARG COMMON_BUILD_ARGS="--skip_submodule_sync --parallel --build_shared_lib --use_openmp"
 RUN mkdir -p /workspace/build
 RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspace/build \
             --config Release $COMMON_BUILD_ARGS \
-            --cmake_extra_defines ONNXRUNTIME_VERSION=$(cat /workspace/onnxruntime/VERSION_NUMBER) \
+            --use_cuda \
             --cuda_home /usr/local/cuda \
             --cudnn_home /usr/local/cudnn-$(echo $CUDNN_VERSION | cut -d. -f1-2)/cuda \
-            --tensorrt_home /usr/src/tensorrt \
-            --use_cuda \
             --use_tensorrt \
+            --tensorrt_home /usr/src/tensorrt \
             --use_openvino CPU_FP32 \
             --update \
             --build
 
-# Record version of ONNX used for ORT compilation,
-RUN cat /workspace/onnxruntime/cmake/external/onnx/VERSION_NUMBER > /workspace/ort_onnx_version.txt
+# Record version of ONNX installed for ORT testing,
+# different versions are installed, but the last one is the latest for ORT
+RUN echo "import onnx; print(onnx.__version__)" | python3 > /workspace/ort_onnx_version.txt
 
 ############################################################################
 ## Final stage: Install and arrange all dependencies needed for build
@@ -518,8 +501,6 @@ RUN cd /opt/tritonserver/lib/pytorch && \
 ARG ONNX_RUNTIME_VERSION
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
      /opt/tritonserver/include/onnxruntime/
-COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_session_options_config_keys.h \
-     /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cuda/cuda_provider_factory.h \
@@ -541,19 +522,26 @@ RUN cd /opt/tritonserver/backends/onnxruntime && \
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
+ARG ONNX_RUNTIME_OPENVINO_VERSION
+COPY --from=tritonserver_onnx /workspace/build/Release/external/ngraph/lib/libovep_ngraph.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/ngraph/lib/libngraph.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/ngraph/lib/libonnx_importer.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libngraph.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/plugins.xml \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/licensing \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+     /opt/tritonserver/backends/onnxruntime/
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libinference_engine_lp_transformations.so \
+     /opt/tritonserver/backends/onnxruntime/
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+     /opt/tritonserver/backends/onnxruntime/
+COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/LICENSE \
      /opt/tritonserver/backends/onnxruntime/LICENSE.openvino
 RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libtbb.so.2 libtbb.so && \
