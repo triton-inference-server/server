@@ -71,7 +71,7 @@ CONCURRENCY=32
 CLIENT_BS=8
 
 # Threshold memory growth in MB per snapshot
-MAX_ALLOWED_ALLOC_RATE="-1.0"
+MAX_ALLOWED_ALLOC_RATE="-0.5"
 export MAX_ALLOWED_ALLOC_RATE
 
 # Create local model repository
