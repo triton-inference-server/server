@@ -78,7 +78,7 @@ def is_unbounded_growth(summary):
     alloc_rate_end = float(totals[-1] - totals[-2])/1e6
     alloc_rate_mb = (alloc_rate_end - alloc_rate_start)/(len(totals) - 2)  
     
-    print("ESTIMATED ALLOC RATE: %f MB/snapshot"%alloc_rate_mb)
+    print("ESTIMATED ALLOC RATE: %f MB/snapshot, MAX ALLOWED RATE: %f"%(alloc_rate_mb, MAX_ALLOWED_ALLOC_RATE))
 
     return (alloc_rate_mb > MAX_ALLOWED_ALLOC_RATE)
 

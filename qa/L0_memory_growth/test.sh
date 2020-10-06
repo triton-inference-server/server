@@ -71,7 +71,8 @@ CONCURRENCY=32
 CLIENT_BS=8
 
 # Threshold memory growth in MB per snapshot
-MAX_ALLOWED_ALLOC_RATE="-0.1"
+MAX_ALLOWED_ALLOC_RATE="-1.0"
+export MAX_ALLOWED_ALLOC_RATE
 
 # Create local model repository
 mkdir -p models/
@@ -103,7 +104,7 @@ for MODEL in $(ls models); do
     cp -r models/$MODEL test_repo/
 
     # Set server, client and valgrind arguments
-    SERVER_ARGS="--model-repository=`pwd`/test_repo --log-verbose=1"
+    SERVER_ARGS="--model-repository=`pwd`/test_repo"
     LEAKCHECK_LOG="test_${MODEL}.valgrind.log"
     MASSIF_LOG="test_${MODEL}.massif"
     LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
@@ -114,7 +115,11 @@ for MODEL in $(ls models); do
     if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then    
         sed -i "s/^max_batch_size:.*/max_batch_size: 32/" test_repo/$MODEL/config.pbtxt
     else
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" test_repo/$MODEL/config.pbtxt
+        if [ "$MODEL" == "resnet50_fp32_netdef" ]; then
+            sed -i "s/^max_batch_size:.*/max_batch_size: 64/" test_repo/$MODEL/config.pbtxt
+        else
+            sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" test_repo/$MODEL/config.pbtxt
+        fi
     fi
     echo "dynamic_batching {}" >> test_repo/$MODEL/config.pbtxt
     echo "instance_group [{ count: ${INSTANCE_CNT} }]" >> test_repo/$MODEL/config.pbtxt
@@ -131,7 +136,7 @@ for MODEL in $(ls models); do
 
     # Run the perf analyzer 3 times
     for i in {1..3}; do    
-        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $CLIENT_LOG 2>&1
+        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***"
@@ -150,11 +155,67 @@ for MODEL in $(ls models); do
     # Check the massif output
     python $MASSIF_TEST $MASSIF_LOG >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
         echo -e "\n***\n*** Test for $MODEL Failed\n***"
         RET=1
     fi
     set -e
 done
+
+# Next perform a test that has unbound memory growth. Use the busy op model
+# with a high delay in order to force requests to sit in the queue, and result
+# in memory growth.
+BUSY_OP_TEST=busy_op_test.py
+DELAY_CYCLES=2100000000
+NUM_REQUESTS=100
+
+rm -rf test_repo && mkdir test_repo
+cp -r ${DATADIR}/qa_custom_ops/tf_custom_ops/graphdef_busyop test_repo/
+
+# Explicitly set library path so custom ops can find TF
+LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1
+SERVER_ARGS="--model-repository=`pwd`/test_repo"
+SERVER_LD_PRELOAD="${DATADIR}/qa_custom_ops/tf_custom_ops/libbusyop.so"
+
+LEAKCHECK_LOG="test_busyop.valgrind.log"
+MASSIF_LOG="test_busyop.massif"
+LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
+SERVER_LOG="test_busyop.server.log"
+CLIENT_LOG="test_busyop.client.log"
+
+# Run server
+run_server_leakcheck
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+# Run the busy_op test
+python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test graphdef_busyop Failed\n***"
+    RET=1
+fi
+set -e
+
+# Stop Server
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+# Check the massif output
+python $MASSIF_TEST $MASSIF_LOG >> $CLIENT_LOG 2>&1
+if [ $? -ne 1 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
+    RET=1
+fi
+set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
