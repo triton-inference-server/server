@@ -53,11 +53,8 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     NO_DELAY_TESTS="test_simple_sequence \
                       test_no_sequence_start \
                       test_batch_size"
-    DELAY_TESTS="test_backlog_same_correlation_id_no_end \
-                    test_backlog_fill_no_end \
+    DELAY_TESTS="test_backlog_fill_no_end \
                     test_backlog_sequence_timeout \
-                    test_half_batch \
-                    test_skip_batch \
                     test_ragged_batch"
 fi
 
