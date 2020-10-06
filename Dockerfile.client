@@ -75,9 +75,13 @@ COPY build build
 COPY src/clients src/clients
 COPY src/core src/core
 
+TRITON_COMMON_REPO_TAG=main
+TRITON_CORE_REPO_TAG=main
 RUN mkdir builddir && cd builddir && \
     cmake -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
+          -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+          -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
           -DTRITON_ENABLE_GRPC=ON \
           -DTRITON_ENABLE_HTTP=ON ../build && \
     make -j16 client
