@@ -497,8 +497,6 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/li
       /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cuda.so \
       /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
-     /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/pytorch/vision/torchvision/csrc \
     /opt/tritonserver/include/torchvision/torchvision/
 COPY --from=tritonserver_pytorch /opt/pytorch/vision/build/libtorchvision.so \
