@@ -71,7 +71,7 @@ def is_unbounded_growth(summary):
         return False
 
     # Don't start measuring from the first snapshot
-    start = len(totals)//3
+    start = len(totals)//6
 
     # Compute change in allocation rate 
     alloc_rate_start = float(totals[start] - totals[start - 1])/1e6
