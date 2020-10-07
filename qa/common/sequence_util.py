@@ -51,8 +51,7 @@ _test_system_shared_memory = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 _test_cuda_shared_memory = bool(
     int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
-_test_valgrind = bool(
-    int(os.environ.get('TEST_VALGRIND', 0)))
+_test_valgrind = bool(int(os.environ.get('TEST_VALGRIND', 0)))
 
 _max_sequence_idle_ms = 5000
 _valgrind_delay_ms = 50
