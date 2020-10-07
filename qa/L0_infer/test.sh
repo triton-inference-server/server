@@ -66,9 +66,11 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 SERVER=${OPTDIR}/tritonserver/bin/tritonserver
 BACKEND_DIR=${OPTDIR}/tritonserver/backends
+TF_VERSION=${TF_VERSION:=1}
 
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --backend-directory=${BACKEND_DIR}"
+SERVER_ARGS_EXTRA="--exit-timeout-secs=120 --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -103,7 +105,7 @@ for TARGET in cpu gpu; do
         fi
         # set strict readiness=false on CPU-only device to allow
         # unsuccessful load of TensorRT plans, which require GPU.
-        SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --strict-readiness=false --exit-on-error=false  --backend-directory=${BACKEND_DIR}"
+        SERVER_ARGS="--model-repository=${MODELDIR} --strict-readiness=false --exit-on-error=false ${SERVER_ARGS_EXTRA}"
     fi
 
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
