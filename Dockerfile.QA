@@ -31,6 +31,8 @@
 ARG BASE_IMAGE=tritonserver
 ARG BUILD_IMAGE=tritonserver_build
 ARG CLIENT_IMAGE=tritonserver_client
+ARG TRITON_COMMON_REPO_TAG=main
+ARG TRITON_CORE_REPO_TAG=main
 
 ############################################################################
 ## Build tests in the BUILD_IMAGE since it has already been configured
@@ -48,7 +50,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
             libopencv-core-dev
 
 WORKDIR /tmp/tritonbuild/tritonserver/build
-RUN cmake -DTRITON_ENABLE_GPU=ON /workspace/build && \
+ARG TRITON_COMMON_REPO_TAG
+ARG TRITON_CORE_REPO_TAG
+RUN cmake -DTRITON_ENABLE_GPU=ON \
+          -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+          -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} /workspace/build && \
     make -j16 test-util
 
 # Update the qa/ directory with test executables, models, etc.
