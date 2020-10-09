@@ -629,7 +629,7 @@ ENV TF_AUTOTUNE_THRESHOLD       2
 # Intel MKL FATAL ERROR: Cannot load libmkl_intel_thread.so
 ENV MKL_THREADING_LAYER GNU
 
-# Create a user that can be used to run the triton-server as
+# Create a user that can be used to run triton as
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
 ENV TRITON_SERVER_USER=triton-server
@@ -642,23 +642,21 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl is needed for GCS
+#
+# FIXME python3, python3-pip and the pip installs should only be
+# installed for python backend and onnxruntime backend (and then only
+# if openvino is enabled)
 RUN apt-get update && \
-    if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
-        apt-get install -y --no-install-recommends \
-                libb64-0d \
-                libcurl3-dev \
-                libgoogle-glog0v5 \
-                libre2-1v5; \
-    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
-        apt-get install -y --no-install-recommends \
-                libb64-0d \
-                libcurl4-openssl-dev \
-                libgoogle-glog0v5 \
-                libre2-4; \
-    else \
-        echo "Ubuntu version must be either 16.04 or 18.04" && \
-        exit 1; \
-    fi && \
+    apt-get install -y --no-install-recommends \
+         libb64-0d \
+         libcurl4-openssl-dev \
+         libgoogle-glog0v5 \
+         libre2-4 \
+         python3 \
+         python3-pip && \
+    pip3 install --upgrade pip && \
+    pip3 install --upgrade wheel setuptools && \
+    pip3 install --upgrade grpcio-tools grpcio-channelz numpy && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/tritonserver
