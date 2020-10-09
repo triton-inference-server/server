@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,54 +25,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-{% extends "!layout.html" %}
-  {% block sidebartitle %} {{ super() }}
 
-  <style>
-    /* Sidebar header (and topbar for mobile) */
-    .wy-side-nav-search, .wy-nav-top {
-      background: #76b900;
-    }
+# Model Analyzer
 
-    .wy-side-nav-search a:link, .wy-nav-top a:link {
-      color: #fff;
-    }
-    .wy-side-nav-search a:visited, .wy-nav-top a:visited {
-      color: #fff;
-    }
-    .wy-side-nav-search a:hover, .wy-nav-top a:hover {
-      color: #fff;
-    }
+The Triton Model Analyzer is a tool that uses [Performance
+Analyzer](perf_analyzer.md) to send requests to your model while
+measuring GPU memory and compute utilization. The Model Analyzer is
+specifically useful for characterizing the GPU memory requirements for
+your model under different batching and model instance
+configurations. Once you have this GPU memory usage information you
+can more intelligently decide on how to combine multiple models on the
+same GPU while remaining within the memory capacity of the GPU.
 
-    .wy-menu-vertical a:link, .wy-menu-vertical a:visited {
-      color: #d9d9d9
-    }
-
-    .wy-menu-vertical a:active {
-      background-color: #76b900
-    }
-
-    .wy-side-nav-search>div.version {
-      color: rgba(0, 0, 0, 0.3)
-    }
-  </style>
-  {% endblock %}
-
-  {% block footer %} {{ super() }}
-
-  <style>
-  a:link, a:visited {
-    color: #76b900;
-  }
-
-  a:hover {
-    color: #8c0;
-  }
-
-  .rst-content dl:not(.docutils) dt {
-    background: rgba(118, 185, 0, 0.1);
-    color: rgba(59,93,0,1);
-    border-top: solid 3px rgba(59,93,0,1);
-  }
-  </style>
-  {% endblock %}
+For more information see the [Model Analyzer
+repository](https://github.com/triton-inference-server/model_analyzer)
+and the detailed explanation provided in [Maximizing Deep Learning
+Inference Performance with NVIDIA Model
+Analyzer](https://developer.nvidia.com/blog/maximizing-deep-learning-inference-performance-with-nvidia-model-analyzer).
