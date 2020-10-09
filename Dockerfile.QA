@@ -241,13 +241,6 @@ RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
     mkdir -p qa/L0_decoupled/models/nested_square/1
 
-# Generating the docs requires the docs source and the source code so
-# copy that into L0_docs so that it is available when that test runs.
-RUN cp VERSION qa/L0_docs/. && \
-    cp README.rst qa/L0_docs/. && \
-    cp -r docs qa/L0_docs/. && \
-    cp -r src qa/L0_docs/.
-
 ############################################################################
 ## Copy artifacts from client container
 ############################################################################

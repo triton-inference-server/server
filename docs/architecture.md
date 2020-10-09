@@ -1,153 +1,216 @@
-..
-  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
-  #
-  # Redistribution and use in source and binary forms, with or without
-  # modification, are permitted provided that the following conditions
-  # are met:
-  #  * Redistributions of source code must retain the above copyright
-  #    notice, this list of conditions and the following disclaimer.
-  #  * Redistributions in binary form must reproduce the above copyright
-  #    notice, this list of conditions and the following disclaimer in the
-  #    documentation and/or other materials provided with the distribution.
-  #  * Neither the name of NVIDIA CORPORATION nor the names of its
-  #    contributors may be used to endorse or promote products derived
-  #    from this software without specific prior written permission.
-  #
-  # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-  # CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-  # EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-  # PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-  # PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-  # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+<!--
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
 
-.. _section-models-and-schedulers:
+# Triton Architecture
 
-Models And Schedulers
-=====================
+The following figure shows the Triton Inference Server high-level
+architecture. The [model repository](model_repository.md) is a
+file-system based repository of the models that Triton will make
+available for inferencing. Inference requests arrive at the server via
+either [HTTP/REST or GRPC](inference_protocols.md) or by the [C
+API](c_api.md) and are then routed to the appropriate per-model
+scheduler. Triton implements [multiple scheduling and batching
+algorithms](#models-and-schedulers) that can be configured on a
+model-by-model basis. Each model's scheduler optionally performs
+batching of inference requests and then passes the requests to the
+[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+corresponding to the model type. The backend performs inferencing
+using the inputs provided in the batched requests to produce the
+requested outputs. The outputs are then returned.
 
-By incorporating backends for :ref:`multiple frameworks
-<section-framework-model-definition>` and also allowing backends with
-:ref:`custom implementations <section-backends>`, the Triton Inference
-Server supports a wide variety of models. Triton also supports
-multiple :ref:`scheduling and batching configurations
-<section-scheduling-and-batching>` that further expand the class of
-models that can be handled.
+Triton supports a [backend C
+API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
+that allows Triton to be extended with new functionality such as
+custom pre- and post-processing operations or even a new deep-learning
+framework.
 
-This section describes *stateless*, *stateful* and *ensemble* models
-and how Triton provides schedulers to support those model types.
+The models being served by Triton can be queried and controlled by a
+dedicated [model management API](model_management.md) that is
+available by HTTP/REST or GRPC protocol, or by the C API.
 
-.. _section-stateless-models:
+Readiness and liveness health endpoints and utilization, throughput
+and latency metrics ease the integration of Triton into deployment
+framework such as Kubernetes,
 
-Stateless Models
-----------------
+![Triton Architecture Diagram](images/arch.jpg)
 
-With respect to Triton's schedulers, a *stateless* model (or stateless
-backend) does not maintain state between inference requests. Each
-inference performed on a stateless model is independent of all other
-inferences using that model.
+## Concurrent Model Execution
+
+The Triton architecture allows multiple models and/or multiple
+instances of the same model to execute in parallel on the same
+system. The system may have zero, one, or many GPUs. The following
+figure shows an example with two models; model0 and model1. Assuming
+Triton is not currently processing any request, when two requests
+arrive simultaneously, one for each model, Triton immediately
+schedules both of them onto the GPU and the GPU’s hardware scheduler
+begins working on both computations in parallel. Models executing on
+the system's CPU are handled similarly by Triton except that the
+scheduling of the CPU threads execution each model is handled by the
+system's OS.
+
+![Triton Mult-Model Execution Diagram](images/multi_model_exec.png)
+
+By default, if multiple requests for the same model arrive at the same
+time, Triton will serialize their execution by scheduling only one at
+a time on the GPU, as shown in the following figure.
+
+![Triton Mult-Model Serial Execution
+Diagram](images/multi_model_serial_exec.png)
+
+Triton provides a [model configuration option called
+instance-group](model_configuration.md#instance-groups) that allows
+each model to specify how many parallel executions of that model
+should be allowed. Each such enabled parallel execution is referred to
+as an *instance*. By default, Triton gives each model a single
+instance, which means that only a single execution of the model is
+allowed to be in progress at a time as shown in the above figure. By
+using instance-group the number of execution instances for a model can
+be increased. The following figure shows model execution when model1
+is configured to allow three instances. As shown in the figure, the
+first three model1 inference requests are immediately executed in
+parallel. The fourth model1 inference request must wait until one of
+the first three executions completes before beginning.
+
+![Triton Mult-Model Parallel Execution
+Diagram](images/multi_model_parallel_exec.png)
+
+## Models And Schedulers
+
+Triton supports multiple scheduling and batching algorithms that can
+be selected independently for each model.  This section describes
+*stateless*, *stateful* and *ensemble* models and how Triton provides
+schedulers to support those model types. For a given model, the
+selection and configuration of the scheduler is done with the [model's
+configuration file](model_configuration.md).
+
+### Stateless Models
+
+With respect to Triton's schedulers, a *stateless* model does not
+maintain state between inference requests. Each inference performed on
+a stateless model is independent of all other inferences using that
+model.
 
 Examples of stateless models are CNNs such as image classification and
-object detection. The :ref:`default scheduler
-<section-default-scheduler>` or :ref:`dynamic batcher
-<section-dynamic-batcher>` can be used for these stateless models.
+object detection. The [default
+scheduler](model_configuration.md#default-scheduler) or [dynamic
+batcher](model_configuration.md#dynamic-batcher) can be used as the
+scheduler for these stateless models.
 
 RNNs and similar models which do have internal memory can be stateless
 as long as the state they maintain does not span inference
 requests. For example, an RNN that iterates over all elements in a
 batch is considered stateless by Triton if the internal state is not
-carried between inference requests. The :ref:`default scheduler
-<section-default-scheduler>` can be used for these stateless
-models. The :ref:`dynamic batcher <section-dynamic-batcher>` cannot be
-used since the model is typically not expecting the batch to represent
-multiple inference requests.
+carried between batches of inference requests. The [default
+scheduler](model_configuration.md#default-scheduler) can be used for
+these stateless models. The [dynamic
+batcher](model_configuration.md#dynamic-batcher) cannot be used since
+the model is typically not expecting the batch to represent multiple
+inference requests.
 
-.. _section-stateful-models:
+### Stateful Models
 
-Stateful Models
----------------
+With respect to Triton's schedulers, a *stateful* model does maintain
+state between inference requests. The model is expecting multiple
+inference requests that together form a sequence of inferences that
+must be routed to the same model instance so that the state being
+maintained by the model is correctly updated. Moreover, the model may
+require that Triton provide *control* signals indicating, for example,
+the start and end of the sequence.
 
-With respect to Triton's schedulers, a *stateful* model (or stateful
-backend) does maintain state between inference requests. The model is
-expecting multiple inference requests that together form a sequence of
-inferences that must be routed to the same model instance so that the
-state being maintained by the model is correctly updated. Moreover,
-the model may require that Triton provide *control* signals
-indicating, for example, sequence start.
-
-The :ref:`sequence batcher <section-sequence-batcher>` must be used
-for these stateful models. As explained below, the sequence batcher
-ensures that all inference requests in a sequence get routed to the
-same model instance so that the model can maintain state
+The [sequence batcher](model_configuration.md#sequence-batcher) must
+be used for these stateful models. As explained below, the sequence
+batcher ensures that all inference requests in a sequence get routed
+to the same model instance so that the model can maintain state
 correctly. The sequence batcher also communicates with the model to
 indicate when a sequence is starting, when a sequence is ending, when
 a sequence has a inference request ready for execution, and the
-correlation ID of the sequence.
+*correlation ID* of the sequence.
 
-As explained in :ref:`section-client-api-stateful-models`, when making
-inference requests for a stateful model, the client application must
-provide the same correlation ID to all requests in a sequence, and
-must also mark the start and end of the sequence. The correlation ID
-allows Triton to identify that the requests belong to the same
-sequence.
+When making inference requests for a stateful model, the client
+application must provide the same correlation ID to all requests in a
+sequence, and must also mark the start and end of the sequence. The
+correlation ID allows Triton to identify that the requests belong to
+the same sequence.
 
-Control Inputs
-^^^^^^^^^^^^^^
+#### Control Inputs
 
 For a stateful model to operate correctly with the sequence batcher,
 the model must typically accept one or more *control* input tensors
 that Triton uses to communicate with the model. The
-:cpp:var:`nvidia::inferenceserver::ModelSequenceBatching::Control`
-section of the sequence batcher configuration indicates how the model
-exposes the tensors that the sequence batcher should use for these
+*ModelSequenceBatching::Control* section of the [model
+configuration](model_configuration.md) indicates how the model exposes
+the tensors that the sequence batcher should use for these
 controls. All controls are optional. Below is portion of a model
 configuration that shows an example configuration for all the
-available control signals::
+available control signals.
 
-  sequence_batching {
-    control_input [
-      {
-        name: "START"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_START
-            fp32_false_true: [ 0, 1 ]
-          }
-        ]
-      },
-      {
-        name: "END"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_END
-            fp32_false_true: [ 0, 1 ]
-          }
-        ]
-      },
-      {
-        name: "READY"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_READY
-            fp32_false_true: [ 0, 1 ]
-          }
-        ]
-      },
-      {
-        name: "CORRID"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_CORRID
-            data_type: TYPE_UINT64
-          }
-        ]
-      }
-    ]
-  }
+```
+sequence_batching {
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "END"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_END
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "READY"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "CORRID"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_CORRID
+          data_type: TYPE_UINT64
+        }
+      ]
+    }
+  ]
+}
+```
 
 * **Start**: The start input tensor is specified using
   CONTROL_SEQUENCE_START in the configuration. The example
@@ -194,18 +257,13 @@ available control signals::
   the batch-size. Each element in the tensor indicates the correlation
   ID of the sequence in the corresponding batch slot.
 
-Scheduling Strategies
-^^^^^^^^^^^^^^^^^^^^^
+#### Scheduling Strategies
 
 The sequence batcher can employ one of two scheduling strategies when
 deciding how to batch the sequences that are routed to the same model
-instance. These strategies are :ref:`section-sequence-batcher-direct`
-and :ref:`section-sequence-batcher-oldest`.
+instance. These strategies are [direct](#direct) and [oldest](#oldest).
 
-.. _section-sequence-batcher-direct:
-
-Direct
-~~~~~~
+##### Direct
 
 With the Direct scheduling strategy the sequence batcher ensures not
 only that all inference requests in a sequence are routed to the same
@@ -217,54 +275,56 @@ so that the state is correctly updated.
 
 As an example of the sequence batcher using the Direct scheduling
 strategy, assume a TensorRT stateful model that has the following
-model configuration::
+model configuration.
 
-  name: "direct_stateful_model"
-  platform: "tensorrt_plan"
-  max_batch_size: 2
-  sequence_batching {
-    max_sequence_idle_microseconds: 5000000
-    direct { }
-    control_input [
-      {
-        name: "START"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_START
-            fp32_false_true: [ 0, 1 ]
-          }
-        ]
-      },
-      {
-        name: "READY"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_READY
-            fp32_false_true: [ 0, 1 ]
-          }
-        ]
-      }
-    ]
+```
+name: "direct_stateful_model"
+platform: "tensorrt_plan"
+max_batch_size: 2
+sequence_batching {
+  max_sequence_idle_microseconds: 5000000
+  direct { }
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "READY"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    }
+  ]
+}
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_FP32
+    dims: [ 100, 100 ]
   }
-  input [
-    {
-      name: "INPUT"
-      data_type: TYPE_FP32
-      dims: [ 100, 100 ]
-    }
-  ]
-  output [
-    {
-      name: "OUTPUT"
-      data_type: TYPE_FP32
-      dims: [ 10 ]
-    }
-  ]
-  instance_group [
-    {
-      count: 2
-    }
-  ]
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_FP32
+    dims: [ 10 ]
+  }
+]
+instance_group [
+  {
+    count: 2
+  }
+]
+```
 
 The sequence_batching section indicates that the model should use the
 sequence batcher and the Direct scheduling strategy. In this example
@@ -276,7 +336,7 @@ batch-size 2 inferences. The following figure shows a representation
 of the sequence batcher and the inference resources specified by this
 configuration.
 
-.. image:: images/sequence_example0.png
+![Sequence Batching Example](images/sequence_example0.png)
 
 Each model instance is maintaining state for each batch slot, and is
 expecting all inference requests for a given sequence to be routed to
@@ -316,7 +376,7 @@ before any inference request in sequences 2-5, etc.
 The right of the figure shows how the inference request sequences are
 scheduled onto the model instances over time.
 
-.. image:: images/sequence_example1.png
+![Sequence Batcher Example](images/sequence_example1.png)
 
 The following figure shows the sequence batcher uses the control input
 tensors to communicate with the model. The figure shows two sequences
@@ -348,82 +408,81 @@ model. Over time the following happens:
 * The processing continues in a similar manner for the other inference
   requests.
 
-.. image:: images/sequence_example2.png
+![Sequence Batcher Example](images/sequence_example2.png)
 
-.. _section-sequence-batcher-oldest:
-
-Oldest
-~~~~~~
+##### Oldest
 
 With the Oldest scheduling strategy the sequence batcher ensures that
 all inference requests in a sequence are routed to the same model
-instance and then uses the :ref:`dynamic batcher
-<section-dynamic-batcher>` to batch together multiple inferences from
-different sequences into a batch that inferences together.  With this
-strategy the model must typically use the CONTROL_SEQUENCE_CORRID
-control so that it knows which sequence each inference request in the
-batch belongs to. The CONTROL_SEQUENCE_READY control is typically not
-needed because all inferences in the batch will always be ready for
-inference.
+instance and then uses the [dynamic
+batcher](model_configuration.md#dynamic-batcher) to batch together
+multiple inferences from different sequences into a batch that
+inferences together.  With this strategy the model must typically use
+the CONTROL_SEQUENCE_CORRID control so that it knows which sequence
+each inference request in the batch belongs to. The
+CONTROL_SEQUENCE_READY control is typically not needed because all
+inferences in the batch will always be ready for inference.
 
 As an example of the sequence batcher using the Oldest scheduling
 strategy, assume a stateful model that has the following model
-configuration::
+configuration:
 
-  name: "oldest_stateful_model"
-  platform: "custom"
-  max_batch_size: 2
-  sequence_batching {
-    max_sequence_idle_microseconds: 5000000
-    oldest
-      {
-        max_candidate_sequences: 4
-        preferred_batch_size: [ 2 ]
-      }
-    control_input [
-      {
-        name: "START"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_START
-            fp32_false_true: [ 0, 1 ]
-          }
-        ]
-      },
-      {
-        name: "END"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_END
-            fp32_false_true: [ 0, 1 ]
-          }
-        ]
-      },
-      {
-        name: "CORRID"
-        control [
-          {
-            kind: CONTROL_SEQUENCE_CORRID
-            data_type: TYPE_UINT64
-          }
-        ]
-      }
-    ]
+```
+name: "oldest_stateful_model"
+platform: "custom"
+max_batch_size: 2
+sequence_batching {
+  max_sequence_idle_microseconds: 5000000
+  oldest
+    {
+      max_candidate_sequences: 4
+      preferred_batch_size: [ 2 ]
+    }
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "END"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_END
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "CORRID"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_CORRID
+          data_type: TYPE_UINT64
+        }
+      ]
+    }
+  ]
+}
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_FP32
+    dims: [ 100, 100 ]
   }
-  input [
-    {
-      name: "INPUT"
-      data_type: TYPE_FP32
-      dims: [ 100, 100 ]
-    }
-  ]
-  output [
-    {
-      name: "OUTPUT"
-      data_type: TYPE_FP32
-      dims: [ 10 ]
-    }
-  ]
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_FP32
+    dims: [ 10 ]
+  }
+]
+```
 
 The sequence_batching section indicates that the model should use the
 sequence batcher and the Oldest scheduling strategy. The Oldest
@@ -434,7 +493,7 @@ batches of size 2. In this example the model requires a *start*,
 batcher. The following figure shows a representation of the sequence
 batcher and the inference resources specified by this configuration.
 
-.. image:: images/dyna_sequence_example0.png
+![Sequence Batching Example](images/dyna_sequence_example0.png)
 
 Using the Oldest scheduling strategy, the sequence batcher:
 
@@ -469,12 +528,9 @@ oldest requests but never includes more than one request from a given
 sequence in a batch (for example, the last two inferences in sequence
 D are not batched together).
 
-.. image:: images/dyna_sequence_example1.png
+![Sequence Batcher Example](images/dyna_sequence_example1.png)
 
-.. _section-ensemble-models:
-
-Ensemble Models
----------------
+### Ensemble Models
 
 An ensemble model represents a *pipeline* of one or more models and
 the connection of input and output tensors between those
@@ -484,90 +540,91 @@ procedure that involves multiple models, such as "data preprocessing
 purpose can avoid the overhead of transferring intermediate tensors
 and minimize the number of requests that must be sent to Triton.
 
-The :ref:`ensemble scheduler <section-ensemble-scheduler>` must be used for
-ensemble models, regardless of the scheduler used by the models within the
-ensemble. With respect to the ensemble scheduler, an *ensemble* model is not
-an actual model. Instead, it specifies the dataflow between models within the
-ensemble as :cpp:var:`Step
-<nvidia::inferenceserver::ModelEnsembling::Step>`. The
-scheduler collects the output tensors in each step, provides them as input
-tensors for other steps according to the specification. In spite of that, the
-ensemble model is still viewed as a single model from an external view.
-:ref:`section-ensemble-image-classification-example` is an example that performs
-image classification using an ensemble model.
+The [ensemble scheduler](#ensemble-scheduler) must be used for
+ensemble models, regardless of the scheduler used by the models within
+the ensemble. With respect to the ensemble scheduler, an *ensemble*
+model is not an actual model. Instead, it specifies the dataflow
+between models within the ensemble as *ModelEnsembling::Step* entries
+in the model configuration. The scheduler collects the output tensors
+in each step, provides them as input tensors for other steps according
+to the specification. In spite of that, the ensemble model is still
+viewed as a single model from an external view.
 
-Note that the ensemble models will inherit the characteristics of the models
-involved, so the meta-data in the request header must comply with the models
-within the ensemble. For instance, if one of the models is stateful model, then
-the inference request for the ensemble model should contain the information
-mentioned in the previous :ref:`section <section-stateful-models>`, which will
-be provided to the stateful model by the scheduler.
+Note that the ensemble models will inherit the characteristics of the
+models involved, so the meta-data in the request header must comply
+with the models within the ensemble. For instance, if one of the
+models is stateful model, then the inference request for the ensemble
+model should contain the information mentioned in [Stateful
+Models](#stateful-models), which will be provided to the stateful
+model by the scheduler.
 
-As a running example, consider an ensemble model for image classification and
-segmentation that has the following model configuration::
+As an example consider an ensemble model for image classification and
+segmentation that has the following model configuration:
 
-  name: "ensemble_model"
-  platform: "ensemble"
-  max_batch_size: 1
-  input [
+```
+name: "ensemble_model"
+platform: "ensemble"
+max_batch_size: 1
+input [
+  {
+    name: "IMAGE"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "CLASSIFICATION"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+  },
+  {
+    name: "SEGMENTATION"
+    data_type: TYPE_FP32
+    dims: [ 3, 224, 224 ]
+  }
+]
+ensemble_scheduling {
+  step [
     {
-      name: "IMAGE"
-      data_type: TYPE_STRING
-      dims: [ 1 ]
-    }
-  ]
-  output [
-    {
-      name: "CLASSIFICATION"
-      data_type: TYPE_FP32
-      dims: [ 1000 ]
+      model_name: "image_preprocess_model"
+      model_version: -1
+      input_map {
+        key: "RAW_IMAGE"
+        value: "IMAGE"
+      }
+      output_map {
+        key: "PREPROCESSED_OUTPUT"
+        value: "preprocessed_image"
+      }
     },
     {
-      name: "SEGMENTATION"
-      data_type: TYPE_FP32
-      dims: [ 3, 224, 224 ]
+      model_name: "classification_model"
+      model_version: -1
+      input_map {
+        key: "FORMATTED_IMAGE"
+        value: "preprocessed_image"
+      }
+      output_map {
+        key: "CLASSIFICATION_OUTPUT"
+        value: "CLASSIFICATION"
+      }
+    },
+    {
+      model_name: "segmentation_model"
+      model_version: -1
+      input_map {
+        key: "FORMATTED_IMAGE"
+        value: "preprocessed_image"
+      }
+      output_map {
+        key: "SEGMENTATION_OUTPUT"
+        value: "SEGMENTATION"
+      }
     }
   ]
-  ensemble_scheduling {
-    step [
-      {
-        model_name: "image_preprocess_model"
-        model_version: -1
-        input_map {
-          key: "RAW_IMAGE"
-          value: "IMAGE"
-        }
-        output_map {
-          key: "PREPROCESSED_OUTPUT"
-          value: "preprocessed_image"
-        }
-      },
-      {
-        model_name: "classification_model"
-        model_version: -1
-        input_map {
-          key: "FORMATTED_IMAGE"
-          value: "preprocessed_image"
-        }
-        output_map {
-          key: "CLASSIFICATION_OUTPUT"
-          value: "CLASSIFICATION"
-        }
-      },
-      {
-        model_name: "segmentation_model"
-        model_version: -1
-        input_map {
-          key: "FORMATTED_IMAGE"
-          value: "preprocessed_image"
-        }
-        output_map {
-          key: "SEGMENTATION_OUTPUT"
-          value: "SEGMENTATION"
-        }
-      }
-    ]
-  }
+}
+```
 
 The ensemble_scheduling section indicates that the ensemble scheduler will be
 used and that the ensemble model consists of three different models. Each element
@@ -591,7 +648,7 @@ model and the segmentation model are being served, the client applications will
 see them as four different models which can process requests independently.
 However, the ensemble scheduler will view the ensemble model as the following.
 
-.. image:: images/ensemble_example0.png
+![Ensemble Example](images/ensemble_example0.png)
 
 When an inference request for the ensemble model is received, the ensemble
 scheduler will:

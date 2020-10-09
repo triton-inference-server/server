@@ -1,5 +1,5 @@
-#!/bin/bash
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+<!--
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,10 +24,12 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
 
-for pf in "$@"; do
-    bname=$(basename $pf)
-    echo -e "$bname" > $bname.rst
-    echo -e "====================\n" >> $bname.rst
-    sed -n -e 's/.*\/\/@@\(.*\)/\1/p' $pf >> $bname.rst
-done
+[![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
+
+# Triton Inference Server
+
+**NOTE: You are currently on the r20.10 branch which tracks
+stabilization towards the next release. This branch is not usable
+during stabilization.**
