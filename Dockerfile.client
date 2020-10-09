@@ -27,6 +27,9 @@
 # Default setting is building on nvidia/cuda:10.1-devel-ubuntu18.04
 ARG BASE_IMAGE=nvidia/cuda:10.1-devel-ubuntu18.04
 
+ARG TRITON_COMMON_REPO_TAG=main
+ARG TRITON_CORE_REPO_TAG=main
+
 FROM ${BASE_IMAGE}
 
 # Ensure apt-get won't prompt for selecting options
@@ -75,9 +78,13 @@ COPY build build
 COPY src/clients src/clients
 COPY src/core src/core
 
+ARG TRITON_COMMON_REPO_TAG
+ARG TRITON_CORE_REPO_TAG
 RUN mkdir builddir && cd builddir && \
     cmake -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
+          -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+          -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
           -DTRITON_ENABLE_GRPC=ON \
           -DTRITON_ENABLE_HTTP=ON ../build && \
     make -j16 client

@@ -810,9 +810,16 @@ PlanBackend::Context::InitializeShapeInputBinding(
         (engine_->getBindingFormat(binding_index) ==
          nvinfer1::TensorFormat::kLINEAR);
     if (!io_binding_info.is_linear_format_) {
-      io_binding_info.format_element_size_ =
-          engine_->getBindingComponentsPerElement(binding_index) *
-          engine_->getBindingBytesPerComponent(binding_index);
+      io_binding_info.vectorized_dim_ =
+          engine_->getBindingVectorizedDim(binding_index);
+      io_binding_info.components_per_element_ =
+          engine_->getBindingComponentsPerElement(binding_index);
+      if (io_binding_info.vectorized_dim_ == -1) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unexpected vectorized dim is -1 for non-linear input '" +
+                input_name + "' for " + name_);
+      }
     }
 
     nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
@@ -949,9 +956,16 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         (engine_->getBindingFormat(binding_index) ==
          nvinfer1::TensorFormat::kLINEAR);
     if (!io_binding_info.is_linear_format_) {
-      io_binding_info.format_element_size_ =
-          engine_->getBindingComponentsPerElement(binding_index) *
-          engine_->getBindingBytesPerComponent(binding_index);
+      io_binding_info.vectorized_dim_ =
+          engine_->getBindingVectorizedDim(binding_index);
+      io_binding_info.components_per_element_ =
+          engine_->getBindingComponentsPerElement(binding_index);
+      if (io_binding_info.vectorized_dim_ == -1) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unexpected vectorized dim is -1 for non-linear input '" +
+                input_name + "' for " + name_);
+      }
     }
 
     // Detect whether dynamic or not
@@ -1027,16 +1041,22 @@ PlanBackend::Context::InitializeExecuteInputBinding(
                 input_name + "' for " + name_);
       }
       if (!io_binding_info.is_linear_format_) {
-        // FIXME case where vectorized dim is first dimension
-        byte_size = io_binding_info.format_element_size_ * context.context_->getStrides(io_index).d[0] *
-                    context.max_dims_[io_index].d[0];
+        maximum_dims[io_binding_info.vectorized_dim_] +=
+            (io_binding_info.components_per_element_ -
+             (maximum_dims[io_binding_info.vectorized_dim_] %
+              io_binding_info.components_per_element_));
+        byte_size = GetByteSize(dt, maximum_dims);
       }
     } else {
-      byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
-      if (!io_binding_info.is_linear_format_) {
-        // FIXME case where vectorized dim is first dimension
-        byte_size = io_binding_info.format_element_size_ * context.context_->getStrides(io_index).d[0] *
-                    model_config_dims[0];
+      if (io_binding_info.is_linear_format_) {
+        byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
+      } else {
+        auto dims = model_config_dims;
+        dims[io_binding_info.vectorized_dim_] +=
+            (io_binding_info.components_per_element_ -
+             (dims[io_binding_info.vectorized_dim_] %
+              io_binding_info.components_per_element_));
+        byte_size = GetByteSize(max_batch_size_, dt, dims);
       }
     }
 
@@ -1064,6 +1084,12 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   io_binding_info.byte_size_ = max_byte_size;
   io_binding_info.buffer_ = buffer;
   io_binding_info.buffer_is_ragged_ = is_ragged;
+  if (io_binding_info.buffer_is_ragged_ && !io_binding_info.is_linear_format_) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "unexpected allow-ragged for non-linear input '" + input_name +
+            "' for " + name_);
+  }
 
   // Set buffer bindings of all optimization profile since buffer is allocated
   for (auto& trt_context : trt_contexts_) {
@@ -1266,9 +1292,16 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
           (engine_->getBindingFormat(binding_index) ==
            nvinfer1::TensorFormat::kLINEAR);
       if (!io_binding_info.is_linear_format_) {
-        io_binding_info.format_element_size_ =
-            engine_->getBindingComponentsPerElement(binding_index) *
-            engine_->getBindingBytesPerComponent(binding_index);
+        io_binding_info.vectorized_dim_ =
+            engine_->getBindingVectorizedDim(binding_index);
+        io_binding_info.components_per_element_ =
+            engine_->getBindingComponentsPerElement(binding_index);
+        if (io_binding_info.vectorized_dim_ == -1) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "unexpected vectorized dim is -1 for non-linear output '" +
+                  io.name() + "' for " + name_);
+        }
       }
 
       const DimsList& model_config_dims =
@@ -1373,9 +1406,16 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
           (engine_->getBindingFormat(binding_index) ==
            nvinfer1::TensorFormat::kLINEAR);
       if (!io_binding_info.is_linear_format_) {
-        io_binding_info.format_element_size_ =
-            engine_->getBindingComponentsPerElement(binding_index) *
-            engine_->getBindingBytesPerComponent(binding_index);
+        io_binding_info.vectorized_dim_ =
+            engine_->getBindingVectorizedDim(binding_index);
+        io_binding_info.components_per_element_ =
+            engine_->getBindingComponentsPerElement(binding_index);
+        if (io_binding_info.vectorized_dim_ == -1) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "unexpected vectorized dim is -1 for non-linear output '" +
+                  io.name() + "' for " + name_);
+        }
       }
 
       const DimsList& model_config_dims =
@@ -1388,6 +1428,14 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
             name_, io.name(), engine_dims, model_config_dims, support_batching_,
             (!engine_->hasImplicitBatchDimension()),
             false /* compare_exact */));
+      }
+
+      if (io_binding_info.buffer_is_ragged_ &&
+          !io_binding_info.is_linear_format_) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unexpected allow-ragged for non-linear output '" + io.name() +
+                "' for " + name_);
       }
 
       int64_t byte_size;
@@ -1735,8 +1783,11 @@ PlanBackend::Context::BuildCudaGraphV2(
 
   std::vector<int64_t> cuda_graph_key;
   auto cuda_graph = TensorRTContext::CudaGraph();
-  if (!SetCudaGraphShape(trt_context, graph_spec, &cuda_graph_key, &cuda_graph)
-           .IsOk()) {
+  auto status =
+      SetCudaGraphShape(trt_context, graph_spec, &cuda_graph_key, &cuda_graph);
+  if (!status.IsOk()) {
+    LOG_ERROR << "Failed to set cuda graph shape for " << name_
+              << status.Message();
     return false;
   }
 
@@ -1848,7 +1899,7 @@ PlanBackend::Context::SetCudaGraphShape(
         } else {
           cuda_graph->input_dims_.emplace_back();
           cuda_graph->input_dims_.back().push_back(batch_size);
-          lower_bound_key.push_back(batch_size);
+          lower_bound_key.push_back(lower_bound_key[0]);
         }
         auto& shape = cuda_graph->input_dims_.back();
         shape.insert(shape.end(), it->second.begin(), it->second.end());
@@ -2330,17 +2381,8 @@ PlanBackend::Context::Run(
                 &input_dims),
             "error setting the binding dimension");
 
-        size_t total_byte_size = 0;
-        if (io_binding_info.is_linear_format_) {
-          datatype = batch_input.data_type();
-          total_byte_size = GetByteSize(datatype, ragged_shape);
-        } else {
-          // FIXME case where vectorized dim is first dimension
-          total_byte_size =
-              io_binding_info.format_element_size_ *
-              citr->second.context_->getStrides(binding_index).d[0] *
-              ragged_shape[0];
-        }
+        datatype = batch_input.data_type();
+        size_t total_byte_size = GetByteSize(datatype, ragged_shape);
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
@@ -2385,16 +2427,7 @@ PlanBackend::Context::Run(
                 &input_dims),
             "error setting the binding dimension");
 
-        size_t total_byte_size = 0;
-        if (io_binding_info.is_linear_format_) {
-          total_byte_size = GetByteSize(datatype, ragged_shape);
-        } else {
-          // FIXME case where vectorized dim is first dimension
-          total_byte_size =
-              io_binding_info.format_element_size_ *
-              citr->second.context_->getStrides(binding_index).d[0] *
-              ragged_shape[0];
-        }
+        size_t total_byte_size = GetByteSize(datatype, ragged_shape);
 
         collector.ProcessTensor(
             name, datatype, static_cast<char*>(io_binding_info.buffer_),
@@ -2437,11 +2470,15 @@ PlanBackend::Context::Run(
       if (io_binding_info.is_linear_format_) {
         total_byte_size = GetByteSize(datatype, batchn_shape);
       } else {
-        // FIXME case where vectorized dim is first dimension
-        total_byte_size =
-            io_binding_info.format_element_size_ *
-            citr->second.context_->getStrides(binding_index).d[0] *
-            batchn_shape[0];
+        int vectorized_dim = io_binding_info.vectorized_dim_;
+        if (!UseTensorRTv2API(engine_) && (max_batch_size_ != NO_BATCHING)) {
+          vectorized_dim++;
+        }
+        batchn_shape[vectorized_dim] +=
+            (io_binding_info.components_per_element_ -
+             (batchn_shape[vectorized_dim] %
+              io_binding_info.components_per_element_));
+        total_byte_size = GetByteSize(datatype, batchn_shape);
       }
 
       if ((engine_->isShapeBinding(binding_index)) && (support_batching_)) {

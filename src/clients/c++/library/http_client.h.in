@@ -72,7 +72,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Create a client that can be used to communicate with the server.
   /// \param client Returns a new InferenceServerHttpClient object.
-  /// \param server_url The inference server name and port.
+  /// \param server_url The inference server name, port and optional
+  /// base path in the following format: host:port/<base-path>.
   /// \param verbose If true generate verbose output when contacting
   /// the inference server.
   /// \return Error object indicating success or failure.

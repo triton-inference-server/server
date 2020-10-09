@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
-EXPECTED_NUM_TESTS="42"
+EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="42"}
 
 if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
     TEST_SYSTEM_SHARED_MEMORY="0"
@@ -49,9 +49,7 @@ if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
     TEST_CUDA_SHARED_MEMORY="0"
 fi
 
-if [ -z "$TEST_VALGRIND" ]; then
-    TEST_VALGRIND="0"
-else
+if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_LOG_BASE="./valgrind_test"
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
@@ -67,9 +65,12 @@ MODELDIR=`pwd`/models
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 SERVER=${OPTDIR}/tritonserver/bin/tritonserver
+BACKEND_DIR=${OPTDIR}/tritonserver/backends
+TF_VERSION=${TF_VERSION:=1}
 
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
+SERVER_ARGS_EXTRA="--exit-timeout-secs=120 --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -104,7 +105,7 @@ for TARGET in cpu gpu; do
         fi
         # set strict readiness=false on CPU-only device to allow
         # unsuccessful load of TensorRT plans, which require GPU.
-        SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --strict-readiness=false --exit-on-error=false"
+        SERVER_ARGS="--model-repository=${MODELDIR} --strict-readiness=false --exit-on-error=false ${SERVER_ARGS_EXTRA}"
     fi
 
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log

@@ -530,6 +530,11 @@ CustomBackend::Context::Run(
   // send any responses and so send an error response and releasee
   // each request.
   if (err != 0) {
+    // response may be created if the custom backend calls GetOutput()
+    // on the output. In this case, a different response for error will
+    // be sent and thus the response in 'work_io_contexts' needs to be released
+    // explicitly to ensure its lifecycle ends properly.
+    work_io_contexts.clear();
     InferenceRequest::RespondIfError(
         requests,
         Status(

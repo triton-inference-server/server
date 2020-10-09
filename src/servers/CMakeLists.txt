@@ -393,6 +393,7 @@ target_link_libraries(
   PRIVATE triton-core-backendapi
   PRIVATE triton-core-serverapi
   PRIVATE triton-common-json
+  PRIVATE triton-common-table-printer
   PRIVATE ${TRITON_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf
 )

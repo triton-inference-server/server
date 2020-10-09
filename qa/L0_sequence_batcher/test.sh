@@ -42,18 +42,28 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
 
-if [ -z "$TEST_VALGRIND" ]; then
-    TEST_VALGRIND="0"
-else
+if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
     SERVER_TIMEOUT=1200
     rm -f *.valgrind.log
+
+    # Shortened tests due valgrind overhead
+    MODEL_TRIALS="0 v"
+    NO_DELAY_TESTS="test_simple_sequence \
+                      test_no_sequence_start \
+                      test_batch_size"
+    DELAY_TESTS="test_backlog_fill_no_end \
+                    test_backlog_sequence_timeout \
+                    test_ragged_batch"
 fi
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 SERVER=${OPTDIR}/tritonserver/bin/tritonserver
+BACKEND_DIR=${OPTDIR}/tritonserver/backends
+TF_VERSION=${TF_VERSION:=1}
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
 
 source ../common/util.sh
 
@@ -62,6 +72,30 @@ RET=0
 # If BACKENDS not specified, set to all
 BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx plan custom"}
 export BACKENDS
+
+# If MODEL_TRIALS not specified set to 0 1 2 3 v
+MODEL_TRIALS=${MODEL_TRIALS:="0 1 2 4 v"}
+
+# Basic sequence batcher tests
+NO_DELAY_TESTS=${NO_DELAY_TESTS:="test_simple_sequence \
+                                    test_length1_sequence \
+                                    test_batch_size \
+                                    test_no_sequence_start \
+                                    test_no_sequence_start2 \
+                                    test_no_sequence_end \
+                                    test_no_correlation_id"}
+
+# Tests that use scheduler delay
+DELAY_TESTS=${DELAY_TESTS:="test_backlog_fill \
+                              test_backlog_fill_no_end \
+                              test_backlog_same_correlation_id \
+                              test_backlog_same_correlation_id_no_end \
+                              test_backlog_sequence_timeout \
+                              test_half_batch \
+                              test_skip_batch \
+                              test_full_batch \
+                              test_ragged_batch \
+                              test_backlog"}
 
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
@@ -105,21 +139,23 @@ for BACKEND in $BACKENDS; do
 done
 
 for MODEL in $MODELS; do
+  if [[ ! "$TEST_VALGRIND" -eq 1 ]]; then
     cp -r $MODEL models1/. && \
-        (cd models1/$(basename $MODEL) && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+      (cd models1/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
     cp -r $MODEL models2/. && \
-        (cd models2/$(basename $MODEL) && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
-            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
-            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
+      (cd models2/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
     cp -r $MODEL models4/. && \
-        (cd models4/$(basename $MODEL) && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
-            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
-            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+      (cd models4/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+  fi
 done
 
 MODELS=""
@@ -178,7 +214,7 @@ done
 
 # Same test work on all models since they all have same total number
 # of batch slots.
-for model_trial in v 0 1 2 4; do
+for model_trial in $MODEL_TRIALS; do
     export NO_BATCHING=1 &&
         [[ "$model_trial" != "0" ]] && export NO_BATCHING=0
     export MODEL_INSTANCES=1 &&
@@ -199,15 +235,8 @@ for model_trial in v 0 1 2 4; do
     export BATCHER_TYPE="VARIABLE" &&
         [[ "$model_trial" != "v" ]] && export BATCHER_TYPE="FIXED"
 
-    for i in \
-            test_simple_sequence \
-            test_length1_sequence \
-            test_batch_size \
-            test_no_sequence_start \
-            test_no_sequence_start2 \
-            test_no_sequence_end \
-            test_no_correlation_id ; do
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+    for i in $NO_DELAY_TESTS; do
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         
         if [ "$TEST_VALGRIND" -eq 1 ]; then
@@ -257,17 +286,7 @@ for model_trial in v 0 1 2 4; do
 
     # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
     # scheduler is delayed and requests can collect in the queue.
-    for i in \
-            test_backlog_fill \
-            test_backlog_fill_no_end \
-            test_backlog_same_correlation_id \
-            test_backlog_same_correlation_id_no_end \
-            test_backlog_sequence_timeout \
-            test_half_batch \
-            test_skip_batch \
-            test_full_batch \
-            test_ragged_batch \
-            test_backlog ; do
+    for i in $DELAY_TESTS; do
         export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=3 &&
             [[ "$i" != "test_backlog_fill_no_end" ]] && export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=2 &&
             [[ "$i" != "test_backlog_fill" ]] &&
@@ -278,7 +297,7 @@ for model_trial in v 0 1 2 4; do
             [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRITONSERVER_DELAY_SCHEDULER=8 &&
             [[ "$i" != "test_half_batch" ]] && export TRITONSERVER_DELAY_SCHEDULER=4 &&
             [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRITONSERVER_DELAY_SCHEDULER=12
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         
         if [ "$TEST_VALGRIND" -eq 1 ]; then
@@ -349,7 +368,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
       export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
       export TRITONSERVER_DELAY_SCHEDULER=12
 
-      SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+      SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR ${SERVER_ARGS_EXTRA}"
       SERVER_LOG="./$i.$MODEL_DIR.serverlog"
       
       if [ "$TEST_VALGRIND" -eq 1 ]; then

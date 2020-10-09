@@ -31,7 +31,10 @@ from setuptools import find_packages
 from setuptools import setup
 from itertools import chain
 
-IS_MANYLINUX_BUILD = "--plat-name=manylinux1_x86_64" in sys.argv
+if "--plat-name" in sys.argv:
+    PLATFORM_FLAG = sys.argv[sys.argv.index("--plat-name") + 1]
+else:
+    PLATFORM_FLAG = 'any'
 
 if 'VERSION' not in os.environ:
     raise Exception('envvar VERSION must be specified')
@@ -48,10 +51,7 @@ try:
             self.root_is_pure = False
 
         def get_tag(self):
-            if IS_MANYLINUX_BUILD:
-                pyver, abi, plat = 'py3', 'none', 'manylinux1_x86_64'
-            else:
-                pyver, abi, plat = 'py3', 'none', 'any'
+            pyver, abi, plat = 'py3', 'none', PLATFORM_FLAG
             return pyver, abi, plat
 except ImportError:
     bdist_wheel = None
@@ -77,7 +77,7 @@ extras_require = {
 extras_require['all'] = list(chain(extras_require.values()))
 
 platform_package_data = []
-if IS_MANYLINUX_BUILD:
+if PLATFORM_FLAG != 'any':
     platform_package_data += ['libcshm.so']
     if bool(os.environ.get('CUDA_VERSION', 0)):
         platform_package_data += ['libccudashm.so']
@@ -85,7 +85,7 @@ if IS_MANYLINUX_BUILD:
 data_files = [
     ("", ["LICENSE.txt"]),
 ]
-if IS_MANYLINUX_BUILD:
+if PLATFORM_FLAG != 'any':
     data_files += [("bin", ["perf_analyzer", "perf_client"])]
 
 setup(

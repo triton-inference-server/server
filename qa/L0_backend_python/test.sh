@@ -103,6 +103,29 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Triton non-graceful exit
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Trigger non-graceful termination of Triton
+kill -9 $SERVER_PID
+
+# Wait 10 seconds so that Python gRPC server can detect non-graceful exit
+sleep 10
+
+num_triton_procs=`ps aux | grep /opt/tritonserver/ | wc -l`
+
+if [ $num_triton_procs -ne 1 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python backend non-graceful exit test failed \n***"
+    RET=1
+fi
+
 # These models have errors in the initialization and finalization
 # steps and we want to ensure that correct error is being returned
 
