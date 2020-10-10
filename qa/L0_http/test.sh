@@ -65,6 +65,8 @@ SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
 rm -f *.log
 rm -f *.log.*
 
+set -e
+
 # Get the TensorFlow inception model
 mkdir -p models/inception_graphdef/1
 wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
@@ -75,10 +77,12 @@ mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.grap
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
 
 # Create model repository layout for ensemble image classification
-cp -r ../L0_docs/docs/examples/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception models/ && \
-cp -r ../L0_docs/docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble models/ && \
-mkdir -p models/image_preprocess_nchw_3x224x224_inception/1 && \
-mkdir -p models/preprocess_resnet50_ensemble/1 && \
+rm -fr models/image_preprocess_nchw_3x224x224_inception && \
+    rm -fr models/preprocess_resnet50_ensemble && \
+    cp -r ensemble_model_repository/image_preprocess_nchw_3x224x224_inception models/ && \
+    cp -r ensemble_model_repository/preprocess_resnet50_ensemble models/ && \
+    mkdir -p models/image_preprocess_nchw_3x224x224_inception/1 && \
+    mkdir -p models/preprocess_resnet50_ensemble/1
 
 # Obtain actual models
 cp -r /data/inferenceserver/${REPO_VERSION}/c2_model_store/resnet50_netdef models/ && \
