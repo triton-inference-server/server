@@ -58,10 +58,6 @@ except ImportError:
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 
-with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
-    long_description = f.read()
-
-
 def req_file(filename, folder="requirements"):
     with open(os.path.join(folder, filename)) as f:
         content = f.readlines()
@@ -95,7 +91,6 @@ setup(
     author_email='sw-dl-triton@nvidia.com',
     description=
     "Python client library and utilities for communicating with Triton Inference Server",
-    long_description=long_description,
     license='BSD',
     url='https://developer.nvidia.com/nvidia-triton-inference-server',
     keywords=[
