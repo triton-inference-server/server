@@ -45,14 +45,12 @@ endif() # NOT WIN32
 
 configure_file(../../../../VERSION VERSION COPYONLY)
 configure_file(LICENSE.txt LICENSE.txt COPYONLY)
-configure_file(README.md README.md COPYONLY)
 configure_file(setup.py setup.py COPYONLY)
 file(COPY requirements DESTINATION .)
 
 set(WHEEL_DEPENDS 
       ${CMAKE_CURRENT_BINARY_DIR}/VERSION
       ${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt
-      ${CMAKE_CURRENT_BINARY_DIR}/README.md
       ${CMAKE_CURRENT_BINARY_DIR}/setup.py
 )
 
