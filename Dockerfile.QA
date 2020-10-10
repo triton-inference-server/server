@@ -81,6 +81,8 @@ RUN mkdir -p qa/common && \
     mkdir qa/L0_secure_grpc/models && \
     cp -r docs/examples/model_repository/simple qa/L0_secure_grpc/models/. && \
     cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_analyzer/ && \
+    cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_grpc/ && \
+    cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_http/ && \
     cp /tmp/tritonbuild/install/bin/simple qa/L0_simple_lib/. && \
     cp /tmp/tritonbuild/install/bin/memory_alloc qa/L0_io/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/memory_test qa/L0_memory/.
