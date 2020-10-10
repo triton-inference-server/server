@@ -114,7 +114,6 @@ function main() {
   fi
   
   cp LICENSE.txt "${WHLDIR}"
-  cp README.md "${WHLDIR}"
   cp -r requirements "${WHLDIR}"
   cp setup.py "${WHLDIR}"
 
