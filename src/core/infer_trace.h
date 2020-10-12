@@ -30,7 +30,7 @@
 #include <memory>
 #include "src/core/constants.h"
 #include "src/core/status.h"
-#include "triton/core/tritonserver.h"
+#include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {
 

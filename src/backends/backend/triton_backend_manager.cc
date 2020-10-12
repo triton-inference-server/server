@@ -156,7 +156,7 @@ TritonBackend::ClearHandles()
 Status
 TritonBackend::LoadBackendLibrary()
 {
-  void* handle = dlopen(libpath_.c_str(), RTLD_LAZY);
+  void* handle = dlopen(libpath_.c_str(), RTLD_NOW | RTLD_LOCAL);
   if (handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
