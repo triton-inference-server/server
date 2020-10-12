@@ -277,7 +277,7 @@ The MSBuild.exe may need to be invoked twice for a successful build.
 
 The C++ client API exposes a class-based interface. The commented
 interface is available in
-[gpu_client.h](../src/clients/c%2B%2B/library/grpc_client.h.in),
+[grpc_client.h](../src/clients/c%2B%2B/library/grpc_client.h.in),
 [http_client.h](../src/clients/c%2B%2B/library/http_client.h.in),
 [common.h](../src/clients/c%2B%2B/library/common.h).
 
