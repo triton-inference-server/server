@@ -109,8 +109,7 @@ def gitclone(cwd, repo, tag, subdir):
     log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
     p = subprocess.Popen([
         'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
-        tag, 'https://github.com/triton-inference-server/{}.git'.format(repo),
-        subdir
+        tag, '{}/{}.git'.format(FLAGS.github_organization, repo), subdir
     ],
                          cwd=cwd)
     p.wait()
@@ -952,6 +951,14 @@ if __name__ == '__main__':
         default=None,
         help='Build parallelism. Defaults to 2 * number-of-cores.')
 
+    parser.add_argument(
+        '--github-organization',
+        type=str,
+        required=False,
+        default='https://github.com/triton-inference-server',
+        help=
+        'The GitHub organization containing the repos used for the build. Defaults to "https://github.com/triton-inference-server".'
+    )
     parser.add_argument('--version',
                         type=str,
                         required=False,
