@@ -112,19 +112,27 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+sleep 5
+
+triton_procs=`pgrep --parent $SERVER_PID`
+
+set +e
 # Trigger non-graceful termination of Triton
 kill -9 $SERVER_PID
 
 # Wait 10 seconds so that Python gRPC server can detect non-graceful exit
 sleep 10
 
-num_triton_procs=`ps aux | grep /opt/tritonserver/ | wc -l`
-
-if [ $num_triton_procs -ne 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Python backend non-graceful exit test failed \n***"
-    RET=1
-fi
+for triton_proc in $triton_procs; do
+    kill -0 $triton_proc > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Python backend non-graceful exit test failed \n***"
+        RET=1
+        break
+    fi
+done
+set -e
 
 # These models have errors in the initialization and finalization
 # steps and we want to ensure that correct error is being returned
@@ -138,7 +146,7 @@ set +e
 run_server_nowait
 wait $SERVER_PID
 
-grep "Exception calling application: name 'lorem_ipsum' is not defined" $SERVER_LOG
+grep "name 'lorem_ipsum' is not defined" $SERVER_LOG
 
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -152,6 +160,7 @@ mkdir -p models/fini_error/1/
 cp ../python_models/fini_error/model.py ./models/fini_error/1/
 cp ../python_models/fini_error/config.pbtxt ./models/fini_error/
 
+set +e
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -162,13 +171,14 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
-grep "Exception calling application: name 'undefined_variable' is not defined" $SERVER_LOG
+grep "name 'undefined_variable' is not defined" $SERVER_LOG
 
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** fini_error model test failed \n***"
     RET=1
 fi
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

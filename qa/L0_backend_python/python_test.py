@@ -36,9 +36,9 @@ import test_util as tu
 import os
 import requests as httpreq
 
-from tritonclientutils import *
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
+from tritonclient.utils import *
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
 
 
 class PythonTest(tu.TestResultCollector):
