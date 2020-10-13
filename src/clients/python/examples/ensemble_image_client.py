@@ -50,9 +50,6 @@ def parse_model_grpc(model_metadata, model_config):
     if len(model_metadata.inputs) != 1:
         raise Exception("expecting 1 input, got {}".format(
             len(model_metadata.inputs)))
-    if len(model_metadata.outputs) != 1:
-        raise Exception("expecting 1 output, got {}".format(
-            len(model_metadata.outputs)))
 
     if len(model_config.input) != 1:
         raise Exception(
@@ -60,9 +57,9 @@ def parse_model_grpc(model_metadata, model_config):
                 len(model_config.input)))
 
     input_metadata = model_metadata.inputs[0]
-    output_metadata = model_metadata.outputs[0]
+    output_metadata = model_metadata.outputs
 
-    return (input_metadata.name, output_metadata.name,
+    return (input_metadata.name, output_metadata,
             model_config.max_batch_size)
 
 
@@ -75,9 +72,6 @@ def parse_model_http(model_metadata, model_config):
     if len(model_metadata['inputs']) != 1:
         raise Exception("expecting 1 input, got {}".format(
             len(model_metadata['inputs'])))
-    if len(model_metadata['outputs']) != 1:
-        raise Exception("expecting 1 output, got {}".format(
-            len(model_metadata['outputs'])))
 
     if len(model_config['input']) != 1:
         raise Exception(
@@ -85,28 +79,33 @@ def parse_model_http(model_metadata, model_config):
                 len(model_config['input'])))
 
     input_metadata = model_metadata['inputs'][0]
-    output_metadata = model_metadata['outputs'][0]
+    output_metadata = model_metadata['outputs']
 
-    return (input_metadata['name'], output_metadata['name'],
+    return (input_metadata['name'], output_metadata,
             model_config['max_batch_size'])
 
 
-def postprocess(results, output_name, filenames, batch_size):
+def postprocess(results, output_names, filenames, batch_size):
     """
     Post-process results to show classifications.
     """
-    output_array = results.as_numpy(output_name)
-    if len(output_array) != batch_size:
-        raise Exception("expected {} results, got {}".format(
-            batch_size, len(output_array)))
+    output_dict = {}
+    for output_name in output_names:
+        output_dict[output_name] = results.as_numpy(output_name)
+        if len(output_dict[output_name]) != batch_size:
+            raise Exception("expected {} results for output {}, got {}".format(
+                batch_size, output_name, len(output_dict[output_name])))
 
-    for results in output_array:
-        for result in results:
-            if output_array.dtype.type == np.bytes_:
-                cls = "".join(chr(x) for x in result).split(':')
-            else:
-                cls = result.split(':')
-            print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
+    for n, f in enumerate(filenames):
+        print('\n"{}":'.format(f))
+        for output_name in output_names:
+            print('  [{}]:'.format(output_name))
+            for result in output_dict[output_name][n]:
+                if output_dict[output_name][n].dtype.type == np.bytes_:
+                    cls = "".join(chr(x) for x in result).split(':')
+                else:
+                    cls = result.split(':')
+                print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
 
 if __name__ == '__main__':
@@ -117,6 +116,12 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
+    parser.add_argument('-m',
+                        '--model-name',
+                        type=str,
+                        required=False,
+                        default='preprocess_resnet50_ensemble',
+                        help='Name of model. Default is preprocess_resnet50_ensemble.')
     parser.add_argument('-c',
                         '--classes',
                         type=int,
@@ -158,7 +163,7 @@ if __name__ == '__main__':
         print("client creation failed: " + str(e))
         sys.exit(1)
 
-    model_name = "preprocess_resnet50_ensemble"
+    model_name = FLAGS.model_name
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
@@ -175,10 +180,10 @@ if __name__ == '__main__':
         sys.exit(1)
 
     if FLAGS.protocol.lower() == "grpc":
-        input_name, output_name, batch_size = parse_model_grpc(
+        input_name, output_metadata, batch_size = parse_model_grpc(
             model_metadata, model_config.config)
     else:
-        input_name, output_name, batch_size = parse_model_http(
+        input_name, output_metadata, batch_size = parse_model_http(
             model_metadata, model_config)
 
     filenames = []
@@ -232,20 +237,22 @@ if __name__ == '__main__':
                                   "BYTES"))
         inputs[0].set_data_from_numpy(batched_image_data, binary_data=True)
 
+    output_names = [ output.name if FLAGS.protocol.lower() == "grpc"
+                        else output['name'] for output in output_metadata ]
+
     outputs = []
-    if FLAGS.protocol.lower() == "grpc":
-        outputs.append(
-            grpcclient.InferRequestedOutput(output_name,
+    for output_name in output_names:
+        if FLAGS.protocol.lower() == "grpc":
+            outputs.append(grpcclient.InferRequestedOutput(output_name,
                                             class_count=FLAGS.classes))
-    else:
-        outputs.append(
-            httpclient.InferRequestedOutput(output_name,
+        else:
+            outputs.append(httpclient.InferRequestedOutput(output_name,
                                             binary_data=True,
                                             class_count=FLAGS.classes))
 
     # Send request
     result = triton_client.infer(model_name, inputs, outputs=outputs)
 
-    postprocess(result, output_name, input_filenames, batch_size)
+    postprocess(result, output_names, input_filenames, batch_size)
 
     print("PASS")
