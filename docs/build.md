@@ -80,6 +80,10 @@ corresponding branch/tag in the build. For example, if you have a
 branch called "mybranch" in the identity_backend repo that you want to
 use in the build, you would specify --backend=identity:mybranch.
 
+By default build.py clones Triton repos from
+https://github.com/triton-inference-server. Use the
+--github-organization options to select a different URL.
+
 The backends can also be built independently in each of the backend
 repositories. See the [backend
 repo](https://github.com/triton-inference-server/backend) for more
