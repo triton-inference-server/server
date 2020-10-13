@@ -614,39 +614,6 @@ Usage()
     }
   }
 
-  // FIXME, once backends are more separated from core Triton the
-  // documentation for these flags should be moved to the backend
-  // documentation.
-  ss << std::endl;
-  ss << "For --backend-config for the 'tensorflow' backend the following flags "
-        "are accepted."
-     << std::endl;
-  ss << "  --backend-config=tensorflow,allow-soft-placement=<boolean>"
-     << std::endl;
-  ss << "\t"
-     << FormatUsageMessage(
-            "Instruct TensorFlow to use CPU implementation of an operation "
-            "when a GPU implementation is not available.",
-            0)
-     << std::endl;
-  ss << "  --backend-config=tensorflow,gpu-memory-fraction=<float>"
-     << std::endl;
-  ss << "\t"
-     << FormatUsageMessage(
-            "Reserve a portion of GPU memory for TensorFlow models. Default "
-            "value 0.0 indicates that TensorFlow should dynamically allocate "
-            "memory as needed. Value of 1.0 indicates that TensorFlow should "
-            "allocate all of GPU memory.",
-            0)
-     << std::endl;
-  ss << "  --backend-config=tensorflow,version=<int>" << std::endl;
-  ss << "\t"
-     << FormatUsageMessage(
-            "Select the version of the TensorFlow library to be used, "
-            "available version is 1 and 2. Default TensorFlow version is 1.",
-            0)
-     << std::endl;
-
   return ss.str();
 }
 
