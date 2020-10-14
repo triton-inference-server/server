@@ -36,6 +36,7 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
+import threading
 
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
@@ -76,6 +77,51 @@ class LifeCycleTest(tu.TestResultCollector):
                                    swap=(swap or (v == 3)))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+    
+    def _infer_success_identity(self,
+                              model_base,
+                              versions,
+                              tensor_dtype,
+                              tensor_shape):
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            for v in versions:
+                self.assertTrue(
+                    triton_client.is_model_ready(tu.get_zero_model_name(model_base, 1, tensor_dtype), str(v)))
+
+            for v in versions:
+                iu.infer_zero(
+                self,
+                model_base,
+                1,
+                tensor_dtype,
+                tensor_shape,
+                tensor_shape,
+                use_http=False,
+               use_grpc=True,
+               use_http_json_tensors=False,
+               use_streaming=False)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def _async_load(self, model_name):
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True)
+            triton_client.load_model(model_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def _async_server_live(self):
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True)
+            triton_client.is_server_live()
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_parse_error_noexit(self):
         # Server was started with invalid args and
@@ -1424,6 +1470,74 @@ class LifeCycleTest(tu.TestResultCollector):
                     triton_client.is_model_ready(ensemble_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_model_availability_on_reload(self):
+        model_name = "identity_zero_1_int32"
+        model_base = "identity"
+        model_shape = (16,)
+
+        # Make sure version 1 of the model is loaded
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(
+                triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_identity(model_base, (1,), np.int32, model_shape)
+
+        # Create a new version for reload
+        os.mkdir("models/" + model_name + "/2")
+
+        # Reload models, v1 should still be available until v2 is loaded
+        # The load is requested in other thread as it is blocking API,
+        # and the v1 availibility should be tested during the reload
+        thread = threading.Thread(
+                        target=self._async_load,
+                        args=(model_name,))
+        thread.start()
+        # wait for time < model creation delay to ensure load request is sent
+        time.sleep(3)
+        # A dummy request to any endpoint is needed as the first request after
+        # the async loading above will be blocked until the load returns
+        dummy_thread = threading.Thread(
+                        target=self._async_server_live)
+        dummy_thread.start()
+        time.sleep(1)
+        load_start = time.time()
+
+        # Make sure version 1 of the model is still available
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            load_end = time.time()
+            self.assertTrue((load_end-load_start) < 5, "server was waiting unexpectly, waited {}".format((load_end-load_start)))
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(
+                triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_identity(model_base, (1,), np.int32, model_shape)
+
+        thread.join()
+        # Make sure version 2 of the model is available while version 1 is not
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertFalse(
+                triton_client.is_model_ready(model_name, "1"))
+            self.assertTrue(
+                triton_client.is_model_ready(model_name, "2"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_identity(model_base, (2,), np.int32, model_shape)
+
+        dummy_thread.join()
 
     def test_multiple_model_repository_control_startup_models(self):
         model_shape = (1, 16)
