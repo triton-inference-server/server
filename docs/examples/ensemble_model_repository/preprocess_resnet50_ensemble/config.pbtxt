@@ -44,7 +44,7 @@ output [
 ensemble_scheduling {
   step [
     {
-      model_name: "image_preprocess_nchw_3x224x224_inception"
+      model_name: "image_preprocess_nchw_224x224x3_inception"
       model_version: -1
       input_map {
         key: "INPUT"
@@ -56,14 +56,14 @@ ensemble_scheduling {
       }
     },
     {
-      model_name: "resnet50_netdef"
+      model_name: "resnet_graphdef"
       model_version: -1
       input_map {
-        key: "gpu_0/data"
+        key: "input"
         value: "preprocessed_image"
       }
       output_map {
-        key: "gpu_0/softmax"
+        key: "resnet_v1_50/predictions/Softmax"
         value: "OUTPUT"
       }
     }

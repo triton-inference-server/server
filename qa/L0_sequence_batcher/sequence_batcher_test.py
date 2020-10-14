@@ -44,7 +44,7 @@ TEST_SYSTEM_SHARED_MEMORY = bool(
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
 BACKENDS = os.environ.get('BACKENDS',
-                          "graphdef savedmodel netdef onnx plan custom")
+                          "graphdef savedmodel onnx plan custom")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 NO_BATCHING = (int(os.environ['NO_BATCHING']) == 1)
@@ -120,7 +120,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # qa/common/gen_qa_sequence_models.py for more
         # information.
         if ((not NO_BATCHING and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
+            ("graphdef" in trial) or ("plan" in trial) or
             ("onnx" in trial)) or ("libtorch" in trial):
             expected_result = value
             if (flag_str is not None) and ("start" in flag_str):

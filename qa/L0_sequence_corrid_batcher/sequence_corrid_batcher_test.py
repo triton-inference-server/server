@@ -48,10 +48,10 @@ _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
 if _no_batching:
-    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch",
+    _trials = ("savedmodel_nobatch", "graphdef_nobatch",
                "plan_nobatch", "onnx_nobatch")
 else:
-    _trials = ("savedmodel", "graphdef", "netdef", "plan", "onnx")
+    _trials = ("savedmodel", "graphdef", "plan", "onnx")
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
@@ -73,7 +73,7 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
         # qa/common/gen_qa_dyna_sequence_models.py for more
         # information.
         if ((("nobatch" not in trial) and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
+            ("graphdef" in trial) or ("plan" in trial) or
             ("onnx" in trial)) or ("libtorch" in trial):
             expected_result = value
             if flag_str is not None:

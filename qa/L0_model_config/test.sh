@@ -45,7 +45,7 @@ source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0
 
-TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan caffe2_netdef onnxruntime_onnx pytorch_libtorch custom"
+TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan onnxruntime_onnx pytorch_libtorch custom"
 
 # Copy fixed TensorRT plans into the test model repositories.
 for modelpath in \

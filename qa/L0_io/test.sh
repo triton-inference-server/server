@@ -56,7 +56,7 @@ RET=0
 
 # Prepare float32 models with basic config
 rm -rf $MODELSDIR
-for trial in graphdef savedmodel netdef onnx libtorch plan ; do
+for trial in graphdef savedmodel onnx libtorch plan ; do
     full=${trial}_float32_float32_float32
     mkdir -p $MODELSDIR/${full}/1 && \
         cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
@@ -117,7 +117,7 @@ cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
 
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do
-        for trial in graphdef savedmodel netdef onnx libtorch plan custom; do
+        for trial in graphdef savedmodel onnx libtorch plan custom; do
             # TensorRT Plan should only be deployed on GPU device
             model_devices="-1 0 1" && [[ "$trial" == "plan" ]] && model_devices="0 1"
             for model_device in $model_devices; do

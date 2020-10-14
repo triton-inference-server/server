@@ -46,7 +46,6 @@ TRT_MODEL_NAME="resnet50_fp16_plan"
 TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
 PYT_MODEL_NAME="resnet50_fp32_libtorch"
 ONNX_MODEL_NAME="resnet50_fp32_onnx"
-NETDEF_MODEL_NAME="resnet50_fp32_netdef"
 
 # The base model name should be the prefix to the
 # respective optimized model name.
@@ -60,7 +59,7 @@ TFAMP_MODEL_NAME="resnet50v1.5_fp16_savedmodel_amp"
 STATIC_BATCH=1
 INSTANCE_CNT=1
 CONCURRENCY=1
-MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME} ${NETDEF_MODEL_NAME}"
+MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME}"
 OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME} ${TFAMP_MODEL_NAME}"
 
 # Create optimized models

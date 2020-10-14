@@ -1,0 +1,19 @@
+name: "resnet50_graphdef"
+platform: "tensorflow_graphdef"
+max_batch_size: 128
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    format: FORMAT_NHWC
+    dims: [ 224, 224, 3 ]
+  }
+]
+output [
+  {
+    name: "resnet_v1_50/predictions/Softmax"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+    label_filename: "resnet50_labels.txt"
+  }
+]

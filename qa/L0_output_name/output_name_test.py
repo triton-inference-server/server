@@ -41,7 +41,7 @@ import grpc
 from tritongrpcclient import grpc_service_pb2
 from tritongrpcclient import grpc_service_pb2_grpc
 
-_trials = ("graphdef", "libtorch", "netdef", "onnx", "plan", "savedmodel")
+_trials = ("graphdef", "libtorch", "onnx", "plan", "savedmodel")
 
 
 class OutputNameValidationTest(tu.TestResultCollector):

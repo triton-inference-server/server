@@ -86,7 +86,7 @@ def check_sequence_async(client_metadata,
 
     """
     if (("savedmodel" in trial) or ("graphdef" in trial) or
-        ("netdef" in trial) or ("custom" in trial) or ("plan" in trial)):
+        ("custom" in trial) or ("plan" in trial)):
         tensor_shape = (
             1,
             1,

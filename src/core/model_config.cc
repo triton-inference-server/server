@@ -223,12 +223,6 @@ GetPlatform(const std::string& platform_str)
   }
 #endif  // TRITON_ENABLE_TENSORRT
 
-#ifdef TRITON_ENABLE_CAFFE2
-  if (platform_str == kCaffe2NetDefPlatform) {
-    return Platform::PLATFORM_CAFFE2_NETDEF;
-  }
-#endif  // TRITON_ENABLE_CAFFE2
-
 #ifdef TRITON_ENABLE_CUSTOM
   if (platform_str == kCustomPlatform) {
     return Platform::PLATFORM_CUSTOM;

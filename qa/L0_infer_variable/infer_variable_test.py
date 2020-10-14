@@ -165,20 +165,6 @@ class InferVariableTest(tu.TestResultCollector):
                                         output1_raw=output1_raw,
                                         swap=swap)
 
-        if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
-                                    input_shape, output0_shape, output1_shape):
-            for prefix in ensemble_prefix:
-                _infer_exact_helper(self,
-                                    prefix + 'netdef',
-                                    input_shape,
-                                    8,
-                                    input_dtype,
-                                    output0_dtype,
-                                    output1_dtype,
-                                    output0_raw=output0_raw,
-                                    output1_raw=output1_raw,
-                                    swap=swap)
-
         # the custom model is src/custom/addsub... it does not swap
         # the inputs so always set to False
         if tu.validate_for_custom_model(input_dtype, output0_dtype,

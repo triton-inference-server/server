@@ -46,10 +46,10 @@ _test_cuda_shared_memory = bool(
 
 _no_batching = (int(os.environ.get('NO_BATCHING', 0)) == 1)
 
-_trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx",
+_trials = ("custom", "savedmodel", "graphdef", "plan", "onnx",
            "libtorch")
 if _no_batching:
-    _trials += ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch",
+    _trials += ("savedmodel_nobatch", "graphdef_nobatch",
                 "plan_nobatch", "onnx_nobatch", "libtorch_nobatch")
 
 _ragged_batch_supported_trials = list()
@@ -76,8 +76,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         # qa/common/gen_qa_dyna_sequence_models.py for more
         # information.
         if ((("nobatch" not in trial) and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
-            ("onnx" in trial)) or ("libtorch" in trial):
+            ("graphdef" in trial) or ("plan" in trial) or ("onnx" in trial)) or 
+            ("libtorch" in trial):
             expected_result = value
             if flag_str is not None:
                 if "start" in flag_str:

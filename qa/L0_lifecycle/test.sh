@@ -192,9 +192,7 @@ mkdir models models_0
 for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in netdef plan ; do
-    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
-done
+cp -r $DATADIR/qa_model_repository/plan_float32_float32_float32 models_0/.
 rm models/graphdef_float32_float32_float32/*/*
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
@@ -270,9 +268,7 @@ mkdir models models_0
 for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in netdef plan ; do
-    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
-done
+cp -r $DATADIR/qa_model_repository/plan_float32_float32_float32 models_0/.
 rm models/graphdef_float32_float32_float32/config.pbtxt
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
@@ -318,9 +314,6 @@ sed -i "s/OUTPUT/_OUTPUT/" models_0/custom_int32_int32_int32/config.pbtxt
 for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in netdef ; do
-    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
-done
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
@@ -358,7 +351,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_model_no_version
 rm -fr models
 mkdir models
-for i in savedmodel netdef plan ; do
+for i in savedmodel plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 mkdir -p models/graphdef_float32_float32_float32
@@ -445,7 +438,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_model_load_unload
 rm -fr models savedmodel_float32_float32_float32
 mkdir models
-for i in graphdef netdef plan ; do
+for i in graphdef plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
@@ -483,7 +476,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_model_load_unload_disabled
 rm -fr models savedmodel_float32_float32_float32
 mkdir models
-for i in graphdef netdef plan ; do
+for i in graphdef libtorch plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
@@ -680,9 +673,6 @@ mkdir models models_0
 for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in netdef ; do
-    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
-done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. && \
     rm -rf models/savedmodel_float32_float32_float32/3
@@ -722,9 +712,6 @@ rm -fr models models_0 savedmodel_float32_float32_float32
 mkdir models models_0
 for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
-done
-for i in netdef ; do
-    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. && \
@@ -814,8 +801,8 @@ for i in plan onnx ; do
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models_0/simple_${i}_float32_float32_float32/config.pbtxt
 done
 
-# netdef doesn't load because it is duplicated in 2 repositories
-for i in netdef ; do
+# libtorch doesn't load because it is duplicated in 2 repositories
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
@@ -824,7 +811,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
              --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
-             --load-model=netdef_float32_float32_float32 \
+             --load-model=libtorch_float32_float32_float32 \
              --load-model=plan_float32_float32_float32 \
              --load-model=simple_onnx_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -864,8 +851,8 @@ for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
 done
 
-# netdef doesn't load because it is duplicated in 2 repositories
-for i in netdef ; do
+# libtorch doesn't load because it is duplicated in 2 repositories
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
@@ -874,7 +861,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
              --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
-             --load-model=netdef_float32_float32_float32 \
+             --load-model=libtorch_float32_float32_float32 \
              --load-model=graphdef_float32_float32_float32 \
              --load-model=simple_savedmodel_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -1027,7 +1014,7 @@ LOG_IDX=$((LOG_IDX+1))
 # Send HTTP request to control endpoint
 rm -fr models config.pbtxt.*
 mkdir models
-for i in graphdef savedmodel netdef plan ; do
+for i in graphdef savedmodel plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 

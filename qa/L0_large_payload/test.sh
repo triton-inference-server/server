@@ -52,7 +52,7 @@ RET=0
 
 MODEL_SUFFIX=nobatch_zero_1_float32
 rm -fr models && mkdir models
-for TARGET in graphdef savedmodel netdef onnx libtorch plan; do
+for TARGET in graphdef savedmodel onnx libtorch plan; do
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${TARGET}_$MODEL_SUFFIX \
        models/.
 done
@@ -67,7 +67,7 @@ cp -r ../custom_models/custom_zero_1_float32 models/. && \
 
 # Restart server before every test to make sure server state
 # is invariant to previous test
-for TARGET in graphdef savedmodel netdef onnx libtorch custom plan; do
+for TARGET in graphdef savedmodel onnx libtorch custom plan; do
     SERVER_LOG=$SERVER_LOG_BASE.$TARGET
     CLIENT_LOG=$CLIENT_LOG_BASE.$TARGET
 

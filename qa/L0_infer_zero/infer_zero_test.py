@@ -92,32 +92,6 @@ class InferZeroTest(tu.TestResultCollector):
                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if tu.validate_for_c2_model(dtype, dtype, dtype, shapes[0], shapes[0],
-                                    shapes[0]):
-            # model that supports batching
-            for bs in (1, 8):
-                batch_shapes = [[
-                    bs,
-                ] + shape for shape in shapes]
-                iu.infer_zero(
-                    self,
-                    'netdef',
-                    bs,
-                    dtype,
-                    batch_shapes,
-                    batch_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            # model that does not support batching
-            iu.infer_zero(self,
-                          'netdef_nobatch',
-                          1,
-                          dtype,
-                          shapes,
-                          shapes,
-                          use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                          use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-
         if tu.validate_for_onnx_model(dtype, dtype, dtype, shapes[0], shapes[0],
                                       shapes[0]):
             # model that supports batching

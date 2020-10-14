@@ -133,10 +133,6 @@ if(${TRITON_ENABLE_TENSORRT})
   add_definitions(-DTRITON_ENABLE_TENSORRT=1)
 endif() # TRITON_ENABLE_TENSORRT
 
-if(${TRITON_ENABLE_CAFFE2})
-  add_definitions(-DTRITON_ENABLE_CAFFE2=1)
-endif() # TRITON_ENABLE_CAFFE2
-
 if(${TRITON_ENABLE_ONNXRUNTIME})
   add_definitions(-DTRITON_ENABLE_ONNXRUNTIME=1)
 endif() # TRITON_ENABLE_ONNXRUNTIME
@@ -228,7 +224,6 @@ endif() # TRITON_ENABLE_METRICS
 
 add_subdirectory(../../src/core src/core)
 add_subdirectory(../../src/backends/backend src/backends/backend)
-add_subdirectory(../../src/backends/caffe2 src/backends/caffe2)
 add_subdirectory(../../src/backends/custom src/backends/custom)
 add_subdirectory(../../src/backends/ensemble src/backends/ensemble)
 add_subdirectory(../../src/backends/onnx src/backends/onnx)

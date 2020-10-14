@@ -41,7 +41,7 @@ TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
 CPU_ONLY = (os.environ.get('TRITON_SERVER_CPU_ONLY') is not None)
 BACKENDS = os.environ.get(
-    'BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom python")
+    'BACKENDS', "graphdef savedmodel onnx libtorch plan custom python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 np_dtype_string = np.dtype(object)
@@ -143,21 +143,6 @@ class InferTest(tu.TestResultCollector):
                                             output0_raw=output0_raw,
                                             output1_raw=output1_raw,
                                             swap=swap)
-
-        if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
-                                    (input_size,), (input_size,),
-                                    (input_size,)):
-            for prefix in ensemble_prefix:
-                if 'netdef' in BACKENDS:
-                    _infer_exact_helper(self,
-                                        prefix + 'netdef', (input_size,),
-                                        8,
-                                        input_dtype,
-                                        output0_dtype,
-                                        output1_dtype,
-                                        output0_raw=output0_raw,
-                                        output1_raw=output1_raw,
-                                        swap=swap)
 
         if not CPU_ONLY and tu.validate_for_trt_model(
                 input_dtype, output0_dtype, output1_dtype, (input_size, 1, 1),
@@ -613,7 +598,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_int32_int32_int32 and all should
         # be available.
-        for platform in ('graphdef', 'savedmodel', 'netdef'):
+        for platform in ('graphdef', 'savedmodel'):
             if platform not in BACKENDS:
                 continue
             iu.infer_exact(self,
@@ -710,7 +695,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.
-        for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
+        for platform in ('graphdef', 'savedmodel', 'plan'):
             if platform == 'plan' and CPU_ONLY:
                 continue
             if platform not in BACKENDS:
@@ -758,7 +743,7 @@ class InferTest(tu.TestResultCollector):
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     if ENSEMBLES:
-        if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
+        if all(x in BACKENDS for x in ['graphdef', 'savedmodel']):
 
             def test_ensemble_mix_platform(self):
                 # Skip on CPU only machine as TensorRT model is used in this ensemble
@@ -789,7 +774,7 @@ class InferTest(tu.TestResultCollector):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
+        if all(x in BACKENDS for x in ['graphdef', 'savedmodel']):
 
             def test_ensemble_mix_ensemble(self):
                 for bs in (1, 8):
@@ -844,7 +829,7 @@ class InferTest(tu.TestResultCollector):
 
             def test_ensemble_label_lookup(self):
                 if all(x in BACKENDS
-                       for x in ['graphdef', 'netdef', 'savedmodel']):
+                       for x in ['graphdef', 'savedmodel']):
                     # Ensemble needs to look up label from the actual model
                     for bs in (1, 8):
                         iu.infer_exact(
@@ -860,7 +845,7 @@ class InferTest(tu.TestResultCollector):
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
                 if all(x in BACKENDS
-                       for x in ['graphdef', 'netdef', 'savedmodel']):
+                       for x in ['graphdef', 'savedmodel']):
                     # Label from the actual model will be passed along the nested ensemble
                     for bs in (1, 8):
                         iu.infer_exact(

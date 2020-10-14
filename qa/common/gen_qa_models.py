@@ -87,32 +87,6 @@ def np_to_tf_dtype(np_dtype):
     return None
 
 
-def np_to_c2_dtype(np_dtype):
-    if np_dtype == np.bool:
-        return c2core.DataType.BOOL
-    elif np_dtype == np.int8:
-        return c2core.DataType.INT8
-    elif np_dtype == np.int16:
-        return c2core.DataType.INT16
-    elif np_dtype == np.int32:
-        return c2core.DataType.INT32
-    elif np_dtype == np.int64:
-        return c2core.DataType.INT64
-    elif np_dtype == np.uint8:
-        return c2core.DataType.UINT8
-    elif np_dtype == np.uint16:
-        return c2core.DataType.UINT16
-    elif np_dtype == np.float16:
-        return c2core.DataType.FLOAT16
-    elif np_dtype == np.float32:
-        return c2core.DataType.FLOAT
-    elif np_dtype == np.float64:
-        return c2core.DataType.DOUBLE
-    elif np_dtype == np_dtype_string:
-        return c2core.DataType.STRING
-    return None
-
-
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.bool:
         return trt.bool
@@ -450,132 +424,6 @@ def create_savedmodel_modelconfig(models_dir, max_batch, model_version,
     config = '''
 name: "{}"
 platform: "tensorflow_savedmodel"
-max_batch_size: {}
-version_policy: {}
-input [
-  {{
-    name: "INPUT0"
-    data_type: {}
-    dims: [ {} ]
-  }},
-  {{
-    name: "INPUT1"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-output [
-  {{
-    name: "OUTPUT0"
-    data_type: {}
-    dims: [ {} ]
-    label_filename: "output0_labels.txt"
-  }},
-  {{
-    name: "OUTPUT1"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-'''.format(model_name, max_batch, version_policy_str,
-           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
-           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
-           np_to_model_dtype(output0_dtype),
-           tu.shape_to_dims_str(output0_shape),
-           np_to_model_dtype(output1_dtype),
-           tu.shape_to_dims_str(output1_shape))
-
-    try:
-        os.makedirs(config_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(config_dir + "/config.pbtxt", "w") as cfile:
-        cfile.write(config)
-
-    with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(output0_label_cnt):
-            lfile.write("label" + str(l) + "\n")
-
-
-def create_netdef_modelfile(models_dir,
-                            max_batch,
-                            model_version,
-                            input_shape,
-                            output0_shape,
-                            output1_shape,
-                            input_dtype,
-                            output0_dtype,
-                            output1_dtype,
-                            swap=False):
-
-    if not tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
-                                    input_shape, output0_shape, output1_shape):
-        return
-
-    c2_input_dtype = np_to_c2_dtype(input_dtype)
-    c2_output0_dtype = np_to_c2_dtype(output0_dtype)
-    c2_output1_dtype = np_to_c2_dtype(output1_dtype)
-
-    model_name = tu.get_model_name(
-        "netdef_nobatch" if max_batch == 0 else "netdef", input_dtype,
-        output0_dtype, output1_dtype)
-
-    # Create the model
-    model = c2model_helper.ModelHelper(name=model_name)
-    add = model.net.Add(["INPUT0", "INPUT1"], "add")
-    sub = model.net.Sub(["INPUT0", "INPUT1"], "sub")
-    out0 = model.net.Cast(["add" if not swap else "sub"],
-                          "OUTPUT0",
-                          to=c2_output0_dtype)
-    out1 = model.net.Cast(["sub" if not swap else "add"],
-                          "OUTPUT1",
-                          to=c2_output1_dtype)
-    predict_net, _ = c2model_helper.ExtractPredictorNet(model.Proto(), \
-        input_blobs = ["INPUT0", "INPUT1"], output_blobs = ["OUTPUT0", "OUTPUT1"])
-
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(model_version_dir + "/model.netdef", "wb") as f:
-        f.write(predict_net.Proto().SerializeToString())
-    with open(model_version_dir + "/init_model.netdef", "wb") as f:
-        f.write(model.InitProto().SerializeToString())
-
-
-def create_netdef_modelconfig(models_dir, max_batch, model_version, input_shape,
-                              output0_shape, output1_shape, input_dtype,
-                              output0_dtype, output1_dtype, output0_label_cnt,
-                              version_policy):
-
-    if not tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
-                                    input_shape, output0_shape, output1_shape):
-        return
-
-    # Unpack version policy
-    version_policy_str = "{ latest { num_versions: 1 }}"
-    if version_policy is not None:
-        type, val = version_policy
-        if type == 'latest':
-            version_policy_str = "{{ latest {{ num_versions: {} }}}}".format(
-                val)
-        elif type == 'specific':
-            version_policy_str = "{{ specific {{ versions: {} }}}}".format(val)
-        else:
-            version_policy_str = "{ all { }}"
-
-    # Use a different model name for the non-batching variant
-    model_name = tu.get_model_name(
-        "netdef_nobatch" if max_batch == 0 else "netdef", input_dtype,
-        output0_dtype, output1_dtype)
-    config_dir = models_dir + "/" + model_name
-    config = '''
-name: "{}"
-platform: "caffe2_netdef"
 max_batch_size: {}
 version_policy: {}
 input [
@@ -1494,24 +1342,6 @@ def create_models(models_dir,
                                     output0_shape, output1_shape, input_dtype,
                                     output0_dtype, output1_dtype)
 
-    if FLAGS.netdef:
-        # max-batch 8
-        create_netdef_modelconfig(models_dir, 8, model_version, input_shape,
-                                  output0_shape, output1_shape, input_dtype,
-                                  output0_dtype, output1_dtype,
-                                  output0_label_cnt, version_policy)
-        create_netdef_modelfile(models_dir, 8, model_version, input_shape,
-                                output0_shape, output1_shape, input_dtype,
-                                output0_dtype, output1_dtype)
-        # max-batch 0
-        create_netdef_modelconfig(models_dir, 0, model_version, input_shape,
-                                  output0_shape, output1_shape, input_dtype,
-                                  output0_dtype, output1_dtype,
-                                  output0_label_cnt, version_policy)
-        create_netdef_modelfile(models_dir, 0, model_version, input_shape,
-                                output0_shape, output1_shape, input_dtype,
-                                output0_dtype, output1_dtype)
-
     if FLAGS.tensorrt:
         # max-batch 8
         suffix = ()
@@ -1668,10 +1498,6 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate SavedModel models')
-    parser.add_argument('--netdef',
-                        required=False,
-                        action='store_true',
-                        help='Generate NetDef models')
     parser.add_argument('--tensorrt',
                         required=False,
                         action='store_true',
@@ -1702,9 +1528,6 @@ if __name__ == '__main__':
                         ' are not completed.')
     FLAGS, unparsed = parser.parse_known_args()
 
-    if FLAGS.netdef:
-        from caffe2.python import core as c2core
-        from caffe2.python import model_helper as c2model_helper
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io, graph_util
@@ -1820,37 +1643,6 @@ if __name__ == '__main__':
                                             vt,
                                             vt,
                                             swap=True)
-
-        if FLAGS.netdef:
-            for vt in [np.float32, np.int32]:
-                create_netdef_modelfile(FLAGS.models_dir,
-                                        8,
-                                        2, (16,), (16,), (16,),
-                                        vt,
-                                        vt,
-                                        vt,
-                                        swap=True)
-                create_netdef_modelfile(FLAGS.models_dir,
-                                        8,
-                                        3, (16,), (16,), (16,),
-                                        vt,
-                                        vt,
-                                        vt,
-                                        swap=True)
-                create_netdef_modelfile(FLAGS.models_dir,
-                                        0,
-                                        2, (16,), (16,), (16,),
-                                        vt,
-                                        vt,
-                                        vt,
-                                        swap=True)
-                create_netdef_modelfile(FLAGS.models_dir,
-                                        0,
-                                        3, (16,), (16,), (16,),
-                                        vt,
-                                        vt,
-                                        vt,
-                                        swap=True)
 
         if FLAGS.tensorrt:
             for vt in [np.float32, np.float16, np.int32]:

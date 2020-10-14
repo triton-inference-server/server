@@ -93,7 +93,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom python"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom python"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
@@ -181,7 +181,7 @@ for TARGET in cpu gpu; do
           ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
         fi
 
-        if [[ $BACKENDS == *"savedmodel"* ]] && [[ $BACKENDS == *"netdef"* ]] ; then
+        if [[ $BACKENDS == *"savedmodel"* ]] ; then
           ENSEMBLE_MODELS="${ENSEMBLE_MODELS} mix_platform_float32_float32_float32 mix_ensemble_int32_float32_float32"
         fi
 

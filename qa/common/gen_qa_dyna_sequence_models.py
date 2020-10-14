@@ -86,32 +86,6 @@ def np_to_tf_dtype(np_dtype):
     return None
 
 
-def np_to_c2_dtype(np_dtype):
-    if np_dtype == np.bool:
-        return c2core.DataType.BOOL
-    elif np_dtype == np.int8:
-        return c2core.DataType.INT8
-    elif np_dtype == np.int16:
-        return c2core.DataType.INT16
-    elif np_dtype == np.int32:
-        return c2core.DataType.INT32
-    elif np_dtype == np.int64:
-        return c2core.DataType.INT64
-    elif np_dtype == np.uint8:
-        return c2core.DataType.UINT8
-    elif np_dtype == np.uint16:
-        return c2core.DataType.UINT16
-    elif np_dtype == np.float16:
-        return c2core.DataType.FLOAT16
-    elif np_dtype == np.float32:
-        return c2core.DataType.FLOAT
-    elif np_dtype == np.float64:
-        return c2core.DataType.DOUBLE
-    elif np_dtype == np_dtype_string:
-        return c2core.DataType.STRING
-    return None
-
-
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.bool:
         return trt.bool
@@ -386,134 +360,6 @@ instance_group [
         if max_batch > 0 else "", "fp32" if dtype == np.float32 else "int32",
         "fp32" if dtype == np.float32 else "int32",
         "fp32" if dtype == np.float32 else "int32", np_to_model_dtype(dtype),
-        tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
-
-    try:
-        os.makedirs(config_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(config_dir + "/config.pbtxt", "w") as cfile:
-        cfile.write(config)
-
-
-def create_netdef_modelfile(models_dir, model_version, max_batch, dtype, shape):
-
-    if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
-    c2_dtype = np_to_c2_dtype(dtype)
-    model_name = tu.get_dyna_sequence_model_name(
-        "netdef_nobatch" if max_batch == 0 else "netdef", dtype)
-
-    # Create the model. For now don't implement a proper accumulator
-    # just return 0 if not-ready and 'INPUT'+'START'+('END'*'CORRID)
-    # otherwise...  the tests know to expect this.
-    model = c2model_helper.ModelHelper(name=model_name)
-    model.net.Add(["INPUT", "START"], "add0")
-    model.net.Mul(["END", "CORRID"], "mul0")
-    model.net.Add(["add0", "mul0"], "sum")
-    model.net.Sub(["READY", "READY"], "zeros")
-    model.net.NE(["READY", "zeros"], "compare")
-    model.net.Where(["compare", "sum", "zeros"], "OUTPUT")
-    predict_net, _ = c2model_helper.ExtractPredictorNet(
-        model.Proto(),
-        input_blobs=["INPUT", "START", "END", "READY", "CORRID"],
-        output_blobs=["OUTPUT"])
-
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(model_version_dir + "/model.netdef", "wb") as f:
-        f.write(predict_net.Proto().SerializeToString())
-    with open(model_version_dir + "/init_model.netdef", "wb") as f:
-        f.write(model.InitProto().SerializeToString())
-
-
-def create_netdef_modelconfig(models_dir, model_version, max_batch, dtype,
-                              shape):
-
-    if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
-    model_name = tu.get_dyna_sequence_model_name(
-        "netdef_nobatch" if max_batch == 0 else "netdef", dtype)
-    config_dir = models_dir + "/" + model_name
-    config = '''
-name: "{}"
-platform: "caffe2_netdef"
-max_batch_size: {}
-sequence_batching {{
-  max_sequence_idle_microseconds: 5000000
-  {}
-  control_input [
-    {{
-      name: "START"
-      control [
-        {{
-          kind: CONTROL_SEQUENCE_START
-          {}_false_true: [ 0, 1 ]
-        }}
-      ]
-    }},
-    {{
-      name: "END"
-      control [
-        {{
-          kind: CONTROL_SEQUENCE_END
-          {}_false_true: [ 0, 1 ]
-        }}
-      ]
-    }},
-    {{
-      name: "READY"
-      control [
-        {{
-          kind: CONTROL_SEQUENCE_READY
-          {}_false_true: [ 0, 1 ]
-        }}
-      ]
-    }},
-    {{
-      name: "CORRID"
-      control [
-        {{
-          kind: CONTROL_SEQUENCE_CORRID
-          data_type: TYPE_INT32
-        }}
-      ]
-    }}
-  ]
-}}
-input [
-  {{
-    name: "INPUT"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-output [
-  {{
-    name: "OUTPUT"
-    data_type: {}
-    dims: [ 1 ]
-  }}
-]
-instance_group [
-  {{
-    kind: KIND_CPU
-  }}
-]
-'''.format(
-        model_name, max_batch,
-        "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
-        if max_batch > 0 else "", "int32" if dtype == np.int32 else "fp32",
-        "int32" if dtype == np.int32 else "fp32",
-        "int32" if dtype == np.int32 else "fp32", np_to_model_dtype(dtype),
         tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
 
     try:
@@ -1545,14 +1391,6 @@ def create_models(models_dir, dtype, shape, no_batch=True):
             create_tf_modelfile(True, models_dir, model_version, 0, dtype,
                                 shape)
 
-    if FLAGS.netdef:
-        create_netdef_modelconfig(models_dir, model_version, 8, dtype, shape)
-        create_netdef_modelfile(models_dir, model_version, 8, dtype, shape)
-        if no_batch:
-            create_netdef_modelconfig(models_dir, model_version, 0, dtype,
-                                      shape)
-            create_netdef_modelfile(models_dir, model_version, 0, dtype, shape)
-
     if FLAGS.tensorrt:
         suffix = []
         if dtype == np.int8:
@@ -1599,10 +1437,6 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate SavedModel models')
-    parser.add_argument('--netdef',
-                        required=False,
-                        action='store_true',
-                        help='Generate NetDef models')
     parser.add_argument('--tensorrt',
                         required=False,
                         action='store_true',
@@ -1632,9 +1466,6 @@ if __name__ == '__main__':
                         help='Used variable-shape tensors for input/output')
     FLAGS, unparsed = parser.parse_known_args()
 
-    if FLAGS.netdef:
-        from caffe2.python import core as c2core
-        from caffe2.python import model_helper as c2model_helper
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io, graph_util
