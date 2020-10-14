@@ -42,6 +42,12 @@
 #include <aws/s3/model/ListObjectsRequest.h>
 #endif  // TRITON_ENABLE_S3
 
+#ifdef TRITON_ENABLE_AZURE_STORAGE
+#include <blob/blob_client.h>
+#include <storage_account.h>
+#include <storage_credential.h>
+#endif  // TRITON_ENABLE_AZURE_STORAGE
+
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/text_format.h>
 #include <re2/re2.h>
@@ -51,16 +57,9 @@
 #include <unistd.h>
 #include <cerrno>
 #include <fstream>
-
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/status.h"
-
-#ifdef TRITON_ENABLE_AZURE_STORAGE
-#include <blob/blob_client.h>
-#include <storage_account.h>
-#include <storage_credential.h>
-#endif  // TRITON_ENABLE_AZURE_STORAGE
 
 namespace nvidia { namespace inferenceserver {
 
