@@ -943,13 +943,13 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_load_same_model_different_platform
-rm -fr models plan_float32_float32_float32
+rm -fr models simple_float32_float32_float32
 mkdir models
 # Prepare two models of different platforms, but with the same name
 cp -r $DATADIR/qa_model_repository/plan_float32_float32_float32 models/simple_float32_float32_float32
 sed -i "s/plan_float32_float32_float32/simple_float32_float32_float32/" models/simple_float32_float32_float32/config.pbtxt
-cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 simple_float32_float32_float32
-sed -i "s/savedmodel_float32_float32_float32/simple_float32_float32_float32/" simple_float32_float32_float32/config.pbtxt
+cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 simple_float32_float32_float32
+sed -i "s/libtorch_float32_float32_float32/simple_float32_float32_float32/" simple_float32_float32_float32/config.pbtxt
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
              --load-model=simple_float32_float32_float32 \
