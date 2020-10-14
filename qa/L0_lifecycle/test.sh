@@ -942,6 +942,46 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_load_same_model_different_platform
+rm -fr models plan_float32_float32_float32
+mkdir models
+# Prepare two models of different platforms, but with the same name
+cp -r $DATADIR/qa_model_repository/plan_float32_float32_float32 models/simple_float32_float32_float32
+sed -i "s/plan_float32_float32_float32/simple_float32_float32_float32/" models/simple_float32_float32_float32/config.pbtxt
+cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 simple_float32_float32_float32
+sed -i "s/savedmodel_float32_float32_float32/simple_float32_float32_float32/" simple_float32_float32_float32/config.pbtxt
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
+             --load-model=simple_float32_float32_float32 \
+             --exit-timeout-secs=5"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_load_same_model_different_platform >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
 # Send HTTP request to control endpoint
 rm -fr models config.pbtxt.*
 mkdir models

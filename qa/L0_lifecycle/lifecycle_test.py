@@ -1471,6 +1471,51 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_load_same_model_different_platform(self):
+        model_shape = (1, 16)
+        model_name = tu.get_model_name('simple', np.float32, np.float32,
+                                      np.float32)
+
+        # Make sure 3 versions of the model are loaded
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(
+                triton_client.is_model_ready(model_name, "1"))
+            self.assertTrue(
+                triton_client.is_model_ready(model_name, "3"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_models(["simple",], (1, 3,), model_shape)
+
+        # Copy the same model of different platform to model repository
+        shutil.rmtree("models/" + model_name)
+        shutil.copytree(model_name, "models/" + model_name)
+
+        # Reload models
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.load_model(model_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Make sure 3 versions of the model are loaded
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(
+                triton_client.is_model_ready(model_name, "1"))
+            self.assertTrue(
+                triton_client.is_model_ready(model_name, "3"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_models(["simple",], (1, 3,), model_shape)
+
     def test_model_availability_on_reload(self):
         model_name = "identity_zero_1_int32"
         model_base = "identity"
@@ -1500,6 +1545,7 @@ class LifeCycleTest(tu.TestResultCollector):
         thread.start()
         # wait for time < model creation delay to ensure load request is sent
         time.sleep(3)
+        # DLIS-1698
         # A dummy request to any endpoint is needed as the first request after
         # the async loading above will be blocked until the load returns
         dummy_thread = threading.Thread(
