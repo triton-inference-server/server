@@ -32,8 +32,7 @@
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_message.h"
-#include "triton/core/tritonbackend.h"
-#include "triton/core/tritonserver.h"
+#include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {
 
