@@ -25,34 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/tritonserver_apis.h"
+#define _COMPILING_TRITONSERVER 1
+#define _COMPILING_TRITONBACKEND 1
 
-namespace nvidia { namespace inferenceserver {
+#include "triton/core/tritonbackend.h"
+#include "triton/core/tritonserver.h"
 
-//
-// Implementation for TRITONSERVER_ResponseAllocator.
-//
-class ResponseAllocator {
- public:
-  explicit ResponseAllocator(
-      TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
-      TRITONSERVER_ResponseAllocatorStartFn_t start_fn)
-      : alloc_fn_(alloc_fn), release_fn_(release_fn), start_fn_(start_fn)
-  {
-  }
-
-  TRITONSERVER_ResponseAllocatorAllocFn_t AllocFn() const { return alloc_fn_; }
-  TRITONSERVER_ResponseAllocatorReleaseFn_t ReleaseFn() const
-  {
-    return release_fn_;
-  }
-  TRITONSERVER_ResponseAllocatorStartFn_t StartFn() const { return start_fn_; }
-
- private:
-  TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
-  TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn_;
-  TRITONSERVER_ResponseAllocatorStartFn_t start_fn_;
-};
-
-}}  // namespace nvidia::inferenceserver
+#undef _COMPILING_TRITONSERVER
+#undef _COMPILING_TRITONBACKEND

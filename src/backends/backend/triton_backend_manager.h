@@ -33,7 +33,7 @@
 #include "src/core/model_config.h"
 #include "src/core/server_message.h"
 #include "src/core/status.h"
-#include "triton/core/tritonbackend.h"
+#include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {
 

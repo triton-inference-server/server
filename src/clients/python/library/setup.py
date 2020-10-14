@@ -58,6 +58,7 @@ except ImportError:
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 
+
 def req_file(filename, folder="requirements"):
     with open(os.path.join(folder, filename)) as f:
         content = f.readlines()

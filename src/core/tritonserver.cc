@@ -24,8 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "triton/core/tritonserver.h"
-
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
@@ -43,6 +41,7 @@
 #include "src/core/server.h"
 #include "src/core/server_message.h"
 #include "src/core/status.h"
+#include "src/core/tritonserver_apis.h"
 
 #define TRITONJSON_STATUSTYPE nvidia::inferenceserver::Status
 #define TRITONJSON_STATUSRETURN(M)        \
@@ -802,7 +801,7 @@ TRITONSERVER_InferenceTraceModelName(
 #endif  // TRITON_ENABLE_TRACING
 }
 
-TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_Error*
 TRITONSERVER_InferenceTraceModelVersion(
     TRITONSERVER_InferenceTrace* trace, int64_t* model_version)
 {
