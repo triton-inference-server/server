@@ -146,6 +146,65 @@ message ModelInstanceGroup
   //@@     of instances created. Default is 1.
   int32 count = 2;
 
+  //@@
+  //@@  .. cpp:var:: message RateLimiterSpec
+  //@@
+  //@@     The specifications required by the rate limiter to properly
+  //@@     schedule the inference requests across the different models
+  //@@     and their instances.
+  //@@
+  message RateLimiterSpec
+  {
+    //@@  .. cpp:var:: message Resource
+    //@@
+    //@@     The resoure constraints required to execute an inference
+    //@@     on the instance of the model.
+    //@@
+    message Resource
+    {
+      //@@  .. cpp:var:: message global
+      //@@
+      //@@     Whether or not the resource is global. If true then the resource
+      //@@     is assumed to be shared among the GPU devices otherwise specified
+      //@@     count of the resource is assumed for each GPU device associated
+      //@@     with the instance.
+      //@@
+      bool global = 1;
+
+      //@@  .. cpp:var:: message count
+      //@@
+      //@@     The number of resources required for the execution of the model
+      //@@     instance.
+      //@@
+      uint32 count = 2;
+    }
+
+    //@@  .. cpp:var:: map<string, ResourceCount> resources
+    //@@
+    //@@     The resources required to execute the request on a model instance.
+    //@@     Resources are just names with a corresponding count. The execution
+    //@@     of the instance will be blocked until the specificied resources are
+    //@@     available. By default an instance uses no rate-limiter resources.
+    //@@
+    map<string, Resource> resources = 1;
+
+    //@@  .. cpp:var:: uint32 priority
+    //@@
+    //@@     The weighting value to be used for prioritizing across instances.
+    //@@     An instance with priority 2 will be given 1/2 the number of
+    //@@     scheduling chances as an instance_group with priority 1. The
+    //@@     default priority is 1.
+    //@@
+    uint32 priority = 2;
+  }
+
+  //@@  .. cpp:var:: RateLimiterSpec rate_limiter_spec
+  //@@
+  //@@     The rate limiter specific settings to be associated with this
+  //@@     instance group.
+  //@@
+  RateLimiterSpec rate_limiter_spec = 6;
+
   //@@  .. cpp:var:: int32 gpus (repeated)
   //@@
   //@@     GPU(s) where instances should be available. For each GPU listed,
