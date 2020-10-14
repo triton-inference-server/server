@@ -210,15 +210,30 @@ def infer_exact(tester,
     else:
         output1_array_tmp = output1_array
 
-    OUTPUT0 = "OUTPUT0"
-    OUTPUT1 = "OUTPUT1"
-    INPUT0 = "INPUT0"
-    INPUT1 = "INPUT1"
-    if pf == "libtorch" or pf == "libtorch_nobatch":
+    # Get model platform
+    model_name = tu.get_model_name(pf, input_dtype, output0_dtype,
+                                    output1_dtype)
+    if configs[0][1] == "http":
+        metadata_client = httpclient.InferenceServerClient(configs[0][0],
+                                                            verbose=True)
+        metadata = metadata_client.get_model_metadata(model_name)
+        platform = metadata["platform"]
+    else:
+        metadata_client = grpcclient.InferenceServerClient(configs[0][0],
+                                                            verbose=True)
+        metadata = metadata_client.get_model_metadata(model_name)
+        platform = metadata.platform
+        
+    if platform == "pytorch_libtorch":
         OUTPUT0 = "OUTPUT__0"
         OUTPUT1 = "OUTPUT__1"
         INPUT0 = "INPUT__0"
         INPUT1 = "INPUT__1"
+    else:
+        OUTPUT0 = "OUTPUT0"
+        OUTPUT1 = "OUTPUT1"
+        INPUT0 = "INPUT0"
+        INPUT1 = "INPUT1"
 
     output0_byte_size = sum([o0.nbytes for o0 in output0_array_tmp])
     output1_byte_size = sum([o1.nbytes for o1 in output1_array_tmp])
@@ -794,8 +809,21 @@ def infer_zero(tester,
     shm_ip_handles = list()
     shm_op_handles = list()
 
+    # Get model platform
+    model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
+    if configs[0][1] == "http":
+        metadata_client = httpclient.InferenceServerClient(configs[0][0],
+                                                            verbose=True)
+        metadata = metadata_client.get_model_metadata(model_name)
+        platform = metadata["platform"]
+    else:
+        metadata_client = grpcclient.InferenceServerClient(configs[0][0],
+                                                            verbose=True)
+        metadata = metadata_client.get_model_metadata(model_name)
+        platform = metadata.platform
+
     for io_num in range(io_cnt):
-        if pf == "libtorch" or pf == "libtorch_nobatch":
+        if platform == "pytorch_libtorch":
             input_name = "INPUT__{}".format(io_num)
             output_name = "OUTPUT__{}".format(io_num)
         else:
@@ -962,7 +990,7 @@ def infer_zero(tester,
 
             tester.assertTrue(result_name in expected_dict)
             if use_system_shared_memory or use_cuda_shared_memory:
-                if pf == "libtorch" or pf == "libtorch_nobatch":
+                if platform == "pytorch_libtorch":
                     io_num = int(result_name.split("OUTPUT__")[1])
                 else:
                     io_num = int(result_name.split("OUTPUT")[1])
