@@ -207,6 +207,8 @@ RUN cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so 
     cp -r qa/L0_infer/. qa/L0_infer_cudashm && \
     mkdir -p qa/L0_infer_valgrind && \
     cp -r qa/L0_infer/. qa/L0_infer_valgrind && \
+    mkdir -p qa/L0_infer_tf2 && \
+    cp -r qa/L0_infer/. qa/L0_infer_tf2 && \
     mkdir -p qa/L0_trt_shape_tensors_shm && \
     cp -r qa/L0_trt_shape_tensors/. qa/L0_trt_shape_tensors_shm && \
     mkdir -p qa/L0_trt_shape_tensors_cudashm && \
