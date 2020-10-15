@@ -89,8 +89,8 @@ DynamicBatchScheduler::Create(
 
   return Create(
       runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, max_batch_size, enforce_equal_shape_tensors, batcher_config,
-      scheduler);
+      dynamic_batching_enabled, max_batch_size, enforce_equal_shape_tensors,
+      batcher_config, scheduler);
 }
 
 Status
@@ -500,8 +500,8 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
       // the batch size larger than all of the preferred batch sizes,
       // so mark the cursor at this point. Not sending the pending batch so that
       // we can examine the queue delay of requests that fits in a batch.
-      if (((pending_batch_size_ + batch_size) > max_preferred_batch_size_)
-        && (best_preferred_batch_size == 0)) {
+      if (((pending_batch_size_ + batch_size) > max_preferred_batch_size_) &&
+          (best_preferred_batch_size == 0)) {
         best_preferred_batch_size = pending_batch_size_;
         queue_.MarkCursor();
       }
@@ -555,7 +555,8 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
 
   // If the delay has been exceeded, or if the current batch can't grow
   // any larger then just immediately execute whatever is pending.
-  if (send_now || delay_is_exceeded || (pending_batch_size_ >= max_preferred_batch_size_)) {
+  if (send_now || delay_is_exceeded ||
+      (pending_batch_size_ >= max_preferred_batch_size_)) {
     return 0;
   }
 

@@ -1222,9 +1222,8 @@ OldestSequenceBatch::OldestSequenceBatch(
   Status status = DynamicBatchScheduler::Create(
       batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
       OnWarmup, OnSchedule, true /* dynamic_batching_enabled */,
-      config.max_batch_size(),
-      enforce_equal_shape_tensors_, true /* preserve_ordering */,
-      preferred_batch_sizes,
+      config.max_batch_size(), enforce_equal_shape_tensors_,
+      true /* preserve_ordering */, preferred_batch_sizes,
       config.sequence_batching().oldest().max_queue_delay_microseconds(),
       &dynamic_batcher_);
   if (!status.IsOk()) {

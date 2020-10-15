@@ -256,14 +256,15 @@ InferenceBackend::SetConfiguredScheduler(
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
         OnWarmup, OnRun, true /* dynamic_batching_enabled */,
-        config_.max_batch_size(),
-        enforce_equal_shape_tensors, config_.dynamic_batching(), &scheduler));
+        config_.max_batch_size(), enforce_equal_shape_tensors,
+        config_.dynamic_batching(), &scheduler));
   } else {
     // Default scheduler. Use dynamic batch scheduler (with batching
     // disabled) as the default scheduler.
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
-        OnWarmup, OnRun, false /* dynamic_batching_enabled */, 1 /* max_batch_size */,
+        OnWarmup, OnRun, false /* dynamic_batching_enabled */,
+        1 /* max_batch_size */,
         std::unordered_map<
             std::string, bool>() /* enforce_equal_shape_tensors */,
         false /* preserve_ordering */,
