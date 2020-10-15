@@ -107,8 +107,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     if output.shape[0] != 1:
-        print("error: expected 1 output result, got {}".format(
-            len(result["OUTPUT"])))
+        print("error: expected 1 output result, got {}".format(output.shape[0]))
         sys.exit(1)
 
     res_data = output[0].reshape([-1])

@@ -1,4 +1,4 @@
-name: "resnet50_graphdef"
+name: "inception_graphdef"
 platform: "tensorflow_graphdef"
 max_batch_size: 128
 input [
@@ -6,14 +6,14 @@ input [
     name: "input"
     data_type: TYPE_FP32
     format: FORMAT_NHWC
-    dims: [ 224, 224, 3 ]
+    dims: [ 299, 299, 3 ]
   }
 ]
 output [
   {
-    name: "resnet_v1_50/predictions/Softmax"
+    name: "InceptionV3/Predictions/Softmax"
     data_type: TYPE_FP32
-    dims: [ 1000 ]
-    label_filename: "resnet50_labels.txt"
+    dims: [ 1001 ]
+    label_filename: "inception_labels.txt"
   }
 ]
