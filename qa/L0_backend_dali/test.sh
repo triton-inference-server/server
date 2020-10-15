@@ -32,6 +32,8 @@ if [ -z ${DALI_BACKEND_REPO_TAG+unused} ]; then
   exit 1
 fi
 
+pip install --extra-index-url https://developer.download.nvidia.com/compute/redist nvidia-dali-cuda110
+
 git clone --single-branch --depth=1 -b $DALI_BACKEND_REPO_TAG https://github.com/triton-inference-server/dali_backend.git $DALI_BACKEND_DIR
 
 /bin/bash -x ./test_identity.sh $DALI_BACKEND_DIR
