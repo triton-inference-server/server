@@ -950,6 +950,78 @@ class BatcherTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_multi_batch_delayed_use_max_batch(self):
+        # Send three requests with first not having preferred size,
+        # second being smaller than max preferred size but the sum of
+        # the requests being larger than max preferred size and thrid
+        # is sent after the first two requests exceeds the queue delay
+        # and the sum of the requests to be in full batch. Use
+        # TRITONSERVER_DELAY_SCHEDULER in the environment so that
+        # requests can be queued up before scheduler starts
+        # servicing. This should cause all response to be returned together,
+        # while it appears that the first two responses to be returned
+        # after being delayed and the third response to be returned immediately.
+        if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+            shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
+            shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
+            shm2_region_names = ['ip20', 'ip21', 'op20', 'op21']
+        else:
+            shm0_region_names = None
+            shm1_region_names = None
+            shm2_region_names = None
+        precreated_shm0_regions = self.create_advance(['op00', 'op01'])
+        precreated_shm1_regions = self.create_advance(['op10', 'op11'])
+        precreated_shm2_regions = self.create_advance(['op20', 'op21'])
+        for trial in _trials:
+            try:
+                model_name = tu.get_model_name(trial, np.float32, np.float32,
+                                               np.float32)
+
+                self.check_setup(model_name)
+
+                # Need scheduler to wait for queue to contain 2 requests
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 3)
+
+                threads = []
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 3, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms)),
+                        kwargs={
+                            'shm_region_names': shm0_region_names,
+                            'precreated_shm_regions': precreated_shm0_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 4, (_max_queue_delay_ms * 1.5,
+                                         _max_queue_delay_ms)),
+                        kwargs={
+                            'shm_region_names': shm1_region_names,
+                            'precreated_shm_regions': precreated_shm1_regions
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_response,
+                        args=(trial, 1, (6000, None)),
+                        kwargs={
+                            'shm_region_names': shm2_region_names,
+                            'precreated_shm_regions': precreated_shm2_regions
+                        }))
+                threads[0].start()
+                threads[1].start()
+                time.sleep(11)
+                threads[2].start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(model_name, {8: 1}, 3, 8)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_multi_batch_delayed_preferred_different_shape(self):
         # Send two requests with total static batch size in between
         # preferred sizes. Then send a request with a different shape

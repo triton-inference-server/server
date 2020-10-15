@@ -92,7 +92,8 @@ NO_DELAY_TESTS=${NO_DELAY_TESTS:="test_static_batch_preferred \
 # Tests that use scheduler delay
 DELAY_TESTS=${DELAY_TESTS:="test_multi_batch_delayed_sum_gt_max_preferred \
                         test_multi_batch_use_biggest_preferred \
-                        test_multi_batch_use_best_preferred"}
+                        test_multi_batch_use_best_preferred \
+                        test_multi_batch_delayed_use_max_batch"}
 
 # Tests with different shapes
 DIFFERENT_SHAPE_TESTS=${DIFFERENT_SHAPE_TESTS:="test_multi_batch_not_preferred_different_shape \
@@ -208,7 +209,8 @@ for model_type in FIXED VARIABLE; do
     for i in $DELAY_TESTS ; do
         export TRITONSERVER_DELAY_SCHEDULER=6 &&
             [[ "$i" != "test_multi_batch_use_biggest_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=3 &&
-            [[ "$i" != "test_multi_batch_use_best_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=2
+            [[ "$i" != "test_multi_batch_use_best_preferred" ]] &&
+            [[ "$i" != "test_multi_batch_delayed_use_max_batch" ]] && export TRITONSERVER_DELAY_SCHEDULER=2
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$model_type.serverlog"
         
