@@ -34,5 +34,5 @@ fi
 
 git clone --single-branch --depth=1 -b $DALI_BACKEND_REPO_TAG https://github.com/triton-inference-server/dali_backend.git $DALI_BACKEND_DIR
 
-sh ./test_identity.sh $DALI_BACKEND_DIR
-sh ./test_rn50_ensemble.sh $DALI_BACKEND_DIR
+/bin/bash -x ./test_identity.sh $DALI_BACKEND_DIR
+/bin/bash -x ./test_rn50_ensemble.sh $DALI_BACKEND_DIR
