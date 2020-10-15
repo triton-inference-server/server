@@ -42,6 +42,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     const uint32_t runner_id_start, const uint32_t runner_cnt,
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
     const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
+    const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
@@ -52,6 +53,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       dynamic_batching_enabled_(dynamic_batching_enabled),
       scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
       queue_(default_queue_policy, priority_levels, queue_policy_map),
+      max_batch_size_((size_t)std::max(1, max_batch_size)),
       preferred_batch_sizes_(preferred_batch_sizes),
       pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
       pending_batch_size_(0), queued_batch_size_(0),
@@ -71,6 +73,7 @@ DynamicBatchScheduler::Create(
     const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
     const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
+    const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
@@ -86,7 +89,7 @@ DynamicBatchScheduler::Create(
 
   return Create(
       runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, enforce_equal_shape_tensors, batcher_config,
+      dynamic_batching_enabled, max_batch_size, enforce_equal_shape_tensors, batcher_config,
       scheduler);
 }
 
@@ -95,6 +98,7 @@ DynamicBatchScheduler::Create(
     const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
     const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
+    const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const inference::ModelDynamicBatching& batcher_config,
     std::unique_ptr<Scheduler>* scheduler)
@@ -106,7 +110,7 @@ DynamicBatchScheduler::Create(
 
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
       runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, enforce_equal_shape_tensors,
+      dynamic_batching_enabled, max_batch_size, enforce_equal_shape_tensors,
       batcher_config.preserve_ordering(), preferred_batch_sizes,
       batcher_config.max_queue_delay_microseconds(),
       batcher_config.default_queue_policy(), batcher_config.priority_levels(),
@@ -493,8 +497,15 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
       }
     } else {
       // There is a pending batch and adding this request would make
-      // the batch size too large, so send the pending batch as it is.
-      if ((pending_batch_size_ + batch_size) > max_preferred_batch_size_) {
+      // the batch size larger than all of the preferred batch sizes,
+      // so mark the cursor at this point. Not sending the pending batch so that
+      // we can examine the queue delay of requests that fits in a batch.
+      if (((pending_batch_size_ + batch_size) > max_preferred_batch_size_)
+        && (best_preferred_batch_size == 0)) {
+        best_preferred_batch_size = pending_batch_size_;
+        queue_.MarkCursor();
+      }
+      if ((pending_batch_size_ + batch_size) > max_batch_size_) {
         send_now = true;
         break;
       }
@@ -520,8 +531,17 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
     }
   }
 
-  // If we found a preferred batch size then execute that.
-  if (best_preferred_batch_size != 0) {
+  // Obatin the age of the oldest pending request to compare with the maximum
+  // batch queuing delay
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+  uint64_t delay_ns = now_ns - queue_.OldestEnqueueTime();
+  bool delay_is_exceeded = (delay_ns >= pending_batch_delay_ns_);
+
+  // If we found a preferred batch size and the queue delay hasn't been
+  // exceeded, then execute that.
+  if ((best_preferred_batch_size != 0) && !delay_is_exceeded) {
     pending_batch_size_ = best_preferred_batch_size;
     queue_.SetCursorToMark();
     return 0;
@@ -533,24 +553,9 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
     return 0;
   }
 
-  // If there is no batch queuing delay or if the current batch can't
-  // grow any larger then just immediately execute whatever is
-  // pending.
-  if (send_now || (pending_batch_delay_ns_ == 0) ||
-      (pending_batch_size_ >= max_preferred_batch_size_)) {
-    return 0;
-  }
-
-  // Compare the age of the oldest pending request to the maximum
-  // batch queuing delay and execute now if queuing delay is
-  // exceeded. If queuing delay not exceeded create a timer to wakeup
-  // a thread to check again at the maximum allowed delay.
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  uint64_t now_ns = TIMESPEC_TO_NANOS(now);
-  uint64_t delay_ns = now_ns - queue_.OldestEnqueueTime();
-
-  if (delay_ns >= pending_batch_delay_ns_) {
+  // If the delay has been exceeded, or if the current batch can't grow
+  // any larger then just immediately execute whatever is pending.
+  if (send_now || delay_is_exceeded || (pending_batch_size_ >= max_preferred_batch_size_)) {
     return 0;
   }
 
