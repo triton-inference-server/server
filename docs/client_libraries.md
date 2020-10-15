@@ -164,7 +164,7 @@ You can optionally add *--build-arg "BASE_IMAGE=<base_image>"* to set
 the base image that you want the client library built against. This
 base image must be an Ubuntu CUDA image to be able to build CUDA
 shared memory support. If CUDA shared memory support is not required,
-you can use Ubuntu 18.04 as the base image.
+you can use Ubuntu 20.04 as the base image.
 
 After the build completes the tritonserver_sdk docker image will
 contain the built client libraries in /workspace/install/lib, the
@@ -180,7 +180,7 @@ Note that version 3.18.4 of cmake is needed to compile the
 client. The build dependencies and requirements are shown in
 `Dockerfile.sdk`. To build without Docker you must first
 install those dependencies along with required cmake version.
-This section describes the client build for Ubuntu 18.04 and
+This section describes the client build for Ubuntu 20.04 and
 Windows 10 systems.
 
 To build the libraries using CMake, first change directory to the root
@@ -192,7 +192,7 @@ under-development version).
 $ git checkout r20.12
 ```
 
-#### Ubuntu 18.04
+#### Ubuntu 20.04
 
 For Ubuntu, the dependencies and how to install them can be found in
 `Dockerfile.sdk`. The appropriate CUDA library must be installed
