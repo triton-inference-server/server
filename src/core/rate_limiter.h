@@ -38,50 +38,62 @@ namespace nvidia { namespace inferenceserver {
 
 // Limits the rate at which requests are dispatched from the scheduler
 class RateLimiter {
- public:
-  class ModelInstance;
-
  private:
   class ModelContext;
+
+ public:
+  class ModelInstance;
 
   using StandardReleaseFunc = std::function<void(ModelInstance*)>;
   using StandardScheduleFunc = std::function<void(ModelInstance*)>;
   using StandardStageFunc = std::function<void(ModelInstance*)>;
-  using Specification = inference::ModelInstanceGroup::RateLimiterSpec;
+  using RateLimiterConfig = inference::ModelRateLimiter;
 
- public:
-  /// Creates a rate limiter object which will funnel the inference requests to
-  /// the model instances.
-  /// \param enable_rate_limiting Whether or not to enable rate limiting.
+  /// Creates a rate limiter object which will funnel the requests to
+  /// the model instances. A typical lifetime of the model instance within
+  /// RateLimiter transition from available -> staged -> allocated -> available.
+  /// The transition from available to staged occurs when a request is
+  /// registered for the model. Depending upon the resource availabilty and
+  /// priority, the RateLimiter will transition an instance to allocated state
+  /// at some point in the future. The staged state is skipped when
+  /// configured to ignore the resource constraints. The cycle in this case
+  /// will be available -> allocated -> available.
+  /// \param ignore_resources_and_priority Whether or not to ignore resource
+  /// constraints and cross-model priority. An available instance is directly
+  /// allocated when true.Default value is false.
   /// \return Status object indicating success or failure.
   static Status Create(
-      const bool enable_rate_limiting,
+      const bool ignore_resources_and_priority,
       std::unique_ptr<RateLimiter>* rate_limiter);
 
-  /// Loads the specified model to the RateLimiter
-  /// \param enable_rate_limiting Whether or not to enable rate limiting.
+  /// Loads the configified model to the RateLimiter
+  /// \param model_name The name of the model to load.
+  /// \param version The version of the model to load.
+  /// \param model_config The configuration of the model to load.
   /// \return Status object indicating success or failure.
   Status LoadModel(
       const std::string& model_name, const int64_t version,
       const inference::ModelConfig& model_config);
 
-  /// Unloads the specified model from the RateLimiter
-  /// \param enable_rate_limiting Whether or not to enable rate limiting.
+  /// Unloads the configified model from the RateLimiter
+  /// \param model_name The name of the model to load.
+  /// \param version The version of the model to load.
   /// \return Status object indicating success or failure.
   Status UnloadModel(const std::string& model_name, const int64_t version);
 
-  /// Enqueues the callback to the specified model. In future, when the
+  /// Enqueues the callback to the configified model. In future, when the
   /// conditions are met, the callback will be invoked and a pointer to
   /// allocated RateLimiter::ModelInstance object will be exposed as a
   /// parameter. The user must ensure RateLimiter::ModelInstance::Release
   /// gets called on the instance once the inference request is complete
   /// so that the instance and its resources are returned to the available
   /// pool. Also, note the callback should be a light-weight call and
-  /// must not itself invoke the inference execution.
+  /// must not itself invoke the inference execution but just be used
+  /// as a signal to proceed with the execution.
   /// \param OnSchedule The callback function to be called when scheduling.
   /// \param model_name The name of the model.
   /// \param version The version of the model.
-  /// \param instance_index The index to a specific instance of the model.
+  /// \param instance_index The index to a configific instance of the model.
   /// The default value is -1 which means that an instance with highest
   /// priority will be selected for the execution.
   /// \return Status object indicating success or failure.
@@ -109,12 +121,15 @@ class RateLimiter {
     ModelInstance(
         const std::string& model_name, const int64_t version,
         ModelContext* model_context, const uint32_t index, const int gpu_device,
-        const Specification& spec, StandardStageFunc OnStage,
+        const RateLimiterConfig& rate_limiter_config, StandardStageFunc OnStage,
         StandardReleaseFunc OnRelease);
 
     std::pair<std::string, int64_t> ModelIdentifier();
     int32_t DeviceId() const { return gpu_device_; }
-    const Specification* GetSpecification() const { return &spec_; }
+    const RateLimiterConfig* GetRateLimiterConfig() const
+    {
+      return &rate_limiter_config_;
+    }
     void MarkAvailable();
     double ScaledPriority();
     Status Stage(StandardScheduleFunc OnSchedule);
@@ -128,7 +143,7 @@ class RateLimiter {
     ModelContext* model_context_;
     int32_t index_;
     int gpu_device_;
-    Specification spec_;
+    RateLimiterConfig rate_limiter_config_;
     StandardStageFunc OnStage_;
     StandardReleaseFunc OnRelease_;
     std::atomic<uint64_t> exec_count_;
@@ -147,14 +162,14 @@ class RateLimiter {
 
   void LoadModelHelper(
       const std::string& model_name, const int64_t version, const int device_id,
-      const Specification& rate_limit_spec, ModelContext* model_context,
+      const RateLimiterConfig& rate_limit_config, ModelContext* model_context,
       std::vector<std::shared_ptr<ModelInstance>>* model_instances);
 
   void OnStage(ModelInstance* instance_ptr);
   void OnRelease(ModelInstance* instance_ptr);
   void AttemptAllocation();
 
-  class Comparator {
+  class ScaledPriorityComparator {
    public:
     bool operator()(ModelInstance* a, ModelInstance* b)
     {
@@ -163,7 +178,7 @@ class RateLimiter {
   };
 
   using PriorityQueue = std::priority_queue<
-      ModelInstance*, std::vector<ModelInstance*>, Comparator>;
+      ModelInstance*, std::vector<ModelInstance*>, ScaledPriorityComparator>;
 
   // Holds the active context to a loaded model
   class ModelContext {
@@ -224,6 +239,8 @@ class RateLimiter {
     std::mutex allocated_resources_mtx_;
   };
 
+  bool ignore_resources_and_priority_;
+
   // Instances for the loaded models
   std::map<
       std::pair<std::string, int64_t>,
@@ -241,8 +258,6 @@ class RateLimiter {
 
   // Manager to keep track of the resource allocations
   std::unique_ptr<ResourceManager> resource_manager_;
-
-  bool enable_rate_limiting_;
 };
 
 }}  // namespace nvidia::inferenceserver

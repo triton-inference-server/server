@@ -57,29 +57,19 @@ class RateLimiterTest : public ::testing::Test {
         group->add_gpus(gpu_id);
       }
     }
-    group->mutable_rate_limiter_spec()->set_priority(priority);
+    group->mutable_rate_limiter()->set_priority(priority);
 
     for (const auto& resource : global_resources) {
-      auto itr =
-          group->mutable_rate_limiter_spec()
-              ->mutable_resources()
-              ->insert(
-                  {resource.first,
-                   inference::ModelInstanceGroup::RateLimiterSpec::Resource()})
-              .first;
-      itr->second.set_global(true);
-      itr->second.set_count(resource.second);
+      auto rate_limiter_config = group->mutable_rate_limiter()->add_resources();
+      rate_limiter_config->set_name(resource.first);
+      rate_limiter_config->set_global(true);
+      rate_limiter_config->set_count(resource.second);
     }
 
     for (const auto& resource : local_resources) {
-      auto itr =
-          group->mutable_rate_limiter_spec()
-              ->mutable_resources()
-              ->insert(
-                  {resource.first,
-                   inference::ModelInstanceGroup::RateLimiterSpec::Resource()})
-              .first;
-      itr->second.set_count(resource.second);
+      auto rate_limiter_config = group->mutable_rate_limiter()->add_resources();
+      rate_limiter_config->set_name(resource.first);
+      rate_limiter_config->set_count(resource.second);
     }
   }
 

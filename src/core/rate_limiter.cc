@@ -34,10 +34,11 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 RateLimiter::Create(
-    const bool enable_rate_limiting, std::unique_ptr<RateLimiter>* rate_limiter)
+    const bool ignore_resources_and_priority,
+    std::unique_ptr<RateLimiter>* rate_limiter)
 {
   std::unique_ptr<RateLimiter> local_rate_limiter(
-      new RateLimiter(enable_rate_limiting));
+      new RateLimiter(ignore_resources_and_priority));
   *rate_limiter = std::move(local_rate_limiter);
 
   return Status::Success;
@@ -61,11 +62,11 @@ RateLimiter::LoadModel(
           if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
             LoadModelHelper(
                 model_name, version, ResourceManager::NO_GPU_DEVICE,
-                group.rate_limiter_spec(), &model_context, &model_instances);
+                group.rate_limiter(), &model_context, &model_instances);
           } else {
             for (int gpu_device : group.gpus()) {
               LoadModelHelper(
-                  model_name, version, gpu_device, group.rate_limiter_spec(),
+                  model_name, version, gpu_device, group.rate_limiter(),
                   &model_context, &model_instances);
             }
           }
@@ -85,12 +86,12 @@ RateLimiter::LoadModel(
 void
 RateLimiter::LoadModelHelper(
     const std::string& model_name, const int64_t version, const int device_id,
-    const Specification& rate_limit_spec, ModelContext* model_context,
+    const RateLimiterConfig& rate_limter_config, ModelContext* model_context,
     std::vector<std::shared_ptr<ModelInstance>>* model_instances)
 {
   int index = model_instances->size();
   model_instances->push_back(std::shared_ptr<ModelInstance>(new ModelInstance(
-      model_name, version, model_context, index, device_id, rate_limit_spec,
+      model_name, version, model_context, index, device_id, rate_limter_config,
       [this](ModelInstance* instance) { OnStage(instance); },
       [this](ModelInstance* instance) { OnRelease(instance); })));
   model_context->AddAvailableInstance(model_instances->back().get());
@@ -145,7 +146,7 @@ RateLimiter::EnqueueModelRequest(
   }
 
   itr->second.EnqueueModelRequest(OnSchedule, instance_index);
-  if (enable_rate_limiting_) {
+  if (ignore_resources_and_priority_) {
     itr->second.StageInstanceIfAvailable();
   } else {
     // Directly allocate an available model instance if not using rate limiter.
@@ -155,8 +156,8 @@ RateLimiter::EnqueueModelRequest(
   return Status::Success;
 }
 
-RateLimiter::RateLimiter(const bool enable_rate_limiting)
-    : enable_rate_limiting_(enable_rate_limiting)
+RateLimiter::RateLimiter(const bool ignore_resources_and_priority)
+    : ignore_resources_and_priority_(ignore_resources_and_priority)
 {
   ResourceManager::Create(&resource_manager_);
 }
@@ -178,7 +179,7 @@ RateLimiter::OnRelease(ModelInstance* instance)
   model_context.AddAvailableInstance(instance);
   resource_manager_->ReleaseResources(instance);
   if (model_context.ContainsPendingRequests(instance->Index())) {
-    if (enable_rate_limiting_) {
+    if (ignore_resources_and_priority_) {
       model_context.StageInstanceIfAvailable();
     } else {
       // Directly allocate an available model instance if not using rate
@@ -338,11 +339,13 @@ RateLimiter::ModelContext::Unload()
 RateLimiter::ModelInstance::ModelInstance(
     const std::string& model_name, const int64_t version,
     RateLimiter::ModelContext* model_context, const uint32_t index,
-    const int gpu_device, const RateLimiter::Specification& spec,
+    const int gpu_device,
+    const RateLimiter::RateLimiterConfig& rate_limiter_config,
     RateLimiter::StandardStageFunc OnStage,
     RateLimiter::StandardReleaseFunc OnRelease)
     : model_name_(model_name), version_(version), model_context_(model_context),
-      index_(index), gpu_device_(gpu_device), spec_(spec), OnStage_(OnStage),
+      index_(index), gpu_device_(gpu_device),
+      rate_limiter_config_(rate_limiter_config), OnStage_(OnStage),
       OnRelease_(OnRelease), exec_count_(0), state_(AVAILABLE)
 {
 }
@@ -471,7 +474,7 @@ RateLimiter::ModelInstance::ScaledPriority()
 {
   // TODO: Different schemes for the prioritization of
   // model instance can be added here.
-  return (exec_count_ * spec_.priority());
+  return (exec_count_ * rate_limiter_config_.priority());
 }
 
 
@@ -495,13 +498,13 @@ RateLimiter::ResourceManager::LoadModelInstance(
 {
   std::lock_guard<std::mutex> lk(model_resources_mtx_);
   auto pr = model_resources_.emplace(std::make_pair(instance, ResourceMap()));
-  for (const auto& resource : instance->GetSpecification()->resources()) {
-    if (resource.second.global()) {
-      (pr.first->second[GLOBAL_RESOURCE_KEY])[resource.first] =
-          resource.second.count();
+  for (const auto& resource : instance->GetRateLimiterConfig()->resources()) {
+    if (resource.global()) {
+      (pr.first->second[GLOBAL_RESOURCE_KEY])[resource.name()] =
+          resource.count();
     } else {
-      (pr.first->second[instance->DeviceId()])[resource.first] =
-          resource.second.count();
+      (pr.first->second[instance->DeviceId()])[resource.name()] =
+          resource.count();
     }
   }
 }
