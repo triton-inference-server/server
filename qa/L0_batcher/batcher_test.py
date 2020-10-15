@@ -44,8 +44,8 @@ TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
-BACKENDS = os.environ.get(
-    'BACKENDS', "graphdef savedmodel onnx libtorch plan custom")
+BACKENDS = os.environ.get('BACKENDS',
+                          "graphdef savedmodel onnx libtorch plan custom")
 
 _trials = BACKENDS.split(" ")
 if "custom" in BACKENDS:

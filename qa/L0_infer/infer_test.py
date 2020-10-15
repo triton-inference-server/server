@@ -828,8 +828,7 @@ class InferTest(tu.TestResultCollector):
         if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
 
             def test_ensemble_label_lookup(self):
-                if all(x in BACKENDS
-                       for x in ['graphdef', 'savedmodel']):
+                if all(x in BACKENDS for x in ['graphdef', 'savedmodel']):
                     # Ensemble needs to look up label from the actual model
                     for bs in (1, 8):
                         iu.infer_exact(
@@ -844,8 +843,7 @@ class InferTest(tu.TestResultCollector):
                             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-                if all(x in BACKENDS
-                       for x in ['graphdef', 'savedmodel']):
+                if all(x in BACKENDS for x in ['graphdef', 'savedmodel']):
                     # Label from the actual model will be passed along the nested ensemble
                     for bs in (1, 8):
                         iu.infer_exact(

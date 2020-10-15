@@ -48,8 +48,8 @@ _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
 if _no_batching:
-    _trials = ("savedmodel_nobatch", "graphdef_nobatch",
-               "plan_nobatch", "onnx_nobatch")
+    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "plan_nobatch",
+               "onnx_nobatch")
 else:
     _trials = ("savedmodel", "graphdef", "plan", "onnx")
 
@@ -72,8 +72,8 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
         # couldn't implement the full accumulator. See
         # qa/common/gen_qa_dyna_sequence_models.py for more
         # information.
-        if ((("nobatch" not in trial) and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("plan" in trial) or
+        if ((("nobatch" not in trial) and ("custom" not in trial)) or \
+            ("graphdef" in trial) or ("plan" in trial) or \
             ("onnx" in trial)) or ("libtorch" in trial):
             expected_result = value
             if flag_str is not None:

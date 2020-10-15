@@ -454,7 +454,7 @@ class LifeCycleTest(tu.TestResultCollector):
         savedmodel_name = tu.get_model_name('savedmodel', np.float32,
                                             np.float32, np.float32)
         onnx_name = tu.get_model_name('onnx', np.float32, np.float32,
-                                        np.float32)
+                                      np.float32)
 
         # Make sure savedmodel model is not in the status (because
         # initially it is not in the model repository)
@@ -653,8 +653,8 @@ class LifeCycleTest(tu.TestResultCollector):
                            np.float32,
                            np.float32,
                            swap=True)
-            self.assertTrue(
-                False, "expected error for unavailable model " + onnx_name)
+            self.assertTrue(False,
+                            "expected error for unavailable model " + onnx_name)
         except Exception as ex:
             self.assertTrue(ex.message().startswith(
                 "Request for unknown model: 'onnx_float32_float32_float32' has no available versions"
@@ -665,7 +665,7 @@ class LifeCycleTest(tu.TestResultCollector):
         savedmodel_name = tu.get_model_name('savedmodel', np.float32,
                                             np.float32, np.float32)
         onnx_name = tu.get_model_name('onnx', np.float32, np.float32,
-                                        np.float32)
+                                      np.float32)
 
         # Make sure savedmodel model is not in the status (because
         # initially it is not in the model repository)

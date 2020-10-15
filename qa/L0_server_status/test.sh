@@ -81,7 +81,7 @@ fi
 set -e
 
 rm -fr models/graphdef_int32_int32_int32/2 models/graphdef_int32_int32_int32/3
-rm -fr models/onnx_int32_int32_int32/2 models/onnx_int32_int32_int32/3	
+rm -fr models/onnx_int32_int32_int32/2 models/onnx_int32_int32_int32/3
 cp -r models/graphdef_float16_float32_float32/1 models/graphdef_float16_float32_float32/7
 sleep 3
 
