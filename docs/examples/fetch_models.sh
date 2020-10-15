@@ -27,13 +27,6 @@
 
 set -ex
 
-# Caffe2 resnet50
-mkdir -p model_repository/resnet50_netdef/1
-wget -O model_repository/resnet50_netdef/1/model.netdef \
-     http://download.caffe2.ai.s3.amazonaws.com/models/resnet50/predict_net.pb
-wget -O model_repository/resnet50_netdef/1/init_model.netdef \
-     http://download.caffe2.ai.s3.amazonaws.com/models/resnet50/init_net.pb
-
 # TensorFlow inception
 mkdir -p model_repository/inception_graphdef/1
 wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \

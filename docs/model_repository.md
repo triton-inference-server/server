@@ -314,23 +314,3 @@ A minimal model repository for a DALI model is:
       1/
         model.dali
 ```
-
-### Caffe2 Models
-
-A Caffe2 model definition is called a *NetDef*. A Caffe2 NetDef is a
-single file that by default must be named model.netdef. This default
-name can be overridden using the *default_model_filename* property in
-the [model configuration](model_configuration.md).
-
-A minimal model repository for a  NetDef model is:
-
-```
-  <model-repository-path>/
-    <model-name>/
-      config.pbtxt
-      1/
-        model.netdef
-```
-
-**Support for Caffe2 models is deprecated and will be removed in an
-uncoming release of Triton**.
