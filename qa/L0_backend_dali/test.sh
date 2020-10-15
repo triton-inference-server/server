@@ -25,7 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-DALI_BACKEND_DIR=/data/dali_backend_dir
+DALI_BACKEND_DIR=`pwd`/dali_backend_dir
+
+if [ -z ${DALI_BACKEND_REPO_TAG+unused} ]; then
+  echo -e "\n***\n*** Test FAILED: DALI_BACKEND_REPO_TAG is undefined\n***"
+  exit 1
+fi
 
 git clone --single-branch --depth=1 -b $DALI_BACKEND_REPO_TAG https://github.com/triton-inference-server/dali_backend.git $DALI_BACKEND_DIR
 
