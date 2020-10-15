@@ -287,7 +287,7 @@ def backend_cmake_args(images, components, be, install_dir):
 
 def pytorch_cmake_args():
     return [
-        '-DTRITON_PYTORCH_INCLUDE_PATHS=/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision;/usr/include/python3.6',
+        '-DTRITON_PYTORCH_INCLUDE_PATHS=/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision',
         '-DTRITON_PYTORCH_LIB_PATHS=/opt/tritonserver/backends/pytorch'
     ]
 
@@ -382,55 +382,47 @@ FROM ${BASE_IMAGE} AS tritonserver_onnx
 ARG ONNX_RUNTIME_VERSION
 ARG ONNXRUNTIME_REPO=https://github.com/Microsoft/onnxruntime
 
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /workspace
 
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/workspace/cmake-3.14.3-Linux-x86_64/bin:/opt/miniconda/bin:$PATH
-ENV LD_LIBRARY_PATH /opt/miniconda/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+#ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/workspace/cmake-3.14.3-Linux-x86_64/bin:/opt/miniconda/bin:$PATH
+#ENV LD_LIBRARY_PATH /opt/miniconda/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
 # The Onnx Runtime dockerfile is the collection of steps in
 # https://github.com/microsoft/onnxruntime/tree/v1.5.1/dockerfiles
 
-# Install common dependencies
-RUN apt-get update && \
-    apt-get install -y sudo git bash unattended-upgrades
+# Install dependencies from
+# onnxruntime/dockerfiles/scripts/install_common_deps.sh. We don't run
+# that script directly because we don't want cmake installed from that
+# file.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        wget \
+        zip \
+        ca-certificates \
+        build-essential \
+        cmake \
+        curl \
+        libcurl4-openssl-dev \
+        libssl-dev \
+        python3-dev \
+        python3-pip
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-4.5.11-Linux-x86_64.sh -O ~/miniconda.sh \
+        --no-check-certificate && \
+    /bin/bash ~/miniconda.sh -b -p /opt/miniconda && \
+    rm ~/miniconda.sh && \
+    /opt/miniconda/bin/conda clean -ya
+
+#RUN apt-get update && \
+#    apt-get install -y sudo git bash unattended-upgrades
 # Dependencies for OpenVINO
-RUN apt-get install -y apt-transport-https ca-certificates zip x11-apps \
+#RUN apt-get install -y apt-transport-https ca-certificates zip x11-apps \
         lsb-core wget cpio libboost-python-dev libpng-dev zlib1g-dev libnuma1 \
-        ocl-icd-libopencl1 clinfo libboost-filesystem1.65-dev \
-        libboost-thread1.65-dev protobuf-compiler libprotoc-dev autoconf \
+        ocl-icd-libopencl1 clinfo libboost-filesystem-dev \
+        libboost-thread-dev protobuf-compiler libprotoc-dev autoconf \
         automake libtool libjson-c-dev ocl-icd-libopencl1
-RUN unattended-upgrade
-
-# Install OpenVINO
-ARG ONNX_RUNTIME_OPENVINO_VERSION
-ENV INTEL_OPENVINO_DIR=/opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.287
-ENV InferenceEngine_DIR=${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/share
-ENV IE_PLUGINS_PATH=${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/lib/intel64
-ENV LD_LIBRARY_PATH=/opt/intel/opencl:${INTEL_OPENVINO_DIR}/inference_engine/external/gna/lib:${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/mkltiny_lnx/lib:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/omp/lib:${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/tbb/lib:$IE_PLUGINS_PATH:$LD_LIBRARY_PATH
-ENV OpenCV_DIR=${INTEL_OPENVINO_DIR}/opencv/share/OpenCV
-ENV LD_LIBRARY_PATH=${INTEL_OPENVINO_DIR}/opencv/lib:${INTEL_OPENVINO_DIR}/opencv/share/OpenCV/3rdparty/lib:$LD_LIBRARY_PATH
-ENV HDDL_INSTALL_DIR=${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/hddl
-ENV LD_LIBRARY_PATH=${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/hddl/lib:$LD_LIBRARY_PATH
-ENV LANG en_US.UTF-8
-
-RUN wget https://apt.repos.intel.com/openvino/2020/GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
-    apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2020 && rm GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
-    cd /etc/apt/sources.list.d && \
-    echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \
-    apt update && \
-    apt -y install intel-openvino-dev-ubuntu18-${ONNX_RUNTIME_OPENVINO_VERSION}.287
-# Text replacement to skip installing CMake via distribution
-# as it downgrades the version (need >= 3.11.0)
-RUN cd ${INTEL_OPENVINO_DIR}/install_dependencies && \
-    sed -i 's/cmake//' install_openvino_dependencies.sh && \
-    ./install_openvino_dependencies.sh
-
-RUN wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-gmmlib_19.3.2_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-igc-core_1.0.2597_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-igc-opencl_1.0.2597_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-opencl_19.41.14441_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-ocloc_19.41.14441_amd64.deb && \
-    sudo dpkg -i *.deb && ldconfig && rm -rf *.deb
+#RUN unattended-upgrade
 
 # Allow configure to pick up GDK and CuDNN where it expects it.
 # (Note: $CUDNN_VERSION is defined by NVidia's base image)
@@ -440,15 +432,37 @@ RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
     mkdir -p /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64 && \
     ln -s /etc/alternatives/libcudnn_so /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64/libcudnn.so
 
-# Install ONNX Runtime
-RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive ${ONNXRUNTIME_REPO} onnxruntime && \
-    (cd onnxruntime && \
-            git submodule update --init --recursive)
-RUN /bin/sh onnxruntime/dockerfiles/scripts/install_common_deps.sh
-RUN cd /workspace/onnxruntime/cmake/external/onnx && python3 setup.py install
+# Install OpenVINO
+ARG ONNX_RUNTIME_OPENVINO_VERSION
+ENV INTEL_OPENVINO_DIR /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110
+ENV LD_LIBRARY_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:$INTEL_OPENVINO_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
 
-ENV PATH /usr/bin:$PATH
-RUN cmake --version
+ENV PYTHONPATH $INTEL_OPENVINO_DIR/tools:$PYTHONPATH
+ENV IE_PLUGINS_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64
+
+RUN wget https://apt.repos.intel.com/openvino/2021/GPG-PUB-KEY-INTEL-OPENVINO-2021 && \
+    apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2021 && rm GPG-PUB-KEY-INTEL-OPENVINO-2021 && \
+    cd /etc/apt/sources.list.d && \
+    echo "deb https://apt.repos.intel.com/openvino/2021 all main">intel-openvino-2021.list && \
+    apt update && \
+    apt install -y intel-openvino-dev-ubuntu18-${ONNX_RUNTIME_OPENVINO_VERSION}.110 && \
+    cd ${INTEL_OPENVINO_DIR}/install_dependencies && ./install_openvino_dependencies.sh
+
+RUN wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-gmmlib_19.3.2_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-igc-core_1.0.2597_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-igc-opencl_1.0.2597_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-opencl_19.41.14441_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-ocloc_19.41.14441_amd64.deb && \
+    dpkg -i *.deb && rm -rf *.deb
+
+# Clone and build ONNX Runtime
+RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive ${ONNXRUNTIME_REPO} onnxruntime && \
+    (cd onnxruntime && git submodule update --init --recursive)
+#RUN /bin/sh onnxruntime/dockerfiles/scripts/install_common_deps.sh
+#RUN cd /workspace/onnxruntime/cmake/external/onnx && python3 setup.py install
+
+#ENV PATH /usr/bin:$PATH
+#RUN cmake --version
 
 ARG COMMON_BUILD_ARGS="--skip_submodule_sync --parallel --build_shared_lib --use_openmp"
 RUN mkdir -p /workspace/build
@@ -476,6 +490,9 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
+
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
 
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
@@ -516,7 +533,7 @@ RUN pip3 install --upgrade pip && \
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
       gpg --dearmor - |  \
       tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
     apt-get update && \
     apt-get install -y --no-install-recommends cmake
 '''
@@ -702,13 +719,16 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
     [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
     [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
          libb64-0d \
          libcurl4-openssl-dev \
-         libre2-4 && \
+         libre2-5 && \
     rm -rf /var/lib/apt/lists/*
 '''
     # Add dependencies needed for python backend

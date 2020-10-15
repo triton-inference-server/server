@@ -277,21 +277,20 @@ FROM $BASE_IMAGE
 ENV DEBIAN_FRONTEND=noninteractive
 
 # install platform specific packages
-RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
+RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
-                libpng12-dev; \
+                libpng-dev; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev; \
     else \
-        echo "Ubuntu version must be either 16.04 or 18.04" && \
+        echo "Ubuntu version must be either 18.04 or 20.04" && \
         exit 1; \
     fi
 
 # go client requires golang and CI/QA for memcheck requires valgrind
-# wkhtmltox, xfonts-75dpi, xfonts-base are dependencies of pdfkit
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               libopencv-dev \
@@ -305,13 +304,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               golang-go \
                               nginx \
                               protobuf-compiler \
-                              valgrind \
-                              xfonts-75dpi \
-                              xfonts-base && \
-    rm -rf /var/lib/apt/lists/* && \
-    wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \
-    dpkg -i wkhtmltox_0.12.6-1.bionic_amd64.deb && \
-    rm -rf wkhtmltox_0.12.6-1.bionic_amd64.deb
+                              valgrind && \
+    rm -rf /var/lib/apt/lists/*
 
 # CI/QA expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
