@@ -46,6 +46,8 @@
 #include <blob/blob_client.h>
 #include <storage_account.h>
 #include <storage_credential.h>
+#undef LOG_INFO
+#undef LOG_WARNING
 #endif  // TRITON_ENABLE_AZURE_STORAGE
 
 #include <google/protobuf/io/coded_stream.h>
