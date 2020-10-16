@@ -489,6 +489,15 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     if 'pytorch' in backends:
         df += '''
 # LibTorch and Torchvision headers and libraries
+COPY --from=tritonserver_pytorch \
+     /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
+     /opt/tritonserver/backends/pytorch/
+COPY --from=tritonserver_pytorch \
+     /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
+     /opt/tritonserver/backends/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_core.so /opt/tritonserver/backends/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_gnu_thread.so /opt/tritonserver/backends/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
      /opt/tritonserver/include/torch
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
