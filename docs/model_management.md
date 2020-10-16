@@ -49,7 +49,7 @@ and will return an error response.
 This model control mode is selected by specifying
 --model-control-mode=none when starting Triton. This is the default
 model control mode. Changing the model repository while Triton is
-running must be carefully, as explained in [Modifying the Model
+running must be done carefully, as explained in [Modifying the Model
 Repository](#modifying-the-model-repository).
 
 ## Model Control Mode EXPLICIT
@@ -68,8 +68,8 @@ the load or unload action.
 
 This model control mode is enabled by specifying
 --model-control-mode=explicit. Changing the model repository while
-Triton is running must be carefully, as explained in [Modifying the
-Model Repository](#modifying-the-model-repository).
+Triton is running must be done carefully, as explained in [Modifying
+the Model Repository](#modifying-the-model-repository).
 
 ## Model Control Mode POLL
 
@@ -101,8 +101,8 @@ and will return an error response.
 This model control mode is enabled by specifying
 --model-control-mode=poll and by setting --repository-poll-secs to a
 non-zero value when starting Triton. Changing the model repository
-while Triton is running must be carefully, as explained in [Modifying
-the Model Repository](#modifying-the-model-repository).
+while Triton is running must be done carefully, as explained in
+[Modifying the Model Repository](#modifying-the-model-repository).
 
 In POLL mode Triton responds to the following model repository
 changes:
@@ -141,8 +141,8 @@ changes:
 Each model in a model repository [resides in its own
 sub-directory](model_repository.md#repository-layout). The activity
 allowed on the contents of a model's sub-directory varies depending on
-how Triton is using that model. The loaded or unloaded state of a
-model can be determined by using the [model
+how Triton is using that model. The state of a model can be determined
+by using the [model
 metadata](inference_protocols.md#inference-protocols-and-apis) or
 [repository index](protocol/extension_model_repository.md#index) APIs.
 
