@@ -45,7 +45,7 @@ RateLimiter::Create(
 }
 
 Status
-RateLimiter::LoadModel(
+RateLimiter::AddModel(
     const std::string& model_name, const int64_t version,
     const inference::ModelConfig& model_config)
 {
@@ -57,15 +57,19 @@ RateLimiter::LoadModel(
     auto& model_instances =
         model_instances_[std::make_pair(model_name, version)];
     {
+      // TODO: Use the TritonModel and TritonModelInstance abstractions
+      // to preventrepeating this code. The signature of RateLimiter
+      // must be modified as well when integrating the rate limiter
+      // with the server.
       for (const auto& group : model_config.instance_group()) {
         for (int c = 0; c < group.count(); c++) {
           if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
-            LoadModelHelper(
+            AddModelHelper(
                 model_name, version, ResourceManager::NO_GPU_DEVICE,
                 group.rate_limiter(), &model_context, &model_instances);
           } else {
             for (int gpu_device : group.gpus()) {
-              LoadModelHelper(
+              AddModelHelper(
                   model_name, version, gpu_device, group.rate_limiter(),
                   &model_context, &model_instances);
             }
@@ -77,14 +81,14 @@ RateLimiter::LoadModel(
   }
 
   // To reduce the number of scans, update the resources limits
-  // once all the model instances are loaded.
+  // once all the model instances are added.
   resource_manager_->UpdateResourceLimits();
 
   return Status::Success;
 }
 
 void
-RateLimiter::LoadModelHelper(
+RateLimiter::AddModelHelper(
     const std::string& model_name, const int64_t version, const int device_id,
     const RateLimiterConfig& rate_limter_config, ModelContext* model_context,
     std::vector<std::shared_ptr<ModelInstance>>* model_instances)
@@ -95,12 +99,12 @@ RateLimiter::LoadModelHelper(
       [this](ModelInstance* instance) { OnStage(instance); },
       [this](ModelInstance* instance) { OnRelease(instance); })));
   model_context->AddAvailableInstance(model_instances->back().get());
-  resource_manager_->LoadModelInstance(model_instances->back().get());
+  resource_manager_->AddModelInstance(model_instances->back().get());
 }
 
 
 Status
-RateLimiter::UnloadModel(const std::string& model_name, const int64_t version)
+RateLimiter::RemoveModel(const std::string& model_name, const int64_t version)
 {
   {
     std::lock_guard<std::mutex> lk1(model_contexts_mtx_);
@@ -108,11 +112,11 @@ RateLimiter::UnloadModel(const std::string& model_name, const int64_t version)
 
     auto& model_context = model_contexts_[std::make_pair(model_name, version)];
 
-    model_context.Unload();
+    model_context.RequestRemoval();
     for (const auto& instance :
          model_instances_[std::make_pair(model_name, version)]) {
-      instance->WaitForUnload();
-      resource_manager_->UnloadModelInstance(instance.get());
+      instance->WaitForRemoval();
+      resource_manager_->RemoveModelInstance(instance.get());
     }
 
     model_instances_.erase(std::make_pair(model_name, version));
@@ -125,7 +129,7 @@ RateLimiter::UnloadModel(const std::string& model_name, const int64_t version)
 }
 
 Status
-RateLimiter::EnqueueModelRequest(
+RateLimiter::RequestModelInstance(
     const StandardScheduleFunc& OnSchedule, const std::string& model_name,
     const int64_t version, const int instance_index)
 {
@@ -134,18 +138,17 @@ RateLimiter::EnqueueModelRequest(
   auto itr = model_contexts_.find(std::make_pair(model_name, version));
   if (itr == model_contexts_.end()) {
     return Status(
-        Status::Code::INTERNAL, "No loaded model found with name " +
-                                    model_name + " and version " +
-                                    std::to_string(version));
+        Status::Code::INTERNAL, "No added model found with name " + model_name +
+                                    " and version " + std::to_string(version));
   }
 
-  if (itr->second.isUnloading()) {
+  if (itr->second.isRemovalInProgress()) {
     return Status(
         Status::Code::INTERNAL,
-        "New model requests can not be made to a model that is being unloaded");
+        "New model requests can not be made to a model that is being removed");
   }
 
-  itr->second.EnqueueModelRequest(OnSchedule, instance_index);
+  itr->second.EnqueueModelInstanceRequest(OnSchedule, instance_index);
   if (ignore_resources_and_priority_) {
     // Directly allocate an available model instance if not using rate limiter.
     itr->second.AllocateInstanceIfAvailable();
@@ -207,10 +210,10 @@ RateLimiter::AttemptAllocation()
 //  ModelContext Implementation
 //=========================================================================
 
-RateLimiter::ModelContext::ModelContext() : unloading_(false) {}
+RateLimiter::ModelContext::ModelContext() : removal_in_progress_(false) {}
 
 Status
-RateLimiter::ModelContext::EnqueueModelRequest(
+RateLimiter::ModelContext::EnqueueModelInstanceRequest(
     const StandardScheduleFunc& OnSchedule, const int instance_index)
 {
   std::lock_guard<std::recursive_mutex> lk(request_queue_mtx_);
@@ -326,9 +329,9 @@ RateLimiter::ModelContext::ContainsPendingRequests(int index)
 }
 
 void
-RateLimiter::ModelContext::Unload()
+RateLimiter::ModelContext::RequestRemoval()
 {
-  unloading_ = true;
+  removal_in_progress_ = true;
 }
 
 
@@ -433,9 +436,9 @@ RateLimiter::ModelInstance::Release()
 
   {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    if ((model_context_->isUnloading()) && (state_ == AVAILABLE) &&
+    if ((model_context_->isRemovalInProgress()) && (state_ == AVAILABLE) &&
         (!model_context_->ContainsPendingRequests(index_))) {
-      state_ = UNLOADED;
+      state_ = REMOVED;
     }
   }
 
@@ -443,29 +446,29 @@ RateLimiter::ModelInstance::Release()
 }
 
 void
-RateLimiter::ModelInstance::Unload()
+RateLimiter::ModelInstance::RequestRemoval()
 {
   std::lock_guard<std::mutex> lk(state_mtx_);
 
   if ((state_ == AVAILABLE) &&
       (!model_context_->ContainsPendingRequests(index_))) {
-    state_ = UNLOADED;
+    state_ = REMOVED;
   }
 }
 
 void
-RateLimiter::ModelInstance::WaitForUnload()
+RateLimiter::ModelInstance::WaitForRemoval()
 {
-  if (!model_context_->isUnloading()) {
-    model_context_->Unload();
+  if (!model_context_->isRemovalInProgress()) {
+    model_context_->RequestRemoval();
   }
 
-  Unload();
+  RequestRemoval();
 
-  // Wait for the instance to be unloaded
+  // Wait for the instance to be removed
   {
     std::unique_lock<std::mutex> lk(state_mtx_);
-    cv_.wait(lk, [this] { return state_ == UNLOADED; });
+    cv_.wait(lk, [this] { return state_ == REMOVED; });
   }
 }
 
@@ -493,7 +496,7 @@ RateLimiter::ResourceManager::Create(
 }
 
 void
-RateLimiter::ResourceManager::LoadModelInstance(
+RateLimiter::ResourceManager::AddModelInstance(
     const RateLimiter::ModelInstance* instance)
 {
   std::lock_guard<std::mutex> lk(model_resources_mtx_);
@@ -510,14 +513,14 @@ RateLimiter::ResourceManager::LoadModelInstance(
 }
 
 Status
-RateLimiter::ResourceManager::UnloadModelInstance(
+RateLimiter::ResourceManager::RemoveModelInstance(
     const RateLimiter::ModelInstance* instance)
 {
   std::lock_guard<std::mutex> lk(model_resources_mtx_);
   const auto& itr = model_resources_.find(instance);
   if (itr == model_resources_.end()) {
     return Status(
-        Status::Code::INTERNAL, "Can not find the instance to unload");
+        Status::Code::INTERNAL, "Can not find the instance to remove");
   }
   model_resources_.erase(instance);
   return Status::Success;

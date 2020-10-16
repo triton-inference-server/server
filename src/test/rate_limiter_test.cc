@@ -37,7 +37,8 @@ class RateLimiterTest : public ::testing::Test {
 
   void SetUp() override
   {
-    ni::RateLimiter::Create(false /* ignore_resources_and_priority */, &rate_limiter_);
+    ni::RateLimiter::Create(
+        false /* ignore_resources_and_priority */, &rate_limiter_);
   }
 
   void AddInstanceGroup(
@@ -87,7 +88,7 @@ TEST_F(RateLimiterTest, SingleInstanceSingleInfer)
   inference::ModelConfig test_config;
   // Create a model configuration a single instance
   AddInstanceGroup(&test_config);
-  rate_limiter_->LoadModel(model_name, version, test_config);
+  rate_limiter_->AddModel(model_name, version, test_config);
 
   std::atomic<int> callback_count(0);
 
@@ -98,7 +99,7 @@ TEST_F(RateLimiterTest, SingleInstanceSingleInfer)
         instance->Release();
       };
 
-  rate_limiter_->EnqueueModelRequest(callback_fn, model_name, version);
+  rate_limiter_->RequestModelInstance(callback_fn, model_name, version);
 
   EXPECT_EQ(1, callback_count)
       << "Expect callback_count: " << 1 << ", got: " << callback_count;
@@ -113,7 +114,7 @@ TEST_F(RateLimiterTest, SingleInstanceMultiInfer)
   inference::ModelConfig test_config;
   // Create a model configuration a single instance
   AddInstanceGroup(&test_config);
-  rate_limiter_->LoadModel(model_name, version, test_config);
+  rate_limiter_->AddModel(model_name, version, test_config);
 
   std::queue<ni::RateLimiter::ModelInstance*> instance_queue;
   std::mutex mtx;
@@ -131,7 +132,7 @@ TEST_F(RateLimiterTest, SingleInstanceMultiInfer)
   int request_count = 10;
   // Enqueue all the requests
   for (int i = 0; i < request_count; i++) {
-    rate_limiter_->EnqueueModelRequest(callback_fn, model_name, version);
+    rate_limiter_->RequestModelInstance(callback_fn, model_name, version);
   }
 
   // As there is only a single instance only one callback should be invoked.
@@ -155,7 +156,7 @@ TEST_F(RateLimiterTest, MultiInstanceMultiInfer)
   // Create a model configuration with two instances on different
   // gpu devices.
   AddInstanceGroup(&test_config, std::vector<int>{1, 2});
-  rate_limiter_->LoadModel(model_name, version, test_config);
+  rate_limiter_->AddModel(model_name, version, test_config);
 
   std::queue<ni::RateLimiter::ModelInstance*> instance_queue;
   std::mutex mtx;
@@ -173,7 +174,7 @@ TEST_F(RateLimiterTest, MultiInstanceMultiInfer)
   int request_count = 10;
   // Enqueue all the requests
   for (int i = 0; i < request_count; i++) {
-    rate_limiter_->EnqueueModelRequest(callback_fn, model_name, version);
+    rate_limiter_->RequestModelInstance(callback_fn, model_name, version);
   }
 
   // As there are two instances offset will be 2
@@ -205,7 +206,7 @@ TEST_F(RateLimiterTest, SpecificInstanceMultiInfer)
   // Create a model configuration with two instances on different
   // gpu devices.
   AddInstanceGroup(&test_config, std::vector<int>{1, 2});
-  rate_limiter_->LoadModel(model_name, version, test_config);
+  rate_limiter_->AddModel(model_name, version, test_config);
 
   std::queue<ni::RateLimiter::ModelInstance*> instance_queue;
   std::mutex mtx;
@@ -223,7 +224,7 @@ TEST_F(RateLimiterTest, SpecificInstanceMultiInfer)
   int request_count = 10;
   // Enqueue all the requests
   for (int i = 0; i < request_count; i++) {
-    rate_limiter_->EnqueueModelRequest(
+    rate_limiter_->RequestModelInstance(
         callback_fn, model_name, version, 0 /* instance index */);
   }
 
@@ -256,7 +257,7 @@ TEST_F(RateLimiterTest, SimplePriority)
   // Create a model configuration with two instances with different priority
   AddInstanceGroup(&test_config, std::vector<int>(), 1, 1);
   AddInstanceGroup(&test_config, std::vector<int>(), 1, 2);
-  rate_limiter_->LoadModel(model_name, version, test_config);
+  rate_limiter_->AddModel(model_name, version, test_config);
 
   std::vector<int32_t> callback_counts{0, 0};
 
@@ -270,7 +271,7 @@ TEST_F(RateLimiterTest, SimplePriority)
   int request_count = 12;
   // Enqueue all the requests
   for (int i = 0; i < request_count; i++) {
-    rate_limiter_->EnqueueModelRequest(callback_fn, model_name, version);
+    rate_limiter_->RequestModelInstance(callback_fn, model_name, version);
   }
 
   EXPECT_EQ(callback_counts[0], 8)
@@ -293,7 +294,7 @@ TEST_F(RateLimiterTest, SimpleResource)
 
   AddInstanceGroup(
       &test_config, std::vector<int>{1, 2}, 1, 1, global_resources);
-  rate_limiter_->LoadModel(model_name, version, test_config);
+  rate_limiter_->AddModel(model_name, version, test_config);
 
   std::queue<ni::RateLimiter::ModelInstance*> instance_queue;
   std::mutex mtx;
@@ -311,7 +312,7 @@ TEST_F(RateLimiterTest, SimpleResource)
   int request_count = 10;
   // Enqueue all the requests
   for (int i = 0; i < request_count; i++) {
-    rate_limiter_->EnqueueModelRequest(callback_fn, model_name, version);
+    rate_limiter_->RequestModelInstance(callback_fn, model_name, version);
   }
 
   // Although there are two instances, but because of the resource
@@ -349,9 +350,10 @@ TEST_F(RateLimiterTest, NoLimiting)
       &test_config, std::vector<int>{1, 2}, 1, 1, global_resources);
 
   std::unique_ptr<ni::RateLimiter> rate_limiter;
-  ni::RateLimiter::Create(true /* ignore_resources_and_priority */, &rate_limiter);
+  ni::RateLimiter::Create(
+      true /* ignore_resources_and_priority */, &rate_limiter);
 
-  rate_limiter->LoadModel(model_name, version, test_config);
+  rate_limiter->AddModel(model_name, version, test_config);
 
   std::queue<ni::RateLimiter::ModelInstance*> instance_queue;
   std::mutex mtx;
@@ -369,7 +371,7 @@ TEST_F(RateLimiterTest, NoLimiting)
   int request_count = 10;
   // Enqueue all the requests
   for (int i = 0; i < request_count; i++) {
-    rate_limiter->EnqueueModelRequest(callback_fn, model_name, version);
+    rate_limiter->RequestModelInstance(callback_fn, model_name, version);
   }
 
   // Even though there is a resource constraint, as the rate limiting is

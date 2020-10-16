@@ -206,7 +206,8 @@ message ModelInstanceGroup
   //@@  .. cpp:var:: ModelRateLimiter rate_limiter
   //@@
   //@@     The rate limiter specific settings to be associated with this
-  //@@     instance group.
+  //@@     instance group. Optional, if not specified no rate limiting
+  //@@     will be applied to this instance group.
   //@@
   ModelRateLimiter rate_limiter = 6;
 

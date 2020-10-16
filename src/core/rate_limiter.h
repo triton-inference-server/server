@@ -66,22 +66,22 @@ class RateLimiter {
       const bool ignore_resources_and_priority,
       std::unique_ptr<RateLimiter>* rate_limiter);
 
-  /// Loads the configified model to the RateLimiter
-  /// \param model_name The name of the model to load.
-  /// \param version The version of the model to load.
-  /// \param model_config The configuration of the model to load.
+  /// Add model to the set of models being managed by the rate limiter.
+  /// \param model_name The name of the model.
+  /// \param version The version of the model.
+  /// \param model_config The configuration of the model.
   /// \return Status object indicating success or failure.
-  Status LoadModel(
+  Status AddModel(
       const std::string& model_name, const int64_t version,
       const inference::ModelConfig& model_config);
 
-  /// Unloads the configified model from the RateLimiter
-  /// \param model_name The name of the model to load.
-  /// \param version The version of the model to load.
+  /// Remove model from the set of models being managed by the rate limiter.
+  /// \param model_name The name of the model.
+  /// \param version The version of the model.
   /// \return Status object indicating success or failure.
-  Status UnloadModel(const std::string& model_name, const int64_t version);
+  Status RemoveModel(const std::string& model_name, const int64_t version);
 
-  /// Enqueues the callback to the configified model. In future, when the
+  /// Requests one of the available model instance. In future, when the
   /// conditions are met, the callback will be invoked and a pointer to
   /// allocated RateLimiter::ModelInstance object will be exposed as a
   /// parameter. The user must ensure RateLimiter::ModelInstance::Release
@@ -93,11 +93,11 @@ class RateLimiter {
   /// \param OnSchedule The callback function to be called when scheduling.
   /// \param model_name The name of the model.
   /// \param version The version of the model.
-  /// \param instance_index The index to a configific instance of the model.
+  /// \param instance_index The index to a specific instance of the model.
   /// The default value is -1 which means that an instance with highest
   /// priority will be selected for the execution.
   /// \return Status object indicating success or failure.
-  Status EnqueueModelRequest(
+  Status RequestModelInstance(
       const StandardScheduleFunc& OnSchedule, const std::string& model_name,
       const int64_t version, const int instance_index = -1);
 
@@ -106,7 +106,7 @@ class RateLimiter {
    public:
     friend class RateLimiter;
     friend class ResourceManager;
-    enum State { AVAILABLE, STAGED, ALLOCATED, UNLOADED };
+    enum State { AVAILABLE, STAGED, ALLOCATED, REMOVED };
 
     /// Should be called when the request on the model instance is
     /// complete. This function releases the resources allocated to
@@ -135,8 +135,8 @@ class RateLimiter {
     Status Stage(StandardScheduleFunc OnSchedule);
     Status Allocate();
     Status DirectAllocate(StandardScheduleFunc OnSchedule);
-    void Unload();
-    void WaitForUnload();
+    void RequestRemoval();
+    void WaitForRemoval();
 
     std::string model_name_;
     int64_t version_;
@@ -149,7 +149,7 @@ class RateLimiter {
     std::atomic<uint64_t> exec_count_;
 
     State state_;
-    bool unloading_;
+    bool removal_in_progress_;
     std::mutex state_mtx_;
 
     StandardScheduleFunc OnSchedule_;
@@ -158,9 +158,9 @@ class RateLimiter {
   };
 
  private:
-  RateLimiter(const bool enable_rate_limiting);
+  RateLimiter(const bool ignore_resources_and_priority);
 
-  void LoadModelHelper(
+  void AddModelHelper(
       const std::string& model_name, const int64_t version, const int device_id,
       const RateLimiterConfig& rate_limit_config, ModelContext* model_context,
       std::vector<std::shared_ptr<ModelInstance>>* model_instances);
@@ -180,23 +180,23 @@ class RateLimiter {
   using PriorityQueue = std::priority_queue<
       ModelInstance*, std::vector<ModelInstance*>, ScaledPriorityComparator>;
 
-  // Holds the active context to a loaded model
+  // Holds the active context to a model
   class ModelContext {
    public:
     ModelContext();
 
-    Status EnqueueModelRequest(
+    Status EnqueueModelInstanceRequest(
         const StandardScheduleFunc& OnSchedule, const int instance_index);
     void AddAvailableInstance(ModelInstance* instance);
     void StageInstanceIfAvailable();
     void AllocateInstanceIfAvailable();
     void SetSpecificQueueCount(int queue_count);
     bool ContainsPendingRequests(int32_t index);
-    void Unload();
-    bool isUnloading() { return unloading_; }
+    void RequestRemoval();
+    bool isRemovalInProgress() { return removal_in_progress_; }
 
    private:
-    bool unloading_;
+    bool removal_in_progress_;
 
     // Queue holding pending scheduling request
     std::queue<StandardScheduleFunc> generic_request_queue_;
@@ -218,8 +218,8 @@ class RateLimiter {
     static constexpr int GLOBAL_RESOURCE_KEY = -2;
 
     static Status Create(std::unique_ptr<ResourceManager>* resource_manager);
-    void LoadModelInstance(const RateLimiter::ModelInstance* instance);
-    Status UnloadModelInstance(const RateLimiter::ModelInstance* instance);
+    void AddModelInstance(const RateLimiter::ModelInstance* instance);
+    Status RemoveModelInstance(const RateLimiter::ModelInstance* instance);
     void UpdateResourceLimits();
     bool AllocateResources(const RateLimiter::ModelInstance* instance);
     Status ReleaseResources(const RateLimiter::ModelInstance* instance);
@@ -241,14 +241,14 @@ class RateLimiter {
 
   bool ignore_resources_and_priority_;
 
-  // Instances for the loaded models
+  // Instances for the models
   std::map<
       std::pair<std::string, int64_t>,
       std::vector<std::shared_ptr<ModelInstance>>>
       model_instances_;
   std::mutex model_instances_mtx_;
 
-  // Running context of the loaded models
+  // Running context of the models
   std::map<std::pair<std::string, int64_t>, ModelContext> model_contexts_;
   std::mutex model_contexts_mtx_;
 
