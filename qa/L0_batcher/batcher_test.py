@@ -979,7 +979,7 @@ class BatcherTest(tu.TestResultCollector):
 
                 self.check_setup(model_name)
 
-                # Need scheduler to wait for queue to contain 2 requests
+                # Need scheduler to wait for queue to contain 3 requests
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                 self.assertEqual(
                     int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 3)
