@@ -46,6 +46,8 @@
 #include <blob/blob_client.h>
 #include <storage_account.h>
 #include <storage_credential.h>
+#undef LOG_INFO
+#undef LOG_WARNING
 #endif  // TRITON_ENABLE_AZURE_STORAGE
 
 #include <google/protobuf/io/coded_stream.h>
@@ -747,6 +749,7 @@ ASFileSystem::ASFileSystem(const std::string& path)
 {
   const char* account_str = std::getenv("AZURE_STORAGE_ACCOUNT");
   const char* account_key = std::getenv("AZURE_STORAGE_KEY");
+  const char* sas_query = std::getenv("AZURE_STORAGE_SAS");
   std::shared_ptr<as::storage_account> account = nullptr;
   std::string host_name, container, blob_path, query;
   if (RE2::FullMatch(
@@ -764,14 +767,18 @@ ASFileSystem::ASFileSystem(const std::string& path)
     }
 
     std::shared_ptr<as::storage_credential> cred;
-
-    if (account_key != NULL)  // Shared Key
-    {
+    if (!query.empty()) {
+        LOG_ERROR << "We can't support SAS in query url, please put SAS query in the environment variable AZURE_STORAGE_SAS";
+        return;
+    } else if (account_key != NULL) { 
+      // Shared Key
       cred = std::make_shared<as::shared_key_credential>(
           account_name, account_key);
-    } else if (query.find("sig=") != std::string::npos) {
+      LOG_VERBOSE(1) << "init azure storage using shared_key " << sas_query;
+    } else if (sas_query != NULL) {
       // Shared Access Signature
-      cred = std::make_shared<as::shared_access_signature_credential>(query);
+      cred = std::make_shared<as::shared_access_signature_credential>(std::string(sas_query));
+      LOG_VERBOSE(1) << "init azure storage using SAS " << sas_query;
     } else {
       cred = std::make_shared<as::anonymous_credential>();
     }
@@ -842,6 +849,7 @@ Status
 ASFileSystem::GetDirectoryContents(
     const std::string& path, std::set<std::string>* contents)
 {
+  LOG_VERBOSE(1) << "get dir contents:" << path;
   auto func = [&](const as::list_blobs_segmented_item& item,
                   const std::string& dir) { 
     contents->insert(dir); 
@@ -856,6 +864,7 @@ Status
 ASFileSystem::GetDirectorySubdirs(
     const std::string& path, std::set<std::string>* subdirs)
 {
+  LOG_VERBOSE(1) << "subdir:" << path;
   auto func = [&](const as::list_blobs_segmented_item& item,
                   const std::string& dir) {
     if (item.is_directory) {
@@ -891,14 +900,7 @@ ASFileSystem::IsDirectory(const std::string& path, bool* is_dir)
   std::string container, object_path;
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
 
-  // Check if the bucket exists
   as::blob_client_wrapper bc(client_);
-
-  bool exists = bc.container_exists(container);
-  if (!exists) {
-    return Status(Status::Code::NOT_FOUND, "container not exits " + container);
-  }
-
   auto blobs = bc.list_blobs_segmented(container, "/", "", object_path, 1);
   *is_dir = blobs.blobs.size() > 0;
 
@@ -912,6 +914,7 @@ ASFileSystem::ReadTextFile(const std::string& path, std::string* contents)
   as::blob_client_wrapper bc(client_);
   std::string container, object_path;
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
+  LOG_VERBOSE(1) << "read file:" << container << "/" << object_path;
   using namespace azure::storage_lite;
   std::ostringstream out_stream;
   bc.download_blob_to_stream(container, object_path, 0, 0, out_stream);
@@ -947,6 +950,7 @@ ASFileSystem::DownloadFolder(
     const std::string& container, const std::string& path,
     const std::string& dest)
 {
+  LOG_VERBOSE(1) << "download dir:" << container << "/" << path << "to" << dest;
   as::blob_client_wrapper bc(client_);
   auto func = [&](const as::list_blobs_segmented_item& item,
                   const std::string& dir) {
