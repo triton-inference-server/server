@@ -51,6 +51,7 @@ class DynamicBatchScheduler : public Scheduler {
       const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
+      const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
@@ -64,6 +65,7 @@ class DynamicBatchScheduler : public Scheduler {
       const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
+      const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const inference::ModelDynamicBatching& batcher_config,
       std::unique_ptr<Scheduler>* scheduler);
@@ -78,6 +80,7 @@ class DynamicBatchScheduler : public Scheduler {
       const uint32_t runner_id_start, const uint32_t runner_cnt,
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
+      const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
@@ -122,6 +125,7 @@ class DynamicBatchScheduler : public Scheduler {
   std::vector<std::unique_ptr<std::thread>> scheduler_threads_;
   std::vector<std::shared_ptr<std::atomic<bool>>> scheduler_threads_exit_;
 
+  size_t max_batch_size_;
   size_t max_preferred_batch_size_;
   std::set<int32_t> preferred_batch_sizes_;
   uint64_t pending_batch_delay_ns_;
