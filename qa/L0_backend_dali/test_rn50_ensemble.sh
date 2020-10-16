@@ -40,7 +40,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 pushd $MODEL_REPO/..
-sh setup_resnet50_example.sh
+/bin/bash -x ./setup_resnet50_example.sh
 popd
 
 run_server
