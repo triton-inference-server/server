@@ -189,7 +189,7 @@ Metrics::InitializeNvmlMetrics()
     if (cudaerr != cudaSuccess) {
       LOG_ERROR << "failed to get device properties for cuda device " << didx << "CUDA_ERROR "
                 << cudaerr;
-      return false;
+      continue;
     }
 
     char pcibusid_str[64];
@@ -198,14 +198,14 @@ Metrics::InitializeNvmlMetrics()
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "failed to get PCI Bus ID for CUDA device " << didx
                 << ": " << cudaGetErrorString(cuerr);
-      return false;
+      continue;
     }
 
     nvmlDevice_t gpu;
     nvmlReturn_t nvmlerr = nvmlDeviceGetHandleByPciBusId_v2(pcibusid_str, &gpu);
     if (nvmlerr != NVML_SUCCESS) {
       LOG_ERROR << "failed to get device from PCI Bus ID: NVML_ERROR " << nvmlerr;
-      return false;
+      continue;
     }
 
     if (nvmlerr == NVML_SUCCESS) {
@@ -240,7 +240,12 @@ Metrics::InitializeNvmlMetrics()
     gpu_power_limit_.push_back(&gpu_power_limit_family_.Add(gpu_labels));
     gpu_energy_consumption_.push_back(
         &gpu_energy_consumption_family_.Add(gpu_labels));
+    nvml_device_.emplace_back(gpu);
   }
+
+  // Update the device count. Some devices may have problems using NVML/CUDA API
+  // and thus device count needs to be updated.
+  dcnt = nvml_device_.size();
 
   // Periodically send the NVML metrics...
   if (dcnt > 0) {
@@ -264,94 +269,89 @@ Metrics::InitializeNvmlMetrics()
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
         for (int didx = 0; didx < dcnt; ++didx) {
-          nvmlDevice_t gpu;
-          nvmlReturn_t nvmlerr = nvmlDeviceGetHandleByIndex(didx, &gpu);
-          if (nvmlerr != NVML_SUCCESS) {
-            LOG_ERROR << "failed to get NVML handle for GPU " << didx
-                      << ", NVML_ERROR " << nvmlerr;
-          } else {
-            // Power limit
-            if (power_limit_fail_cnt[didx] < fail_threshold) {
-              unsigned int power_limit;
-              nvmlReturn_t nvmlerr =
-                  nvmlDeviceGetPowerManagementLimit(gpu, &power_limit);
-              if (nvmlerr == NVML_SUCCESS) {
-                power_limit_fail_cnt[didx] = 0;
-              } else {
-                LOG_WARNING << "failed to get power limit for GPU " << didx
-                            << ", NVML_ERROR " << nvmlerr;
-                power_limit = 0;
-                power_limit_fail_cnt[didx]++;
-              }
-              gpu_power_limit_[didx]->Set((double)power_limit * 0.001);
-            }
+          nvmlDevice_t gpu = nvml_device_[didx];
 
-            // Power usage
-            if (power_usage_fail_cnt[didx] < fail_threshold) {
-              unsigned int power_usage;
-              nvmlReturn_t nvmlerr = nvmlDeviceGetPowerUsage(gpu, &power_usage);
-              if (nvmlerr == NVML_SUCCESS) {
-                power_usage_fail_cnt[didx] = 0;
-              } else {
-                LOG_WARNING << "failed to get power usage for GPU " << didx
-                            << ", NVML_ERROR " << nvmlerr;
-                power_usage = 0;
-                power_usage_fail_cnt[didx]++;
-              }
-              gpu_power_usage_[didx]->Set((double)power_usage * 0.001);
+          // Power limit
+          if (power_limit_fail_cnt[didx] < fail_threshold) {
+            unsigned int power_limit;
+            nvmlReturn_t nvmlerr =
+                nvmlDeviceGetPowerManagementLimit(gpu, &power_limit);
+            if (nvmlerr == NVML_SUCCESS) {
+              power_limit_fail_cnt[didx] = 0;
+            } else {
+              LOG_WARNING << "failed to get power limit for GPU " << didx
+                          << ", NVML_ERROR " << nvmlerr;
+              power_limit = 0;
+              power_limit_fail_cnt[didx]++;
             }
+            gpu_power_limit_[didx]->Set((double)power_limit * 0.001);
+          }
 
-            // Energy Consumption
-            if (energy_fail_cnt[didx] < fail_threshold) {
-              unsigned long long energy;
-              nvmlReturn_t nvmlerr =
-                  nvmlDeviceGetTotalEnergyConsumption(gpu, &energy);
-              if (nvmlerr == NVML_SUCCESS) {
-                energy_fail_cnt[didx] = 0;
-                if (last_energy[didx] == 0) {
-                  last_energy[didx] = energy;
-                }
-                gpu_energy_consumption_[didx]->Increment(
-                    (double)(energy - last_energy[didx]) * 0.001);
+          // Power usage
+          if (power_usage_fail_cnt[didx] < fail_threshold) {
+            unsigned int power_usage;
+            nvmlReturn_t nvmlerr = nvmlDeviceGetPowerUsage(gpu, &power_usage);
+            if (nvmlerr == NVML_SUCCESS) {
+              power_usage_fail_cnt[didx] = 0;
+            } else {
+              LOG_WARNING << "failed to get power usage for GPU " << didx
+                          << ", NVML_ERROR " << nvmlerr;
+              power_usage = 0;
+              power_usage_fail_cnt[didx]++;
+            }
+            gpu_power_usage_[didx]->Set((double)power_usage * 0.001);
+          }
+
+          // Energy Consumption
+          if (energy_fail_cnt[didx] < fail_threshold) {
+            unsigned long long energy;
+            nvmlReturn_t nvmlerr =
+                nvmlDeviceGetTotalEnergyConsumption(gpu, &energy);
+            if (nvmlerr == NVML_SUCCESS) {
+              energy_fail_cnt[didx] = 0;
+              if (last_energy[didx] == 0) {
                 last_energy[didx] = energy;
-              } else {
-                LOG_WARNING << "failed to get energy consumption for GPU "
-                            << didx << ", NVML_ERROR " << nvmlerr;
-                energy_fail_cnt[didx]++;
               }
+              gpu_energy_consumption_[didx]->Increment(
+                  (double)(energy - last_energy[didx]) * 0.001);
+              last_energy[didx] = energy;
+            } else {
+              LOG_WARNING << "failed to get energy consumption for GPU "
+                          << didx << ", NVML_ERROR " << nvmlerr;
+              energy_fail_cnt[didx]++;
             }
+          }
 
-            // Utilization
-            if (util_fail_cnt[didx] < fail_threshold) {
-              nvmlUtilization_t util;
-              nvmlReturn_t nvmlerr = nvmlDeviceGetUtilizationRates(gpu, &util);
-              if (nvmlerr == NVML_SUCCESS) {
-                util_fail_cnt[didx] = 0;
-              } else {
-                LOG_WARNING << "failed to get utilization for GPU " << didx
-                            << ", NVML_ERROR " << nvmlerr;
-                util.gpu = 0;
-                util_fail_cnt[didx]++;
-              }
-              gpu_utilization_[didx]->Set((double)util.gpu * 0.01);
+          // Utilization
+          if (util_fail_cnt[didx] < fail_threshold) {
+            nvmlUtilization_t util;
+            nvmlReturn_t nvmlerr = nvmlDeviceGetUtilizationRates(gpu, &util);
+            if (nvmlerr == NVML_SUCCESS) {
+              util_fail_cnt[didx] = 0;
+            } else {
+              LOG_WARNING << "failed to get utilization for GPU " << didx
+                          << ", NVML_ERROR " << nvmlerr;
+              util.gpu = 0;
+              util_fail_cnt[didx]++;
             }
+            gpu_utilization_[didx]->Set((double)util.gpu * 0.01);
+          }
 
-            // Memory
-            if (mem_fail_cnt[didx] < fail_threshold) {
-              nvmlMemory_t mem;
-              nvmlReturn_t nvmlerr = nvmlDeviceGetMemoryInfo(gpu, &mem);
-              if (nvmlerr == NVML_SUCCESS) {
-                mem_fail_cnt[didx] = 0;
-              } else {
-                LOG_WARNING << "failed to get memory for GPU " << didx
-                            << ", NVML_ERROR " << nvmlerr;
-                mem.total = 0;
-                mem.used = 0;
-                mem_fail_cnt[didx]++;
-              }
-              gpu_memory_total_[didx]->Set(mem.total);
-              gpu_memory_used_[didx]->Set(mem.used);
+          // Memory
+          if (mem_fail_cnt[didx] < fail_threshold) {
+            nvmlMemory_t mem;
+            nvmlReturn_t nvmlerr = nvmlDeviceGetMemoryInfo(gpu, &mem);
+            if (nvmlerr == NVML_SUCCESS) {
+              mem_fail_cnt[didx] = 0;
+            } else {
+              LOG_WARNING << "failed to get memory for GPU " << didx
+                          << ", NVML_ERROR " << nvmlerr;
+              mem.total = 0;
+              mem.used = 0;
+              mem_fail_cnt[didx]++;
             }
+            gpu_memory_total_[didx]->Set(mem.total);
+            gpu_memory_used_[didx]->Set(mem.used);
           }
         }
       }
