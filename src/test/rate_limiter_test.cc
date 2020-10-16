@@ -37,7 +37,7 @@ class RateLimiterTest : public ::testing::Test {
 
   void SetUp() override
   {
-    ni::RateLimiter::Create(true /* enable_rate_limiting */, &rate_limiter_);
+    ni::RateLimiter::Create(false /* ignore_resources_and_priority */, &rate_limiter_);
   }
 
   void AddInstanceGroup(
@@ -349,7 +349,7 @@ TEST_F(RateLimiterTest, NoLimiting)
       &test_config, std::vector<int>{1, 2}, 1, 1, global_resources);
 
   std::unique_ptr<ni::RateLimiter> rate_limiter;
-  ni::RateLimiter::Create(false /* enable_rate_limiting */, &rate_limiter);
+  ni::RateLimiter::Create(true /* ignore_resources_and_priority */, &rate_limiter);
 
   rate_limiter->LoadModel(model_name, version, test_config);
 

@@ -147,10 +147,10 @@ RateLimiter::EnqueueModelRequest(
 
   itr->second.EnqueueModelRequest(OnSchedule, instance_index);
   if (ignore_resources_and_priority_) {
-    itr->second.StageInstanceIfAvailable();
-  } else {
     // Directly allocate an available model instance if not using rate limiter.
     itr->second.AllocateInstanceIfAvailable();
+  } else {
+    itr->second.StageInstanceIfAvailable();
   }
 
   return Status::Success;
@@ -180,11 +180,11 @@ RateLimiter::OnRelease(ModelInstance* instance)
   resource_manager_->ReleaseResources(instance);
   if (model_context.ContainsPendingRequests(instance->Index())) {
     if (ignore_resources_and_priority_) {
-      model_context.StageInstanceIfAvailable();
-    } else {
       // Directly allocate an available model instance if not using rate
       // limiter.
       model_context.AllocateInstanceIfAvailable();
+    } else {
+      model_context.StageInstanceIfAvailable();
     }
   }
   AttemptAllocation();

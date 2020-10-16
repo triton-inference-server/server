@@ -60,7 +60,7 @@ class RateLimiter {
   /// will be available -> allocated -> available.
   /// \param ignore_resources_and_priority Whether or not to ignore resource
   /// constraints and cross-model priority. An available instance is directly
-  /// allocated when true.Default value is false.
+  /// allocated when true.
   /// \return Status object indicating success or failure.
   static Status Create(
       const bool ignore_resources_and_priority,
