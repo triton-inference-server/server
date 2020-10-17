@@ -91,7 +91,8 @@ RUN mkdir -p qa/common && \
     cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_http/ && \
     cp /tmp/tritonbuild/install/bin/simple qa/L0_simple_lib/. && \
     cp /tmp/tritonbuild/install/bin/memory_alloc qa/L0_io/. && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/memory_test qa/L0_memory/.
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/memory_test qa/L0_memory/. && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/rate_limiter_test qa/L0_rate_limiter/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
 RUN if [ -f /tmp/tritonbuild/tritonserver/build/test-util/install/bin/caffe2plan ]; then \
