@@ -140,6 +140,11 @@ class InferenceBackend {
 
   uint32_t MaxPriorityLevel() const { return max_priority_level_; }
 
+  bool DecoupledTransactionPolicy()
+  {
+    return config_.model_transaction_policy().decoupled();
+  }
+
  protected:
   struct WarmupData {
     WarmupData(const std::string& sample_name) : sample_name_(sample_name) {}
