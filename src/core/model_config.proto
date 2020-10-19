@@ -1169,7 +1169,36 @@ message ModelSequenceBatching
   //@@     model instance over the lifetime of the sequence. This
   //@@     is the default strategy.
   //@@
-  message StrategyDirect {}
+  message StrategyDirect {
+    //@@    .. cpp:var:: int32 preferred_batch_size (repeated)
+    //@@
+    //@@       Preferred batch sizes for batching of candidate
+    //@@       sequences. If a batch of one of these sizes can be formed
+    //@@       it will be executed immediately. If not specified a
+    //@@       preferred batch size will be chosen automatically
+    //@@       based on model and GPU characteristics.
+    //@@
+    repeated int32 preferred_batch_size = 1;
+
+    //@@    .. cpp:var:: float minimum_slot_utilization
+    //@@
+    //@@       The rate of slot utilization that the selected preferred batch
+    //@@       size must satisfy, otherwise, the largest possible batch will
+    //@@       be executed. The utilization is calculated based on the number of
+    //@@       ready requests in the selected preferred batch. The utilization
+    //@@       is range from 0 to 1 where 1 represents full utilization.
+    //@@       Default is 0.
+    //@@
+    float minimum_slot_utilization = 2;
+
+    //@@    .. cpp:var:: uint64 max_queue_delay_microseconds
+    //@@
+    //@@       The maximum time, in microseconds, a candidate request
+    //@@       will be delayed in the dynamic batch scheduling queue to
+    //@@       wait for additional requests for batching. Default is 0.
+    //@@
+    uint64 max_queue_delay_microseconds = 3;
+  }
 
   //@@  .. cpp:var:: message StrategyOldest
   //@@
@@ -1197,7 +1226,7 @@ message ModelSequenceBatching
     //@@
     //@@       Preferred batch sizes for dynamic batching of candidate
     //@@       sequences. If a batch of one of these sizes can be formed
-    //@@       it will be executed immediately.  If not specified a
+    //@@       it will be executed immediately. If not specified a
     //@@       preferred batch size will be chosen automatically
     //@@       based on model and GPU characteristics.
     //@@
