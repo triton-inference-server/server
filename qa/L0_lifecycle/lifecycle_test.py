@@ -1670,7 +1670,7 @@ class LifeCycleTest(tu.TestResultCollector):
         plan_ensemble_name = ensemble_prefix + plan_name
 
         # Make sure unloaded models are not in the status
-        for base in ('onnx',):
+        for base in ('savedmodel',):
             model_name = tu.get_model_name(base, np.float32, np.float32,
                                            np.float32)
             try:
@@ -1869,7 +1869,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Check model repository index
-        # All models should be in ready state except onnx_float32_float32_float32
+        # All models should be in ready state except savedmodel_float32_float32_float32
         # which appears in two repositories.
         model_bases.append("simple_graphdef")
         try:

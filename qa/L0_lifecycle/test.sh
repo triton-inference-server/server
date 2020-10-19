@@ -814,8 +814,8 @@ for i in plan onnx ; do
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models_0/simple_${i}_float32_float32_float32/config.pbtxt
 done
 
-# onnx doesn't load because it is duplicated in 2 repositories
-for i in onnx ; do
+# savedmodel doesn't load because it is duplicated in 2 repositories
+for i in savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
@@ -824,7 +824,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
              --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
-             --load-model=onnx_float32_float32_float32 \
+             --load-model=savedmodel_float32_float32_float32 \
              --load-model=plan_float32_float32_float32 \
              --load-model=simple_onnx_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
