@@ -1170,34 +1170,26 @@ message ModelSequenceBatching
   //@@     is the default strategy.
   //@@
   message StrategyDirect {
-    //@@    .. cpp:var:: int32 preferred_batch_size (repeated)
-    //@@
-    //@@       Preferred batch sizes for batching of candidate
-    //@@       sequences. If a batch of one of these sizes can be formed
-    //@@       it will be executed immediately. If not specified a
-    //@@       preferred batch size will be chosen automatically
-    //@@       based on model and GPU characteristics.
-    //@@
-    repeated int32 preferred_batch_size = 1;
-
-    //@@    .. cpp:var:: float minimum_slot_utilization
-    //@@
-    //@@       The rate of slot utilization that the selected preferred batch
-    //@@       size must satisfy, otherwise, the largest possible batch will
-    //@@       be executed. The utilization is calculated based on the number of
-    //@@       ready requests in the selected preferred batch. The utilization
-    //@@       is range from 0 to 1 where 1 represents full utilization.
-    //@@       Default is 0.
-    //@@
-    float minimum_slot_utilization = 2;
-
     //@@    .. cpp:var:: uint64 max_queue_delay_microseconds
     //@@
     //@@       The maximum time, in microseconds, a candidate request
-    //@@       will be delayed in the dynamic batch scheduling queue to
+    //@@       will be delayed in the sequence batch scheduling queue to
     //@@       wait for additional requests for batching. Default is 0.
     //@@
-    uint64 max_queue_delay_microseconds = 3;
+    uint64 max_queue_delay_microseconds = 1;
+
+    //@@    .. cpp:var:: float minimum_slot_utilization
+    //@@
+    //@@       The minimum slot utilization that must be satisfied to
+    //@@       execute the batch before 'max_queue_delay_microseconds' expires.
+    //@@       For example, a value of 0.5 indicates that the batch should be
+    //@@       executed as soon as 50% or more of the slots are ready even if
+    //@@       the 'max_queue_delay_microseconds' timeout has not expired.
+    //@@       The default is 0.0, indicating that a batch will be executed
+    //@@       before 'max_queue_delay_microseconds' timeout expires if at least
+    //@@       one batch slot is ready. 
+    //@@
+    float minimum_slot_utilization = 2;
   }
 
   //@@  .. cpp:var:: message StrategyOldest
