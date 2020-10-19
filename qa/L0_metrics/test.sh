@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash  
 # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -48,29 +48,27 @@ rm -f $SERVER_LOG
 RET=0
 
 # Prepare a libtorch float32 model with basic config
-rm -rf $MODELSDIR
-for trial in libtorch; do
-  full=${trial}_float32_float32_float32
-  mkdir -p $MODELSDIR/${full}/1 && \
-    cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
-    cp $DATADIR/${full}/config.pbtxt $MODELSDIR/${full}/. && \
-    (cd $MODELSDIR/${full} && \
-    sed -i "s/label_filename:.*//" config.pbtxt && \
-    echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
-done 
+rm -rf $MODELDIR
+model=libtorch_float32_float32_float32
+mkdir -p $MODELDIR/${model}/1 && \
+  cp -r $DATADIR/${model}/1/* $MODELDIR/${model}/1/. && \
+  cp $DATADIR/${model}/config.pbtxt $MODELDIR/${model}/. && \
+  (cd $MODELDIR/${model} && \ 
+  sed -i "s/label_filename:.*//" config.pbtxt && \
+  echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
 
 set +e
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1,2
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-  echo -e "\n***\n*** Failed to start $SERVER\n***"
+  echo -e "\n***\n*** Failed to start $SERVER\n***" 
   cat $SERVER_LOG
   exit 1
 fi
 
 num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
-if [ $num_gpus -ne 4 ]; then
-  echo "Found $num_gpus GPU(s) instead of 4 GPUs being monitored."
+if [ $num_gpus -ne 3 ]; then
+  echo "Found $num_gpus GPU(s) instead of 3 GPUs being monitored."
   echo -e "\n***\n*** GPU metric test failed. \n***"
   RET=1
 fi
@@ -86,18 +84,18 @@ if [ "$SERVER_PID" == "0" ]; then
   exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
-
 num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
 if [ $num_gpus -ne 1 ]; then
   echo "Found $num_gpus GPU(s) instead of 1 GPU being monitored."
   echo -e "\n***\n*** GPU metric test failed. \n***"
   RET=1
 fi
+kill $SERVER_PID
+wait $SERVER_PID
+
 
 if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***" 
+  echo -e "\n***\n*** Test Passed\n***"
 else
   echo -e "\n***\n*** Test FAILED\n***"
 fi
