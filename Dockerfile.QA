@@ -202,6 +202,8 @@ RUN cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so 
         qa/L0_batcher/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
         qa/L0_client_timeout/. && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
+        qa/L0_custom_legacy/. && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_infer_cudashm && \
