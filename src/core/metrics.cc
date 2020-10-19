@@ -168,7 +168,7 @@ Metrics::InitializeNvmlMetrics()
 #else
   nvmlReturn_t nvmlerr = nvmlInit();
   if (nvmlerr != NVML_SUCCESS) {
-    LOG_ERROR << "failed to initialize NVML: NVML_ERROR " << nvmlerr;
+    LOG_ERROR << "failed to initialize NVML: NVML_ERROR " << nvmlErrorString(nvmlerr);
     return false;
   }
 
@@ -176,7 +176,7 @@ Metrics::InitializeNvmlMetrics()
   cudaError_t cudaerr = cudaGetDeviceCount(&dcnt);
   if (cudaerr != cudaSuccess) {
     LOG_ERROR << "failed to get device count for cuda devices: CUDA_ERROR "
-              << cudaerr;
+              << cudaGetErrorString(cudaerr);
     return false;
   }
 
@@ -188,7 +188,7 @@ Metrics::InitializeNvmlMetrics()
     cudaError_t cudaerr = cudaGetDeviceProperties(&gpu_properties, didx);
     if (cudaerr != cudaSuccess) {
       LOG_ERROR << "failed to get device properties for cuda device " << didx << "CUDA_ERROR "
-                << cudaerr;
+                << cudaGetErrorString(cudaerr);
       continue;
     }
 
@@ -204,7 +204,7 @@ Metrics::InitializeNvmlMetrics()
     nvmlDevice_t gpu;
     nvmlReturn_t nvmlerr = nvmlDeviceGetHandleByPciBusId_v2(pcibusid_str, &gpu);
     if (nvmlerr != NVML_SUCCESS) {
-      LOG_ERROR << "failed to get device from PCI Bus ID: NVML_ERROR " << nvmlerr;
+      LOG_ERROR << "failed to get device from PCI Bus ID: NVML_ERROR " << nvmlErrorString(nvmlerr);
       continue;
     }
 
@@ -216,7 +216,7 @@ Metrics::InitializeNvmlMetrics()
       }
     } else {
       LOG_ERROR << "failed to get device handle for GPU " << didx
-                << ": NVML_ERROR " << nvmlerr;
+                << ": NVML_ERROR " << nvmlErrorString(nvmlerr);
       continue;
     }
 
@@ -280,7 +280,7 @@ Metrics::InitializeNvmlMetrics()
               power_limit_fail_cnt[didx] = 0;
             } else {
               LOG_WARNING << "failed to get power limit for GPU " << didx
-                          << ", NVML_ERROR " << nvmlerr;
+                          << ", NVML_ERROR " << nvmlErrorString(nvmlerr);
               power_limit = 0;
               power_limit_fail_cnt[didx]++;
             }
@@ -295,7 +295,7 @@ Metrics::InitializeNvmlMetrics()
               power_usage_fail_cnt[didx] = 0;
             } else {
               LOG_WARNING << "failed to get power usage for GPU " << didx
-                          << ", NVML_ERROR " << nvmlerr;
+                          << ", NVML_ERROR " << nvmlErrorString(nvmlerr);
               power_usage = 0;
               power_usage_fail_cnt[didx]++;
             }
@@ -317,7 +317,7 @@ Metrics::InitializeNvmlMetrics()
               last_energy[didx] = energy;
             } else {
               LOG_WARNING << "failed to get energy consumption for GPU "
-                          << didx << ", NVML_ERROR " << nvmlerr;
+                          << didx << ", NVML_ERROR " << nvmlErrorString(nvmlerr);
               energy_fail_cnt[didx]++;
             }
           }
@@ -330,7 +330,7 @@ Metrics::InitializeNvmlMetrics()
               util_fail_cnt[didx] = 0;
             } else {
               LOG_WARNING << "failed to get utilization for GPU " << didx
-                          << ", NVML_ERROR " << nvmlerr;
+                          << ", NVML_ERROR " << nvmlErrorString(nvmlerr);
               util.gpu = 0;
               util_fail_cnt[didx]++;
             }
@@ -345,7 +345,7 @@ Metrics::InitializeNvmlMetrics()
               mem_fail_cnt[didx] = 0;
             } else {
               LOG_WARNING << "failed to get memory for GPU " << didx
-                          << ", NVML_ERROR " << nvmlerr;
+                          << ", NVML_ERROR " << nvmlErrorString(nvmlerr);
               mem.total = 0;
               mem.used = 0;
               mem_fail_cnt[didx]++;
@@ -389,14 +389,14 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
   nvmlDevice_t device;
   nvmlReturn_t nvmlerr = nvmlDeviceGetHandleByPciBusId_v2(pcibusid_str, &device);
   if (nvmlerr != NVML_SUCCESS) {
-    LOG_ERROR << "failed to get device from PCI Bus ID: NVML_ERROR " << nvmlerr;
+    LOG_ERROR << "failed to get device from PCI Bus ID: NVML_ERROR " << nvmlErrorString(nvmlerr);
     return false;
   }
 
   char uuid_str[NVML_DEVICE_UUID_BUFFER_SIZE + 1];
   nvmlerr = nvmlDeviceGetUUID(device, uuid_str, NVML_DEVICE_UUID_BUFFER_SIZE);
   if (nvmlerr != NVML_SUCCESS) {
-    LOG_ERROR << "failed to get device UUID: NVML_ERROR " << nvmlerr;
+    LOG_ERROR << "failed to get device UUID: NVML_ERROR " << nvmlErrorString(nvmlerr);
     return false;
   }
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,82 +27,79 @@
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
+  REPO_VERSION=$1
 fi
 if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
+  echo -e "Repository version must be specified"
+  echo -e "\n***\n*** Test Failed\n***"
+  exit 1
 fi
 
-CLIENT_LOG="./client.log"
-MODELSDIR=`pwd`/models
+MODELDIR=`pwd`/models
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
-
+OPTDIR=${OPTDIR:="/opt"}
+SERVER=${OPTDIR}/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${MODELDIR}"
-SERVER_LOG_BASE="./inference_server"
+SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
-
+rm -f $SERVER_LOG
 
 RET=0
 
 # Prepare a libtorch float32 model with basic config
 rm -rf $MODELSDIR
 for trial in libtorch; do
-    full=${trial}_float32_float32_float32
-    mkdir -p $MODELSDIR/${full}/1 && \
-        cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
-        cp $DATADIR/${full}/config.pbtxt $MODELSDIR/${full}/. && \
-        (cd $MODELSDIR/${full} && \
-                sed -i "s/label_filename:.*//" config.pbtxt && \
-                echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
-done
+  full=${trial}_float32_float32_float32
+  mkdir -p $MODELSDIR/${full}/1 && \
+    cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
+    cp $DATADIR/${full}/config.pbtxt $MODELSDIR/${full}/. && \
+    (cd $MODELSDIR/${full} && \
+    sed -i "s/label_filename:.*//" config.pbtxt && \
+    echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
+done 
 
-CUDA_VISIBLE_DEVICES=0,1,2,3
+set +e
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
+  echo -e "\n***\n*** Failed to start $SERVER\n***"
+  cat $SERVER_LOG
+  exit 1
 fi
 
-metrics=`curl -s localhost:8002/metrics`
-num_gpus=`echo metrics | grep "nv_gpu_utilization\{ | wc -l"`
-
+num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
 if [ $num_gpus -ne 4 ]; then
-    echo -e "\n***\n*** GPU metric test failed. \n***"
-    RET=1
+  echo "Found $num_gpus GPU(s) instead of 4 GPUs being monitored."
+  echo -e "\n***\n*** GPU metric test failed. \n***"
+  RET=1
 fi
 
 kill $SERVER_PID
 wait $SERVER_PID
 
-CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
+  echo -e "\n***\n*** Failed to start $SERVER\n***"
+  cat $SERVER_LOG
+  exit 1
 fi
-
-metrics=`curl -s localhost:8002/metrics`
-num_gpus=`echo metrics | grep "nv_gpu_utilization\{ | wc -l"`
 
 kill $SERVER_PID
 wait $SERVER_PID
 
+num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
 if [ $num_gpus -ne 1 ]; then
-    echo -e "\n***\n*** GPU metric test failed. \n***"
-    RET=1
+  echo "Found $num_gpus GPU(s) instead of 1 GPU being monitored."
+  echo -e "\n***\n*** GPU metric test failed. \n***"
+  RET=1
 fi
 
 if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
+  echo -e "\n***\n*** Test Passed\n***" 
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+  echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET
-
