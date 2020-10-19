@@ -46,9 +46,11 @@ ignored. Model load and unload requests using the [model control
 protocol](protocols/extension_model_repository.md) will have no affect
 and will return an error response.
 
-This model control mode is selected by specifing
+This model control mode is selected by specifying
 --model-control-mode=none when starting Triton. This is the default
-model control mode.
+model control mode. Changing the model repository while Triton is
+running must be done carefully, as explained in [Modifying the Model
+Repository](#modifying-the-model-repository).
 
 ## Model Control Mode EXPLICIT
 
@@ -64,8 +66,10 @@ protocol](protocols/extension_model_repository.md). The response
 status of the model control request indicates success or failure of
 the load or unload action.
 
-This model control mode is enabled by specifing
---model-control-mode=explicit.
+This model control mode is enabled by specifying
+--model-control-mode=explicit. Changing the model repository while
+Triton is running must be done carefully, as explained in [Modifying
+the Model Repository](#modifying-the-model-repository).
 
 ## Model Control Mode POLL
 
@@ -94,9 +98,11 @@ Model load and unload requests using the [model control
 protocol](protocols/extension_model_repository.md) will have no affect
 and will return an error response.
 
-This model control mode is enabled by specifing
+This model control mode is enabled by specifying
 --model-control-mode=poll and by setting --repository-poll-secs to a
-non-zero value when starting Triton.
+non-zero value when starting Triton. Changing the model repository
+while Triton is running must be done carefully, as explained in
+[Modifying the Model Repository](#modifying-the-model-repository).
 
 In POLL mode Triton responds to the following model repository
 changes:
@@ -129,3 +135,34 @@ changes:
   *label_filename* property of the output it corresponds to in the
   [model configuration](model_configuration.md) must be performed at
   the same time.
+
+## Modifying the Model Repository
+
+Each model in a model repository [resides in its own
+sub-directory](model_repository.md#repository-layout). The activity
+allowed on the contents of a model's sub-directory varies depending on
+how Triton is using that model. The state of a model can be determined
+by using the [model
+metadata](inference_protocols.md#inference-protocols-and-apis) or
+[repository index](protocol/extension_model_repository.md#index) APIs.
+
+
+* If the model is actively loading or unloading, no files or
+directories within that sub-directory must be added, removed or
+modified.
+
+* If the model has never been loaded or has been completely unloaded,
+  then the entire model sub-directory can be removed or any of its
+  contents can be added, removed or modified.
+
+* If the model has been completely loaded then any files or
+directories within that sub-directory can be added, removed or
+modified; except for shared libraries implementing the model's
+backend. Triton uses the backend shared libraries while the model is
+loading so removing or modifying them will likely cause Triton to
+crash. To update a model's backend you must first unload the model
+completely, modify the backend shared libraries, and then reload the
+model. On some OSes it may also be possible to simply move the
+existing shared-libraries to another location outside of the model
+repository, copy in the new shared libraries, and then reload the
+model.
