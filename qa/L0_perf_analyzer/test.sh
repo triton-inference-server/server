@@ -94,13 +94,8 @@ cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v1_graphdef
 # Copy resnet50v1.5_fp16
 cp -r /data/inferenceserver/${REPO_VERSION}/perf_model_store/resnet50v1.5_fp16_savedmodel $DATADIR
 
-# Set up the ensemble model repository (using inception v3)
-mkdir -p models/inception_graphdef/1
-wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
-     https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
-(cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
-mv /tmp/inception_v3_2016_08_28_frozen.pb ensemble_model_repository/inception_graphdef/1/model.graphdef
-mkdir -p ensemble_model_repository/preprocess_inception_ensemble/1
+# Set up the ensemble model repository
+cp -r ../ensemble_models/image_preprocess_ensemble_example ensemble_model_repository
 
 # Generating test data
 mkdir -p $TESTDATADIR
