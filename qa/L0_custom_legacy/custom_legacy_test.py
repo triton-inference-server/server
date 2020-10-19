@@ -31,7 +31,6 @@ sys.path.append("../common")
 from functools import partial
 import numpy as np
 import queue
-import queue
 import unittest
 import test_util as tu
 
