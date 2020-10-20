@@ -175,11 +175,13 @@ the built client examples that you can learn more about in
 
 ### Build Using CMake
 
-The client library build is performed using CMake. The build
-dependencies and requirements are shown in Dockerfile.client. To build
-without Docker you must first install those dependencies. This section
-describes the client build for Ubuntu 18.04 and Windows 10
-systems.
+The client library build is performed using CMake. *IMPORTANT*
+Note that version 3.18.4 of cmake is needed to compile the
+client. The build dependencies and requirements are shown in
+`Dockerfile.client`. To build without Docker you must first
+install those dependencies along with required cmake version.
+This section describes the client build for Ubuntu 18.04 and
+Windows 10 systems.
 
 To build the libraries using CMake, first change directory to the root
 of the repo and checkout the release version of the branch that you
@@ -193,8 +195,11 @@ $ git checkout r20.09
 #### Ubuntu 18.04
 
 For Ubuntu, the dependencies and how to install them can be found in
-Dockerfile.client. Also note that the dependency name may be different
-depending on the version of the system.
+`Dockerfile.client`. The appropriate CUDA library must be installed
+if TRITON_ENABLE_GPU=OFF is not specified in the cmake. Follow the
+dockerfile closely till the cmake invocation. Also note that
+the dependency name may be different depending on the version of the
+system.
 
 To build on Ubuntu, run the following to configure and build:
 
