@@ -165,24 +165,24 @@ model repository with image classification models see
 
 Once Triton is running you can use the image_client application to
 send inference requests. You can specify a single image or a directory
-holding images. Here we send a request for the resnet50_netdef model
+holding images. Here we send a request for the inception_graphdef model
 for an image from the [qa/images](../qa/images).
 
 ```bash
-$ image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+$ image_client -m inception_graphdef -s INCEPTION qa/images/mug.jpg
 Request 0, batch size 1
 Image '../qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.723991
+    0.754130 (505) = COFFEE MUG
 ```
 
 The Python version of the application accepts the same command-line
 arguments.
 
 ```bash
-$ python image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+$ python image_client.py -m inception_graphdef -s INCEPTION qa/images/mug.jpg
 Request 0, batch size 1
 Image '../qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.778078556061
+     0.826384 (505) = COFFEE MUG
 ```
 
 The image_client and image_client.py applications use the client
@@ -192,22 +192,22 @@ protocol by providing the -i flag. You must also use the -u flag to
 point at the GRPC endpoint on Triton.
 
 ```bash
-$ image_client -i grpc -u localhost:8001 -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+$ image_client -i grpc -u localhost:8001 -m inception_graphdef -s INCEPTION qa/images/mug.jpg
 Request 0, batch size 1
 Image '../qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.723991
+    0.754130 (505) = COFFEE MUG
 ```
 
 By default the client prints the most probable classification for the
 image. Use the -c flag to see more classifications.
 
 ```bash
-$ image_client -m resnet50_netdef -s INCEPTION -c 3 qa/images/mug.jpg
+$ image_client -m inception_graphdef -s INCEPTION -c 3 qa/images/mug.jpg
 Request 0, batch size 1
 Image '../qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.723991
-    968 (CUP) = 0.270953
-    967 (ESPRESSO) = 0.00115996
+    0.754130 (505) = COFFEE MUG
+    0.157077 (969) = CUP
+    0.002880 (968) = ESPRESSO
 ```
 
 The -b flag allows you to send a batch of images for inferencing.
@@ -217,41 +217,41 @@ images then image_client will just repeat the images to fill the
 batch.
 
 ```bash
-$ image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images/mug.jpg
+$ image_client -m inception_graphdef -s INCEPTION -c 3 -b 2 qa/images/mug.jpg
 Request 0, batch size 2
 Image '../qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.778078556061
-    968 (CUP) = 0.213262036443
-    967 (ESPRESSO) = 0.00293014757335
+    0.754130 (505) = COFFEE MUG
+    0.157077 (969) = CUP
+    0.002880 (968) = ESPRESSO
 Image '../qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.778078556061
-    968 (CUP) = 0.213262036443
-    967 (ESPRESSO) = 0.00293014757335
+    0.754130 (505) = COFFEE MUG
+    0.157077 (969) = CUP
+    0.002880 (968) = ESPRESSO
 ```
 
 Provide a directory instead of a single image to perform inferencing
 on all images in the directory.
 
 ```
-$ image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images
+$ image_client -m inception_graphdef -s INCEPTION -c 3 -b 2 qa/images
 Request 0, batch size 2
-Image '../qa/images/car.jpg':
-    817 (SPORTS CAR) = 0.836187
-    511 (CONVERTIBLE) = 0.0708251
-    751 (RACER) = 0.0597549
-Image '../qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.723991
-    968 (CUP) = 0.270953
-    967 (ESPRESSO) = 0.00115996
+Image '/opt/tritonserver/qa/images/car.jpg':
+    0.819196 (818) = SPORTS CAR
+    0.033457 (437) = BEACH WAGON
+    0.031232 (480) = CAR WHEEL
+Image '/opt/tritonserver/qa/images/mug.jpg':
+    0.754130 (505) = COFFEE MUG
+    0.157077 (969) = CUP
+    0.002880 (968) = ESPRESSO
 Request 1, batch size 2
-Image '../qa/images/vulture.jpeg':
-    23 (VULTURE) = 0.992326
-    8 (HEN) = 0.00231854
-    84 (PEACOCK) = 0.00201471
-Image '../qa/images/car.jpg':
-    817 (SPORTS CAR) = 0.836187
-    511 (CONVERTIBLE) = 0.0708251
-    751 (RACER) = 0.0597549
+Image '/opt/tritonserver/qa/images/vulture.jpeg':
+    0.977632 (24) = VULTURE
+    0.000613 (9) = HEN
+    0.000560 (137) = EUROPEAN GALLINULE
+Image '/opt/tritonserver/qa/images/car.jpg':
+    0.819196 (818) = SPORTS CAR
+    0.033457 (437) = BEACH WAGON
+    0.031232 (480) = CAR WHEEL
 ```
 
 The
@@ -264,8 +264,8 @@ communicate with Triton.
 
 In comparison to the image classification example above, this example
 uses an ensemble of an image-preprocessing model implemented as a
-custom backend and a Caffe2 ResNet50 model. This ensemble allows you
-to send the raw image binaries in the request and receive
+custom backend and a TensorFlow Inception model. This ensemble allows
+you to send the raw image binaries in the request and receive
 classification results without preprocessing the images on the
 client. The ensemble image classification example that uses the C++
 client API is
