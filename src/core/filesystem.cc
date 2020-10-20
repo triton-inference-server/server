@@ -774,11 +774,9 @@ ASFileSystem::ASFileSystem(const std::string& path)
       // Shared Key
       cred = std::make_shared<as::shared_key_credential>(
           account_name, account_key);
-      LOG_VERBOSE(1) << "init azure storage using shared_key " << sas_query;
     } else if (sas_query != NULL) {
       // Shared Access Signature
       cred = std::make_shared<as::shared_access_signature_credential>(std::string(sas_query));
-      LOG_VERBOSE(1) << "init azure storage using SAS " << sas_query;
     } else {
       cred = std::make_shared<as::anonymous_credential>();
     }
@@ -849,7 +847,6 @@ Status
 ASFileSystem::GetDirectoryContents(
     const std::string& path, std::set<std::string>* contents)
 {
-  LOG_VERBOSE(1) << "get dir contents:" << path;
   auto func = [&](const as::list_blobs_segmented_item& item,
                   const std::string& dir) { 
     contents->insert(dir); 
@@ -864,7 +861,6 @@ Status
 ASFileSystem::GetDirectorySubdirs(
     const std::string& path, std::set<std::string>* subdirs)
 {
-  LOG_VERBOSE(1) << "subdir:" << path;
   auto func = [&](const as::list_blobs_segmented_item& item,
                   const std::string& dir) {
     if (item.is_directory) {
@@ -914,7 +910,6 @@ ASFileSystem::ReadTextFile(const std::string& path, std::string* contents)
   as::blob_client_wrapper bc(client_);
   std::string container, object_path;
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
-  LOG_VERBOSE(1) << "read file:" << container << "/" << object_path;
   using namespace azure::storage_lite;
   std::ostringstream out_stream;
   bc.download_blob_to_stream(container, object_path, 0, 0, out_stream);
@@ -950,7 +945,6 @@ ASFileSystem::DownloadFolder(
     const std::string& container, const std::string& path,
     const std::string& dest)
 {
-  LOG_VERBOSE(1) << "download dir:" << container << "/" << path << "to" << dest;
   as::blob_client_wrapper bc(client_);
   auto func = [&](const as::list_blobs_segmented_item& item,
                   const std::string& dir) {
