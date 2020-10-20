@@ -644,7 +644,7 @@ class ModelMetadataTest(tu.TestResultCollector):
                 else:
                     stats = infer_stats.model_stats
                 self.assertEqual(
-                    len(stats), 200,
+                    len(stats), 184,
                     "expected 200 infer stats for all ready versions of all model"
                 )
 

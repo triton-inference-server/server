@@ -85,7 +85,7 @@ rm -fr models/image_preprocess_nhwc_299x299x3_inception && \
     mkdir -p models/preprocess_inception_ensemble/1
 
 # Obtain actual models
-cp ../L0_custom_image_preprocess/models/image_preprocess_nhwc_299x299x3/1/libimagepreprocess.so \
+cp ../L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/libimagepreprocess.so \
     models/image_preprocess_nhwc_299x299x3_inception/1/.
 
 CLIENT_LOG=`pwd`/client.log

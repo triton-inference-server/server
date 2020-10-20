@@ -63,7 +63,7 @@ ensemble_scheduling {
         value: "preprocessed_image"
       }
       output_map {
-        key: "resnet_v1_50"
+        key: "InceptionV3/Predictions/Softmax"
         value: "OUTPUT"
       }
     }
