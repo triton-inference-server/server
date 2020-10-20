@@ -47,27 +47,30 @@ results based on that confidence level. For example, if
 percentile request latency. For example,
 
 ```
-$ perf_analyzer -m resnet50_netdef --percentile=95
+$ perf_analyzer -m inception_graphdef --percentile=95
 *** Measurement Settings ***
   Batch size: 1
   Measurement window: 5000 msec
+  Using synchronous calls for inference
   Stabilizing using p95 latency
 
 Request concurrency: 1
   Client:
-    Request count: 809
-    Throughput: 161.8 infer/sec
-    p50 latency: 6178 usec
-    p90 latency: 6237 usec
-    p95 latency: 6260 usec
-    p99 latency: 6339 usec
-    Avg HTTP time: 6153 usec (send/recv 72 usec + response wait 6081 usec)
+    Request count: 348
+    Throughput: 69.6 infer/sec
+    p50 latency: 13936 usec
+    p90 latency: 18682 usec
+    p95 latency: 19673 usec
+    p99 latency: 21859 usec
+    Avg HTTP time: 14017 usec (send/recv 200 usec + response wait 13817 usec)
   Server:
-    Request count: 971
-    Avg request latency: 4824 usec (overhead 10 usec + queue 39 usec + compute 4775 usec)
+    Inference count: 428
+    Execution count: 428
+    Successful request count: 428
+    Avg request latency: 12005 usec (overhead 36 usec + queue 42 usec + compute input 164 usec + compute infer 11748 usec + compute output 15 usec)
 
 Inferences/Second vs. Client p95 Batch Latency
-Concurrency: 1, 161.8 infer/sec, latency 6260 usec
+Concurrency: 1, throughput: 69.6 infer/sec, latency 19673 usec
 ```
 
 ## Request Concurrency
@@ -88,40 +91,43 @@ and other options. For example, to see the latency and throughput of
 your model for request concurrency values from 1 to 4:
 
 ```
-$ perf_analyzer -m resnet50_netdef --concurrency-range 1:4
+$ perf_analyzer -m inception_graphdef --concurrency-range 1:4
 *** Measurement Settings ***
   Batch size: 1
   Measurement window: 5000 msec
   Latency limit: 0 msec
   Concurrency limit: 4 concurrent requests
+  Using synchronous calls for inference
   Stabilizing using average latency
 
 Request concurrency: 1
   Client:
-    Request count: 804
-    Throughput: 160.8 infer/sec
-    Avg latency: 6207 usec (standard deviation 267 usec)
-    p50 latency: 6212 usec
+    Request count: 339
+    Throughput: 67.8 infer/sec
+    Avg latency: 14710 usec (standard deviation 2539 usec)
+    p50 latency: 13665 usec
 ...
 Request concurrency: 4
   Client:
-    Request count: 1042
-    Throughput: 208.4 infer/sec
-    Avg latency: 19185 usec (standard deviation 105 usec)
-    p50 latency: 19168 usec
-    p90 latency: 19218 usec
-    p95 latency: 19265 usec
-    p99 latency: 19583 usec
-    Avg HTTP time: 19156 usec (send/recv 79 usec + response wait 19077 usec)
+    Request count: 415
+    Throughput: 83 infer/sec
+    Avg latency: 48064 usec (standard deviation 6412 usec)
+    p50 latency: 47975 usec
+    p90 latency: 56670 usec
+    p95 latency: 59118 usec
+    p99 latency: 63609 usec
+    Avg HTTP time: 48166 usec (send/recv 264 usec + response wait 47902 usec)
   Server:
-    Request count: 1250
-    Avg request latency: 18099 usec (overhead 9 usec + queue 13314 usec + compute 4776 usec)
+    Inference count: 498
+    Execution count: 498
+    Successful request count: 498
+    Avg request latency: 45602 usec (overhead 39 usec + queue 33577 usec + compute input 217 usec + compute infer 11753 usec + compute output 16 usec)
 
 Inferences/Second vs. Client Average Batch Latency
-Concurrency: 1, 160.8 infer/sec, latency 6207 usec
-Concurrency: 2, 209.2 infer/sec, latency 9548 usec
-Concurrency: 3, 207.8 infer/sec, latency 14423 usec
-Concurrency: 4, 208.4 infer/sec, latency 19185 usec
+Concurrency: 1, throughput: 67.8 infer/sec, latency 14710 usec
+Concurrency: 2, throughput: 89.8 infer/sec, latency 22280 usec
+Concurrency: 3, throughput: 80.4 infer/sec, latency 37283 usec
+Concurrency: 4, throughput: 83 infer/sec, latency 48064 usec
 ```
 
 ## Understanding The Output
@@ -166,13 +172,13 @@ The perf_analyzer provides the -f option to generate a file containing
 CSV output of the results.
 
 ```
-$ perf_analyzer -m resnet50_netdef --concurrency-range 1:4 -f perf.csv
+$ perf_analyzer -m inception_graphdef --concurrency-range 1:4 -f perf.csv
 $ cat perf.csv
 Concurrency,Inferences/Second,Client Send,Network+Server Send/Recv,Server Queue,Server Compute Input,Server Compute Infer,Server Compute Output,Client Recv,p50 latency,p90 latency,p95 latency,p99 latency
-1,163.6,69,1230,33,43,4719,5,9,6133,6191,6224,6415
-2,208.6,180,1306,3299,43,4720,5,28,9482,9617,10746,10832
-4,209.8,173,1268,12835,40,4705,4,27,19046,19133,19164,19290
-3,210.2,175,1267,8052,40,4697,4,27,14259,14325,14350,14426
+1,69.2,225,2148,64,206,11781,19,0,13891,18795,19753,21018
+3,84.2,237,1768,21673,209,11742,17,0,35398,43984,47085,51701
+4,84.2,279,1604,33669,233,11731,18,1,47045,56545,59225,64886
+2,87.2,235,1973,9151,190,11346,17,0,21874,28557,29768,34766
 ```
 
 You can import the CSV file into a spreadsheet to help visualize

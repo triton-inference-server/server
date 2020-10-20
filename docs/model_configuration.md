@@ -239,21 +239,21 @@ corresponding datatype for the model frameworks and for the Python
 numpy library. If a model framework does not have an entry for a given
 datatype, then Triton does not support that datatype for that model.
 
-|Type          |TensorRT      |TensorFlow    |Caffe2        |ONNX Runtime  |PyTorch  |NumPy         |
-|--------------|--------------|--------------|--------------|--------------|---------|--------------|
-|TYPE_BOOL     | kBOOL        |DT_BOOL       |BOOL          |BOOL          |kBool    |bool          |
-|TYPE_UINT8    |              |DT_UINT8      |UINT8         |UINT8         |kByte    |uint8         |
-|TYPE_UINT16   |              |DT_UINT16     |UINT16        |UINT16        |         |uint16        |
-|TYPE_UINT32   |              |DT_UINT32     |              |UINT32        |         |uint32        |
-|TYPE_UINT64   |              |DT_UINT64     |              |UINT64        |         |uint64        |
-|TYPE_INT8     | kINT8        |DT_INT8       |INT8          |INT8          |kChar    |int8          |
-|TYPE_INT16    |              |DT_INT16      |INT16         |INT16         |kShort   |int16         |
-|TYPE_INT32    | kINT32       |DT_INT32      |INT32         |INT32         |kInt     |int32         |
-|TYPE_INT64    |              |DT_INT64      |INT64         |INT64         |kLong    |int64         |
-|TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |FLOAT16       |         |float16       |
-|TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |FLOAT         |kFloat   |float32       |
-|TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |DOUBLE        |kDouble  |float64       |
-|TYPE_STRING   |              |DT_STRING     |              |STRING        |         |dtype(object) |
+|Type          |TensorRT      |TensorFlow    |ONNX Runtime  |PyTorch  |NumPy         |
+|--------------|--------------|--------------|--------------|---------|--------------|
+|TYPE_BOOL     | kBOOL        |DT_BOOL       |BOOL          |kBool    |bool          |
+|TYPE_UINT8    |              |DT_UINT8      |UINT8         |kByte    |uint8         |
+|TYPE_UINT16   |              |DT_UINT16     |UINT16        |         |uint16        |
+|TYPE_UINT32   |              |DT_UINT32     |UINT32        |         |uint32        |
+|TYPE_UINT64   |              |DT_UINT64     |UINT64        |         |uint64        |
+|TYPE_INT8     | kINT8        |DT_INT8       |INT8          |kChar    |int8          |
+|TYPE_INT16    |              |DT_INT16      |INT16         |kShort   |int16         |
+|TYPE_INT32    | kINT32       |DT_INT32      |INT32         |kInt     |int32         |
+|TYPE_INT64    |              |DT_INT64      |INT64         |kLong    |int64         |
+|TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |         |float16       |
+|TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |kFloat   |float32       |
+|TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |kDouble  |float64       |
+|TYPE_STRING   |              |DT_STRING     |STRING        |         |dtype(object) |
 
 For TensorRT each value is in the nvinfer1::DataType namespace. For
 example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point
@@ -261,10 +261,6 @@ datatype.
 
 For TensorFlow each value is in the tensorflow namespace. For example,
 tensorflow::DT_FLOAT is the 32-bit floating-point value.
-
-For Caffe2 each value is in the caffe2 namespace and is prepended with
-TensorProto_DataType_. For example, caffe2::TensorProto_DataType_FLOAT
-is the 32-bit floating-point datatype.
 
 For ONNX Runtime each value is prepended with ONNX_TENSOR_ELEMENT_DATA_TYPE_.
 For example, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT is the 32-bit floating-point

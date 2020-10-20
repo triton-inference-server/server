@@ -48,24 +48,24 @@ Performance Analyzer is an essential tool for optimizing your model's
 performance.
 
 As a running example demonstrating the optimization features and
-options, we will use a Caffe2 ResNet50 model that you can obtain by
-following the [QuickStart](quickstart.md). As a baseline we use
+options, we will use a TensorFlow Inception model that you can obtain
+by following the [QuickStart](quickstart.md). As a baseline we use
 perf_analyzer to determine the performance of the model using a [basic
 model configuration that does not enable any performance
-features](examples/model_repository/resnet50_netdef/config.pbtxt).
+features](examples/model_repository/inception_graphdef/config.pbtxt).
 
 ```
-$ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 1:4
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
 ...
 Inferences/Second vs. Client p95 Batch Latency
-Concurrency: 1, 159 infer/sec, latency 6701 usec
-Concurrency: 2, 204.8 infer/sec, latency 9807 usec
-Concurrency: 3, 204.2 infer/sec, latency 14846 usec
-Concurrency: 4, 199.6 infer/sec, latency 20499 usec
+Concurrency: 1, throughput: 62.6 infer/sec, latency 21371 usec
+Concurrency: 2, throughput: 73.2 infer/sec, latency 34381 usec
+Concurrency: 3, throughput: 73.2 infer/sec, latency 50298 usec
+Concurrency: 4, throughput: 73.4 infer/sec, latency 65569 usec
 ```
 
 The results show that our non-optimized model configuration gives a
-throughput of about 200 inferences per second. Note how there is a
+throughput of about 73 inferences per second. Note how there is a
 significant throughput increase going from one concurrent request to
 two concurrent requests and then throughput levels off. With one
 concurrent request Triton is idle during the time when the response is
@@ -91,7 +91,7 @@ larger batch that will often execute much more efficiently than
 executing the individual requests independently. To enable the dynamic
 batcher stop Triton, add the following line to the end of the [model
 configuration file for
-resnet50_netdef](examples/model_repository/resnet50_netdef/config.pbtxt),
+inception_graphdef](examples/model_repository/inception_graphdef/config.pbtxt),
 and then restart Triton.
 
 ```
@@ -104,21 +104,21 @@ inference. To see this run perf_analyzer with request concurrency from
 1 to 8.
 
 ```
-$ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 1:8
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:8
 ...
 Inferences/Second vs. Client p95 Batch Latency
-Concurrency: 1, 154.2 infer/sec, latency 6662 usec
-Concurrency: 2, 203.6 infer/sec, latency 9931 usec
-Concurrency: 3, 242.4 infer/sec, latency 12421 usec
-Concurrency: 4, 335.6 infer/sec, latency 12423 usec
-Concurrency: 5, 335.2 infer/sec, latency 16034 usec
-Concurrency: 6, 363 infer/sec, latency 19990 usec
-Concurrency: 7, 369.6 infer/sec, latency 21382 usec
-Concurrency: 8, 426.6 infer/sec, latency 19526 usec
+Concurrency: 1, throughput: 66.8 infer/sec, latency 19785 usec
+Concurrency: 2, throughput: 80.8 infer/sec, latency 30732 usec
+Concurrency: 3, throughput: 118 infer/sec, latency 32968 usec
+Concurrency: 4, throughput: 165.2 infer/sec, latency 32974 usec
+Concurrency: 5, throughput: 194.4 infer/sec, latency 33035 usec
+Concurrency: 6, throughput: 217.6 infer/sec, latency 34258 usec
+Concurrency: 7, throughput: 249.8 infer/sec, latency 34522 usec
+Concurrency: 8, throughput: 272 infer/sec, latency 35988 usec
 ```
 
 With eight concurrent requests the dynamic batcher allows Triton to
-provide about 425 inferences per second without increasing latency
+provide 272 inferences per second without increasing latency
 compared to not using the dynamic batcher.
 
 You can also explicitly specify what batch sizes you would like the
@@ -132,20 +132,22 @@ dynamic_batching { preferred_batch_size: [ 4 ]}
 ```
 
 Instead of having perf_analyzer collect data for a range of request
-concurrency values we can instead use a simple rule that typically
-applies when perf_analyzer is running on the same system as
-Triton. The rule is that for maximum throughput set the request
-concurrency to be 2 * <preferred batch size> * <model instance
-count>. We will discuss model instances [below](#model-instances), for
-now we are working with one model instance. So for
-preferred-batch-size 4 we want to run perf_analyzer with request
-concurrency of 2 * 4 * 1 = 8.
+concurrency values we can instead use a couple of simple rules that
+typically applies when perf_analyzer is running on the same system as
+Triton. The first rule is that for minimum latency set the request
+concurrency to 1 and disable the dynamic batcher and use only 1 [model
+instance](#model-instances). The second rule is that for maximum
+throughput set the request concurrency to be 2 * <preferred batch
+size> * <model instance count>. We will discuss model instances
+[below](#model-instances), for now we are working with one model
+instance. So for preferred-batch-size 4 we want to run perf_analyzer
+with request concurrency of 2 * 4 * 1 = 8.
 
 ```
-$ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 8
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 8
 ...
 Inferences/Second vs. Client p95 Batch Latency
-Concurrency: 8, 420.2 infer/sec, latency 19524 usec
+Concurrency: 8, throughput: 267.8 infer/sec, latency 35590 usec
 ```
 
 ### Model Instances
@@ -162,12 +164,12 @@ utilization by allowing more inference work to be executed
 simultaneously on the GPU. Smaller models may benefit from more than
 two instances; you can use perf_analyzer to experiment.
 
-To specify two instances of the resnet50_netdef model: stop Triton,
+To specify two instances of the inception_graphdef model: stop Triton,
 remove any dynamic batching settings you may have previously added to
 the model configuration (we discuss combining dynamic batcher and
 multiple model instances below), add the following lines to the end of
 the [model configuration
-file](examples/model_repository/resnet50_netdef/config.pbtxt), and
+file](examples/model_repository/inception_graphdef/config.pbtxt), and
 then restart Triton.
 
 ```
@@ -177,17 +179,17 @@ instance_group [ { count: 2 }]
 Now run perf_analyzer using the same options as for the baseline.
 
 ```
-$ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 1:4
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
 ...
 Inferences/Second vs. Client p95 Batch Latency
-Concurrency: 1, 129.4 infer/sec, latency 8434 usec
-Concurrency: 2, 257.4 infer/sec, latency 8126 usec
-Concurrency: 3, 289.6 infer/sec, latency 12621 usec
-Concurrency: 4, 287.8 infer/sec, latency 14296 usec
+Concurrency: 1, throughput: 70.6 infer/sec, latency 19547 usec
+Concurrency: 2, throughput: 106.6 infer/sec, latency 23532 usec
+Concurrency: 3, throughput: 110.2 infer/sec, latency 36649 usec
+Concurrency: 4, throughput: 108.6 infer/sec, latency 43588 usec
 ```
 
 In this case having two instances of the model increases throughput
-from about 200 inference per second to about 290 inferences per second
+from about 73 inference per second to about 110 inferences per second
 compared with one instance.
 
 It is possible to enable both the dynamic batcher and multiple model
@@ -203,19 +205,20 @@ When we run perf_analyzer with the same options used for just the
 dynamic batcher above.
 
 ```
-$ perf_analyzer -m resnet50_netdef --percentile=95 --concurrency-range 8
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 16
 ...
 Inferences/Second vs. Client p95 Batch Latency
-Concurrency: 8, 409.2 infer/sec, latency 24284 usec
+Concurrency: 16, throughput: 289.6 infer/sec, latency 59817 usec
 ```
 
-We see that two instances does not improve throughput or latency. This
-occurs because for this model the dynamic batcher alone is capable of
-fully utilizing the GPU and so adding additional model instances does
-not provide any performance advantage. In general the benefit of the
-dynamic batcher and multiple instances is model specific, so you
-should experiment with perf_analyzer to determine the settings that
-best satisfy your throughput and latency requirements.
+We see that two instances does not improve throughput much while
+increasing latency, compared with just using the dynamic batcher and
+one instance. This occurs because for this model the dynamic batcher
+alone is capable of fully utilizing the GPU and so adding additional
+model instances does not provide any performance advantage. In general
+the benefit of the dynamic batcher and multiple instances is model
+specific, so you should experiment with perf_analyzer to determine the
+settings that best satisfy your throughput and latency requirements.
 
 ## Framework-Specific Optimization
 
@@ -305,10 +308,10 @@ features](examples/model_repository/inception_graphdef/config.pbtxt).
 $ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
 ...
 Inferences/Second vs. Client p95 Batch Latency
-Concurrency: 1, 105.6 infer/sec, latency 12865 usec
-Concurrency: 2, 120.6 infer/sec, latency 20888 usec
-Concurrency: 3, 122.8 infer/sec, latency 30308 usec
-Concurrency: 4, 123.4 infer/sec, latency 39465 usec
+Concurrency: 1, throughput: 62.6 infer/sec, latency 21371 usec
+Concurrency: 2, throughput: 73.2 infer/sec, latency 34381 usec
+Concurrency: 3, throughput: 73.2 infer/sec, latency 50298 usec
+Concurrency: 4, throughput: 73.4 infer/sec, latency 65569 usec
 ```
 
 To enable TensorRT optimization for the model: stop Triton, add the
@@ -318,8 +321,8 @@ and wait until the server prints the "Staring endpoints" message. Now
 run perf_analyzer using the same options as for the baseline. Note
 that the first run of perf_analyzer might timeout because the TensorRT
 optimization is performed when the inference request is received and
-may take significant time. In production you can use
-[warmup](model_configuration.md#model-warmup) to avoid this model
+may take significant time. In production you can use [model
+warmup](model_configuration.md#model-warmup) to avoid this model
 startup/optimization slowdown. For now, if this happens just run
 perf_analyzer again.
 
@@ -327,16 +330,16 @@ perf_analyzer again.
 $ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
 ...
 Inferences/Second vs. Client p95 Batch Latency
-Concurrency: 1, 172 infer/sec, latency 6912 usec
-Concurrency: 2, 265.2 infer/sec, latency 8905 usec
-Concurrency: 3, 254.2 infer/sec, latency 13506 usec
-Concurrency: 4, 257 infer/sec, latency 17715 usec
+Concurrency: 1, throughput: 140 infer/sec, latency 8987 usec
+Concurrency: 2, throughput: 195.6 infer/sec, latency 12583 usec
+Concurrency: 3, throughput: 189 infer/sec, latency 19020 usec
+Concurrency: 4, throughput: 191.6 infer/sec, latency 24622 usec
 ```
 
-The TensorRT optimization provided 2x throughput improvement while
-cutting latency in half. The benefit provided by TensorRT will vary
-based on the model, but in general it can provide significant
-performance improvement.
+The TensorRT optimization provided 2.5x throughput improvement while
+cutting latency by more than half. The benefit provided by TensorRT
+will vary based on the model, but in general it can provide
+significant performance improvement.
 
 ### TensorFlow Automatic FP16 Optimization
 
