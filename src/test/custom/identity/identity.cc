@@ -77,6 +77,9 @@ class Context : public CustomInstance {
   // Delay to introduce into execution, in milliseconds.
   int execute_delay_ms_;
 
+  // Whether or not to skip including output tensors in the response
+  bool suppress_outputs_;
+
   struct CopyInfo {
     std::string input_name_;
     inference::DataType datatype_;
@@ -111,7 +114,7 @@ Context::Context(
     const std::string& instance_name,
     const inference::ModelConfig& model_config, const int gpu_device)
     : CustomInstance(instance_name, model_config, gpu_device),
-      execute_delay_ms_(0)
+      execute_delay_ms_(0), suppress_outputs_(false)
 {
   if (model_config_.parameters_size() > 0) {
     const auto itr = model_config_.parameters().find("execute_delay_ms");
@@ -139,6 +142,13 @@ Context::Context(
         multiplier *=
             std::stoi(instance_name.substr(idx_pos, suffix_pos - idx_pos));
         execute_delay_ms_ *= std::max(multiplier, 1);
+      }
+    }
+
+    const auto sitr = model_config_.parameters().find("suppress_outputs");
+    if (sitr != model_config_.parameters().end()) {
+      if (sitr->second.string_value() == "TRUE") {
+        suppress_outputs_ = true;
       }
     }
   }
@@ -273,13 +283,16 @@ Context::Execute(
 
       auto dst_memory_type = src_memory_type;
       int64_t dst_memory_type_id = src_memory_type_id;
-      void* obuffer;
-      if (!output_fn(
-              payload.output_context, output_cname, shape.size(), &shape[0],
-              batchn_byte_size, &obuffer, &dst_memory_type,
-              &dst_memory_type_id)) {
-        payload.error_code = kOutputBuffer;
-        break;
+      void* obuffer = nullptr;
+      // Do not call output_fn when no outputs have been requested
+      if (!suppress_outputs_) {
+        if (!output_fn(
+                payload.output_context, output_cname, shape.size(), &shape[0],
+                batchn_byte_size, &obuffer, &dst_memory_type,
+                &dst_memory_type_id)) {
+          payload.error_code = kOutputBuffer;
+          break;
+        }
       }
 
       // If no error but the 'obuffer' is returned as nullptr, then
@@ -412,12 +425,15 @@ Context::Execute(
         break;
       }
 
-      void* obuffer;
-      if (!output_fn(
-              payload.output_context, output_cname, shape.size(), &shape[0],
-              batchn_byte_size, &obuffer)) {
-        payload.error_code = kOutputBuffer;
-        break;
+      void* obuffer = nullptr;
+      // Do not call output_fn when no outputs have been requested
+      if (!suppress_outputs_) {
+        if (!output_fn(
+                payload.output_context, output_cname, shape.size(), &shape[0],
+                batchn_byte_size, &obuffer)) {
+          payload.error_code = kOutputBuffer;
+          break;
+        }
       }
 
       // If no error but the 'obuffer' is returned as nullptr, then
