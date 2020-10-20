@@ -112,8 +112,8 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         nic::ParseJson(&repository_index_json, repository_index),
         "failed to parse model config");
-    if (repository_index_json.Size() != 9) {
-      std::cerr << "expected number of models 9, got "
+    if (repository_index_json.Size() != 8) {
+      std::cerr << "expected number of models 8, got "
                 << repository_index_json.Size() << std::endl;
       exit(1);
     }

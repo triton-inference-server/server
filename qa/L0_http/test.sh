@@ -67,7 +67,7 @@ rm -f *.log.*
 
 set -e
 
-# Get the TensorFlow inception model
+# Get the TensorFlow inception v3 model
 mkdir -p models/inception_graphdef/1
 wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
      https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
