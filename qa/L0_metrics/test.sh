@@ -1,5 +1,5 @@
 #!/bin/bash  
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,7 +53,7 @@ model=libtorch_float32_float32_float32
 mkdir -p $MODELDIR/${model}/1 && \
   cp -r $DATADIR/${model}/1/* $MODELDIR/${model}/1/. && \
   cp $DATADIR/${model}/config.pbtxt $MODELDIR/${model}/. && \
-  (cd $MODELDIR/${model} && \ 
+  (cd $MODELDIR/${model} && \
   sed -i "s/label_filename:.*//" config.pbtxt && \
   echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
 
