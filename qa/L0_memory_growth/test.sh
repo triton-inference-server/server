@@ -115,11 +115,7 @@ for MODEL in $(ls models); do
     if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then    
         sed -i "s/^max_batch_size:.*/max_batch_size: 32/" test_repo/$MODEL/config.pbtxt
     else
-        if [ "$MODEL" == "resnet50_fp32_netdef" ]; then
-            sed -i "s/^max_batch_size:.*/max_batch_size: 64/" test_repo/$MODEL/config.pbtxt
-        else
-            sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" test_repo/$MODEL/config.pbtxt
-        fi
+        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" test_repo/$MODEL/config.pbtxt
     fi
     echo "dynamic_batching {}" >> test_repo/$MODEL/config.pbtxt
     echo "instance_group [{ count: ${INSTANCE_CNT} }]" >> test_repo/$MODEL/config.pbtxt

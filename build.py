@@ -41,7 +41,7 @@ from distutils.dir_util import copy_tree
 # Build Triton Inference Server.
 #
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
-CORE_BACKENDS = ['pytorch', 'tensorrt', 'custom', 'ensemble', 'caffe2']
+CORE_BACKENDS = ['pytorch', 'tensorrt', 'custom', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali'
 ]
@@ -199,8 +199,6 @@ def core_cmake_args(components, backends, install_dir):
                 pass
             elif be == 'ensemble':
                 pass
-            elif be == 'caffe2':
-                pass
             else:
                 fail('unknown core backend {}'.format(be))
 
@@ -299,7 +297,7 @@ ARG ONNX_RUNTIME_VERSION={}
 ARG ONNX_RUNTIME_OPENVINO_VERSION={}
 
 ############################################################################
-## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
+## PyTorch stage: Use PyTorch container for libtorch and torchvision
 ############################################################################
 FROM ${{PYTORCH_IMAGE}} AS tritonserver_pytorch
 
@@ -408,7 +406,6 @@ FROM ${{BASE_IMAGE}} AS tritonserver_build
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 
-# libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip is needed by python backend
@@ -419,7 +416,6 @@ RUN apt-get update && \
             build-essential \
             docker.io \
             git \
-            libgoogle-glog0v5 \
             libre2-dev \
             libssl-dev \
             libtool \
@@ -454,25 +450,16 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
 # existing triton install before copying in the new components.
 RUN rm -fr /opt/*
 
-# Caffe2 libraries
-COPY --from=tritonserver_pytorch \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_detectron_ops_gpu.so \
-     /opt/tritonserver/lib/pytorch/
+# LibTorch and Torchvision headers and libraries
 COPY --from=tritonserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
      /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
      /opt/tritonserver/lib/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_avx2.so /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_core.so /opt/tritonserver/lib/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_def.so /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_gnu_thread.so /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/tritonserver/lib/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tritonserver/lib/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tritonserver/lib/pytorch/
-
-# LibTorch and Torchvision headers and libraries
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
      /opt/tritonserver/include/torch
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
@@ -481,8 +468,6 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/li
       /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cuda.so \
       /opt/tritonserver/lib/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
-     /opt/tritonserver/lib/pytorch/
 COPY --from=tritonserver_pytorch /opt/pytorch/vision/torchvision/csrc \
     /opt/tritonserver/include/torchvision/torchvision/
 COPY --from=tritonserver_pytorch /opt/pytorch/vision/build/libtorchvision.so \
@@ -624,10 +609,6 @@ ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
 ENV TF_AUTOTUNE_THRESHOLD       2
 
-# Needed by Caffe2 libraries to avoid:
-# Intel MKL FATAL ERROR: Cannot load libmkl_intel_thread.so
-ENV MKL_THREADING_LAYER GNU
-
 # Create a user that can be used to run triton as
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
@@ -639,7 +620,6 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
     [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
     [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 
-# libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl is needed for GCS
 #
 # FIXME python3, python3-pip and the pip installs should only be
@@ -649,7 +629,6 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
          libb64-0d \
          libcurl4-openssl-dev \
-         libgoogle-glog0v5 \
          libre2-4 \
          python3 \
          python3-pip && \

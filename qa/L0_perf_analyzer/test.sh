@@ -94,9 +94,13 @@ cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v1_graphdef
 # Copy resnet50v1.5_fp16
 cp -r /data/inferenceserver/${REPO_VERSION}/perf_model_store/resnet50v1.5_fp16_savedmodel $DATADIR
 
-# Set up the ensemble model repository
-cp -r /data/inferenceserver/${REPO_VERSION}/c2_model_store/resnet50_netdef/1 ensemble_model_repository/resnet50_netdef/1
-mkdir -p ensemble_model_repository/preprocess_resnet50_ensemble/1
+# Set up the ensemble model repository (using inception v3)
+mkdir -p models/inception_graphdef/1
+wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
+     https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
+(cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
+mv /tmp/inception_v3_2016_08_28_frozen.pb ensemble_model_repository/inception_graphdef/1/model.graphdef
+mkdir -p ensemble_model_repository/preprocess_inception_ensemble/1
 
 # Generating test data
 mkdir -p $TESTDATADIR
@@ -151,8 +155,8 @@ for PROTOCOL in grpc http; do
     done
 
     set +e
-    # Testing with preprocess_resnet50_ensemble model
-    $PERF_ANALYZER -v -i $PROTOCOL -m preprocess_resnet50_ensemble --input-data=$IMAGE_JSONDATAFILE \
+    # Testing with preprocess_inception_ensemble model
+    $PERF_ANALYZER -v -i $PROTOCOL -m preprocess_inception_ensemble --input-data=$IMAGE_JSONDATAFILE \
     -p2000 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG

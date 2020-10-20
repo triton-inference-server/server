@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "image_preprocess_nchw_3x224x224_inception"
+name: "image_preprocess_nhwc_299x299x3_inception"
 platform: "custom"
 default_model_filename: "libimagepreprocess.so"
 max_batch_size: 128
@@ -39,13 +39,13 @@ output [
   {
     name: "OUTPUT"
     data_type: TYPE_FP32
-    dims: [ 3, 224, 224 ]
+    dims: [ 299, 299, 3 ]
   }
 ]
 parameters [
   {
     key: "format"
-    value: { string_value: "NCHW" }
+    value: { string_value: "NHWC" }
   },
   {
     key: "scaling"

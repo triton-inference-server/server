@@ -73,7 +73,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom"}
 export BACKENDS
 
 # Basic batcher tests

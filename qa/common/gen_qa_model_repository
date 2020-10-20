@@ -124,7 +124,7 @@ cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
-C2SCRIPT=c2_gen.cmds
+TORCHSCRIPT=torch_gen.cmds
 TFSCRIPT=tf_gen.cmds
 TRTSCRIPT=trt_gen.cmds
 
@@ -190,33 +190,33 @@ if [ $? -ne 0 ]; then
 fi
 
 # PyTorch
-cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
+cat >$HOST_SRCDIR/$TORCHSCRIPT <<EOF
 #!/bin/bash
 set -e
-python3 $SRCDIR/gen_qa_models.py --netdef --libtorch --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --libtorch --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
-python3 $SRCDIR/gen_qa_models.py --netdef --libtorch --variable --models_dir=$VARDESTDIR
+python3 $SRCDIR/gen_qa_models.py --libtorch --variable --models_dir=$VARDESTDIR
 chmod -R 777 $VARDESTDIR
-python3 $SRCDIR/gen_qa_identity_models.py --netdef --libtorch --models_dir=$IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --libtorch --models_dir=$IDENTITYDESTDIR
 chmod -R 777 $IDENTITYDESTDIR
-python3 $SRCDIR/gen_qa_reshape_models.py --netdef --libtorch --variable --models_dir=$RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$RESHAPEDESTDIR
 chmod -R 777 $RESHAPEDESTDIR
-python3 $SRCDIR/gen_qa_sequence_models.py --netdef --libtorch --models_dir=$SEQDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --libtorch --models_dir=$SEQDESTDIR
 chmod -R 777 $SEQDESTDIR
-python3 $SRCDIR/gen_qa_sequence_models.py --netdef --libtorch --variable --models_dir=$VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VARSEQDESTDIR
 chmod -R 777 $VARSEQDESTDIR
-python3 $SRCDIR/gen_qa_dyna_sequence_models.py --netdef --libtorch --models_dir=$DYNASEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
 EOF
 
-chmod a+x $HOST_SRCDIR/$C2SCRIPT
+chmod a+x $HOST_SRCDIR/$TORCHSCRIPT
 if [ $? -ne 0 ]; then
     echo -e "Failed: chmod"
     exit 1
 fi
 
 docker pull $PYTORCH_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$C2SCRIPT \
+docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TORCHSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \

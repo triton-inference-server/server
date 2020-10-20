@@ -204,7 +204,7 @@ main(int argc, char** argv)
   // The ensemble model takes 1 input tensor with shape [ 1 ] and STRING
   // data type and returns 1 output tensor as top k (see '-c' flag)
   // classification result of the input.
-  std::string model_name = "preprocess_resnet50_ensemble";
+  std::string model_name = "preprocess_inception_ensemble";
 
   // Create the inference client for the model.
   TritonClient triton_client;

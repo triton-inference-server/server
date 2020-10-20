@@ -86,37 +86,6 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
     return True
 
 
-def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
-                          input_shape, output0_shape, output1_shape):
-    """Return True if input and output dtypes are supported by a Caffe2 model."""
-
-    # Some operations used by test don't support fp16.
-    if ((input_dtype == np.float16) or (output0_dtype == np.float16) or
-        (output1_dtype == np.float16)):
-        return False
-
-    # Some operations don't support any int type except int32.
-    if ((input_dtype == np.int8) or (output0_dtype == np.int8) or
-        (output1_dtype == np.int8) or (input_dtype == np.int16) or
-        (output0_dtype == np.int16) or (output1_dtype == np.int16)):
-        return False
-
-    # If the input type is string the output type must be string or
-    # int32. This is because the QA models we generate convert strings
-    # internally to int32 for compute.
-    if ((input_dtype == np.object) and
-        (((output0_dtype != np.object) and (output0_dtype != np.int32)) or
-         ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
-        return False
-
-    # Don't support string inputs or outputs.
-    if ((input_dtype == np.object) or (output0_dtype == np.object) or
-        (output1_dtype == np.object)):
-        return False
-
-    return True
-
-
 def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                            input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a TRT model."""

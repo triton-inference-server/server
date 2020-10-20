@@ -139,7 +139,7 @@ TEST_CONCURRENCY+=(
     1
     16
     16)
-TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch netdef"
+TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch"
 
 
 mkdir -p ${REPO_VERSION}

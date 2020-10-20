@@ -100,12 +100,12 @@ if __name__ == '__main__':
                                np_to_triton_dtype(input_data.dtype))
     ]
     inputs[0].set_data_from_numpy(input_data)
-    
+
     # Send requests
     for i in range(FLAGS.num_requests):
         requests.append(client.async_infer(model_name, inputs))
-        print("Sent request %d"%i)
+        print("Sent request %d" % i)
     # wait for requests to finish
     for i in range(len(requests)):
         requests[i].get_result()
-        print("Received result %d"%i)
+        print("Received result %d" % i)

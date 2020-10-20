@@ -58,8 +58,7 @@ for m in \
         $DATADIR/qa_dyna_sequence_model_repository/savedmodel_dyna_sequence_int32 \
         $DATADIR/qa_dyna_sequence_model_repository/plan_dyna_sequence_int32 \
         $DATADIR/qa_dyna_sequence_model_repository/onnx_dyna_sequence_int32 \
-        $DATADIR/qa_dyna_sequence_model_repository/libtorch_dyna_sequence_int32 \
-        $DATADIR/qa_dyna_sequence_model_repository/netdef_dyna_sequence_int32 ; do
+        $DATADIR/qa_dyna_sequence_model_repository/libtorch_dyna_sequence_int32; do
     cp -r $m models4/. && \
         (cd models4/$(basename $m) && \
             sed -i -z "s/oldest.*{.*}.*control_input/control_input/" config.pbtxt && \

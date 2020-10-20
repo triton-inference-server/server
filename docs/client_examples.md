@@ -275,7 +275,7 @@ Python version of the image classification client is
 
 To use ensemble_image_client (or ensemble_image_client.py) you must
 first have a running Triton that is serving the
-"preprocess_resnet50_ensemble" model and the models it depends on. The
+"preprocess_inception_ensemble" model and the models it depends on. The
 models are provided in an example ensemble model repository. See
 [QuickStart](quicksstart.md) for instructions on how to create the
 example model repository.

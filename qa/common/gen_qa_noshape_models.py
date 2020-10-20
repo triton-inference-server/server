@@ -311,10 +311,6 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate SavedModel models')
-    parser.add_argument('--netdef',
-                        required=False,
-                        action='store_true',
-                        help='Generate NetDef models')
     parser.add_argument('--tensorrt',
                         required=False,
                         action='store_true',

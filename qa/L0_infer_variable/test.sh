@@ -71,7 +71,7 @@ for TARGET in cpu gpu; do
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     # Onnx models are handled separately, see below
-    for FW in graphdef savedmodel netdef onnx libtorch custom; do
+    for FW in graphdef savedmodel onnx libtorch custom; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done

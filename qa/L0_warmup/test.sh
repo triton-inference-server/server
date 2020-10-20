@@ -45,7 +45,7 @@ IMAGE="../images/vulture.jpeg"
 DATADIR=`pwd`/models
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --exit-timeout-secs=120"
