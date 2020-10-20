@@ -120,8 +120,8 @@ if __name__ == '__main__':
                         '--model-name',
                         type=str,
                         required=False,
-                        default='preprocess_resnet50_ensemble',
-                        help='Name of model. Default is preprocess_resnet50_ensemble.')
+                        default='preprocess_inception_ensemble',
+                        help='Name of model. Default is preprocess_inception_ensemble.')
     parser.add_argument('-c',
                         '--classes',
                         type=int,

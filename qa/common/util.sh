@@ -345,7 +345,6 @@ function check_test_results () {
 #   * PlanBackend::CreateExecutionContexts -> LoadPlan -> createInferRuntime_INTERNAL
 #   * OnnxBackend::CreateExecutionContext -> OnnxBackend::Context::ValidateOutputs -> OutputInfos -> InputOutputInfos
 #     -> OrtApis::SessionGetOutputName -> StrDup -> onnxruntime::utils::DefaultAlloc
-#   * NetDefBackend::CreateExecutionContext -> Caffe2WorkspaceCreate
 #   * ModelInferHandler::InferResponseComplete -> TRITONSERVER_ErrorNew
 #   *
 function check_valgrind_log () {

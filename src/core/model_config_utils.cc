@@ -683,11 +683,6 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kTensorRTPlanFilename);
     } else
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_CAFFE2
-        if (config->platform() == kCaffe2NetDefPlatform) {
-      config->set_default_model_filename(kCaffe2NetDefFilename);
-    } else
-#endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_ONNXRUNTIME
         if (config->platform() == kOnnxRuntimeOnnxPlatform) {
       config->set_default_model_filename(kOnnxRuntimeOnnxFilename);

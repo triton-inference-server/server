@@ -44,8 +44,8 @@ TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
-BACKENDS = os.environ.get(
-    'BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
+BACKENDS = os.environ.get('BACKENDS',
+                          "graphdef savedmodel onnx libtorch plan custom")
 
 _trials = BACKENDS.split(" ")
 if "custom" in BACKENDS:
@@ -125,9 +125,8 @@ class BatcherTest(tu.TestResultCollector):
         try:
             start_ms = int(round(time.time() * 1000))
 
-            if trial == "savedmodel" or trial == "graphdef" or trial == "netdef" \
-                    or trial == "custom" or trial == "libtorch" or trial == "onnx" \
-                    or trial == "plan":
+            if trial == "savedmodel" or trial == "graphdef" or trial == "custom" \
+                    or trial == "libtorch" or trial == "onnx" or trial == "plan":
                 tensor_shape = (bs, input_size)
                 iu.infer_exact(
                     self,

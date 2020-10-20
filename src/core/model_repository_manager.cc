@@ -43,9 +43,6 @@
 #include <cuda_runtime_api.h>
 #endif
 
-#ifdef TRITON_ENABLE_CAFFE2
-#include "src/backends/caffe2/netdef_backend_factory.h"
-#endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_CUSTOM
 #include "src/backends/backend/backend_factory.h"
 #include "src/backends/custom/custom_backend_factory.h"
@@ -100,15 +97,6 @@ BuildBackendConfigMap(
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     BackendConfigMap* backend_configs)
 {
-#ifdef TRITON_ENABLE_CAFFE2
-  //// Caffe NetDef
-  {
-    auto netdef_config = std::make_shared<NetDefBackendFactory::Config>();
-    netdef_config->autofill = !strict_model_config;
-    (*backend_configs)[kCaffe2NetDefPlatform] = netdef_config;
-  }
-#endif  // TRITON_ENABLE_CAFFE2
-
 #ifdef TRITON_ENABLE_TENSORRT
   //// TensorRT
   {
@@ -355,9 +343,6 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::map<uintptr_t, std::unique_ptr<BackendInfo>> unloading_backends_;
   std::recursive_mutex map_mtx_;
 
-#ifdef TRITON_ENABLE_CAFFE2
-  std::unique_ptr<NetDefBackendFactory> netdef_factory_;
-#endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_CUSTOM
   std::unique_ptr<TritonBackendFactory> triton_backend_factory_;
   std::unique_ptr<CustomBackendFactory> custom_factory_;
@@ -382,14 +367,6 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
       new BackendLifeCycle(min_compute_capability));
-#ifdef TRITON_ENABLE_CAFFE2
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_config_map.find(kCaffe2NetDefPlatform)->second;
-    RETURN_IF_ERROR(NetDefBackendFactory::Create(
-        config, &(local_life_cycle->netdef_factory_)));
-  }
-#endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_TENSORRT
   {
     const std::shared_ptr<BackendConfig>& config =
@@ -876,12 +853,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             version_path, model_config, min_compute_capability_, &is);
         break;
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_CAFFE2
-      case Platform::PLATFORM_CAFFE2_NETDEF:
-        status = netdef_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        break;
-#endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_PYTORCH
       case Platform::PLATFORM_PYTORCH_LIBTORCH:
         status = libtorch_factory_->CreateBackend(

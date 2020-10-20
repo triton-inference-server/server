@@ -66,7 +66,6 @@ def fixed_to_variable_size(shape):
 def platform_types_and_validation():
     res = [("graphdef", tu.validate_for_tf_model),
            ("savedmodel", tu.validate_for_tf_model),
-           ("netdef", tu.validate_for_c2_model),
            ("plan", tu.validate_for_trt_model),
            ("onnx", tu.validate_for_onnx_model),
            ("libtorch", tu.validate_for_libtorch_model)]

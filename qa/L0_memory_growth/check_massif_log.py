@@ -32,6 +32,7 @@ from collections import defaultdict
 # Thresholds
 MAX_ALLOWED_ALLOC_RATE = float(os.environ.get('MAX_ALLOWED_ALLOC_RATE', 1000.0))
 
+
 def parse_massif_out(filename):
     """
     Extract the allocation data from the massif output file, and compile
@@ -41,22 +42,25 @@ def parse_massif_out(filename):
     # Read the file
     with open(filename, 'r') as f:
         contents = f.read()
-        snapshots = re.findall('snapshot=(.*?)heap_tree', contents, flags=re.DOTALL)
+        snapshots = re.findall('snapshot=(.*?)heap_tree',
+                               contents,
+                               flags=re.DOTALL)
 
-    # Create snapshot dictionary    
+    # Create snapshot dictionary
     summary = defaultdict(list)
-    
+
     for snapshot in snapshots:
         # Split the record and ignore first two columns
         columns = snapshot.split()[2:]
-        
+
         # Put columns and values into dictionary
         for col in columns:
             k, v = col.split('=')
             summary[k].append(int(v))
-    
+
     # Return dict
     return summary
+
 
 def is_unbounded_growth(summary):
     """
@@ -71,16 +75,18 @@ def is_unbounded_growth(summary):
         return False
 
     # Don't start measuring from the first snapshot
-    start = len(totals)//6
+    start = len(totals) // 6
 
-    # Compute change in allocation rate 
-    alloc_rate_start = float(totals[start] - totals[start - 1])/1e6
-    alloc_rate_end = float(totals[-1] - totals[-2])/1e6
-    alloc_rate_mb = (alloc_rate_end - alloc_rate_start)/(len(totals) - 2)  
-    
-    print("ESTIMATED ALLOC RATE: %f MB/snapshot, MAX ALLOWED RATE: %f"%(alloc_rate_mb, MAX_ALLOWED_ALLOC_RATE))
+    # Compute change in allocation rate
+    alloc_rate_start = float(totals[start] - totals[start - 1]) / 1e6
+    alloc_rate_end = float(totals[-1] - totals[-2]) / 1e6
+    alloc_rate_mb = (alloc_rate_end - alloc_rate_start) / (len(totals) - 2)
+
+    print("ESTIMATED ALLOC RATE: %f MB/snapshot, MAX ALLOWED RATE: %f" %
+          (alloc_rate_mb, MAX_ALLOWED_ALLOC_RATE))
 
     return (alloc_rate_mb > MAX_ALLOWED_ALLOC_RATE)
+
 
 if __name__ == '__main__':
     summary = parse_massif_out(sys.argv[1])

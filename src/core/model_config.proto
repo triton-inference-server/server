@@ -1461,8 +1461,8 @@ message ModelConfig
   //@@
   //@@     The framework for the model. Possible values are
   //@@     "tensorrt_plan", "tensorflow_graphdef",
-  //@@     "tensorflow_savedmodel", "caffe2_netdef",
-  //@@     "onnxruntime_onnx", "pytorch_libtorch" and "custom".
+  //@@     "tensorflow_savedmodel", "onnxruntime_onnx",
+  //@@     "pytorch_libtorch" and "custom".
   //@@
   string platform = 2;
 
@@ -1583,7 +1583,7 @@ message ModelConfig
   //@@     compute-capability specific model is not specified in
   //@@     :cpp:var:`cc_model_filenames`. If not specified the default name
   //@@     is 'model.graphdef', 'model.savedmodel', 'model.plan' or
-  //@@     'model.netdef' depending on the model type.
+  //@@     'model.pt' depending on the model type.
   //@@
   string default_model_filename = 8;
 

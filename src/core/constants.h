@@ -46,12 +46,6 @@ constexpr char kTensorRTPlanFilename[] = "model.plan";
 constexpr char kTensorRTBackend[] = "tensorrt";
 #endif  // TRITON_ENABLE_TENSORRT
 
-#ifdef TRITON_ENABLE_CAFFE2
-constexpr char kCaffe2NetDefPlatform[] = "caffe2_netdef";
-constexpr char kCaffe2NetDefFilename[] = "model.netdef";
-constexpr char kCaffe2NetDefInitFilenamePrefix[] = "init_";
-#endif  // TRITON_ENABLE_CAFFE2
-
 #ifdef TRITON_ENABLE_ONNXRUNTIME
 constexpr char kOnnxRuntimeOnnxPlatform[] = "onnxruntime_onnx";
 constexpr char kOnnxRuntimeOnnxFilename[] = "model.onnx";

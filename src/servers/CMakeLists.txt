@@ -344,9 +344,6 @@ endif() # TRITON_ENABLE_TENSORFLOW
 if(${TRITON_ENABLE_TENSORRT})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:tensorrt-backend-library>)
 endif() # TRITON_ENABLE_TENSORRT
-if(${TRITON_ENABLE_CAFFE2})
-  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:caffe2-backend-library>)
-endif() # TRITON_ENABLE_CAFFE2
 if(${TRITON_ENABLE_ONNXRUNTIME})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:onnxruntime-backend-library>)
 endif() # TRITON_ENABLE_ONNXRUNTIME
@@ -406,7 +403,7 @@ if(${TRITON_ENABLE_TENSORRT})
   )
 endif() # TRITON_ENABLE_TENSORRT
 
-if(${TRITON_ENABLE_CAFFE2} OR ${TRITON_ENABLE_PYTORCH})
+if(${TRITON_ENABLE_PYTORCH})
   target_link_libraries(
     tritonserver
     PUBLIC ${TRITON_EXTRA_LDFLAGS}
@@ -414,19 +411,13 @@ if(${TRITON_ENABLE_CAFFE2} OR ${TRITON_ENABLE_PYTORCH})
     PUBLIC -ltorch_cpu
     PUBLIC -ltorch_cuda
     PUBLIC -ltorchvision
-    PUBLIC -lcaffe2_detectron_ops_gpu
-    PUBLIC -lcaffe2_nvrtc
     PUBLIC -lc10
     PUBLIC -lc10_cuda
     PUBLIC -lmkl_core
     PUBLIC -lmkl_gnu_thread
-    PUBLIC -lmkl_avx2
-    PUBLIC -lmkl_def
     PUBLIC -lmkl_intel_lp64
-    PUBLIC -lmkl_rt
-    PUBLIC -lmkl_vml_def
   )
-endif() # TRITON_ENABLE_CAFFE2 || TRITON_ENABLE_PYTORCH
+endif() # TRITON_ENABLE_PYTORCH
 
 if(${TRITON_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)

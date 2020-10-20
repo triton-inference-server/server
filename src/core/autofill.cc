@@ -26,9 +26,6 @@
 
 #include "src/core/autofill.h"
 
-#ifdef TRITON_ENABLE_CAFFE2
-#include "src/backends/caffe2/autofill.h"
-#endif  // TRITON_ENABLE_CAFFE2
 #ifdef TRITON_ENABLE_TENSORFLOW
 #include "src/backends/tensorflow/autofill.h"
 #endif  // TRITON_ENABLE_TENSORFLOW
@@ -119,8 +116,7 @@ AutoFill::Create(
   // appropriate autofill object, otherwise just try creating each
   // autofill object to see if one can detect the platform.
 #if defined(TRITON_ENABLE_TENSORFLOW) || defined(TRITON_ENABLE_TENSORRT) || \
-    defined(TRITON_ENABLE_CAFFE2) || defined(TRITON_ENABLE_ONNXRUNTIME) ||  \
-    defined(TRITON_ENABLE_PYTORCH)
+    defined(TRITON_ENABLE_ONNXRUNTIME) || defined(TRITON_ENABLE_PYTORCH)
   const Platform platform = GetPlatform(config.platform());
   const BackendType backend_type = GetBackendType(config.backend());
   bool unknown_model =
@@ -173,18 +169,6 @@ AutoFill::Create(
   }
 #endif  // TRITON_ENABLE_PYTORCH
 
-#ifdef TRITON_ENABLE_CAFFE2
-  if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) || unknown_model) {
-    std::unique_ptr<AutoFill> afnd;
-    status = AutoFillNetDef::Create(model_name, model_path, &afnd);
-    LOG_VERBOSE(1) << "Caffe2 NetDef autofill: " << status.AsString();
-    if (status.IsOk()) {
-      *autofill = std::move(afnd);
-      return Status::Success;
-    }
-  }
-#endif  // TRITON_ENABLE_CAFFE2
-
 #ifdef TRITON_ENABLE_ONNXRUNTIME
   // Check for ONNX model must be done before check for TensorRT plan
   // because TensorRT deserializeCudaEngine() function will cause program
@@ -234,8 +218,7 @@ AutoFill::Create(
   // or null if that fails.
   {
 #if defined(TRITON_ENABLE_TENSORFLOW) || defined(TRITON_ENABLE_TENSORRT) || \
-    defined(TRITON_ENABLE_CAFFE2) || defined(TRITON_ENABLE_ONNXRUNTIME) ||  \
-    defined(TRITON_ENABLE_PYTORCH)
+    defined(TRITON_ENABLE_ONNXRUNTIME) || defined(TRITON_ENABLE_PYTORCH)
     bool print_warning = true;
     if (!LOG_VERBOSE_IS_ON(1)) {
       if (platform == Platform::PLATFORM_UNKNOWN) {
