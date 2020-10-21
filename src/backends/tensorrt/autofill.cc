@@ -455,13 +455,17 @@ AutoFillPlan::Create(
   RETURN_IF_ERROR(GetDirectoryFiles(
       version_path, true /* skip_hidden_files */, &plan_files));
 
-  nvinfer1::IRuntime* runtime = nullptr;
-  nvinfer1::ICudaEngine* engine = nullptr;
+  nvinfer1::IRuntime* runtime;
+  nvinfer1::ICudaEngine* engine;
   std::string plan_file;
   Status status;
   bool found = false;
 
   for (auto file : plan_files) {
+    // Start with a clean state for each load attempt.
+    runtime = nullptr;
+    engine = nullptr;
+
     const auto plan_path = JoinPath({version_path, file});
 
     std::string plan_data_str;
