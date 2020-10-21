@@ -321,9 +321,10 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
 {
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
+  irequest->CaptureQueueStartNs();
   INFER_TRACE_ACTIVITY(
       irequest->Trace(), TRITONSERVER_TRACE_QUEUE_START,
-      irequest->CaptureQueueStartNs());
+      irequest->QueueStartNs());
 
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
@@ -839,6 +840,12 @@ DirectSequenceBatch::DirectSequenceBatch(
     return;
   }
 
+  max_batch_size_ = ((size_t)std::max(1, config.max_batch_size()));
+  minimum_slot_utilization_ =
+      config.sequence_batching().direct().minimum_slot_utilization();
+  pending_batch_delay_ns_ =
+      config.sequence_batching().direct().max_queue_delay_microseconds() * 1000;
+
   // Create a scheduler thread associated with 'batcher_idx' that
   // executes the queued requests.
   const int nice = GetCpuNiceLevel(config);
@@ -993,6 +1000,8 @@ DirectSequenceBatch::SchedulerThread(
         //      b) the required tensor shapes for the batch for the
         //      case where ragged batching is not allowed
         int32_t max_seq_slot = -1;
+        uint64_t earliest_enqueue_time_ns = UINT64_MAX;
+        size_t ready_cnt = 0;
         for (int32_t seq_slot = 0; seq_slot <= max_active_seq_slot_;
              ++seq_slot) {
           std::deque<std::unique_ptr<InferenceRequest>>& queue =
@@ -1041,8 +1050,47 @@ DirectSequenceBatch::SchedulerThread(
               }
             }
 
+            earliest_enqueue_time_ns = std::min(
+                earliest_enqueue_time_ns, queue.front()->QueueStartNs());
+            ready_cnt++;
             max_seq_slot = seq_slot;
+          }
+        }
+
+        if (max_seq_slot != -1) {
+          // Compare the age of the oldest pending request to the maximum
+          // batch queuing delay, and the size of the ready requests in the
+          // batch, execute now if queuing delay is exceeded or the batch size
+          // is large enough. Otherwise create a timer to wakeup a thread to
+          // check again at the maximum allowed delay.
+          struct timespec now;
+          clock_gettime(CLOCK_MONOTONIC, &now);
+          uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+          uint64_t current_batch_delay_ns = (now_ns - earliest_enqueue_time_ns);
+          if ((current_batch_delay_ns > pending_batch_delay_ns_) ||
+              (((float)ready_cnt) / max_batch_size_ >=
+               minimum_slot_utilization_)) {
             wait_microseconds = 0;
+            LOG_ERROR << "execute now";
+            LOG_ERROR << "Now: " << now_ns
+                      << "; oldest: " << earliest_enqueue_time_ns;
+            LOG_ERROR << "current delay: " << current_batch_delay_ns
+                      << "; pending: " << pending_batch_delay_ns_;
+            LOG_ERROR << "util: " << ready_cnt << "/" << max_batch_size_
+                      << "; thres: " << minimum_slot_utilization_;
+          } else {
+            wait_microseconds =
+                (pending_batch_delay_ns_ - current_batch_delay_ns) / 1000;
+            // reset 'max_seq_slot' so that not request is pulled from the
+            // queues
+            max_seq_slot = -1;
+            LOG_ERROR << "defer execution";
+            LOG_ERROR << "Now: " << now_ns
+                      << "; oldest: " << earliest_enqueue_time_ns;
+            LOG_ERROR << "current delay: " << current_batch_delay_ns
+                      << "; pending: " << pending_batch_delay_ns_;
+            LOG_ERROR << "util: " << ready_cnt << "/" << max_batch_size_
+                      << "; thres: " << minimum_slot_utilization_;
           }
         }
 

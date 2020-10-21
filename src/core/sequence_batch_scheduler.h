@@ -288,6 +288,10 @@ class DirectSequenceBatch : public SequenceBatch {
   // The maximum active sequence slot. A value of -1 indicates that
   // no slots are active in the backend.
   int32_t max_active_seq_slot_;
+
+  size_t max_batch_size_;
+  float minimum_slot_utilization_;
+  uint64_t pending_batch_delay_ns_;
 };
 
 // Scheduler that implements the oldest-first sequence scheduling

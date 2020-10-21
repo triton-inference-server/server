@@ -1169,7 +1169,8 @@ message ModelSequenceBatching
   //@@     model instance over the lifetime of the sequence. This
   //@@     is the default strategy.
   //@@
-  message StrategyDirect {
+  message StrategyDirect
+  {
     //@@    .. cpp:var:: uint64 max_queue_delay_microseconds
     //@@
     //@@       The maximum time, in microseconds, a candidate request
@@ -1187,7 +1188,7 @@ message ModelSequenceBatching
     //@@       the 'max_queue_delay_microseconds' timeout has not expired.
     //@@       The default is 0.0, indicating that a batch will be executed
     //@@       before 'max_queue_delay_microseconds' timeout expires if at least
-    //@@       one batch slot is ready. 
+    //@@       one batch slot is ready.
     //@@
     float minimum_slot_utilization = 2;
   }
