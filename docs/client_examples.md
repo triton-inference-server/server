@@ -264,26 +264,19 @@ communicate with Triton.
 
 In comparison to the image classification example above, this example
 uses an ensemble of an image-preprocessing model implemented as a
-custom backend and a TensorFlow Inception model. This ensemble allows
-you to send the raw image binaries in the request and receive
-classification results without preprocessing the images on the
-client. The ensemble image classification example that uses the C++
-client API is
-[ensemble_image_client.cc](../src/clients/c%2B%2B/examples/ensemble_image_client.cc). The
-Python version of the image classification client is
-[ensemble_image_client.py](../src/clients/python/examples/ensemble_image_client.py).
+[DALI
+backend](https://github.com/triton-inference-server/dali_backend) and
+a TensorFlow Inception model. The ensemble model allows you to send
+the raw image binaries in the request and receive classification
+results without preprocessing the images on the client. 
 
-To use ensemble_image_client (or ensemble_image_client.py) you must
-first have a running Triton that is serving the
-"preprocess_inception_ensemble" model and the models it depends on. The
-models are provided in an example ensemble model repository. See
-[QuickStart](quicksstart.md) for instructions on how to create the
-example model repository.
-
-Once Triton is running you can use the ensemble_image_client
-application to send inference requests. You can specify a single image
-or a directory holding images. Here we send a request for the ensemble
-for an image from [qa/images](../qa/images).
+To try this example you should first [setup a model repository that
+contains the required
+models](https://github.com/triton-inference-server/dali_backend/tree/main/docs/examples/rn50_ensemble).
+Then use ensemble_image_client (or ensemble_image_client.py) to send
+inference requests to Triton. You can specify a single image or a
+directory holding images. Here we send a request for the ensemble for
+an image from [qa/images](../qa/images).
 
 ```bash
 $ ensemble_image_client qa/images/mug.jpg

@@ -76,26 +76,9 @@ rm -f *.log.*
 
 set -e
 
-# Get the TensorFlow inception v3 model
-mkdir -p models/inception_graphdef/1
-wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
-     https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
-(cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
-mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
+cp -r ../ensemble_models/image_preprocess_ensemble_example/* models/.
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_int8_int32_int32 models/
 cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/resnet_v1_50_graphdef models/
-
-# Create model repository layout for ensemble image classification
-rm -fr models/image_preprocess_nhwc_299x299x3_inception && \
-    rm -fr models/preprocess_inception_ensemble && \
-    cp -r ensemble_model_repository/image_preprocess_nhwc_299x299x3_inception models/ && \
-    cp -r ensemble_model_repository/preprocess_inception_ensemble models/ && \
-    mkdir -p models/image_preprocess_nhwc_299x299x3_inception/1 && \
-    mkdir -p models/preprocess_inception_ensemble/1
-
-# Obtain actual models
-cp ../L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/libimagepreprocess.so \
-    models/image_preprocess_nhwc_299x299x3_inception/1/.
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models

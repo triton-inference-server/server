@@ -36,7 +36,6 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
 SKIP_PATHS = (
     'builddir', 'build/libevhtp', 'build/onnxruntime',
     'deploy/single_server/.helmignore', 'docs/examples/model_repository',
-    'docs/examples/ensemble_model_repository',
     'qa/common/cuda_op_kernel.cu.cc.patch',
     'qa/custom_models/custom_float32_float32_float32/output0_labels.txt',
     'qa/custom_models/custom_nobatch_float32_float32_float32/output0_labels.txt',
