@@ -57,6 +57,18 @@ RUN cmake -DTRITON_ENABLE_GPU=ON \
           -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} /workspace/build && \
     make -j16 test-util
 
+# Add models and custom backend for imageprocess ensemble example repo
+WORKDIR /workspace/qa/ensemble_models/image_preprocess_ensemble_example
+RUN mkdir -p inception_graphdef/1 && \
+    wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
+         https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz && \
+    (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz) && \
+    mv /tmp/inception_v3_2016_08_28_frozen.pb inception_graphdef/1/model.graphdef && \
+    mkdir -p image_preprocess_nhwc_299x299x3_inception/1 && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libimagepreprocess.so \
+        image_preprocess_nhwc_299x299x3_inception/1/. && \
+    mkdir -p preprocess_inception_ensemble/1
+    
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
@@ -86,9 +98,6 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_https/models/. && \
     mkdir qa/L0_secure_grpc/models && \
     cp -r docs/examples/model_repository/simple qa/L0_secure_grpc/models/. && \
-    cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_analyzer/ && \
-    cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_grpc/ && \
-    cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_http/ && \
     cp /tmp/tritonbuild/install/bin/simple qa/L0_simple_lib/. && \
     cp /tmp/tritonbuild/install/bin/memory_alloc qa/L0_io/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/memory_test qa/L0_memory/. && \
@@ -130,10 +139,6 @@ RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
 RUN mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libimagepreprocess.so \
         qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/.
-
-RUN mkdir -p qa/L0_perf_analyzer/ensemble_model_repository/image_preprocess_nhwc_299x299x3_inception/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libimagepreprocess.so \
-        qa/L0_perf_analyzer/ensemble_model_repository/image_preprocess_nhwc_299x299x3_inception/1/.
 
 RUN mkdir -p qa/L0_backend_identity/models && \
     cp -r src/backends/backend/examples/models/identity_fp32 qa/L0_backend_identity/models/. && \
