@@ -1,5 +1,5 @@
 diff --git a/evhtp.c b/evhtp.c
-index 8d34676..5993ddc 100644
+index 8d34676..1ab109c 100644
 --- a/evhtp.c
 +++ b/evhtp.c
 @@ -1335,6 +1335,10 @@ htp__request_parse_start_(htparser * p)
@@ -50,7 +50,21 @@ index 8d34676..5993ddc 100644
 
      c->body_bytes_read += len;
 
-@@ -2010,6 +2037,12 @@ htp__request_parse_fini_(htparser * p)
+@@ -2003,13 +2030,26 @@ htp__request_parse_fini_(htparser * p)
+      *
+      */
+     if (c->request && c->request->cb) {
++       /*
++        * Set flag to lower the weight of thread that is processing the
++        * callback when selecting the thread to handle future requests. Detail:
++        * https://github.com/criticalstack/libevhtp/issues/146#issuecomment-696339470
++        */
++       evthr_set_busy(c->thread, 1);
+         (c->request->cb)(c->request, c->request->cbarg);
++       evthr_set_busy(c->thread, 0);
+     }
+ 
+     if (c->flags & EVHTP_CONN_FLAG_PAUSED) {
          return -1;
      }
 
@@ -63,7 +77,7 @@ index 8d34676..5993ddc 100644
      return 0;
  } /* htp__request_parse_fini_ */
 
-@@ -3788,6 +3821,10 @@ evhtp_send_reply(evhtp_request_t * request, evhtp_res code)
+@@ -3788,6 +3828,10 @@ evhtp_send_reply(evhtp_request_t * request, evhtp_res code)
      struct evbuffer    * reply_buf;
      struct bufferevent * bev;
 
@@ -74,7 +88,7 @@ index 8d34676..5993ddc 100644
      c = request->conn;
 
      log_debug("set finished flag");
-@@ -3805,6 +3842,10 @@ evhtp_send_reply(evhtp_request_t * request, evhtp_res code)
+@@ -3805,6 +3849,10 @@ evhtp_send_reply(evhtp_request_t * request, evhtp_res code)
      bufferevent_write_buffer(bev, reply_buf);
 
      evbuffer_drain(reply_buf, -1);

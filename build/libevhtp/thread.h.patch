@@ -1,0 +1,13 @@
+diff --git a/include/evhtp/thread.h b/include/evhtp/thread.h
+index 7479aa8..0a7156c 100644
+--- a/include/evhtp/thread.h
++++ b/include/evhtp/thread.h
+@@ -46,6 +46,9 @@ EVHTP_EXPORT evthr_res      evthr_stop(evthr_t * evthr);
+ EVHTP_EXPORT evthr_res      evthr_defer(evthr_t * evthr, evthr_cb cb, void *);
+ EVHTP_EXPORT void           evthr_free(evthr_t * evthr);
+
++/* Detail: https://github.com/criticalstack/libevhtp/issues/146#issuecomment-696339470 */
++EVHTP_EXPORT void           evthr_set_busy(evthr_t * thr, int busy);
++
+ EVHTP_EXPORT evthr_pool_t * evthr_pool_new(int nthreads, evthr_init_cb, void *)
+     DEPRECATED("will take on the syntax of evthr_pool_wexit_new");
