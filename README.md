@@ -43,7 +43,7 @@ application.
 * A new Python backend allows Python code to run as a model within Triton. See 
   https://github.com/triton-inference-server/python_backend.
 
-* A new Python backend allows DALI pipelines to run within Triton. See 
+* A new backend allows DALI pipelines to run within Triton. See 
   https://github.com/triton-inference-server/dali_backend.
 
 * The perf_client application is renamed to perf_analyzer, functionality remains
