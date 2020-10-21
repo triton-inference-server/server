@@ -999,6 +999,10 @@ DirectSequenceBatch::SchedulerThread(
         //
         //      b) the required tensor shapes for the batch for the
         //      case where ragged batching is not allowed
+        //
+        //   3) Determine the earliest enqueue time and number of ready
+        //      sequences if queue delay is enabled
+        //
         int32_t max_seq_slot = -1;
         uint64_t earliest_enqueue_time_ns = UINT64_MAX;
         size_t ready_cnt = 0;
@@ -1058,39 +1062,43 @@ DirectSequenceBatch::SchedulerThread(
         }
 
         if (max_seq_slot != -1) {
-          // Compare the age of the oldest pending request to the maximum
-          // batch queuing delay, and the size of the ready requests in the
-          // batch, execute now if queuing delay is exceeded or the batch size
-          // is large enough. Otherwise create a timer to wakeup a thread to
-          // check again at the maximum allowed delay.
-          struct timespec now;
-          clock_gettime(CLOCK_MONOTONIC, &now);
-          uint64_t now_ns = TIMESPEC_TO_NANOS(now);
-          uint64_t current_batch_delay_ns = (now_ns - earliest_enqueue_time_ns);
-          if ((current_batch_delay_ns > pending_batch_delay_ns_) ||
-              (((float)ready_cnt) / max_batch_size_ >=
-               minimum_slot_utilization_)) {
+          if ((pending_batch_delay_ns_ == 0) ||
+              (minimum_slot_utilization_ == 0.0)) {
             wait_microseconds = 0;
-            LOG_ERROR << "execute now";
-            LOG_ERROR << "Now: " << now_ns
-                      << "; oldest: " << earliest_enqueue_time_ns;
-            LOG_ERROR << "current delay: " << current_batch_delay_ns
-                      << "; pending: " << pending_batch_delay_ns_;
-            LOG_ERROR << "util: " << ready_cnt << "/" << max_batch_size_
-                      << "; thres: " << minimum_slot_utilization_;
           } else {
-            wait_microseconds =
-                (pending_batch_delay_ns_ - current_batch_delay_ns) / 1000;
-            // reset 'max_seq_slot' so that not request is pulled from the
-            // queues
-            max_seq_slot = -1;
-            LOG_ERROR << "defer execution";
-            LOG_ERROR << "Now: " << now_ns
-                      << "; oldest: " << earliest_enqueue_time_ns;
-            LOG_ERROR << "current delay: " << current_batch_delay_ns
-                      << "; pending: " << pending_batch_delay_ns_;
-            LOG_ERROR << "util: " << ready_cnt << "/" << max_batch_size_
-                      << "; thres: " << minimum_slot_utilization_;
+            // Compare the age of the oldest pending request to the maximum
+            // batch queuing delay, and the size of the ready requests in the
+            // batch, execute now if queuing delay is exceeded or the batch size
+            // is large enough. Otherwise create a timer to wakeup a thread to
+            // check again at the maximum allowed delay.
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+            uint64_t current_batch_delay_ns =
+                (now_ns - earliest_enqueue_time_ns);
+            if ((current_batch_delay_ns > pending_batch_delay_ns_) ||
+                (((float)ready_cnt) / max_batch_size_ >=
+                 minimum_slot_utilization_)) {
+              wait_microseconds = 0;
+              LOG_VERBOSE(1)
+                  << "start sequence batch execution. "
+                  << "current batch delay: " << current_batch_delay_ns
+                  << "; maximum delay allowed: " << pending_batch_delay_ns_
+                  << "slot utilization: " << ready_cnt << "/" << max_batch_size_
+                  << "; utilization threshold: " << minimum_slot_utilization_;
+            } else {
+              wait_microseconds =
+                  (pending_batch_delay_ns_ - current_batch_delay_ns) / 1000;
+              // reset 'max_seq_slot' so that not request is pulled from the
+              // queues
+              max_seq_slot = -1;
+              LOG_VERBOSE(1)
+                  << "defer sequence batch execution. "
+                  << "current batch delay: " << current_batch_delay_ns
+                  << "; maximum delay allowed: " << pending_batch_delay_ns_
+                  << "slot utilization: " << ready_cnt << "/" << max_batch_size_
+                  << "; utilization threshold: " << minimum_slot_utilization_;
+            }
           }
         }
 

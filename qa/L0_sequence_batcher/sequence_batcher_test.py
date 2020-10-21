@@ -2036,11 +2036,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
     def test_queue_delay_no_min_util(self):
         # Test model that have set max queue delay but minimum slot utilization
-        # is 0. So that all batch will be sent immediately.
-        # Send 2 sequences in parallel and make sure they get completely batched
-        # into batch-size 2 inferences. The first sequence only has one request
-        # while the second sequence has two, so expecting the second execution
-        # to be a batch of 'null, seq 2'. The executions should not be waited.
+        # is 0. Send 2 sequences in parallel and make sure they get completely
+        # batched into batch-size 2 inferences. The first sequence only has one
+        # request while the second sequence has two, so expecting the second
+        # execution to be a batch of 'null, seq 2'. The executions should not be
+        # waited.
 
         for trial in _trials:
             is_ensemble = False
@@ -2125,12 +2125,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
     def test_queue_delay_half_min_util(self):
         # Test model that have set max queue delay but minimum slot utilization
-        # is 0. So that all batch will be sent immediately.
-        # Send 2 sequences in parallel and make sure they get completely batched
-        # into batch-size 2 inferences. The first sequence only has one request
-        # while the second sequence has two, so expecting the second execution
-        # to be a batch of 'null, seq 2'. The second execution should be waited
-        # until the max queue delay is exceeded for sequence 2.
+        # is 0.5. Send 2 sequences in parallel and make sure they get completely
+        # batched into batch-size 2 inferences. The first sequence only has one
+        # request while the second sequence has two, so expecting the second
+        # execution to be a batch of 'null, seq 2'. The second execution should
+        # be waited until the max queue delay is exceeded for sequence 2.
 
         for trial in _trials:
             is_ensemble = False
@@ -2215,12 +2214,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
     def test_queue_delay_full_min_util(self):
         # Test model that have set max queue delay but minimum slot utilization
-        # is 0. So that all batch will be sent immediately.
-        # Send 2 sequences in parallel and make sure they get completely batched
-        # into batch-size 2 inferences. The first sequence only has one request
-        # while the second sequence has two, so expecting the second execution
-        # to be a batch of 'null, seq 2'. Both executions should be waited
-        # until the max queue delay is exceeded.
+        # is 1. Send 2 sequences in parallel and make sure they get completely
+        # batched into batch-size 2 inferences. The first sequence only has one
+        # request while the second sequence has two, so expecting the second
+        # execution to be a batch of 'null, seq 2'. Both executions should be
+        # waited until the max queue delay is exceeded.
 
         for trial in _trials:
             is_ensemble = False

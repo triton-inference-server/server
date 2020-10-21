@@ -1188,7 +1188,9 @@ message ModelSequenceBatching
     //@@       the 'max_queue_delay_microseconds' timeout has not expired.
     //@@       The default is 0.0, indicating that a batch will be executed
     //@@       before 'max_queue_delay_microseconds' timeout expires if at least
-    //@@       one batch slot is ready.
+    //@@       one batch slot is ready. 'max_queue_delay_microseconds' will be
+    //@@       ignored unless minimum_slot_utilization is set to a non-zero
+    //@@       value.
     //@@
     float minimum_slot_utilization = 2;
   }

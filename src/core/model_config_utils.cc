@@ -1176,7 +1176,7 @@ ValidateModelConfig(
     }
 
     // If direct strategy is enabled make sure the minimum slot utilization is
-    // in range [0.0, 1.0]
+    // in range (0.0, 1.0]
     if (config.sequence_batching().has_direct()) {
       if ((config.sequence_batching().direct().minimum_slot_utilization() <
            0.0) ||
@@ -1185,7 +1185,7 @@ ValidateModelConfig(
         return Status(
             Status::Code::INVALID_ARG,
             "sequence batching minimum slot utilization must be in range "
-            "[0.0, 1.0] for " +
+            "(0.0, 1.0] for " +
                 config.name());
       }
     }
