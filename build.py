@@ -568,7 +568,7 @@ COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
         dfile.write(df)
 
 
-def create_dockerfile(ddir, dockerfile_name, argmap):
+def create_dockerfile(ddir, dockerfile_name, argmap, backends):
     df = '''
 #
 # Multistage build.
@@ -648,10 +648,14 @@ COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/onnx
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    if len(FLAGS.backend) > 0:
-        df += '''
+    # Only need the backends directory if we built some non-core
+    # backends.
+    for noncore in NONCORE_BACKENDS:
+        if noncore in backends:
+            df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backends backends
 '''
+            break
 
     df += '''
 # Get ONNX version supported
@@ -678,7 +682,7 @@ LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
         dfile.write(df)
 
 
-def container_build(images):
+def container_build(backends, images):
     # Set the docker build-args based on container version
     if FLAGS.container_version in CONTAINER_VERSION_MAP:
         if FLAGS.upstream_container_version is not None:
@@ -875,7 +879,8 @@ def container_build(images):
 
         # Final base image... this is a multi-stage build that uses
         # the install artifacts from the tritonserver_build container.
-        create_dockerfile(FLAGS.build_dir, 'Dockerfile', dockerfileargmap)
+        create_dockerfile(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
+                          backends)
         p = subprocess.Popen([
             'docker', 'build', '-f',
             os.path.join(FLAGS.build_dir, 'Dockerfile')
@@ -1052,6 +1057,15 @@ if __name__ == '__main__':
     if FLAGS.filesystem is None:
         FLAGS.filesystem = []
 
+    # Initialize map of backends to build and repo-tag for each.
+    backends = {}
+    for be in FLAGS.backend:
+        parts = be.split(':')
+        if len(parts) == 1:
+            parts.append('main')
+        log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
+        backends[parts[0]] = parts[1]
+
     # Initialize map of docker images.
     images = {}
     for img in FLAGS.image:
@@ -1069,7 +1083,7 @@ if __name__ == '__main__':
     # build within a build container and then from that create a
     # tritonserver container holding the results of the build.
     if FLAGS.container_version is not None:
-        container_build(images)
+        container_build(backends, images)
         sys.exit(0)
 
     # If there is a container pre-build command assume this invocation
@@ -1101,15 +1115,6 @@ if __name__ == '__main__':
         components[parts[0]] = parts[1]
     for c in components:
         log('component "{}" at tag/branch "{}"'.format(c, components[c]))
-
-    # Initialize map of backends to build and repo-tag for each.
-    backends = {}
-    for be in FLAGS.backend:
-        parts = be.split(':')
-        if len(parts) == 1:
-            parts.append('main')
-        log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
-        backends[parts[0]] = parts[1]
 
     # Build the core server. For now the core is contained in this
     # repo so we just build in place
