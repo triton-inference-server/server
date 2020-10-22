@@ -474,9 +474,11 @@ AutoFillPlan::Create(
     if (!LoadPlan(plan_data, &runtime, &engine).IsOk()) {
       if (engine != nullptr) {
         engine->destroy();
+        engine = nullptr;
       }
       if (runtime != nullptr) {
         runtime->destroy();
+        runtime = nullptr;
       }
     } else {
       plan_file = file;
