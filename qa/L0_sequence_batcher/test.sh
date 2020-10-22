@@ -97,6 +97,11 @@ DELAY_TESTS=${DELAY_TESTS:="test_backlog_fill \
                               test_ragged_batch \
                               test_backlog"}
 
+# Tests on queue delay
+QUEUE_DELAY_TESTS=${QUEUE_DELAY_TESTS:="test_queue_delay_no_min_util \
+                                    test_queue_delay_half_min_util \
+                                    test_queue_delay_full_min_util"}
+
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
@@ -107,7 +112,7 @@ export ENSEMBLES
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
-rm -fr *.log *.serverlog models{0,1,2,4} && mkdir models{0,1,2,4}
+rm -fr *.log *.serverlog models{0,1,2,4} queue_delay_models && mkdir models{0,1,2,4} queue_delay_models
 
 # Get the datatype to use based on the backend
 function get_datatype () {
@@ -155,6 +160,21 @@ for MODEL in $MODELS; do
         sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+    # Duplicate the models for different delay settings
+    cp -r $MODEL queue_delay_models/. && \
+      (cd queue_delay_models/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/sequence_batching {/sequence_batching {\\ndirect {\\nmax_queue_delay_microseconds: 3000000\\nminimum_slot_utilization: 0\\n}/" config.pbtxt)
+    cp -r queue_delay_models/$(basename $MODEL) queue_delay_models/$(basename $MODEL)_half && \
+      (cd queue_delay_models/$(basename $MODEL)_half && \
+        sed -i "s/$(basename $MODEL)/$(basename $MODEL)_half/" config.pbtxt && \
+        sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 0.5/" config.pbtxt)
+    cp -r queue_delay_models/$(basename $MODEL) queue_delay_models/$(basename $MODEL)_full && \
+      (cd queue_delay_models/$(basename $MODEL)_full && \
+        sed -i "s/$(basename $MODEL)/$(basename $MODEL)_full/" config.pbtxt && \
+        sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 1/" config.pbtxt)
   fi
 done
 
@@ -418,6 +438,64 @@ if [[ $BACKENDS == *"custom"* ]]; then
       set -e
   done
 fi
+
+# max queue delay
+MODEL_DIR=queue_delay_models
+# remove ensemble models from the test model repo
+rm -r queue_delay_models/simple_* queue_delay_models/fan_* queue_delay_models/sequence_*
+for i in $QUEUE_DELAY_TESTS ; do
+    export NO_BATCHING=0
+    export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+    export TRITONSERVER_DELAY_SCHEDULER=2
+    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$i.$MODEL_DIR.serverlog"
+    
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG="./$i.$MODEL_DIR.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else  
+        run_server
+    fi
+    
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+
+    set +e
+    python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+        echo -e "\n***\n*** Test $i Failed\n***"
+        RET=1
+    else
+        check_test_results $CLIENT_LOG 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
+    unset TRITONSERVER_DELAY_SCHEDULER
+    unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+    kill $SERVER_PID
+    wait $SERVER_PID
+  
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        check_valgrind_log $LEAKCHECK_LOG 
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
