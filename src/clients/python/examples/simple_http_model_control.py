@@ -56,8 +56,8 @@ if __name__ == '__main__':
 
     model_name = 'simple'
 
-    # There are nine models in the repository directory
-    if len(triton_client.get_model_repository_index()) != 9:
+    # There are eight models in the repository directory
+    if len(triton_client.get_model_repository_index()) != 8:
         sys.exit(1)
 
     triton_client.load_model(model_name)
