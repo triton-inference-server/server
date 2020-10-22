@@ -2034,6 +2034,273 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.cleanup_shm_regions(precreated_shm3_handles)
                     self.cleanup_shm_regions(precreated_shm4_handles)
 
+    def test_queue_delay_no_min_util(self):
+        # Test model that have set max queue delay but minimum slot utilization
+        # is 0. Send 2 sequences in parallel and make sure they get completely
+        # batched into batch-size 2 inferences. The first sequence only has one
+        # request while the second sequence has two, so expecting the second
+        # execution to be a batch of 'null, seq 2'. The executions should not be
+        # waited.
+
+        for trial in _trials:
+            is_ensemble = False
+            for prefix in ENSEMBLE_PREFIXES:
+                if prefix in trial:
+                    is_ensemble = True
+                    break
+            if is_ensemble:
+                continue
+            self.clear_deferred_exceptions()
+            dtype = self.get_datatype(trial)
+            precreated_shm0_handles = self.precreate_register_regions((1,),
+                                                                      dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions((11, 12),
+                                                                      dtype, 1)
+            try:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+
+                self.check_setup(model_name)
+
+                # Need scheduler to wait for queue to contain 2 sequences.
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+
+                threads = []
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (2000, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start", 1, None),),
+                            self.get_expected_result(1, 1, trial, "start"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (2000, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start", 11, None),
+                                (None, 12, None),
+                            ),
+                            self.get_expected_result(23, 12, trial, None),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+
+                threads[0].start()
+                time.sleep(1)
+                threads[1].start()
+                for t in threads:
+                    t.join()
+
+                self.check_deferred_exception()
+                self.check_status(model_name, {2: 2}, 2, 3)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+            finally:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                    self.cleanup_shm_regions(precreated_shm0_handles)
+                    self.cleanup_shm_regions(precreated_shm1_handles)
+
+    def test_queue_delay_half_min_util(self):
+        # Test model that have set max queue delay but minimum slot utilization
+        # is 0.5. Send 2 sequences in parallel and make sure they get completely
+        # batched into batch-size 2 inferences. The first sequence only has one
+        # request while the second sequence has two, so expecting the second
+        # execution to be a batch of 'null, seq 2'. The second execution should
+        # be waited until the max queue delay is exceeded for sequence 2.
+
+        for trial in _trials:
+            is_ensemble = False
+            for prefix in ENSEMBLE_PREFIXES:
+                if prefix in trial:
+                    is_ensemble = True
+                    break
+            if is_ensemble:
+                continue
+            self.clear_deferred_exceptions()
+            dtype = self.get_datatype(trial)
+            precreated_shm0_handles = self.precreate_register_regions((1,),
+                                                                      dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions((11, 12),
+                                                                      dtype, 1)
+            try:
+                model_name = tu.get_sequence_model_name(trial, dtype) + "_half"
+
+                self.check_setup(model_name)
+
+                # Need scheduler to wait for queue to contain 2 sequences.
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+
+                threads = []
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (2000, None),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start", 1, None),),
+                            self.get_expected_result(1, 1, trial, "start"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (4000, 3000),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start", 11, None),
+                                (None, 12, None),
+                            ),
+                            self.get_expected_result(23, 12, trial, None),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+
+                threads[0].start()
+                time.sleep(1)
+                threads[1].start()
+                for t in threads:
+                    t.join()
+
+                self.check_deferred_exception()
+                self.check_status(model_name, {2: 2}, 2, 3)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+            finally:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                    self.cleanup_shm_regions(precreated_shm0_handles)
+                    self.cleanup_shm_regions(precreated_shm1_handles)
+
+    def test_queue_delay_full_min_util(self):
+        # Test model that have set max queue delay but minimum slot utilization
+        # is 1. Send 2 sequences in parallel and make sure they get completely
+        # batched into batch-size 2 inferences. The first sequence only has one
+        # request while the second sequence has two, so expecting the second
+        # execution to be a batch of 'null, seq 2'. Both executions should be
+        # waited until the max queue delay is exceeded.
+
+        for trial in _trials:
+            is_ensemble = False
+            for prefix in ENSEMBLE_PREFIXES:
+                if prefix in trial:
+                    is_ensemble = True
+                    break
+            if is_ensemble:
+                continue
+            self.clear_deferred_exceptions()
+            dtype = self.get_datatype(trial)
+            precreated_shm0_handles = self.precreate_register_regions((1,),
+                                                                      dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions((11, 12),
+                                                                      dtype, 1)
+            try:
+                model_name = tu.get_sequence_model_name(trial, dtype) + "_full"
+
+                self.check_setup(model_name)
+
+                # Need scheduler to wait for queue to contain 2 sequences.
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
+                self.assertTrue(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+
+                threads = []
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1001,
+                            (4000, 3000),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start", 1, None),),
+                            self.get_expected_result(1, 1, trial, "start"),
+                            precreated_shm0_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+                threads.append(
+                    threading.Thread(
+                        target=self.check_sequence_async,
+                        args=(
+                            trial,
+                            model_name,
+                            dtype,
+                            1002,
+                            (6000, 5000),
+                            # (flag_str, value, pre_delay_ms)
+                            (
+                                ("start", 11, None),
+                                (None, 12, 2000),
+                            ),
+                            self.get_expected_result(23, 12, trial, None),
+                            precreated_shm1_handles),
+                        kwargs={
+                            'sequence_name': "{}".format(self._testMethodName)
+                        }))
+
+                threads[0].start()
+                time.sleep(1)
+                threads[1].start()
+                for t in threads:
+                    t.join()
+
+                self.check_deferred_exception()
+                self.check_status(model_name, {2: 2}, 2, 3)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+            finally:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                    self.cleanup_shm_regions(precreated_shm0_handles)
+                    self.cleanup_shm_regions(precreated_shm1_handles)
+
 
 if __name__ == '__main__':
     unittest.main()
