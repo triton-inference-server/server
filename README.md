@@ -238,7 +238,10 @@ backend](https://github.com/triton-inference-server/backend).
 
 Contributions to Triton Inference Server are more than welcome. To
 contribute make a pull request and follow the guidelines outlined in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). If you have a backend, client,
+example or similar contribution that is not modifying the core of
+Triton, then you should file a PR in the [contrib
+repo](https://github.com/triton-inference-server/contrib).
 
 ## Reporting problems, asking questions
 
