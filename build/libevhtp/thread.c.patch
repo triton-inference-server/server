@@ -1,0 +1,45 @@
+diff --git a/thread.c b/thread.c
+index dfddc7e..b85146c 100644
+--- a/thread.c
++++ b/thread.c
+@@ -49,6 +49,7 @@ struct evthr {
+     evthr_exit_cb   exit_cb;
+     void          * arg;
+     void          * aux;
++    int             busy;
+
+ #ifdef EVTHR_SHARED_PIPE
+     int            pool_rdr;
+@@ -192,6 +193,14 @@ evthr_get_aux(evthr_t * thr)
+     return thr ? thr->aux : NULL;
+ }
+
++void
++evthr_set_busy(evthr_t * thr, int busy)
++{
++    if (thr) {
++        thr->busy = busy;
++    }
++}
++
+ int
+ evthr_set_initcb(evthr_t * thr, evthr_init_cb cb)
+ {
+@@ -237,6 +246,7 @@ _evthr_new(evthr_init_cb init_cb, evthr_exit_cb exit_cb, void * args)
+     thread->arg     = args;
+     thread->rdr     = fds[0];
+     thread->wdr     = fds[1];
++    thread->busy    = 0;
+
+     thread->init_cb = init_cb;
+     thread->exit_cb = exit_cb;
+@@ -351,6 +361,9 @@ evthr_pool_stop(evthr_pool_t * pool)
+ static inline int
+ get_backlog_(evthr_t * thread)
+ {
++    if (thread->busy) {
++        return INT_MAX;
++    }
+     int backlog = 0;
+
+     ioctl(thread->rdr, FIONREAD, &backlog);
