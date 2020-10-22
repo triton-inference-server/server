@@ -113,15 +113,6 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-    # [DLIS-1698]
-    def _async_server_live(self):
-        try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
-            triton_client.is_server_live()
-        except Exception as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
     def test_parse_error_noexit(self):
         # Server was started with invalid args and
         # --exit-on-error=false so expect it to be running with
@@ -1553,12 +1544,6 @@ class LifeCycleTest(tu.TestResultCollector):
         thread.start()
         # wait for time < model creation delay to ensure load request is sent
         time.sleep(3)
-        # [DLIS-1698]
-        # A dummy request to any endpoint is needed as the first request after
-        # the async loading above will be blocked until the load returns
-        dummy_thread = threading.Thread(target=self._async_server_live)
-        dummy_thread.start()
-        time.sleep(1)
         load_start = time.time()
 
         # Make sure version 1 of the model is still available
@@ -1588,9 +1573,6 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         self._infer_success_identity(model_base, (2,), np.int32, model_shape)
-
-        # [DLIS-1698]
-        dummy_thread.join()
 
     def test_model_availability_on_reload_2(self):
         model_name = "identity_zero_1_int32"
@@ -1619,12 +1601,6 @@ class LifeCycleTest(tu.TestResultCollector):
         thread.start()
         # wait for time < model creation delay to ensure load request is sent
         time.sleep(3)
-        # [DLIS-1698]
-        # A dummy request to any endpoint is needed as the first request after
-        # the async loading above will be blocked until the load returns
-        dummy_thread = threading.Thread(target=self._async_server_live)
-        dummy_thread.start()
-        time.sleep(1)
         load_start = time.time()
 
         # Make sure version 1 of the model is still available
@@ -1654,9 +1630,6 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         self._infer_success_identity(model_base, (2,), np.int32, model_shape)
-
-        # [DLIS-1698]
-        dummy_thread.join()
 
     def test_multiple_model_repository_control_startup_models(self):
         model_shape = (1, 16)
