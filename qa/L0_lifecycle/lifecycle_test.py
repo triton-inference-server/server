@@ -1656,8 +1656,9 @@ class LifeCycleTest(tu.TestResultCollector):
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
             triton_client.load_model(model_name)
+            self.assertTrue(False, "expecting load failure")
         except Exception as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+            pass
 
         # Make sure version 1 of the model is available, and version 2 is not
         try:

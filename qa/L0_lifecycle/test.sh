@@ -991,7 +991,7 @@ cp -r identity_zero_1_int32 models/. \
     && mkdir -p models/identity_zero_1_int32/1 \
     && mkdir -p models/identity_zero_1_int32/2
 echo "version_policy: { specific { versions: [1] }}" >> models/identity_zero_1_int32/config.pbtxt
-cp identity_zero_1_int32/config.pbtxt config.pbtxt.v2 && \
+cp identity_zero_1_int32/config.pbtxt config.pbtxt.v2.gpu && \
     echo "version_policy: { specific { versions: [2] }}" >> config.pbtxt.v2.gpu && \
     sed -i "s/KIND_CPU/KIND_GPU/" config.pbtxt.v2.gpu
 
