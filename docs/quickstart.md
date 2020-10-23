@@ -39,7 +39,7 @@ Before you can use the Triton Docker image you must install and
 nvidia-docker.  For DGX users, see [Preparing to use NVIDIA
 Containers](http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html),
 For users other than DGX, see the [nvidia-docker installation
-documentation](https://github.com/NVIDIA/nvidia-docker>).
+documentation](https://github.com/NVIDIA/nvidia-docker).
 
 Pull the image using the following command.
 
