@@ -440,6 +440,37 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_parse_ignore_non_intergral_version(self):
+        tensor_shape = (1, 16)
+
+        # Server was started but only version 1 is loaded
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
+            try:
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+
+                model_name = tu.get_model_name('savedmodel', np.float32,
+                                               np.float32, np.float32)
+                self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        try:
+            # swap=False for version 1
+            iu.infer_exact(self,
+                           'savedmodel',
+                           tensor_shape,
+                           1,
+                           np.float32,
+                           np.float32,
+                           np.float32,
+                           swap=False)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_dynamic_model_load_unload(self):
         tensor_shape = (1, 16)
         savedmodel_name = tu.get_model_name('savedmodel', np.float32,
