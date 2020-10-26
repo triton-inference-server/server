@@ -150,7 +150,7 @@ under-development version). The branch you use for the client build
 should match the version of Triton you are using.
 
 ```bash
-$ git checkout r20.09
+$ git checkout r20.10
 ```
 
 Then, issue the following command to build the C++ client library and
@@ -187,7 +187,7 @@ want to build (or the master branch if you want to build the
 under-development version).
 
 ```bash
-$ git checkout r20.09
+$ git checkout r20.10
 ```
 
 #### Ubuntu 18.04
