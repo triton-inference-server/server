@@ -1592,7 +1592,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Overwrite config.pbtxt to load v2 only
         shutil.copyfile("config.pbtxt.v2",
-                            "models/" + model_name + "/config.pbtxt")
+                        "models/" + model_name + "/config.pbtxt")
 
         # Reload models, v1 should still be available until v2 is loaded
         # The load is requested in other thread as it is blocking API,
@@ -1630,6 +1630,47 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         self._infer_success_identity(model_base, (2,), np.int32, model_shape)
+
+    def test_model_reload_fail(self):
+        model_name = "identity_zero_1_int32"
+        model_base = "identity"
+        model_shape = (16,)
+
+        # Make sure version 1 of the model is loaded
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_identity(model_base, (1,), np.int32, model_shape)
+
+        # Overwrite config.pbtxt to load v2 only on GPU, which will fail
+        shutil.copyfile("config.pbtxt.v2.gpu",
+                        "models/" + model_name + "/config.pbtxt")
+
+        # Reload models, v1 should still be available even if v2 fails to load
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.load_model(model_name)
+            self.assertTrue(False, "expecting load failure")
+        except Exception as ex:
+            pass
+
+        # Make sure version 1 of the model is available, and version 2 is not
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+            self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_identity(model_base, (1,), np.int32, model_shape)
 
     def test_multiple_model_repository_control_startup_models(self):
         model_shape = (1, 16)

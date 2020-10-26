@@ -251,8 +251,7 @@ class ModelRepositoryManager::BackendLifeCycle {
       const std::string& repository_path, const std::string& model_name,
       const std::set<int64_t>& versions,
       const inference::ModelConfig& model_config, bool defer_unload = false,
-      std::function<void(int64_t, ModelReadyState, size_t)> OnComplete =
-          nullptr);
+      std::function<void(Status)> OnComplete = nullptr);
 
   // Get specified model version's backend. Latest ready version will
   // be retrieved if 'version' is -1. Return error if the version specified is
@@ -574,7 +573,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     const std::string& repository_path, const std::string& model_name,
     const std::set<int64_t>& versions,
     const inference::ModelConfig& model_config, bool defer_unload,
-    std::function<void(int64_t, ModelReadyState, size_t)> OnComplete)
+    std::function<void(Status)> OnComplete)
 {
   LOG_VERBOSE(1) << "AsyncLoad() '" << model_name << "'";
   std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
@@ -613,11 +612,16 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
 
   struct LoadTracker {
     LoadTracker(size_t affected_version_cnt)
-        : completed_version_cnt_(0), affected_version_cnt_(affected_version_cnt)
+        : load_failed_(false), completed_version_cnt_(0),
+          affected_version_cnt_(affected_version_cnt)
     {
     }
+
+    bool load_failed_;
+    std::string reason_;
     size_t completed_version_cnt_;
     size_t affected_version_cnt_;
+    std::map<int64_t, BackendInfo*> load_set_;
     // The set of model versions to be unloaded after the load is completed
     std::set<int64_t> defer_unload_set_;
     std::mutex mtx_;
@@ -647,32 +651,65 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     if (OnComplete != nullptr) {
       backend_info->OnComplete_ = [this, model_name, version, backend_info,
                                    OnComplete, load_tracker]() {
-        {
+        std::lock_guard<std::mutex> tracker_lock(load_tracker->mtx_);
+        ++load_tracker->completed_version_cnt_;
+        load_tracker->load_set_[version] = backend_info;
+        if (backend_info->state_ != ModelReadyState::READY) {
+          load_tracker->load_failed_ = true;
+          load_tracker->reason_ +=
+              ("version " + std::to_string(version) + ": " +
+               backend_info->state_reason_ + ";");
+        }
+        // Check if all versions are completed and finish the load
+        if (load_tracker->completed_version_cnt_ ==
+            load_tracker->affected_version_cnt_) {
           std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
           auto it = map_.find(model_name);
-
-          // Check if the version backend is loaded in background, if so,
-          // replace the current version backend and unload it.
-          auto vit = it->second.find(version);
-          if (vit->second.second.get() == backend_info) {
-            vit->second.second.swap(vit->second.first);
-            auto unload_backend = vit->second.second.get();
-            unloading_backends_[(uintptr_t)unload_backend] =
-                std::move(vit->second.second);
-            std::lock_guard<std::recursive_mutex> lock(unload_backend->mtx_);
-            unload_backend->next_action_ = ActionType::UNLOAD;
-            unload_backend->OnComplete_ = [this, unload_backend]() {
-              std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
-              unloading_backends_.erase((uintptr_t)unload_backend);
-            };
-            TriggerNextAction(model_name, version, unload_backend);
-          }
-
-          // Check if all versions are completed and perform deferred unload
-          std::lock_guard<std::mutex> tracker_lock(load_tracker->mtx_);
-          ++load_tracker->completed_version_cnt_;
-          if (load_tracker->completed_version_cnt_ ==
-              load_tracker->completed_version_cnt_) {
+          if (load_tracker->load_failed_) {
+            // If any of the versions fails to load, abort the load and unload
+            // all newly loaded versions
+            for (auto& loaded : load_tracker->load_set_) {
+              std::lock_guard<std::recursive_mutex> lock(loaded.second->mtx_);
+              if (loaded.second->state_ == ModelReadyState::READY) {
+                auto vit = it->second.find(loaded.first);
+                // Check if the version backend is loaded in background, if so,
+                // move the backend to 'unloading_backends_' and unload it.
+                if (vit->second.second.get() == loaded.second) {
+                  unloading_backends_[(uintptr_t)loaded.second] =
+                      std::move(vit->second.second);
+                  auto unload_backend = loaded.second;
+                  loaded.second->OnComplete_ = [this, unload_backend]() {
+                    std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
+                    unloading_backends_.erase((uintptr_t)unload_backend);
+                  };
+                } else {
+                  loaded.second->OnComplete_ = nullptr;
+                }
+                loaded.second->next_action_ = ActionType::UNLOAD;
+                TriggerNextAction(model_name, loaded.first, loaded.second);
+              }
+            }
+          } else {
+            for (auto& loaded : load_tracker->load_set_) {
+              auto vit = it->second.find(loaded.first);
+              // Check if the version backend is loaded in background, if so,
+              // replace the current version backend and unload it.
+              if (vit->second.second.get() == loaded.second) {
+                vit->second.second.swap(vit->second.first);
+                auto unload_backend = vit->second.second.get();
+                unloading_backends_[(uintptr_t)unload_backend] =
+                    std::move(vit->second.second);
+                std::lock_guard<std::recursive_mutex> lock(
+                    unload_backend->mtx_);
+                unload_backend->next_action_ = ActionType::UNLOAD;
+                unload_backend->OnComplete_ = [this, unload_backend]() {
+                  std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
+                  unloading_backends_.erase((uintptr_t)unload_backend);
+                };
+                TriggerNextAction(model_name, version, unload_backend);
+              }
+            }
+            // Unload the deferred versions
             for (const auto deferred_version :
                  load_tracker->defer_unload_set_) {
               auto vit = it->second.find(deferred_version);
@@ -683,9 +720,11 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
               TriggerNextAction(model_name, deferred_version, unload_backend);
             }
           }
+          OnComplete(
+              load_tracker->load_failed_
+                  ? Status(Status::Code::INVALID_ARG, load_tracker->reason_)
+                  : Status::Success);
         }
-        OnComplete(
-            version, backend_info->state_, load_tracker->affected_version_cnt_);
       };
     }
     Status action_status = TriggerNextAction(model_name, version, backend_info);
@@ -1121,15 +1160,14 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
   return Status::Success;
 }
 
-Status
+std::map<std::string, Status>
 ModelRepositoryManager::LoadModelByDependency()
 {
+  std::map<std::string, Status> res;
   struct ModelState {
-    ModelState(DependencyNode* node) : node_(node) {}
+    ModelState(DependencyNode* node) : node_(node), status_(Status::Success) {}
     DependencyNode* node_;
-    std::set<int64_t> loaded_versions_;
-    std::set<int64_t> unloaded_versions_;
-    std::mutex mtx_;
+    Status status_;
     std::promise<void> ready_;
   };
   NodeSet loaded_models;
@@ -1167,20 +1205,9 @@ ModelRepositoryManager::LoadModelByDependency()
         status = backend_life_cycle_->AsyncLoad(
             repository_path, valid_model->model_name_, versions,
             valid_model->model_config_, true,
-            [model_state](
-                int64_t version, ModelReadyState state,
-                size_t total_version_cnt) {
-              std::lock_guard<std::mutex> lk(model_state->mtx_);
-              if (state == ModelReadyState::READY) {
-                model_state->loaded_versions_.emplace(version);
-              } else {
-                model_state->unloaded_versions_.emplace(version);
-              }
-              if ((model_state->loaded_versions_.size() +
-                   model_state->unloaded_versions_.size()) ==
-                  total_version_cnt) {
-                model_state->ready_.set_value();
-              }
+            [model_state](Status load_status) {
+              model_state->status_ = load_status;
+              model_state->ready_.set_value();
             });
       }
       if (!status.IsOk()) {
@@ -1194,11 +1221,19 @@ ModelRepositoryManager::LoadModelByDependency()
     }
     for (auto& model_state : model_states) {
       model_state->ready_.get_future().wait();
-      model_state->node_->loaded_versions_ = model_state->loaded_versions_;
+      res[model_state->node_->model_name_] = model_state->status_;
+      const auto version_state =
+          backend_life_cycle_->VersionStates(model_state->node_->model_name_);
+      model_state->node_->loaded_versions_.clear();
+      for (const auto& vs : version_state) {
+        if (vs.second.first == ModelReadyState::READY) {
+          model_state->node_->loaded_versions_.emplace(vs.first);
+        }
+      }
     }
     set_pair = ModelsToLoadUnload(loaded_models);
   }
-  return Status::Success;
+  return res;
 }
 
 Status
@@ -1289,6 +1324,7 @@ ModelRepositoryManager::LoadUnloadModels(
     const std::set<std::string>& model_names, ActionType type,
     bool* all_models_polled)
 {
+  auto status = Status::Success;
   *all_models_polled = true;
   // Update ModelInfo related to file system accordingly
   std::set<std::string> added, deleted, modified, unmodified;
@@ -1360,10 +1396,27 @@ ModelRepositoryManager::LoadUnloadModels(
   // Update dependency graph and load
   UpdateDependencyGraph(added, deleted, modified);
 
-  // model loading / unloading error will be printed but ignored
-  LoadModelByDependency();
+  // load / unload the models affected, and check the load status of
+  // the requested models
+  const auto& load_status = LoadModelByDependency();
+  if (status.IsOk() && (type == ActionType::LOAD)) {
+    std::string load_error_message = "";
+    for (const auto& model_name : model_names) {
+      auto it = load_status.find(model_name);
+      // If 'model_name' not in load status, it means the (re-)load is not
+      // necessary because there is no change in the model's directory
+      if ((it != load_status.end()) && !it->second.IsOk()) {
+        load_error_message +=
+            ("load failed for model '" + model_name +
+             "': " + it->second.Message() + "\n");
+      }
+    }
+    if (!load_error_message.empty()) {
+      status = Status(Status::Code::INVALID_ARG, load_error_message);
+    }
+  }
 
-  return Status::Success;
+  return status;
 }
 
 Status

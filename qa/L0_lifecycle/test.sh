@@ -984,6 +984,49 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_model_reload_fail
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r identity_zero_1_int32 models/. \
+    && mkdir -p models/identity_zero_1_int32/1 \
+    && mkdir -p models/identity_zero_1_int32/2
+echo "version_policy: { specific { versions: [1] }}" >> models/identity_zero_1_int32/config.pbtxt
+cp identity_zero_1_int32/config.pbtxt config.pbtxt.v2.gpu && \
+    echo "version_policy: { specific { versions: [2] }}" >> config.pbtxt.v2.gpu && \
+    sed -i "s/KIND_CPU/KIND_GPU/" config.pbtxt.v2.gpu
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
+             --exit-timeout-secs=5 --strict-model-config=false \
+             --load-model=identity_zero_1_int32 \
+             --strict-readiness=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_model_reload_fail >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_load_same_model_different_platform
 rm -fr models simple_float32_float32_float32
 mkdir models
