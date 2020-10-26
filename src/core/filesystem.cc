@@ -749,6 +749,7 @@ ASFileSystem::ASFileSystem(const std::string& path)
 {
   const char* account_str = std::getenv("AZURE_STORAGE_ACCOUNT");
   const char* account_key = std::getenv("AZURE_STORAGE_KEY");
+  const char* sas_query = std::getenv("AZURE_STORAGE_SAS");
   std::shared_ptr<as::storage_account> account = nullptr;
   std::string host_name, container, blob_path, query;
   if (RE2::FullMatch(
@@ -766,14 +767,16 @@ ASFileSystem::ASFileSystem(const std::string& path)
     }
 
     std::shared_ptr<as::storage_credential> cred;
-
-    if (account_key != NULL)  // Shared Key
-    {
+    if (!query.empty()) {
+        LOG_ERROR << "We can't support SAS in query url, please put SAS query in the environment variable AZURE_STORAGE_SAS";
+        return;
+    } else if (account_key != NULL) { 
+      // Shared Key
       cred = std::make_shared<as::shared_key_credential>(
           account_name, account_key);
-    } else if (query.find("sig=") != std::string::npos) {
+    } else if (sas_query != NULL) {
       // Shared Access Signature
-      cred = std::make_shared<as::shared_access_signature_credential>(query);
+      cred = std::make_shared<as::shared_access_signature_credential>(std::string(sas_query));
     } else {
       cred = std::make_shared<as::anonymous_credential>();
     }
@@ -893,14 +896,7 @@ ASFileSystem::IsDirectory(const std::string& path, bool* is_dir)
   std::string container, object_path;
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
 
-  // Check if the bucket exists
   as::blob_client_wrapper bc(client_);
-
-  bool exists = bc.container_exists(container);
-  if (!exists) {
-    return Status(Status::Code::NOT_FOUND, "container not exits " + container);
-  }
-
   auto blobs = bc.list_blobs_segmented(container, "/", "", object_path, 1);
   *is_dir = blobs.blobs.size() > 0;
 

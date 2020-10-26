@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,13 +49,10 @@ fi
 
 ACCOUNT_NAME=$AZURE_STORAGE_ACCOUNT
 ACCOUNT_KEY=$AZURE_STORAGE_KEY
-
 export CUDA_VISIBLE_DEVICES=0
-
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
-#EXPECTED_NUM_TESTS="3"
-
+EXPECTED_NUM_TESTS="3"
 timestamp=$(date +%s)
 CONTAINER_NAME="tritonqatest${timestamp}"
 
@@ -66,10 +63,8 @@ AS_URL="as://${ACCOUNT_NAME}/${CONTAINER_NAME}"
 az storage container create --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
 sleep 10
 
-
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_TIMEOUT=420
-
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -77,9 +72,9 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 RET=0
 
 # Construct model repository
-KIND="KIND_GPU"
+mkdir -p models
 for FW in graphdef savedmodel netdef onnx libtorch plan; do
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
 done
 
 # Copy custom model
@@ -87,8 +82,10 @@ cp -r /opt/tritonserver/qa/custom_models/custom_float32_float32_float32/ models/
 
 # Copy models with string inputs and remove nobatch (bs=1) models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object models/
+
 rm -rf models/*nobatch*
 
+KIND="KIND_GPU"
 for FW in graphdef savedmodel netdef onnx libtorch plan custom; do
     for MC in `ls models/${FW}*/config.pbtxt`; do
         echo "instance_group [ { kind: ${KIND} }]" >> $MC
@@ -104,25 +101,24 @@ for dir in `ls models/`; do
     done
 done
 
-
 # copy contents of /models into container.
 for file in `find models -type f` ;do
     az storage blob upload --container-name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} --file $file --name $file
 done
+sleep 10
 
 # Test 2 Scenarios:
 # 1. access blob using shared key in envs
-# 2. using sas in url
+# 2. using SAS(Shared Access Signature)
 for ENV_VAR in "shared_key" "sas" ; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
-    
+    MODEL_REPO="${AS_URL}/models"
     if [ "$ENV_VAR" == "sas" ]; then
         unset AZURE_STORAGE_KEY
-        sas=`az storage blob generate-sas --container-name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}`
-        MODEL_REPO="${AS_URL}/models?${sas}"
-    elif [ "$ENV_VAR" == "shared_key" ]; then
-        MODEL_REPO="${AS_URL}/models"   
+        sas=`az storage blob generate-sas --container-name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} --name models`
+        sas_without_quote=$(eval echo $sas)
+        export AZURE_STORAGE_SAS="?$sas_without_quote"
     fi
 
     # Now start model tests
@@ -161,7 +157,6 @@ done
  
 # Clean up container
 az storage container delete --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
