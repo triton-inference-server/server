@@ -46,3 +46,4 @@ class TritonPythonModel:
             out_tensor = pb_utils.Tensor("OUT", input_tensor.as_numpy())
             responses.append(pb_utils.InferenceResponse([out_tensor], error))
         return responses
+
