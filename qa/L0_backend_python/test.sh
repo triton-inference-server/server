@@ -180,6 +180,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+# Test KIND_GPU
 rm -rf models/
 mkdir -p models/add_sub_gpu/1/
 cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
@@ -192,7 +193,6 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** KIND_GPU model test failed \n***"
@@ -201,6 +201,32 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Test environment variable propagation
+rm -rf models/
+mkdir -p models/model_env/1/
+cp ../python_models/model_env/model.py ./models/model_env/1/
+cp ../python_models/model_env/config.pbtxt ./models/model_env/
+
+export MY_ENV="MY_ENV"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+grep "My_ENV = MY_ENV" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Environment variable test failed \n***"
+    RET=1
+fi
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
