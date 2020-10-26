@@ -254,8 +254,8 @@ class ModelRepositoryManager {
   /// Load models based on the dependency graph. The function will iteratively
   /// load models that all the models they depend on has been loaded, and unload
   /// models if their dependencies are no longer satisfied.
-  /// \return The error status.
-  Status LoadModelByDependency();
+  /// \return The status of the model loads.
+  std::map<std::string, Status> LoadModelByDependency();
 
   /// Helper function to update the dependency graph based on the poll result
   /// \param added The names of the models added to the repository.
