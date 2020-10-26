@@ -182,7 +182,7 @@ def core_cmake_args(components, backends, install_dir):
     cargs.append('-DTRITON_ENABLE_S3:BOOL={}'.format(
         cmake_enable('s3' in FLAGS.filesystem)))
     cargs.append('-DTRITON_ENABLE_AZURE_STORAGE:BOOL={}'.format(
-        cmake_enable('as' in FLAGS.filesystem)))
+        cmake_enable('azure_storage' in FLAGS.filesystem)))
 
     cargs.append('-DTRITON_ENABLE_TENSORFLOW={}'.format(
         cmake_enable(('tensorflow1' in backends) or
