@@ -121,6 +121,20 @@ describe supported GPUs.
 
 ### User Documentation
 
+- [QuickStart](docs/quickstart.md)
+  - [Install](docs/quickstart.md#install-triton-docker-image)
+  - [Run](docs/quickstart.md#run-triton)
+- [Model Repository](docs/model_repository.md)
+- [Model Configuration](docs/model_configuration.md)
+- [Model Management](docs/model_management.md)
+- [Custom Operations](docs/custom_operations.md)
+- [Client Libraries](docs/client_libraries.md)
+- [Client Examples](docs/client_examples.md)
+- [Optimization](docs/optimization.md)
+  - [Model Analyzer](docs/model_analyzer.md)
+  - [Performance Analyzer](docs/perf_analyzer.md)
+- [Metrics](docs/metrics.md)
+
 The [quickstart](docs/quickstart.md) walks you through all the steps
 required to install and run Triton with an example image
 classification model and then use an example client application to
@@ -142,7 +156,9 @@ send inference and other requests to Triton from your *client*
 application. The [Python and C++ client
 libraries](docs/client_libraries.md) provide
 [APIs](docs/client_libraries.md#client-library-apis) to simplify this
-communication. You can also send HTTP/REST requests directly to Triton
+communication. There are also a large number of [client
+examples](docs/client_examples.md) that demonstrate how to use the
+libraries.  You can also send HTTP/REST requests directly to Triton
 using the [HTTP/REST JSON-based
 protocol](docs/inference_protocols.md#httprest-and-grpc-protocols) or
 [generate a GRPC client for many other
@@ -178,6 +194,11 @@ information](docs/v1_to_v2.md) is helpful if you are moving to
 version 2 of Triton from previously using version 1.
 
 ### Developer Documentation
+
+- [Build](docs/build.md)
+- [Protocols and APIs](docs/inference_protocols.md).
+- [Backends](https://github.com/triton-inference-server/backend)
+- [Test](docs/test.md)
 
 Triton can be [built using
 Docker](docs/build.md#building-triton-with-docker) or [built without
