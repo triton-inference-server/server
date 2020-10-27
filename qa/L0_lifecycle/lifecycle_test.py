@@ -105,10 +105,18 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def _async_load(self, model_name):
-        try:
+    def _get_client(self, use_grpc=False):
+        if use_grpc:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+        else:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
+        return triton_client
+
+    def _async_load(self, model_name, use_grpc):
+        try:
+            triton_client = self._get_client(use_grpc)
             triton_client.load_model(model_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -1497,16 +1505,22 @@ class LifeCycleTest(tu.TestResultCollector):
         model_name = tu.get_model_name('simple', np.float32, np.float32,
                                        np.float32)
 
+        # Check whether or not to use grpc protocol
+        use_grpc = "TRITONSERVER_USE_GRPC" in os.environ
+
         # Make sure version 1 and 3 of the model are loaded
         # and the model platform is TensorRT
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             self.assertTrue(triton_client.is_server_live())
             self.assertTrue(triton_client.is_server_ready())
             self.assertTrue(triton_client.is_model_ready(model_name, "1"))
             self.assertTrue(triton_client.is_model_ready(model_name, "3"))
-            metadata = triton_client.get_model_metadata(model_name)
+            if use_grpc:
+                metadata = triton_client.get_model_metadata(model_name,
+                                                            as_json=True)
+            else:
+                metadata = triton_client.get_model_metadata(model_name)
             self.assertEqual(metadata["platform"], "tensorrt_plan")
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -1523,8 +1537,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Reload models
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             triton_client.load_model(model_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -1532,13 +1545,16 @@ class LifeCycleTest(tu.TestResultCollector):
         # Make sure version 1 and 3 of the model are loaded
         # and the model platform is PyTorch
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             self.assertTrue(triton_client.is_server_live())
             self.assertTrue(triton_client.is_server_ready())
             self.assertTrue(triton_client.is_model_ready(model_name, "1"))
             self.assertTrue(triton_client.is_model_ready(model_name, "3"))
-            metadata = triton_client.get_model_metadata(model_name)
+            if use_grpc:
+                metadata = triton_client.get_model_metadata(model_name,
+                                                            as_json=True)
+            else:
+                metadata = triton_client.get_model_metadata(model_name)
             self.assertEqual(metadata["platform"], "pytorch_libtorch")
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -1554,10 +1570,12 @@ class LifeCycleTest(tu.TestResultCollector):
         model_base = "identity"
         model_shape = (16,)
 
+        # Check whether or not to use grpc protocol
+        use_grpc = "TRITONSERVER_USE_GRPC" in os.environ
+
         # Make sure version 1 of the model is loaded
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             self.assertTrue(triton_client.is_server_live())
             self.assertTrue(triton_client.is_server_ready())
             self.assertTrue(triton_client.is_model_ready(model_name, "1"))
@@ -1571,7 +1589,8 @@ class LifeCycleTest(tu.TestResultCollector):
         # Reload models, v1 should still be available until v2 is loaded
         # The load is requested in other thread as it is blocking API,
         # and the v1 availibility should be tested during the reload
-        thread = threading.Thread(target=self._async_load, args=(model_name,))
+        thread = threading.Thread(target=self._async_load,
+                                  args=(model_name, use_grpc))
         thread.start()
         # wait for time < model creation delay to ensure load request is sent
         time.sleep(3)
@@ -1579,8 +1598,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Make sure version 1 of the model is still available
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             self.assertTrue(triton_client.is_server_live())
             load_end = time.time()
             self.assertTrue((load_end - load_start) < 5,
@@ -1595,8 +1613,7 @@ class LifeCycleTest(tu.TestResultCollector):
         thread.join()
         # Make sure version 2 of the model is available while version 1 is not
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             self.assertTrue(triton_client.is_server_live())
             self.assertTrue(triton_client.is_server_ready())
             self.assertFalse(triton_client.is_model_ready(model_name, "1"))
@@ -1610,10 +1627,12 @@ class LifeCycleTest(tu.TestResultCollector):
         model_base = "identity"
         model_shape = (16,)
 
+        # Check whether or not to use grpc protocol
+        use_grpc = "TRITONSERVER_USE_GRPC" in os.environ
+
         # Make sure version 1 of the model is loaded
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             self.assertTrue(triton_client.is_server_live())
             self.assertTrue(triton_client.is_server_ready())
             self.assertTrue(triton_client.is_model_ready(model_name, "1"))
@@ -1628,7 +1647,8 @@ class LifeCycleTest(tu.TestResultCollector):
         # Reload models, v1 should still be available until v2 is loaded
         # The load is requested in other thread as it is blocking API,
         # and the v1 availibility should be tested during the reload
-        thread = threading.Thread(target=self._async_load, args=(model_name,))
+        thread = threading.Thread(target=self._async_load,
+                                  args=(model_name, use_grpc))
         thread.start()
         # wait for time < model creation delay to ensure load request is sent
         time.sleep(3)
@@ -1636,8 +1656,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Make sure version 1 of the model is still available
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             self.assertTrue(triton_client.is_server_live())
             load_end = time.time()
             self.assertTrue((load_end - load_start) < 5,
@@ -1652,8 +1671,7 @@ class LifeCycleTest(tu.TestResultCollector):
         thread.join()
         # Make sure version 2 of the model is available while version 1 is not
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
+            triton_client = self._get_client(use_grpc)
             self.assertTrue(triton_client.is_server_live())
             self.assertTrue(triton_client.is_server_ready())
             self.assertFalse(triton_client.is_model_ready(model_name, "1"))
