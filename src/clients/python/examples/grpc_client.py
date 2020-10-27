@@ -50,11 +50,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
 
-    # We use a simple model that takes 2 input tensors of 16 integers
-    # each and returns 2 output tensors of 16 integers each. One
-    # output tensor is the element-wise sum of the inputs and one
-    # output is the element-wise difference.
-    model_name = "simple"
+    model_name = "inception_graphdef"
     model_version = ""
     batch_size = 1
 
@@ -74,7 +70,7 @@ if __name__ == '__main__':
     response = grpc_stub.ServerReady(request)
     print("server {}".format(response))
 
-    request = service_pb2.ModelReadyRequest(name="resnet_v1_50_graphdef",
+    request = service_pb2.ModelReadyRequest(name=model_name,
                                             version=model_version)
     response = grpc_stub.ModelReady(request)
     print("model {}".format(response))
@@ -84,34 +80,34 @@ if __name__ == '__main__':
     response = grpc_stub.ServerMetadata(request)
     print("server metadata:\n{}".format(response))
 
-    request = service_pb2.ModelMetadataRequest(name="resnet_v1_50_graphdef",
+    request = service_pb2.ModelMetadataRequest(name=model_name,
                                                version=model_version)
     response = grpc_stub.ModelMetadata(request)
     print("model metadata:\n{}".format(response))
 
     # Configuration
-    request = service_pb2.ModelConfigRequest(name="resnet_v1_50_graphdef",
+    request = service_pb2.ModelConfigRequest(name=model_name,
                                              version=model_version)
     response = grpc_stub.ModelConfig(request)
     print("model config:\n{}".format(response))
 
     # Infer
     request = service_pb2.ModelInferRequest()
-    request.model_name = "resnet_v1_50_graphdef"
+    request.model_name = model_name
     request.model_version = model_version
     request.id = "my request id"
 
     input = service_pb2.ModelInferRequest().InferInputTensor()
     input.name = "input"
     input.datatype = "FP32"
-    input.shape.extend([1, 224, 224, 3])
+    input.shape.extend([1, 299, 299, 3])
     request.inputs.extend([input])
 
     output = service_pb2.ModelInferRequest().InferRequestedOutputTensor()
-    output.name = "resnet_v1_50/predictions/Softmax"
+    output.name = "InceptionV3/Predictions/Softmax"
     request.outputs.extend([output])
 
-    request.raw_input_contents.extend([bytes(602112 * 'a', 'utf-8')])
+    request.raw_input_contents.extend([bytes(1072812 * 'a', 'utf-8')])
 
     response = grpc_stub.ModelInfer(request)
     print("model infer:\n{}".format(response))

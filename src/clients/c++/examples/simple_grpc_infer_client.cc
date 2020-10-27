@@ -112,8 +112,7 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt_long(argc, argv, "vu:t:H:", long_options, NULL)) !=
-         -1) {
+  while ((opt = getopt_long(argc, argv, "vu:t:H:", long_options, NULL)) != -1) {
     switch (opt) {
       case 0:
         use_ssl = true;

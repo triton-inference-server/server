@@ -122,7 +122,7 @@ if __name__ == '__main__':
     # We use the custom "sequence" model which takes 1 input
     # value. The output is the accumulated value of the inputs. See
     # src/custom/sequence.
-    model_name = "simple_sequence"
+    model_name = "simple_dyna_sequence" if FLAGS.dyna else "simple_sequence"
     model_version = ""
     batch_size = 1
 
@@ -177,10 +177,15 @@ if __name__ == '__main__':
                     sys.exit(1)
             recv_count = recv_count + 1
 
-    seq0_expected = 0
-    seq1_expected = 100
-
     for i in range(len(result0_list)):
+        seq0_expected = 1 if (i == 0) else values[i]
+        seq1_expected = 101 if (i == 0) else values[i] * -1
+        # The dyna_sequence custom backend adds the correlation ID
+        # to the last request in a sequence.
+        if FLAGS.dyna and (values[i] == 1):
+            seq0_expected += sequence_id0
+            seq1_expected += sequence_id1
+
         print("[" + str(i) + "] " + str(result0_list[i][0][0]) + " : " +
               str(result1_list[i][0][0]))
 
@@ -189,15 +194,5 @@ if __name__ == '__main__':
             print("[ expected ] " + str(seq0_expected) + " : " +
                   str(seq1_expected))
             sys.exit(1)
-
-        if i < len(values):
-            seq0_expected += values[i]
-            seq1_expected -= values[i]
-
-            # The dyna_sequence custom backend adds the correlation ID
-            # to the last request in a sequence.
-            if FLAGS.dyna and (values[i] == 1):
-                seq0_expected += sequence_id0
-                seq1_expected += sequence_id1
 
     print("PASS: Sequence + Streaming")

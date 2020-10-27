@@ -77,8 +77,6 @@ rm -f *.log.*
 set -e
 
 cp -r ../ensemble_models/image_preprocess_ensemble_example/* models/.
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_int8_int32_int32 models/
-cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/resnet_v1_50_graphdef models/
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models

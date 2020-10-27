@@ -68,7 +68,6 @@ rm -f *.log.*
 set -e
 
 cp -r ../ensemble_models/image_preprocess_ensemble_example/* models/.
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models

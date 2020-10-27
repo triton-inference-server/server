@@ -52,7 +52,7 @@ if __name__ == '__main__':
     # each and returns 2 output tensors of 16 integers each. One
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
-    model_name = "graphdef_int8_int32_int32"
+    model_name = "simple_int8"
     model_version = ""
     batch_size = 1
 
@@ -100,7 +100,7 @@ if __name__ == '__main__':
         for value in output.shape:
             shape.append(value)
         output_results.append(
-            np.frombuffer(response.raw_output_contents[index], dtype=np.int32))
+            np.frombuffer(response.raw_output_contents[index], dtype=np.int8))
         output_results[-1] = np.resize(output_results[-1], shape)
         index += 1
 
