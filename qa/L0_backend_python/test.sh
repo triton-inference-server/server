@@ -87,7 +87,7 @@ fi
 RET=0
 
 set +e
-python $CLIENT_PY >>$CLIENT_LOG 2>&1
+python3 $CLIENT_PY >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 else
@@ -212,21 +212,13 @@ export MY_ENV="MY_ENV"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
+    echo -e "\n***\n*** Environment variable test failed \n***"
     cat $SERVER_LOG
     exit 1
 fi
 
 kill $SERVER_PID
 wait $SERVER_PID
-
-set +e
-grep "My_ENV = MY_ENV" $SERVER_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Environment variable test failed \n***"
-    RET=1
-fi
-set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
