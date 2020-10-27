@@ -442,6 +442,50 @@ fi
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_parse_ignore_non_intergral_version
+rm -fr models
+mkdir models
+for i in savedmodel ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    mv models/${i}_float32_float32_float32/3 models/${i}_float32_float32_float32/abc
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false \
+             --exit-timeout-secs=5"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_parse_ignore_non_intergral_version >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# check server log for the warning messages
+if [ `grep -c "ignore version directory 'abc' which fails to convert to integral number" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_dynamic_model_load_unload
 rm -fr models savedmodel_float32_float32_float32
 mkdir models
