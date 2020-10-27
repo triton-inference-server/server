@@ -74,7 +74,7 @@ $ ./build.py --version=0.0.0 --container-version=20.10dev ...
 If you are building on master/main branch then <container tag> should
 be set to "main". If you are building on a release branch you should
 set the <container tag> to match. For example, if you are building on
-the r20.09 branch you should set <container tag> to be "r20.09". If
+the r20.10 branch you should set <container tag> to be "r20.10". If
 can use a different <container tag> for a component to instead use the
 corresponding branch/tag in the build. For example, if you have a
 branch called "mybranch" in the identity_backend repo that you want to
