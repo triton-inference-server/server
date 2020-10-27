@@ -180,6 +180,28 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+rm -rf models/
+mkdir -p models/add_sub_gpu/1/
+cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
+cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** KIND_GPU model test failed \n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
