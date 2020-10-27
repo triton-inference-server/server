@@ -137,13 +137,6 @@ for i in \
     fi
 done
 
-# Test with custom model
-$SIMPLE_INFER_CLIENT_PY -v -c >> ${CLIENT_LOG}.custom 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.custom
-    RET=1
-fi
-
 # Test while reusing the InferInput and InferRequestedOutput objects
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY -v >> ${CLIENT_LOG}.reuse 2>&1
 if [ $? -ne 0 ]; then
@@ -180,13 +173,6 @@ for i in \
         RET=1
     fi
 done
-
-# Test with custom model
-$SIMPLE_INFER_CLIENT -v -c >> ${CLIENT_LOG}.c++.custom 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.c++.custom
-    RET=1
-fi
 
 # Test while reusing the InferInput and InferRequestedOutput objects
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v >> ${CLIENT_LOG}.c++.reuse 2>&1

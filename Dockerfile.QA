@@ -120,12 +120,6 @@ RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
     mkdir -p qa/custom_models/custom_nobatch_float32_float32_float32/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libaddsub.so \
         qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
-    mkdir -p qa/L0_grpc/models/simple_custom/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libaddsub.so \
-        qa/L0_grpc/models/simple_custom/1/. && \
-    mkdir -p qa/L0_http/models/simple_custom/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libaddsub.so \
-        qa/L0_http/models/simple_custom/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libaddsub.so \
         qa/L0_simple_ensemble/models/simple/1/. && \
