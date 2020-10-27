@@ -25,9 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 name: "simple_dyna_sequence"
-platform: "custom"
+platform: "tensorflow_graphdef"
 max_batch_size: 8
-default_model_filename: "libdyna_sequence.so"
 sequence_batching {
     max_sequence_idle_microseconds: 10000000
     oldest {
