@@ -683,19 +683,6 @@ LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
 
 
 def container_build(backends, images):
-    # Set the docker build-args based on container version
-    if FLAGS.container_version in CONTAINER_VERSION_MAP:
-        if FLAGS.upstream_container_version is not None:
-            upstream_container_version = FLAGS.upstream_container_version
-        else:
-            upstream_container_version = CONTAINER_VERSION_MAP[
-                FLAGS.container_version][0]
-        onnx_runtime_version = CONTAINER_VERSION_MAP[FLAGS.container_version][1]
-        onnx_runtime_openvino_version = CONTAINER_VERSION_MAP[
-            FLAGS.container_version][2]
-    else:
-        fail('unsupported container version {}'.format(FLAGS.container_version))
-
     # The build and install directories within the container.
     build_dir = os.path.join(os.sep, 'tmp', 'tritonbuild')
     install_dir = os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
@@ -708,21 +695,21 @@ def container_build(backends, images):
         base_image = images['base']
     else:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
-            upstream_container_version)
+            FLAGS.upstream_container_version)
 
     if 'pytorch' in images:
         pytorch_image = images['pytorch']
     else:
         pytorch_image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
-            upstream_container_version)
+            FLAGS.upstream_container_version)
 
     dockerfileargmap = {
         'TRITON_VERSION': FLAGS.version,
         'TRITON_CONTAINER_VERSION': FLAGS.container_version,
         'BASE_IMAGE': base_image,
         'PYTORCH_IMAGE': pytorch_image,
-        'ONNX_RUNTIME_VERSION': onnx_runtime_version,
-        'ONNX_RUNTIME_OPENVINO_VERSION': onnx_runtime_openvino_version
+        'ONNX_RUNTIME_VERSION': FLAGS.onnx_runtime_version,
+        'ONNX_RUNTIME_OPENVINO_VERSION': FLAGS.onnx_runtime_openvino_version
     }
 
     cachefrommap = [
@@ -786,6 +773,10 @@ def container_build(backends, images):
         # --container-version is removed so that a direct build is
         # performed within the container
         #
+        # Add --upstream-container-version, --onnx-runtime-version and
+        # --onnx-runtime-openvino-version if necessary since these
+        # FLAGS can be set manually and so may not be in sys.argv
+        #
         # --build-dir is added/overridden to 'build_dir'
         #
         # --install-dir is added/overridden to 'install_dir'
@@ -803,6 +794,18 @@ def container_build(backends, images):
             elif a.startswith('--container-version='):
                 continue
             runargs.append(a)
+
+        if FLAGS.upstream_container_version is not None:
+            runargs += [
+                '--upstream-container-version', FLAGS.upstream_container_version
+            ]
+        if FLAGS.onnx_runtime_version is not None:
+            runargs += ['--onnx-runtime-version', FLAGS.onnx_runtime_version]
+        if FLAGS.onnx_runtime_openvino_version is not None:
+            runargs += [
+                '--onnx-runtime-openvino-version',
+                FLAGS.onnx_runtime_openvino_version
+            ]
 
         runargs += ['--build-dir', build_dir]
         runargs += ['--install-dir', install_dir]
@@ -963,6 +966,20 @@ if __name__ == '__main__':
         'The upstream container version to use when performing a container build. If not specified the upstream container version will be chosen automaticallly based on --container-version.'
     )
     parser.add_argument(
+        '--onnx-runtime-version',
+        type=str,
+        required=False,
+        help=
+        'The ONNX Runtime version to use. If not specified the upstream container version will be chosen automaticallly based on --container-version.'
+    )
+    parser.add_argument(
+        '--onnx-runtime-openvino-version',
+        type=str,
+        required=False,
+        help=
+        'The ONNX Runtime OpenVINO version to use. If not specified the upstream container version will be chosen automaticallly based on --container-version.'
+    )
+    parser.add_argument(
         '--container-prebuild-command',
         type=str,
         required=False,
@@ -1056,6 +1073,20 @@ if __name__ == '__main__':
         FLAGS.endpoint = []
     if FLAGS.filesystem is None:
         FLAGS.filesystem = []
+
+    if FLAGS.container_version is not None:
+        if FLAGS.container_version not in CONTAINER_VERSION_MAP:
+            fail('unsupported container version {}'.format(
+                FLAGS.container_version))
+        if FLAGS.upstream_container_version is None:
+            FLAGS.upstream_container_version = CONTAINER_VERSION_MAP[
+                FLAGS.container_version][0]
+        if FLAGS.onnx_runtime_version is None:
+            FLAGS.onnx_runtime_version = CONTAINER_VERSION_MAP[
+                FLAGS.container_version][1]
+        if FLAGS.onnx_runtime_openvino_version is None:
+            FLAGS.onnx_runtime_openvino_version = CONTAINER_VERSION_MAP[
+                FLAGS.container_version][2]
 
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
