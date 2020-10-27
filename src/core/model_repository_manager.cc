@@ -2043,8 +2043,8 @@ ModelRepositoryManager::VersionsToLoad(
       existing_versions.insert(version);
     }
     catch (const std::invalid_argument& ia) {
-      LOG_ERROR << "failed to convert version directory '" << subdir
-                << "' to integral number";
+      LOG_WARNING << "ignore version directory '" << subdir
+                  << "' which fails to convert to integral number";
     }
   }
 
