@@ -317,7 +317,7 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Execute()
   OnExecute_(request_, &response_, &status_);
   step_ = Steps::WRITEREADY;
 
-  if (async) {
+  if (async_) {
     // For asynchronous operation, need to add itself onto the completion
     // queue so that the response can be written once the object is
     // taken up next for execution.
