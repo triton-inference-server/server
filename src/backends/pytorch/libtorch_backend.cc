@@ -762,20 +762,21 @@ LibTorchBackend::Context::Execute(
 
   try {
     model_outputs_ = torch_model_->forward(*inputs_);
-    auto model_outputs_tuple = model_outputs_.toTuple();
-    for (auto& m_op : model_outputs_tuple->elements()) {
-      outputs_->push_back(m_op.toTensor());
-    }
-  }
-  catch (std::exception& ex) {
-    try {
+    if (model_outputs_.isTuple()) {
+      auto model_outputs_tuple = model_outputs_.toTuple();
+      for (auto& m_op : model_outputs_tuple->elements()) {
+        outputs_->push_back(m_op.toTensor());
+      }
+    } else {
       auto model_output_tensor = model_outputs_.toTensor();
       outputs_->push_back(model_output_tensor);
     }
-    catch (std::exception& exx) {
-      LOG_VERBOSE(1) << ex.what();
-      return Status(Status::Code::INTERNAL, "failed to run model '" + name_);
-    }
+  }
+  catch (std::exception& ex) {
+    LOG_VERBOSE(1) << ex.what();
+    return Status(
+        Status::Code::INTERNAL,
+        "failed to run model '" + name_ + "': " + ex.what());
   }
 
   return Status::Success;
