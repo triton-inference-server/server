@@ -268,32 +268,7 @@ uses an ensemble of an image-preprocessing model implemented as a
 backend](https://github.com/triton-inference-server/dali_backend) and
 a TensorFlow Inception model. The ensemble model allows you to send
 the raw image binaries in the request and receive classification
-results without preprocessing the images on the client. 
+results without preprocessing the images on the client.
 
-To try this example you should first [setup a model repository that
-contains the required
-models](https://github.com/triton-inference-server/dali_backend/tree/main/docs/examples/rn50_ensemble).
-Then use ensemble_image_client (or ensemble_image_client.py) to send
-inference requests to Triton. You can specify a single image or a
-directory holding images. Here we send a request for the ensemble for
-an image from [qa/images](../qa/images).
-
-```bash
-$ ensemble_image_client qa/images/mug.jpg
-Image 'qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.723991
-```
-
-The Python version of the application accepts the same command-line
-arguments.
-
-```bash
-$ python ensemble_image_client.py qa/images/mug.jpg
-Image 'qa/images/mug.jpg':
-    504 (COFFEE MUG) = 0.778078556061
-```
-
-Similar to [image_client example described
-above](#image_classification_example), ensemble_image_client can be
-instructed to use GRPC protocol, to return mulitple classifications,
-and to process a directory of images.
+To try this example you should follow the [DALI ensemble example
+instructions](https://github.com/triton-inference-server/dali_backend/tree/main/docs/examples/inception_ensemble).
