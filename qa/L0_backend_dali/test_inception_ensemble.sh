@@ -29,10 +29,10 @@ export CUDA_VISIBLE_DEVICES=0
 
 DALI_BACKEND_DIR=$1
 
-CLIENT_PY=$DALI_BACKEND_DIR/qa/rn50_ensemble/ensemble_client.py
+CLIENT_PY=$DALI_BACKEND_DIR/qa/inception_ensemble/ensemble_client.py
 CLIENT_LOG="./client.log"
 
-MODEL_REPO=$DALI_BACKEND_DIR/docs/examples/rn50_ensemble/model_repository
+MODEL_REPO=$DALI_BACKEND_DIR/docs/examples/inception_ensemble/model_repository
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$MODEL_REPO"
@@ -40,7 +40,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 pushd $MODEL_REPO/..
-/bin/bash -x ./setup_resnet50_example.sh
+/bin/bash -x ./setup_inception_example.sh
 popd
 
 run_server
@@ -53,7 +53,7 @@ fi
 RET=0
 
 set +e
-python $CLIENT_PY --img_dir $DALI_BACKEND_DIR/qa/rn50_ensemble/images --model_name ensemble_dali_resnet -v --batch_size 3 >>$CLIENT_LOG 2>&1
+python $CLIENT_PY --img_dir $DALI_BACKEND_DIR/qa/inception_ensemble/images --model_name ensemble_dali_inception --batch_size 3 >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
   RET=1
 fi
