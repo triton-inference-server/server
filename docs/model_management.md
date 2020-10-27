@@ -31,7 +31,7 @@
 Triton provides model management APIs are part of the [HTTP/REST and
 GRPC protocols, and as part of the C
 API](inference_protocols.md). Triton operates in one of three model
-control modes: NONE, POLL, or EXPLICIT. The model control mode
+control modes: NONE, EXPLICIT or POLL. The model control mode
 determines how changes to the model repository are handled by Triton
 and which of these protocols and APIs are available.
 
@@ -64,7 +64,11 @@ After startup, all model load and unload actions must be initiated
 explicitly by using the [model control
 protocol](protocols/extension_model_repository.md). The response
 status of the model control request indicates success or failure of
-the load or unload action.
+the load or unload action. When attempting to reload an already loaded
+model, if the reload fails for any reason the already loaded model
+will be unchanged and will remain loaded. If the reload succeeds, the
+newly loaded model will replace the already loaded model without any
+loss in availability for the model.
 
 This model control mode is enabled by specifying
 --model-control-mode=explicit. Changing the model repository while
@@ -78,11 +82,17 @@ startup. Models that Triton is not able to load will be marked as
 UNAVAILABLE and will not be available for inferencing.
 
 Changes to the model repository will be detected and Triton will
-attempt to load and unload models as necessary based on those
-changes. Changes to the model repository may not be detected
-immediately because Triton polls the repository periodically. You can
-control the polling interval with the --repository-poll-secs
-option. The console log or the [model ready
+attempt to load and unload models as necessary based on those changes.
+When attempting to reload an already loaded model, if the reload fails
+for any reason the already loaded model will be unchanged and will
+remain loaded. If the reload succeeds, the newly loaded model will
+replace the already loaded model without any loss of availability for
+the model.
+
+Changes to the model repository may not be detected immediately
+because Triton polls the repository periodically. You can control the
+polling interval with the --repository-poll-secs option. The console
+log or the [model ready
 protocol](https://github.com/kubeflow/kfserving/blob/master/docs/predict-api/v2/required_api.md)
 or the index operation of the [model control
 protocol](protocols/extension_model_repository.md) can be used to
