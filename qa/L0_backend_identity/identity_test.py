@@ -159,15 +159,23 @@ if __name__ == '__main__':
     # Reuse a single client for all sync tests
     with client_util.InferenceServerClient(FLAGS.url,
                                            verbose=FLAGS.verbose) as client:
-        for model_name, np_dtype, shape in (("identity_fp32", np.float32, [
-                1, 0
-        ]), ("identity_fp32", np.float32,
-             [1, 5]), ("identity_uint32", np.uint32,
-                       [4, 0]), ("identity_uint32", np.uint32, [8, 5]),
-                                            ("identity_nobatch_int8", np.int8,
-                                             [0]), ("identity_nobatch_int8",
-                                                    np.int8, [7])):
-            input_data = (16384 * np.random.randn(*shape)).astype(np_dtype)
+        for model_name, np_dtype, shape in (
+            # yapf: disable
+            ("identity_fp32", np.float32, [1, 0]),
+            ("identity_fp32", np.float32, [1, 5]),
+            ("identity_uint32", np.uint32, [4, 0]),
+            ("identity_uint32", np.uint32, [8, 5]),
+            ("identity_nobatch_int8", np.int8, [0]),
+            ("identity_nobatch_int8", np.int8, [7]),
+            ("identity_bytes", object, [1, 1])):
+            # yapf: enable
+            if np_dtype != object:
+                input_data = (16384 * np.random.randn(*shape)).astype(np_dtype)
+            else:
+                in0 = (16384 * np.ones(shape, dtype='int'))
+                in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                dtype=object)
+                input_data = in0n.reshape(in0.shape)
             inputs = [
                 client_util.InferInput("INPUT0", input_data.shape,
                                        np_to_triton_dtype(input_data.dtype))
@@ -182,6 +190,9 @@ if __name__ == '__main__':
             if output_data is None:
                 print("error: expected 'OUTPUT0'")
                 sys.exit(1)
+
+            if np_dtype == object:
+                output_data = np.char.decode(output_data)
 
             if not np.array_equal(output_data, input_data):
                 print("error: expected output {} to match input {}".format(

@@ -38,6 +38,10 @@ source ../common/util.sh
 rm -fr *.log ./all_models
 
 cp -r ./models ./all_models
+cp -r ./models/identity_fp32 ./all_models/identity_bytes
+(cd all_models/identity_bytes && \
+          sed -i "s/^name:.*/name: \"identity_bytes\"/" config.pbtxt && \
+          sed -i "s/TYPE_FP32/TYPE_STRING/g" config.pbtxt)
 cp -r ./models/identity_fp32 ./all_models/identity_nobatch_int8
 (cd all_models/identity_nobatch_int8 && \
           sed -i "s/^name:.*/name: \"identity_nobatch_int8\"/" config.pbtxt && \
@@ -71,9 +75,25 @@ done
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Validate the byte_sizes reported by backend
+OLDIFS=$IFS; IFS=','
+for i in "byte_size = 0, 6", \
+         "byte_size = 7, 2", \
+         "byte_size = 16, 6", \
+         "byte_size = 20, 2", \
+         "byte_size = 160, 2" \
+         ; do set -- $i; \
+    if [[ $(cat $SERVER_LOG | grep $1 | wc -l) -ne $2 ]]; then
+        echo -e "\n***\n*** Test Failed $1 $2\n***"
+        RET=1
+    fi
+done
+IFS=$OLDIFS
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
+    cat $SERVER_LOG
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
