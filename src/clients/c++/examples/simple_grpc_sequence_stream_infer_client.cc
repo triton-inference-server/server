@@ -273,11 +273,11 @@ main(int argc, char** argv)
 
 
   for (size_t i = 0; i < result0_data.size(); i++) {
-    int32_t seq0_expected = (i == 0) ? 1 : values[i];
-    int32_t seq1_expected = (i == 0) ? 101 : values[i] * -1;
+    int32_t seq0_expected = (i == 0) ? 1 : values[i-1];
+    int32_t seq1_expected = (i == 0) ? 101 : values[i-1] * -1;
     // The dyna_sequence custom backend adds the sequence ID to
     // the last request in a sequence.
-    if (dyna_sequence && (values[i] == 1)) {
+    if (dyna_sequence && (i != 0) && (values[i-1] == 1)) {
       seq0_expected += sequence_id0;
       seq1_expected += sequence_id1;
     }
