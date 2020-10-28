@@ -222,6 +222,8 @@ class InferenceProfiler {
     return nic::Error::Success;
   }
 
+  bool IncludeServerStats() { return include_server_stats_; }
+
  private:
   InferenceProfiler(
       const bool verbose, const double stability_threshold,

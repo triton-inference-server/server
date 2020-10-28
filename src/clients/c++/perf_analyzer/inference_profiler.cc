@@ -530,7 +530,9 @@ InferenceProfiler::Measure(PerfStatus& status_summary)
   nic::InferStat start_stat;
   nic::InferStat end_stat;
 
-  RETURN_IF_ERROR(GetServerSideStatus(&start_status));
+  if (include_server_stats_) {
+    RETURN_IF_ERROR(GetServerSideStatus(&start_status));
+  }
   RETURN_IF_ERROR(manager_->GetAccumulatedClientStat(&start_stat));
 
   // Wait for specified time interval in msec
@@ -541,7 +543,9 @@ InferenceProfiler::Measure(PerfStatus& status_summary)
 
   // Get server status and then print report on difference between
   // before and after status.
-  RETURN_IF_ERROR(GetServerSideStatus(&end_status));
+  if (include_server_stats_) {
+    RETURN_IF_ERROR(GetServerSideStatus(&end_status));
+  }
 
   TimestampVector current_timestamps;
   RETURN_IF_ERROR(manager_->SwapTimestamps(current_timestamps));
@@ -577,8 +581,10 @@ InferenceProfiler::Summarize(
       start_stat, end_stat, valid_range.second - valid_range.first,
       latencies.size(), valid_sequence_count, delayed_request_count, summary));
 
-  RETURN_IF_ERROR(
-      SummarizeServerStats(start_status, end_status, &(summary.server_stats)));
+  if (include_server_stats_) {
+    RETURN_IF_ERROR(SummarizeServerStats(
+        start_status, end_status, &(summary.server_stats)));
+  }
 
   return nic::Error::Success;
 }
