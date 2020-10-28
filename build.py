@@ -40,22 +40,36 @@ from distutils.dir_util import copy_tree
 #
 # Build Triton Inference Server.
 #
+
+# By default build.py builds the Triton container. The VERSION file
+# indicates the Triton version and TRITON_VERSION_MAP is used to
+# determine the corresponding container version and upstream container
+# version (upstream containers are dependencies required by
+# Triton). These versions may be overridden. See docs/build.md for
+# more information.
+
+# Map from Triton version to corresponding container and component versions.
+#
+#   triton version ->
+#     (triton container version,
+#      upstream container version,
+#      ORT version,
+#      ORT openvino version
+#     )
+TRITON_VERSION_MAP = {
+    '2.2.0': ('20.08', '20.08', '1.4.0', '2020.2'),
+    '2.3.0': ('20.09', '20.09', '1.4.0', '2020.2'),
+    '2.4.0dev': ('20.09', '20.09', '1.4.0', '2020.2'),
+    '2.4.0': ('20.10', '20.10', '1.4.0', '2020.2'),
+    '2.5.0dev': ('20.11dev', '20.10', '1.4.0', '2020.2')
+}
+
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['pytorch', 'tensorrt', 'custom', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali'
 ]
 FLAGS = None
-
-# Map from container version to corresponding component versions
-# container-version -> (upstream container version, ort version, ort openvino version)
-CONTAINER_VERSION_MAP = {
-    '20.08': ('20.08', '1.4.0', '2020.2'),  # 2.2.0
-    '20.09': ('20.09', '1.4.0', '2020.2'),  # 2.3.0
-    '20.10dev': ('20.09', '1.4.0', '2020.2'),  # 2.4.0dev
-    '20.10': ('20.10', '1.4.0', '2020.2'),  # 2.4.0
-    '20.11dev': ('20.10', '1.4.0', '2020.2')  # 2.5.0dev
-}
 
 
 def log(msg, force=False):
@@ -282,24 +296,33 @@ def dali_cmake_args():
     ]
 
 
-def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
+def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
     df = '''
 #
 # Multistage build.
 #
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
-
 ARG BASE_IMAGE={}
+'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
+           argmap['BASE_IMAGE'])
+    if 'pytorch' in backends:
+        df += '''
 ARG PYTORCH_IMAGE={}
-
+'''.format(argmap['PYTORCH_IMAGE'])
+    if 'onnxruntime' in backends:
+        df += '''
 ARG ONNX_RUNTIME_VERSION={}
 ARG ONNX_RUNTIME_OPENVINO_VERSION={}
+'''.format(argmap['ONNX_RUNTIME_VERSION'],
+           argmap['ONNX_RUNTIME_OPENVINO_VERSION'])
 
+    if 'pytorch' in backends:
+        df += '''
 ############################################################################
 ## PyTorch stage: Use PyTorch container for libtorch and torchvision
 ############################################################################
-FROM ${{PYTORCH_IMAGE}} AS tritonserver_pytorch
+FROM ${PYTORCH_IMAGE} AS tritonserver_pytorch
 
 # Must rebuild in the pytorch container to disable some features that
 # are not relevant for inferencing and so that OpenCV libraries are
@@ -320,11 +343,14 @@ RUN cd pytorch && \
     USE_OPENCV=OFF USE_LEVELDB=OFF USE_LMDB=OFF USE_REDIS=OFF \
     BUILD_TEST=OFF \
     pip install --no-cache-dir -v .
+'''
 
+    if 'onnxruntime' in backends:
+        df += '''
 ############################################################################
 ## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
 ############################################################################
-FROM ${{BASE_IMAGE}} AS tritonserver_onnx
+FROM ${BASE_IMAGE} AS tritonserver_onnx
 
 # Onnx Runtime release version from top of file
 ARG ONNX_RUNTIME_VERSION
@@ -336,7 +362,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
 
-RUN git clone -b rel-${{ONNX_RUNTIME_VERSION}} --recursive https://github.com/Microsoft/onnxruntime && \
+RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive https://github.com/Microsoft/onnxruntime && \
     (cd onnxruntime && \
             git submodule update --init --recursive)
 
@@ -345,9 +371,9 @@ ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 # Copy patches into container...
 COPY build/onnxruntime /tmp/trtis/build/onnxruntime
 
-RUN sed -i "s/backend-test-tools.*//" ${{SCRIPT_DIR}}/install_onnx.sh
-RUN cp -r ${{SCRIPT_DIR}} /tmp/scripts && \
-    ${{SCRIPT_DIR}}/install_ubuntu.sh -p 3.6 -o 18.04 && ${{SCRIPT_DIR}}/install_deps.sh -p 3.6
+RUN sed -i "s/backend-test-tools.*//" ${SCRIPT_DIR}/install_onnx.sh
+RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
+    ${SCRIPT_DIR}/install_ubuntu.sh -p 3.6 -o 18.04 && ${SCRIPT_DIR}/install_deps.sh -p 3.6
 
 ENV PATH /usr/bin:$PATH
 RUN cmake --version
@@ -358,8 +384,8 @@ ARG ONNX_RUNTIME_OPENVINO_VERSION
 # Nested text replacement to skip installing CMake via distribution
 # as it downgrades the version (need >= 3.11.0)
 RUN sed -i 's/\\.\\/install_dependencies\\.sh/sed -i "s\\/cmake \\\\\\\\\\\\\\\\\\/\\\\\\\\\\\\\\\\\\/" install_dependencies\\.sh\\n\\.\\/install_dependencies\\.sh/' /tmp/scripts/install_openvino.sh
-RUN /tmp/scripts/install_openvino.sh -o ${{ONNX_RUNTIME_OPENVINO_VERSION}}
-ENV INTEL_OPENVINO_DIR /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}
+RUN /tmp/scripts/install_openvino.sh -o ${ONNX_RUNTIME_OPENVINO_VERSION}
+ENV INTEL_OPENVINO_DIR /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}
 ENV LD_LIBRARY_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_OPENVINO_DIR/deployment_tools/:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:$INTEL_OPENVINO_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
 
 ENV PYTHONPATH $INTEL_OPENVINO_DIR/tools:$PYTHONPATH
@@ -397,11 +423,13 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
 # Record version of ONNX installed for ORT testing,
 # different versions are installed, but the last one is the latest for ORT
 RUN echo "import onnx; print(onnx.__version__)" | python3 > /workspace/ort_onnx_version.txt
+'''
 
+    df += '''
 ############################################################################
 ## Final stage: Install and arrange all dependencies needed for build
 ############################################################################
-FROM ${{BASE_IMAGE}} AS tritonserver_build
+FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
@@ -445,7 +473,9 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
     apt-get update && \
     apt-get install -y --no-install-recommends cmake
-
+'''
+    if 'pytorch' in backends:
+        df += '''
 # LibTorch and Torchvision headers and libraries
 COPY --from=tritonserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
@@ -474,7 +504,9 @@ RUN cd /opt/tritonserver/lib/pytorch && \
     for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
     done
-
+'''
+    if 'onnxruntime' in backends:
+        df += '''
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
@@ -489,7 +521,7 @@ COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/pr
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
-COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${{ONNX_RUNTIME_VERSION}} \
+COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
      /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/LICENSE \
      /opt/tritonserver/backends/onnxruntime/
@@ -498,56 +530,55 @@ COPY --from=tritonserver_onnx /workspace/ort_onnx_version.txt \
 COPY --from=tritonserver_onnx /workspace/build/Release/onnxruntime_perf_test \
      /opt/tritonserver/backends/onnxruntime/
 RUN cd /opt/tritonserver/backends/onnxruntime && \
-    ln -sf libonnxruntime.so.${{ONNX_RUNTIME_VERSION}} libonnxruntime.so
+    ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
 ARG ONNX_RUNTIME_OPENVINO_VERSION
 COPY --from=tritonserver_onnx /workspace/build/Release/external/ngraph/lib/libovep_ngraph.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libngraph.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libngraph.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/plugins.xml \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/plugins.xml \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/lib/intel64/libinference_engine_lp_transformations.so \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/deployment_tools/inference_engine/lib/intel64/libinference_engine_lp_transformations.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /data/dldt/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}/LICENSE \
+COPY --from=tritonserver_onnx /data/dldt/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}/LICENSE \
      /opt/tritonserver/backends/onnxruntime/LICENSE.openvino
 RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libtbb.so.2 libtbb.so && \
     for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
     done
-
+'''
+    df += '''
 WORKDIR /workspace
 RUN rm -fr *
 COPY . .
-
+'''
+    if 'onnxruntime' in backends:
+        df += '''
 # Copy ONNX custom op library and model (Needed for testing)
 COPY --from=tritonserver_onnx /workspace/build/Release/libcustom_op_library.so \
     /workspace/qa/L0_custom_ops/
 COPY --from=tritonserver_onnx /workspace/build/Release/testdata/custom_op_library/custom_op_test.onnx \
     /workspace/qa/L0_custom_ops/
-
+'''
+    df += '''
 ENTRYPOINT []
-
-ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
-'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
-           argmap['BASE_IMAGE'], argmap['PYTORCH_IMAGE'],
-           argmap['ONNX_RUNTIME_VERSION'],
-           argmap['ONNX_RUNTIME_OPENVINO_VERSION'])
-
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+'''
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -595,11 +626,15 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
 LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
 
 ENV PATH /opt/tritonserver/bin:${{PATH}}
-
+'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
+           argmap['BASE_IMAGE'])
+    if 'pytorch' in backends:
+        df += '''
 # Need to include pytorch in LD_LIBRARY_PATH since Torchvision loads custom
 # ops from that path
 ENV LD_LIBRARY_PATH /opt/tritonserver/lib/pytorch/:$LD_LIBRARY_PATH
-
+'''
+    df += '''
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
@@ -639,10 +674,15 @@ COPY --chown=1000:1000 LICENSE .
 COPY --chown=1000:1000 VERSION .
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
+'''
+    if 'pytorch' in backends:
+        df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/lib/pytorch lib/pytorch
+'''
+    if 'onnxruntime' in backends:
+        df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/onnxruntime/* backends/onnxruntime/
-'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
-           argmap['BASE_IMAGE'])
+'''
 
     # Only need the backends directory if we built some non-core
     # backends.
@@ -653,10 +693,12 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backen
 '''
             break
 
-    df += '''
+    if 'onnxruntime' in backends:
+        df += '''
 # Get ONNX version supported
 RUN export ONNX_VERSION=`cat backends/onnxruntime/ort_onnx_version.txt`
-
+'''
+    df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
@@ -693,20 +735,31 @@ def container_build(backends, images):
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
 
-    if 'pytorch' in images:
-        pytorch_image = images['pytorch']
-    else:
-        pytorch_image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
-            FLAGS.upstream_container_version)
-
     dockerfileargmap = {
         'TRITON_VERSION': FLAGS.version,
         'TRITON_CONTAINER_VERSION': FLAGS.container_version,
         'BASE_IMAGE': base_image,
-        'PYTORCH_IMAGE': pytorch_image,
-        'ONNX_RUNTIME_VERSION': FLAGS.onnx_runtime_version,
-        'ONNX_RUNTIME_OPENVINO_VERSION': FLAGS.onnx_runtime_openvino_version
     }
+
+    # If building the pytorch backend then need to include pytorch in
+    # buildbase image.
+    if 'pytorch' in backends:
+        if 'pytorch' in images:
+            pytorch_image = images['pytorch']
+        else:
+            pytorch_image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
+                FLAGS.upstream_container_version)
+        dockerfileargmap['PYTORCH_IMAGE'] = pytorch_image
+
+    # If building the ORT backend then need to include ORT in
+    # buildbase image.
+    if 'onnxruntime' in backends:
+        if FLAGS.version not in TRITON_VERSION_MAP:
+            fail('ONNX Runtime version not known for {}'.format(FLAGS.version))
+        dockerfileargmap['ONNX_RUNTIME_VERSION'] = TRITON_VERSION_MAP[
+            FLAGS.version][2]
+        dockerfileargmap['ONNX_RUNTIME_OPENVINO_VERSION'] = TRITON_VERSION_MAP[
+            FLAGS.version][3]
 
     cachefrommap = [
         'tritonserver_pytorch', 'tritonserver_pytorch_cache0',
@@ -724,28 +777,29 @@ def container_build(backends, images):
 
     log_verbose('buildbase container {}'.format(commonargs + cachefromargs))
     create_dockerfile_buildbase(FLAGS.build_dir, 'Dockerfile.buildbase',
-                                dockerfileargmap)
+                                dockerfileargmap, backends)
     try:
         # First build Dockerfile.buildbase. Because of the way Docker
         # does caching with multi-stage images, we must build each
-        # stage separately to make sure it is cached (specifically
-        # this is needed for CI builds where the build starts with a
-        # clean docker cache each time).
+        # stage separately to make sure it is cached.
 
         # PyTorch
-        p = subprocess.Popen(commonargs + cachefromargs + [
-            '-t', 'tritonserver_pytorch', '--target', 'tritonserver_pytorch',
-            '.'
-        ])
-        p.wait()
-        fail_if(p.returncode != 0, 'docker build tritonserver_pytorch failed')
+        if 'pytorch' in backends:
+            p = subprocess.Popen(commonargs + cachefromargs + [
+                '-t', 'tritonserver_pytorch', '--target',
+                'tritonserver_pytorch', '.'
+            ])
+            p.wait()
+            fail_if(p.returncode != 0,
+                    'docker build tritonserver_pytorch failed')
 
         # ONNX Runtime
-        p = subprocess.Popen(
-            commonargs + cachefromargs +
-            ['-t', 'tritonserver_onnx', '--target', 'tritonserver_onnx', '.'])
-        p.wait()
-        fail_if(p.returncode != 0, 'docker build tritonserver_onnx failed')
+        if 'onnxruntime' in backends:
+            p = subprocess.Popen(commonargs + cachefromargs + [
+                '-t', 'tritonserver_onnx', '--target', 'tritonserver_onnx', '.'
+            ])
+            p.wait()
+            fail_if(p.returncode != 0, 'docker build tritonserver_onnx failed')
 
         # Final buildbase image
         p = subprocess.Popen(commonargs + cachefromargs +
@@ -766,41 +820,28 @@ def container_build(backends, images):
         # Next run build.py inside the container with the same flags
         # as was used to run this instance, except:
         #
-        # --container-version is removed so that a direct build is
-        # performed within the container
+        # --non-container-build is added so that within the buildbase
+        # container we just created we do not attempt to do a nested
+        # container build
         #
-        # Add --upstream-container-version, --onnx-runtime-version and
-        # --onnx-runtime-openvino-version if necessary since these
-        # FLAGS can be set manually and so may not be in sys.argv
+        # Add --version, --container-version and
+        # --upstream-container-version flags since they can be set
+        # automatically and so may not be in sys.argv
         #
         # --build-dir is added/overridden to 'build_dir'
         #
         # --install-dir is added/overridden to 'install_dir'
         #
         # --container-prebuild-command needs to be quoted correctly
-        runargs = []
-        skip_arg = False
-        for a in sys.argv[1:]:
-            if skip_arg:
-                skip_arg = False
-                continue
-            if a == '--container-version':
-                skip_arg = True
-                continue
-            elif a.startswith('--container-version='):
-                continue
-            runargs.append(a)
-
+        runargs = sys.argv[1:]
+        runargs.append('--non-container-build')
+        if FLAGS.version is not None:
+            runargs += ['--version', FLAGS.version]
+        if FLAGS.container_version is not None:
+            runargs += ['--container-version', FLAGS.container_version]
         if FLAGS.upstream_container_version is not None:
             runargs += [
                 '--upstream-container-version', FLAGS.upstream_container_version
-            ]
-        if FLAGS.onnx_runtime_version is not None:
-            runargs += ['--onnx-runtime-version', FLAGS.onnx_runtime_version]
-        if FLAGS.onnx_runtime_openvino_version is not None:
-            runargs += [
-                '--onnx-runtime-openvino-version',
-                FLAGS.onnx_runtime_openvino_version
             ]
 
         runargs += ['--build-dir', build_dir]
@@ -907,6 +948,11 @@ if __name__ == '__main__':
                           required=False,
                           help='Enable verbose output.')
 
+    parser.add_argument('--non-container-build',
+                        action="store_true",
+                        required=False,
+                        help='Do not use Docker container for build.')
+
     parser.add_argument(
         '--build-dir',
         type=str,
@@ -942,38 +988,26 @@ if __name__ == '__main__':
         help=
         'The GitHub organization containing the repos used for the build. Defaults to "https://github.com/triton-inference-server".'
     )
-    parser.add_argument('--version',
-                        type=str,
-                        required=False,
-                        default='0.0.0',
-                        help='The Triton version.')
+    parser.add_argument(
+        '--version',
+        type=str,
+        required=False,
+        help=
+        'The Triton version. If not specified defaults to the value in VERSION file.'
+    )
     parser.add_argument(
         '--container-version',
         type=str,
         required=False,
         help=
-        'The Triton container version. When this argument is given Docker will be used for the build.'
+        'The Triton container version to build. If not specified the container version will be chosen automatically based on --version value.'
     )
     parser.add_argument(
         '--upstream-container-version',
         type=str,
         required=False,
         help=
-        'The upstream container version to use when performing a container build. If not specified the upstream container version will be chosen automaticallly based on --container-version.'
-    )
-    parser.add_argument(
-        '--onnx-runtime-version',
-        type=str,
-        required=False,
-        help=
-        'The ONNX Runtime version to use. If not specified the upstream container version will be chosen automaticallly based on --container-version.'
-    )
-    parser.add_argument(
-        '--onnx-runtime-openvino-version',
-        type=str,
-        required=False,
-        help=
-        'The ONNX Runtime OpenVINO version to use. If not specified the upstream container version will be chosen automaticallly based on --container-version.'
+        'The upstream container version to use for the build. If not specified the upstream container version will be chosen automatically based on --version value.'
     )
     parser.add_argument(
         '--container-prebuild-command',
@@ -1070,19 +1104,22 @@ if __name__ == '__main__':
     if FLAGS.filesystem is None:
         FLAGS.filesystem = []
 
-    if FLAGS.container_version is not None:
-        if FLAGS.container_version not in CONTAINER_VERSION_MAP:
-            fail('unsupported container version {}'.format(
-                FLAGS.container_version))
-        if FLAGS.upstream_container_version is None:
-            FLAGS.upstream_container_version = CONTAINER_VERSION_MAP[
-                FLAGS.container_version][0]
-        if FLAGS.onnx_runtime_version is None:
-            FLAGS.onnx_runtime_version = CONTAINER_VERSION_MAP[
-                FLAGS.container_version][1]
-        if FLAGS.onnx_runtime_openvino_version is None:
-            FLAGS.onnx_runtime_openvino_version = CONTAINER_VERSION_MAP[
-                FLAGS.container_version][2]
+    # Determine the versions. Start with Triton version, if --version
+    # is not explicitly specified read from VERSION file.
+    if FLAGS.version is None:
+        with open('VERSION', "r") as vfile:
+            FLAGS.version = vfile.readline().strip()
+    # For other versions use the TRITON_VERSION_MAP unless explicitly
+    # given.
+    if FLAGS.container_version is None:
+        if FLAGS.version not in TRITON_VERSION_MAP:
+            fail('container version not known for {}'.format(FLAGS.version))
+        FLAGS.container_version = TRITON_VERSION_MAP[FLAGS.version][0]
+    if FLAGS.upstream_container_version is None:
+        if FLAGS.version not in TRITON_VERSION_MAP:
+            fail('upstream container version not known for {}'.format(
+                FLAGS.version))
+        FLAGS.upstream_container_version = TRITON_VERSION_MAP[FLAGS.version][1]
 
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
@@ -1106,10 +1143,10 @@ if __name__ == '__main__':
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
 
-    # If --container-version is specified then we perform the actual
+    # If --container-build is specified then we perform the actual
     # build within a build container and then from that create a
     # tritonserver container holding the results of the build.
-    if FLAGS.container_version is not None:
+    if not FLAGS.non_container_build:
         container_build(backends, images)
         sys.exit(0)
 
@@ -1125,8 +1162,6 @@ if __name__ == '__main__':
         FLAGS.install_dir = os.path.join(FLAGS.build_dir, "opt", "tritonserver")
     if FLAGS.build_parallel is None:
         FLAGS.build_parallel = multiprocessing.cpu_count() * 2
-    if FLAGS.version is None:
-        FLAGS.version = '0.0.0'
 
     # Initialize map of common components and repo-tag for each.
     components = {'common': 'main', 'core': 'main', 'backend': 'main'}
