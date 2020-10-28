@@ -108,7 +108,7 @@ nic::Error
 ReportClientSideStats(
     const ClientSideStats& stats, const int64_t percentile,
     const ProtocolType protocol, const bool verbose,
-    const bool on_sequence_model, const bool display_lib_stats)
+    const bool on_sequence_model, const bool include_lib_stats)
 {
   const uint64_t avg_latency_us = stats.avg_latency_ns / 1000;
   const uint64_t std_us = stats.std_us;
@@ -120,7 +120,7 @@ ReportClientSideStats(
       avg_request_time_us - avg_send_time_us - avg_receive_time_us;
 
   std::string client_library_detail = "    ";
-  if (display_lib_stats) {
+  if (include_lib_stats) {
     if (protocol == ProtocolType::GRPC) {
       client_library_detail +=
           "Avg gRPC time: " + std::to_string(avg_request_time_us) + " usec (";
@@ -186,15 +186,17 @@ nic::Error
 Report(
     const PerfStatus& summary, const int64_t percentile,
     const ProtocolType protocol, const bool verbose,
-    const bool display_lib_stats)
+    const bool include_lib_stats, const bool include_server_stats)
 {
   std::cout << "  Client: " << std::endl;
   ReportClientSideStats(
       summary.client_stats, percentile, protocol, verbose,
-      summary.on_sequence_model, display_lib_stats);
+      summary.on_sequence_model, include_lib_stats);
 
-  std::cout << "  Server: " << std::endl;
-  ReportServerSideStats(summary.server_stats, 1);
+  if (include_server_stats) {
+    std::cout << "  Server: " << std::endl;
+    ReportServerSideStats(summary.server_stats, 1);
+  }
 
   return nic::Error::Success;
 }
@@ -236,6 +238,14 @@ InferenceProfiler::InferenceProfiler(
 {
   load_parameters_.stability_threshold = stability_threshold;
   load_parameters_.stability_window = 3;
+  // Measure and report client library stats only when the model
+  // is not decoupled.
+  include_lib_stats_ = (!parser_->IsDecoupled());
+  // Measure and report server statistics only when the server
+  // supports the statistics extension.
+  std::set<std::string> extensions;
+  profile_client_->ServerExtensions(&extensions);
+  include_server_stats_ = (extensions.find("statistics") != extensions.end());
 }
 
 nic::Error
@@ -257,8 +267,8 @@ InferenceProfiler::Profile(
   err = ProfileHelper(false /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
     err = Report(
-        status_summary, percentile_, protocol_, verbose_,
-        (!parser_->IsDecoupled()));
+        status_summary, percentile_, protocol_, verbose_, include_lib_stats_,
+        include_server_stats_);
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -304,8 +314,8 @@ InferenceProfiler::Profile(
   err = ProfileHelper(false /*clean_starts*/, status_summary, &is_stable);
   if (err.IsOk()) {
     err = Report(
-        status_summary, percentile_, protocol_, verbose_,
-        (!parser_->IsDecoupled()));
+        status_summary, percentile_, protocol_, verbose_, include_lib_stats_,
+        include_server_stats_);
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -348,8 +358,8 @@ InferenceProfiler::Profile(
   err = ProfileHelper(true /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
     err = Report(
-        status_summary, percentile_, protocol_, verbose_,
-        (!parser_->IsDecoupled()));
+        status_summary, percentile_, protocol_, verbose_, include_lib_stats_,
+        include_server_stats_);
     summary.push_back(status_summary);
     uint64_t stabilizing_latency_ms =
         status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -717,7 +727,7 @@ InferenceProfiler::SummarizeClientStat(
   summary.client_stats.infer_per_sec =
       (valid_request_count * summary.batch_size) / client_duration_sec;
 
-  if (!parser_->IsDecoupled()) {
+  if (include_lib_stats_) {
     size_t completed_count =
         end_stat.completed_request_count - start_stat.completed_request_count;
     uint64_t request_time_ns = end_stat.cumulative_total_request_time_ns -
