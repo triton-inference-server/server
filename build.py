@@ -59,7 +59,7 @@ from distutils.dir_util import copy_tree
 TRITON_VERSION_MAP = {'2.6.0dev': ('20.12dev', '20.10', '1.5.3', '2020.4')}
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
-CORE_BACKENDS = ['pytorch', 'tensorrt', 'custom', 'ensemble']
+CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch'
 ]
@@ -209,7 +209,7 @@ def core_cmake_args(components, backends, install_dir):
                 fail('unknown core backend {}'.format(be))
 
     cargs.append(
-        '-DTRITON_EXTRA_LIB_PATHS=/opt/tritonserver/lib;/opt/tritonserver/lib/caffe2'
+        '-DTRITON_EXTRA_LIB_PATHS=/opt/tritonserver/lib'
     )
     cargs.append('/workspace/build')
     return cargs

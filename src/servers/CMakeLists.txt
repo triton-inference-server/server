@@ -423,7 +423,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/caffe2"
+    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch"
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonserver.ldscript
     LINK_FLAGS "-Wl,--version-script libtritonserver.ldscript"
 )
