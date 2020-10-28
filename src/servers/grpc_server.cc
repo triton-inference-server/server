@@ -216,12 +216,20 @@ class CommonCallData : public GRPCServer::ICallData {
   CommonCallData(
       const std::string& name, const uint64_t id,
       const StandardRegisterFunc OnRegister,
-      const StandardCallbackFunc OnCallback)
-      : name_(name), id_(id), OnRegister_(OnRegister), OnCallback_(OnCallback),
-        responder_(&ctx_), step_(Steps::START)
+      const StandardCallbackFunc OnExecute, const bool async,
+      grpc::ServerCompletionQueue* cq)
+      : name_(name), id_(id), OnRegister_(OnRegister), OnExecute_(OnExecute),
+        async_(async), cq_(cq), responder_(&ctx_), step_(Steps::START)
   {
     OnRegister_(&ctx_, &request_, &responder_, this);
     LOG_VERBOSE(1) << "Ready for RPC '" << name_ << "', " << id_;
+  }
+
+  ~CommonCallData()
+  {
+    if (async_thread_.joinable()) {
+      async_thread_.join();
+    }
   }
 
   bool Process(bool ok) override;
@@ -231,15 +239,26 @@ class CommonCallData : public GRPCServer::ICallData {
   uint64_t Id() override { return id_; }
 
  private:
+  void Execute();
+  void AddToCompletionQueue();
+  void WriteResponse();
+
   const std::string name_;
   const uint64_t id_;
   const StandardRegisterFunc OnRegister_;
-  const StandardCallbackFunc OnCallback_;
+  const StandardCallbackFunc OnExecute_;
+  const bool async_;
+  grpc::ServerCompletionQueue* cq_;
 
   grpc::ServerContext ctx_;
+  grpc::Alarm alarm_;
 
   ResponderType responder_;
   RequestType request_;
+  ResponseType response_;
+  grpc::Status status_;
+
+  std::thread async_thread_;
 
   Steps step_;
 };
@@ -257,28 +276,68 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Process(bool rpc_ok)
   // we can do since we one execute one step.
   const bool shutdown = (!rpc_ok && (step_ == Steps::START));
   if (shutdown) {
+    if (async_thread_.joinable()) {
+      async_thread_.join();
+    }
     step_ = Steps::FINISH;
   }
 
   if (step_ == Steps::START) {
-    ResponseType response;
-    grpc::Status status;
+    // Start a new request to replace this one...
+    if (!shutdown) {
+      new CommonCallData<ResponderType, RequestType, ResponseType>(
+          name_, id_ + 1, OnRegister_, OnExecute_, async_, cq_);
+    }
 
-    OnCallback_(request_, &response, &status);
-
-    step_ = Steps::COMPLETE;
-
-    responder_.Finish(response, status, this);
+    if (!async_) {
+      // For synchronous calls, execute and write response
+      // here.
+      Execute();
+      WriteResponse();
+    } else {
+      // For asynchronous calls, delegate the execution to another
+      // thread.
+      step_ = Steps::ISSUED;
+      async_thread_ = std::thread(&CommonCallData::Execute, this);
+    }
+  } else if (step_ == Steps::WRITEREADY) {
+    // Will only come here for asynchronous mode.
+    WriteResponse();
   } else if (step_ == Steps::COMPLETE) {
     step_ = Steps::FINISH;
   }
 
-  if (!shutdown && (step_ == Steps::FINISH)) {
-    new CommonCallData<ResponderType, RequestType, ResponseType>(
-        name_, id_ + 1, OnRegister_, OnCallback_);
-  }
-
   return step_ != Steps::FINISH;
+}
+
+template <typename ResponderType, typename RequestType, typename ResponseType>
+void
+CommonCallData<ResponderType, RequestType, ResponseType>::Execute()
+{
+  OnExecute_(request_, &response_, &status_);
+  step_ = Steps::WRITEREADY;
+
+  if (async_) {
+    // For asynchronous operation, need to add itself onto the completion
+    // queue so that the response can be written once the object is
+    // taken up next for execution.
+    AddToCompletionQueue();
+  }
+}
+
+template <typename ResponderType, typename RequestType, typename ResponseType>
+void
+CommonCallData<ResponderType, RequestType, ResponseType>::AddToCompletionQueue()
+{
+  alarm_.Set(cq_, gpr_now(gpr_clock_type::GPR_CLOCK_REALTIME), this);
+}
+
+template <typename ResponderType, typename RequestType, typename ResponseType>
+void
+CommonCallData<ResponderType, RequestType, ResponseType>::WriteResponse()
+{
+  step_ = Steps::COMPLETE;
+  responder_.Finish(response_, status_, this);
 }
 
 //
@@ -410,7 +469,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ServerLiveResponse>,
       inference::ServerLiveRequest, inference::ServerLiveResponse>(
-      "ServerLive", 0, OnRegisterServerLive, OnExecuteServerLive);
+      "ServerLive", 0, OnRegisterServerLive, OnExecuteServerLive,
+      false /* async */, cq_);
 
   //
   //  ServerReady
@@ -442,7 +502,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>,
       inference::ServerReadyRequest, inference::ServerReadyResponse>(
-      "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady);
+      "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady,
+      false /* async */, cq_);
 
   //
   //  ModelReady
@@ -480,7 +541,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>,
       inference::ModelReadyRequest, inference::ModelReadyResponse>(
-      "ModelReady", 0, OnRegisterModelReady, OnExecuteModelReady);
+      "ModelReady", 0, OnRegisterModelReady, OnExecuteModelReady,
+      false /* async */, cq_);
 
   //
   //  ServerMetadata
@@ -554,7 +616,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>,
       inference::ServerMetadataRequest, inference::ServerMetadataResponse>(
-      "ServerMetadata", 0, OnRegisterServerMetadata, OnExecuteServerMetadata);
+      "ServerMetadata", 0, OnRegisterServerMetadata, OnExecuteServerMetadata,
+      false /* async */, cq_);
 
   //
   //  ModelMetadata
@@ -718,7 +781,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ModelMetadataResponse>,
       inference::ModelMetadataRequest, inference::ModelMetadataResponse>(
-      "ModelMetadata", 0, OnRegisterModelMetadata, OnExecuteModelMetadata);
+      "ModelMetadata", 0, OnRegisterModelMetadata, OnExecuteModelMetadata,
+      false /* async */, cq_);
 
   //
   //  ModelConfig
@@ -765,7 +829,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>,
       inference::ModelConfigRequest, inference::ModelConfigResponse>(
-      "ModelConfig", 0, OnRegisterModelConfig, OnExecuteModelConfig);
+      "ModelConfig", 0, OnRegisterModelConfig, OnExecuteModelConfig,
+      false /* async */, cq_);
 
   //
   //  ModelStatistics
@@ -1031,8 +1096,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>,
       inference::ModelStatisticsRequest, inference::ModelStatisticsResponse>(
-      "ModelStatistics", 0, OnRegisterModelStatistics,
-      OnExecuteModelStatistics);
+      "ModelStatistics", 0, OnRegisterModelStatistics, OnExecuteModelStatistics,
+      false /* async */, cq_);
 
 
   //
@@ -1104,7 +1169,7 @@ CommonHandler::SetUpAllRequests()
       inference::SystemSharedMemoryStatusRequest,
       inference::SystemSharedMemoryStatusResponse>(
       "SystemSharedMemoryStatus", 0, OnRegisterSystemSharedMemoryStatus,
-      OnExecuteSystemSharedMemoryStatus);
+      OnExecuteSystemSharedMemoryStatus, false /* async */, cq_);
 
 
   //
@@ -1140,7 +1205,7 @@ CommonHandler::SetUpAllRequests()
       inference::SystemSharedMemoryRegisterRequest,
       inference::SystemSharedMemoryRegisterResponse>(
       "SystemSharedMemoryRegister", 0, OnRegisterSystemSharedMemoryRegister,
-      OnExecuteSystemSharedMemoryRegister);
+      OnExecuteSystemSharedMemoryRegister, false /* async */, cq_);
 
 
   //
@@ -1180,7 +1245,7 @@ CommonHandler::SetUpAllRequests()
       inference::SystemSharedMemoryUnregisterRequest,
       inference::SystemSharedMemoryUnregisterResponse>(
       "SystemSharedMemoryUnregister", 0, OnRegisterSystemSharedMemoryUnregister,
-      OnExecuteSystemSharedMemoryUnregister);
+      OnExecuteSystemSharedMemoryUnregister, false /* async */, cq_);
 
 
   //
@@ -1243,7 +1308,7 @@ CommonHandler::SetUpAllRequests()
       inference::CudaSharedMemoryStatusRequest,
       inference::CudaSharedMemoryStatusResponse>(
       "CudaSharedMemoryStatus", 0, OnRegisterCudaSharedMemoryStatus,
-      OnExecuteCudaSharedMemoryStatus);
+      OnExecuteCudaSharedMemoryStatus, false /* async */, cq_);
 
 
   //
@@ -1291,7 +1356,7 @@ CommonHandler::SetUpAllRequests()
       inference::CudaSharedMemoryRegisterRequest,
       inference::CudaSharedMemoryRegisterResponse>(
       "CudaSharedMemoryRegister", 0, OnRegisterCudaSharedMemoryRegister,
-      OnExecuteCudaSharedMemoryRegister);
+      OnExecuteCudaSharedMemoryRegister, false /* async */, cq_);
 
   //
   // CudaSharedMemoryUnregister
@@ -1330,7 +1395,7 @@ CommonHandler::SetUpAllRequests()
       inference::CudaSharedMemoryUnregisterRequest,
       inference::CudaSharedMemoryUnregisterResponse>(
       "CudaSharedMemoryUnregister", 0, OnRegisterCudaSharedMemoryUnregister,
-      OnExecuteCudaSharedMemoryUnregister);
+      OnExecuteCudaSharedMemoryUnregister, false /* async */, cq_);
 
   //
   // RepositoryIndex
@@ -1426,8 +1491,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>,
       inference::RepositoryIndexRequest, inference::RepositoryIndexResponse>(
-      "RepositoryIndex", 0, OnRegisterRepositoryIndex,
-      OnExecuteRepositoryIndex);
+      "RepositoryIndex", 0, OnRegisterRepositoryIndex, OnExecuteRepositoryIndex,
+      false /* async */, cq_);
 
   //
   // RepositoryModelLoad
@@ -1467,7 +1532,7 @@ CommonHandler::SetUpAllRequests()
       inference::RepositoryModelLoadRequest,
       inference::RepositoryModelLoadResponse>(
       "RepositoryModelLoad", 0, OnRegisterRepositoryModelLoad,
-      OnExecuteRepositoryModelLoad);
+      OnExecuteRepositoryModelLoad, true /* async */, cq_);
 
   //
   // RepositoryModelUnload
@@ -1507,7 +1572,7 @@ CommonHandler::SetUpAllRequests()
       inference::RepositoryModelUnloadRequest,
       inference::RepositoryModelUnloadResponse>(
       "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
-      OnExecuteRepositoryModelUnload);
+      OnExecuteRepositoryModelUnload, true /* async */, cq_);
 }
 
 //=========================================================================
