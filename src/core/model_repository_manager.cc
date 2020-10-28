@@ -43,8 +43,8 @@
 #include <cuda_runtime_api.h>
 #endif
 
-#ifdef TRITON_ENABLE_CUSTOM
 #include "src/backends/backend/backend_factory.h"
+#ifdef TRITON_ENABLE_CUSTOM
 #include "src/backends/custom/custom_backend_factory.h"
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
@@ -342,8 +342,8 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::map<uintptr_t, std::unique_ptr<BackendInfo>> unloading_backends_;
   std::recursive_mutex map_mtx_;
 
-#ifdef TRITON_ENABLE_CUSTOM
   std::unique_ptr<TritonBackendFactory> triton_backend_factory_;
+#ifdef TRITON_ENABLE_CUSTOM
   std::unique_ptr<CustomBackendFactory> custom_factory_;
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_TENSORRT
@@ -366,6 +366,11 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
       new BackendLifeCycle(min_compute_capability));
+  {
+    RETURN_IF_ERROR(TritonBackendFactory::Create(
+        server, backend_cmdline_config_map,
+        &(local_life_cycle->triton_backend_factory_)));
+  }
 #ifdef TRITON_ENABLE_TENSORRT
   {
     const std::shared_ptr<BackendConfig>& config =
@@ -388,11 +393,6 @@ ModelRepositoryManager::BackendLifeCycle::Create(
         backend_config_map.find(kCustomPlatform)->second;
     RETURN_IF_ERROR(CustomBackendFactory::Create(
         config, &(local_life_cycle->custom_factory_)));
-  }
-  {
-    RETURN_IF_ERROR(TritonBackendFactory::Create(
-        server, backend_cmdline_config_map,
-        &(local_life_cycle->triton_backend_factory_)));
   }
 #endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
@@ -878,13 +878,10 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 
   // If 'backend' is specified in the config then use the new triton
   // backend.
-#ifdef TRITON_ENABLE_CUSTOM
   if (!model_config.backend().empty()) {
     status = triton_backend_factory_->CreateBackend(
         backend_info->repository_path_, model_name, version, model_config, &is);
-  } else
-#endif  // TRITON_ENABLE_CUSTOM
-  {
+  } else {
     switch (backend_info->platform_) {
 #ifdef TRITON_ENABLE_TENSORRT
       case Platform::PLATFORM_TENSORRT_PLAN:
