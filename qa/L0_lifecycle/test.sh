@@ -988,9 +988,7 @@ for protocol in grpc http; do
     kill $SERVER_PID
     wait $SERVER_PID
 
-    if [[ $protocol == "grpc" ]]; then
-        unset TRITONSERVER_USE_GRPC
-    fi
+    unset TRITONSERVER_USE_GRPC
 
     LOG_IDX=$((LOG_IDX+1))
 done
@@ -1039,9 +1037,7 @@ for protocol in grpc http; do
     kill $SERVER_PID
     wait $SERVER_PID
 
-    if [[ $protocol == "grpc" ]]; then
-        unset TRITONSERVER_USE_GRPC
-    fi
+    unset TRITONSERVER_USE_GRPC
 
     LOG_IDX=$((LOG_IDX+1))
 done
@@ -1131,9 +1127,7 @@ for protocol in grpc http; do
     kill $SERVER_PID
     wait $SERVER_PID
 
-    if [[ $protocol == "grpc" ]]; then
-       unset TRITONSERVER_USE_GRPC
-    fi
+    unset TRITONSERVER_USE_GRPC
 
     LOG_IDX=$((LOG_IDX+1))
 done 
