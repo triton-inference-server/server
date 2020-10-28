@@ -1179,7 +1179,8 @@ EnsembleScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
-  request->CaptureQueueStartNs() INFER_TRACE_ACTIVITY(
+  request->CaptureQueueStartNs();
+  INFER_TRACE_ACTIVITY(
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
