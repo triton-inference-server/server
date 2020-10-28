@@ -446,10 +446,6 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     apt-get update && \
     apt-get install -y --no-install-recommends cmake
 
-# BASE_IMAGE can be a tritonserver image so we must remove any
-# existing triton install before copying in the new components.
-RUN rm -fr /opt/*
-
 # LibTorch and Torchvision headers and libraries
 COPY --from=tritonserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
@@ -694,7 +690,7 @@ def container_build(backends, images):
     if 'base' in images:
         base_image = images['base']
     else:
-        base_image = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
+        base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
 
     if 'pytorch' in images:
