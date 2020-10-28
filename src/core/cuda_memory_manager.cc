@@ -77,8 +77,9 @@ Status
 CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
 {
   if (instance_ != nullptr) {
-    return Status(
-        Status::Code::ALREADY_EXISTS, "CudaMemoryManager has been created");
+    LOG_INFO << "New CUDA memory pools could not be created since they already "
+                "exists.";
+    return Status::Success;
   }
 
   std::set<int> supported_gpus;

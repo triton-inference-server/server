@@ -179,8 +179,10 @@ Status
 PinnedMemoryManager::Create(const Options& options)
 {
   if (instance_ != nullptr) {
-    return Status(
-        Status::Code::ALREADY_EXISTS, "PinnedMemoryManager has been created");
+    LOG_INFO << "New pinned memory pool of size "
+             << options.pinned_memory_pool_byte_size_
+             << " could not be created since one already exists.";
+    return Status::Success;
   }
 
   void* buffer = nullptr;
