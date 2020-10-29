@@ -489,9 +489,10 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
   }
 
 #ifdef TRITON_ENABLE_STATS
+  request->CaptureRequestStartNs();
   INFER_TRACE_ACTIVITY(
       request->Trace(), TRITONSERVER_TRACE_REQUEST_START,
-      request->CaptureRequestStartNs());
+      request->RequestStartNs());
 #endif  // TRITON_ENABLE_STATS
 
   return InferenceRequest::Run(request);

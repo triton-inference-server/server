@@ -61,6 +61,9 @@ class TritonClientWrapper {
       std::shared_ptr<nic::Headers> http_headers, const bool verbose,
       std::unique_ptr<TritonClientWrapper>* triton_client);
 
+  /// Get the server metadata from the server
+  nic::Error ServerExtensions(std::set<std::string>* server_extensions);
+
   /// Get the model metadata from the server for specified name and
   /// version as rapidjson DOM object.
   nic::Error ModelMetadata(

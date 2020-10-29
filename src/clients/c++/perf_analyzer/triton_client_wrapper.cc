@@ -69,6 +69,38 @@ TritonClientWrapper::Create(
 }
 
 nic::Error
+TritonClientWrapper::ServerExtensions(std::set<std::string>* extensions)
+{
+  extensions->clear();
+  if (protocol_ == ProtocolType::HTTP) {
+    std::string server_metadata;
+    FAIL_IF_ERR(
+        client_.http_client_->ServerMetadata(&server_metadata, *http_headers_),
+        "unable to get server metadata");
+
+    rapidjson::Document server_metadata_json;
+    FAIL_IF_ERR(
+        nic::ParseJson(&server_metadata_json, server_metadata),
+        "failed to parse server metadata");
+    for (const auto& extension :
+         server_metadata_json["extensions"].GetArray()) {
+      extensions->insert(
+          std::string(extension.GetString(), extension.GetStringLength()));
+    }
+  } else {
+    inference::ServerMetadataResponse server_metadata;
+    FAIL_IF_ERR(
+        client_.grpc_client_->ServerMetadata(&server_metadata, *http_headers_),
+        "unable to get server metadata");
+    for (const auto& extension : server_metadata.extensions()) {
+      extensions->insert(extension);
+    }
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
 TritonClientWrapper::ModelMetadata(
     rapidjson::Document* model_metadata, const std::string& model_name,
     const std::string& model_version)

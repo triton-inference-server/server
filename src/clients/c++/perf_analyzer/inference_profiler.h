@@ -222,6 +222,8 @@ class InferenceProfiler {
     return nic::Error::Success;
   }
 
+  bool IncludeServerStats() { return include_server_stats_; }
+
  private:
   InferenceProfiler(
       const bool verbose, const double stability_threshold,
@@ -402,4 +404,7 @@ class InferenceProfiler {
   std::unique_ptr<TritonClientWrapper> profile_client_;
   std::unique_ptr<LoadManager> manager_;
   LoadParams load_parameters_;
+
+  bool include_lib_stats_;
+  bool include_server_stats_;
 };

@@ -1301,10 +1301,13 @@ main(int argc, char** argv)
       } else {
         ofs << "Request Rate,";
       }
-      ofs << "Inferences/Second,Client Send,"
-          << "Network+Server Send/Recv,Server Queue,"
-          << "Server Compute Input,Server Compute Infer,"
-          << "Server Compute Output,Client Recv";
+      ofs << "Inferences/Second,Client Send,";
+      if (profiler->IncludeServerStats()) {
+        ofs << "Network+Server Send/Recv,Server Queue,"
+            << "Server Compute Input,Server Compute Infer,"
+            << "Server Compute Output,";
+      }
+      ofs << "Client Recv";
       for (const auto& percentile :
            summary[0].client_stats.percentile_latency_ns) {
         ofs << ",p" << percentile.first << " latency";
@@ -1319,31 +1322,6 @@ main(int argc, char** argv)
           });
 
       for (PerfStatus& status : summary) {
-        uint64_t avg_queue_ns = status.server_stats.queue_time_ns /
-                                status.server_stats.success_count;
-        uint64_t avg_compute_input_ns =
-            status.server_stats.compute_input_time_ns /
-            status.server_stats.success_count;
-        uint64_t avg_compute_infer_ns =
-            status.server_stats.compute_infer_time_ns /
-            status.server_stats.success_count;
-        uint64_t avg_compute_output_ns =
-            status.server_stats.compute_output_time_ns /
-            status.server_stats.success_count;
-
-        uint64_t avg_compute_ns =
-            avg_compute_input_ns + avg_compute_infer_ns + avg_compute_output_ns;
-
-        uint64_t avg_client_wait_ns = status.client_stats.avg_latency_ns -
-                                      status.client_stats.avg_send_time_ns -
-                                      status.client_stats.avg_receive_time_ns;
-        // Network misc is calculated by subtracting data from different
-        // measurements (server v.s. client), so the result needs to be capped
-        // at 0
-        uint64_t avg_network_misc_ns =
-            avg_client_wait_ns > (avg_queue_ns + avg_compute_ns)
-                ? avg_client_wait_ns - (avg_queue_ns + avg_compute_ns)
-                : 0;
         if (target_concurrency) {
           ofs << status.concurrency << ",";
         } else {
@@ -1351,12 +1329,41 @@ main(int argc, char** argv)
         }
 
         ofs << status.client_stats.infer_per_sec << ","
-            << (status.client_stats.avg_send_time_ns / 1000) << ","
-            << (avg_network_misc_ns / 1000) << "," << (avg_queue_ns / 1000)
-            << "," << (avg_compute_input_ns / 1000) << ","
-            << (avg_compute_infer_ns / 1000) << ","
-            << (avg_compute_output_ns / 1000) << ","
-            << (status.client_stats.avg_receive_time_ns / 1000);
+            << (status.client_stats.avg_send_time_ns / 1000) << ",";
+        if (profiler->IncludeServerStats()) {
+          uint64_t avg_queue_ns = status.server_stats.queue_time_ns /
+                                  status.server_stats.success_count;
+          uint64_t avg_compute_input_ns =
+              status.server_stats.compute_input_time_ns /
+              status.server_stats.success_count;
+          uint64_t avg_compute_infer_ns =
+              status.server_stats.compute_infer_time_ns /
+              status.server_stats.success_count;
+          uint64_t avg_compute_output_ns =
+              status.server_stats.compute_output_time_ns /
+              status.server_stats.success_count;
+
+          uint64_t avg_compute_ns = avg_compute_input_ns +
+                                    avg_compute_infer_ns +
+                                    avg_compute_output_ns;
+
+          uint64_t avg_client_wait_ns = status.client_stats.avg_latency_ns -
+                                        status.client_stats.avg_send_time_ns -
+                                        status.client_stats.avg_receive_time_ns;
+          // Network misc is calculated by subtracting data from different
+          // measurements (server v.s. client), so the result needs to be capped
+          // at 0
+          uint64_t avg_network_misc_ns =
+              avg_client_wait_ns > (avg_queue_ns + avg_compute_ns)
+                  ? avg_client_wait_ns - (avg_queue_ns + avg_compute_ns)
+                  : 0;
+
+          ofs << (avg_network_misc_ns / 1000) << "," << (avg_queue_ns / 1000)
+              << "," << (avg_compute_input_ns / 1000) << ","
+              << (avg_compute_infer_ns / 1000) << ","
+              << (avg_compute_output_ns / 1000) << ",";
+        }
+        ofs << (status.client_stats.avg_receive_time_ns / 1000);
         for (const auto& percentile :
              status.client_stats.percentile_latency_ns) {
           ofs << "," << (percentile.second / 1000);
@@ -1365,61 +1372,66 @@ main(int argc, char** argv)
       }
       ofs.close();
 
-      // Record composing model stat in a separate file
-      if (!summary.front().server_stats.composing_models_stat.empty()) {
-        // For each of the composing model, generate CSV file in the same format
-        // as the one for ensemble.
-        for (const auto& model_identifier :
-             summary[0].server_stats.composing_models_stat) {
-          const auto& name = model_identifier.first.first;
-          const auto& version = model_identifier.first.second;
-          const auto name_ver = name + "_v" + version;
+      if (profiler->IncludeServerStats()) {
+        // Record composing model stat in a separate file.
+        if (!summary.front().server_stats.composing_models_stat.empty()) {
+          // For each of the composing model, generate CSV file in the same
+          // format as the one for ensemble.
+          for (const auto& model_identifier :
+               summary[0].server_stats.composing_models_stat) {
+            const auto& name = model_identifier.first.first;
+            const auto& version = model_identifier.first.second;
+            const auto name_ver = name + "_v" + version;
 
-          std::ofstream ofs(name_ver + "." + filename, std::ofstream::out);
-          if (target_concurrency) {
-            ofs << "Concurrency,";
-          } else {
-            ofs << "Request Rate,";
-          }
-          ofs << "Inferences/Second,Client Send,"
-              << "Network+Server Send/Recv,Server Queue,"
-              << "Server Compute Input,Server Compute Infer,"
-              << "Server Compute Output,Client Recv";
-
-          for (PerfStatus& status : summary) {
-            auto it = status.server_stats.composing_models_stat.find(
-                model_identifier.first);
-            const auto& stats = it->second;
-            uint64_t avg_queue_ns = stats.queue_time_ns / stats.success_count;
-            uint64_t avg_compute_input_ns =
-                stats.compute_input_time_ns / stats.success_count;
-            uint64_t avg_compute_infer_ns =
-                stats.compute_infer_time_ns / stats.success_count;
-            uint64_t avg_compute_output_ns =
-                stats.compute_output_time_ns / stats.success_count;
-            uint64_t avg_compute_ns = avg_compute_input_ns +
-                                      avg_compute_infer_ns +
-                                      avg_compute_output_ns;
-            uint64_t avg_overhead_ns = stats.cumm_time_ns / stats.success_count;
-            avg_overhead_ns =
-                (avg_overhead_ns > (avg_queue_ns + avg_compute_ns))
-                    ? (avg_overhead_ns - avg_queue_ns - avg_compute_ns)
-                    : 0;
-            // infer / sec of the composing model is calculated using the
-            // request count ratio between the composing model and the ensemble
-            double infer_ratio =
-                1.0 * stats.success_count / status.server_stats.success_count;
-            double infer_per_sec =
-                infer_ratio * status.client_stats.infer_per_sec;
+            std::ofstream ofs(name_ver + "." + filename, std::ofstream::out);
             if (target_concurrency) {
-              ofs << status.concurrency << ",";
+              ofs << "Concurrency,";
             } else {
-              ofs << status.request_rate << ",";
+              ofs << "Request Rate,";
             }
-            ofs << infer_per_sec << ",0," << (avg_overhead_ns / 1000) << ","
-                << (avg_queue_ns / 1000) << "," << (avg_compute_input_ns / 1000)
-                << "," << (avg_compute_infer_ns / 1000) << ","
-                << (avg_compute_output_ns / 1000) << ",0" << std::endl;
+            ofs << "Inferences/Second,Client Send,"
+                << "Network+Server Send/Recv,Server Queue,"
+                << "Server Compute Input,Server Compute Infer,"
+                << "Server Compute Output,Client Recv";
+
+            for (PerfStatus& status : summary) {
+              auto it = status.server_stats.composing_models_stat.find(
+                  model_identifier.first);
+              const auto& stats = it->second;
+              uint64_t avg_queue_ns = stats.queue_time_ns / stats.success_count;
+              uint64_t avg_compute_input_ns =
+                  stats.compute_input_time_ns / stats.success_count;
+              uint64_t avg_compute_infer_ns =
+                  stats.compute_infer_time_ns / stats.success_count;
+              uint64_t avg_compute_output_ns =
+                  stats.compute_output_time_ns / stats.success_count;
+              uint64_t avg_compute_ns = avg_compute_input_ns +
+                                        avg_compute_infer_ns +
+                                        avg_compute_output_ns;
+              uint64_t avg_overhead_ns =
+                  stats.cumm_time_ns / stats.success_count;
+              avg_overhead_ns =
+                  (avg_overhead_ns > (avg_queue_ns + avg_compute_ns))
+                      ? (avg_overhead_ns - avg_queue_ns - avg_compute_ns)
+                      : 0;
+              // infer / sec of the composing model is calculated using the
+              // request count ratio between the composing model and the
+              // ensemble
+              double infer_ratio =
+                  1.0 * stats.success_count / status.server_stats.success_count;
+              double infer_per_sec =
+                  infer_ratio * status.client_stats.infer_per_sec;
+              if (target_concurrency) {
+                ofs << status.concurrency << ",";
+              } else {
+                ofs << status.request_rate << ",";
+              }
+              ofs << infer_per_sec << ",0," << (avg_overhead_ns / 1000) << ","
+                  << (avg_queue_ns / 1000) << ","
+                  << (avg_compute_input_ns / 1000) << ","
+                  << (avg_compute_infer_ns / 1000) << ","
+                  << (avg_compute_output_ns / 1000) << ",0" << std::endl;
+            }
           }
         }
       }
