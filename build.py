@@ -377,14 +377,14 @@ RUN unattended-upgrade
 
 # Install OpenVINO
 ARG ONNX_RUNTIME_OPENVINO_VERSION
-ENV INTEL_OPENVINO_DIR=/opt/intel/openvino_${{ONNX_RUNTIME_OPENVINO_VERSION}}.287
-ENV InferenceEngine_DIR=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/share
-ENV IE_PLUGINS_PATH=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/lib/intel64
-ENV LD_LIBRARY_PATH=/opt/intel/opencl:${{INTEL_OPENVINO_DIR}}/inference_engine/external/gna/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/mkltiny_lnx/lib:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/omp/lib:${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/tbb/lib:$IE_PLUGINS_PATH:$LD_LIBRARY_PATH
-ENV OpenCV_DIR=${{INTEL_OPENVINO_DIR}}/opencv/share/OpenCV
-ENV LD_LIBRARY_PATH=${{INTEL_OPENVINO_DIR}}/opencv/lib:${{INTEL_OPENVINO_DIR}}/opencv/share/OpenCV/3rdparty/lib:$LD_LIBRARY_PATH
-ENV HDDL_INSTALL_DIR=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/hddl
-ENV LD_LIBRARY_PATH=${{INTEL_OPENVINO_DIR}}/deployment_tools/inference_engine/external/hddl/lib:$LD_LIBRARY_PATH
+ENV INTEL_OPENVINO_DIR=/opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.287
+ENV InferenceEngine_DIR=${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/share
+ENV IE_PLUGINS_PATH=${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/lib/intel64
+ENV LD_LIBRARY_PATH=/opt/intel/opencl:${INTEL_OPENVINO_DIR}/inference_engine/external/gna/lib:${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/mkltiny_lnx/lib:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/omp/lib:${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/tbb/lib:$IE_PLUGINS_PATH:$LD_LIBRARY_PATH
+ENV OpenCV_DIR=${INTEL_OPENVINO_DIR}/opencv/share/OpenCV
+ENV LD_LIBRARY_PATH=${INTEL_OPENVINO_DIR}/opencv/lib:${INTEL_OPENVINO_DIR}/opencv/share/OpenCV/3rdparty/lib:$LD_LIBRARY_PATH
+ENV HDDL_INSTALL_DIR=${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/hddl
+ENV LD_LIBRARY_PATH=${INTEL_OPENVINO_DIR}/deployment_tools/inference_engine/external/hddl/lib:$LD_LIBRARY_PATH
 ENV LANG en_US.UTF-8
 
 RUN wget https://apt.repos.intel.com/openvino/2020/GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
@@ -392,10 +392,10 @@ RUN wget https://apt.repos.intel.com/openvino/2020/GPG-PUB-KEY-INTEL-OPENVINO-20
     cd /etc/apt/sources.list.d && \
     echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \ 
     apt update && \
-    apt -y install intel-openvino-dev-ubuntu18-${{ONNX_RUNTIME_OPENVINO_VERSION}}.287
+    apt -y install intel-openvino-dev-ubuntu18-${ONNX_RUNTIME_OPENVINO_VERSION}.287
 # Text replacement to skip installing CMake via distribution
 # as it downgrades the version (need >= 3.11.0)
-RUN cd ${{INTEL_OPENVINO_DIR}}/install_dependencies && \
+RUN cd ${INTEL_OPENVINO_DIR}/install_dependencies && \
     sed -i 's/cmake//' install_openvino_dependencies.sh && \
     ./install_openvino_dependencies.sh
 
@@ -415,7 +415,7 @@ RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
     ln -s /etc/alternatives/libcudnn_so /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64/libcudnn.so
 
 # Install ONNX Runtime
-RUN git clone -b rel-${{ONNX_RUNTIME_VERSION}} --recursive ${{ONNXRUNTIME_REPO}} onnxruntime && \
+RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive ${ONNXRUNTIME_REPO} onnxruntime && \
     (cd onnxruntime && \
             git submodule update --init --recursive)
 RUN /bin/sh onnxruntime/dockerfiles/scripts/install_common_deps.sh
