@@ -33,7 +33,7 @@ import tritonclient.http as httpclient
 
 
 def TestIdentityInference(np_array, binary_data):
-    model_name = "savedmodel_zero_1_object"
+    model_name = "simple_identity"
     inputs = []
     outputs = []
 

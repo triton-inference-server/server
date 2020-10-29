@@ -1,0 +1,27 @@
+name: "simple_int8"
+platform: "tensorflow_graphdef"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT8
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT8
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT8
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT8
+    dims: [ 16 ]
+  }
+]

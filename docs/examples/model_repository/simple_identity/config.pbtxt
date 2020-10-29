@@ -1,0 +1,19 @@
+
+name: "simple_identity"
+platform: "tensorflow_savedmodel"
+max_batch_size: 8
+
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
