@@ -49,6 +49,7 @@ PointerToString(void* ptr)
 }  // namespace
 
 std::unique_ptr<PinnedMemoryManager> PinnedMemoryManager::instance_;
+uint64_t PinnedMemoryManager::pinned_memory_byte_size_;
 
 PinnedMemoryManager::PinnedMemoryManager(
     void* pinned_memory_buffer, uint64_t size)
@@ -179,9 +180,10 @@ Status
 PinnedMemoryManager::Create(const Options& options)
 {
   if (instance_ != nullptr) {
-    LOG_INFO << "New pinned memory pool of size "
-             << options.pinned_memory_pool_byte_size_
-             << " could not be created since one already exists.";
+    LOG_WARNING << "New pinned memory pool of size "
+                << options.pinned_memory_pool_byte_size_
+                << " could not be created since one already exists"
+                << " of size " << pinned_memory_byte_size_;
     return Status::Success;
   }
 
@@ -200,6 +202,7 @@ PinnedMemoryManager::Create(const Options& options)
 #endif  // TRITON_ENABLE_GPU
   instance_.reset(
       new PinnedMemoryManager(buffer, options.pinned_memory_pool_byte_size_));
+  pinned_memory_byte_size_ = options.pinned_memory_pool_byte_size_;
   return Status::Success;
 }
 
