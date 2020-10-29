@@ -92,7 +92,7 @@ set LD_LIBRARY_PATH in the "docker run" command or inside the
 container.
 
 ```bash
-$ export LD_LIBRARY_PATH=/opt/tritonserver/lib/tensorflow:$LD_LIBRARY_PATH
+$ export LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1:$LD_LIBRARY_PATH
 ```
 
 A limitation of this approach is that the custom operations must be
