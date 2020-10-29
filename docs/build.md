@@ -29,7 +29,7 @@
 # Building Triton
 
 Triton is built using the [build.py](../build.py) script. The build.py
-script supports for the Docker build and a non-Docker build:
+script supports both a Docker build and a non-Docker build.
 
 * [Build using Docker](#building-triton-with-docker) and the
   TensorFlow and PyTorch containers from [NVIDIA GPU Cloud
@@ -42,7 +42,7 @@ script supports for the Docker build and a non-Docker build:
 The easiest way to build Triton is to use Docker. The result of the
 build will be a Docker image called *tritonserver* that will contain
 the tritonserver executable in /opt/tritonserver/bin and the required
-shared libraries in /opt/tritonserver/lib. The backend built for
+shared libraries in /opt/tritonserver/lib. The backends built for
 Triton will be in /opt/tritonserver/backends (note that as of the
 20.10 release the PyTorch and TensorRT backends are still included in
 the core of Triton and so do not appear in
@@ -50,35 +50,25 @@ the core of Triton and so do not appear in
 
 Building with Docker ensures that all the correct CUDA, cudnn,
 TensorRT and other dependencies are handled for you. A Docker build is
-enabled by using the --container-version flag with build.py. By
-default no Triton features are enabled. The following build.py
+the default when using build.py.
+
+By default no Triton features are enabled. The following build.py
 invocation builds all features and backends.
 
 ```
-$ ./build.py --version=<version> --container-version=<container version> --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --backend=custom --backend=ensemble --backend=tensorrt --backend=pytorch --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=python:<container tag> --backend=dali:<container tag>
-```
-
-Where <version> is the version to assign to Triton and <container
-version> is the version to assign to the produced Docker
-image. Typically you will set <version> to something meaningful for
-your build and set <container version> to the value associated with
-the Triton version found in the VERSION file. You can find these
-associated values in CONTAINER_VERSION_MAP in build.py. For example,
-if the VERSION file contents are "2.4.0dev" then the build invocation
-should be:
-
-```
-$ ./build.py --version=0.0.0 --container-version=20.10dev ...
+$ ./build.py --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --backend=custom --backend=ensemble --backend=tensorrt --backend=pytorch --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=python:<container tag> --backend=dali:<container tag>
 ```
 
 If you are building on master/main branch then <container tag> should
 be set to "main". If you are building on a release branch you should
 set the <container tag> to match. For example, if you are building on
-the r20.10 branch you should set <container tag> to be "r20.10". If
+the r20.10 branch you should set <container tag> to be "r20.10". You
 can use a different <container tag> for a component to instead use the
 corresponding branch/tag in the build. For example, if you have a
-branch called "mybranch" in the identity_backend repo that you want to
-use in the build, you would specify --backend=identity:mybranch.
+branch called "mybranch" in the
+[identity_backend](https://github.com/triton-inference-server/identity_backend)
+repo that you want to use in the build, you would specify
+--backend=identity:mybranch.
 
 By default build.py clones Triton repos from
 https://github.com/triton-inference-server. Use the
@@ -92,8 +82,8 @@ information.
 ## Building Triton without Docker
 
 To build Triton without using Docker follow the [build.py steps
-described above](#building-triton-with-docker) except do not specify
---container-version.
+described above](#building-triton-with-docker) except that you must
+also specify --no-container-build flag to build.py.
 
 When building without Docker you must install the necessary CUDA
 libraries and other dependencies needed for the build before invoking

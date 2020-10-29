@@ -820,7 +820,7 @@ def container_build(backends, images):
         # Next run build.py inside the container with the same flags
         # as was used to run this instance, except:
         #
-        # --non-container-build is added so that within the buildbase
+        # --no-container-build is added so that within the buildbase
         # container we just created we do not attempt to do a nested
         # container build
         #
@@ -834,7 +834,7 @@ def container_build(backends, images):
         #
         # --container-prebuild-command needs to be quoted correctly
         runargs = sys.argv[1:]
-        runargs.append('--non-container-build')
+        runargs.append('--no-container-build')
         if FLAGS.version is not None:
             runargs += ['--version', FLAGS.version]
         if FLAGS.container_version is not None:
@@ -948,7 +948,7 @@ if __name__ == '__main__':
                           required=False,
                           help='Enable verbose output.')
 
-    parser.add_argument('--non-container-build',
+    parser.add_argument('--no-container-build',
                         action="store_true",
                         required=False,
                         help='Do not use Docker container for build.')
@@ -1146,7 +1146,7 @@ if __name__ == '__main__':
     # If --container-build is specified then we perform the actual
     # build within a build container and then from that create a
     # tritonserver container holding the results of the build.
-    if not FLAGS.non_container_build:
+    if not FLAGS.no_container_build:
         container_build(backends, images)
         sys.exit(0)
 
