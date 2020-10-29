@@ -61,7 +61,8 @@ TRITON_VERSION_MAP = {
     '2.3.0': ('20.09', '20.09', '1.4.0', '2020.2'),
     '2.4.0dev': ('20.09', '20.09', '1.4.0', '2020.2'),
     '2.4.0': ('20.10', '20.10', '1.4.0', '2020.2'),
-    '2.5.0dev': ('20.11dev', '20.10', '1.5.3', '2020.4')
+    '2.5.0dev': ('20.11dev', '20.10', '1.5.3', '2020.4'),
+    '2.5.0': ('20.11', '20.11', '1.5.3', '2020.4')
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -361,7 +362,7 @@ WORKDIR /workspace
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/workspace/cmake-3.14.3-Linux-x86_64/bin:/opt/miniconda/bin:$PATH
 ENV LD_LIBRARY_PATH /opt/miniconda/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
-# The Onnx Runtime dockerfile is the collection of steps in 
+# The Onnx Runtime dockerfile is the collection of steps in
 # https://github.com/microsoft/onnxruntime/tree/v1.5.1/dockerfiles
 
 # Install common dependencies
@@ -390,7 +391,7 @@ ENV LANG en_US.UTF-8
 RUN wget https://apt.repos.intel.com/openvino/2020/GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
     apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2020 && rm GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
     cd /etc/apt/sources.list.d && \
-    echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \ 
+    echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \
     apt update && \
     apt -y install intel-openvino-dev-ubuntu18-${ONNX_RUNTIME_OPENVINO_VERSION}.287
 # Text replacement to skip installing CMake via distribution
