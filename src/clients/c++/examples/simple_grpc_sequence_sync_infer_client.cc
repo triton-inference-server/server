@@ -176,7 +176,8 @@ main(int argc, char** argv)
   // We use the custom "sequence" model which takes 1 input value. The
   // output is the accumulated value of the inputs. See
   // src/custom/sequence.
-  std::string model_name = "simple_sequence";
+  std::string model_name =
+      dyna_sequence ? "simple_dyna_sequence" : "simple_sequence";
 
 
   const uint64_t sequence_id0 = 1 + sequence_id_offset * 2;
@@ -215,11 +216,16 @@ main(int argc, char** argv)
         (v == 1) /* end-of-sequence */, result1_data, http_headers);
   }
 
-
-  int32_t seq0_expected = 0;
-  int32_t seq1_expected = 100;
-
   for (size_t i = 0; i < result0_data.size(); i++) {
+    int32_t seq0_expected = (i == 0) ? 1 : values[i-1];
+    int32_t seq1_expected = (i == 0) ? 101 : values[i-1] * -1;
+    // The dyna_sequence custom backend adds the sequence ID to
+    // the last request in a sequence.
+    if (dyna_sequence && (i != 0) && (values[i-1] == 1)) {
+      seq0_expected += sequence_id0;
+      seq1_expected += sequence_id1;
+    }
+
     std::cout << "[" << i << "] " << result0_data[i] << " : " << result1_data[i]
               << std::endl;
 
@@ -228,18 +234,6 @@ main(int argc, char** argv)
       std::cout << "[ expected ] " << seq0_expected << " : " << seq1_expected
                 << std::endl;
       return 1;
-    }
-
-    if (i < values.size()) {
-      seq0_expected += values[i];
-      seq1_expected -= values[i];
-
-      // The dyna_sequence custom backend adds the sequence ID to
-      // the last request in a sequence.
-      if (dyna_sequence && (values[i] == 1)) {
-        seq0_expected += sequence_id0;
-        seq1_expected += sequence_id1;
-      }
     }
   }
 
