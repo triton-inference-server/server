@@ -31,7 +31,8 @@
 To simplify communication with Triton, the Triton project provides C++
 and Python [client libraries](client_libraries.md). This section
 describes several example applications that show how to use these
-libraries.
+libraries. Many of these examples use models from the [example model
+repository](quickstart.md#create-a-model-repository).
 
 * C++ and Python versions of *image_client*, an example application
   that uses the C++ or Python client library to execute image
