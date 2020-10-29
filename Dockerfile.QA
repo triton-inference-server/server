@@ -83,11 +83,14 @@ RUN mkdir -p qa/common && \
     cp /workspace/src/clients/go/*.go qa/L0_simple_go_client/. && \
     mkdir qa/L0_backend_release/simple_models && \
     cp -r docs/examples/model_repository/simple qa/L0_backend_release/simple_models/. && \
+    mkdir qa/L0_backend_release/simple_seq_models && \
+    cp -r /workspace/docs/examples/model_repository/simple_sequence qa/L0_backend_release/simple_seq_models/. && \
     mkdir qa/L0_shared_memory/models && \
     cp -r docs/examples/model_repository/simple qa/L0_shared_memory/models/. && \
     mkdir qa/L0_cuda_shared_memory/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_client_timeout/models && \
+    cp -r /workspace/docs/examples/model_repository/simple_sequence qa/L0_client_timeout/models/. && \
     mkdir qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/simple_dyna_sequence qa/L0_grpc/models && \
@@ -148,13 +151,7 @@ RUN mkdir -p qa/L0_backend_identity/models && \
     cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
         qa/L0_backend_identity/models/identity_fp32/1/.
 
-RUN mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libsequence.so \
-        qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
-    mkdir -p qa/L0_client_timeout/models/simple_sequence/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libsequence.so \
-        qa/L0_client_timeout/models/simple_sequence/1/. && \
-    mkdir -p qa/custom_models/custom_sequence_int32/1 && \
+RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \
     mkdir -p qa/custom_models/custom_dyna_sequence_int32/1 && \
