@@ -45,7 +45,7 @@ BATCHER_TEST=sequence_batcher_test.py
 if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
-    SERVER_TIMEOUT=2400
+    SERVER_TIMEOUT=3600
     rm -f *.valgrind.log
 
     # Shortened tests due valgrind overhead
