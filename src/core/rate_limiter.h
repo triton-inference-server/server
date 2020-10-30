@@ -31,6 +31,7 @@
 #include <queue>
 #include <vector>
 
+#include "src/backends/backend/triton_model.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
 
@@ -49,6 +50,16 @@ class RateLimiter {
   using StandardStageFunc = std::function<void(ModelInstance*)>;
   using RateLimiterConfig = inference::ModelRateLimiter;
 
+  using ResourceMap = std::map<int, std::map<std::string, size_t>>;
+  enum RESOURCE_KIND_KEY {
+    // Key for holding cpu resources
+    CPU_RESOURCE_KEY = INT_MIN,
+    // Key for holding global resources
+    GLOBAL_RESOURCE_KEY,
+    // Key for holding resources per each device
+    PER_DEVICE_RESOURCE_KEY
+  };
+
   /// Creates a rate limiter object which will funnel the requests to
   /// the model instances. A typical lifetime of the model instance within
   /// RateLimiter transition from available -> staged -> allocated -> available.
@@ -61,25 +72,26 @@ class RateLimiter {
   /// \param ignore_resources_and_priority Whether or not to ignore resource
   /// constraints and cross-model priority. An available instance is directly
   /// allocated when true.
+  /// \param resource_map The map to the available resource count provided
+  /// explicitly.
   /// \return Status object indicating success or failure.
   static Status Create(
-      const bool ignore_resources_and_priority,
+      const bool ignore_resources_and_priority, const ResourceMap& resource_map,
       std::unique_ptr<RateLimiter>* rate_limiter);
 
-  /// Add model to the set of models being managed by the rate limiter.
-  /// \param model_name The name of the model.
-  /// \param version The version of the model.
-  /// \param model_config The configuration of the model.
-  /// \return Status object indicating success or failure.
-  Status AddModel(
-      const std::string& model_name, const int64_t version,
-      const inference::ModelConfig& model_config);
+  /// Registers the model instance with the rate limiter.
+  /// \param instance The pointer to the TritonModelInstance object to register
+  /// with the rate limiter.
+  /// \param rate_limiter_config The rate limiter configuration associated with
+  /// the model instance.
+  Status RegisterModelInstance(
+      const TritonModelInstance* instance,
+      const RateLimiterConfig& rate_limiter_config);
 
   /// Remove model from the set of models being managed by the rate limiter.
-  /// \param model_name The name of the model.
-  /// \param version The version of the model.
+  /// \param model The pointer to TritonModel object to be removed.
   /// \return Status object indicating success or failure.
-  Status RemoveModel(const std::string& model_name, const int64_t version);
+  Status UnregisterModel(const TritonModel* model);
 
   /// Requests one of the available model instance. In future, when the
   /// conditions are met, the callback will be invoked and a pointer to
@@ -91,15 +103,17 @@ class RateLimiter {
   /// must not itself invoke the inference execution but just be used
   /// as a signal to proceed with the execution.
   /// \param OnSchedule The callback function to be called when scheduling.
-  /// \param model_name The name of the model.
-  /// \param version The version of the model.
-  /// \param instance_index The index to a specific instance of the model.
-  /// The default value is -1 which means that an instance with highest
-  /// priority will be selected for the execution.
+  /// \param model The TritonModel object pointer to be used for running the
+  /// inference.
+  /// \param instance The TritonModelInstance object pointer to be used for
+  /// running the inference. The default value is nullptr which means that an
+  /// instance with highest priority will be selected for the execution.
   /// \return Status object indicating success or failure.
   Status RequestModelInstance(
-      const StandardScheduleFunc& OnSchedule, const std::string& model_name,
-      const int64_t version, const int instance_index = -1);
+      const StandardScheduleFunc& OnSchedule, const TritonModel* model,
+      const TritonModelInstance* instance = nullptr);
+
+  bool IgnoreResourcesAndPriority() { return ignore_resources_and_priority_; }
 
   // Holds the state of the model instance.
   class ModelInstance {
@@ -112,20 +126,21 @@ class RateLimiter {
     /// complete. This function releases the resources allocated to
     /// the model instance and sends the instance into the available
     /// pool so that it can serve other requests.
-    void Release();
+    void Release(bool executed);
 
     /// Returns the index of the instance
-    int32_t Index() { return index_; }
+    const TritonModelInstance* RawInstance() const
+    {
+      return triton_model_instance_;
+    }
 
    private:
     ModelInstance(
-        const std::string& model_name, const int64_t version,
-        ModelContext* model_context, const uint32_t index, const int gpu_device,
+        const TritonModelInstance* triton_model_instance,
+        ModelContext* model_context,
         const RateLimiterConfig& rate_limiter_config, StandardStageFunc OnStage,
         StandardReleaseFunc OnRelease);
 
-    std::pair<std::string, int64_t> ModelIdentifier();
-    int32_t DeviceId() const { return gpu_device_; }
     const RateLimiterConfig* GetRateLimiterConfig() const
     {
       return &rate_limiter_config_;
@@ -138,11 +153,8 @@ class RateLimiter {
     void RequestRemoval();
     void WaitForRemoval();
 
-    std::string model_name_;
-    int64_t version_;
+    const TritonModelInstance* triton_model_instance_;
     ModelContext* model_context_;
-    int32_t index_;
-    int gpu_device_;
     RateLimiterConfig rate_limiter_config_;
     StandardStageFunc OnStage_;
     StandardReleaseFunc OnRelease_;
@@ -158,12 +170,10 @@ class RateLimiter {
   };
 
  private:
-  RateLimiter(const bool ignore_resources_and_priority);
+  RateLimiter(
+      const bool ignore_resources_and_priority,
+      const ResourceMap& resource_map);
 
-  void AddModelHelper(
-      const std::string& model_name, const int64_t version, const int device_id,
-      const RateLimiterConfig& rate_limit_config, ModelContext* model_context,
-      std::vector<std::shared_ptr<ModelInstance>>* model_instances);
 
   void OnStage(ModelInstance* instance_ptr);
   void OnRelease(ModelInstance* instance_ptr);
@@ -186,11 +196,12 @@ class RateLimiter {
     ModelContext();
 
     Status EnqueueModelInstanceRequest(
-        const StandardScheduleFunc& OnSchedule, const int instance_index);
+        const StandardScheduleFunc& OnSchedule,
+        const TritonModelInstance* triton_model_instance);
     void AddAvailableInstance(ModelInstance* instance);
     void StageInstanceIfAvailable();
     void AllocateInstanceIfAvailable();
-    void SetSpecificQueueCount(int queue_count);
+    void AddSpecificRequestQueue();
     bool ContainsPendingRequests(int32_t index);
     void RequestRemoval();
     bool isRemovalInProgress() { return removal_in_progress_; }
@@ -211,13 +222,9 @@ class RateLimiter {
   // Manages and keep track of resource allocation to the model instances.
   class ResourceManager {
    public:
-    // GPU device number that indicates that no gpu is available for a
-    // context
-    static constexpr int NO_GPU_DEVICE = -1;
-    // Key for holding global resources
-    static constexpr int GLOBAL_RESOURCE_KEY = -2;
-
-    static Status Create(std::unique_ptr<ResourceManager>* resource_manager);
+    static Status Create(
+        const ResourceMap& resource_map,
+        std::unique_ptr<ResourceManager>* resource_manager);
     void AddModelInstance(const RateLimiter::ModelInstance* instance);
     Status RemoveModelInstance(const RateLimiter::ModelInstance* instance);
     void UpdateResourceLimits();
@@ -225,9 +232,9 @@ class RateLimiter {
     Status ReleaseResources(const RateLimiter::ModelInstance* instance);
 
    private:
-    ResourceManager();
+    ResourceManager(const ResourceMap& resource_map);
 
-    using ResourceMap = std::map<int, std::map<std::string, uint32_t>>;
+    ResourceMap explicit_max_resources_;
 
     std::map<const RateLimiter::ModelInstance*, ResourceMap> model_resources_;
     std::mutex model_resources_mtx_;
@@ -242,14 +249,12 @@ class RateLimiter {
   bool ignore_resources_and_priority_;
 
   // Instances for the models
-  std::map<
-      std::pair<std::string, int64_t>,
-      std::vector<std::shared_ptr<ModelInstance>>>
+  std::map<const TritonModel*, std::vector<std::shared_ptr<ModelInstance>>>
       model_instances_;
   std::mutex model_instances_mtx_;
 
   // Running context of the models
-  std::map<std::pair<std::string, int64_t>, ModelContext> model_contexts_;
+  std::map<const TritonModel*, ModelContext> model_contexts_;
   std::mutex model_contexts_mtx_;
 
   // Holds the model instances that have been staged

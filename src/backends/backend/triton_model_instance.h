@@ -30,6 +30,7 @@
 #include "src/core/constants.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/rate_limiter.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -51,7 +52,7 @@ class TritonModelInstance {
   TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
   int32_t DeviceId() const { return device_id_; }
 
-  TritonModel* Model() { return model_; }
+  TritonModel* Model() const { return model_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
@@ -66,7 +67,11 @@ class TritonModelInstance {
   static Status CreateInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
+      const inference::ModelRateLimiter& rate_limiter_config,
       std::vector<std::unique_ptr<TritonModelInstance>>* instances);
+  static Status RegisterToRateLimiter(
+      const TritonModelInstance* instance,
+      const inference::ModelRateLimiter& rate_limiter_config);
 
   // The TritonModel object that owns this instance. The instance
   // holds this as a raw pointer because the lifetime of the model is

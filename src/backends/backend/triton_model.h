@@ -59,7 +59,7 @@ class TritonModel : public InferenceBackend {
   {
     return localized_model_dir_->Path();
   }
-  InferenceServer* Server() { return server_; }
+  InferenceServer* Server() const { return server_; }
   bool AutoCompleteConfig() const { return auto_complete_config_; }
   Status UpdateModelConfig(
       const uint32_t config_version,

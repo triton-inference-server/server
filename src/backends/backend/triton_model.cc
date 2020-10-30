@@ -32,6 +32,7 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/server.h"
 #include "src/core/server_message.h"
 #include "src/core/tritonserver_apis.h"
 
@@ -164,6 +165,7 @@ TritonModel::Create(
   // already initialized so there is no need to have the scheduler
   // thread call any initialization.
   RETURN_IF_ERROR(local_model->SetConfiguredScheduler(
+      (const void*)raw_local_model,
       local_model->instances_.size() /* runner_cnt */,
       /* Initialization callback */
       [](uint32_t runner_idx) -> Status { return Status::Success; },
@@ -300,6 +302,10 @@ TritonModel::~TritonModel()
   // cleaned up once legacy InferenceBackend is completed replaced by
   // TritonModel.
   scheduler_.reset();
+
+  // Unregister itself from the rate limiter
+  RateLimiter* rate_limiter = server_->GetRateLimiter();
+  rate_limiter->UnregisterModel(this);
 
   // Explicitly delete/finalize all model instances before finalizing
   // the model itself.
