@@ -39,17 +39,21 @@ from tritonclientutils import np_to_triton_dtype, InferenceServerException
 class LargePayLoadTest(tu.TestResultCollector):
 
     def setUp(self):
-        self.data_type_ = np.float32
+        self._data_type = np.float32
         # n GB divided by element size as tensor shape
-        tensor_shape = (math.trunc(6 * (1024 * 1024 * 1024) /
-                                   np.dtype(self.data_type_).itemsize),)
-        self.in0_ = np.random.random(tensor_shape).astype(self.data_type_)
+        very_large_tensor_shape = (math.trunc(6 * (1024 * 1024 * 1024) /
+                                   np.dtype(self._data_type).itemsize),)
+        self._very_large_in0 = np.random.random(very_large_tensor_shape).astype(self._data_type)
+
+        large_tensor_shape = (math.trunc(1.9 * (1024 * 1024 * 1024) //
+                                   np.dtype(self._data_type).itemsize),)
+        self._large_in0 = np.random.random(large_tensor_shape).astype(self._data_type)
 
         small_tensor_shape = (1,)
-        self.sin0_ = np.random.random(small_tensor_shape).astype(
-            self.data_type_)
+        self._small_in0 = np.random.random(small_tensor_shape).astype(
+            self._data_type)
 
-        self.clients_ = ((httpclient,
+        self._clients = ((httpclient,
                           httpclient.InferenceServerClient('localhost:8000')),
                          (grpcclient,
                           grpcclient.InferenceServerClient('localhost:8001')))
@@ -59,17 +63,31 @@ class LargePayLoadTest(tu.TestResultCollector):
                      model_name,
                      input_name='INPUT0',
                      output_name='OUTPUT0'):
+        inputs = [
+            client[0].InferInput(input_name, self._large_in0.shape,
+                                 np_to_triton_dtype(self._data_type))
+        ]
+        inputs[0].set_data_from_numpy(self._large_in0)
+        results = client[1].infer(model_name, inputs)
+
+        # if the inference is completed, examine results to ensure that
+        # the framework and protocol do support large payload
+        self.assertTrue(
+            np.array_equal(self._large_in0, results.as_numpy(output_name)),
+            "output is different from input")
+
         try:
             inputs = [
-                client[0].InferInput(input_name, self.in0_.shape,
-                                     np_to_triton_dtype(self.data_type_))
+                client[0].InferInput(input_name, self._very_large_in0.shape,
+                                     np_to_triton_dtype(self._data_type))
             ]
-            inputs[0].set_data_from_numpy(self.in0_)
+            inputs[0].set_data_from_numpy(self._very_large_in0)
             results = client[1].infer(model_name, inputs)
+
             # if the inference is completed, examine results to ensure that
             # the framework and protocol do support large payload
             self.assertTrue(
-                np.array_equal(self.in0_, results.as_numpy(output_name)),
+                np.array_equal(self._large_in0, results.as_numpy(output_name)),
                 "output is different from input")
 
         except InferenceServerException as ex:
@@ -77,13 +95,13 @@ class LargePayLoadTest(tu.TestResultCollector):
             # gracefully. In addition to this, send a small payload to
             # verify if the server is still functional
             inputs = [
-                client[0].InferInput(input_name, self.sin0_.shape,
-                                     np_to_triton_dtype(self.data_type_))
+                client[0].InferInput(input_name, self._small_in0_.shape,
+                                     np_to_triton_dtype(self._data_type))
             ]
-            inputs[0].set_data_from_numpy(self.sin0_)
+            inputs[0].set_data_from_numpy(self._small_in0)
             results = client[1].infer(model_name, inputs)
             self.assertTrue(
-                np.array_equal(self.sin0_, results.as_numpy(output_name)),
+                np.array_equal(self._small_in0, results.as_numpy(output_name)),
                 "output is different from input")
 
     def test_graphdef(self):
@@ -106,6 +124,13 @@ class LargePayLoadTest(tu.TestResultCollector):
             model_name = tu.get_zero_model_name("onnx_nobatch", 1,
                                                 self.data_type_)
             self._test_helper(client, model_name)
+
+    def test_python(self):
+        # python_nobatch_zero_1_float32 is identity model with input shape [-1]
+        for client in self.clients_:
+            model_name = tu.get_zero_model_name("python_nobatch", 1,
+                                                self.data_type_)
+            self._test_helper(client, model_name, 'IN', 'OUT')
 
     def test_plan(self):
         # plan_nobatch_zero_1_float32 is identity model with input shape [-1]
