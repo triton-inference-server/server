@@ -56,7 +56,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     DELAY_TESTS="test_backlog_fill_no_end \
                     test_backlog_sequence_timeout \
                     test_ragged_batch"
-    QUEUE_DELAY_TESTS:="test_queue_delay_full_min_util"
+    QUEUE_DELAY_TESTS="test_queue_delay_full_min_util"
 fi
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
