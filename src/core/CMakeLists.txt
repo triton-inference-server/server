@@ -129,6 +129,7 @@ set(
   backend_context.cc
   cuda_utils.cc
   dynamic_batch_scheduler.cc
+  dynamic_batch_scheduler_v2.cc
   ensemble_scheduler.cc
   ensemble_utils.cc
   filesystem.cc
@@ -143,6 +144,7 @@ set(
   model_config_utils.cc
   model_repository_manager.cc
   pinned_memory_manager.cc
+  rate_limiter.cc
   scheduler_utils.cc
   sequence_batch_scheduler.cc
   server.cc
@@ -160,6 +162,7 @@ set(
   constants.h
   cuda_utils.h
   dynamic_batch_scheduler.h
+  dynamic_batch_scheduler_v2.h
   ensemble_scheduler.h
   ensemble_utils.h
   filesystem.h
@@ -175,6 +178,7 @@ set(
   model_repository_manager.h
   nvtx.h
   pinned_memory_manager.h
+  rate_limiter.h
   response_allocator.h
   sync_queue.h
   scheduler.h
