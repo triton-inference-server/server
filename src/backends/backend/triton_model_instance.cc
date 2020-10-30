@@ -75,23 +75,13 @@ TritonModelInstance::CreateInstances(
                                     : group.name()};
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         RETURN_IF_ERROR(CreateInstance(
-<<<<<<< HEAD
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
-            0 /* device_id */, instances));
-      } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
-        for (const int32_t device_id : group.gpus()) {
-          RETURN_IF_ERROR(CreateInstance(
-              model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
-              device_id, instances));
-=======
-            model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
             0 /* device_id */, group.rate_limiter(), instances));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           RETURN_IF_ERROR(CreateInstance(
-              model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
+              model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
               device_id, group.rate_limiter(), instances));
->>>>>>> Add TritonModel and TritonModeInstance abstraction to the RateLimiter
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         RETURN_IF_ERROR(CreateInstance(
