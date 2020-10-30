@@ -30,6 +30,7 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/server.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -72,12 +73,12 @@ TritonModelInstance::CreateInstances(
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         RETURN_IF_ERROR(CreateInstance(
             model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
-            0 /* device_id */, instances));
+            0 /* device_id */, group.rate_limiter(), instances));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           RETURN_IF_ERROR(CreateInstance(
               model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
-              device_id, instances));
+              device_id, group.rate_limiter(), instances));
         }
       } else {
         return Status(
@@ -94,6 +95,7 @@ Status
 TritonModelInstance::CreateInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
+    const inference::ModelRateLimiter& rate_limiter_config,
     std::vector<std::unique_ptr<TritonModelInstance>>* instances)
 {
   std::unique_ptr<TritonModelInstance> local_instance(
@@ -108,10 +110,26 @@ TritonModelInstance::CreateInstance(
         model->Backend()->ModelInstanceInitFn()(triton_instance));
   }
 
+  RETURN_IF_ERROR(
+      RegisterToRateLimiter(local_instance.get(), rate_limiter_config));
+
   instances->push_back(std::move(local_instance));
 
   return Status::Success;
 }
+
+Status
+TritonModelInstance::RegisterToRateLimiter(
+    const TritonModelInstance* instance,
+    const inference::ModelRateLimiter& rate_limiter_config)
+{
+  RateLimiter* rate_limiter = instance->Model()->Server()->GetRateLimiter();
+  RETURN_IF_ERROR(
+      rate_limiter->RegisterModelInstance(instance, rate_limiter_config));
+
+  return Status::Success;
+}
+
 
 extern "C" {
 
