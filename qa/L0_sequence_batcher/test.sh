@@ -56,6 +56,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     DELAY_TESTS="test_backlog_fill_no_end \
                     test_backlog_sequence_timeout \
                     test_ragged_batch"
+    QUEUE_DELAY_TESTS:="test_queue_delay_full_min_util"
 fi
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -442,7 +443,7 @@ fi
 # max queue delay
 MODEL_DIR=queue_delay_models
 # remove ensemble models from the test model repo
-rm -r queue_delay_models/simple_* queue_delay_models/fan_* queue_delay_models/sequence_*
+rm -rf queue_delay_models/simple_* queue_delay_models/fan_* queue_delay_models/sequence_*
 for i in $QUEUE_DELAY_TESTS ; do
     export NO_BATCHING=0
     export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
