@@ -199,6 +199,15 @@ InferenceServer::Init()
         Status::Code::INVALID_ARG, "--model-repository must be specified");
   }
 
+  bool ignore_resources_and_priority =
+      (rate_limit_mode_ == RateLimitMode::RL_OFF);
+  status = RateLimiter::Create(
+      ignore_resources_and_priority, rate_limit_resource_map_, &rate_limiter_);
+  if (!status.IsOk()) {
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return status;
+  }
+
   PinnedMemoryManager::Options options(pinned_memory_pool_size_);
   status = PinnedMemoryManager::Create(options);
   if (!status.IsOk()) {
