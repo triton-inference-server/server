@@ -36,6 +36,7 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/persistent_backend_manager.h"
+#include "src/core/rate_limiter.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -44,6 +45,9 @@ class InferenceBackend;
 class InferenceRequest;
 
 enum class ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
+
+// The configured mode for rate limiting
+enum class RateLimitMode { RL_OFF, RL_EXEC_COUNT };
 
 // Readiness status for the inference server.
 enum class ServerReadyState {
@@ -154,6 +158,20 @@ class InferenceServer {
   bool StrictModelConfigEnabled() const { return strict_model_config_; }
   void SetStrictModelConfigEnabled(bool e) { strict_model_config_ = e; }
 
+  // Get / set rate limit mode.
+  RateLimitMode GetRateLimitMode() const { return rate_limit_mode_; }
+  void SetRateLimitMode(RateLimitMode m) { rate_limit_mode_ = m; }
+
+  // Get / set rate limit resource counts
+  const RateLimiter::ResourceMap& GetRateLimitResources() const
+  {
+    return rate_limit_resource_map_;
+  }
+  void SetRateLimitResources(const RateLimiter::ResourceMap& rm)
+  {
+    rate_limit_resource_map_ = rm;
+  }
+
   // Get / set the pinned memory pool byte size.
   int64_t PinnedMemoryPoolByteSize() const { return pinned_memory_pool_size_; }
   void SetPinnedMemoryPoolByteSize(int64_t s)
@@ -232,6 +250,9 @@ class InferenceServer {
         model_name, model_version, backend);
   }
 
+  // Return the pointer to RateLimiter object.
+  RateLimiter* GetRateLimiter() { return rate_limiter_.get(); }
+
  private:
   const std::string version_;
   std::string id_;
@@ -249,6 +270,8 @@ class InferenceServer {
   double min_supported_compute_capability_;
   BackendCmdlineConfigMap backend_cmdline_config_map_;
   std::string repoagent_dir_;
+  RateLimitMode rate_limit_mode_;
+  RateLimiter::ResourceMap rate_limit_resource_map_;
 
   // FIXME, remove once all backends use backend config.
   // Tensorflow options
@@ -264,6 +287,7 @@ class InferenceServer {
   // requests but that is determined by backend shared_ptr).
   std::atomic<uint64_t> inflight_request_counter_;
 
+  std::unique_ptr<RateLimiter> rate_limiter_;
   std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
   std::shared_ptr<PersistentBackendManager> persist_backend_manager_;
 };

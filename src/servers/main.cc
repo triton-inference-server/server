@@ -220,6 +220,8 @@ enum OptionId {
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
   OPTION_STARTUP_MODEL,
+  OPTION_RATE_LIMIT,
+  OPTION_RATE_LIMIT_RESOURCE,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
   OPTION_CUDA_MEMORY_POOL_BYTE_SIZE,
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
@@ -366,6 +368,27 @@ std::vector<Option> options_
        "Name of the model to be loaded on server startup. It may be specified "
        "multiple times to add multiple models. Note that this option will only "
        "take affect if --model-control-mode=explicit is true."},
+      {OPTION_RATE_LIMIT, "rate-limit", Option::ArgStr,
+       "Specify the mode for rate limiting. Options are \"off\" and "
+       "\"execution_count\". The default is \"off\". "
+       "For \"off\", the server will ignore any rate limiter config and run "
+       "inference as soon as an instance is ready. For \"execution_count\", "
+       "the server will determine the instance using configured priority and "
+       "the number of time the instance has been used to run inference. "
+       "The inference will finally be executed once the required resources "
+       "are available."},
+      {OPTION_RATE_LIMIT_RESOURCE, "rate-limit-resource",
+       "<string>:<string>:<integer>",
+       "The number of resources available to the server. The format of this "
+       "flag is --rate-limit-resource=<device>:<resource_name>:<count>. The "
+       "<device> is optional and if not listed will be applied to every "
+       "device. "
+       "\"GLOBAL\" can be specified in place of <device> to list the resources "
+       "that are shared among all the devices in the system. This flag can be "
+       "specified multiple times to specify each resources and their "
+       "availability. By default, the max across all instances that list the "
+       "resource is selected as its availability. The values for this flag"
+       "is case-insensitive."},
       {OPTION_PINNED_MEMORY_POOL_BYTE_SIZE, "pinned-memory-pool-byte-size",
        Option::ArgInt,
        "The total byte size that can be allocated as pinned system memory. "
@@ -767,6 +790,44 @@ ParseTraceLevelOption(std::string arg)
 }
 #endif  // TRITON_ENABLE_TRACING
 
+std::tuple<std::string, std::string, int>
+ParseRateLimitResourceOption(const std::string arg)
+{
+  std::string error_string(
+      "--rate-limit-resource option format is "
+      "'<device>:<resource_name>:<count>' or '<resource_name>:<count>'. Got " +
+      arg);
+
+  std::string device_string("");
+  std::string name_string("");
+  int count = -1;
+
+  size_t delim_first = arg.find(":");
+  size_t delim_second = arg.find(":", delim_first + 1);
+
+  if (delim_second != std::string::npos) {
+    // Handle format `<device>:<resource_name>:<count>'
+    size_t delim_third = arg.find(":", delim_second + 1);
+    if (delim_third != std::string::npos) {
+      std::cerr << error_string << std::endl;
+      exit(1);
+    }
+    device_string = arg.substr(0, delim_first);
+    name_string = arg.substr(delim_first + 1, delim_second - delim_first - 1);
+    count = std::stoi(arg.substr(delim_second + 1));
+  } else if (delim_first != std::string::npos) {
+    // Handle format `<resource_name>:<count>'
+    name_string = arg.substr(0, delim_first);
+    count = std::stoi(arg.substr(delim_first + 1));
+  } else {
+    // If no colons found
+    std::cerr << error_string << std::endl;
+    exit(1);
+  }
+
+  return {device_string, name_string, count};
+}
+
 std::tuple<std::string, std::string, std::string>
 ParseBackendConfigOption(const std::string arg)
 {
@@ -873,6 +934,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
   TRITONSERVER_ModelControlMode control_mode = TRITONSERVER_MODEL_CONTROL_NONE;
   std::set<std::string> startup_models_;
+
+  TRITONSERVER_RateLimitMode rate_limit_mode = TRITONSERVER_RATE_LIMIT_OFF;
+  std::vector<std::tuple<std::string, std::string, int>> rate_limit_resources;
 
 #ifdef TRITON_ENABLE_LOGGING
   bool log_info = true;
@@ -1034,6 +1098,30 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         }
         break;
       }
+      case OPTION_RATE_LIMIT: {
+        std::string rate_limit_str(optarg);
+        std::transform(
+            rate_limit_str.begin(), rate_limit_str.end(),
+            rate_limit_str.begin(), ::tolower);
+        if (rate_limit_str == "off") {
+          rate_limit_mode = TRITONSERVER_RATE_LIMIT_OFF;
+        } else if (rate_limit_str == "execution_count") {
+          rate_limit_mode = TRITONSERVER_RATE_LIMIT_EXEC_COUNT;
+        } else {
+          std::cerr << "invalid argument for --rate-limit" << std::endl;
+          std::cerr << Usage() << std::endl;
+          return false;
+        }
+        break;
+      }
+      case OPTION_RATE_LIMIT_RESOURCE: {
+        std::string rate_limit_resource_str(optarg);
+        std::transform(
+            rate_limit_resource_str.begin(), rate_limit_resource_str.end(),
+            rate_limit_resource_str.begin(), ::tolower);
+        rate_limit_resources.push_back(ParseRateLimitResourceOption(optarg));
+        break;
+      }
       case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
         pinned_memory_pool_byte_size = ParseLongLongOption(optarg);
         break;
@@ -1129,6 +1217,16 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetStartupModel(loptions, model.c_str()),
         "setting startup model");
+  }
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetRateLimitMode(loptions, rate_limit_mode),
+      "setting rate limiter configuration");
+  for (const auto& resource : rate_limit_resources) {
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsAddRateLimitResource(
+            loptions, std::get<0>(resource).c_str(),
+            std::get<1>(resource).c_str(), std::get<2>(resource)),
+        "setting rate limiter resource");
   }
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(

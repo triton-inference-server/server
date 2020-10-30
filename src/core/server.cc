@@ -148,6 +148,12 @@ InferenceServer::Init()
   if (status.IsOk() && (buffer_manager_thread_count_ > 0)) {
     status = AsyncWorkQueue::Initialize(buffer_manager_thread_count_);
   }
+
+  bool ignore_resources_and_priority =
+      (rate_limit_mode_ == RateLimitMode::RL_OFF);
+  status = RateLimiter::Create(
+      ignore_resources_and_priority, rate_limit_resource_map_, &rate_limiter_);
+
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return status;
