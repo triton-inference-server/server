@@ -37,19 +37,25 @@ from tritonclientutils import np_to_triton_dtype, InferenceServerException
 
 
 class LargePayLoadTest(tu.TestResultCollector):
-
     def setUp(self):
         self._data_type = np.float32
-        # n GB divided by element size as tensor shape
-        very_large_tensor_shape = (math.trunc(6 * (1024 * 1024 * 1024) /
-                                   np.dtype(self._data_type).itemsize),)
-        self._very_large_in0 = np.random.random(very_large_tensor_shape).astype(self._data_type)
 
+        # Very large tensor will always fail for gRPC because the Protobuf has
+        # a hard limit on 2GBs for the size of input tensors. All backends
+        # except the Python and plan backend should be able to handle payloads
+        # larger than 2GBs using HTTP.
+        very_large_tensor_shape = (math.trunc(
+            6 * (1024 * 1024 * 1024) / np.dtype(self._data_type).itemsize), )
+        self._very_large_in0 = np.random.random(
+            very_large_tensor_shape).astype(self._data_type)
+
+        # 1.9 GBs allows us to test gRPC with moderate sizes too.
         large_tensor_shape = (math.trunc(1.9 * (1024 * 1024 * 1024) //
-                                   np.dtype(self._data_type).itemsize),)
-        self._large_in0 = np.random.random(large_tensor_shape).astype(self._data_type)
+                                         np.dtype(self._data_type).itemsize), )
+        self._large_in0 = np.random.random(large_tensor_shape).astype(
+            self._data_type)
 
-        small_tensor_shape = (1,)
+        small_tensor_shape = (1, )
         self._small_in0 = np.random.random(small_tensor_shape).astype(
             self._data_type)
 
@@ -65,7 +71,8 @@ class LargePayLoadTest(tu.TestResultCollector):
                      output_name='OUTPUT0'):
         # plan does not supoort large batch sizes.
         # FIXME libtorch seems to have an issue with handling large batch sizes see DLIS-1770
-        if not (model_name.startswith('plan') or model_name.startswith('libtorch')):
+        if not (model_name.startswith('plan')
+                or model_name.startswith('libtorch')):
             inputs = [
                 client[0].InferInput(input_name, self._large_in0.shape,
                                      np_to_triton_dtype(self._data_type))
@@ -90,7 +97,8 @@ class LargePayLoadTest(tu.TestResultCollector):
             # if the inference is completed, examine results to ensure that
             # the framework and protocol do support large payload
             self.assertTrue(
-                np.array_equal(self._large_in0, results.as_numpy(output_name)),
+                np.array_equal(self._very_large_in0,
+                               results.as_numpy(output_name)),
                 "output is different from input")
 
         except InferenceServerException as ex:
