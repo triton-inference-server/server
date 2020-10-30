@@ -30,6 +30,7 @@
 #include <future>
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
+#include "src/core/dynamic_batch_scheduler_v2.h"
 #include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
 #include "src/core/logging.h"
@@ -180,6 +181,101 @@ InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 
   scheduler_ = std::move(scheduler);
   return Status::Success;
+}
+
+
+Status
+InferenceBackend::SetConfiguredScheduler(
+    const void* triton_model, const uint32_t runner_cnt,
+    const Scheduler::StandardInitFunc& OnInit,
+    const Scheduler::StandardRunFunc& OnRun)
+{
+  std::unique_ptr<Scheduler> scheduler;
+
+  // Create a warmup function for the scheduler thread to run the contexts
+  // in corresponding threads. Currently the warmup function can't be run
+  // asynchronously with respect to Scheduler::Create() as there is no way to
+  // change ModelReadyState, which is controlled by model manager, from within
+  // the scheduler.
+  // But running warmup synchronously allows us to use one set of warmup data
+  // for all contexts.
+  std::vector<std::vector<WarmupData>> samples{runner_cnt};
+  if (Config().model_warmup_size() != 0) {
+    // The ownership of InferenceRequest will be transferred on model execution,
+    // so must have unique set of samples for each runner
+    for (auto& runner_samples : samples) {
+      RETURN_IF_ERROR(GenerateWarmupData(&runner_samples));
+    }
+  }
+
+  auto OnWarmup = [this, &samples](uint32_t runner_idx) -> Status {
+    auto& runner_samples = samples[runner_idx];
+    for (auto& sample : runner_samples) {
+      LOG_VERBOSE(1) << "model '" << sample.requests_.back()->ModelName()
+                     << "' instance " << std::to_string(runner_idx)
+                     << " is running warmup sample '" << sample.sample_name_
+                     << "'";
+
+      std::promise<void> warmup_promise;
+      // only now we can set the proper request complete callback,
+      // only one request in the batch can set the promise.
+      sample.requests_[0]->SetReleaseCallback(
+          WarmupRequestComplete, &warmup_promise);
+      for (size_t idx = 1; idx < sample.requests_.size(); idx++) {
+        sample.requests_[idx]->SetReleaseCallback(
+            WarmupRequestComplete, nullptr);
+      }
+      WarmUp(runner_idx, sample);
+      warmup_promise.get_future().get();
+    }
+
+    return Status::Success;
+  };
+
+  // Need to enforce equal shape batches (i.e. non-ragged batches) if
+  // the model 1) allows one or more variable-size input tensors that
+  // are not marked as 'allow_ragged_batch' or 2) has one or more
+  // shape-tensor inputs. This is not needed if all input shapes are
+  // non-variable and if there are no shape tensors... so we don't
+  // enable it in that case for efficiency reasons.
+  std::unordered_map<std::string, bool> enforce_equal_shape_tensors;
+  for (const auto input : config_.input()) {
+    if (input.is_shape_tensor()) {
+      enforce_equal_shape_tensors.insert({input.name(), true});
+    } else if (!input.allow_ragged_batch() && (GetElementCount(input) == -1)) {
+      enforce_equal_shape_tensors.insert({input.name(), false});
+    }
+  }
+
+  // If 'sequence_batching' is configured use the SequenceBatchScheduler,
+  // otherwise use the default DynamicBatchScheduler.
+  if (config_.has_sequence_batching()) {
+    // Sequence batcher
+    RETURN_IF_ERROR(SequenceBatchScheduler::Create(
+        config_, runner_cnt, OnInit, OnWarmup, OnRun,
+        enforce_equal_shape_tensors, &scheduler));
+  } else if (config_.has_dynamic_batching()) {
+    // Dynamic batcher
+    RETURN_IF_ERROR(DynamicBatchSchedulerV2::Create(
+        triton_model, 0 /* runner_id_start */, runner_cnt,
+        GetCpuNiceLevel(config_), OnInit, OnWarmup, OnRun,
+        true /* dynamic_batching_enabled */, config_.max_batch_size(),
+        enforce_equal_shape_tensors, config_.dynamic_batching(), &scheduler));
+  } else {
+    // Default scheduler. Use dynamic batch scheduler (with batching
+    // disabled) as the default scheduler.
+    RETURN_IF_ERROR(DynamicBatchSchedulerV2::Create(
+        triton_model, 0 /* runner_id_start */, runner_cnt,
+        GetCpuNiceLevel(config_), OnInit, OnWarmup, OnRun,
+        false /* dynamic_batching_enabled */, 1 /* max_batch_size */,
+        std::unordered_map<
+            std::string, bool>() /* enforce_equal_shape_tensors */,
+        false /* preserve_ordering */,
+        std::set<int32_t>() /* preferred_batch_sizes */,
+        0 /* max_queue_delay_microseconds */, &scheduler));
+  }
+
+  return SetScheduler(std::move(scheduler));
 }
 
 Status
