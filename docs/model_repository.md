@@ -297,13 +297,15 @@ A minimal model repository for a Python model is:
 
 ### DALI Models
 
-The [DALI
-backend](https://github.com/triton-inference-server/dali_backend)
+The [DALI backend](https://github.com/triton-inference-server/dali_backend)
 allows you to run a [DALI pipeline](https://github.com/NVIDIA/DALI) as
-a model within Triton. By default the DALI script must be named
-model.dali but this default name can be overridden using the
-*default_model_filename* property in the [model
-configuration](model_configuration.md).
+a model within Triton. In order to use this backend, you need to generate
+a file, by default named `model.dali`, and include it in your model repository. 
+Please refer to [DALI backend documentation
+](https://github.com/triton-inference-server/dali_backend#how-to-use) for the
+description, how to generate `model.dali`. The default model file name can be
+overridden using the *default_model_filename* property in the 
+[model configuration](model_configuration.md).
 
 A minimal model repository for a DALI model is:
 
