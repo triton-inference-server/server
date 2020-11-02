@@ -63,10 +63,11 @@ repository](quickstart.md#create-a-model-repository).
   *image_client* but that uses a generated GRPC client stub to
   communicate with Triton.
 
-* The [protoc compiler](https://grpc.io/docs/guides/) can generate a
-  GRPC API in a large number of programming languages. See
-  [src/clients/go](../src/clients/go) for an example for the [Go
-  programming language](https://golang.org/).
+* The [protoc
+  compiler](https://developers.google.com/protocol-buffers/docs/tutorials)
+  can generate a GRPC API in a large number of programming
+  languages. See [src/clients/go](../src/clients/go) for an example
+  for the [Go programming language](https://golang.org/).
 
 ## Getting the Client Examples
 
