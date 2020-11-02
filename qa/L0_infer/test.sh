@@ -57,7 +57,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_LOG_BASE="./valgrind_test"
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
-    SERVER_TIMEOUT=2400
+    SERVER_TIMEOUT=3600
     rm -f $LEAKCHECK_LOG_BASE*
 fi
 
