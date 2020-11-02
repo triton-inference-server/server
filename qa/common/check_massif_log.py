@@ -29,10 +29,6 @@ import sys
 import re
 from collections import defaultdict
 
-# Thresholds
-MAX_ALLOWED_ALLOC_RATE = float(os.environ.get('MAX_ALLOWED_ALLOC_RATE', 1000.0))
-
-
 def parse_massif_out(filename):
     """
     Extract the allocation data from the massif output file, and compile
@@ -62,7 +58,7 @@ def parse_massif_out(filename):
     return summary
 
 
-def is_unbounded_growth(summary):
+def is_unbounded_growth(summary, max_allowed_alloc_rate):
     """
     Check whether the rate of heap allocations is increasing     
     
@@ -83,14 +79,15 @@ def is_unbounded_growth(summary):
     alloc_rate_mb = (alloc_rate_end - alloc_rate_start) / (len(totals) - 2)
 
     print("ESTIMATED ALLOC RATE: %f MB/snapshot, MAX ALLOWED RATE: %f" %
-          (alloc_rate_mb, MAX_ALLOWED_ALLOC_RATE))
+          (alloc_rate_mb, max_allowed_alloc_rate))
 
-    return (alloc_rate_mb > MAX_ALLOWED_ALLOC_RATE)
+    return (alloc_rate_mb > max_allowed_alloc_rate)
 
 
 if __name__ == '__main__':
     summary = parse_massif_out(sys.argv[1])
-    if is_unbounded_growth(summary):
+    max_allowed_alloc_rate = float(sys.argv[1])
+    if is_unbounded_growth(summary, max_allowed_alloc_rate):
         sys.exit(1)
     else:
         sys.exit(0)

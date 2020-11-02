@@ -53,7 +53,7 @@ SERVER_TIMEOUT=1200
 # Valgrind massif
 LEAKCHECK=/usr/bin/valgrind
 LEAKCHECK_ARGS_BASE="--tool=massif --time-unit=B"
-MASSIF_TEST=check_massif_log.py
+MASSIF_TEST=../common/check_massif_log.py
 
 source ../common/util.sh
 
@@ -149,7 +149,7 @@ for MODEL in $(ls models); do
     set +e
 
     # Check the massif output
-    python $MASSIF_TEST $MASSIF_LOG >> $CLIENT_LOG 2>&1
+    python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC_RATE >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test for $MODEL Failed\n***"
