@@ -40,6 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 RET=0
 
 CLIENT_TIMEOUT_TEST=client_timeout_test.py
+CLIENT_TIMEOUT_TEST_CPP=../clients/client_timeout_test
 
 rm -f *.log
 rm -f *.log.*
@@ -63,10 +64,10 @@ fi
 set +e
 
 # CASE 1: Provide too small a timeout and expect a failure.
-
+# Note, the custom_identity_int32 is configured with a delay
+# of 3 sec.
 # Test request timeout in grpc synchronous inference
-CLIENT=../clients/simple_grpc_infer_client
-$CLIENT -t 1000 -v >> ${CLIENT_LOG}.c++.grpc_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v -i grpc >> ${CLIENT_LOG}.c++.grpc_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -77,8 +78,7 @@ if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.grpc_infer` != "1" ]; then
 fi
 
 # Test request timeout in grpc asynchronous inference
-CLIENT=../clients/simple_grpc_async_infer_client
-$CLIENT -t 1000 -v >> ${CLIENT_LOG}.c++.grpc_async_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v -i grpc -a >> ${CLIENT_LOG}.c++.grpc_async_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -89,8 +89,7 @@ if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.grpc_async_infer` != "1" ]; 
 fi
 
 # Test stream timeout in grpc asynchronous streaming inference
-CLIENT=../clients/simple_grpc_sequence_stream_infer_client
-$CLIENT -t 100 -v >> ${CLIENT_LOG}.c++.grpc_async_stream_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v -i grpc -s >> ${CLIENT_LOG}.c++.grpc_async_stream_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -101,8 +100,7 @@ if [ `grep -c "Stream has been closed" ${CLIENT_LOG}.c++.grpc_async_stream_infer
 fi
 
 # Test request timeout in http synchronous inference
-CLIENT=../clients/simple_http_infer_client
-$CLIENT -t 1000 -v >> ${CLIENT_LOG}.c++.http_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v >> ${CLIENT_LOG}.c++.http_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -114,8 +112,7 @@ fi
 
 
 # Test request timeout in http asynchronous inference
-CLIENT=../clients/simple_http_async_infer_client
-$CLIENT -t 1000 -v >> ${CLIENT_LOG}.c++.http_async_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v -a >> ${CLIENT_LOG}.c++.http_async_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -136,19 +133,44 @@ fi
 
 
 # CASE 2: Provide sufficiently large timeout value
+TIMEOUT_VALUE=100000000
 set +e
-for i in simple_grpc_infer_client \
-    simple_grpc_async_infer_client \
-    simple_grpc_sequence_stream_infer_client \
-    simple_http_infer_client \
-    simple_http_async_infer_client \
-   ; do
-   echo "TEST:  $i" >> ${CLIENT_LOG}
-   ../clients/$i -v -t 100000000 >> ${CLIENT_LOG} 2>&1
-   if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+
+echo "TEST:  GRPC Synchronous" >> ${CLIENT_LOG}
+$CLIENT_TIMEOUT_TEST_CPP -t $TIMEOUT_VALUE -v -i grpc >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed: GRPC Synchronous\n***"
+    RET=1
+fi
+
+echo "TEST:  GRPC Asynchronous" >> ${CLIENT_LOG}
+$CLIENT_TIMEOUT_TEST_CPP -t $TIMEOUT_VALUE -v -i grpc -a >> ${CLIENT_LOG}.c++.grpc_async_infer 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed: GRPC Asynchronous\n***"
+    RET=1
+fi
+
+echo "TEST:  GRPC Streaming" >> ${CLIENT_LOG}
+$CLIENT_TIMEOUT_TEST_CPP -t $TIMEOUT_VALUE -v -i grpc -s >> ${CLIENT_LOG}.c++.grpc_async_stream_infer 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed: GRPC Streaming\n***"
+    RET=1
+fi
+
+echo "TEST:  HTTP Synchronous" >> ${CLIENT_LOG}
+$CLIENT_TIMEOUT_TEST_CPP -t $TIMEOUT_VALUE -v >> ${CLIENT_LOG}.c++.http_infer 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed: HTTP Synchronous\n***"
+    RET=1
+fi
+
+echo "TEST:  HTTP Asynchronous" >> ${CLIENT_LOG}
+$CLIENT_TIMEOUT_TEST_CPP -t $TIMEOUT_VALUE -v -a >> ${CLIENT_LOG}.c++.http_async_infer 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed: HTTP Asynchronous\n***"
+    RET=1
+fi
+
 
 echo "TEST:  Python Library" >> ${CLIENT_LOG}
 
