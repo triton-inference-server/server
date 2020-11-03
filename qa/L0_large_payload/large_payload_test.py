@@ -69,10 +69,31 @@ class LargePayLoadTest(tu.TestResultCollector):
                      model_name,
                      input_name='INPUT0',
                      output_name='OUTPUT0'):
-        # plan does not supoort large batch sizes.
+
         # FIXME libtorch seems to have an issue with handling large batch sizes see DLIS-1770
-        if not (model_name.startswith('plan')
-                or model_name.startswith('libtorch')):
+        if model_name.startswith('libtorch'):
+            try:
+                inputs = [
+                    client[0].InferInput(input_name, self._large_in0.shape,
+                                         np_to_triton_dtype(self._data_type))
+                ]
+                inputs[0].set_data_from_numpy(self._large_in0)
+                results = client[1].infer(model_name, inputs)
+
+                # if the inference is completed, examine results to ensure that
+                # the framework and protocol do support large payload
+                self.assertTrue(
+                    np.array_equal(self._large_in0,
+                                   results.as_numpy(output_name)),
+                    "output is different from input")
+            except InferenceServerException as ex:
+                self.assertTrue(
+                    ex.message() ==
+                    "OUTPUT__0: failed to perform CUDA copy: invalid argument")
+
+        # plan does not supoort large batch sizes.
+        elif not model_name.startswith('plan'):
+
             inputs = [
                 client[0].InferInput(input_name, self._large_in0.shape,
                                      np_to_triton_dtype(self._data_type))
@@ -86,34 +107,36 @@ class LargePayLoadTest(tu.TestResultCollector):
                 np.array_equal(self._large_in0, results.as_numpy(output_name)),
                 "output is different from input")
 
-        try:
+        if client[0] == httpclient:
+            # FIXME HTTPServer cannot support large payloads. See DLIS-1776.
             inputs = [
                 client[0].InferInput(input_name, self._very_large_in0.shape,
                                      np_to_triton_dtype(self._data_type))
             ]
             inputs[0].set_data_from_numpy(self._very_large_in0)
-            results = client[1].infer(model_name, inputs)
+            with self.assertRaises(InferenceServerException):
+                results = client[1].infer(model_name, inputs)
 
-            # if the inference is completed, examine results to ensure that
-            # the framework and protocol do support large payload
-            self.assertTrue(
-                np.array_equal(self._very_large_in0,
-                               results.as_numpy(output_name)),
-                "output is different from input")
-
-        except InferenceServerException as ex:
-            # if the inference failed, inference server should return error
-            # gracefully. In addition to this, send a small payload to
-            # verify if the server is still functional
+        if client[0] == grpcclient:
             inputs = [
-                client[0].InferInput(input_name, self._small_in0.shape,
+                client[0].InferInput(input_name, self._very_large_in0.shape,
                                      np_to_triton_dtype(self._data_type))
             ]
-            inputs[0].set_data_from_numpy(self._small_in0)
-            results = client[1].infer(model_name, inputs)
-            self.assertTrue(
-                np.array_equal(self._small_in0, results.as_numpy(output_name)),
-                "output is different from input")
+            inputs[0].set_data_from_numpy(self._very_large_in0)
+            # GRPC must fail for large payloads because of a 2GB protobuf limit
+            with self.assertRaises(InferenceServerException):
+                results = client[1].infer(model_name, inputs)
+
+        # Send a small payload to verify if the server is still functional
+        inputs = [
+            client[0].InferInput(input_name, self._small_in0.shape,
+                                 np_to_triton_dtype(self._data_type))
+        ]
+        inputs[0].set_data_from_numpy(self._small_in0)
+        results = client[1].infer(model_name, inputs)
+        self.assertTrue(
+            np.array_equal(self._small_in0, results.as_numpy(output_name)),
+            "output is different from input")
 
     def test_graphdef(self):
         # graphdef_nobatch_zero_1_float32 is identity model with input shape [-1]
