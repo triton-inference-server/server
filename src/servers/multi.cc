@@ -841,7 +841,7 @@ main(int argc, char** argv)
     FAIL("triton server API version mismatch");
   }
 
-  // Create two instances of the server...
+  // Create two instances of the server with 1 common and 1 unique repo each
   TRITONSERVER_ServerOptions *server1_options = nullptr,
                              *server2_options = nullptr;
   SetServerOptions(
@@ -883,14 +883,22 @@ main(int argc, char** argv)
       TRITONSERVER_ServerLoadModel(server1.get(), "simple"),
       "failed to load model");
   FAIL_IF_ERR(
+      TRITONSERVER_ServerLoadModel(server1.get(), "simple2"),
+      "failed to load model");
+  FAIL_IF_ERR(
       TRITONSERVER_ServerLoadModel(server2.get(), "simple"),
       "failed to load model");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerLoadModel(server2.get(), "simple3"),
+      "failed to load model");
 
-  // Wait for the model to become available.
+  // Wait for the models to become available.
   bool is_torch_model = false;
   bool is_int = true;
   AwaitModelReady(server1, "simple", &is_int, &is_torch_model);
+  AwaitModelReady(server1, "simple2", &is_int, &is_torch_model);
   AwaitModelReady(server2, "simple", &is_int, &is_torch_model);
+  AwaitModelReady(server2, "simple3", &is_int, &is_torch_model);
 
   // Create the allocator that will be used to allocate buffers for
   // the result tensors.
@@ -902,7 +910,11 @@ main(int argc, char** argv)
 
   // Inference
   RunInferenceAndValidate(server1, allocator, "simple", is_int, is_torch_model);
+  RunInferenceAndValidate(
+      server1, allocator, "simple2", is_int, is_torch_model);
   RunInferenceAndValidate(server2, allocator, "simple", is_int, is_torch_model);
+  RunInferenceAndValidate(
+      server2, allocator, "simple3", is_int, is_torch_model);
 
   FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorDelete(allocator),
@@ -911,10 +923,16 @@ main(int argc, char** argv)
   // Unload models in both servers.
   FAIL_IF_ERR(
       TRITONSERVER_ServerUnloadModel(server1.get(), "simple"),
-      "failed to load model");
+      "failed to unload model");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerUnloadModel(server1.get(), "simple2"),
+      "failed to unload model");
   FAIL_IF_ERR(
       TRITONSERVER_ServerUnloadModel(server2.get(), "simple"),
-      "failed to load model");
+      "failed to unload model");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerUnloadModel(server2.get(), "simple3"),
+      "failed to unload model");
 
   return 0;
 }
