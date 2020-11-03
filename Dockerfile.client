@@ -29,7 +29,7 @@ ARG BASE_IMAGE=nvidia/cuda:11.1-devel-ubuntu18.04
 
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
-ARG TRITON_MODEL_ANALYZER_REPO_TAG=main-dev
+ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 
 FROM ${BASE_IMAGE}
 
@@ -118,12 +118,8 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
-RUN git clone --single-branch --depth=1 -b $TRITON_MODEL_ANALYZER_REPO_TAG \
-    https://github.com/triton-inference-server/model_analyzer.git && \
-    (export VERSION=`cat /workspace/VERSION` && cd model_analyzer && python3 setup.py install)
-
-# Remove Model Analyzer Git source
-RUN rm -rf model_analyzer
+ENV TRITON_MODEL_ANALYZER_REPO "https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
+RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
