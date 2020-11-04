@@ -186,7 +186,7 @@ As part of you deployment strategy you may want to [explicitly manage
 what models are available by loading and unloading
 models](docs/model_management.md) from a running Triton server. If you
 are using Kubernetes for deployment a simple example of how to [deploy
-Triton using Kubernetes and Helm](deploy/single_server/README.rst) may
+Triton using Kubernetes and Helm](deploy/single_server/README.md) may
 be helpful.
 
 The [version 1 to version 2 migration
