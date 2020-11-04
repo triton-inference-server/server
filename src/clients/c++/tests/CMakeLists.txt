@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,11 +26,27 @@
 
 cmake_minimum_required (VERSION 3.18)
 
-add_subdirectory(library)
-if(NOT ${TRITON_CLIENT_SKIP_EXAMPLES})
-  add_subdirectory(examples)
-  add_subdirectory(perf_analyzer)
-  # FIXME: Control building the client test with a
-  # separate cmake flag.
-  add_subdirectory(tests)
-endif() # TRITON_CLIENT_SKIP_EXAMPLES
+if(WIN32)
+  message("Currently, CMake will not build perf_analyzer because it uses functionalities that "
+		      "are UNIX specific.")
+else()
+
+#
+# client_timeout_test
+#
+add_executable(
+  client_timeout_test
+  client_timeout_test.cc
+)
+
+target_link_libraries(
+  client_timeout_test
+  PRIVATE TRITON::grpcclient_static
+  PRIVATE TRITON::httpclient_static
+)
+install(
+  TARGETS client_timeout_test
+  RUNTIME DESTINATION bin
+)
+
+endif()
