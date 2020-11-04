@@ -37,19 +37,29 @@ from tritonclientutils import np_to_triton_dtype, InferenceServerException
 
 
 class LargePayLoadTest(tu.TestResultCollector):
-
     def setUp(self):
-        self.data_type_ = np.float32
-        # n GB divided by element size as tensor shape
-        tensor_shape = (math.trunc(6 * (1024 * 1024 * 1024) /
-                                   np.dtype(self.data_type_).itemsize),)
-        self.in0_ = np.random.random(tensor_shape).astype(self.data_type_)
+        self._data_type = np.float32
 
-        small_tensor_shape = (1,)
-        self.sin0_ = np.random.random(small_tensor_shape).astype(
-            self.data_type_)
+        # Very large tensor will always fail for gRPC because the Protobuf has
+        # a hard limit on 2GBs for the size of input tensors. All backends
+        # except the Python and plan backend should be able to handle payloads
+        # larger than 2GBs using HTTP.
+        very_large_tensor_shape = (math.trunc(
+            6 * (1024 * 1024 * 1024) / np.dtype(self._data_type).itemsize), )
+        self._very_large_in0 = np.random.random(
+            very_large_tensor_shape).astype(self._data_type)
 
-        self.clients_ = ((httpclient,
+        # 1.9 GBs allows us to test gRPC with moderate sizes too.
+        large_tensor_shape = (math.trunc(1.9 * (1024 * 1024 * 1024) //
+                                         np.dtype(self._data_type).itemsize), )
+        self._large_in0 = np.random.random(large_tensor_shape).astype(
+            self._data_type)
+
+        small_tensor_shape = (1, )
+        self._small_in0 = np.random.random(small_tensor_shape).astype(
+            self._data_type)
+
+        self._clients = ((httpclient,
                           httpclient.InferenceServerClient('localhost:8000')),
                          (grpcclient,
                           grpcclient.InferenceServerClient('localhost:8001')))
@@ -59,72 +69,120 @@ class LargePayLoadTest(tu.TestResultCollector):
                      model_name,
                      input_name='INPUT0',
                      output_name='OUTPUT0'):
-        try:
+
+        # FIXME libtorch seems to have an issue with handling large batch sizes see DLIS-1770
+        if model_name.startswith('libtorch'):
+            try:
+                inputs = [
+                    client[0].InferInput(input_name, self._large_in0.shape,
+                                         np_to_triton_dtype(self._data_type))
+                ]
+                inputs[0].set_data_from_numpy(self._large_in0)
+                results = client[1].infer(model_name, inputs)
+
+                # if the inference is completed, examine results to ensure that
+                # the framework and protocol do support large payload
+                self.assertTrue(
+                    np.array_equal(self._large_in0,
+                                   results.as_numpy(output_name)),
+                    "output is different from input")
+            except InferenceServerException as ex:
+                self.assertTrue(
+                    ex.message() ==
+                    "OUTPUT__0: failed to perform CUDA copy: invalid argument")
+
+        # plan does not supoort large batch sizes.
+        elif not model_name.startswith('plan'):
+
             inputs = [
-                client[0].InferInput(input_name, self.in0_.shape,
-                                     np_to_triton_dtype(self.data_type_))
+                client[0].InferInput(input_name, self._large_in0.shape,
+                                     np_to_triton_dtype(self._data_type))
             ]
-            inputs[0].set_data_from_numpy(self.in0_)
+            inputs[0].set_data_from_numpy(self._large_in0)
             results = client[1].infer(model_name, inputs)
+
             # if the inference is completed, examine results to ensure that
             # the framework and protocol do support large payload
             self.assertTrue(
-                np.array_equal(self.in0_, results.as_numpy(output_name)),
+                np.array_equal(self._large_in0, results.as_numpy(output_name)),
                 "output is different from input")
 
-        except InferenceServerException as ex:
-            # if the inference failed, inference server should return error
-            # gracefully. In addition to this, send a small payload to
-            # verify if the server is still functional
+        if client[0] == httpclient:
+            # FIXME HTTPServer cannot support large payloads. See DLIS-1776.
             inputs = [
-                client[0].InferInput(input_name, self.sin0_.shape,
-                                     np_to_triton_dtype(self.data_type_))
+                client[0].InferInput(input_name, self._very_large_in0.shape,
+                                     np_to_triton_dtype(self._data_type))
             ]
-            inputs[0].set_data_from_numpy(self.sin0_)
-            results = client[1].infer(model_name, inputs)
-            self.assertTrue(
-                np.array_equal(self.sin0_, results.as_numpy(output_name)),
-                "output is different from input")
+            inputs[0].set_data_from_numpy(self._very_large_in0)
+            with self.assertRaises(InferenceServerException):
+                results = client[1].infer(model_name, inputs)
+
+        if client[0] == grpcclient:
+            inputs = [
+                client[0].InferInput(input_name, self._very_large_in0.shape,
+                                     np_to_triton_dtype(self._data_type))
+            ]
+            inputs[0].set_data_from_numpy(self._very_large_in0)
+            # GRPC must fail for large payloads because of a 2GB protobuf limit
+            with self.assertRaises(InferenceServerException):
+                results = client[1].infer(model_name, inputs)
+
+        # Send a small payload to verify if the server is still functional
+        inputs = [
+            client[0].InferInput(input_name, self._small_in0.shape,
+                                 np_to_triton_dtype(self._data_type))
+        ]
+        inputs[0].set_data_from_numpy(self._small_in0)
+        results = client[1].infer(model_name, inputs)
+        self.assertTrue(
+            np.array_equal(self._small_in0, results.as_numpy(output_name)),
+            "output is different from input")
 
     def test_graphdef(self):
         # graphdef_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for client in self.clients_:
+        for client in self._clients:
             model_name = tu.get_zero_model_name("graphdef_nobatch", 1,
-                                                self.data_type_)
+                                                self._data_type)
             self._test_helper(client, model_name)
 
     def test_savedmodel(self):
         # savedmodel_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for client in self.clients_:
+        for client in self._clients:
             model_name = tu.get_zero_model_name("savedmodel_nobatch", 1,
-                                                self.data_type_)
+                                                self._data_type)
             self._test_helper(client, model_name)
 
     def test_onnx(self):
         # onnx_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for client in self.clients_:
+        for client in self._clients:
             model_name = tu.get_zero_model_name("onnx_nobatch", 1,
-                                                self.data_type_)
-            self._test_helper(client, model_name)
+                                                self._data_type)
+
+    def test_python(self):
+        # python_nobatch_zero_1_float32 is identity model with input shape [-1]
+        for client in self._clients:
+            model_name = tu.get_zero_model_name("python_nobatch", 1,
+                                                self._data_type)
+            self._test_helper(client, model_name, "IN", "OUT")
 
     def test_plan(self):
         # plan_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for client in self.clients_:
+        for client in self._clients:
             model_name = tu.get_zero_model_name("plan_nobatch", 1,
-                                                self.data_type_)
+                                                self._data_type)
             self._test_helper(client, model_name)
 
     def test_libtorch(self):
         # libtorch_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for client in self.clients_:
+        for client in self._clients:
             model_name = tu.get_zero_model_name("libtorch_nobatch", 1,
-                                                self.data_type_)
+                                                self._data_type)
             self._test_helper(client, model_name, 'INPUT__0', 'OUTPUT__0')
 
     def test_custom(self):
         # custom_zero_1_float32 is identity model with input shape [-1]
-        for client in self.clients_:
-            model_name = tu.get_zero_model_name("custom", 1, self.data_type_)
+        for client in self._clients:
+            model_name = tu.get_zero_model_name("custom", 1, self._data_type)
             self._test_helper(client, model_name)
 
 
