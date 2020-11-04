@@ -42,7 +42,7 @@ CLIENT_LOG_BASE="./client.log"
 DATADIR=`pwd`/models
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR"
+SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1"
 SERVER_LOG_BASE="./inference_server.log"
 source ../common/util.sh
 
@@ -65,9 +65,17 @@ cp -r ../custom_models/custom_zero_1_float32 models/. && \
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
 
+mkdir -p models/python_$MODEL_SUFFIX/1/
+cp ../python_models/identity_fp32/config.pbtxt models/python_$MODEL_SUFFIX/
+(cd models/python_$MODEL_SUFFIX && \
+            sed -i "s/max_batch_size: 64/max_batch_size: 0/" config.pbtxt && \
+            sed -i "s/name: \"identity_fp32\"/name: \"python_$MODEL_SUFFIX\"/" config.pbtxt)
+
+cp ../python_models/identity_fp32/model.py models/python_$MODEL_SUFFIX/1/model.py
+
 # Restart server before every test to make sure server state
 # is invariant to previous test
-for TARGET in graphdef savedmodel onnx libtorch custom plan; do
+for TARGET in graphdef savedmodel onnx libtorch custom plan python; do
     SERVER_LOG=$SERVER_LOG_BASE.$TARGET
     CLIENT_LOG=$CLIENT_LOG_BASE.$TARGET
 
