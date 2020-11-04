@@ -293,25 +293,20 @@ install(
 )
 
 #
-# multi
+# multi_server
 #
 set(
-  SIMPLE_SRCS
-  multi.cc
-)
-
-set(
-  SIMPLE_HDRS
+  MULTISERVER_SRCS
+  multi_server.cc
 )
 
 add_executable(
-  multi
-  ${SIMPLE_SRCS}
-  ${SIMPLE_HDRS}
+  multi_server
+  ${MULTISERVER_SRCS}
   $<TARGET_OBJECTS:proto-library>
 )
 set_target_properties(
-  multi
+  multi_server
   PROPERTIES
     COMPILE_FLAGS "-Wno-type-limits"
     SKIP_BUILD_RPATH TRUE
@@ -320,23 +315,23 @@ set_target_properties(
     INSTALL_RPATH ""
 )
 target_link_libraries(
-  multi
+  multi_server
   PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
   )
 
 if(${TRITON_ENABLE_GPU})
-target_include_directories(multi PRIVATE ${CUDA_INCLUDE_DIRS})
+target_include_directories(multi_server PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
-  multi
+  multi_server
   PUBLIC -L/usr/local/cuda/lib64/stubs
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRITON_ENABLE_GPU
 install(
-  TARGETS multi
+  TARGETS multi_server
   RUNTIME DESTINATION bin
 )
 

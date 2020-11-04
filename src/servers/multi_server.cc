@@ -906,25 +906,26 @@ main(int argc, char** argv)
 
   // Load models in both servers.
   FAIL_IF_ERR(
-      TRITONSERVER_ServerLoadModel(server1.get(), "simple"),
+      TRITONSERVER_ServerLoadModel(server1.get(), "simple1"),
       "failed to load model");
   FAIL_IF_ERR(
       TRITONSERVER_ServerLoadModel(server1.get(), "simple2"),
       "failed to load model");
   FAIL_IF_ERR(
-      TRITONSERVER_ServerLoadModel(server2.get(), "simple"),
+      TRITONSERVER_ServerLoadModel(server2.get(), "simple1"),
       "failed to load model");
   FAIL_IF_ERR(
       TRITONSERVER_ServerLoadModel(server2.get(), "simple3"),
       "failed to load model");
 
   // Wait for the models to become available.
-  bool is_torch_model = false;
-  bool is_int = true;
-  AwaitModelReady(server1, "simple", &is_int, &is_torch_model);
-  AwaitModelReady(server1, "simple2", &is_int, &is_torch_model);
-  AwaitModelReady(server2, "simple", &is_int, &is_torch_model);
-  AwaitModelReady(server2, "simple3", &is_int, &is_torch_model);
+  bool is_int1 = true, is_int2 = true, is_int3 = true;
+  bool is_torch_model1 = false, is_torch_model2 = false,
+       is_torch_model3 = false;
+  AwaitModelReady(server1, "simple1", &is_int1, &is_torch_model1);
+  AwaitModelReady(server1, "simple2", &is_int2, &is_torch_model2);
+  AwaitModelReady(server2, "simple1", &is_int1, &is_torch_model1);
+  AwaitModelReady(server2, "simple3", &is_int3, &is_torch_model3);
 
   // Create the allocator that will be used to allocate buffers for
   // the result tensors.
@@ -935,32 +936,34 @@ main(int argc, char** argv)
       "creating response allocator");
 
   // Inference
-  RunInferenceAndValidate(server1, allocator, "simple", is_int, is_torch_model);
   RunInferenceAndValidate(
-      server1, allocator, "simple2", is_int, is_torch_model);
-  RunInferenceAndValidate(server2, allocator, "simple", is_int, is_torch_model);
+      server1, allocator, "simple1", is_int1, is_torch_model1);
   RunInferenceAndValidate(
-      server2, allocator, "simple3", is_int, is_torch_model);
+      server1, allocator, "simple2", is_int2, is_torch_model2);
+  RunInferenceAndValidate(
+      server2, allocator, "simple1", is_int1, is_torch_model1);
+  RunInferenceAndValidate(
+      server2, allocator, "simple3", is_int3, is_torch_model3);
 
   FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorDelete(allocator),
       "deleting response allocator");
 
   // Print Model Statistics for all models
-  PrintModelStats(server1, "simple");
+  PrintModelStats(server1, "simple1");
   PrintModelStats(server1, "simple2");
-  PrintModelStats(server2, "simple");
+  PrintModelStats(server2, "simple1");
   PrintModelStats(server2, "simple3");
 
   // Unload models in both servers.
   FAIL_IF_ERR(
-      TRITONSERVER_ServerUnloadModel(server1.get(), "simple"),
+      TRITONSERVER_ServerUnloadModel(server1.get(), "simple1"),
       "failed to unload model");
   FAIL_IF_ERR(
       TRITONSERVER_ServerUnloadModel(server1.get(), "simple2"),
       "failed to unload model");
   FAIL_IF_ERR(
-      TRITONSERVER_ServerUnloadModel(server2.get(), "simple"),
+      TRITONSERVER_ServerUnloadModel(server2.get(), "simple1"),
       "failed to unload model");
   FAIL_IF_ERR(
       TRITONSERVER_ServerUnloadModel(server2.get(), "simple3"),
