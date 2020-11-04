@@ -75,15 +75,19 @@
 
 Use clang-format to format all source files (\*.h, \*.cc, \*.proto) to
 a consistent format. You should run clang-format on all source files
-before submitting a pull request::
+before submitting a pull request:
 
-  $ apt-get install clang-format clang-format-6.0
+```
+$ apt-get install clang-format clang-format-6.0
+```
 
-For convenience there is a format.py script in tools/ that can be used
-to clang-format all files within the repo::
+For convenience there is a format.py script in the
+triton-inference-server/common repo in the "tools" directory that can
+be used to clang-format all files within the repo:
 
-  $ cd .../triton-inference-server    # top-level of repo
-  $ python3 format.py *
+```
+$ python3 ../common/tools/format.py *
+```
 
 # Contributor License Agreement (CLA)
 
