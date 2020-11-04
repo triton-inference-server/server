@@ -776,6 +776,32 @@ RunInferenceAndValidate(
       "deleting inference request");
 }
 
+void
+PrintModelStats(
+    std::shared_ptr<TRITONSERVER_Server> server, const std::string model_name)
+{
+  TRITONSERVER_Message* model_stats_message = nullptr;
+
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerModelStatistics(
+          server.get(), model_name.c_str(), -1 /* model_version */,
+          &model_stats_message),
+      "unable to get model stats message");
+  const char* buffer;
+  size_t byte_size;
+  FAIL_IF_ERR(
+      TRITONSERVER_MessageSerializeToJson(
+          model_stats_message, &buffer, &byte_size),
+      "unable to serialize server metadata message");
+
+  std::cout << "Model '" << model_name << "' Stats:" << std::endl;
+  std::cout << std::string(buffer, byte_size) << std::endl;
+
+  FAIL_IF_ERR(
+      TRITONSERVER_MessageDelete(model_stats_message),
+      "deleting model stats message");
+}
+
 int
 main(int argc, char** argv)
 {
@@ -919,6 +945,12 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorDelete(allocator),
       "deleting response allocator");
+
+  // Print Model Statistics for all models
+  PrintModelStats(server1, "simple");
+  PrintModelStats(server1, "simple2");
+  PrintModelStats(server2, "simple");
+  PrintModelStats(server2, "simple3");
 
   // Unload models in both servers.
   FAIL_IF_ERR(
