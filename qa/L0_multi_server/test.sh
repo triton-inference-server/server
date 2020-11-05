@@ -36,11 +36,11 @@ if [ -z "$REPO_VERSION" ]; then
 fi
 
 MODELSDIR=`pwd`/models
-DATADIR=/data/inferenceserver/20.09dev/qa_model_repository
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 
 export CUDA_VISIBLE_DEVICES=0
 
-# Must explicitly set LD_LIBRARY_PATH so that clients can find
+# Must explicitly set LD_LIBRARY_PATH so that server can find
 # libtritonserver.so.
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 
@@ -53,7 +53,7 @@ CLIENT_LOG=$MULTI_SERVER
 MULTI_SERVER=./$MULTI_SERVER
 
 I=1
-for trial in graphdef onnx libtorch ; do
+for trial in graphdef onnx plan ; do
     full=${trial}_float32_float32_float32
     rm -rf ${MODELSDIR}${I}
     mkdir -p ${MODELSDIR}${I}/simple${I}/1 && \

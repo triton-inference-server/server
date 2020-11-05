@@ -265,77 +265,66 @@ InferResponseComplete(
 }
 
 TRITONSERVER_Error*
-ParseModelMetadata(
-    const rapidjson::Document& model_metadata, bool* is_int,
-    bool* is_torch_model)
+ParseModelMetadata(const rapidjson::Document& model_metadata)
 {
   std::string seen_data_type;
   for (const auto& input : model_metadata["inputs"].GetArray()) {
-    if (strcmp(input["datatype"].GetString(), "INT32") &&
-        strcmp(input["datatype"].GetString(), "FP32")) {
+    if (strcmp(input["datatype"].GetString(), "FP32")) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
-          "simple lib example only supports model with data type INT32 or "
-          "FP32");
+          "multi-server example only supports model with data type FP32");
     }
     if (seen_data_type.empty()) {
       seen_data_type = input["datatype"].GetString();
     } else if (strcmp(seen_data_type.c_str(), input["datatype"].GetString())) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          "the inputs and outputs of 'simple' model must have the data type");
+          "the inputs and outputs of model must have the data type");
     }
   }
   for (const auto& output : model_metadata["outputs"].GetArray()) {
-    if (strcmp(output["datatype"].GetString(), "INT32") &&
-        strcmp(output["datatype"].GetString(), "FP32")) {
+    if (strcmp(output["datatype"].GetString(), "FP32")) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
-          "simple lib example only supports model with data type INT32 or "
-          "FP32");
+          "multi-server example only supports model with data type FP32");
     } else if (strcmp(seen_data_type.c_str(), output["datatype"].GetString())) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          "the inputs and outputs of 'simple' model must have the data type");
+          "the inputs and outputs of model must have the data type");
     }
   }
 
-  *is_int = (strcmp(seen_data_type.c_str(), "INT32") == 0);
-  *is_torch_model =
-      (strcmp(model_metadata["platform"].GetString(), "pytorch_libtorch") == 0);
   return nullptr;
 }
 
-template <typename T>
 void
 GenerateInputData(
-    std::vector<char>* input0_data, std::vector<char>* input1_data)
+    std::vector<float>* input0_data, std::vector<float>* input1_data)
 {
-  input0_data->resize(16 * sizeof(T));
-  input1_data->resize(16 * sizeof(T));
+  input0_data->resize(16);
+  input1_data->resize(16);
   for (size_t i = 0; i < 16; ++i) {
-    ((T*)input0_data->data())[i] = i;
-    ((T*)input1_data->data())[i] = 1;
+    input0_data->data()[i] = i;
+    input1_data->data()[i] = 1;
   }
 }
 
-template <typename T>
 void
 CompareResult(
     const std::string& output0_name, const std::string& output1_name,
-    const void* input0, const void* input1, const char* output0,
-    const char* output1)
+    const float* input0, const float* input1, const float* output0,
+    const float* output1)
 {
   for (size_t i = 0; i < 16; ++i) {
-    std::cout << ((T*)input0)[i] << " + " << ((T*)input1)[i] << " = "
-              << ((T*)output0)[i] << std::endl;
-    std::cout << ((T*)input0)[i] << " - " << ((T*)input1)[i] << " = "
-              << ((T*)output1)[i] << std::endl;
+    std::cout << input0[i] << " + " << input1[i] << " = " << output0[i]
+              << std::endl;
+    std::cout << input0[i] << " - " << input1[i] << " = " << output1[i]
+              << std::endl;
 
-    if ((((T*)input0)[i] + ((T*)input1)[i]) != ((T*)output0)[i]) {
+    if ((input0[i] + input1[i]) != output0[i]) {
       FAIL("incorrect sum in " + output0_name);
     }
-    if ((((T*)input0)[i] - ((T*)input1)[i]) != ((T*)output1)[i]) {
+    if ((input0[i] - input1[i]) != output1[i]) {
       FAIL("incorrect difference in " + output1_name);
     }
   }
@@ -344,12 +333,12 @@ CompareResult(
 void
 Check(
     TRITONSERVER_InferenceResponse* response,
-    const std::vector<char>& input0_data, const std::vector<char>& input1_data,
-    const std::string& output0, const std::string& output1,
-    const size_t expected_byte_size,
-    const TRITONSERVER_DataType expected_datatype, const bool is_int)
+    const std::vector<float>& input0_data,
+    const std::vector<float>& input1_data, const std::string& output0,
+    const std::string& output1, const size_t expected_byte_size,
+    const TRITONSERVER_DataType expected_datatype)
 {
-  std::unordered_map<std::string, std::vector<char>> output_data;
+  std::unordered_map<std::string, std::vector<float>> output_data;
 
   uint32_t output_count;
   FAIL_IF_ERR(
@@ -412,19 +401,19 @@ Check(
     }
 
     // We make a copy of the data here... which we could avoid for
-    // performance reasons but ok for this simple example.
-    std::vector<char>& odata = output_data[name];
+    // performance reasons but ok for this example.
+    std::vector<float>& odata = output_data[name];
     switch (memory_type) {
       case TRITONSERVER_MEMORY_CPU: {
         std::cout << name << " is stored in system memory" << std::endl;
-        const char* cbase = reinterpret_cast<const char*>(base);
+        const float* cbase = reinterpret_cast<const float*>(base);
         odata.assign(cbase, cbase + byte_size);
         break;
       }
 
       case TRITONSERVER_MEMORY_CPU_PINNED: {
         std::cout << name << " is stored in pinned memory" << std::endl;
-        const char* cbase = reinterpret_cast<const char*>(base);
+        const float* cbase = reinterpret_cast<const float*>(base);
         odata.assign(cbase, cbase + byte_size);
         break;
       }
@@ -445,15 +434,9 @@ Check(
     }
   }
 
-  if (is_int) {
-    CompareResult<int32_t>(
-        output0, output1, &input0_data[0], &input1_data[0],
-        output_data[output0].data(), output_data[output1].data());
-  } else {
-    CompareResult<float>(
-        output0, output1, &input0_data[0], &input1_data[0],
-        output_data[output0].data(), output_data[output1].data());
-  }
+  CompareResult(
+      output0, output1, &input0_data[0], &input1_data[0],
+      output_data[output0].data(), output_data[output1].data());
 }
 
 }  // namespace
@@ -548,8 +531,7 @@ PrintServerStatus(std::shared_ptr<TRITONSERVER_Server> server)
 
 void
 AwaitModelReady(
-    std::shared_ptr<TRITONSERVER_Server> server, const std::string model_name,
-    bool* is_int, bool* is_torch_model)
+    std::shared_ptr<TRITONSERVER_Server> server, const std::string model_name)
 {
   bool is_ready = false;
   size_t wait_seconds = 0;
@@ -608,17 +590,14 @@ AwaitModelReady(
       FAIL("unable to find version 1 status for model");
     }
 
-    FAIL_IF_ERR(
-        ParseModelMetadata(model_metadata, is_int, is_torch_model),
-        "parsing model metadata");
+    FAIL_IF_ERR(ParseModelMetadata(model_metadata), "parsing model metadata");
   }
 }
 
 void
 RunInferenceAndValidate(
     std::shared_ptr<TRITONSERVER_Server> server,
-    TRITONSERVER_ResponseAllocator* allocator, const std::string model_name,
-    const bool is_int, const bool is_torch_model)
+    TRITONSERVER_ResponseAllocator* allocator, const std::string model_name)
 {
   TRITONSERVER_InferenceRequest* irequest = nullptr;
   FAIL_IF_ERR(
@@ -636,14 +615,13 @@ RunInferenceAndValidate(
       "setting request release callback");
 
   // Inputs
-  auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";
-  auto input1 = is_torch_model ? "INPUT__1" : "INPUT1";
+  auto input0 = "INPUT0";
+  auto input1 = "INPUT1";
 
   std::vector<int64_t> input0_shape({1, 16});
   std::vector<int64_t> input1_shape({1, 16});
 
-  const TRITONSERVER_DataType datatype =
-      (is_int) ? TRITONSERVER_TYPE_INT32 : TRITONSERVER_TYPE_FP32;
+  const TRITONSERVER_DataType datatype = TRITONSERVER_TYPE_FP32;
 
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAddInput(
@@ -654,8 +632,8 @@ RunInferenceAndValidate(
           irequest, input1, datatype, &input1_shape[0], input1_shape.size()),
       "setting input 1 meta-data for the request");
 
-  auto output0 = is_torch_model ? "OUTPUT__0" : "OUTPUT0";
-  auto output1 = is_torch_model ? "OUTPUT__1" : "OUTPUT1";
+  auto output0 = "OUTPUT0";
+  auto output1 = "OUTPUT1";
 
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output0),
@@ -666,16 +644,12 @@ RunInferenceAndValidate(
 
   // Create the data for the two input tensors. Initialize the first
   // to unique values and the second to all ones.
-  std::vector<char> input0_data;
-  std::vector<char> input1_data;
-  if (is_int) {
-    GenerateInputData<int32_t>(&input0_data, &input1_data);
-  } else {
-    GenerateInputData<float>(&input0_data, &input1_data);
-  }
+  std::vector<float> input0_data;
+  std::vector<float> input1_data;
+  GenerateInputData(&input0_data, &input1_data);
 
-  size_t input0_size = input0_data.size();
-  size_t input1_size = input1_data.size();
+  size_t input0_size = input0_data.size() * 4;
+  size_t input1_size = input1_data.size() * 4;
 
   const void* input0_base = &input0_data[0];
   const void* input1_base = &input1_data[0];
@@ -764,7 +738,7 @@ RunInferenceAndValidate(
 
     Check(
         completed_response, input0_data, input1_data, output0, output1,
-        input0_size, datatype, is_int);
+        input0_size, datatype);
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseDelete(completed_response),
@@ -919,13 +893,10 @@ main(int argc, char** argv)
       "failed to load model");
 
   // Wait for the models to become available.
-  bool is_int1 = true, is_int2 = true, is_int3 = true;
-  bool is_torch_model1 = false, is_torch_model2 = false,
-       is_torch_model3 = false;
-  AwaitModelReady(server1, "simple1", &is_int1, &is_torch_model1);
-  AwaitModelReady(server1, "simple2", &is_int2, &is_torch_model2);
-  AwaitModelReady(server2, "simple1", &is_int1, &is_torch_model1);
-  AwaitModelReady(server2, "simple3", &is_int3, &is_torch_model3);
+  AwaitModelReady(server1, "simple1");
+  AwaitModelReady(server1, "simple2");
+  AwaitModelReady(server2, "simple1");
+  AwaitModelReady(server2, "simple3");
 
   // Create the allocator that will be used to allocate buffers for
   // the result tensors.
@@ -936,14 +907,10 @@ main(int argc, char** argv)
       "creating response allocator");
 
   // Inference
-  RunInferenceAndValidate(
-      server1, allocator, "simple1", is_int1, is_torch_model1);
-  RunInferenceAndValidate(
-      server1, allocator, "simple2", is_int2, is_torch_model2);
-  RunInferenceAndValidate(
-      server2, allocator, "simple1", is_int1, is_torch_model1);
-  RunInferenceAndValidate(
-      server2, allocator, "simple3", is_int3, is_torch_model3);
+  RunInferenceAndValidate(server1, allocator, "simple1");
+  RunInferenceAndValidate(server1, allocator, "simple2");
+  RunInferenceAndValidate(server2, allocator, "simple1");
+  RunInferenceAndValidate(server2, allocator, "simple3");
 
   FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorDelete(allocator),
@@ -968,6 +935,13 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerUnloadModel(server2.get(), "simple3"),
       "failed to unload model");
+
+  // Try to load wrong model. Expected to fail
+  TRITONSERVER_Error* err =
+      TRITONSERVER_ServerLoadModel(server1.get(), "simple3");
+  if (err == nullptr) {
+    FAIL("Success when expected to failed to load wrong model");
+  }
 
   return 0;
 }
