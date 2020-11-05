@@ -86,7 +86,7 @@ def is_unbounded_growth(summary, max_allowed_alloc_rate):
 
 if __name__ == '__main__':
     summary = parse_massif_out(sys.argv[1])
-    max_allowed_alloc_rate = float(sys.argv[1])
+    max_allowed_alloc_rate = float(sys.argv[2])
     if is_unbounded_growth(summary, max_allowed_alloc_rate):
         sys.exit(1)
     else:
