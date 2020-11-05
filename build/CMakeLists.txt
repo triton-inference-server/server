@@ -78,6 +78,7 @@ set(TRITON_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
 set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
 set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
 set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
+set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/third_party repo")
 
 # Version
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" TRITON_VERSION)
@@ -251,21 +252,45 @@ ExternalProject_Add(libevent
 )
 
 #
-# Build libevhtp
+# Get patched third party repo
 #
-# Need to patch due to https://github.com/criticalstack/libevhtp/issues/135
+ExternalProject_Add(third-party-repo
+  PREFIX third-party-repo
+  GIT_REPOSITORY "https://github.com/triton-inference-server/third_party.git"
+  GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/third-party-repo/src/third_party"
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+  TEST_COMMAND ""
+)
+
 #
+# Build patched libevhtp
+#
+if (WIN32)
+# FIXME evhtp can't be built successfully in native Windows environment
+# CMAKE_PREFIX_PATH is needed to find libevent
 ExternalProject_Add(libevhtp
   PREFIX libevhtp
-  URL "https://github.com/criticalstack/libevhtp/archive/1.2.18.zip"
-  URL_HASH SHA256=3194dc6eb4e8d6aa1e7dd3dc60bfbe066f38f9a0b5881463f0e149badd82a7bb
-  PATCH_COMMAND sed -i "s/LibEvent/Libevent/g" ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/CMakeLists.txt
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.c.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/evhtp.c
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.h.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/evhtp.h
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/thread.c.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/thread.c
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/thread.h.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/thread.h
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/config.h.in.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/config.h.in
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/third-party-repo/src/third_party/libevhtp/libevhtp"
+  DOWNLOAD_COMMAND ""
+  CMAKE_CACHE_ARGS
+    -DEVHTP_DISABLE_REGEX:BOOL=ON
+    -DEVHTP_DISABLE_SSL:BOOL=ON
+    -DEVHTP_TRITON_ENABLE_HTTP_CONTIGUOUS:BOOL=ON
+    -DEVHTP_TRITON_ENABLE_TRACING:BOOL=${TRITON_ENABLE_TRACING}
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install
+    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install
+  DEPENDS libevent third-party-repo
+)
+else()
+ExternalProject_Add(libevhtp
+  PREFIX libevhtp
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/third-party-repo/src/third_party/libevhtp/libevhtp"
+  DOWNLOAD_COMMAND ""
   CMAKE_CACHE_ARGS
     -DEVHTP_DISABLE_REGEX:BOOL=ON
     -DEVHTP_DISABLE_SSL:BOOL=ON
@@ -275,8 +300,9 @@ ExternalProject_Add(libevhtp
     -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install
-  DEPENDS libevent
+  DEPENDS libevent third-party-repo
 )
+endif()
 
 #
 # Build Prometheus C++ library
@@ -361,13 +387,12 @@ ExternalProject_Add(azure-storage-cpplite
 #
 ExternalProject_Add(cnmem
   PREFIX cnmem
-  GIT_REPOSITORY "https://github.com/NVIDIA/cnmem.git"
-  GIT_TAG "37896cc9bfc6536a8c878a1e675835c22d827821"
-  PATCH_COMMAND sed -i "s/SHARED/STATIC/g" ${CMAKE_CURRENT_BINARY_DIR}/cnmem/src/cnmem/CMakeLists.txt
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/cnmem/src/cnmem"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/third-party-repo/src/third_party/cnmem/cnmem"
+  DOWNLOAD_COMMAND ""
   CMAKE_CACHE_ARGS
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/cnmem
+    DEPENDS third-party-repo
 )
 
 #
