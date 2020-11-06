@@ -221,11 +221,15 @@ RUN cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so 
     mkdir -p qa/L0_perf_nomodel_shm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_shm && \
     mkdir -p qa/L0_perf_nomodel_cudashm && \
-    cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm && \
-    mkdir -p qa/L0_model_control_stress_valgrind && \
-    cp -r qa/L0_model_control_stress/. qa/L0_model_control_stress_valgrind && \
-    mkdir -p qa/L0_model_control_stress_valgrind_massif && \
-    cp -r qa/L0_model_control_stress/. qa/L0_model_control_stress_valgrind_massif
+    cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm
+
+# L0_model_control_stress will not be present if gitlab tests are not available
+RUN if [ -d qa/L0_model_control_stress ]; then \
+        mkdir -p qa/L0_model_control_stress_valgrind && \
+            cp -r qa/L0_model_control_stress/. qa/L0_model_control_stress_valgrind && \
+            mkdir -p qa/L0_model_control_stress_valgrind_massif && \
+            cp -r qa/L0_model_control_stress/. qa/L0_model_control_stress_valgrind_massif; \
+    fi
 
 RUN cp /tmp/tritonbuild/install/backends/repeat/libtriton_repeat.so \
         qa/L0_model_config/.
