@@ -350,8 +350,9 @@ gpu_execution_accelerator property.
 
 ```
 optimization { execution_accelerators {
-  gpu_execution_accelerator : [ {
-    name : "auto_mixed_precision"
+  gpu_execution_accelerator : [ 
+    { name : "auto_mixed_precision" }
+  ]
 }}
 ```
 
