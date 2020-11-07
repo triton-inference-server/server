@@ -533,9 +533,9 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
 
   // Obatin the age of the oldest pending request to compare with the maximum
   // batch queuing delay
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+  uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+             .count();
   uint64_t delay_ns = now_ns - queue_.OldestEnqueueTime();
   bool delay_is_exceeded = (delay_ns >= pending_batch_delay_ns_);
 

@@ -381,9 +381,9 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   // sequence, and if it is it will release the sequence slot (if any)
   // allocated to that sequence.
   {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    uint64_t now_us = TIMESPEC_TO_NANOS(now) / 1000;
+    uint64_t now_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
     correlation_id_timestamps_[correlation_id] = now_us;
   }
 
@@ -578,9 +578,9 @@ SequenceBatchScheduler::ReaperThread(const int nice)
     {
       std::unique_lock<std::mutex> lock(mu_);
 
-      struct timespec now;
-      clock_gettime(CLOCK_MONOTONIC, &now);
-      uint64_t now_us = TIMESPEC_TO_NANOS(now) / 1000;
+      uint64_t now_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count();
 
       for (auto cid_itr = correlation_id_timestamps_.cbegin();
            cid_itr != correlation_id_timestamps_.cend();) {
@@ -1071,9 +1071,10 @@ DirectSequenceBatch::SchedulerThread(
             // batch, execute now if queuing delay is exceeded or the batch size
             // is large enough. Otherwise create a timer to wakeup a thread to
             // check again at the maximum allowed delay.
-            struct timespec now;
-            clock_gettime(CLOCK_MONOTONIC, &now);
-            uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+            uint64_t now_ns =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch())
+                    .count();
             uint64_t current_batch_delay_ns =
                 (now_ns - earliest_enqueue_time_ns);
             if ((current_batch_delay_ns > pending_batch_delay_ns_) ||

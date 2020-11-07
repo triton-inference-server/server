@@ -132,9 +132,9 @@ TraceManager::CaptureTimestamp(
 {
   if ((trace_id != 0) && (level <= level_)) {
     if (timestamp_ns == 0) {
-      struct timespec ts;
-      clock_gettime(CLOCK_MONOTONIC, &ts);
-      timestamp_ns = TIMESPEC_TO_NANOS(ts);
+      timestamp_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                         std::chrono::steady_clock::now().time_since_epoch())
+                         .count();
     }
 
     std::stringstream ss;

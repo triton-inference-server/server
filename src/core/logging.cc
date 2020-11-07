@@ -25,10 +25,17 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/core/logging.h"
+#ifdef _WIN32
+// suppress the min and max definitions in Windef.h.
+#define NOMINMAX
+#include <Windows.h>
+#else
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#endif
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 
@@ -55,17 +62,27 @@ const std::vector<char> LogMessage::level_name_{'E', 'W', 'I'};
 
 LogMessage::LogMessage(const char* file, int line, uint32_t level)
 {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  struct tm tm_time;
-  gmtime_r(((time_t*)&(tv.tv_sec)), &tm_time);
-
   std::string path(file);
   size_t pos = path.rfind('/');
   if (pos != std::string::npos) {
     path = path.substr(pos + 1, std::string::npos);
   }
 
+#ifdef _WIN32
+  SYSTEMTIME system_time;
+  GetSystemTime(&system_time);
+  stream_ << level_name_[std::min(level, (uint32_t)Level::kINFO)]
+          << std::setfill('0') << std::setw(2) << (system_time.wMonth + 1)
+          << std::setw(2) << system_time.wDay << " " << std::setw(2)
+          << system_time.wHour << ':' << std::setw(2) << system_time.wMinute << ':'
+          << std::setw(2) << system_time.wSecond << "." << std::setw(6) << system_time.wMilliseconds * 1000
+          << ' ' << static_cast<uint32_t>(GetCurrentProcessId()) << ' ' << path << ':'
+          << line << "] ";
+#else
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  struct tm tm_time;
+  gmtime_r(((time_t*)&(tv.tv_sec)), &tm_time);
   stream_ << level_name_[std::min(level, (uint32_t)Level::kINFO)]
           << std::setfill('0') << std::setw(2) << (tm_time.tm_mon + 1)
           << std::setw(2) << tm_time.tm_mday << " " << std::setw(2)
@@ -73,6 +90,7 @@ LogMessage::LogMessage(const char* file, int line, uint32_t level)
           << std::setw(2) << tm_time.tm_sec << "." << std::setw(6) << tv.tv_usec
           << ' ' << static_cast<uint32_t>(getpid()) << ' ' << path << ':'
           << line << "] ";
+#endif
 }
 
 LogMessage::~LogMessage()
