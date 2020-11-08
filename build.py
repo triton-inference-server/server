@@ -56,9 +56,7 @@ from distutils.dir_util import copy_tree
 #      ORT version,
 #      ORT openvino version
 #     )
-TRITON_VERSION_MAP = {
-    '2.6.0dev': ('20.12dev', '20.10', '1.5.3', '2020.4')
-}
+TRITON_VERSION_MAP = {'2.6.0dev': ('20.12dev', '20.10', '1.5.3', '2020.4')}
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['pytorch', 'tensorrt', 'custom', 'ensemble']
@@ -718,20 +716,19 @@ RUN export ONNX_VERSION=`cat backends/onnxruntime/ort_onnx_version.txt`
 '''
     df += '''
 # Extra defensive wiring for CUDA Compat lib
-RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
- && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
+RUN ln -sf ${{_CUDA_COMPAT_PATH}}/lib.real ${{_CUDA_COMPAT_PATH}}/lib \
+ && echo ${{_CUDA_COMPAT_PATH}}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
  && ldconfig \
- && rm -f ${_CUDA_COMPAT_PATH}/lib
+ && rm -f ${{_CUDA_COMPAT_PATH}}/lib
 
 COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tritonserver
 ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 
-ARG NVIDIA_BUILD_ID
-ENV NVIDIA_BUILD_ID ${NVIDIA_BUILD_ID:-<unknown>}
-LABEL com.nvidia.build.id="${NVIDIA_BUILD_ID}"
-ARG NVIDIA_BUILD_REF
-LABEL com.nvidia.build.ref="${NVIDIA_BUILD_REF}"
-'''
+ENV NVIDIA_BUILD_ID {}
+LABEL com.nvidia.build.id={}
+LABEL com.nvidia.build.ref={}
+'''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
+           argmap['NVIDIA_BUILD_REF'])
 
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -754,9 +751,16 @@ def container_build(backends, images):
             FLAGS.upstream_container_version)
 
     dockerfileargmap = {
-        'TRITON_VERSION': FLAGS.version,
-        'TRITON_CONTAINER_VERSION': FLAGS.container_version,
-        'BASE_IMAGE': base_image,
+        'NVIDIA_BUILD_REF':
+            '' if FLAGS.build_sha is None else FLAGS.build_sha,
+        'NVIDIA_BUILD_ID':
+            '<unknown>' if FLAGS.build_id is None else FLAGS.build_id,
+        'TRITON_VERSION':
+            FLAGS.version,
+        'TRITON_CONTAINER_VERSION':
+            FLAGS.container_version,
+        'BASE_IMAGE':
+            base_image,
     }
 
     # If building the pytorch backend then need to include pytorch in
@@ -971,6 +975,14 @@ if __name__ == '__main__':
                         required=False,
                         help='Do not use Docker container for build.')
 
+    parser.add_argument('--build-id',
+                        type=str,
+                        required=False,
+                        help='Build ID associated with the build.')
+    parser.add_argument('--build-sha',
+                        type=str,
+                        required=False,
+                        help='SHA associated with the build.')
     parser.add_argument(
         '--build-dir',
         type=str,
