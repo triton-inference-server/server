@@ -205,7 +205,7 @@ wait $SERVER_PID
 set +e
 
 # Check the massif output
-python $MASSIF_TEST $MASSIF_LOG >> $CLIENT_LOG 2>&1
+python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC_RATE >> $CLIENT_LOG 2>&1
 if [ $? -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
