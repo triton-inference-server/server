@@ -26,10 +26,11 @@
 
 #include "src/core/sequence_batch_scheduler.h"
 
+#ifndef _WIN32
 #include <sys/resource.h>
 #include <sys/syscall.h>
-#include <sys/types.h>
 #include <unistd.h>
+#endif
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
@@ -560,6 +561,7 @@ SequenceBatchScheduler::DelayScheduler(
 void
 SequenceBatchScheduler::ReaperThread(const int nice)
 {
+#ifndef _WIN32
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting sequence-batch reaper thread at nice " << nice
                    << "...";
@@ -568,6 +570,9 @@ SequenceBatchScheduler::ReaperThread(const int nice)
                       "(requested nice "
                    << nice << " failed)...";
   }
+#else
+  LOG_VERBOSE(1) << "Starting sequence-batch reaper thread at default nice...";
+#endif
 
   const uint64_t backlog_idle_wait_microseconds = 50 * 1000;
 
@@ -909,6 +914,7 @@ void
 DirectSequenceBatch::SchedulerThread(
     const int nice, std::promise<bool>* is_initialized)
 {
+#ifndef _WIN32
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting Direct sequence-batch scheduler thread "
                    << batcher_idx_ << " at nice " << nice << "...";
@@ -917,6 +923,10 @@ DirectSequenceBatch::SchedulerThread(
                    << batcher_idx_ << " at default nice (requested nice "
                    << nice << " failed)...";
   }
+#else
+  LOG_VERBOSE(1) << "Starting Direct sequence-batch scheduler thread "
+                   << batcher_idx_ << " at default nice...";
+#endif
 
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have

@@ -28,7 +28,6 @@
 
 #include <stdint.h>
 #include <time.h>
-#include <unistd.h>
 #include <algorithm>
 #include <csignal>
 #include <iostream>

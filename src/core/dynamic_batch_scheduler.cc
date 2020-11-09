@@ -26,11 +26,11 @@
 
 #include "src/core/dynamic_batch_scheduler.h"
 
+#ifndef _WIN32
 #include <sys/resource.h>
 #include <sys/syscall.h>
-#include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
+#endif
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
@@ -225,6 +225,7 @@ DynamicBatchScheduler::SchedulerThread(
     const std::shared_ptr<std::atomic<bool>>& rthread_exit,
     std::promise<bool>* is_initialized)
 {
+#ifndef _WIN32
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
                    << " at nice " << nice << "...";
@@ -233,6 +234,10 @@ DynamicBatchScheduler::SchedulerThread(
                    << " at default nice (requested nice " << nice
                    << " failed)...";
   }
+#else
+  LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
+                   << " at default nice...";
+#endif
 
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
