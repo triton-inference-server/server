@@ -114,15 +114,39 @@ def untar(targetdir, tarfile):
 
 
 def gitclone(cwd, repo, tag, subdir):
-    log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
-    p = subprocess.Popen([
-        'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
-        tag, '{}/{}.git'.format(FLAGS.github_organization, repo), subdir
-    ],
-                         cwd=cwd)
-    p.wait()
-    fail_if(p.returncode != 0,
-            'git clone of repo "{}" at tag "{}" failed'.format(repo, tag))
+    # If 'tag' starts with "pull/" then it must be of form
+    # "pull/<pr>/head". We just clone at "main" and then fetch the
+    # reference onto a new branch we name "tritonbuildref".
+    if tag.startswith("pull/"):
+        log_verbose('git clone of repo "{}" at ref "{}"'.format(repo, tag))
+        p = subprocess.Popen([
+            'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
+            'main', '{}/{}.git'.format(FLAGS.github_organization, repo), subdir
+        ],
+                             cwd=cwd)
+        p.wait()
+        fail_if(p.returncode != 0,
+                'git clone of repo "{}" at branch "main" failed'.format(repo))
+        p = subprocess.Popen(
+            ['git', 'fetch', 'origin', '{}:tritonbuildref'.format(tag)],
+            cwd=cwd)
+        p.wait()
+        fail_if(p.returncode != 0, 'git fetch of ref "{}" failed'.format(tag))
+        p = subprocess.Popen(['git', 'checkout', 'tritonbuildref'], cwd=cwd)
+        fail_if(p.returncode != 0,
+                'git checkout of branch "tritonbuildref" failed')
+        p.wait()
+
+    else:
+        log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
+        p = subprocess.Popen([
+            'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
+            tag, '{}/{}.git'.format(FLAGS.github_organization, repo), subdir
+        ],
+                             cwd=cwd)
+        p.wait()
+        fail_if(p.returncode != 0,
+                'git clone of repo "{}" at tag "{}" failed'.format(repo, tag))
 
 
 def prebuild_command():
@@ -1110,7 +1134,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. <repo-tag> indicates the git tag/branch to use for the build, default is "main".'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build, default is "main".'
     )
     parser.add_argument(
         '-r',
@@ -1118,7 +1142,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'The git tag/branch to use for a component of the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", or "backend".'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", or "backend". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. Default is "main".'
     )
 
     FLAGS = parser.parse_args()
