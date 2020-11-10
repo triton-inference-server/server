@@ -43,6 +43,10 @@ CLIENT_LOG="./client.log"
 BATCHER_TEST=batcher_test.py
 VERIFY_TIMESTAMPS=verify_timestamps.py
 
+if [ -z "$TEST_VALGRIND" ]; then
+    TEST_VALGRIND="0"
+fi 
+
 # Add valgrind flag check
 if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
