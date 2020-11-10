@@ -42,6 +42,10 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
 
+if [ -z "$TEST_VALGRIND" ]; then
+    TEST_VALGRIND="0"
+fi 
+
 if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
