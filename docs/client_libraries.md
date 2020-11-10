@@ -261,7 +261,6 @@ following cmake configuration.
 
 ```
 > cmake -G"Visual Studio 16 2019" -DTRITON_ENABLE_GPU=OFF -DTRITON_ENABLE_METRICS_GPU=OFF -DCMAKE_BUILD_TYPE=Release -DTRITON_COMMON_REPO_TAG:STRING=<tag> -DTRITON_CORE_REPO_TAG:STRING=<tag>
-
 ```
 
 Where <tag> is "main" if you are building the clients from the master
