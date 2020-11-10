@@ -26,7 +26,20 @@
 
 #include "src/core/filesystem.h"
 
+#ifdef _WIN32
+// suppress the min and max definitions in Windef.h.
+#define NOMINMAX
+#include <Windows.h>
+
+// _CRT_INTERNAL_NONSTDC_NAMES 1 before including Microsoft provided C Runtime
+// library to expose declarations without "_" prefix to match POSIX style.
+#define _CRT_INTERNAL_NONSTDC_NAMES 1
+#include <io.h>
+#include <direct.h>
+#else
 #include <dirent.h>
+#include <unistd.h>
+#endif
 
 #ifdef TRITON_ENABLE_GCS
 #include <google/cloud/storage/client.h>
@@ -55,13 +68,21 @@
 #include <re2/re2.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <cerrno>
 #include <fstream>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/status.h"
+
+#ifdef _WIN32
+// <sys/stat.h> in Windows doesn't define S_ISDIR macro
+#if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
+  #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#define F_OK 0
+#endif
 
 namespace nvidia { namespace inferenceserver {
 
@@ -84,6 +105,58 @@ IsPathDirectory(const std::string& path, bool* is_dir)
   return Status::Success;
 }
 
+#if defined(TRITON_ENABLE_S3) || defined(TRITON_ENABLE_GCS)
+Status
+MakeTemporaryDirectory(std::string* temp_dir)
+{
+#ifdef _WIN32
+  char temp_path[MAX_PATH+1];
+  size_t temp_path_length = GetTempPath(MAX_PATH+1, temp_path);
+  if (temp_path_length == 0) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to get local directory for temporary files");
+  }
+  // There is no single operation like 'mkdtemp' in Windows, thus generating
+  // unique temporary directory is a process of getting temporary file name,
+  // deleting the file (file creation is side effect fo getting anme), creating
+  // corresponding directory, so mutex is used to avoid possible race condition.
+  // However, it doesn't prevent other process on creating temporary file and
+  // thus the race condition may still happen. One possible solution is
+  // to reserve a temporary directory for the process and generate temporary
+  // model directories inside it.
+  static std::mutex mtx;
+  std::lock_guard<std::mutex> lk(mtx);
+  // Construct a std::string as filled 'temp_path' is not C string,
+  // and so that we can reuse 'temp_path' to hold the temp file name.
+  std::string temp_path_str(temp_path, temp_path_length);
+  if (GetTempFileName(temp_path_str.c_str(), "folder", 0, temp_path) == 0) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder");
+  }
+  *temp_dir = temp_path;
+  DeleteFile(temp_dir->c_str());
+  if (CreateDirectory(temp_dir->c_str(), NULL) == 0) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder: " + *temp_dir);
+  }
+#else
+  std::string folder_template = "/tmp/folderXXXXXX";
+  char* res = mkdtemp(const_cast<char*>(folder_template.c_str()));
+  if (res == nullptr) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder: " + folder_template +
+            ", errno:" + strerror(errno));
+  }
+  *temp_dir = res;
+#endif
+  return Status::Success;
+}
+#endif
+
 }  // namespace
 
 LocalizedDirectory::~LocalizedDirectory()
@@ -98,24 +171,19 @@ LocalizedDirectory::~LocalizedDirectory()
 Status
 LocalizedDirectory::DeleteDirectory(const std::string& path)
 {
-  struct dirent* ep;
-  DIR* dp = opendir(path.c_str());
+  std::set<std::string> contents;
+  RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
 
-  while ((ep = readdir(dp)) != NULL) {
-    if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0) {
-      continue;
-    }
-    std::string tmp_path = path + "/" + std::string(ep->d_name);
+  for (const auto& content : contents) {
+    std::string full_path = JoinPath({path, content});
     bool is_dir = false;
-    RETURN_IF_ERROR(IsPathDirectory(tmp_path.c_str(), &is_dir));
+    RETURN_IF_ERROR(IsPathDirectory(full_path.c_str(), &is_dir));
     if (is_dir) {
-      DeleteDirectory(tmp_path);
+      DeleteDirectory(full_path);
     } else {
-      remove(tmp_path.c_str());
+      remove(full_path.c_str());
     }
   }
-
-  closedir(dp);
   rmdir(path.c_str());
 
   return Status::Success;
@@ -186,7 +254,12 @@ LocalFileSystem::FileModificationTime(
     return Status(Status::Code::INTERNAL, "failed to stat file " + path);
   }
 
+#ifdef _WIN32
+  // In Windows, st_mtime is in time_t
+  *mtime_ns = st.st_mtime;
+#else
   *mtime_ns = TIMESPEC_TO_NANOS(st.st_mtim);
+#endif
   return Status::Success;
 }
 
@@ -194,6 +267,24 @@ Status
 LocalFileSystem::GetDirectoryContents(
     const std::string& path, std::set<std::string>* contents)
 {
+#ifdef _WIN32
+  WIN32_FIND_DATA entry;
+  // Append "*" to obtain all files under 'path'
+  HANDLE dir = FindFirstFile(JoinPath({path, "*"}).c_str(), &entry);
+  if (dir == INVALID_HANDLE_VALUE) {
+    return Status(Status::Code::INTERNAL, "failed to open directory " + path);
+  }
+  if ((strcmp(entry.cFileName, ".") != 0) && (strcmp(entry.cFileName, "..") != 0)) {
+    contents->insert(entry.cFileName);
+  }
+  while (FindNextFile(dir, &entry)) {
+    if ((strcmp(entry.cFileName, ".") != 0) && (strcmp(entry.cFileName, "..") != 0)) {
+      contents->insert(entry.cFileName);
+    }
+  }
+
+  FindClose(dir);
+#else
   DIR* dir = opendir(path.c_str());
   if (dir == nullptr) {
     return Status(Status::Code::INTERNAL, "failed to open directory " + path);
@@ -208,7 +299,7 @@ LocalFileSystem::GetDirectoryContents(
   }
 
   closedir(dir);
-
+#endif
   return Status::Success;
 }
 
@@ -607,14 +698,8 @@ GCSFileSystem::LocalizeDirectory(
         Status::Code::INTERNAL, "directory does not exist at " + path);
   }
 
-  std::string folder_template = "/tmp/folderXXXXXX";
-  char* tmp_folder = mkdtemp(const_cast<char*>(folder_template.c_str()));
-  if (tmp_folder == nullptr) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Failed to create local temp folder: " + folder_template +
-            ", errno:" + strerror(errno));
-  }
+  std::string tmp_folder;
+  RETURN_IF_ERROR(MakeTemporaryDirectory(&tmp_folder));
 
   localized->reset(new LocalizedDirectory(path, tmp_folder));
 
@@ -636,9 +721,14 @@ GCSFileSystem::LocalizeDirectory(
       RETURN_IF_ERROR(IsDirectory(gcs_fpath, &is_subdir));
       if (is_subdir) {
         // Create local mirror of sub-directories
+#ifdef _WIN32
+        int status = mkdir(
+            const_cast<char*>(local_fpath.c_str()));
+#else
         int status = mkdir(
             const_cast<char*>(local_fpath.c_str()),
             S_IRUSR | S_IWUSR | S_IXUSR);
+#endif
         if (status == -1) {
           return Status(
               Status::Code::INTERNAL,
@@ -1388,14 +1478,8 @@ S3FileSystem::LocalizeDirectory(
     effective_path = path;
   }
 
-  std::string folder_template = "/tmp/folderXXXXXX";
-  char* tmp_folder = mkdtemp(const_cast<char*>(folder_template.c_str()));
-  if (tmp_folder == nullptr) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Failed to create local temp folder: " + folder_template +
-            ", errno:" + strerror(errno));
-  }
+  std::string tmp_folder;
+  RETURN_IF_ERROR(MakeTemporaryDirectory(&tmp_folder));
 
   localized->reset(new LocalizedDirectory(effective_path, tmp_folder));
 
@@ -1417,9 +1501,14 @@ S3FileSystem::LocalizeDirectory(
       RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
       if (is_subdir) {
         // Create local mirror of sub-directories
+#ifdef _WIN32
+        int status = mkdir(
+            const_cast<char*>(local_fpath.c_str()));
+#else
         int status = mkdir(
             const_cast<char*>(local_fpath.c_str()),
             S_IRUSR | S_IWUSR | S_IXUSR);
+#endif
         if (status == -1) {
           return Status(
               Status::Code::INTERNAL,
@@ -1531,7 +1620,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 
 }  // namespace
 
-
+// FIXME: Windows support '/'? If so, the below doesn't need to change
 bool
 IsAbsolutePath(const std::string& path)
 {
