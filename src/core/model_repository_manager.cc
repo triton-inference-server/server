@@ -50,9 +50,6 @@
 #ifdef TRITON_ENABLE_ENSEMBLE
 #include "src/backends/ensemble/ensemble_backend_factory.h"
 #endif  // TRITON_ENABLE_ENSEMBLE
-#ifdef TRITON_ENABLE_PYTORCH
-#include "src/backends/pytorch/libtorch_backend_factory.h"
-#endif  // TRITON_ENABLE_PYTORCH
 #ifdef TRITON_ENABLE_TENSORRT
 #include "src/backends/tensorrt/plan_backend_factory.h"
 #endif  // TRITON_ENABLE_TENSORRT
@@ -105,15 +102,6 @@ BuildBackendConfigMap(
     (*backend_configs)[kTensorRTPlanPlatform] = plan_config;
   }
 #endif  // TRITON_ENABLE_TENSORRT
-
-#ifdef TRITON_ENABLE_PYTORCH
-  //// PyTorch LibTorch
-  {
-    auto libtorch_config = std::make_shared<LibTorchBackendFactory::Config>();
-    libtorch_config->autofill = !strict_model_config;
-    (*backend_configs)[kPyTorchLibTorchPlatform] = libtorch_config;
-  }
-#endif  // TRITON_ENABLE_PYTORCH
 
 #ifdef TRITON_ENABLE_CUSTOM
   //// Custom
@@ -349,9 +337,6 @@ class ModelRepositoryManager::BackendLifeCycle {
 #ifdef TRITON_ENABLE_TENSORRT
   std::unique_ptr<PlanBackendFactory> plan_factory_;
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_PYTORCH
-  std::unique_ptr<LibTorchBackendFactory> libtorch_factory_;
-#endif  // TRITON_ENABLE_PYTORCH
 #ifdef TRITON_ENABLE_ENSEMBLE
   std::unique_ptr<EnsembleBackendFactory> ensemble_factory_;
 #endif  // TRITON_ENABLE_ENSEMBLE
@@ -379,14 +364,6 @@ ModelRepositoryManager::BackendLifeCycle::Create(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_PYTORCH
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_config_map.find(kPyTorchLibTorchPlatform)->second;
-    RETURN_IF_ERROR(LibTorchBackendFactory::Create(
-        config, &(local_life_cycle->libtorch_factory_)));
-  }
-#endif  // TRITON_ENABLE_PYTORCH
 #ifdef TRITON_ENABLE_CUSTOM
   {
     const std::shared_ptr<BackendConfig>& config =
@@ -889,12 +866,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             version_path, model_config, min_compute_capability_, &is);
         break;
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_PYTORCH
-      case Platform::PLATFORM_PYTORCH_LIBTORCH:
-        status = libtorch_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        break;
-#endif  // TRITON_ENABLE_PYTORCH
 #ifdef TRITON_ENABLE_CUSTOM
       case Platform::PLATFORM_CUSTOM:
         status = custom_factory_->CreateBackend(

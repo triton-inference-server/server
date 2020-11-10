@@ -446,22 +446,6 @@ if(${TRITON_ENABLE_TENSORRT})
   )
 endif() # TRITON_ENABLE_TENSORRT
 
-if(${TRITON_ENABLE_PYTORCH})
-  target_link_libraries(
-    tritonserver
-    PUBLIC ${TRITON_EXTRA_LDFLAGS}
-    PUBLIC -ltorch
-    PUBLIC -ltorch_cpu
-    PUBLIC -ltorch_cuda
-    PUBLIC -ltorchvision
-    PUBLIC -lc10
-    PUBLIC -lc10_cuda
-    PUBLIC -lmkl_core
-    PUBLIC -lmkl_gnu_thread
-    PUBLIC -lmkl_intel_lp64
-  )
-endif() # TRITON_ENABLE_PYTORCH
-
 if(${TRITON_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)
   message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")

@@ -650,6 +650,11 @@ GetNormalizedModelConfig(
       config->set_backend(kOnnxRuntimeBackend);
     }
 #endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
+    if (config->platform() == kPyTorchLibTorchPlatform) {
+      config->set_backend(kPyTorchBackend);
+    }
+#endif  // TRITON_ENABLE_PYTORCH
     // FIXME: "else if ()" other supported frameworks once they are ported
     // to use backend API.
   }
@@ -666,6 +671,11 @@ GetNormalizedModelConfig(
       config->set_platform(kOnnxRuntimeOnnxPlatform);
     }
 #endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
+    if (config->backend() == kPyTorchBackend) {
+      config->set_platform(kPyTorchLibTorchPlatform);
+    }
+#endif  // TRITON_ENABLE_PYTORCH
   }
 
   // If 'default_model_filename' is not specified set it appropriately
