@@ -220,16 +220,8 @@ class PriorityQueue {
     Cursor() = default;
     Cursor(PriorityQueues::iterator start_it);
 
-    Cursor(const Cursor& rhs)
-        : curr_it_(rhs.curr_it_), queue_idx_(rhs.queue_idx_),
-          at_delayed_queue_(rhs.at_delayed_queue_),
-          pending_batch_closest_timeout_ns_(
-              rhs.pending_batch_closest_timeout_ns_),
-          pending_batch_oldest_enqueue_time_ns_(
-              rhs.pending_batch_oldest_enqueue_time_ns_),
-          pending_batch_count_(rhs.pending_batch_count_), valid_(rhs.valid_)
-    {
-    }
+    Cursor(const Cursor& rhs) = default;
+    Cursor& operator=(const Cursor& rhs) = default;
 
     PriorityQueues::iterator curr_it_;
     size_t queue_idx_;
