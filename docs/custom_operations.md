@@ -130,13 +130,13 @@ $ LD_PRELOAD=libpytcustom.so tritonserver --model-repository=/tmp/models ...
 All PyTorch custom operations depend on one or more PyTorch shared
 libraries that must be available to the custom shared library when it
 is loading. In practice this means that you must make sure that
-/opt/tritonserver/lib/pytorch is on the library path before issuing
+/opt/tritonserver/backends/pytorch is on the library path before issuing
 the above command. There are several ways to control the library path
 and a common one is to use the LD_LIBRARY_PATH. You can set
 LD_LIBRARY_PATH in the "docker run" command or inside the container.
 
 ```bash
-$ export LD_LIBRARY_PATH=/opt/tritonserver/lib/pytorch:$LD_LIBRARY_PATH
+$ export LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH
 ```
 
 A limitation of this approach is that the custom operations must be

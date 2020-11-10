@@ -53,8 +53,8 @@ rm -f $SERVER_LOG $CLIENT_LOG
 RET=0
 
 # Must explicitly set LD_LIBRARY_PATH so that the custom operations
-# can find libtensorflow_framework.so and pytorch library.
-LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1:/opt/tritonserver/lib/pytorch:$LD_LIBRARY_PATH
+# can find libtensorflow_framework.so and pytorch libraries.
+LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1:/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH
 
 # Tensorflow
 SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops"
