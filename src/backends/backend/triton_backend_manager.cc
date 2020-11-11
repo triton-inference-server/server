@@ -26,7 +26,13 @@
 
 #include "src/backends/backend/triton_backend_manager.h"
 
+#ifdef _WIN32
+// suppress the min and max definitions in Windef.h.
+#define NOMINMAX
+#include <Windows.h>
+#else
 #include <dlfcn.h>
+#endif
 #include "src/backends/backend/triton_memory_manager.h"
 #include "src/core/logging.h"
 #include "src/core/server_message.h"
@@ -36,11 +42,80 @@ namespace nvidia { namespace inferenceserver {
 namespace {
 
 Status
+OpenLibraryHandle(const std::string& path, void** handle)
+{
+#ifdef _WIN32
+  // HMODULE is typedef of void*
+  // https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types
+  *handle = LoadLibrary(path.c_str());
+  if (*handle == nullptr) {
+    LPSTR err_buffer = nullptr;
+    size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                 NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&err_buffer, 0, NULL);
+    std::string errstr(err_buffer, size);
+    LocalFree(err_buffer);
+
+    return Status(
+        Status::Code::NOT_FOUND,
+        "unable to load custom library: " + errstr);
+  }
+#else
+  *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+  if (*handle == nullptr) {
+    return Status(
+        Status::Code::NOT_FOUND,
+        "unable to load custom library: " + std::string(dlerror()));
+  }
+#endif
+  return Status::Success;
+}
+
+Status
+CloseLibraryHandle(void* handle)
+{
+  if (handle != nullptr) {
+#ifdef _WIN32
+    if (FreeLibrary((HMODULE)handle) == 0) {
+      LPSTR err_buffer = nullptr;
+      size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                  NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&err_buffer, 0, NULL);
+      std::string errstr(err_buffer, size);
+      LocalFree(err_buffer);
+      return Status(
+          Status::Code::INTERNAL,
+          "unable to unload backend library: " + errstr);
+    }
+#else
+    if (dlclose(handle) != 0) {
+      return Status(
+          Status::Code::INTERNAL,
+          "unable to unload backend library: " + std::string(dlerror()));
+    }
+#endif
+  }
+  return Status::Success;
+}
+
+Status
 GetEntrypoint(
     void* handle, const std::string& name, const bool optional, void** befn)
 {
   *befn = nullptr;
-
+#ifdef _WIN32
+  void* fn = GetProcAddress((HMODULE)handle, name.c_str());
+  if ((fn == nullptr)  && !optional) {
+    LPSTR err_buffer = nullptr;
+    size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&err_buffer, 0, NULL);
+    std::string errstr(err_buffer, size);
+    LocalFree(err_buffer);
+    CloseLibraryHandle(handle);
+    return Status(
+        Status::Code::NOT_FOUND,
+        "unable to find '" + name +
+            "' entrypoint in custom library: " + errstr);
+  }
+#else
   dlerror();
   void* fn = dlsym(handle, name.c_str());
   const char* dlsym_error = dlerror();
@@ -66,6 +141,7 @@ GetEntrypoint(
         Status::Code::NOT_FOUND,
         "unable to find required entrypoint '" + name + "' in backend library");
   }
+#endif
 
   *befn = fn;
   return Status::Success;
@@ -156,12 +232,8 @@ TritonBackend::ClearHandles()
 Status
 TritonBackend::LoadBackendLibrary()
 {
-  void* handle = dlopen(libpath_.c_str(), RTLD_NOW | RTLD_LOCAL);
-  if (handle == nullptr) {
-    return Status(
-        Status::Code::NOT_FOUND,
-        "unable to load backend library: " + std::string(dlerror()));
-  }
+  void* handle = nullptr;
+  RETURN_IF_ERROR(OpenLibraryHandle(libpath_, &handle));
 
   TritonBackendInitFn_t bifn;
   TritonBackendFiniFn_t bffn;
@@ -228,11 +300,7 @@ TritonBackend::UnloadBackendLibrary()
   }
 
   if (enable_unload) {
-    if ((dlhandle_ != nullptr) && (dlclose(dlhandle_) != 0)) {
-      return Status(
-          Status::Code::INTERNAL,
-          "unable to unload backend library: " + std::string(dlerror()));
-    }
+    RETURN_IF_ERROR(CloseLibraryHandle(dlhandle_));
   }
 
   ClearHandles();
