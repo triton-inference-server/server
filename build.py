@@ -120,22 +120,27 @@ def gitclone(cwd, repo, tag, subdir):
     if tag.startswith("pull/"):
         log_verbose('git clone of repo "{}" at ref "{}"'.format(repo, tag))
         p = subprocess.Popen([
-            'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
-            'main', '{}/{}.git'.format(FLAGS.github_organization, repo), subdir
+            'git', 'clone', '--recursive', '--depth=1', '{}/{}.git'.format(
+                FLAGS.github_organization, repo), subdir
         ],
                              cwd=cwd)
         p.wait()
         fail_if(p.returncode != 0,
                 'git clone of repo "{}" at branch "main" failed'.format(repo))
+
+        log_verbose('git fetch of ref "{}"'.format(tag))
         p = subprocess.Popen(
             ['git', 'fetch', 'origin', '{}:tritonbuildref'.format(tag)],
-            cwd=cwd)
+            cwd=os.path.join(cwd, subdir))
         p.wait()
         fail_if(p.returncode != 0, 'git fetch of ref "{}" failed'.format(tag))
-        p = subprocess.Popen(['git', 'checkout', 'tritonbuildref'], cwd=cwd)
+
+        log_verbose('git checkout of tritonbuildref')
+        p = subprocess.Popen(['git', 'checkout', 'tritonbuildref'],
+                             cwd=os.path.join(cwd, subdir))
+        p.wait()
         fail_if(p.returncode != 0,
                 'git checkout of branch "tritonbuildref" failed')
-        p.wait()
 
     else:
         log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
@@ -232,9 +237,7 @@ def core_cmake_args(components, backends, install_dir):
             else:
                 fail('unknown core backend {}'.format(be))
 
-    cargs.append(
-        '-DTRITON_EXTRA_LIB_PATHS=/opt/tritonserver/lib'
-    )
+    cargs.append('-DTRITON_EXTRA_LIB_PATHS=/opt/tritonserver/lib')
     cargs.append('/workspace/build')
     return cargs
 
