@@ -25,22 +25,43 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <time.h>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <random>
-
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
 #include <sys/stat.h>
-#include "src/clients/c++/library/grpc_client.h"
-#include "src/clients/c++/library/http_client.h"
+#include <time.h>
+#include <chrono>
+#include <fstream>
+#include <functional>
+#include <iomanip>
+#include <iostream>
+#include <memory>
+#include <random>
+
 #include "src/core/constants.h"
 
-namespace ni = nvidia::inferenceserver;
-namespace nic = nvidia::inferenceserver::client;
+#define RETURN_IF_ERROR(S)           \
+  do {                               \
+    const cb::Error& status__ = (S); \
+    if (!status__.IsOk()) {          \
+      return status__;               \
+    }                                \
+  } while (false)
 
+#define FAIL_IF_ERR(X, MSG)                                        \
+  {                                                                \
+    cb::Error err = (X);                                           \
+    if (!err.IsOk()) {                                             \
+      std::cerr << "error: " << (MSG) << ": " << err << std::endl; \
+      exit(1);                                                     \
+    }                                                              \
+  }
+
+namespace cb = perfanalyzer::clientbackend;
+namespace pa = perfanalyzer;
+
+namespace perfanalyzer {
+
+//==============================================================================
 using TimestampVector =
     std::vector<std::tuple<struct timespec, struct timespec, uint32_t, bool>>;
 
@@ -50,26 +71,6 @@ std::string const character_set =
 
 // A boolean flag to mark an interrupt and commencement of early exit
 extern volatile bool early_exit;
-
-
-#define RETURN_IF_ERROR(S)            \
-  do {                                \
-    const nic::Error& status__ = (S); \
-    if (!status__.IsOk()) {           \
-      return status__;                \
-    }                                 \
-  } while (false)
-
-#define FAIL_IF_ERR(X, MSG)                                        \
-  {                                                                \
-    nic::Error err = (X);                                          \
-    if (!err.IsOk()) {                                             \
-      std::cerr << "error: " << (MSG) << ": " << err << std::endl; \
-      exit(1);                                                     \
-    }                                                              \
-  }
-
-enum ProtocolType { HTTP = 0, GRPC = 1, UNKNOWN = 2 };
 
 enum Distribution { POISSON = 0, CONSTANT = 1, CUSTOM = 2 };
 enum SearchMode { LINEAR = 0, BINARY = 1, NONE = 2 };
@@ -82,21 +83,21 @@ enum SharedMemoryType {
 constexpr uint64_t NO_LIMIT = 0;
 
 // Parse the communication protocol type
-ProtocolType ParseProtocol(const std::string& str);
+cb::ProtocolType ParseProtocol(const std::string& str);
 
 // Reads the data from file specified by path into vector of characters
 // \param path The complete path to the file to be read
 // \param contents The character vector that will contain the data read
 // \return error status. Returns Non-Ok if an error is encountered during
 //  read operation.
-nic::Error ReadFile(const std::string& path, std::vector<char>* contents);
+cb::Error ReadFile(const std::string& path, std::vector<char>* contents);
 
 // Reads the string from file specified by path into vector of strings
 // \param path The complete path to the file to be read
 // \param contents The string vector that will contain the data read
 // \return error status. Returns Non-Ok if an error is encountered during
 //  read operation.
-nic::Error ReadTextFile(
+cb::Error ReadTextFile(
     const std::string& path, std::vector<std::string>* contents);
 
 // Reads the time intervals in microseconds from file specified by path into
@@ -105,7 +106,7 @@ nic::Error ReadTextFile(
 // \param contents The time interval vector that will contain the data read.
 // \return error status. Returns Non-Ok if an error is encountered during
 //  read operation.
-nic::Error ReadTimeIntervalsFile(
+cb::Error ReadTimeIntervalsFile(
     const std::string& path, std::vector<std::chrono::nanoseconds>* contents);
 
 // To check whether the path points to a valid system directory
@@ -127,7 +128,7 @@ void SerializeStringTensor(
 
 // Serializes an explicit tensor read from the data file to the
 // raw bytes.
-nic::Error SerializeExplicitTensor(
+cb::Error SerializeExplicitTensor(
     const rapidjson::Value& tensor, const std::string& dt,
     std::vector<char>* decoded_data);
 
@@ -147,3 +148,5 @@ std::string ShapeTensorValuesToString(const int* data_ptr, const int count);
 template <Distribution distribution>
 std::function<std::chrono::nanoseconds(std::mt19937&)> ScheduleDistribution(
     const double request_rate);
+
+}  // namespace perfanalyzer

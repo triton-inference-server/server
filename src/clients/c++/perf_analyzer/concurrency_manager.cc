@@ -25,7 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/clients/c++/perf_analyzer/concurrency_manager.h"
+
 #include <queue>
+
+namespace perfanalyzer {
 
 ConcurrencyManager::~ConcurrencyManager()
 {
@@ -34,7 +37,7 @@ ConcurrencyManager::~ConcurrencyManager()
   StopWorkerThreads();
 }
 
-nic::Error
+cb::Error
 ConcurrencyManager::Create(
     const bool async, const bool streaming, const int32_t batch_size,
     const size_t max_threads, const size_t max_concurrency,
@@ -43,7 +46,7 @@ ConcurrencyManager::Create(
     std::vector<std::string>& user_data,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ModelParser>& parser,
-    const std::shared_ptr<TritonClientFactory>& factory,
+    const std::shared_ptr<cb::ClientBackendFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
@@ -62,7 +65,7 @@ ConcurrencyManager::Create(
 
   *manager = std::move(local_manager);
 
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
 ConcurrencyManager::ConcurrencyManager(
@@ -70,7 +73,7 @@ ConcurrencyManager::ConcurrencyManager(
     const size_t max_threads, const size_t max_concurrency,
     const size_t sequence_length, const SharedMemoryType shared_memory_type,
     const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
-    const std::shared_ptr<TritonClientFactory>& factory)
+    const std::shared_ptr<cb::ClientBackendFactory>& factory)
     : LoadManager(
           async, streaming, batch_size, max_threads, sequence_length,
           shared_memory_type, output_shm_size, parser, factory),
@@ -83,7 +86,7 @@ ConcurrencyManager::ConcurrencyManager(
   }
 }
 
-nic::Error
+cb::Error
 ConcurrencyManager::ChangeConcurrencyLevel(
     const size_t concurrent_request_count)
 {
@@ -139,7 +142,7 @@ ConcurrencyManager::ChangeConcurrencyLevel(
   wake_signal_.notify_all();
 
   std::cout << "Request concurrency: " << concurrent_request_count << std::endl;
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
 // Function for worker threads.
@@ -149,8 +152,8 @@ ConcurrencyManager::ChangeConcurrencyLevel(
 // to maintain (sequence) concurrency assigned to worker.
 void
 ConcurrencyManager::Infer(
-    std::shared_ptr<ThreadStat> thread_stat,
-    std::shared_ptr<ThreadConfig> thread_config)
+    std::shared_ptr<ConcurrencyManager::ThreadStat> thread_stat,
+    std::shared_ptr<ConcurrencyManager::ThreadConfig> thread_config)
 {
   std::vector<std::unique_ptr<InferContext>> ctxs;
   uint32_t seq_id = 0, ctx_id = 0;
@@ -176,9 +179,9 @@ ConcurrencyManager::Infer(
   std::map<std::string, AsyncRequestProperties> async_req_map;
 
   // Callback function for handling asynchronous requests
-  const auto callback_func = [&](nic::InferResult* result) {
+  const auto callback_func = [&](cb::InferResult* result) {
     uint32_t ctx_id = 0;
-    std::shared_ptr<nic::InferResult> result_ptr(result);
+    std::shared_ptr<cb::InferResult> result_ptr(result);
     if (thread_stat->cb_status_.IsOk()) {
       // Add the request timestamp to thread Timestamp vector with
       // proper locking
@@ -195,7 +198,7 @@ ConcurrencyManager::Infer(
               it->second.start_time_, end_time_async, it->second.sequence_end_,
               false /* delayed */));
           ctx_id = it->second.ctx_id_;
-          ctxs[ctx_id]->infer_client_->ClientInferStat(
+          ctxs[ctx_id]->infer_backend_->ClientInferStat(
               &(thread_stat->contexts_stat_[ctx_id]));
           async_req_map.erase(request_id);
         } else {
@@ -254,8 +257,8 @@ ConcurrencyManager::Infer(
       }
       ctxs.emplace_back(new InferContext());
       thread_stat->status_ =
-          factory_->CreateTritonClient(&(ctxs.back()->infer_client_));
-      ctxs.back()->options_.reset(new nic::InferOptions(parser_->ModelName()));
+          factory_->CreateClientBackend(&(ctxs.back()->infer_backend_));
+      ctxs.back()->options_.reset(new cb::InferOptions(parser_->ModelName()));
       ctxs.back()->options_->model_version_ = parser_->ModelVersion();
       thread_stat->contexts_stat_.emplace_back();
       if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
@@ -268,7 +271,7 @@ ConcurrencyManager::Infer(
       }
       if (streaming_) {
         // Decoupled models should not collect client side statistics
-        thread_stat->status_ = ctxs.back()->infer_client_->StartStream(
+        thread_stat->status_ = ctxs.back()->infer_backend_->StartStream(
             callback_func, (!parser_->IsDecoupled()));
         if (!thread_stat->status_.IsOk()) {
           return;
@@ -352,11 +355,11 @@ ConcurrencyManager::Infer(
           it->second.sequence_end_ = ctxs[ctx_id]->options_->sequence_end_;
         }
         if (streaming_) {
-          thread_stat->status_ = ctxs[ctx_id]->infer_client_->AsyncStreamInfer(
+          thread_stat->status_ = ctxs[ctx_id]->infer_backend_->AsyncStreamInfer(
               *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
               ctxs[ctx_id]->outputs_);
         } else {
-          thread_stat->status_ = ctxs[ctx_id]->infer_client_->AsyncInfer(
+          thread_stat->status_ = ctxs[ctx_id]->infer_backend_->AsyncInfer(
               callback_func, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
               ctxs[ctx_id]->outputs_);
         }
@@ -366,8 +369,8 @@ ConcurrencyManager::Infer(
       } else {
         struct timespec start_time_sync, end_time_sync;
         clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
-        nic::InferResult* results = nullptr;
-        thread_stat->status_ = ctxs[ctx_id]->infer_client_->Infer(
+        cb::InferResult* results = nullptr;
+        thread_stat->status_ = ctxs[ctx_id]->infer_backend_->Infer(
             &results, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
             ctxs[ctx_id]->outputs_);
         if (results != nullptr) {
@@ -384,7 +387,7 @@ ConcurrencyManager::Infer(
           thread_stat->request_timestamps_.emplace_back(std::make_tuple(
               start_time_sync, end_time_sync,
               ctxs[ctx_id]->options_->sequence_end_, false /* delayed */));
-          thread_stat->status_ = ctxs[ctx_id]->infer_client_->ClientInferStat(
+          thread_stat->status_ = ctxs[ctx_id]->infer_backend_->ClientInferStat(
               &(thread_stat->contexts_stat_[ctx_id]));
           if (!thread_stat->status_.IsOk()) {
             return;
@@ -428,3 +431,5 @@ ConcurrencyManager::Infer(
     }
   } while (true);
 }
+
+}  // namespace perfanalyzer

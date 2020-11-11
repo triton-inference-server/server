@@ -25,40 +25,43 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/clients/c++/perf_analyzer/client_backend/client_backend.h"
 #include "src/clients/c++/perf_analyzer/data_loader.h"
-#include "src/clients/c++/perf_analyzer/model_parser.h"
 #include "src/clients/c++/perf_analyzer/perf_utils.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <thread>
+
+namespace perfanalyzer {
 
 class LoadManager {
  public:
   virtual ~LoadManager();
 
   /// Check if the load manager is working as expected.
-  /// \return Error object indicating success or failure.
-  nic::Error CheckHealth();
+  /// \return cb::Error object indicating success or failure.
+  cb::Error CheckHealth();
 
   /// Swap the content of the timestamp vector recorded by the load
   /// manager with a new timestamp vector
   /// \param new_timestamps The timestamp vector to be swapped.
-  /// \return Error object indicating success or failure.
-  nic::Error SwapTimestamps(TimestampVector& new_timestamps);
+  /// \return cb::Error object indicating success or failure.
+  cb::Error SwapTimestamps(TimestampVector& new_timestamps);
 
   /// Get the sum of all contexts' stat
   /// \param contexts_stat Returned the accumulated stat from all contexts
   /// in load manager
-  nic::Error GetAccumulatedClientStat(nic::InferStat* contexts_stat);
+  cb::Error GetAccumulatedClientStat(cb::InferStat* contexts_stat);
 
   /// \return the batch size used for the inference requests
   size_t BatchSize() const { return batch_size_; }
 
   /// Resets all worker thread states to beginning of schedule.
-  /// \return Error object indicating success or failure.
-  virtual nic::Error ResetWorkers()
+  /// \return cb::Error object indicating success or failure.
+  virtual cb::Error ResetWorkers()
   {
-    return nic::Error(
+    return cb::Error(
         "resetting worker threads not supported for this load manager.");
   }
 
@@ -77,17 +80,17 @@ class LoadManager {
         delete output;
       }
     }
-    // The triton client to communicate with the server
-    std::unique_ptr<TritonClientWrapper> infer_client_;
+    // The backend to communicate with the server
+    std::unique_ptr<cb::ClientBackend> infer_backend_;
     // The vector of pointers to InferInput objects to be
     // used for inference request.
-    std::vector<nic::InferInput*> inputs_;
+    std::vector<cb::InferInput*> inputs_;
     // The vector of pointers to InferRequestedOutput objects
     // to be used with the inference request.
-    std::vector<const nic::InferRequestedOutput*> outputs_;
+    std::vector<const cb::InferRequestedOutput*> outputs_;
     // The InferOptions object holding the details of the
     // inference.
-    std::unique_ptr<nic::InferOptions> options_;
+    std::unique_ptr<cb::InferOptions> options_;
     // The total number of inference in-flight.
     std::atomic<size_t> inflight_request_cnt_;
   };
@@ -107,14 +110,13 @@ class LoadManager {
     bool delayed_;
   };
 
-
  protected:
   LoadManager(
       const bool async, const bool streaming, const int32_t batch_size,
       const size_t max_threads, const size_t sequence_length,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
       const std::shared_ptr<ModelParser>& parser,
-      const std::shared_ptr<TritonClientFactory>& factory);
+      const std::shared_ptr<cb::ClientBackendFactory>& factory);
 
   /// Helper funtion to retrieve the input data for the inferences
   /// \param string_length The length of the random strings to be generated
@@ -123,36 +125,34 @@ class LoadManager {
   /// \param zero_input Whether to use zero for model inputs.
   /// \param user_data The vector containing path/paths to user-provided data
   /// that can be a directory or path to a json data file.
-  /// \return Error object indicating success or failure.
-  nic::Error InitManagerInputs(
+  /// \return cb::Error object indicating success or failure.
+  cb::Error InitManagerInputs(
       const size_t string_length, const std::string& string_data,
       const bool zero_input, std::vector<std::string>& user_data);
 
   /// Helper function to allocate and prepare shared memory.
   /// from shared memory.
-  /// \return Error object indicating success or failure.
-  nic::Error InitSharedMemory();
+  /// \return cb::Error object indicating success or failure.
+  cb::Error InitSharedMemory();
 
   /// Helper function to prepare the InferContext for sending inference request.
   /// \param ctx The target InferContext object.
-  /// \return Error object indicating success or failure.
-  nic::Error PrepareInfer(InferContext* ctx);
-
+  /// \return cb::Error object indicating success or failure.
+  cb::Error PrepareInfer(InferContext* ctx);
 
   /// Helper function to prepare the InferContext for sending inference
   /// request in shared memory.
   /// \param ctx The target InferContext object.
-  /// \return Error object indicating success or failure.
-  nic::Error PrepareSharedMemoryInfer(InferContext* ctx);
-
+  /// \return cb::Error object indicating success or failure.
+  cb::Error PrepareSharedMemoryInfer(InferContext* ctx);
 
   /// Updates the input data to use for inference request
   /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
-  /// \return Error object indicating success or failure.
-  nic::Error UpdateInputs(
-      std::vector<nic::InferInput*>& inputs, int stream_index, int step_index);
+  /// \return cb::Error object indicating success or failure.
+  cb::Error UpdateInputs(
+      std::vector<cb::InferInput*>& inputs, int stream_index, int step_index);
 
   void InitNewSequence(int sequence_id);
 
@@ -170,18 +170,18 @@ class LoadManager {
   /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
-  /// \return Error object indicating success or failure.
-  nic::Error SetInputs(
-      const std::vector<nic::InferInput*>& inputs, const int stream_index,
+  /// \return cb::Error object indicating success or failure.
+  cb::Error SetInputs(
+      const std::vector<cb::InferInput*>& inputs, const int stream_index,
       const int step_index);
 
   /// Helper function to update the shared memory inputs
   /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
-  /// \return Error object indicating success or failure.
-  nic::Error SetInputsSharedMemory(
-      const std::vector<nic::InferInput*>& inputs, const int stream_index,
+  /// \return cb::Error object indicating success or failure.
+  cb::Error SetInputsSharedMemory(
+      const std::vector<cb::InferInput*>& inputs, const int stream_index,
       const int step_index);
 
  protected:
@@ -195,12 +195,13 @@ class LoadManager {
   bool on_sequence_model_;
 
   std::shared_ptr<ModelParser> parser_;
-  std::shared_ptr<TritonClientFactory> factory_;
+  std::shared_ptr<cb::ClientBackendFactory> factory_;
 
   bool using_json_data_;
+  bool using_shared_memory_;
 
   std::unique_ptr<DataLoader> data_loader_;
-  std::unique_ptr<TritonClientWrapper> client_;
+  std::unique_ptr<cb::ClientBackend> backend_;
 
   // Map from shared memory key to its starting address and size
   std::unordered_map<std::string, std::pair<uint8_t*, size_t>>
@@ -211,11 +212,11 @@ class LoadManager {
     ThreadStat() {}
 
     // The status of the worker thread
-    nic::Error status_;
+    cb::Error status_;
     // The status of the callback thread for async requests
-    nic::Error cb_status_;
+    cb::Error cb_status_;
     // The statistics of the InferContext
-    std::vector<nic::InferStat> contexts_stat_;
+    std::vector<cb::InferStat> contexts_stat_;
     // The concurrency level that the worker should produce
     size_t concurrency_;
     // A vector of request timestamps <start_time, end_time>
@@ -253,3 +254,5 @@ class LoadManager {
   std::condition_variable wake_signal_;
   std::mutex wake_mutex_;
 };
+
+}  // namespace perfanalyzer
