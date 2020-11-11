@@ -414,7 +414,6 @@ void
 TritonClientBackend::ParseInferOptionsToTriton(
     const InferOptions& options, nic::InferOptions* triton_options)
 {
-  triton_options->model_name_ = options.model_name_;
   triton_options->model_version_ = options.model_version_;
   triton_options->request_id_ = options.request_id_;
   triton_options->sequence_id_ = options.sequence_id_;
