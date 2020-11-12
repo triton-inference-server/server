@@ -44,9 +44,8 @@ build will be a Docker image called *tritonserver* that will contain
 the tritonserver executable in /opt/tritonserver/bin and the required
 shared libraries in /opt/tritonserver/lib. The backends built for
 Triton will be in /opt/tritonserver/backends (note that as of the
-20.10 release the PyTorch and TensorRT backends are still included in
-the core of Triton and so do not appear in
-/opt/tritonserver/backends).
+20.11 release the TensorRT backend is still included in the core of
+Triton and so does not appear in /opt/tritonserver/backends).
 
 Building with Docker ensures that all the correct CUDA, cudnn,
 TensorRT and other dependencies are handled for you. A Docker build is
@@ -56,7 +55,7 @@ By default no Triton features are enabled. The following build.py
 invocation builds all features and backends.
 
 ```
-$ ./build.py --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --backend=custom --backend=ensemble --backend=tensorrt --backend=pytorch --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=python:<container tag> --backend=dali:<container tag>
+$ ./build.py --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --backend=custom --backend=ensemble --backend=tensorrt --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=pytorch:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=python:<container tag> --backend=dali:<container tag>
 ```
 
 If you are building on master/main branch then <container tag> should
