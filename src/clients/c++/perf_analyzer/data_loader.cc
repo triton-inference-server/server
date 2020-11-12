@@ -29,14 +29,15 @@
 #include <b64/decode.h>
 #include <rapidjson/filereadstream.h>
 #include <fstream>
-#include "src/core/model_config.h"
+
+namespace perfanalyzer {
 
 DataLoader::DataLoader(const size_t batch_size)
     : batch_size_(batch_size), data_stream_cnt_(0)
 {
 }
 
-nic::Error
+cb::Error
 DataLoader::ReadDataFromDir(
     std::shared_ptr<ModelTensorMap> inputs, const std::string& data_directory)
 {
@@ -63,16 +64,16 @@ DataLoader::ReadDataFromDir(
       SerializeStringTensor(input_string_data, &it->second);
     }
   }
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
-nic::Error
+cb::Error
 DataLoader::ReadDataFromJSON(
     std::shared_ptr<ModelTensorMap> inputs, const std::string& json_file)
 {
   FILE* data_file = fopen(json_file.c_str(), "r");
   if (data_file == nullptr) {
-    return nic::Error("failed to open file for reading input data");
+    return cb::Error("failed to open file for reading input data");
   }
 
   char readBuffer[65536];
@@ -82,14 +83,14 @@ DataLoader::ReadDataFromJSON(
   d.ParseStream(fs);
 
   if (d.HasParseError()) {
-    std::cerr << "Error  : " << d.GetParseError() << '\n'
+    std::cerr << "cb::Error  : " << d.GetParseError() << '\n'
               << "Offset : " << d.GetErrorOffset() << '\n';
-    return nic::Error(
+    return cb::Error(
         "failed to parse the specified json file for reading inputs");
   }
 
   if (!d.HasMember("data")) {
-    return nic::Error("The json file doesn't contain data field");
+    return cb::Error("The json file doesn't contain data field");
   }
 
   const rapidjson::Value& streams = d["data"];
@@ -125,10 +126,10 @@ DataLoader::ReadDataFromJSON(
   max_non_sequence_step_id_ = std::max(1, (int)(step_num_[0] / batch_size_));
 
   fclose(data_file);
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
-nic::Error
+cb::Error
 DataLoader::GenerateData(
     std::shared_ptr<ModelTensorMap> inputs, const bool zero_input,
     const size_t string_length, const std::string& string_data)
@@ -141,7 +142,7 @@ DataLoader::GenerateData(
   // Validate the absence of shape tensors
   for (const auto& input : *inputs) {
     if (input.second.is_shape_tensor_) {
-      return nic::Error(
+      return cb::Error(
           "can not generate data for shape tensor '" + input.second.name_ +
           "', user-provided data is needed.");
     }
@@ -152,7 +153,7 @@ DataLoader::GenerateData(
     if (input.second.datatype_.compare("BYTES") != 0) {
       int64_t byte_size = ByteSize(input.second.shape_, input.second.datatype_);
       if (byte_size < 0) {
-        return nic::Error(
+        return cb::Error(
             "input " + input.second.name_ +
             " contains dynamic shape, provide shapes to send along with the "
             "request");
@@ -195,10 +196,10 @@ DataLoader::GenerateData(
     }
   }
 
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
-nic::Error
+cb::Error
 DataLoader::GetInputData(
     const ModelTensor& input, const int stream_id, const int step_id,
     const uint8_t** data_ptr, size_t* batch1_size)
@@ -207,13 +208,13 @@ DataLoader::GetInputData(
   if (!input_data_.empty()) {
     // validate if the indices conform to the vector sizes
     if (stream_id < 0 || stream_id >= (int)data_stream_cnt_) {
-      return nic::Error(
+      return cb::Error(
           "stream_id for retrieving the data should be less than " +
           std::to_string(data_stream_cnt_) + ", got " +
           std::to_string(stream_id));
     }
     if (step_id < 0 || step_id >= (int)step_num_[stream_id]) {
-      return nic::Error(
+      return cb::Error(
           "step_id for retrieving the data should be less than " +
           std::to_string(step_num_[stream_id]) + ", got " +
           std::to_string(step_id));
@@ -233,7 +234,7 @@ DataLoader::GetInputData(
       }
       *data_ptr = (const uint8_t*)&((it->second)[0]);
     } else {
-      return nic::Error(
+      return cb::Error(
           "unable to find data for input '" + input.name_ +
           "' in provided data.");
     }
@@ -241,18 +242,18 @@ DataLoader::GetInputData(
       (input.datatype_.compare("BYTES") != 0) && (input_buf_.size() != 0)) {
     int64_t byte_size = ByteSize(input.shape_, input.datatype_);
     if (byte_size < 0) {
-      return nic::Error(
+      return cb::Error(
           "failed to get correct byte size for '" + input.name_ + "'.");
     }
     *batch1_size = (size_t)byte_size;
     *data_ptr = &input_buf_[0];
   } else {
-    return nic::Error("unable to find data for input '" + input.name_ + "'.");
+    return cb::Error("unable to find data for input '" + input.name_ + "'.");
   }
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
-nic::Error
+cb::Error
 DataLoader::GetInputShape(
     const ModelTensor& input, const int stream_id, const int step_id,
     std::vector<int64_t>* provided_shape)
@@ -271,10 +272,10 @@ DataLoader::GetInputShape(
   } else {
     *provided_shape = input.shape_;
   }
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
-nic::Error
+cb::Error
 DataLoader::ReadInputTensorData(
     const rapidjson::Value& step, std::shared_ptr<ModelTensorMap> inputs,
     int stream_index, int step_index)
@@ -302,14 +303,14 @@ DataLoader::ReadInputTensorData(
               input_shapes_.emplace(key_name, std::vector<int64_t>()).first;
           for (const auto& value : tensor["shape"].GetArray()) {
             if (!value.IsInt()) {
-              return nic::Error("shape values must be integers.");
+              return cb::Error("shape values must be integers.");
             }
             shape_it->second.push_back(value.GetInt());
           }
         }
 
         if (!tensor.HasMember("content")) {
-          return nic::Error(
+          return cb::Error(
               "missing content field. ( Location stream id: " +
               std::to_string(stream_index) +
               ", step id: " + std::to_string(step_index) + ")");
@@ -317,7 +318,6 @@ DataLoader::ReadInputTensorData(
 
         content = &tensor["content"];
       }
-
 
       if (content->IsArray()) {
         RETURN_IF_ERROR(SerializeExplicitTensor(
@@ -335,7 +335,7 @@ DataLoader::ReadInputTensorData(
             int64_t batch1_byte =
                 ByteSize(input.second.shape_, input.second.datatype_);
             if (batch1_byte > 0 && (size_t)batch1_byte != it->second.size()) {
-              return nic::Error(
+              return cb::Error(
                   "mismatch in the data provided. "
                   "Expected: " +
                   std::to_string(batch1_byte) +
@@ -345,14 +345,14 @@ DataLoader::ReadInputTensorData(
                   ", step id: " + std::to_string(step_index) + ")");
             }
           } else {
-            return nic::Error(
+            return cb::Error(
                 "the value of b64 field should be of type string ( "
                 "Location stream id: " +
                 std::to_string(stream_index) +
                 ", step id: " + std::to_string(step_index) + ")");
           }
         } else {
-          return nic::Error(
+          return cb::Error(
               "The input values are not supported. Expected an array or "
               "b64 string ( Location stream id: " +
               std::to_string(stream_index) +
@@ -360,12 +360,14 @@ DataLoader::ReadInputTensorData(
         }
       }
     } else {
-      return nic::Error(
+      return cb::Error(
           "missing input " + input.first +
           " ( Location stream id: " + std::to_string(stream_index) +
           ", step id: " + std::to_string(step_index) + ")");
     }
   }
 
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
+
+}  // namespace perfanalyzer

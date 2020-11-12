@@ -26,7 +26,9 @@
 
 #include "src/clients/c++/perf_analyzer/custom_load_manager.h"
 
-nic::Error
+namespace perfanalyzer {
+
+cb::Error
 CustomLoadManager::Create(
     const bool async, const bool streaming,
     const uint64_t measurement_window_ms,
@@ -37,7 +39,7 @@ CustomLoadManager::Create(
     std::vector<std::string>& user_data,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ModelParser>& parser,
-    const std::shared_ptr<TritonClientFactory>& factory,
+    const std::shared_ptr<cb::ClientBackendFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<CustomLoadManager> local_manager(new CustomLoadManager(
@@ -57,7 +59,7 @@ CustomLoadManager::Create(
 
   *manager = std::move(local_manager);
 
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
 CustomLoadManager::CustomLoadManager(
@@ -67,7 +69,7 @@ CustomLoadManager::CustomLoadManager(
     const uint32_t num_of_sequences, const size_t sequence_length,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ModelParser>& parser,
-    const std::shared_ptr<TritonClientFactory>& factory)
+    const std::shared_ptr<cb::ClientBackendFactory>& factory)
     : RequestRateManager(
           async, streaming, Distribution::CUSTOM, batch_size,
           measurement_window_ms, max_threads, num_of_sequences, sequence_length,
@@ -76,7 +78,7 @@ CustomLoadManager::CustomLoadManager(
 {
 }
 
-nic::Error
+cb::Error
 CustomLoadManager::InitCustomIntervals()
 {
   schedule_.clear();
@@ -94,14 +96,14 @@ CustomLoadManager::InitCustomIntervals()
       }
     }
   }
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
 
-nic::Error
+cb::Error
 CustomLoadManager::GetCustomRequestRate(double* request_rate)
 {
   if (custom_intervals_.empty()) {
-    return nic::Error("The custom intervals vector is empty");
+    return cb::Error("The custom intervals vector is empty");
   }
   uint64_t total_time_ns = 0;
   for (auto interval : custom_intervals_) {
@@ -110,5 +112,7 @@ CustomLoadManager::GetCustomRequestRate(double* request_rate)
 
   *request_rate =
       (custom_intervals_.size() * 1000 * 1000 * 1000) / (total_time_ns);
-  return nic::Error::Success;
+  return cb::Error::Success;
 }
+
+}  // namespace perfanalyzer

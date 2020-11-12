@@ -27,6 +27,8 @@
 
 #include "src/clients/c++/perf_analyzer/load_manager.h"
 
+namespace perfanalyzer {
+
 //==============================================================================
 /// ConcurrencyManager is a helper class to send inference requests to inference
 /// server consistently, based on the specified setting, so that the
@@ -65,11 +67,11 @@ class ConcurrencyManager : public LoadManager {
   /// \param output_shm_size The size in bytes of the shared memory to
   /// allocate for the output.
   /// \param parser The ModelParser object to get the model details.
-  /// \param factory The TritonClientFactory object used to create
+  /// \param factory The ClientBackendFactory object used to create
   /// client to the server.
   /// \param manager Returns a new ConcurrencyManager object.
-  /// \return Error object indicating success or failure.
-  static nic::Error Create(
+  /// \return cb::Error object indicating success or failure.
+  static cb::Error Create(
       const bool async, const bool streaming, const int32_t batch_size,
       const size_t max_threads, const size_t max_concurrency,
       const size_t sequence_length, const size_t string_length,
@@ -77,14 +79,14 @@ class ConcurrencyManager : public LoadManager {
       std::vector<std::string>& user_data,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
       const std::shared_ptr<ModelParser>& parser,
-      const std::shared_ptr<TritonClientFactory>& factory,
+      const std::shared_ptr<cb::ClientBackendFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
   /// Adjusts the number of concurrent requests to be the same as
   /// 'concurrent_request_count' (by creating or pausing threads)
   /// \param concurent_request_count The number of concurrent requests.
-  /// \return Error object indicating success or failure.
-  nic::Error ChangeConcurrencyLevel(const size_t concurrent_request_count);
+  /// \return cb::Error object indicating success or failure.
+  cb::Error ChangeConcurrencyLevel(const size_t concurrent_request_count);
 
  private:
   ConcurrencyManager(
@@ -92,7 +94,7 @@ class ConcurrencyManager : public LoadManager {
       const size_t max_threads, const size_t max_concurrency,
       const size_t sequence_length, const SharedMemoryType shared_memory_type,
       const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
-      const std::shared_ptr<TritonClientFactory>& factory);
+      const std::shared_ptr<cb::ClientBackendFactory>& factory);
 
   struct ThreadConfig {
     ThreadConfig(size_t thread_id)
@@ -126,3 +128,5 @@ class ConcurrencyManager : public LoadManager {
   size_t max_concurrency_;
   std::vector<std::shared_ptr<ThreadConfig>> threads_config_;
 };
+
+}  // namespace perfanalyzer

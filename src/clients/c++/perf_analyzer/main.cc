@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <getopt.h>
+#include <signal.h>
+#include <algorithm>
 
 #include "src/clients/c++/perf_analyzer/concurrency_manager.h"
 #include "src/clients/c++/perf_analyzer/custom_load_manager.h"
@@ -32,6 +34,8 @@
 #include "src/clients/c++/perf_analyzer/model_parser.h"
 #include "src/clients/c++/perf_analyzer/perf_utils.h"
 #include "src/clients/c++/perf_analyzer/request_rate_manager.h"
+
+namespace perfanalyzer {
 
 volatile bool early_exit = false;
 
@@ -50,6 +54,7 @@ SignalHandler(int signum)
     exit(0);
   }
 }
+}  // namespace perfanalyzer
 
 //==============================================================================
 // Perf Analyzer
@@ -390,7 +395,6 @@ Usage(char** argv, const std::string& msg = std::string())
                    18)
             << std::endl;
 
-
   std::cerr
       << FormatMessage(
              " --latency-threshold (-l): Sets the limit on the observed "
@@ -574,7 +578,7 @@ main(int argc, char** argv)
   // average length of a sentence
   size_t sequence_length = 20;
   int32_t percentile = -1;
-  uint64_t latency_threshold_ms = NO_LIMIT;
+  uint64_t latency_threshold_ms = pa::NO_LIMIT;
   int32_t batch_size = 1;
   uint64_t concurrency_range[3] = {1, 1, 1};
   double request_rate_range[3] = {1.0, 1.0, 1.0};
@@ -585,9 +589,9 @@ main(int argc, char** argv)
   std::string model_version;
   std::string url("localhost:8000");
   std::string filename("");
-  ProtocolType protocol = ProtocolType::HTTP;
-  std::shared_ptr<nic::Headers> http_headers(new nic::Headers());
-  SharedMemoryType shared_memory_type = SharedMemoryType::NO_SHARED_MEMORY;
+  cb::ProtocolType protocol = cb::ProtocolType::HTTP;
+  std::shared_ptr<cb::Headers> http_headers(new cb::Headers());
+  pa::SharedMemoryType shared_memory_type = pa::NO_SHARED_MEMORY;
   size_t output_shm_size = 100 * 1024;
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
   size_t string_length = 128;
@@ -604,15 +608,14 @@ main(int argc, char** argv)
   bool using_concurrency_range = false;
   bool using_request_rate_range = false;
   bool using_custom_intervals = false;
-  SearchMode search_mode = SearchMode::LINEAR;
-  Distribution request_distribution = Distribution::CONSTANT;
+  pa::SearchMode search_mode = pa::SearchMode::LINEAR;
+  pa::Distribution request_distribution = pa::Distribution::CONSTANT;
   std::string request_intervals_file("");
 
   // Required for detecting the use of conflicting options
   bool using_old_options = false;
   bool url_specified = false;
   bool max_threads_specified = false;
-
 
   // {name, has_arg, *flag, val}
   static struct option long_options[] = {
@@ -743,7 +746,7 @@ main(int argc, char** argv)
       case 11: {
         std::string arg = optarg;
         // Check whether the argument is a directory
-        if (IsDirectory(arg) || IsFile(arg)) {
+        if (pa::IsDirectory(arg) || pa::IsFile(arg)) {
           user_data.push_back(optarg);
         } else if (arg.compare("zero") == 0) {
           zero_input = true;
@@ -807,15 +810,15 @@ main(int argc, char** argv)
         break;
       }
       case 18: {
-        search_mode = SearchMode::BINARY;
+        search_mode = pa::SearchMode::BINARY;
         break;
       }
       case 19: {
         std::string arg = optarg;
         if (arg.compare("poisson") == 0) {
-          request_distribution = Distribution::POISSON;
+          request_distribution = pa::Distribution::POISSON;
         } else if (arg.compare("constant") == 0) {
-          request_distribution = Distribution::CONSTANT;
+          request_distribution = pa::Distribution::CONSTANT;
         } else {
           Usage(
               argv, "unsupported request distribution provided " +
@@ -830,10 +833,10 @@ main(int argc, char** argv)
       case 21: {
         std::string arg = optarg;
         if (arg.compare("system") == 0) {
-          shared_memory_type = SharedMemoryType::SYSTEM_SHARED_MEMORY;
+          shared_memory_type = pa::SharedMemoryType::SYSTEM_SHARED_MEMORY;
         } else if (arg.compare("cuda") == 0) {
 #ifdef TRITON_ENABLE_GPU
-          shared_memory_type = SharedMemoryType::CUDA_SHARED_MEMORY;
+          shared_memory_type = pa::SharedMemoryType::CUDA_SHARED_MEMORY;
 #else
           Usage(
               argv,
@@ -877,7 +880,7 @@ main(int argc, char** argv)
         measurement_window_ms = std::atoi(optarg);
         break;
       case 'i':
-        protocol = ParseProtocol(optarg);
+        protocol = pa::ParseProtocol(optarg);
         break;
       case 'H': {
         std::string arg = optarg;
@@ -926,10 +929,10 @@ main(int argc, char** argv)
   if (request_rate_range[SEARCH_RANGE::kSTART] <= 0) {
     Usage(argv, "The start of the search range must be > 0");
   }
-  if (protocol == ProtocolType::UNKNOWN) {
+  if (protocol == cb::ProtocolType::UNKNOWN) {
     Usage(argv, "protocol should be either HTTP or gRPC");
   }
-  if (streaming && (protocol != ProtocolType::GRPC)) {
+  if (streaming && (protocol != cb::ProtocolType::GRPC)) {
     Usage(argv, "streaming is only allowed with gRPC protocol");
   }
   if (max_threads == 0) {
@@ -950,7 +953,6 @@ main(int argc, char** argv)
   if (async && forced_sync) {
     Usage(argv, "Both --async and --sync can not be specified simultaneously.");
   }
-
 
   if (using_concurrency_range && using_old_options) {
     Usage(argv, "can not use deprecated options with --concurrency-range");
@@ -984,27 +986,27 @@ main(int argc, char** argv)
         "along with --request-intervals");
   }
 
-  if (((concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) ||
+  if (((concurrency_range[SEARCH_RANGE::kEND] == pa::NO_LIMIT) ||
        (request_rate_range[SEARCH_RANGE::kEND] ==
-        static_cast<double>(NO_LIMIT))) &&
-      (latency_threshold_ms == NO_LIMIT)) {
+        static_cast<double>(pa::NO_LIMIT))) &&
+      (latency_threshold_ms == pa::NO_LIMIT)) {
     Usage(
         argv,
         "The end of the search range and the latency limit can not be both 0 "
         "(or 0.0) simultaneously");
   }
 
-  if (((concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) ||
+  if (((concurrency_range[SEARCH_RANGE::kEND] == pa::NO_LIMIT) ||
        (request_rate_range[SEARCH_RANGE::kEND] ==
-        static_cast<double>(NO_LIMIT))) &&
-      (search_mode == SearchMode::BINARY)) {
+        static_cast<double>(pa::NO_LIMIT))) &&
+      (search_mode == pa::SearchMode::BINARY)) {
     Usage(
         argv,
         "The end of the range can not be 0 (or 0.0) for binary search mode.");
   }
 
-  if ((search_mode == SearchMode::BINARY) &&
-      (latency_threshold_ms == NO_LIMIT)) {
+  if ((search_mode == pa::SearchMode::BINARY) &&
+      (latency_threshold_ms == pa::NO_LIMIT)) {
     Usage(argv, "The latency threshold can not be 0 for binary search mode.");
   }
 
@@ -1012,14 +1014,14 @@ main(int argc, char** argv)
         concurrency_range[SEARCH_RANGE::kSTART]) ||
        (request_rate_range[SEARCH_RANGE::kEND] <
         request_rate_range[SEARCH_RANGE::kSTART])) &&
-      (search_mode == SearchMode::BINARY)) {
+      (search_mode == pa::SearchMode::BINARY)) {
     Usage(
         argv,
         "The end of the range can not be less than start of the range for "
         "binary search mode.");
   }
 
-  if (!url_specified && (protocol == ProtocolType::GRPC)) {
+  if (!url_specified && (protocol == cb::ProtocolType::GRPC)) {
     url = "localhost:8001";
   }
 
@@ -1027,63 +1029,39 @@ main(int argc, char** argv)
       (using_concurrency_range || using_old_options ||
        !(using_request_rate_range || using_custom_intervals));
 
-
   // Overriding the max_threads default for request_rate search
   if (!max_threads_specified && target_concurrency) {
     max_threads = 16;
   }
 
   // trap SIGINT to allow threads to exit gracefully
-  signal(SIGINT, SignalHandler);
+  signal(SIGINT, pa::SignalHandler);
 
-  std::shared_ptr<TritonClientFactory> factory;
-  // Disabling verbosity in the clients to prevent huge dump of
-  // messages.
+  std::shared_ptr<cb::ClientBackendFactory> factory;
   FAIL_IF_ERR(
-      TritonClientFactory::Create(
-          url, protocol, http_headers, extra_verbose, &factory),
+      cb::ClientBackendFactory::Create(
+          cb::BackendKind::TRITON, url, protocol, http_headers, extra_verbose,
+          &factory),
       "failed to create client factory");
 
-  std::unique_ptr<TritonClientWrapper> triton_client_wrapper;
+  std::unique_ptr<cb::ClientBackend> backend;
   FAIL_IF_ERR(
-      factory->CreateTritonClient(&triton_client_wrapper),
-      "failed to create triton client");
+      factory->CreateClientBackend(&backend),
+      "failed to create triton client backend");
 
-  std::shared_ptr<ModelParser> parser = std::make_shared<ModelParser>();
-  if (protocol == ProtocolType::HTTP) {
-    rapidjson::Document model_metadata;
-    FAIL_IF_ERR(
-        triton_client_wrapper->ModelMetadata(
-            &model_metadata, model_name, model_version),
-        "failed to get model metadata");
-    rapidjson::Document model_config;
-    FAIL_IF_ERR(
-        triton_client_wrapper->ModelConfig(
-            &model_config, model_name, model_version),
-        "failed to get model config");
-    FAIL_IF_ERR(
-        parser->Init(
-            model_metadata, model_config, model_version, input_shapes,
-            triton_client_wrapper),
-        "failed to create model parser");
-  } else {
-    inference::ModelMetadataResponse model_metadata;
-    FAIL_IF_ERR(
-        triton_client_wrapper->ModelMetadata(
-            &model_metadata, model_name, model_version),
-        "failed to get model metadata");
-
-    inference::ModelConfigResponse model_config;
-    FAIL_IF_ERR(
-        triton_client_wrapper->ModelConfig(
-            &model_config, model_name, model_version),
-        "failed to get model config");
-    FAIL_IF_ERR(
-        parser->Init(
-            model_metadata, model_config.config(), model_version, input_shapes,
-            triton_client_wrapper),
-        "failed to create model parser");
-  }
+  std::shared_ptr<pa::ModelParser> parser = std::make_shared<pa::ModelParser>();
+  rapidjson::Document model_metadata;
+  FAIL_IF_ERR(
+      backend->ModelMetadata(&model_metadata, model_name, model_version),
+      "failed to get model metadata");
+  rapidjson::Document model_config;
+  FAIL_IF_ERR(
+      backend->ModelConfig(&model_config, model_name, model_version),
+      "failed to get model config");
+  FAIL_IF_ERR(
+      parser->Init(
+          model_metadata, model_config, model_version, input_shapes, backend),
+      "failed to create model parser");
 
   if ((parser->MaxBatchSize() == 0) && batch_size > 1) {
     std::cerr << "can not specify batch size > 1 as the model does not support "
@@ -1093,8 +1071,8 @@ main(int argc, char** argv)
   }
 
   // Change the default value for the --async option for sequential models
-  if ((parser->SchedulerType() == ModelParser::SEQUENCE) ||
-      (parser->SchedulerType() == ModelParser::ENSEMBLE_SEQUENCE)) {
+  if ((parser->SchedulerType() == pa::ModelParser::SEQUENCE) ||
+      (parser->SchedulerType() == pa::ModelParser::ENSEMBLE_SEQUENCE)) {
     if (!async) {
       async = forced_sync ? false : true;
     }
@@ -1114,12 +1092,12 @@ main(int argc, char** argv)
     async = true;
   }
 
-  std::unique_ptr<LoadManager> manager;
+  std::unique_ptr<pa::LoadManager> manager;
 
   if (target_concurrency) {
-    if ((parser->SchedulerType() == ModelParser::SEQUENCE) ||
-        (parser->SchedulerType() == ModelParser::ENSEMBLE_SEQUENCE)) {
-      if (concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT && async) {
+    if ((parser->SchedulerType() == pa::ModelParser::SEQUENCE) ||
+        (parser->SchedulerType() == pa::ModelParser::ENSEMBLE_SEQUENCE)) {
+      if (concurrency_range[SEARCH_RANGE::kEND] == pa::NO_LIMIT && async) {
         std::cerr << "The 'end' concurrency can not be 0 for sequence "
                      "models when using asynchronous API."
                   << std::endl;
@@ -1130,9 +1108,8 @@ main(int argc, char** argv)
         concurrency_range[SEARCH_RANGE::kSTART],
         concurrency_range[SEARCH_RANGE::kEND]);
 
-
     if (!async) {
-      if (concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) {
+      if (concurrency_range[SEARCH_RANGE::kEND] == pa::NO_LIMIT) {
         std::cerr
             << "WARNING: The maximum attainable concurrency will be limited by "
                "max_threads specification."
@@ -1154,7 +1131,7 @@ main(int argc, char** argv)
       }
     }
     FAIL_IF_ERR(
-        ConcurrencyManager::Create(
+        pa::ConcurrencyManager::Create(
             async, streaming, batch_size, max_threads, max_concurrency,
             sequence_length, string_length, string_data, zero_input, user_data,
             shared_memory_type, output_shm_size, parser, factory, &manager),
@@ -1162,7 +1139,7 @@ main(int argc, char** argv)
 
   } else if (using_request_rate_range) {
     FAIL_IF_ERR(
-        RequestRateManager::Create(
+        pa::RequestRateManager::Create(
             async, streaming, measurement_window_ms, request_distribution,
             batch_size, max_threads, num_of_sequences, sequence_length,
             string_length, string_data, zero_input, user_data,
@@ -1171,7 +1148,7 @@ main(int argc, char** argv)
 
   } else {
     FAIL_IF_ERR(
-        CustomLoadManager::Create(
+        pa::CustomLoadManager::Create(
             async, streaming, measurement_window_ms, request_intervals_file,
             batch_size, max_threads, num_of_sequences, sequence_length,
             string_length, string_data, zero_input, user_data,
@@ -1179,12 +1156,12 @@ main(int argc, char** argv)
         "failed to create custom load manager");
   }
 
-  std::unique_ptr<InferenceProfiler> profiler;
+  std::unique_ptr<pa::InferenceProfiler> profiler;
   FAIL_IF_ERR(
-      InferenceProfiler::Create(
+      pa::InferenceProfiler::Create(
           verbose, stability_threshold, measurement_window_ms, max_trials,
           percentile, latency_threshold_ms, protocol, parser,
-          std::move(triton_client_wrapper), std::move(manager), &profiler),
+          std::move(backend), std::move(manager), &profiler),
       "failed to create profiler");
 
   // pre-run report
@@ -1195,7 +1172,7 @@ main(int argc, char** argv)
   if (concurrency_range[SEARCH_RANGE::kEND] != 1) {
     std::cout << "  Latency limit: " << latency_threshold_ms << " msec"
               << std::endl;
-    if (concurrency_range[SEARCH_RANGE::kEND] != NO_LIMIT) {
+    if (concurrency_range[SEARCH_RANGE::kEND] != pa::NO_LIMIT) {
       std::cout << "  Concurrency limit: "
                 << std::max(
                        concurrency_range[SEARCH_RANGE::kSTART],
@@ -1207,7 +1184,7 @@ main(int argc, char** argv)
     std::cout << "  Latency limit: " << latency_threshold_ms << " msec"
               << std::endl;
     if (request_rate_range[SEARCH_RANGE::kEND] !=
-        static_cast<double>(NO_LIMIT)) {
+        static_cast<double>(pa::NO_LIMIT)) {
       std::cout << "  Request Rate limit: "
                 << std::max(
                        request_rate_range[SEARCH_RANGE::kSTART],
@@ -1216,7 +1193,7 @@ main(int argc, char** argv)
     }
   }
   if (using_request_rate_range) {
-    if (request_distribution == Distribution::POISSON) {
+    if (request_distribution == pa::Distribution::POISSON) {
       std::cout << "  Using poisson distribution on request generation"
                 << std::endl;
     } else {
@@ -1224,7 +1201,7 @@ main(int argc, char** argv)
                 << std::endl;
     }
   }
-  if (search_mode == SearchMode::BINARY) {
+  if (search_mode == pa::SearchMode::BINARY) {
     std::cout << "  Using Binary Search algorithm" << std::endl;
   }
   if (async) {
@@ -1245,14 +1222,14 @@ main(int argc, char** argv)
   }
   std::cout << std::endl;
 
-  std::vector<PerfStatus> summary;
+  std::vector<pa::PerfStatus> summary;
 
   if (using_custom_intervals) {
     // Will be using user-provided time intervals, hence no control variable.
-    search_mode = SearchMode::NONE;
+    search_mode = pa::SearchMode::NONE;
   }
 
-  nic::Error err;
+  cb::Error err;
   if (target_concurrency) {
     err = profiler->Profile<size_t>(
         concurrency_range[SEARCH_RANGE::kSTART],
@@ -1269,7 +1246,7 @@ main(int argc, char** argv)
     std::cerr << err << std::endl;
     // In the case of early_exit, the thread does not return and continues to
     // report the summary
-    if (!early_exit) {
+    if (!pa::early_exit) {
       return 1;
     }
   }
@@ -1282,7 +1259,7 @@ main(int argc, char** argv)
       std::cout << "p" << percentile << " Batch Latency" << std::endl;
     }
 
-    for (PerfStatus& status : summary) {
+    for (pa::PerfStatus& status : summary) {
       if (target_concurrency) {
         std::cout << "Concurrency: " << status.concurrency << ", ";
       } else {
@@ -1317,11 +1294,11 @@ main(int argc, char** argv)
       // Sort summary results in order of increasing infer/sec.
       std::sort(
           summary.begin(), summary.end(),
-          [](const PerfStatus& a, const PerfStatus& b) -> bool {
+          [](const pa::PerfStatus& a, const pa::PerfStatus& b) -> bool {
             return a.client_stats.infer_per_sec < b.client_stats.infer_per_sec;
           });
 
-      for (PerfStatus& status : summary) {
+      for (pa::PerfStatus& status : summary) {
         if (target_concurrency) {
           ofs << status.concurrency << ",";
         } else {
@@ -1394,7 +1371,7 @@ main(int argc, char** argv)
                 << "Server Compute Input,Server Compute Infer,"
                 << "Server Compute Output,Client Recv";
 
-            for (PerfStatus& status : summary) {
+            for (pa::PerfStatus& status : summary) {
               auto it = status.server_stats.composing_models_stat.find(
                   model_identifier.first);
               const auto& stats = it->second;
