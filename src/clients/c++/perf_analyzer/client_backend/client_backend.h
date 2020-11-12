@@ -136,6 +136,8 @@ struct InferOptions {
   std::string model_name_;
   /// The version of the model.
   std::string model_version_;
+  /// The model signature name for TF models.
+  std::string model_signature_name_;
   /// An identifier for the request.
   std::string request_id_;
   /// The unique identifier for the sequence being represented by the
