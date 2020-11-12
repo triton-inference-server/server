@@ -27,6 +27,8 @@
 
 #include "src/clients/c++/perf_analyzer/request_rate_manager.h"
 
+namespace perfanalyzer {
+
 //==============================================================================
 /// CustomLoadManager is a helper class to send inference requests to
 /// inference server in accordance with  user provided time intervals. This
@@ -57,11 +59,11 @@ class CustomLoadManager : public RequestRateManager {
   /// \param output_shm_size The size of the shared memory to allocate for the
   /// output.
   /// \param parser The ModelParser object to get the model details.
-  /// \param factory The TritonClientFactory object used to create
+  /// \param factory The ClientBackendFactory object used to create
   /// client to the server.
   /// \param manager Returns a new ConcurrencyManager object.
-  /// \return Error object indicating success or failure.
-  static nic::Error Create(
+  /// \return cb::Error object indicating success or failure.
+  static cb::Error Create(
       const bool async, const bool streaming,
       const uint64_t measurement_window_ms,
       const std::string& request_intervals_file, const int32_t batch_size,
@@ -71,21 +73,20 @@ class CustomLoadManager : public RequestRateManager {
       std::vector<std::string>& user_data,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
       const std::shared_ptr<ModelParser>& parser,
-      const std::shared_ptr<TritonClientFactory>& factory,
+      const std::shared_ptr<cb::ClientBackendFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
-
 
   /// Initializes the load manager with the provided file containing request
   /// intervals
-  /// \return Error object indicating success or failure.
-  nic::Error InitCustomIntervals();
+  /// \return cb::Error object indicating success or failure.
+  cb::Error InitCustomIntervals();
 
   /// Computes the request rate from the time interval file. Fails with an error
   /// if the file is not present or is empty.
   /// \param request_rate Returns request rate as computed from the time
   /// interval file.
-  /// \return Error object indicating success or failure.
-  nic::Error GetCustomRequestRate(double* request_rate);
+  /// \return cb::Error object indicating success or failure.
+  cb::Error GetCustomRequestRate(double* request_rate);
 
  private:
   CustomLoadManager(
@@ -95,8 +96,10 @@ class CustomLoadManager : public RequestRateManager {
       const uint32_t num_of_sequences, const size_t sequence_length,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
       const std::shared_ptr<ModelParser>& parser,
-      const std::shared_ptr<TritonClientFactory>& factory);
+      const std::shared_ptr<cb::ClientBackendFactory>& factory);
 
   std::string request_intervals_file_;
   std::vector<std::chrono::nanoseconds> custom_intervals_;
 };
+
+}  // namespace perfanalyzer

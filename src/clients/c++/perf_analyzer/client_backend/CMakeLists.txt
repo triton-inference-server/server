@@ -26,65 +26,36 @@
 
 cmake_minimum_required (VERSION 3.18)
 
-if(WIN32)
-  message("Currently, CMake will not build perf_analyzer because it uses functionalities that "
-		      "are UNIX specific.")
-else()
-
-add_subdirectory(client_backend)
-
 set(
-  PERF_ANALYZER_SRCS
-  main.cc
-  model_parser.cc
-  perf_utils.cc
-  load_manager.cc
-  data_loader.cc
-  concurrency_manager.cc
-  request_rate_manager.cc
-  custom_load_manager.cc
-  inference_profiler.cc
+  CLIENT_BACKEND_SRCS
+  client_backend.cc
+  triton/triton_client_backend.cc
+  ../../examples/shm_utils.cc
 )
 
 set(
-  PERF_ANALYZER_HDRS
-  model_parser.h
-  perf_utils.h
-  load_manager.h
-  data_loader.h
-  concurrency_manager.h
-  request_rate_manager.h
-  custom_load_manager.h
-  inference_profiler.h
+  CLIENT_BACKEND_HDRS
+  client_backend.h
+  triton/triton_client_backend.h
+  ../../examples/shm_utils.h
 )
 
-add_executable(
-  perf_analyzer
-  ${PERF_ANALYZER_SRCS}
-  ${PERF_ANALYZER_HDRS}
-  $<TARGET_OBJECTS:json-utils-library>
+add_library(
+  client-backend-library
+  ${CLIENT_BACKEND_SRCS}
+  ${CLIENT_BACKEND_HDRS}
 )
+
 target_link_libraries(
-  perf_analyzer
-  PRIVATE client-backend-library
-  PRIVATE -lb64
+  client-backend-library
+  PUBLIC triton-common-json        # from repo-common
+  PRIVATE model-config-library
+  PRIVATE TRITON::grpcclient_static
+  PRIVATE TRITON::httpclient_static
 )
 
-# If gpu is enabled then compile with CUDA dependencies
 if(${TRITON_ENABLE_GPU})
-  target_include_directories(perf_analyzer PRIVATE ${CUDA_INCLUDE_DIRS})
-  target_link_libraries(perf_analyzer PRIVATE ${CUDA_LIBRARIES})
-endif()
+    target_include_directories(client-backend-library PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(client-backend-library PRIVATE ${CUDA_LIBRARIES})
+endif() # TRITON_ENABLE_GPU
 
-
-install(
-  TARGETS perf_analyzer
-  RUNTIME DESTINATION bin
-)
-
-# Creating perf_client link to perf_analyzer binary for backwards compatibility.
-install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ./perf_analyzer perf_client
-  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin/)")
-install(CODE "message(\"-- Created symlink: perf_client -> ./perf_analyzer\")")
-
-endif()

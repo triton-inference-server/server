@@ -25,9 +25,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/perf_analyzer/perf_utils.h"
-#include "src/clients/c++/perf_analyzer/triton_client_wrapper.h"
+#include <unordered_map>
 
+#include "src/clients/c++/perf_analyzer/client_backend/client_backend.h"
+#include "src/clients/c++/perf_analyzer/perf_utils.h"
+
+namespace perfanalyzer {
 struct ModelTensor {
   ModelTensor() : is_shape_tensor_(false) {}
   std::string name_;
@@ -37,7 +40,7 @@ struct ModelTensor {
 };
 
 using ModelTensorMap = std::map<std::string, ModelTensor>;
-using ComposingModelMap = std::map<std::string, std::set<ModelIdentifier>>;
+using ComposingModelMap = std::map<std::string, std::set<cb::ModelIdentifier>>;
 
 //==============================================================================
 /// ModelParser is a helper class to parse the information about the target
@@ -64,21 +67,6 @@ class ModelParser {
   {
   }
 
-  /// Initializes the ModelParser with the metadata and config messages
-  /// for the target model
-  /// \param metadata The metadata of the target model.
-  /// \param config The config of the target model.
-  /// \param model_version The version of target model.
-  /// \param input_shapes The user provided default shapes which will be use
-  /// if a certain input has wildcard in its dimension.
-  /// \param client_wrapper The wrapped triton client object.
-  /// \return Error object indicating success or failure.
-  nic::Error Init(
-      const inference::ModelMetadataResponse& metadata,
-      const inference::ModelConfig& config, const std::string& model_version,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      std::unique_ptr<TritonClientWrapper>& client_wrapper);
-
   /// Initializes the ModelParser with the metadata and config rapidjson DOM
   /// for the target model
   /// \param metadata The metadata of the target model.
@@ -86,13 +74,13 @@ class ModelParser {
   /// \param model_version The version of target model.
   /// \param input_shapes The user provided default shapes which will be use
   /// if a certain input has wildcard in its dimension.
-  /// \param client_wrapper The wrapped triton client object.
-  /// \return Error object indicating success or failure.
-  nic::Error Init(
+  /// \param backend The backend object.
+  /// \return cb::Error object indicating success or failure.
+  cb::Error Init(
       const rapidjson::Document& metadata, const rapidjson::Document& config,
       const std::string& model_version,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      std::unique_ptr<TritonClientWrapper>& client_wrapper);
+      std::unique_ptr<cb::ClientBackend>& backend);
 
   /// Get the name of the target model
   /// \return Model name as string
@@ -132,18 +120,10 @@ class ModelParser {
     return composing_models_map_;
   }
 
-
  private:
-  nic::Error GetEnsembleSchedulerType(
-      const inference::ModelConfig& config, const std::string& model_version,
-      std::unique_ptr<TritonClientWrapper>& client_wrapper,
-      bool* is_sequential);
-
-  nic::Error GetEnsembleSchedulerType(
+  cb::Error GetEnsembleSchedulerType(
       const rapidjson::Document& config, const std::string& model_version,
-      std::unique_ptr<TritonClientWrapper>& client_wrapper,
-      bool* is_sequential);
-
+      std::unique_ptr<cb::ClientBackend>& backend, bool* is_sequential);
 
   std::shared_ptr<ModelTensorMap> inputs_;
   std::shared_ptr<ModelTensorMap> outputs_;
@@ -155,3 +135,5 @@ class ModelParser {
   size_t max_batch_size_;
   bool is_decoupled_;
 };
+
+}  // namespace perfanalyzer

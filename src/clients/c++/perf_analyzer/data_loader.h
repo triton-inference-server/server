@@ -29,6 +29,8 @@
 #include "src/clients/c++/perf_analyzer/model_parser.h"
 #include "src/clients/c++/perf_analyzer/perf_utils.h"
 
+namespace perfanalyzer {
+
 class DataLoader {
  public:
   DataLoader(size_t batch_size);
@@ -51,12 +53,11 @@ class DataLoader {
     return 0;
   }
 
-
   /// Reads the input data from the specified data directory.
   /// \param inputs The pointer to the map holding the information about
   /// input tensors of a model
   /// \param data_directory The path to the directory containing the data
-  nic::Error ReadDataFromDir(
+  cb::Error ReadDataFromDir(
       std::shared_ptr<ModelTensorMap> inputs,
       const std::string& data_directory);
 
@@ -66,7 +67,7 @@ class DataLoader {
   /// \param json_file The json file containing the user-provided input
   /// data.
   /// Returns error object indicating status
-  nic::Error ReadDataFromJSON(
+  cb::Error ReadDataFromJSON(
       std::shared_ptr<ModelTensorMap> inputs, const std::string& json_file);
 
   /// Generates the input data to use with the inference requests
@@ -79,7 +80,7 @@ class DataLoader {
   /// \param string_data The user provided string to use to populate
   /// string tensors
   /// Returns error object indicating status
-  nic::Error GenerateData(
+  cb::Error GenerateData(
       std::shared_ptr<ModelTensorMap> inputs, const bool zero_input,
       const size_t string_length, const std::string& string_data);
 
@@ -90,7 +91,7 @@ class DataLoader {
   /// \param data Returns the pointer to the data for the requested input.
   /// \param batch1_size Returns the size of the input data in bytes.
   /// Returns error object indicating status
-  nic::Error GetInputData(
+  cb::Error GetInputData(
       const ModelTensor& input, const int stream_id, const int step_id,
       const uint8_t** data_ptr, size_t* batch1_size);
 
@@ -101,7 +102,7 @@ class DataLoader {
   /// \param shape returns the pointer to the vector containing the shape
   /// values.
   /// Returns error object indicating status
-  nic::Error GetInputShape(
+  cb::Error GetInputShape(
       const ModelTensor& input, const int stream_id, const int step_id,
       std::vector<int64_t>* shape);
 
@@ -113,10 +114,9 @@ class DataLoader {
   /// \param stream_index the stream index the data should be exported to.
   /// \param step_index the step index the data should be exported to.
   /// Returns error object indicating status
-  nic::Error ReadInputTensorData(
+  cb::Error ReadInputTensorData(
       const rapidjson::Value& step, std::shared_ptr<ModelTensorMap> inputs,
       int stream_index, int step_index);
-
 
   // The batch_size_ for the data
   size_t batch_size_;
@@ -136,3 +136,5 @@ class DataLoader {
   // except string
   std::vector<uint8_t> input_buf_;
 };
+
+}  // namespace perfanalyzer
