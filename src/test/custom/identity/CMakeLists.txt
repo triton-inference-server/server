@@ -52,8 +52,7 @@ if(${TRITON_ENABLE_GPU})
 target_include_directories(identity PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   identity
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
+  PUBLIC ${CUDA_nvml_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRITON_ENABLE_GPU
