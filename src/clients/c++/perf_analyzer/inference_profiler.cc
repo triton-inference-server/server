@@ -242,14 +242,19 @@ InferenceProfiler::InferenceProfiler(
 {
   load_parameters_.stability_threshold = stability_threshold;
   load_parameters_.stability_window = 3;
-  // Measure and report client library stats only when the model
-  // is not decoupled.
-  include_lib_stats_ = (!parser_->IsDecoupled());
-  // Measure and report server statistics only when the server
-  // supports the statistics extension.
-  std::set<std::string> extensions;
-  profile_backend_->ServerExtensions(&extensions);
-  include_server_stats_ = (extensions.find("statistics") != extensions.end());
+  if (profile_backend_->Kind() == cb::BackendKind::TRITON) {
+    // Measure and report client library stats only when the model
+    // is not decoupled.
+    include_lib_stats_ = (!parser_->IsDecoupled());
+    // Measure and report server statistics only when the server
+    // supports the statistics extension.
+    std::set<std::string> extensions;
+    profile_backend_->ServerExtensions(&extensions);
+    include_server_stats_ = (extensions.find("statistics") != extensions.end());
+  } else {
+    include_lib_stats_ = true;
+    include_server_stats_ = false;
+  }
 }
 
 cb::Error

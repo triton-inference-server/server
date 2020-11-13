@@ -50,6 +50,42 @@ ParseProtocol(const std::string& str)
 }
 
 cb::Error
+ConvertDTypeFromTFS(const std::string& tf_dtype, std::string* datatype)
+{
+  if (tf_dtype == "DT_HALF") {
+    *datatype = "FP16";
+  } else if (tf_dtype == "DT_FLOAT") {
+    *datatype = "FP32";
+  } else if (tf_dtype == "DT_DOUBLE") {
+    *datatype = "FP64";
+  } else if (tf_dtype == "DT_INT32") {
+    *datatype = "INT32";
+  } else if (tf_dtype == "DT_INT16") {
+    *datatype = "INT16";
+  } else if (tf_dtype == "DT_UINT16") {
+    *datatype = "UINT16";
+  } else if (tf_dtype == "DT_INT8") {
+    *datatype = "INT8";
+  } else if (tf_dtype == "DT_UNIT8") {
+    *datatype = "UINT8";
+  } else if (tf_dtype == "DT_STRING") {
+    *datatype = "BYTES";
+  } else if (tf_dtype == "DT_INT64") {
+    *datatype = "INT64";
+  } else if (tf_dtype == "DT_BOOL") {
+    *datatype = "BOOL";
+  } else if (tf_dtype == "DT_UINT32") {
+    *datatype = "UINT32";
+  } else if (tf_dtype == "DT_UINT64") {
+    *datatype = "UINT64";
+  } else {
+    return cb::Error("unsupported datatype encountered " + tf_dtype);
+  }
+
+  return cb::Error::Success;
+}
+
+cb::Error
 ReadFile(const std::string& path, std::vector<char>* contents)
 {
   std::ifstream in(path, std::ios::in | std::ios::binary);

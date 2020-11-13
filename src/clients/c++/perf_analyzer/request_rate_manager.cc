@@ -188,6 +188,7 @@ RequestRateManager::Infer(
   thread_stat->status_ = factory_->CreateClientBackend(&(ctx->infer_backend_));
   ctx->options_.reset(new cb::InferOptions(parser_->ModelName()));
   ctx->options_->model_version_ = parser_->ModelVersion();
+  ctx->options_->model_signature_name_ = parser_->ModelSignatureName();
 
   thread_stat->contexts_stat_.emplace_back();
 
