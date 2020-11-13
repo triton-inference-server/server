@@ -82,6 +82,14 @@ enum SharedMemoryType {
 
 constexpr uint64_t NO_LIMIT = 0;
 
+// Converts the datatype from tensorflow to perf analyzer space
+// \param tf_dtype The data type string returned from the model metadata.
+// \param datatype Returns the datatype in perf_analyzer space.
+// \return error status. Returns Non-Ok if an error is encountered during
+//  read operation.
+cb::Error ConvertDTypeFromTFS(
+    const std::string& tf_dtype, std::string* datatype);
+
 // Parse the communication protocol type
 cb::ProtocolType ParseProtocol(const std::string& str);
 

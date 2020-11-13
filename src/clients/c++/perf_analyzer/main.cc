@@ -212,8 +212,10 @@ Usage(char** argv, const std::string& msg = std::string())
 
   std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
   std::cerr << "==== SYNOPSIS ====\n \n";
+  std::cerr << "\t--service-kind <\"triton\"|\"tfserving\">" << std::endl;
   std::cerr << "\t-m <model name>" << std::endl;
   std::cerr << "\t-x <model version>" << std::endl;
+  std::cerr << "\t--model-signature-name <model signature name>" << std::endl;
   std::cerr << "\t-v" << std::endl;
   std::cerr << std::endl;
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
@@ -272,6 +274,14 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "==== OPTIONS ==== \n \n";
 
   std::cerr
+      << FormatMessage(
+             " --service-kind: Describes the kind of service perf_analyzer "
+             "to generate load for. The options are \"triton\" and "
+             "\"tfserving\". Default value is \"triton\".",
+             18)
+      << std::endl;
+
+  std::cerr
       << std::setw(9) << std::left << " -m: "
       << FormatMessage(
              "This is a required argument and is used to specify the model"
@@ -284,6 +294,13 @@ Usage(char** argv, const std::string& msg = std::string())
                    " the most recent version (that is, the highest numbered"
                    " version) of the model will be used.",
                    9)
+            << std::endl;
+  std::cerr << FormatMessage(
+                   " --model-signature-name: The signature name of the saved "
+                   "model to use. Default value is \"serving_default\". This "
+                   "option will be ignored if --service-kind is not "
+                   "\"tfserving\".",
+                   18)
             << std::endl;
   std::cerr << std::setw(9) << std::left
             << " -v: " << FormatMessage("Enables verbose mode.", 9)
@@ -529,8 +546,10 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "III. SERVER DETAILS: " << std::endl;
   std::cerr << std::setw(9) << std::left << " -u: "
             << FormatMessage(
-                   "Specify URL to the server. Default is \"localhost:8000\" "
-                   "if using HTTP and \"localhost:8001\" if using gRPC. ",
+                   "Specify URL to the server. When using triton default is "
+                   "\"localhost:8000\" if using HTTP and \"localhost:8001\" "
+                   "if using gRPC. When using tfserving default is "
+                   "\"localhost:8500\". ",
                    9)
             << std::endl;
   std::cerr << std::setw(9) << std::left << " -i: "
@@ -571,6 +590,7 @@ Usage(char** argv, const std::string& msg = std::string())
 int
 main(int argc, char** argv)
 {
+  cb::BackendKind kind(cb::BackendKind::TRITON);
   bool verbose = false;
   bool extra_verbose = false;
   bool streaming = false;
@@ -587,6 +607,7 @@ main(int argc, char** argv)
   size_t max_trials = 10;
   std::string model_name;
   std::string model_version;
+  std::string model_signature_name("serving_default");
   std::string url("localhost:8000");
   std::string filename("");
   cb::ProtocolType protocol = cb::ProtocolType::HTTP;
@@ -642,6 +663,8 @@ main(int argc, char** argv)
       {"request-intervals", 1, 0, 20},
       {"shared-memory", 1, 0, 21},
       {"output-shared-memory-size", 1, 0, 22},
+      {"service-kind", 1, 0, 23},
+      {"model-signature-name", 1, 0, 24},
       {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -845,8 +868,23 @@ main(int argc, char** argv)
         }
         break;
       }
-      case 22:
+      case 22: {
         output_shm_size = std::atoi(optarg);
+        break;
+      }
+      case 23: {
+        std::string arg = optarg;
+        if (arg.compare("triton") == 0) {
+          kind = cb::TRITON;
+        } else if (arg.compare("tfserving") == 0) {
+          kind = cb::TENSORFLOW_SERVING;
+        } else {
+          Usage(argv, "unsupported --service-kind specified");
+        }
+        break;
+      }
+      case 24:
+        model_signature_name = optarg;
         break;
       case 'v':
         extra_verbose = verbose;
@@ -1022,7 +1060,36 @@ main(int argc, char** argv)
   }
 
   if (!url_specified && (protocol == cb::ProtocolType::GRPC)) {
-    url = "localhost:8001";
+    if (kind == cb::BackendKind::TRITON) {
+      url = "localhost:8001";
+    } else if (kind == cb::BackendKind::TENSORFLOW_SERVING) {
+      url = "localhost:8500";
+    }
+  }
+
+  if (kind == cb::TENSORFLOW_SERVING) {
+    if (protocol != cb::ProtocolType::GRPC) {
+      std::cerr
+          << "perf_analyzer supports only grpc protocol for TensorFlow Serving."
+          << std::endl;
+      return 1;
+    } else if (streaming) {
+      std::cerr
+          << "perf_analyzer does not support streaming for TensorFlow Serving."
+          << std::endl;
+      return 1;
+    } else if (async) {
+      std::cerr
+          << "perf_analyzer does not support async API for TensorFlow Serving."
+          << std::endl;
+      return 1;
+    } else if (batch_size > 1) {
+      std::cerr
+          << "perf_analyzer does not support -b flag with TensorFlow Serving "
+             "backend. See --shape to specify explicit batch dimension."
+          << std::endl;
+      return 1;
+    }
   }
 
   bool target_concurrency =
@@ -1040,8 +1107,7 @@ main(int argc, char** argv)
   std::shared_ptr<cb::ClientBackendFactory> factory;
   FAIL_IF_ERR(
       cb::ClientBackendFactory::Create(
-          cb::BackendKind::TRITON, url, protocol, http_headers, extra_verbose,
-          &factory),
+          kind, url, protocol, http_headers, extra_verbose, &factory),
       "failed to create client factory");
 
   std::unique_ptr<cb::ClientBackend> backend;
@@ -1049,19 +1115,36 @@ main(int argc, char** argv)
       factory->CreateClientBackend(&backend),
       "failed to create triton client backend");
 
-  std::shared_ptr<pa::ModelParser> parser = std::make_shared<pa::ModelParser>();
-  rapidjson::Document model_metadata;
-  FAIL_IF_ERR(
-      backend->ModelMetadata(&model_metadata, model_name, model_version),
-      "failed to get model metadata");
-  rapidjson::Document model_config;
-  FAIL_IF_ERR(
-      backend->ModelConfig(&model_config, model_name, model_version),
-      "failed to get model config");
-  FAIL_IF_ERR(
-      parser->Init(
-          model_metadata, model_config, model_version, input_shapes, backend),
-      "failed to create model parser");
+  std::shared_ptr<pa::ModelParser> parser =
+      std::make_shared<pa::ModelParser>(kind);
+  if (kind == cb::BackendKind::TRITON) {
+    rapidjson::Document model_metadata;
+    FAIL_IF_ERR(
+        backend->ModelMetadata(&model_metadata, model_name, model_version),
+        "failed to get model metadata");
+    rapidjson::Document model_config;
+    FAIL_IF_ERR(
+        backend->ModelConfig(&model_config, model_name, model_version),
+        "failed to get model config");
+    FAIL_IF_ERR(
+        parser->InitTriton(
+            model_metadata, model_config, model_version, input_shapes, backend),
+        "failed to create model parser");
+  } else if (kind == cb::BackendKind::TENSORFLOW_SERVING) {
+    rapidjson::Document model_metadata;
+    FAIL_IF_ERR(
+        backend->ModelMetadata(&model_metadata, model_name, model_version),
+        "failed to get model metadata");
+    FAIL_IF_ERR(
+        parser->InitTFServe(
+            model_metadata, model_name, model_version, model_signature_name,
+            input_shapes, backend),
+        "failed to create model parser");
+
+  } else {
+    std::cerr << "unsupported client backend kind" << std::endl;
+    return 1;
+  }
 
   if ((parser->MaxBatchSize() == 0) && batch_size > 1) {
     std::cerr << "can not specify batch size > 1 as the model does not support "
@@ -1165,9 +1248,11 @@ main(int argc, char** argv)
       "failed to create profiler");
 
   // pre-run report
-  std::cout << "*** Measurement Settings ***" << std::endl
-            << "  Batch size: " << batch_size << std::endl
-            << "  Measurement window: " << measurement_window_ms << " msec"
+  std::cout << "*** Measurement Settings ***" << std::endl;
+  if (kind == cb::BackendKind::TRITON) {
+    std::cout << "  Batch size: " << batch_size << std::endl;
+  }
+  std::cout << "  Measurement window: " << measurement_window_ms << " msec"
             << std::endl;
   if (concurrency_range[SEARCH_RANGE::kEND] != 1) {
     std::cout << "  Latency limit: " << latency_threshold_ms << " msec"

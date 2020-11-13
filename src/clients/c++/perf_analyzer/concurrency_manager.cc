@@ -260,6 +260,8 @@ ConcurrencyManager::Infer(
           factory_->CreateClientBackend(&(ctxs.back()->infer_backend_));
       ctxs.back()->options_.reset(new cb::InferOptions(parser_->ModelName()));
       ctxs.back()->options_->model_version_ = parser_->ModelVersion();
+      ctxs.back()->options_->model_signature_name_ =
+          parser_->ModelSignatureName();
       thread_stat->contexts_stat_.emplace_back();
       if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
         thread_stat->status_ = PrepareInfer(ctxs.back().get());

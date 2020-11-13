@@ -63,7 +63,7 @@ GetInt(const rapidjson::Value& value, int64_t* integer_value)
 }  // namespace
 
 cb::Error
-ModelParser::Init(
+ModelParser::InitTriton(
     const rapidjson::Document& metadata, const rapidjson::Document& config,
     const std::string& model_version,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
@@ -201,6 +201,75 @@ ModelParser::Init(
       }
     }
   }
+  return cb::Error::Success;
+}
+
+cb::Error
+ModelParser::InitTFServe(
+    const rapidjson::Document& metadata, const std::string& model_name,
+    const std::string& model_version, const std::string& model_signature_name,
+    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+    std::unique_ptr<cb::ClientBackend>& backend)
+{
+  model_name_ = model_name;
+  model_version_ = model_version;
+  model_signature_name_ = model_signature_name;
+  // Get the scheduler type for the model
+  scheduler_type_ = NONE;
+
+  const rapidjson::Value& signature_config =
+      metadata["metadata"]["signature_def"]["signature_def"];
+  if (!signature_config.HasMember(model_signature_name.c_str())) {
+    return cb::Error(
+        "Failed to find signature_name \"" + model_signature_name +
+        "\" in the metadata");
+  }
+
+  // Get the information about inputs from metadata
+  if (signature_config[model_signature_name.c_str()].HasMember("inputs")) {
+    const rapidjson::Value& inputs =
+        signature_config[model_signature_name.c_str()]["inputs"];
+    for (rapidjson::Value::ConstMemberIterator json_itr = inputs.MemberBegin();
+         json_itr != inputs.MemberEnd(); ++json_itr) {
+      auto it =
+          inputs_->emplace(json_itr->name.GetString(), ModelTensor()).first;
+      it->second.name_ = json_itr->name.GetString();
+      RETURN_IF_ERROR(ConvertDTypeFromTFS(
+          json_itr->value["dtype"].GetString(), &it->second.datatype_));
+      bool is_dynamic = false;
+      if (json_itr->value["tensor_shape"]["unknown_rank"].GetBool()) {
+        is_dynamic = true;
+      } else {
+        for (const auto& dim :
+             json_itr->value["tensor_shape"]["dim"].GetArray()) {
+          int64_t dim_int;
+          RETURN_IF_ERROR(GetInt(dim["size"], &dim_int));
+          if (dim_int == -1) {
+            is_dynamic = true;
+          }
+          it->second.shape_.push_back(dim_int);
+        }
+      }
+
+      if (is_dynamic) {
+        const auto user_shape_it = input_shapes.find(it->second.name_);
+        if (user_shape_it != input_shapes.end()) {
+          // Update the default shape to be used.
+          it->second.shape_.clear();
+          for (const auto dim : user_shape_it->second) {
+            it->second.shape_.push_back(dim);
+          }
+        }
+      }
+    }
+  }
+
+  // Will not extract the information about the information about the outputs.
+  // As by default, the TensorFlow serving will return all the output tensors
+  // if none are requested.
+  // See here
+  // https://github.com/tensorflow/serving/blob/2.3.0/tensorflow_serving/apis/predict.proto#L27
+
   return cb::Error::Success;
 }
 

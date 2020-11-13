@@ -59,8 +59,9 @@ class ModelParser {
     ENSEMBLE_SEQUENCE
   };
 
-  ModelParser()
-      : inputs_(std::make_shared<ModelTensorMap>()),
+  explicit ModelParser(cb::BackendKind backend_kind)
+      : backend_kind_(backend_kind),
+        inputs_(std::make_shared<ModelTensorMap>()),
         outputs_(std::make_shared<ModelTensorMap>()),
         composing_models_map_(std::make_shared<ComposingModelMap>()),
         scheduler_type_(NONE), max_batch_size_(0), is_decoupled_(false)
@@ -68,7 +69,7 @@ class ModelParser {
   }
 
   /// Initializes the ModelParser with the metadata and config rapidjson DOM
-  /// for the target model
+  /// for the target model obtained from Triton service
   /// \param metadata The metadata of the target model.
   /// \param config The config of the target model.
   /// \param model_version The version of target model.
@@ -76,9 +77,25 @@ class ModelParser {
   /// if a certain input has wildcard in its dimension.
   /// \param backend The backend object.
   /// \return cb::Error object indicating success or failure.
-  cb::Error Init(
+  cb::Error InitTriton(
       const rapidjson::Document& metadata, const rapidjson::Document& config,
       const std::string& model_version,
+      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+      std::unique_ptr<cb::ClientBackend>& backend);
+
+  /// Initializes the ModelParser with the metadata and config rapidjson DOM
+  /// for the target model obtained from TF serving service.
+  /// \param metadata The metadata of the target model.
+  /// \param model_name The name of target model.
+  /// \param model_version The version of target model.
+  /// \param model_signature_name The signature name of target model.
+  /// \param input_shapes The user provided default shapes which will be use
+  /// if a certain input has wildcard in its dimension.
+  /// \param backend The backend object.
+  /// \return cb::Error object indicating success or failure.
+  cb::Error InitTFServe(
+      const rapidjson::Document& metadata, const std::string& model_name,
+      const std::string& model_version, const std::string& model_signature_name,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       std::unique_ptr<cb::ClientBackend>& backend);
 
@@ -89,6 +106,13 @@ class ModelParser {
   /// Get the version of target model
   /// \return Model version as string
   const std::string& ModelVersion() const { return model_version_; }
+
+  /// Get the signature name of target model
+  /// \return Model signature name as string
+  const std::string& ModelSignatureName() const
+  {
+    return model_signature_name_;
+  }
 
   /// Get the scheduler type for the model
   ModelSchedulerType SchedulerType() const { return scheduler_type_; }
@@ -125,12 +149,15 @@ class ModelParser {
       const rapidjson::Document& config, const std::string& model_version,
       std::unique_ptr<cb::ClientBackend>& backend, bool* is_sequential);
 
+  cb::BackendKind backend_kind_;
+
   std::shared_ptr<ModelTensorMap> inputs_;
   std::shared_ptr<ModelTensorMap> outputs_;
   std::shared_ptr<ComposingModelMap> composing_models_map_;
 
   std::string model_name_;
   std::string model_version_;
+  std::string model_signature_name_;
   ModelSchedulerType scheduler_type_;
   size_t max_batch_size_;
   bool is_decoupled_;
