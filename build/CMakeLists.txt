@@ -58,6 +58,10 @@ option(TRITON_ENABLE_AZURE_STORAGE "Include Azure Storage Filesystem support in 
 # Multiple paths may be specified by separating them with semicolon
 set(TRITON_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
 set(TRITON_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
+# Used for the case where TensorRT is not installed under default search path,
+# i.e. Windows build, this flag should be able to remove once TensorRT backend
+# is ported to use backend API
+set(TRITON_TENSORRT_INCLUDE_PATHS "" CACHE PATH "Paths to TensorRT includes")
 set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
 
 # Client
@@ -543,6 +547,7 @@ ExternalProject_Add(server
     -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
     -DTRITON_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRITON_ONNXRUNTIME_INCLUDE_PATHS}
     -DTRITON_PYTORCH_INCLUDE_PATHS:PATH=${TRITON_PYTORCH_INCLUDE_PATHS}
+    -DTRITON_TENSORRT_INCLUDE_PATHS:PATH=${TRITON_TENSORRT_INCLUDE_PATHS}
     -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
     -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
     -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}

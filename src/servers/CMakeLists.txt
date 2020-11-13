@@ -461,10 +461,12 @@ target_link_libraries(
 )
 
 if(${TRITON_ENABLE_TENSORRT})
+  find_library(NVINFER_LIBRARY NAMES nvinfer)
+  find_library(NVINFER_PLUGIN_LIBRARY NAMES nvinfer_plugin)
   target_link_libraries(
     tritonserver
-    PUBLIC nvinfer
-    PUBLIC nvinfer_plugin
+    PUBLIC ${NVINFER_LIBRARY}
+    PUBLIC ${NVINFER_PLUGIN_LIBRARY}
   )
 endif() # TRITON_ENABLE_TENSORRT
 
