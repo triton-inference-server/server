@@ -380,18 +380,15 @@ FROM ${BASE_IMAGE} AS tritonserver_onnx
 
 # Onnx Runtime release version from top of file
 ARG ONNX_RUNTIME_VERSION
-ARG ONNXRUNTIME_REPO=https://github.com/Microsoft/onnxruntime
+ARG ONNXRUNTIME_REPO=https://github.com/microsoft/onnxruntime
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /workspace
 
-#ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/workspace/cmake-3.14.3-Linux-x86_64/bin:/opt/miniconda/bin:$PATH
-#ENV LD_LIBRARY_PATH /opt/miniconda/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-
 # The Onnx Runtime dockerfile is the collection of steps in
-# https://github.com/microsoft/onnxruntime/tree/v1.5.1/dockerfiles
+# https://github.com/microsoft/onnxruntime/tree/master/dockerfiles
 
 # Install dependencies from
 # onnxruntime/dockerfiles/scripts/install_common_deps.sh. We don't run
@@ -414,16 +411,6 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-4.5.11-Linux-x86
     rm ~/miniconda.sh && \
     /opt/miniconda/bin/conda clean -ya
 
-#RUN apt-get update && \
-#    apt-get install -y sudo git bash unattended-upgrades
-# Dependencies for OpenVINO
-#RUN apt-get install -y apt-transport-https ca-certificates zip x11-apps \
-        lsb-core wget cpio libboost-python-dev libpng-dev zlib1g-dev libnuma1 \
-        ocl-icd-libopencl1 clinfo libboost-filesystem-dev \
-        libboost-thread-dev protobuf-compiler libprotoc-dev autoconf \
-        automake libtool libjson-c-dev ocl-icd-libopencl1
-#RUN unattended-upgrade
-
 # Allow configure to pick up GDK and CuDNN where it expects it.
 # (Note: $CUDNN_VERSION is defined by NVidia's base image)
 RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
@@ -436,7 +423,6 @@ RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
 ARG ONNX_RUNTIME_OPENVINO_VERSION
 ENV INTEL_OPENVINO_DIR /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110
 ENV LD_LIBRARY_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_OPENVINO_DIR/deployment_tools/ngraph/lib:$INTEL_OPENVINO_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
-
 ENV PYTHONPATH $INTEL_OPENVINO_DIR/tools:$PYTHONPATH
 ENV IE_PLUGINS_PATH $INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/intel64
 
@@ -448,21 +434,17 @@ RUN wget https://apt.repos.intel.com/openvino/2021/GPG-PUB-KEY-INTEL-OPENVINO-20
     apt install -y intel-openvino-dev-ubuntu18-${ONNX_RUNTIME_OPENVINO_VERSION}.110 && \
     cd ${INTEL_OPENVINO_DIR}/install_dependencies && ./install_openvino_dependencies.sh
 
-RUN wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-gmmlib_19.3.2_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-igc-core_1.0.2597_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-igc-opencl_1.0.2597_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-opencl_19.41.14441_amd64.deb && \
-    wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-ocloc_19.41.14441_amd64.deb && \
+ARG INTEL_COMPUTE_RUNTIME_URL=https://github.com/intel/compute-runtime/releases/download/19.41.14441
+RUN wget ${INTEL_COMPUTE_RUNTIME_URL}/intel-gmmlib_19.3.2_amd64.deb && \
+    wget ${INTEL_COMPUTE_RUNTIME_URL}/intel-igc-core_1.0.2597_amd64.deb && \
+    wget ${INTEL_COMPUTE_RUNTIME_URL}/intel-igc-opencl_1.0.2597_amd64.deb && \
+    wget ${INTEL_COMPUTE_RUNTIME_URL}/intel-opencl_19.41.14441_amd64.deb && \
+    wget ${INTEL_COMPUTE_RUNTIME_URL}/intel-ocloc_19.41.14441_amd64.deb && \
     dpkg -i *.deb && rm -rf *.deb
 
 # ONNX Runtime
 RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive ${ONNXRUNTIME_REPO} onnxruntime && \
     (cd onnxruntime && git submodule update --init --recursive)
-#RUN /bin/sh onnxruntime/dockerfiles/scripts/install_common_deps.sh
-#RUN cd /workspace/onnxruntime/cmake/external/onnx && python3 setup.py install
-
-#ENV PATH /usr/bin:$PATH
-#RUN cmake --version
 
 # Need to patch until https://github.com/onnx/onnx-tensorrt/pull/568
 # is merged and used in ORT
