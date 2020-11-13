@@ -455,7 +455,7 @@ RUN wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/
     wget https://github.com/intel/compute-runtime/releases/download/19.41.14441/intel-ocloc_19.41.14441_amd64.deb && \
     dpkg -i *.deb && rm -rf *.deb
 
-# Clone and build ONNX Runtime
+# ONNX Runtime
 RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive ${ONNXRUNTIME_REPO} onnxruntime && \
     (cd onnxruntime && git submodule update --init --recursive)
 #RUN /bin/sh onnxruntime/dockerfiles/scripts/install_common_deps.sh
@@ -463,6 +463,12 @@ RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive ${ONNXRUNTIME_REPO} onn
 
 #ENV PATH /usr/bin:$PATH
 #RUN cmake --version
+
+# Need to patch until https://github.com/onnx/onnx-tensorrt/pull/568
+# is merged and used in ORT
+COPY build/onnxruntime/onnx_tensorrt.patch /tmp/onnx_tensorrt.patch
+RUN cd /workspace/onnxruntime/cmake/external/onnx-tensorrt && \
+    patch -i /tmp/onnx_tensorrt.patch builtin_op_importers.cpp
 
 ARG COMMON_BUILD_ARGS="--skip_submodule_sync --parallel --build_shared_lib --use_openmp"
 RUN mkdir -p /workspace/build
