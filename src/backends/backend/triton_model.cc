@@ -167,8 +167,11 @@ TritonModel::Create(
       }
     }
   }
-
+#ifdef _WIN32
+  const std::string backend_libname = "triton_" + backend_name + ".dll";
+#else
   const std::string backend_libname = "libtriton_" + backend_name + ".so";
+#endif
 
   // Get the path to the backend shared library. Search path is
   // version directory, model directory, global backend directory.
