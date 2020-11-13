@@ -26,6 +26,73 @@
 
 #include "src/servers/shared_memory_manager.h"
 
+// Not supporting shared memory for now
+#ifdef _WIN32
+namespace nvidia { namespace inferenceserver {
+SharedMemoryManager::~SharedMemoryManager()
+{
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::RegisterSystemSharedMemory(
+      const std::string& name, const std::string& shm_key, const size_t offset,
+      const size_t byte_size)
+{
+  return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string("Shared memory feature is currently not supported on Windows")
+            .c_str());
+}
+
+#ifdef TRITON_ENABLE_GPU
+  TRITONSERVER_Error*
+  SharedMemoryManager::RegisterCUDASharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
+      const size_t byte_size, const int device_id)
+      {return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string("Shared memory feature is currently not supported on Windows")
+            .c_str());}
+#endif  // TRITON_ENABLE_GPU
+
+  TRITONSERVER_Error*
+  SharedMemoryManager::GetMemoryInfo(
+      const std::string& name, size_t offset, void** shm_mapped_addr,
+      TRITONSERVER_MemoryType* memory_type, int64_t* device_id)
+      {return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string("Shared memory feature is currently not supported on Windows")
+            .c_str());}
+
+  TRITONSERVER_Error*
+  SharedMemoryManager::GetStatus(
+      const std::string& name, TRITONSERVER_MemoryType memory_type,
+      triton::common::TritonJson::Value* shm_status){return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string("Shared memory feature is currently not supported on Windows")
+            .c_str());}
+
+  TRITONSERVER_Error*
+  SharedMemoryManager::Unregister(
+      const std::string& name, TRITONSERVER_MemoryType memory_type){return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string("Shared memory feature is currently not supported on Windows")
+            .c_str());}
+
+  TRITONSERVER_Error*
+  SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type){return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string("Shared memory feature is currently not supported on Windows")
+            .c_str());}
+
+  TRITONSERVER_Error*
+  SharedMemoryManager::UnregisterHelper(
+      const std::string& name, TRITONSERVER_MemoryType memory_type){return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string("Shared memory feature is currently not supported on Windows")
+            .c_str());}
+}}  // namespace nvidia::inferenceserver
+#else
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -433,3 +500,4 @@ SharedMemoryManager::UnregisterHelper(
 }
 
 }}  // namespace nvidia::inferenceserver
+#endif
