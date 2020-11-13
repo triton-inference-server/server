@@ -54,9 +54,9 @@ from distutils.dir_util import copy_tree
 #     (triton container version,
 #      upstream container version,
 #      ORT version,
-#      ORT openvino version
+#      ORT openvino version (use None to disable openvino)
 #     )
-TRITON_VERSION_MAP = {'2.6.0': ('20.12', '20.12', '1.5.3', '2020.4')}
+TRITON_VERSION_MAP = {'2.6.0': ('20.12', '20.12', '1.5.3', None)}
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
@@ -293,12 +293,15 @@ def pytorch_cmake_args():
 
 
 def onnxruntime_cmake_args():
-    return [
+    cargs = [
         '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
-        '-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON',
         '-DTRITON_ONNXRUNTIME_INCLUDE_PATHS=/opt/tritonserver/include/onnxruntime',
         '-DTRITON_ONNXRUNTIME_LIB_PATHS=/opt/tritonserver/backends/onnxruntime'
     ]
+
+    if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
+        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
+    return cargs
 
 
 def tensorflow_cmake_args(ver, images):
@@ -339,9 +342,11 @@ ARG PYTORCH_IMAGE={}
     if 'onnxruntime' in backends:
         df += '''
 ARG ONNX_RUNTIME_VERSION={}
+'''.format(argmap['ONNX_RUNTIME_VERSION'])
+        if 'ONNX_RUNTIME_OPENVINO_VERSION' in argmap:
+            df += '''
 ARG ONNX_RUNTIME_OPENVINO_VERSION={}
-'''.format(argmap['ONNX_RUNTIME_VERSION'],
-           argmap['ONNX_RUNTIME_OPENVINO_VERSION'])
+'''.format(argmap['ONNX_RUNTIME_OPENVINO_VERSION'])
 
     if 'pytorch' in backends:
         df += '''
@@ -418,7 +423,9 @@ RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
     ln -s /usr/include/cudnn.h /usr/local/cudnn-$_CUDNN_VERSION/cuda/include/cudnn.h && \
     mkdir -p /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64 && \
     ln -s /etc/alternatives/libcudnn_so /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64/libcudnn.so
-
+'''
+        if 'ONNX_RUNTIME_OPENVINO_VERSION' in argmap:
+            df += '''
 # Install OpenVINO
 ARG ONNX_RUNTIME_OPENVINO_VERSION
 ENV INTEL_OPENVINO_DIR /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110
@@ -431,7 +438,7 @@ RUN wget https://apt.repos.intel.com/openvino/2021/GPG-PUB-KEY-INTEL-OPENVINO-20
     cd /etc/apt/sources.list.d && \
     echo "deb https://apt.repos.intel.com/openvino/2021 all main">intel-openvino-2021.list && \
     apt update && \
-    apt install -y intel-openvino-dev-ubuntu18-${ONNX_RUNTIME_OPENVINO_VERSION}.110 && \
+    apt install -y intel-openvino-dev-ubuntu20-${ONNX_RUNTIME_OPENVINO_VERSION}.110 && \
     cd ${INTEL_OPENVINO_DIR}/install_dependencies && ./install_openvino_dependencies.sh
 
 ARG INTEL_COMPUTE_RUNTIME_URL=https://github.com/intel/compute-runtime/releases/download/19.41.14441
@@ -441,7 +448,8 @@ RUN wget ${INTEL_COMPUTE_RUNTIME_URL}/intel-gmmlib_19.3.2_amd64.deb && \
     wget ${INTEL_COMPUTE_RUNTIME_URL}/intel-opencl_19.41.14441_amd64.deb && \
     wget ${INTEL_COMPUTE_RUNTIME_URL}/intel-ocloc_19.41.14441_amd64.deb && \
     dpkg -i *.deb && rm -rf *.deb
-
+'''
+        df += '''
 # ONNX Runtime
 RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive ${ONNXRUNTIME_REPO} onnxruntime && \
     (cd onnxruntime && git submodule update --init --recursive)
@@ -454,6 +462,11 @@ RUN cd /workspace/onnxruntime/cmake/external/onnx-tensorrt && \
 
 ARG COMMON_BUILD_ARGS="--skip_submodule_sync --parallel --build_shared_lib --use_openmp"
 RUN mkdir -p /workspace/build
+'''
+        extra_build_args = ''
+        if 'ONNX_RUNTIME_OPENVINO_VERSION' in argmap:
+            extra_build_args += '--use_openvino CPU_FP32'
+        df += '''
 RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspace/build \
             --config Release $COMMON_BUILD_ARGS \
             --cmake_extra_defines ONNXRUNTIME_VERSION=$(cat /workspace/onnxruntime/VERSION_NUMBER) \
@@ -462,9 +475,10 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
             --tensorrt_home /usr/src/tensorrt \
             --use_cuda \
             --use_tensorrt \
-            --use_openvino CPU_FP32 \
             --update \
-            --build
+            --build {}
+'''.format(extra_build_args)
+        df += '''
 
 # Record version of ONNX used for ORT compilation,
 RUN cat /workspace/onnxruntime/cmake/external/onnx/VERSION_NUMBER > /workspace/ort_onnx_version.txt
@@ -576,8 +590,13 @@ COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/pr
      /opt/tritonserver/include/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/tensorrt/tensorrt_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
+'''
+        if 'ONNX_RUNTIME_OPENVINO_VERSION' in argmap:
+            df += '''
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
+'''
+        df += '''
 COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
      /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime_providers_shared.so \
@@ -594,7 +613,9 @@ COPY --from=tritonserver_onnx /workspace/build/Release/onnx_test_runner \
      /opt/tritonserver/backends/onnxruntime/
 RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
-
+'''
+        if 'ONNX_RUNTIME_OPENVINO_VERSION' in argmap:
+            df += '''
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
 COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
@@ -829,8 +850,10 @@ def container_build(backends, images):
             fail('ONNX Runtime version not known for {}'.format(FLAGS.version))
         dockerfileargmap['ONNX_RUNTIME_VERSION'] = TRITON_VERSION_MAP[
             FLAGS.version][2]
-        dockerfileargmap['ONNX_RUNTIME_OPENVINO_VERSION'] = TRITON_VERSION_MAP[
-            FLAGS.version][3]
+        if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
+            dockerfileargmap[
+                'ONNX_RUNTIME_OPENVINO_VERSION'] = TRITON_VERSION_MAP[
+                    FLAGS.version][3]
 
     cachefrommap = [
         'tritonserver_pytorch', 'tritonserver_pytorch_cache0',
