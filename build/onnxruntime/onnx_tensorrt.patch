@@ -1,0 +1,13 @@
+diff --git a/builtin_op_importers.cpp b/builtin_op_importers.cpp
+index 7cc17b5..95140df 100644
+--- a/builtin_op_importers.cpp
++++ b/builtin_op_importers.cpp
+@@ -3734,7 +3734,7 @@ std::vector<nvinfer1::PluginField> loadFields(string_map<std::vector<uint8_t>>&
+             }
+             fields.emplace_back(fieldName.c_str(), data, type, size);
+     }
+-    return std::move(fields);
++    return fields;
+ }
+
+ // Any ops that are not supported will attempt to import as plugins.
