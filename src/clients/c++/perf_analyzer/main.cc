@@ -1248,9 +1248,11 @@ main(int argc, char** argv)
       "failed to create profiler");
 
   // pre-run report
-  std::cout << "*** Measurement Settings ***" << std::endl
-            << "  Batch size: " << batch_size << std::endl
-            << "  Measurement window: " << measurement_window_ms << " msec"
+  std::cout << "*** Measurement Settings ***" << std::endl;
+  if (kind == cb::BackendKind::TRITON) {
+    std::cout << "  Batch size: " << batch_size << std::endl;
+  }
+  std::cout << "  Measurement window: " << measurement_window_ms << " msec"
             << std::endl;
   if (concurrency_range[SEARCH_RANGE::kEND] != 1) {
     std::cout << "  Latency limit: " << latency_threshold_ms << " msec"
