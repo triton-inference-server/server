@@ -208,6 +208,7 @@ cb::Error
 ModelParser::InitTFServe(
     const rapidjson::Document& metadata, const std::string& model_name,
     const std::string& model_version, const std::string& model_signature_name,
+    const int32_t batch_size,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     std::unique_ptr<cb::ClientBackend>& backend)
 {
@@ -236,18 +237,38 @@ ModelParser::InitTFServe(
       it->second.name_ = json_itr->name.GetString();
       RETURN_IF_ERROR(ConvertDTypeFromTFS(
           json_itr->value["dtype"].GetString(), &it->second.datatype_));
+
+      // Will use the user provided batch size as max. Relies on the service
+      // to throw an error if not supported.
+      max_batch_size_ = batch_size;
+
       bool is_dynamic = false;
       if (json_itr->value["tensor_shape"]["unknown_rank"].GetBool()) {
+        if (max_batch_size_ != 0) {
+          return cb::Error(
+              "Can not specify -b flag for saved model with unknown ranked "
+              "inputs");
+        }
         is_dynamic = true;
       } else {
+        bool first_dim = true;
         for (const auto& dim :
              json_itr->value["tensor_shape"]["dim"].GetArray()) {
           int64_t dim_int;
           RETURN_IF_ERROR(GetInt(dim["size"], &dim_int));
-          if (dim_int == -1) {
-            is_dynamic = true;
+          if (first_dim && (max_batch_size_ != 0)) {
+            if (dim_int != -1) {
+              return cb::Error(
+                  "Can not specify -b flag for saved model with input not "
+                  "having their first dim as -1");
+            }
+            first_dim = false;
+          } else {
+            if (dim_int == -1) {
+              is_dynamic = true;
+            }
+            it->second.shape_.push_back(dim_int);
           }
-          it->second.shape_.push_back(dim_int);
         }
       }
 

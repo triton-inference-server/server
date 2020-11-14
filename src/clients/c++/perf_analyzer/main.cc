@@ -600,6 +600,7 @@ main(int argc, char** argv)
   int32_t percentile = -1;
   uint64_t latency_threshold_ms = pa::NO_LIMIT;
   int32_t batch_size = 1;
+  bool using_batch_size = false;
   uint64_t concurrency_range[3] = {1, 1, 1};
   double request_rate_range[3] = {1.0, 1.0, 1.0};
   double stability_threshold = 0.1;
@@ -909,6 +910,7 @@ main(int argc, char** argv)
         break;
       case 'b':
         batch_size = std::atoi(optarg);
+        using_batch_size = true;
         break;
       case 't':
         using_old_options = true;
@@ -1083,11 +1085,8 @@ main(int argc, char** argv)
           << "perf_analyzer does not support async API for TensorFlow Serving."
           << std::endl;
       return 1;
-    } else if (batch_size > 1) {
-      std::cerr
-          << "perf_analyzer does not support -b flag with TensorFlow Serving "
-             "backend. See --shape to specify explicit batch dimension."
-          << std::endl;
+    } else if (!using_batch_size) {
+      batch_size = 0;
       return 1;
     }
   }
@@ -1138,7 +1137,7 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         parser->InitTFServe(
             model_metadata, model_name, model_version, model_signature_name,
-            input_shapes, backend),
+            batch_size, input_shapes, backend),
         "failed to create model parser");
 
   } else {
@@ -1249,7 +1248,7 @@ main(int argc, char** argv)
 
   // pre-run report
   std::cout << "*** Measurement Settings ***" << std::endl;
-  if (kind == cb::BackendKind::TRITON) {
+  if (kind == cb::BackendKind::TRITON || using_batch_size) {
     std::cout << "  Batch size: " << batch_size << std::endl;
   }
   std::cout << "  Measurement window: " << measurement_window_ms << " msec"

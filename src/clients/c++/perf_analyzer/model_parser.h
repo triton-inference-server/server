@@ -96,6 +96,7 @@ class ModelParser {
   cb::Error InitTFServe(
       const rapidjson::Document& metadata, const std::string& model_name,
       const std::string& model_version, const std::string& model_signature_name,
+      const int32_t batch_size,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       std::unique_ptr<cb::ClientBackend>& backend);
 
