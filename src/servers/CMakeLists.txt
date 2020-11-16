@@ -474,6 +474,17 @@ if(${TRITON_ENABLE_S3})
   )
 endif() # TRITON_ENABLE_S3
 
+if(${TRITON_ENABLE_AZURE_STORAGE})
+  target_link_libraries(
+    tritonserver
+    PRIVATE -L${azure-storage-cpplite_DIR}/lib
+    PRIVATE -lazure-storage-lite
+    PRIVATE -lre2
+    PRIVATE -luuid
+    PRIVATE -lcurl
+  )
+endif() # TRITON_ENABLE_AZURE_STORAGE
+
 if(${TRITON_ENABLE_GPU})
   target_link_libraries(
     tritonserver

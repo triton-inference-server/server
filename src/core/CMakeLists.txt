@@ -235,6 +235,13 @@ if(${TRITON_ENABLE_S3})
   )
 endif() # TRITON_ENABLE_S3
 
+if(${TRITON_ENABLE_AZURE_STORAGE})
+  target_include_directories(
+    server-library
+    PRIVATE ${azure-storage-cpplite_DIR}/include
+  )
+endif() # TRITON_ENABLE_AZURE_STORAGE
+
 target_link_libraries(
   server-library
   PUBLIC
