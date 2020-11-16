@@ -749,7 +749,6 @@ ASFileSystem::ASFileSystem(const std::string& path)
 {
   const char* account_str = std::getenv("AZURE_STORAGE_ACCOUNT");
   const char* account_key = std::getenv("AZURE_STORAGE_KEY");
-  const char* sas_query = std::getenv("AZURE_STORAGE_SAS");
   std::shared_ptr<as::storage_account> account = nullptr;
   std::string host_name, container, blob_path, query;
   if (RE2::FullMatch(
@@ -767,20 +766,13 @@ ASFileSystem::ASFileSystem(const std::string& path)
     }
 
     std::shared_ptr<as::storage_credential> cred;
-    if (!query.empty()) {
-        LOG_ERROR << "We can't support SAS in query url, please put SAS query in the environment variable AZURE_STORAGE_SAS";
-        return;
-    } else if (account_key != NULL) { 
+    if (account_key != NULL) { 
       // Shared Key
       cred = std::make_shared<as::shared_key_credential>(
           account_name, account_key);
-    } else if (sas_query != NULL) {
-      // Shared Access Signature
-      cred = std::make_shared<as::shared_access_signature_credential>(std::string(sas_query));
     } else {
       cred = std::make_shared<as::anonymous_credential>();
     }
-
     account = std::make_shared<as::storage_account>(
         account_name, cred, /* use_https */ true);
     client_ = std::make_shared<as::blob_client>(account, /*max_concurrency*/ 16);

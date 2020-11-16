@@ -1046,7 +1046,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified filesystem in build. Allowed values are "gcs", "as" and "s3".'
+        'Include specified filesystem in build. Allowed values are "gcs", "azure_storage" and "s3".'
     )
     parser.add_argument(
         '-b',
