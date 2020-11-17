@@ -44,31 +44,31 @@ export CUDA_VISIBLE_DEVICES=0
 # libtritonserver.so.
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 
-rm -f *.log
+rm -f *.log && rm -rf ${MODELSDIR}*
 
 RET=0
 
 MULTI_SERVER=multi_server
 CLIENT_LOG=$MULTI_SERVER
 MULTI_SERVER=./$MULTI_SERVER
+BACKENDS=(graphdef onnx plan)
+THREAD_COUNT=128
 
-I=1
-for trial in graphdef onnx plan ; do
-    full=${trial}_float32_float32_float32
-    rm -rf ${MODELSDIR}${I}
+for (( I=1; I<${THREAD_COUNT}+1; I++ )); do
+    BACKEND_INDEX=$(((I % 3) - 1))
+    full=${BACKENDS[$BACKEND_INDEX]}_float32_float32_float32
     mkdir -p ${MODELSDIR}${I}/simple${I}/1 && \
         cp -r $DATADIR/${full}/1/* ${MODELSDIR}${I}/simple${I}/1/. && \
         cp $DATADIR/${full}/config.pbtxt ${MODELSDIR}${I}/simple${I}/. && \
         (cd ${MODELSDIR}${I}/simple${I} && \
                 sed -i "s/^name:.*/name: \"simple${I}\"/" config.pbtxt && \
                 sed -i "s/label_filename:.*//" config.pbtxt)
-    I=$(($I+1))
 done
 
 set +e
 
 # No memory type enforcement
-$MULTI_SERVER -r ${MODELSDIR}1 -r ${MODELSDIR}2 -r ${MODELSDIR}3 >>$CLIENT_LOG.$full.log 2>&1
+$MULTI_SERVER -r ${MODELSDIR}1 -r ${MODELSDIR}2 -r ${MODELSDIR}3 -t $THREAD_COUNT >>$CLIENT_LOG.$full.log 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG.$full.log
     echo -e "\n***\n*** Test Failed\n***"
@@ -77,7 +77,7 @@ fi
 
 # Enforce I/O to be in specific memory type
 for MEM_TYPE in system pinned gpu ; do
-    $MULTI_SERVER -r ${MODELSDIR}1 -r ${MODELSDIR}2 -r ${MODELSDIR}3 -m $MEM_TYPE >>$CLIENT_LOG.$full.$MEM_TYPE.log 2>&1
+    $MULTI_SERVER -r ${MODELSDIR}1 -r ${MODELSDIR}2 -r ${MODELSDIR}3 -m $MEM_TYPE -t $THREAD_COUNT >>$CLIENT_LOG.$full.$MEM_TYPE.log 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG.$full.$MEM_TYPE.log
         echo -e "\n***\n*** Test Failed\n***"
