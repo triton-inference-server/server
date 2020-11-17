@@ -131,7 +131,7 @@ Use docker pull to get the client libraries and examples container
 from NGC.
 
 ```bash
-$ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
+$ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
 ```
 
 Where <xx.yy> is the version that you want to pull. Within the
@@ -157,7 +157,7 @@ Then, issue the following command to build the C++ client library and
 the Python wheel files for the Python client library.
 
 ```bash
-$ docker build -t tritonserver_sdk -f Dockerfile.tritonsdk .
+$ docker build -t tritonserver_sdk -f Dockerfile.sdk .
 ```
 
 You can optionally add *--build-arg "BASE_IMAGE=<base_image>"* to set
@@ -178,7 +178,7 @@ the built client examples that you can learn more about in
 The client library build is performed using CMake. *IMPORTANT*
 Note that version 3.18.4 of cmake is needed to compile the
 client. The build dependencies and requirements are shown in
-`Dockerfile.tritonsdk`. To build without Docker you must first
+`Dockerfile.sdk`. To build without Docker you must first
 install those dependencies along with required cmake version.
 This section describes the client build for Ubuntu 18.04 and
 Windows 10 systems.
@@ -195,7 +195,7 @@ $ git checkout r20.10
 #### Ubuntu 18.04
 
 For Ubuntu, the dependencies and how to install them can be found in
-`Dockerfile.tritonsdk`. The appropriate CUDA library must be installed
+`Dockerfile.sdk`. The appropriate CUDA library must be installed
 if TRITON_ENABLE_GPU=OFF is not specified in the cmake. Follow the
 dockerfile closely till the cmake invocation. Also note that
 the dependency name may be different depending on the version of the
