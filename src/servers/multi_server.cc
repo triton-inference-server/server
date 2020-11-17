@@ -460,6 +460,15 @@ SetServerOptions(
       TRITONSERVER_ServerOptionsSetLogVerbose(*server_options, verbose_level),
       "setting verbose logging level");
   FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetMetrics(*server_options, true),
+      "failed to enable metrics");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetStrictReadiness(*server_options, true),
+      "failed to set strict readiness");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetStrictModelConfig(*server_options, true),
+      "failed to set strict model config");
+  FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetModelControlMode(
           *server_options, TRITONSERVER_MODEL_CONTROL_EXPLICIT),
       "failed to set model control mode to explicit");
@@ -776,15 +785,109 @@ PrintModelStats(
       "deleting model stats message");
 }
 
+static volatile std::atomic<int> counter(0);
+static std::mutex mutex;
+std::condition_variable cv;
+
+void
+CreateAndRunTritonserverInstance(
+    std::vector<std::string> model_repository_paths, size_t thread_id,
+    bool verbose_level)
+{
+  std::unique_lock<std::mutex> lock(mutex);
+  counter++;
+  cv.wait(lock);
+
+  TRITONSERVER_ServerOptions* server_options = nullptr;
+
+  SetServerOptions(
+      &server_options, verbose_level, model_repository_paths[0],
+      model_repository_paths[thread_id]);
+
+  TRITONSERVER_Server* server_ptr = nullptr;
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerNew(&server_ptr, server_options),
+      "creating server instance no. " + std::to_string(thread_id));
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsDelete(server_options),
+      "deleting server options");
+
+  std::shared_ptr<TRITONSERVER_Server> server(
+      server_ptr, TRITONSERVER_ServerDelete);
+
+  // Wait and until the servers are both live and ready.
+  CheckServerLiveAndReady(server);
+
+  // Print status of the servers.
+  PrintServerStatus(server);
+  std::string model1 = "simple1",
+              model2 = "simple" + std::to_string(thread_id + 1);
+
+  // Load models in server.
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerLoadModel(server.get(), model1.c_str()),
+      "failed to load model");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerLoadModel(server.get(), model2.c_str()),
+      "failed to load model");
+
+  // Wait for the models to become available.
+  AwaitModelReady(server, model1.c_str());
+  AwaitModelReady(server, model2.c_str());
+
+  // Create the allocator that will be used to allocate buffers for
+  // the result tensors.
+  TRITONSERVER_ResponseAllocator* allocator = nullptr;
+  FAIL_IF_ERR(
+      TRITONSERVER_ResponseAllocatorNew(
+          &allocator, ResponseAlloc, ResponseRelease, nullptr /* start_fn */),
+      "creating response allocator");
+
+  // Inference
+  RunInferenceAndValidate(server, allocator, model1.c_str());
+  RunInferenceAndValidate(server, allocator, model2.c_str());
+
+  FAIL_IF_ERR(
+      TRITONSERVER_ResponseAllocatorDelete(allocator),
+      "deleting response allocator");
+
+  // Print Model Statistics for all models
+  PrintModelStats(server, model1.c_str());
+  PrintModelStats(server, model2.c_str());
+
+  // Unload models in both servers.
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerUnloadModel(server.get(), model1.c_str()),
+      "failed to unload model");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerUnloadModel(server.get(), model2.c_str()),
+      "failed to unload model");
+
+  std::string wrong_model;
+  if (thread_id == (model_repository_paths.size() + 1)) {
+    wrong_model = "simple2";
+  } else {
+    wrong_model = "simple" + std::to_string(thread_id + 2);
+  }
+
+  // Try to load wrong model. Expected to fail
+  TRITONSERVER_Error* err =
+      TRITONSERVER_ServerLoadModel(server.get(), wrong_model.c_str());
+  if (err == nullptr) {
+    FAIL("Success when expected to failed to load wrong model");
+  }
+}
+
 int
 main(int argc, char** argv)
 {
   std::vector<std::string> model_repository_paths;
   int verbose_level = 0;
+  int thread_count = 2;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vm:r:")) != -1) {
+  while ((opt = getopt(argc, argv, "vm:r:t")) != -1) {
     switch (opt) {
       case 'm': {
         enforce_memory_type = true;
@@ -805,6 +908,9 @@ main(int argc, char** argv)
       case 'r':
         model_repository_paths.push_back(optarg);
         break;
+      case 't':
+        thread_count = std::stoi(optarg);
+        break;
       case 'v':
         verbose_level = 1;
         break;
@@ -814,15 +920,17 @@ main(int argc, char** argv)
     }
   }
 
-  if (model_repository_paths.size() != 3) {
+  // model repository paths must be 'thread_count' - 1
+  if (int(model_repository_paths.size() - 1) != thread_count) {
     Usage(
-        argv,
-        "-r must be used to specify three model repository paths, 2 unique and "
-        "1 common");
+        argv, "-r must be used to specify " + std::to_string(thread_count + 1) +
+                  " model repository paths, " + std::to_string(thread_count) +
+                  " unique paths and 1 common");
   }
+
   for (const auto& repo_path : model_repository_paths) {
     if (repo_path.empty()) {
-      Usage(argv, "model repository path must not be empty");
+      Usage(argv, "model repository paths must not be empty");
     }
   }
 #ifndef TRITON_ENABLE_GPU
@@ -841,106 +949,25 @@ main(int argc, char** argv)
     FAIL("triton server API version mismatch");
   }
 
-  // Create two instances of the server with 1 common and 1 unique repo each
-  TRITONSERVER_ServerOptions *server1_options = nullptr,
-                             *server2_options = nullptr;
-  SetServerOptions(
-      &server1_options, verbose_level, model_repository_paths[0],
-      model_repository_paths[1]);
-  SetServerOptions(
-      &server2_options, verbose_level, model_repository_paths[0],
-      model_repository_paths[2]);
+  // Create 'thread_count' number of instances of the server with 1 common and 1
+  // unique repo each
+  std::thread tritonservers[thread_count];
+  for (int i = 0; i < thread_count; i++) {
+    tritonservers[i] = std::thread(
+        &CreateAndRunTritonserverInstance, model_repository_paths,
+        size_t(i + 1), verbose_level);
+  }
+  while (counter < thread_count) {
+    usleep(5000);
+  }
 
-  TRITONSERVER_Server *server1_ptr = nullptr, *server2_ptr = nullptr;
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerNew(&server1_ptr, server1_options),
-      "creating first server instance");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerNew(&server2_ptr, server2_options),
-      "creating second server instance");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsDelete(server1_options),
-      "deleting server options");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsDelete(server2_options),
-      "deleting server options");
+  {
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.notify_all();
+  }
 
-  std::shared_ptr<TRITONSERVER_Server> server1(
-      server1_ptr, TRITONSERVER_ServerDelete);
-  std::shared_ptr<TRITONSERVER_Server> server2(
-      server2_ptr, TRITONSERVER_ServerDelete);
-
-  // Wait and until the servers are both live and ready.
-  CheckServerLiveAndReady(server1);
-  CheckServerLiveAndReady(server2);
-
-  // Print status of the servers.
-  PrintServerStatus(server1);
-  PrintServerStatus(server2);
-
-  // Load models in both servers.
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerLoadModel(server1.get(), "simple1"),
-      "failed to load model");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerLoadModel(server1.get(), "simple2"),
-      "failed to load model");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerLoadModel(server2.get(), "simple1"),
-      "failed to load model");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerLoadModel(server2.get(), "simple3"),
-      "failed to load model");
-
-  // Wait for the models to become available.
-  AwaitModelReady(server1, "simple1");
-  AwaitModelReady(server1, "simple2");
-  AwaitModelReady(server2, "simple1");
-  AwaitModelReady(server2, "simple3");
-
-  // Create the allocator that will be used to allocate buffers for
-  // the result tensors.
-  TRITONSERVER_ResponseAllocator* allocator = nullptr;
-  FAIL_IF_ERR(
-      TRITONSERVER_ResponseAllocatorNew(
-          &allocator, ResponseAlloc, ResponseRelease, nullptr /* start_fn */),
-      "creating response allocator");
-
-  // Inference
-  RunInferenceAndValidate(server1, allocator, "simple1");
-  RunInferenceAndValidate(server1, allocator, "simple2");
-  RunInferenceAndValidate(server2, allocator, "simple1");
-  RunInferenceAndValidate(server2, allocator, "simple3");
-
-  FAIL_IF_ERR(
-      TRITONSERVER_ResponseAllocatorDelete(allocator),
-      "deleting response allocator");
-
-  // Print Model Statistics for all models
-  PrintModelStats(server1, "simple1");
-  PrintModelStats(server1, "simple2");
-  PrintModelStats(server2, "simple1");
-  PrintModelStats(server2, "simple3");
-
-  // Unload models in both servers.
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerUnloadModel(server1.get(), "simple1"),
-      "failed to unload model");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerUnloadModel(server1.get(), "simple2"),
-      "failed to unload model");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerUnloadModel(server2.get(), "simple1"),
-      "failed to unload model");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerUnloadModel(server2.get(), "simple3"),
-      "failed to unload model");
-
-  // Try to load wrong model. Expected to fail
-  TRITONSERVER_Error* err =
-      TRITONSERVER_ServerLoadModel(server1.get(), "simple3");
-  if (err == nullptr) {
-    FAIL("Success when expected to failed to load wrong model");
+  for (int i = 0; i < thread_count; ++i) {
+    tritonservers[i].join();
   }
 
   return 0;
