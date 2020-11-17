@@ -218,6 +218,10 @@ ModelParser::InitTFServe(
   // Get the scheduler type for the model
   scheduler_type_ = NONE;
 
+  // Will use the user provided batch size as max. Relies on the service
+  // to throw an error if not supported.
+  max_batch_size_ = batch_size;
+
   const rapidjson::Value& signature_config =
       metadata["metadata"]["signature_def"]["signature_def"];
   if (!signature_config.HasMember(model_signature_name.c_str())) {
@@ -237,10 +241,6 @@ ModelParser::InitTFServe(
       it->second.name_ = json_itr->name.GetString();
       RETURN_IF_ERROR(ConvertDTypeFromTFS(
           json_itr->value["dtype"].GetString(), &it->second.datatype_));
-
-      // Will use the user provided batch size as max. Relies on the service
-      // to throw an error if not supported.
-      max_batch_size_ = batch_size;
 
       bool is_dynamic = false;
       if (json_itr->value["tensor_shape"]["unknown_rank"].GetBool()) {
@@ -290,6 +290,28 @@ ModelParser::InitTFServe(
   // if none are requested.
   // See here
   // https://github.com/tensorflow/serving/blob/2.3.0/tensorflow_serving/apis/predict.proto#L27
+
+  return cb::Error::Success;
+}
+
+cb::Error
+ModelParser::InitTorchServe(
+    const std::string& model_name, const std::string& model_version,
+    const int32_t batch_size)
+{
+  // TorchServe does not return model metadata hence we can not obtain any
+  // parameters.
+  model_name_ = model_name;
+  model_version_ = model_version;
+  max_batch_size_ = batch_size;
+
+  // TorchServe needs to upload a file to the server. The input will hold the
+  // path to the file which should be provided as json to --input-data
+  auto it = inputs_->emplace("TORCHSERVE_INPUT", ModelTensor()).first;
+  it->second.name_ = "TORCHSERVE_INPUT";
+  it->second.datatype_ = "BYTES";
+  // Supports only a single input file
+  it->second.shape_.push_back(1);
 
   return cb::Error::Success;
 }

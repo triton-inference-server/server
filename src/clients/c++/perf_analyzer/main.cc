@@ -212,7 +212,8 @@ Usage(char** argv, const std::string& msg = std::string())
 
   std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
   std::cerr << "==== SYNOPSIS ====\n \n";
-  std::cerr << "\t--service-kind <\"triton\"|\"tfserving\">" << std::endl;
+  std::cerr << "\t--service-kind <\"triton\"|\"tfserving\"|\"torchserve\">"
+            << std::endl;
   std::cerr << "\t-m <model name>" << std::endl;
   std::cerr << "\t-x <model version>" << std::endl;
   std::cerr << "\t--model-signature-name <model signature name>" << std::endl;
@@ -276,8 +277,13 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << FormatMessage(
              " --service-kind: Describes the kind of service perf_analyzer "
-             "to generate load for. The options are \"triton\" and "
-             "\"tfserving\". Default value is \"triton\".",
+             "to generate load for. The options are \"triton\", \"tfserving\" "
+             "and \"torchserve\". Default value is \"triton\". Note in order "
+             "to use \"torchserve\" backend --input-data option must point to "
+             "a json file holding data in the following format {\"data\" : "
+             "[{\"TORCHSERVE_INPUT\" : [\"<complete path to the content "
+             "file>\"]}, {...}...]}. The type of file here will depend on the "
+             " model. ",
              18)
       << std::endl;
 
@@ -487,7 +493,8 @@ Usage(char** argv, const std::string& msg = std::string())
              "round-robin fashion for every new sequence. Muliple json files "
              "can also be provided (--input-data json_file1 --input-data "
              "json-file2 and so on) and the analyzer will append data streams "
-             "from each file. Default is \"random\".",
+             "from each file. When using --service-kind=torchserve make sure "
+             "this option points to a json file. Default is \"random\".",
              18)
       << std::endl;
   std::cerr << FormatMessage(
@@ -879,6 +886,8 @@ main(int argc, char** argv)
           kind = cb::TRITON;
         } else if (arg.compare("tfserving") == 0) {
           kind = cb::TENSORFLOW_SERVING;
+        } else if (arg.compare("torchserve") == 0) {
+          kind = cb::TORCHSERVE;
         } else {
           Usage(argv, "unsupported --service-kind specified");
         }
@@ -1089,6 +1098,13 @@ main(int argc, char** argv)
       batch_size = 0;
       return 1;
     }
+  } else if (kind == cb::TORCHSERVE) {
+    if (user_data.empty()) {
+      std::cerr << "--input-data should be provided with a json file with "
+                   "input data for torchserve"
+                << std::endl;
+      return 1;
+    }
   }
 
   bool target_concurrency =
@@ -1139,7 +1155,10 @@ main(int argc, char** argv)
             model_metadata, model_name, model_version, model_signature_name,
             batch_size, input_shapes, backend),
         "failed to create model parser");
-
+  } else if (kind == cb::BackendKind::TORCHSERVE) {
+    FAIL_IF_ERR(
+        parser->InitTorchServe(model_name, model_version, batch_size),
+        "failed to create model parser");
   } else {
     std::cerr << "unsupported client backend kind" << std::endl;
     return 1;

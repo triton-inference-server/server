@@ -100,6 +100,10 @@ class ModelParser {
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       std::unique_ptr<cb::ClientBackend>& backend);
 
+  cb::Error InitTorchServe(
+      const std::string& model_name, const std::string& model_version,
+      const int32_t batch_size);
+
   /// Get the name of the target model
   /// \return Model name as string
   const std::string& ModelName() const { return model_name_; }
