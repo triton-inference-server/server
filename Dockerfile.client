@@ -37,7 +37,7 @@ FROM ${BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
 # DCGM version to install for Model Analyzer
-ENV DCGM_VERSION=2.0.13
+ARG DCGM_VERSION=2.0.13
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -118,7 +118,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
-ENV TRITON_MODEL_ANALYZER_REPO "https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
+ARG TRITON_MODEL_ANALYZER_REPO "https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
 RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 ENV PATH /workspace/install/bin:${PATH}
