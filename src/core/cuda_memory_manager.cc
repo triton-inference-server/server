@@ -57,6 +57,7 @@ PointerToString(void* ptr)
 namespace nvidia { namespace inferenceserver {
 
 std::unique_ptr<CudaMemoryManager> CudaMemoryManager::instance_;
+std::mutex CudaMemoryManager::cuda_memory_creating_;
 
 CudaMemoryManager::~CudaMemoryManager()
 {
@@ -76,6 +77,8 @@ CudaMemoryManager::Reset()
 Status
 CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
 {
+  // Ensure thread-safe creation of CUDA memory pool
+  std::lock_guard<std::mutex> lock(cuda_memory_creating_);
   if (instance_ != nullptr) {
     LOG_WARNING << "New CUDA memory pools could not be created since they "
                    "already exists";

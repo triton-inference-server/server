@@ -29,6 +29,7 @@
 #ifdef TRITON_ENABLE_METRICS
 
 #include <atomic>
+#include <mutex>
 #include <thread>
 #include "prometheus/registry.h"
 #include "prometheus/serializer.h"
@@ -164,6 +165,7 @@ class Metrics {
 
   bool metrics_enabled_;
   bool gpu_metrics_enabled_;
+  std::mutex gpu_metrics_enabling_;
 };
 
 }}  // namespace nvidia::inferenceserver
