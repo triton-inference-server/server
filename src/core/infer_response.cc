@@ -209,7 +209,8 @@ InferenceResponse::Send(
   if (response->null_response_) {
     response->response_fn_(nullptr /* response */, flags, userp);
   } else {
-    response->response_fn_(
+    auto& response_fn = response->response_fn_;
+    response_fn(
         reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
         flags, userp);
   }

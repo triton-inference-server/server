@@ -179,7 +179,8 @@ InferenceRequest::Release(
 #endif  // TRITON_ENABLE_TRACING
 
   void* userp = request->release_userp_;
-  request->release_fn_(
+  auto& release_fn = request->release_fn_;
+  release_fn(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
       release_flags, userp);
 
