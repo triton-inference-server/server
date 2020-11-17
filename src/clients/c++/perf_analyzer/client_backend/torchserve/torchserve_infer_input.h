@@ -30,7 +30,6 @@
 #include "src/clients/c++/perf_analyzer/client_backend/client_backend.h"
 #include "src/clients/c++/perf_analyzer/perf_utils.h"
 
-
 namespace perfanalyzer { namespace clientbackend {
 
 //==============================================================
@@ -67,7 +66,6 @@ class TorchServeInferInput : public InferInput {
 
   std::vector<int64_t> shape_;
   size_t byte_size_;
-
   size_t bufs_idx_, buf_pos_;
   std::vector<const uint8_t*> bufs_;
   std::vector<size_t> buf_byte_sizes_;

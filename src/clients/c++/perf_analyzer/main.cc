@@ -283,7 +283,7 @@ Usage(char** argv, const std::string& msg = std::string())
              "a json file holding data in the following format {\"data\" : "
              "[{\"TORCHSERVE_INPUT\" : [\"<complete path to the content "
              "file>\"]}, {...}...]}. The type of file here will depend on the "
-             " model. ",
+             "model.",
              18)
       << std::endl;
 

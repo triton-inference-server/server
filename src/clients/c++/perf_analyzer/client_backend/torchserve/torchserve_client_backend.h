@@ -84,26 +84,7 @@ class TorchServeClientBackend : public ClientBackend {
       const nic::InferStat& torchserve_infer_stat, InferStat* infer_stat);
 
   std::unique_ptr<ts::HttpClient> http_client_;
-
   std::shared_ptr<Headers> http_headers_;
-};
-
-//==============================================================
-/// TorchServeInferRequestedOutput is a wrapper around
-/// InferRequestedOutput object of triton common client library.
-///
-class TorchServeInferRequestedOutput : public InferRequestedOutput {
- public:
-  static Error Create(
-      InferRequestedOutput** infer_output, const std::string name);
-  /// Returns the raw InferRequestedOutput object required by torchserve
-  /// client library.
-  nic::InferRequestedOutput* Get() const { return output_.get(); }
-
- private:
-  explicit TorchServeInferRequestedOutput();
-
-  std::unique_ptr<nic::InferRequestedOutput> output_;
 };
 
 //==============================================================

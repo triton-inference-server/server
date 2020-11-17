@@ -362,9 +362,6 @@ InferRequestedOutput::Create(
         TritonInferRequestedOutput::Create(infer_output, name, class_count));
   } else if (kind == TENSORFLOW_SERVING) {
     RETURN_IF_CB_ERROR(TFServeInferRequestedOutput::Create(infer_output, name));
-  } else if (kind == TORCHSERVE) {
-    RETURN_IF_CB_ERROR(
-        TorchServeInferRequestedOutput::Create(infer_output, name));
   } else {
     return Error(
         "unsupported client backend provided to create InferRequestedOutput "

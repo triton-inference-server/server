@@ -27,7 +27,6 @@
 #include "src/clients/c++/perf_analyzer/client_backend/torchserve/http_client.h"
 #include "src/clients/c++/perf_analyzer/client_backend/torchserve/torchserve_client_backend.h"
 
-
 #include <chrono>
 #include <cstdint>
 
@@ -87,7 +86,6 @@ HttpInferRequest::InitializeRequest()
   http_code_ = 400;
   // Prepare buffer to record the response
   infer_response_buffer_.reset(new std::string());
-
   return Error::Success;
 }
 
@@ -117,8 +115,7 @@ HttpClient::Infer(
     request_uri += "/" + options.model_version_;
   }
 
-  std::shared_ptr<HttpInferRequest> sync_request(
-      new HttpInferRequest(nullptr /* callback */, verbose_));
+  std::shared_ptr<HttpInferRequest> sync_request(new HttpInferRequest());
 
   sync_request->Timer().Reset();
   sync_request->Timer().CaptureTimestamp(
@@ -227,7 +224,6 @@ HttpClient::PreRunProcessing(
 
   std::vector<std::string> input_filepaths;
 
-
   curl_easy_setopt(curl, CURLOPT_URL, request_uri.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
   curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
@@ -317,6 +313,7 @@ HttpClient::~HttpClient()
 }
 
 //======================================================================
+
 Error
 InferResult::Create(
     InferResult** infer_result, std::shared_ptr<HttpInferRequest> infer_request)

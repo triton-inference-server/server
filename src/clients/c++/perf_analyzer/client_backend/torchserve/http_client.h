@@ -42,7 +42,7 @@ using TorchServeOnCompleteFn = std::function<void(InferResult*)>;
 
 //==============================================================================
 /// An HttpClient object is used to perform any kind of communication with the
-/// TFserving service using gRPC protocol. None of the functions are thread
+/// torchserve service using libcurl. None of the functions are thread
 /// safe.
 ///
 /// \code
@@ -84,7 +84,6 @@ class HttpClient : public nic::InferenceServerClient {
           std::vector<const InferRequestedOutput*>(),
       const Headers& headers = Headers());
 
-
  private:
   HttpClient(const std::string& url, bool verbose);
   Error PreRunProcessing(
@@ -99,8 +98,9 @@ class HttpClient : public nic::InferenceServerClient {
 
   // The server url
   const std::string url_;
-  // curl easy handle shared for all synchronous requests
+  // curl easy handle shared for all synchronous requests.
   void* easy_handle_;
+  // The handle to interact with mime API.
   curl_mime* mime_handle_;
 };
 
@@ -108,25 +108,15 @@ class HttpClient : public nic::InferenceServerClient {
 
 class HttpInferRequest {
  public:
-  HttpInferRequest(
-      TorchServeOnCompleteFn callback = nullptr, const bool verbose = false)
-      : callback_(callback), verbose_(verbose), header_list_(nullptr),
-        response_json_size_(0)
-  {
-  }
-
+  HttpInferRequest() : header_list_(nullptr) {}
   ~HttpInferRequest();
-
   Error InitializeRequest();
   nic::RequestTimers& Timer() { return timer_; }
   std::string& DebugString() { return *infer_response_buffer_; }
-
   friend HttpClient;
   friend InferResult;
 
  private:
-  TorchServeOnCompleteFn callback_;
-  bool verbose_;
   // Pointer to the list of the HTTP request header, keep it such that it will
   // be valid during the transfer and can be freed once transfer is completed.
   struct curl_slist* header_list_;
@@ -134,7 +124,6 @@ class HttpInferRequest {
   long http_code_;
   // Buffer that accumulates the response body.
   std::unique_ptr<std::string> infer_response_buffer_;
-  size_t response_json_size_;
   // The timers for infer request.
   nic::RequestTimers timer_;
 };
@@ -146,8 +135,6 @@ class InferResult {
   static Error Create(
       InferResult** infer_result,
       std::shared_ptr<HttpInferRequest> infer_request);
-
-
   Error RequestStatus() const;
   Error Id(std::string* id) const;
   std::string DebugString() const { return infer_request_->DebugString(); }
@@ -155,7 +142,9 @@ class InferResult {
  private:
   InferResult(std::shared_ptr<HttpInferRequest> infer_request);
 
+  // The status of the inference
   Error status_;
+  // The pointer to the HttpInferRequest object
   std::shared_ptr<HttpInferRequest> infer_request_;
 };
 

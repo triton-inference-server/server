@@ -35,7 +35,6 @@ TorchServeInferInput::Create(
 {
   TorchServeInferInput* local_infer_input =
       new TorchServeInferInput(name, dims, datatype);
-
   *infer_input = local_infer_input;
   return Error::Success;
 }
@@ -61,10 +60,8 @@ Error
 TorchServeInferInput::AppendRaw(const uint8_t* input, size_t input_byte_size)
 {
   byte_size_ += input_byte_size;
-
   bufs_.push_back(input);
   buf_byte_sizes_.push_back(input_byte_size);
-
   return Error::Success;
 }
 
@@ -97,7 +94,6 @@ TorchServeInferInput::GetNext(
     *input_bytes = 0;
   }
   *end_of_input = (bufs_idx_ >= bufs_.size());
-
   return Error::Success;
 }
 

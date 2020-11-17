@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/clients/c++/perf_analyzer/client_backend/torchserve/torchserve_client_backend.h"
-
 #include "src/clients/c++/examples/json_utils.h"
 
 namespace perfanalyzer { namespace clientbackend {
@@ -44,12 +43,9 @@ TorchServeClientBackend::Create(
   }
   std::unique_ptr<TorchServeClientBackend> torchserve_client_backend(
       new TorchServeClientBackend(http_headers));
-
   RETURN_IF_CB_ERROR(ts::HttpClient::Create(
       &(torchserve_client_backend->http_client_), url, verbose));
-
   *client_backend = std::move(torchserve_client_backend);
-
   return Error::Success;
 }
 
@@ -62,9 +58,7 @@ TorchServeClientBackend::Infer(
   ts::InferResult* torchserve_result;
   RETURN_IF_CB_ERROR(http_client_->Infer(
       &torchserve_result, options, inputs, outputs, *http_headers_));
-
   *result = new TorchServeInferResult(torchserve_result);
-
   return Error::Success;
 }
 
@@ -74,11 +68,8 @@ TorchServeClientBackend::ClientInferStat(InferStat* infer_stat)
   // Reusing the common library utilities to collect and report the
   // client side statistics.
   nic::InferStat client_infer_stat;
-
   RETURN_IF_TRITON_ERROR(http_client_->ClientInferStat(&client_infer_stat));
-
   ParseInferStat(client_infer_stat, infer_stat);
-
   return Error::Success;
 }
 
@@ -94,30 +85,6 @@ TorchServeClientBackend::ParseInferStat(
       torchserve_infer_stat.cumulative_send_time_ns;
   infer_stat->cumulative_receive_time_ns =
       torchserve_infer_stat.cumulative_receive_time_ns;
-}
-
-//==============================================================================
-
-Error
-TorchServeInferRequestedOutput::Create(
-    InferRequestedOutput** infer_output, const std::string name)
-{
-  TorchServeInferRequestedOutput* local_infer_output =
-      new TorchServeInferRequestedOutput();
-
-  nic::InferRequestedOutput* torchserve_infer_output;
-  RETURN_IF_TRITON_ERROR(
-      nic::InferRequestedOutput::Create(&torchserve_infer_output, name));
-  local_infer_output->output_.reset(torchserve_infer_output);
-
-  *infer_output = local_infer_output;
-
-  return Error::Success;
-}
-
-TorchServeInferRequestedOutput::TorchServeInferRequestedOutput()
-    : InferRequestedOutput(BackendKind::TORCHSERVE)
-{
 }
 
 //==============================================================================
@@ -142,6 +109,5 @@ TorchServeInferResult::RequestStatus() const
 }
 
 //==============================================================================
-
 
 }}  // namespace perfanalyzer::clientbackend
