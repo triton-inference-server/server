@@ -26,8 +26,8 @@
 #pragma once
 
 #include <atomic>
-#include <memory>
 #include <chrono>
+#include <memory>
 #include "src/core/constants.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver_apis.h"
@@ -73,9 +73,10 @@ class InferenceTrace {
   // Report trace activity at the current time.
   void ReportNow(const TRITONSERVER_InferenceTraceActivity activity)
   {
-    Report(activity, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                         std::chrono::steady_clock::now().time_since_epoch())
-                         .count());
+    Report(
+        activity, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      std::chrono::steady_clock::now().time_since_epoch())
+                      .count());
   }
 
   // Release the trace. Call the trace release callback and transfer

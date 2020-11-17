@@ -135,9 +135,10 @@ InferenceStatsAggregator::UpdateInferBatchStatsWithDuration(
     const uint64_t compute_infer_duration_ns,
     const uint64_t compute_output_duration_ns)
 {
-  uint64_t inference_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::system_clock::now().time_since_epoch())
-                            .count();
+  uint64_t inference_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count();
 
   std::lock_guard<std::mutex> lock(mu_);
 

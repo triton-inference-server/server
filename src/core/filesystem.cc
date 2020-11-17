@@ -34,8 +34,8 @@
 // _CRT_INTERNAL_NONSTDC_NAMES 1 before including Microsoft provided C Runtime
 // library to expose declarations without "_" prefix to match POSIX style.
 #define _CRT_INTERNAL_NONSTDC_NAMES 1
-#include <io.h>
 #include <direct.h>
+#include <io.h>
 #else
 #include <dirent.h>
 #include <unistd.h>
@@ -68,8 +68,8 @@
 #include <re2/re2.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <cerrno>
 #include <fstream>
 #include "src/core/constants.h"
@@ -79,7 +79,7 @@
 #ifdef _WIN32
 // <sys/stat.h> in Windows doesn't define S_ISDIR macro
 #if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
-  #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#define S_ISDIR(m) (((m)&S_IFMT) == S_IFDIR)
 #endif
 #define F_OK 0
 #endif
@@ -110,8 +110,8 @@ Status
 MakeTemporaryDirectory(std::string* temp_dir)
 {
 #ifdef _WIN32
-  char temp_path[MAX_PATH+1];
-  size_t temp_path_length = GetTempPath(MAX_PATH+1, temp_path);
+  char temp_path[MAX_PATH + 1];
+  size_t temp_path_length = GetTempPath(MAX_PATH + 1, temp_path);
   if (temp_path_length == 0) {
     return Status(
         Status::Code::INTERNAL,
@@ -131,9 +131,7 @@ MakeTemporaryDirectory(std::string* temp_dir)
   // and so that we can reuse 'temp_path' to hold the temp file name.
   std::string temp_path_str(temp_path, temp_path_length);
   if (GetTempFileName(temp_path_str.c_str(), "folder", 0, temp_path) == 0) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Failed to create local temp folder");
+    return Status(Status::Code::INTERNAL, "Failed to create local temp folder");
   }
   *temp_dir = temp_path;
   DeleteFile(temp_dir->c_str());
@@ -274,11 +272,13 @@ LocalFileSystem::GetDirectoryContents(
   if (dir == INVALID_HANDLE_VALUE) {
     return Status(Status::Code::INTERNAL, "failed to open directory " + path);
   }
-  if ((strcmp(entry.cFileName, ".") != 0) && (strcmp(entry.cFileName, "..") != 0)) {
+  if ((strcmp(entry.cFileName, ".") != 0) &&
+      (strcmp(entry.cFileName, "..") != 0)) {
     contents->insert(entry.cFileName);
   }
   while (FindNextFile(dir, &entry)) {
-    if ((strcmp(entry.cFileName, ".") != 0) && (strcmp(entry.cFileName, "..") != 0)) {
+    if ((strcmp(entry.cFileName, ".") != 0) &&
+        (strcmp(entry.cFileName, "..") != 0)) {
       contents->insert(entry.cFileName);
     }
   }
@@ -722,8 +722,7 @@ GCSFileSystem::LocalizeDirectory(
       if (is_subdir) {
         // Create local mirror of sub-directories
 #ifdef _WIN32
-        int status = mkdir(
-            const_cast<char*>(local_fpath.c_str()));
+        int status = mkdir(const_cast<char*>(local_fpath.c_str()));
 #else
         int status = mkdir(
             const_cast<char*>(local_fpath.c_str()),
@@ -786,7 +785,7 @@ GCSFileSystem::WriteTextFile(
 namespace as = azure::storage_lite;
 const std::string AS_URL_PATTERN = "as://([^/]+)/([^/?]+)(?:/([^?]*))?(\\?.*)?";
 
-class ASFileSystem :  public FileSystem {
+class ASFileSystem : public FileSystem {
  public:
   ASFileSystem(const std::string& s3_path);
   Status CheckClient();
@@ -834,8 +833,7 @@ ASFileSystem::ParsePath(
   return Status::Success;
 }
 
-ASFileSystem::ASFileSystem(const std::string& path)
-    : as_regex_(AS_URL_PATTERN)
+ASFileSystem::ASFileSystem(const std::string& path) : as_regex_(AS_URL_PATTERN)
 {
   const char* account_str = std::getenv("AZURE_STORAGE_ACCOUNT");
   const char* account_key = std::getenv("AZURE_STORAGE_KEY");
@@ -845,7 +843,7 @@ ASFileSystem::ASFileSystem(const std::string& path)
           path, as_regex_, &host_name, &container, &blob_path, &query)) {
     size_t pos = host_name.rfind(".blob.core.windows.net");
     std::string account_name;
-    if (account_str == NULL) { 
+    if (account_str == NULL) {
       if (pos != std::string::npos) {
         account_name = host_name.substr(0, pos);
       } else {
@@ -856,7 +854,7 @@ ASFileSystem::ASFileSystem(const std::string& path)
     }
 
     std::shared_ptr<as::storage_credential> cred;
-    if (account_key != NULL) { 
+    if (account_key != NULL) {
       // Shared Key
       cred = std::make_shared<as::shared_key_credential>(
           account_name, account_key);
@@ -865,14 +863,15 @@ ASFileSystem::ASFileSystem(const std::string& path)
     }
     account = std::make_shared<as::storage_account>(
         account_name, cred, /* use_https */ true);
-    client_ = std::make_shared<as::blob_client>(account, /*max_concurrency*/ 16);
+    client_ =
+        std::make_shared<as::blob_client>(account, /*max_concurrency*/ 16);
   }
 }
 
-Status ASFileSystem::CheckClient() 
+Status
+ASFileSystem::CheckClient()
 {
-  if (client_ == nullptr) 
-  {
+  if (client_ == nullptr) {
     return Status(Status::Code::INTERNAL, "blob client initialize failed.");
   }
   return Status::Success;
@@ -905,7 +904,6 @@ ASFileSystem::ListDirectory(
         Status(const as::list_blobs_segmented_item&, const std::string&)>
         func)
 {
-
   as::blob_client_wrapper bc(client_);
 
   // Append a slash to make it easier to list contents
@@ -918,7 +916,7 @@ ASFileSystem::ListDirectory(
     // Let set take care of subdirectory contents
     std::string subfile = name.substr(item_start, item_end - item_start);
     auto status = func(item, subfile);
-    if (!status.IsOk()){
+    if (!status.IsOk()) {
       return status;
     }
   }
@@ -930,8 +928,8 @@ ASFileSystem::GetDirectoryContents(
     const std::string& path, std::set<std::string>* contents)
 {
   auto func = [&](const as::list_blobs_segmented_item& item,
-                  const std::string& dir) { 
-    contents->insert(dir); 
+                  const std::string& dir) {
+    contents->insert(dir);
     return Status::Success;
   };
   std::string container, dir_path;
@@ -988,14 +986,13 @@ ASFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 Status
 ASFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 {
-
   as::blob_client_wrapper bc(client_);
   std::string container, object_path;
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
   using namespace azure::storage_lite;
   std::ostringstream out_stream;
   bc.download_blob_to_stream(container, object_path, 0, 0, out_stream);
-  if (errno!=0) {
+  if (errno != 0) {
     auto error = "Failed to download blob " + path;
     return Status(Status::Code::INTERNAL, error);
   }
@@ -1042,15 +1039,15 @@ ASFileSystem::DownloadFolder(
                 ", errno:" + strerror(errno));
       }
       auto ret = DownloadFolder(container, blob_path, local_path);
-      if (!ret.IsOk()) 
-      {
+      if (!ret.IsOk()) {
         return ret;
       }
     } else {
       time_t last_modified;
       bc.download_blob_to_file(container, blob_path, local_path, last_modified);
       if (errno != 0) {
-        return Status(Status::Code::INTERNAL, "download file "+ blob_path+" failed.");
+        return Status(
+            Status::Code::INTERNAL, "download file " + blob_path + " failed.");
       }
     }
     return Status::Success;
@@ -1107,8 +1104,9 @@ ASFileSystem::WriteTextFile(
           .get();
   if (!ret.success()) {
     return Status(
-        Status::Code::INTERNAL, "Failed to upload blob, Error: " + ret.error().code +
-                              ", " + ret.error().code_name);
+        Status::Code::INTERNAL,
+        "Failed to upload blob, Error: " + ret.error().code + ", " +
+            ret.error().code_name);
   }
   return Status::Success;
 }
@@ -1502,8 +1500,7 @@ S3FileSystem::LocalizeDirectory(
       if (is_subdir) {
         // Create local mirror of sub-directories
 #ifdef _WIN32
-        int status = mkdir(
-            const_cast<char*>(local_fpath.c_str()));
+        int status = mkdir(const_cast<char*>(local_fpath.c_str()));
 #else
         int status = mkdir(
             const_cast<char*>(local_fpath.c_str()),
@@ -1596,7 +1593,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #endif  // TRITON_ENABLE_S3
   }
 
-  // Check if this is an Azure Storage path 
+  // Check if this is an Azure Storage path
   if (!path.empty() && !path.rfind("as://", 0)) {
 #ifndef TRITON_ENABLE_AZURE_STORAGE
     return Status(

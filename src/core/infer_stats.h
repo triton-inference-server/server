@@ -146,11 +146,11 @@ class InferenceStatsAggregator {
 // Macros to set infer stats.
 //
 #ifdef TRITON_ENABLE_STATS
-#define INFER_STATS_SET_TIMESTAMP(TS_NS)                          \
-  {                                                               \
-    TS_NS = std::chrono::duration_cast<std::chrono::nanoseconds>( \
-             std::chrono::steady_clock::now().time_since_epoch()) \
-             .count();                                            \
+#define INFER_STATS_SET_TIMESTAMP(TS_NS)                             \
+  {                                                                  \
+    TS_NS = std::chrono::duration_cast<std::chrono::nanoseconds>(    \
+                std::chrono::steady_clock::now().time_since_epoch()) \
+                .count();                                            \
   }
 #define INFER_STATS_DECL_TIMESTAMP(TS_NS) \
   uint64_t TS_NS;                         \

@@ -74,9 +74,10 @@ LogMessage::LogMessage(const char* file, int line, uint32_t level)
   stream_ << level_name_[std::min(level, (uint32_t)Level::kINFO)]
           << std::setfill('0') << std::setw(2) << (system_time.wMonth + 1)
           << std::setw(2) << system_time.wDay << " " << std::setw(2)
-          << system_time.wHour << ':' << std::setw(2) << system_time.wMinute << ':'
-          << std::setw(2) << system_time.wSecond << "." << std::setw(6) << system_time.wMilliseconds * 1000
-          << ' ' << static_cast<uint32_t>(GetCurrentProcessId()) << ' ' << path << ':'
+          << system_time.wHour << ':' << std::setw(2) << system_time.wMinute
+          << ':' << std::setw(2) << system_time.wSecond << "." << std::setw(6)
+          << system_time.wMilliseconds * 1000 << ' '
+          << static_cast<uint32_t>(GetCurrentProcessId()) << ' ' << path << ':'
           << line << "] ";
 #else
   struct timeval tv;

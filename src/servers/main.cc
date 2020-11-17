@@ -127,39 +127,46 @@ int http_thread_cnt_ = 8;
 int optind = 1;
 const char* optarg = nullptr;
 
-struct option
-{
-  option(const char *name, int has_arg, int *flag,int val)
-  : name_(name), has_arg_(has_arg), flag_(flag), val_(val) {}
+struct option {
+  option(const char* name, int has_arg, int* flag, int val)
+      : name_(name), has_arg_(has_arg), flag_(flag), val_(val)
+  {
+  }
   const char* name_;
   int has_arg_;
   int* flag_;
   int val_;
 };
 
-bool end_of_long_opts(const struct option *longopts)
+bool
+end_of_long_opts(const struct option* longopts)
 {
-  return ((longopts->name_ == nullptr) && (longopts->has_arg_ == 0) && (longopts->flag_ == nullptr) && (longopts->val_ == 0));
+  return (
+      (longopts->name_ == nullptr) && (longopts->has_arg_ == 0) &&
+      (longopts->flag_ == nullptr) && (longopts->val_ == 0));
 }
 
-int getopt_long(int argc, char * const argv[],
-           const char *optstring,
-           const struct option *longopts, int *longindex)
+int
+getopt_long(
+    int argc, char* const argv[], const char* optstring,
+    const struct option* longopts, int* longindex)
 {
   if ((longindex != NULL) || (optind >= argc)) {
     return -1;
   }
-  const struct option * curr_longopt = longopts;
+  const struct option* curr_longopt = longopts;
   std::string argv_str = argv[optind];
   size_t found = argv_str.find_first_of("=");
-  std::string key = argv_str.substr(2, (found == std::string::npos) ? std::string::npos: (found - 2));
-  while(!end_of_long_opts(curr_longopt)) {
+  std::string key = argv_str.substr(
+      2, (found == std::string::npos) ? std::string::npos : (found - 2));
+  while (!end_of_long_opts(curr_longopt)) {
     if (key == curr_longopt->name_) {
       if (curr_longopt->has_arg_ == required_argument) {
         if (found == std::string::npos) {
           optind++;
           if (optind >= argc) {
-            std::cerr << argv[0] << ": option '" << argv_str << "' requires an argument" << std::endl;
+            std::cerr << argv[0] << ": option '" << argv_str
+                      << "' requires an argument" << std::endl;
             return '?';
           }
           optarg = argv[optind];
