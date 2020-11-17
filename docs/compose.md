@@ -77,6 +77,7 @@ $ docker build -t tritonserver_min .
 ### Triton with Specific Backends
 
 One or more of the
+[PyTorch](https://github.com/triton-inference-server/pytorch_backend),
 [TensorFlow1](https://github.com/triton-inference-server/tensorflow_backend),
 [TensorFlow2](https://github.com/triton-inference-server/tensorflow_backend),
 [ONNX
