@@ -299,15 +299,7 @@ RequestRateManager::Infer(
       // Need lock to protect the order of dispatch across worker threads.
       // This also helps in reporting the realistic latencies.
       std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
-      if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
-        ctx->options_->sequence_start_ = true;
-        InitNewSequence(seq_id);
-      }
-      if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
-        ctx->options_->sequence_end_ = true;
-      }
-
-      ctx->options_->sequence_id_ = sequence_stat_[seq_id]->seq_id_;
+      SetInferSequenceOptions(seq_id, ctx->options_);
 
       // Update the inputs if required
       if (using_json_data_) {

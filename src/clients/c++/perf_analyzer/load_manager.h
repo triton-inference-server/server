@@ -154,6 +154,8 @@ class LoadManager {
   cb::Error UpdateInputs(
       std::vector<cb::InferInput*>& inputs, int stream_index, int step_index);
 
+  void SetInferSequenceOptions(
+      const uint32_t seq_id, std::unique_ptr<cb::InferOptions>& options);
   void InitNewSequence(int sequence_id);
 
   /// Generate random sequence length based on 'offset_ratio' and

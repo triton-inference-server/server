@@ -577,6 +577,14 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test whether there was a conflict in sending sequences
+SERVER_ERROR_STRING="The previous sequence did not end before this sequence start"
+if [ $(cat $SERVER_LOG |  grep "${SERVER_ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $SERVER_LOG |  grep "${SERVER_ERROR_STRING}"
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
