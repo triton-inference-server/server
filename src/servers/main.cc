@@ -24,9 +24,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#ifndef _WIN32
 #include <getopt.h>
-#include <stdint.h>
 #include <unistd.h>
+#endif
+#include <stdint.h>
 #include <algorithm>
 #include <cctype>
 #include <condition_variable>
@@ -116,6 +118,70 @@ int grpc_infer_allocation_pool_size_ = 8;
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
 #endif  // TRITON_ENABLE_HTTP
+
+#ifdef _WIN32
+// Minimum implementation of <getopt.h> for Windows
+#define required_argument 1
+#define no_argument 2
+
+int optind = 1;
+const char* optarg = nullptr;
+
+struct option {
+  option(const char* name, int has_arg, int* flag, int val)
+      : name_(name), has_arg_(has_arg), flag_(flag), val_(val)
+  {
+  }
+  const char* name_;
+  int has_arg_;
+  int* flag_;
+  int val_;
+};
+
+bool
+end_of_long_opts(const struct option* longopts)
+{
+  return (
+      (longopts->name_ == nullptr) && (longopts->has_arg_ == 0) &&
+      (longopts->flag_ == nullptr) && (longopts->val_ == 0));
+}
+
+int
+getopt_long(
+    int argc, char* const argv[], const char* optstring,
+    const struct option* longopts, int* longindex)
+{
+  if ((longindex != NULL) || (optind >= argc)) {
+    return -1;
+  }
+  const struct option* curr_longopt = longopts;
+  std::string argv_str = argv[optind];
+  size_t found = argv_str.find_first_of("=");
+  std::string key = argv_str.substr(
+      2, (found == std::string::npos) ? std::string::npos : (found - 2));
+  while (!end_of_long_opts(curr_longopt)) {
+    if (key == curr_longopt->name_) {
+      if (curr_longopt->has_arg_ == required_argument) {
+        if (found == std::string::npos) {
+          optind++;
+          if (optind >= argc) {
+            std::cerr << argv[0] << ": option '" << argv_str
+                      << "' requires an argument" << std::endl;
+            return '?';
+          }
+          optarg = argv[optind];
+        } else {
+          optarg = (argv[optind] + found + 1);
+        }
+      }
+      optind++;
+      return curr_longopt->val_;
+    }
+    curr_longopt++;
+  }
+  return -1;
+}
+#endif
 
 // Command-line options
 enum OptionId {

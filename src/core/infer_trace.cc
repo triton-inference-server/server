@@ -38,7 +38,8 @@ void
 InferenceTrace::Release(std::unique_ptr<InferenceTrace>&& trace)
 {
   void* userp = trace->userp_;
-  trace->release_fn_(
+  auto& release_fn = trace->release_fn_;
+  release_fn(
       reinterpret_cast<TRITONSERVER_InferenceTrace*>(trace.release()), userp);
 }
 
