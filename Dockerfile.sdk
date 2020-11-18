@@ -60,7 +60,8 @@ RUN apt-get update && \
             vim \
             wget && \
     pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade grpcio-tools
+    pip3 install --upgrade grpcio-tools && \
+    pip3 install --upgrade pip
 
 # Client build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
@@ -118,7 +119,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
-ARG TRITON_MODEL_ANALYZER_REPO "https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
+ARG TRITON_MODEL_ANALYZER_REPO="https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
 RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 ENV PATH /workspace/install/bin:${PATH}
