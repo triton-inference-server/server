@@ -52,9 +52,10 @@ MULTI_SERVER=multi_server
 CLIENT_LOG=$MULTI_SERVER
 MULTI_SERVER=./$MULTI_SERVER
 BACKENDS=(graphdef onnx plan)
-THREAD_COUNT=128
+THREAD_COUNT=64
 
-for (( I=1; I<${THREAD_COUNT}+1; I++ )); do
+EXTRA_ARGS=" -t ${THREAD_COUNT}"
+for (( I=1; I<${THREAD_COUNT}+2; I++ )); do
     BACKEND_INDEX=$(((I % 3) - 1))
     full=${BACKENDS[$BACKEND_INDEX]}_float32_float32_float32
     mkdir -p ${MODELSDIR}${I}/simple${I}/1 && \
@@ -63,23 +64,24 @@ for (( I=1; I<${THREAD_COUNT}+1; I++ )); do
         (cd ${MODELSDIR}${I}/simple${I} && \
                 sed -i "s/^name:.*/name: \"simple${I}\"/" config.pbtxt && \
                 sed -i "s/label_filename:.*//" config.pbtxt)
+    EXTRA_ARGS="${EXTRA_ARGS} -r ${MODELSDIR}${I}"
 done
 
 set +e
 
 # No memory type enforcement
-$MULTI_SERVER -r ${MODELSDIR}1 -r ${MODELSDIR}2 -r ${MODELSDIR}3 -t $THREAD_COUNT >>$CLIENT_LOG.$full.log 2>&1
+$MULTI_SERVER ${EXTRA_ARGS} >>$CLIENT_LOG.log 2>&1
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.$full.log
+    cat $CLIENT_LOG.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
 # Enforce I/O to be in specific memory type
 for MEM_TYPE in system pinned gpu ; do
-    $MULTI_SERVER -r ${MODELSDIR}1 -r ${MODELSDIR}2 -r ${MODELSDIR}3 -m $MEM_TYPE -t $THREAD_COUNT >>$CLIENT_LOG.$full.$MEM_TYPE.log 2>&1
+    $MULTI_SERVER -m ${MEM_TYPE} ${EXTRA_ARGS} >>$CLIENT_LOG.$MEM_TYPE.log 2>&1
     if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.$full.$MEM_TYPE.log
+        cat $CLIENT_LOG.$MEM_TYPE.log
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi

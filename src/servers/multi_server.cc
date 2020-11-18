@@ -85,6 +85,7 @@ Usage(char** argv, const std::string& msg = std::string())
             << " will be based on the model's preferred type." << std::endl;
   std::cerr << "\t-v Enable verbose logging" << std::endl;
   std::cerr << "\t-r [model repository absolute path]" << std::endl;
+  std::cerr << "\t-t Thread Count" << std::endl;
 
   exit(1);
 }
@@ -785,19 +786,11 @@ PrintModelStats(
       "deleting model stats message");
 }
 
-static volatile std::atomic<int> counter(0);
-static std::mutex mutex;
-std::condition_variable cv;
-
 void
 CreateAndRunTritonserverInstance(
     std::vector<std::string> model_repository_paths, size_t thread_id,
     bool verbose_level)
 {
-  std::unique_lock<std::mutex> lock(mutex);
-  counter++;
-  cv.wait(lock);
-
   TRITONSERVER_ServerOptions* server_options = nullptr;
 
   SetServerOptions(
@@ -878,6 +871,25 @@ CreateAndRunTritonserverInstance(
   }
 }
 
+static volatile std::atomic<int> counter(0);
+static std::mutex mutex;
+std::condition_variable cv;
+
+void
+RepeatedlyCreateAndRunInstance(
+    std::vector<std::string> model_repository_paths, size_t thread_id,
+    bool verbose_level)
+{
+  std::unique_lock<std::mutex> lock(mutex);
+  counter++;
+  cv.wait(lock);
+
+  for (size_t i = 0; i < 2; i++) {
+    CreateAndRunTritonserverInstance(
+        model_repository_paths, thread_id, verbose_level);
+  }
+}
+
 int
 main(int argc, char** argv)
 {
@@ -887,7 +899,7 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vm:r:t")) != -1) {
+  while ((opt = getopt(argc, argv, "vm:r:t:")) != -1) {
     switch (opt) {
       case 'm': {
         enforce_memory_type = true;
@@ -954,8 +966,8 @@ main(int argc, char** argv)
   std::thread tritonservers[thread_count];
   for (int i = 0; i < thread_count; i++) {
     tritonservers[i] = std::thread(
-        &CreateAndRunTritonserverInstance, model_repository_paths,
-        size_t(i + 1), verbose_level);
+        &RepeatedlyCreateAndRunInstance, model_repository_paths, size_t(i + 1),
+        verbose_level);
   }
   while (counter < thread_count) {
     usleep(5000);
