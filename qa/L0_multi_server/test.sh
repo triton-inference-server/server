@@ -52,7 +52,7 @@ MULTI_SERVER=multi_server
 CLIENT_LOG=$MULTI_SERVER
 MULTI_SERVER=./$MULTI_SERVER
 BACKENDS=(graphdef onnx plan)
-THREAD_COUNT=64
+THREAD_COUNT=32
 
 EXTRA_ARGS=" -t ${THREAD_COUNT}"
 for (( I=1; I<${THREAD_COUNT}+2; I++ )); do
@@ -76,16 +76,6 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-
-# Enforce I/O to be in specific memory type
-for MEM_TYPE in system pinned gpu ; do
-    $MULTI_SERVER -m ${MEM_TYPE} ${EXTRA_ARGS} >>$CLIENT_LOG.$MEM_TYPE.log 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.$MEM_TYPE.log
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-done
 
 set -e
 

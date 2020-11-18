@@ -884,7 +884,7 @@ RepeatedlyCreateAndRunInstance(
   counter++;
   cv.wait(lock);
 
-  for (size_t i = 0; i < 4; i++) {
+  for (size_t i = 0; i < 10; i++) {
     CreateAndRunTritonserverInstance(
         model_repository_paths, thread_id, verbose_level);
   }
@@ -970,7 +970,7 @@ main(int argc, char** argv)
         verbose_level);
   }
   while (counter < thread_count) {
-    usleep(5000);
+    usleep(1000);
   }
 
   {
