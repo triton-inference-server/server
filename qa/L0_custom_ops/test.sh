@@ -138,7 +138,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # ONNX
-mkdir -p onnx_custom_ops/custom_op/1 && \
+rm -rf onnx_custom_ops && \
+    mkdir -p onnx_custom_ops/custom_op/1 && \
     cp custom_op_test.onnx onnx_custom_ops/custom_op/1/model.onnx
 
 touch onnx_custom_ops/custom_op/config.pbtxt

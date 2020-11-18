@@ -148,7 +148,9 @@ is currently no way to handle it.
 Starting with the 20.07 release of Triton the [TorchVision
 operations](https://github.com/pytorch/vision) will be included with
 the PyTorch backend and hence they do not have to be explicitly added
-as custom operations.
+as custom operations. The Pytorch shared libraries must be available
+for the TorchVision custom operations to be loaded. To do this,
+we must add /opt/tritonserver/backends/pytorch to the LD_LIBRARY_PATH.
 
 When building the custom operations shared library it is important to
 use the same version of PyTorch as is being used in Triton. You can
