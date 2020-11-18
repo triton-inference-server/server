@@ -26,8 +26,8 @@
 
 #include "src/clients/c++/perf_analyzer/client_backend/client_backend.h"
 #include "src/clients/c++/perf_analyzer/client_backend/tensorflow_serving/tfserve_client_backend.h"
+#include "src/clients/c++/perf_analyzer/client_backend/torchserve/torchserve_client_backend.h"
 #include "src/clients/c++/perf_analyzer/client_backend/triton/triton_client_backend.h"
-
 
 namespace perfanalyzer { namespace clientbackend {
 
@@ -107,6 +107,9 @@ ClientBackend::Create(
         url, protocol, http_headers, verbose, &local_backend));
   } else if (kind == TENSORFLOW_SERVING) {
     RETURN_IF_CB_ERROR(TFServeClientBackend::Create(
+        url, protocol, http_headers, verbose, &local_backend));
+  } else if (kind == TORCHSERVE) {
+    RETURN_IF_CB_ERROR(TorchServeClientBackend::Create(
         url, protocol, http_headers, verbose, &local_backend));
   } else {
     return Error("unsupported client backend requested");
@@ -294,6 +297,9 @@ InferInput::Create(
   } else if (kind == TENSORFLOW_SERVING) {
     RETURN_IF_CB_ERROR(
         TFServeInferInput::Create(infer_input, name, dims, datatype));
+  } else if (kind == TORCHSERVE) {
+    RETURN_IF_CB_ERROR(
+        TorchServeInferInput::Create(infer_input, name, dims, datatype));
   } else {
     return Error(
         "unsupported client backend provided to create InferInput object");

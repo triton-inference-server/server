@@ -85,6 +85,14 @@ compile_proto(1 "${CMAKE_BINARY_DIR}/protos" "${CMAKE_CURRENT_BINARY_DIR}/compil
 # Including compiled files.
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/compiled)
 
+if(${TRITON_CURL_WITHOUT_CONFIG})
+  find_package(CURL REQUIRED)
+else()
+  find_package(CURL CONFIG REQUIRED)
+endif() # TRITON_CURL_WITHOUT_CONFIG
+message(STATUS "Using curl ${CURL_VERSION}")
+add_definitions(-DCURL_STATICLIB)
+
 set(
   CLIENT_BACKEND_SRCS
   client_backend.cc
@@ -95,6 +103,9 @@ set(
   tensorflow_serving/grpc_client.cc
   ${PB_SOURCES}
   ${PB_GRPC_SOURCES}
+  torchserve/torchserve_client_backend.cc
+  torchserve/torchserve_infer_input.cc
+  torchserve/http_client.cc
 )
 
 set(
@@ -107,6 +118,9 @@ set(
   tensorflow_serving/grpc_client.h
   ${PB_HEADERS} 
   ${PB_GRPC_HEADERS} 
+  torchserve/torchserve_client_backend.h
+  torchserve/torchserve_infer_input.h
+  torchserve/http_client.h
 )
 
 add_library(
@@ -123,7 +137,8 @@ target_link_libraries(
   PRIVATE TRITON::httpclient_static
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
-  PUBLIC protobuf::libprotobuf
+  PRIVATE protobuf::libprotobuf
+  PRIVATE CURL::libcurl
 
 )
 
