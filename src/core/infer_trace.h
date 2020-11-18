@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <time.h>
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include "src/core/constants.h"
 #include "src/core/status.h"
@@ -73,9 +73,10 @@ class InferenceTrace {
   // Report trace activity at the current time.
   void ReportNow(const TRITONSERVER_InferenceTraceActivity activity)
   {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    Report(activity, TIMESPEC_TO_NANOS(ts));
+    Report(
+        activity, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      std::chrono::steady_clock::now().time_since_epoch())
+                      .count());
   }
 
   // Release the trace. Call the trace release callback and transfer

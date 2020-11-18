@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <sys/time.h>
 #include <atomic>
 #include <condition_variable>
 #include <deque>

@@ -26,11 +26,11 @@
 
 #include "src/core/dynamic_batch_scheduler.h"
 
+#ifndef _WIN32
 #include <sys/resource.h>
 #include <sys/syscall.h>
-#include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
+#endif
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
@@ -225,6 +225,7 @@ DynamicBatchScheduler::SchedulerThread(
     const std::shared_ptr<std::atomic<bool>>& rthread_exit,
     std::promise<bool>* is_initialized)
 {
+#ifndef _WIN32
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
                    << " at nice " << nice << "...";
@@ -233,6 +234,10 @@ DynamicBatchScheduler::SchedulerThread(
                    << " at default nice (requested nice " << nice
                    << " failed)...";
   }
+#else
+  LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
+                   << " at default nice...";
+#endif
 
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
@@ -533,9 +538,9 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
 
   // Obatin the age of the oldest pending request to compare with the maximum
   // batch queuing delay
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+  uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+             .count();
   uint64_t delay_ns = now_ns - queue_.OldestEnqueueTime();
   bool delay_is_exceeded = (delay_ns >= pending_batch_delay_ns_);
 

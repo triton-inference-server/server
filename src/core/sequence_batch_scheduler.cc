@@ -26,10 +26,11 @@
 
 #include "src/core/sequence_batch_scheduler.h"
 
+#ifndef _WIN32
 #include <sys/resource.h>
 #include <sys/syscall.h>
-#include <sys/types.h>
 #include <unistd.h>
+#endif
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
@@ -381,9 +382,9 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   // sequence, and if it is it will release the sequence slot (if any)
   // allocated to that sequence.
   {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    uint64_t now_us = TIMESPEC_TO_NANOS(now) / 1000;
+    uint64_t now_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
     correlation_id_timestamps_[correlation_id] = now_us;
   }
 
@@ -560,6 +561,7 @@ SequenceBatchScheduler::DelayScheduler(
 void
 SequenceBatchScheduler::ReaperThread(const int nice)
 {
+#ifndef _WIN32
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting sequence-batch reaper thread at nice " << nice
                    << "...";
@@ -568,6 +570,9 @@ SequenceBatchScheduler::ReaperThread(const int nice)
                       "(requested nice "
                    << nice << " failed)...";
   }
+#else
+  LOG_VERBOSE(1) << "Starting sequence-batch reaper thread at default nice...";
+#endif
 
   const uint64_t backlog_idle_wait_microseconds = 50 * 1000;
 
@@ -578,9 +583,9 @@ SequenceBatchScheduler::ReaperThread(const int nice)
     {
       std::unique_lock<std::mutex> lock(mu_);
 
-      struct timespec now;
-      clock_gettime(CLOCK_MONOTONIC, &now);
-      uint64_t now_us = TIMESPEC_TO_NANOS(now) / 1000;
+      uint64_t now_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count();
 
       for (auto cid_itr = correlation_id_timestamps_.cbegin();
            cid_itr != correlation_id_timestamps_.cend();) {
@@ -909,6 +914,7 @@ void
 DirectSequenceBatch::SchedulerThread(
     const int nice, std::promise<bool>* is_initialized)
 {
+#ifndef _WIN32
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting Direct sequence-batch scheduler thread "
                    << batcher_idx_ << " at nice " << nice << "...";
@@ -917,6 +923,10 @@ DirectSequenceBatch::SchedulerThread(
                    << batcher_idx_ << " at default nice (requested nice "
                    << nice << " failed)...";
   }
+#else
+  LOG_VERBOSE(1) << "Starting Direct sequence-batch scheduler thread "
+                   << batcher_idx_ << " at default nice...";
+#endif
 
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
@@ -1071,9 +1081,10 @@ DirectSequenceBatch::SchedulerThread(
             // batch, execute now if queuing delay is exceeded or the batch size
             // is large enough. Otherwise create a timer to wakeup a thread to
             // check again at the maximum allowed delay.
-            struct timespec now;
-            clock_gettime(CLOCK_MONOTONIC, &now);
-            uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+            uint64_t now_ns =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch())
+                    .count();
             uint64_t current_batch_delay_ns =
                 (now_ns - earliest_enqueue_time_ns);
             if ((current_batch_delay_ns > pending_batch_delay_ns_) ||

@@ -114,7 +114,9 @@ endif() # TRITON_ENABLE_GPU
 if(${TRITON_ENABLE_GCS})
   find_package(storage_client REQUIRED)
   message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
+if (NOT WIN32)
   set_source_files_properties(filesystem.cc PROPERTIES COMPILE_FLAGS -Wno-missing-field-initializers)
+endif() # NOT WIN32
 endif() # TRITON_ENABLE_GCS
 
 if(${TRITON_ENABLE_S3})

@@ -26,6 +26,8 @@
 
 cmake_minimum_required (VERSION 3.18)
 
+find_library(RE2_LIBRARY NAMES re2)
+
 #
 # grpc endpoint
 #
@@ -139,8 +141,8 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
     PRIVATE ${LIBEVENT_LIBRARIES}
     PRIVATE libevhtp::evhtp
     PRIVATE protobuf::libprotobuf
-    PRIVATE -lre2
-    PRIVATE -lb64
+    PRIVATE ${RE2_LIBRARY}
+    PRIVATE b64
   )
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
 
@@ -226,13 +228,18 @@ target_link_libraries(
   main
   ${HTTP_ENDPOINT_LIBRARIES}
   ${GRPC_ENDPOINT_LIBRARIES}
-  PRIVATE rt
   ${TRACING_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE triton-common-json
   PRIVATE triton-core-serverapi
   PRIVATE tritonserver
 )
+if (NOT WIN32)
+target_link_libraries(
+  main
+  PRIVATE rt
+)
+endif()
 if(${TRITON_ENABLE_GPU})
 target_link_libraries(
   main
@@ -244,6 +251,7 @@ install(
   RUNTIME DESTINATION bin
 )
 
+if (NOT WIN32)
 #
 # simple
 #
@@ -282,8 +290,7 @@ if(${TRITON_ENABLE_GPU})
 target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   simple
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
+  PUBLIC ${CUDA_nvml_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRITON_ENABLE_GPU
@@ -365,8 +372,7 @@ set_target_properties(
 )
 target_link_libraries(
   memory_alloc
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
+  PUBLIC ${CUDA_nvml_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE tritonserver
@@ -377,6 +383,7 @@ install(
   RUNTIME DESTINATION bin
 )
 endif() # TRITON_ENABLE_GPU
+endif() # NOT WIN32
 
 #
 # libtritonserver.so
@@ -417,6 +424,17 @@ add_library(
   ${CUDA_OBJS}
   ${BACKEND_OBJS}
 )
+# FIXME need to check how Windows exposes symbols
+if (WIN32)
+set_target_properties(
+  tritonserver
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch"
+)
+else ()
 set_target_properties(
   tritonserver
   PROPERTIES
@@ -429,7 +447,11 @@ set_target_properties(
 )
 target_link_libraries(
   tritonserver
-  PRIVATE -ldl
+  PRIVATE dl
+)
+endif()
+target_link_libraries(
+  tritonserver
   PRIVATE triton-core-backendapi
   PRIVATE triton-core-serverapi
   PRIVATE triton-common-json
@@ -439,10 +461,12 @@ target_link_libraries(
 )
 
 if(${TRITON_ENABLE_TENSORRT})
+  find_library(NVINFER_LIBRARY NAMES nvinfer)
+  find_library(NVINFER_PLUGIN_LIBRARY NAMES nvinfer_plugin)
   target_link_libraries(
     tritonserver
-    PUBLIC -lnvinfer
-    PUBLIC -lnvinfer_plugin
+    PUBLIC ${NVINFER_LIBRARY}
+    PUBLIC ${NVINFER_PLUGIN_LIBRARY}
   )
 endif() # TRITON_ENABLE_TENSORRT
 
@@ -470,7 +494,7 @@ if(${TRITON_ENABLE_S3})
   target_link_libraries(
     tritonserver
     PRIVATE aws-cpp-sdk-s3
-    PRIVATE -lre2
+    PRIVATE ${RE2_LIBRARY}
   )
 endif() # TRITON_ENABLE_S3
 
@@ -486,13 +510,12 @@ if(${TRITON_ENABLE_AZURE_STORAGE})
 endif() # TRITON_ENABLE_AZURE_STORAGE
 
 if(${TRITON_ENABLE_GPU})
+  find_library(CNMEM_LIBRARY NAMES cnmem PATHS ${CNMEM_PATH}/lib)
   target_link_libraries(
     tritonserver
-    PUBLIC -L/usr/local/cuda/lib64/stubs
-    PUBLIC -lnvidia-ml
+    PUBLIC ${CUDA_nvml_LIBRARY}
     PRIVATE ${CUDA_LIBRARIES}
-    PRIVATE -L${CNMEM_PATH}/lib
-    PRIVATE -lcnmem
+    PRIVATE ${CNMEM_LIBRARY}
   )
 endif() # TRITON_ENABLE_GPU
 
