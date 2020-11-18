@@ -788,6 +788,12 @@ ModelRepositoryManager::BackendLifeCycle::Load(
       backend_info->state_ = ModelReadyState::LOADING;
       backend_info->state_reason_.clear();
       {
+        // FIXME WAR for glibc bug when spawning threads too
+        // quickly. https://sourceware.org/bugzilla/show_bug.cgi?id=19329
+        // We should instead use a thread-pool here with the number of
+        // threads chosen to provide the required amount of load
+        // parallelism. DLIS-1833.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         std::thread worker(
             &ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend,
             this, model_name, version, backend_info);
