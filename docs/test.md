@@ -61,8 +61,8 @@ image will contain Triton, the QA tests, and all the dependencies
 needed to run the QA tests. First do a [Docker image
 build](build.md#building-triton-with-docker) to produce the
 *tritonserver_build* and *tritonserver* images. Then build the
-*tritonserver_client* image that contains the client libraries and
-examples. Then build the actual QA image.
+*tritonserver_sdk* image that contains the client libraries,
+model analyzer, and examples. Then build the actual QA image.
 
 ```
 $ docker build -t tritonserver_qa -f Dockerfile.QA .
