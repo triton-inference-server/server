@@ -85,7 +85,8 @@ Usage(char** argv, const std::string& msg = std::string())
             << " will be based on the model's preferred type." << std::endl;
   std::cerr << "\t-v Enable verbose logging" << std::endl;
   std::cerr << "\t-r [model repository absolute path]" << std::endl;
-  std::cerr << "\t-t Thread Count" << std::endl;
+  std::cerr << "\t-t Thread count." << std::endl;
+  std::cerr << "\t-l Number of loops to run in each thread." << std::endl;
 
   exit(1);
 }
@@ -878,13 +879,13 @@ std::condition_variable cv;
 void
 RepeatedlyCreateAndRunInstance(
     std::vector<std::string> model_repository_paths, size_t thread_id,
-    bool verbose_level)
+    size_t loops, bool verbose_level)
 {
   std::unique_lock<std::mutex> lock(mutex);
   counter++;
   cv.wait(lock);
 
-  for (size_t i = 0; i < 10; i++) {
+  for (size_t i = 0; i < loops; i++) {
     CreateAndRunTritonserverInstance(
         model_repository_paths, thread_id, verbose_level);
   }
@@ -896,10 +897,11 @@ main(int argc, char** argv)
   std::vector<std::string> model_repository_paths;
   int verbose_level = 0;
   int thread_count = 2;
+  int loops = 1;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vm:r:t:")) != -1) {
+  while ((opt = getopt(argc, argv, "vm:r:t:l:")) != -1) {
     switch (opt) {
       case 'm': {
         enforce_memory_type = true;
@@ -923,6 +925,9 @@ main(int argc, char** argv)
       case 't':
         thread_count = std::stoi(optarg);
         break;
+      case 'l':
+        loops = std::stoi(optarg);
+        break;
       case 'v':
         verbose_level = 1;
         break;
@@ -932,7 +937,15 @@ main(int argc, char** argv)
     }
   }
 
-  // model repository paths must be 'thread_count' - 1
+  if ((thread_count < 1) && (loops < 1)) {
+    Usage(argv, "thread_count and loops must be > 1");
+  }
+
+  if (repo_path.empty()) {
+    Usage(argv, "model repository paths must not be empty");
+  }
+
+  // model repository paths must be 'thread_count' + 1
   if (int(model_repository_paths.size() - 1) != thread_count) {
     Usage(
         argv, "-r must be used to specify " + std::to_string(thread_count + 1) +
@@ -967,7 +980,7 @@ main(int argc, char** argv)
   for (int i = 0; i < thread_count; i++) {
     tritonservers[i] = std::thread(
         &RepeatedlyCreateAndRunInstance, model_repository_paths, size_t(i + 1),
-        verbose_level);
+        size_t(loops), verbose_level);
   }
   while (counter < thread_count) {
     usleep(1000);
