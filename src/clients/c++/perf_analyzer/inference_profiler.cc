@@ -729,7 +729,7 @@ InferenceProfiler::SummarizeClientStat(
   summary.on_sequence_model =
       ((parser_->SchedulerType() == ModelParser::SEQUENCE) ||
        (parser_->SchedulerType() == ModelParser::ENSEMBLE_SEQUENCE));
-  summary.batch_size = manager_->BatchSize();
+  summary.batch_size = std::max(manager_->BatchSize(), (size_t)1);
   summary.client_stats.request_count = valid_request_count;
   summary.client_stats.sequence_count = valid_sequence_count;
   summary.client_stats.delayed_request_count = delayed_request_count;
