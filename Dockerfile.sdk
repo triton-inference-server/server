@@ -29,11 +29,15 @@ ARG BASE_IMAGE=nvidia/cuda:11.1-devel-ubuntu18.04
 
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
+ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 
 FROM ${BASE_IMAGE}
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
+
+# DCGM version to install for Model Analyzer
+ARG DCGM_VERSION=2.0.13
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -56,7 +60,8 @@ RUN apt-get update && \
             vim \
             wget && \
     pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade grpcio-tools
+    pip3 install --upgrade grpcio-tools && \
+    pip3 install --upgrade pip
 
 # Client build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
@@ -108,6 +113,15 @@ RUN pip3 install --upgrade numpy pillow && \
     "tritonclient-*-manylinux1_x86_64.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
+# Install DCGM
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
+    dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb
 
-ENV PATH //workspace/install/bin:${PATH}
+# Install Model Analyzer
+ARG TRITON_MODEL_ANALYZER_REPO_TAG
+ARG TRITON_MODEL_ANALYZER_REPO="https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
+RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
+
+ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
+
