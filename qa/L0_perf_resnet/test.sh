@@ -175,3 +175,20 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
                 bash -x run_test.sh
     done
 done
+
+# TensorFlow Serving does not support multiple instances.
+# Need to run the tensorflow model with a single instance
+# for fair comparison.
+MODEL_NAME=${TF_MODEL_NAME}
+STATIC_BATCH=128
+INSTANCE_CNT=1
+CONCURRENCY=4
+FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
+MODEL_NAME=${MODEL_NAME} \
+    MODEL_FRAMEWORK=${FRAMEWORK} \
+    MODEL_PATH="$REPO/${MODEL_NAME}" \
+    STATIC_BATCH=${STATIC_BATCH} \
+    PERF_CLIENT_PROTOCOL="grpc" \
+    INSTANCE_CNT=${INSTANCE_CNT} \
+    CONCURRENCY=${CONCURRENCY} \
+    bash -x run_test.sh
