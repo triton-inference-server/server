@@ -941,10 +941,6 @@ main(int argc, char** argv)
     Usage(argv, "thread_count and loops must be > 1");
   }
 
-  if (repo_path.empty()) {
-    Usage(argv, "model repository paths must not be empty");
-  }
-
   // model repository paths must be 'thread_count' + 1
   if (int(model_repository_paths.size() - 1) != thread_count) {
     Usage(
@@ -983,7 +979,7 @@ main(int argc, char** argv)
         size_t(loops), verbose_level);
   }
   while (counter < thread_count) {
-    usleep(1000);
+    usleep(50);
   }
 
   {

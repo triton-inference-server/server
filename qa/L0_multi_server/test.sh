@@ -53,8 +53,9 @@ CLIENT_LOG=$MULTI_SERVER
 MULTI_SERVER=./$MULTI_SERVER
 BACKENDS=(graphdef onnx plan)
 THREAD_COUNT=32
+LOOPS=32
 
-EXTRA_ARGS=" -t ${THREAD_COUNT}"
+EXTRA_ARGS=" -t ${THREAD_COUNT} -l ${LOOPS}"
 for (( I=1; I<${THREAD_COUNT}+2; I++ )); do
     BACKEND_INDEX=$(((I % 3) - 1))
     full=${BACKENDS[$BACKEND_INDEX]}_float32_float32_float32
