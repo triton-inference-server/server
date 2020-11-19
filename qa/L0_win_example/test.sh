@@ -31,6 +31,7 @@ INFER_TEST=simple_grpc_infer_client.py
 
 SERVER=/mnt/c/tmp/server_build/server/build/server/install/bin/tritonserver.exe
 SERVER_ARGS="--model-repository=C:/tmp/server_build/models --backend-directory=C:/tmp/server_build/backends"
+SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 RET=0
@@ -43,6 +44,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 sleep 10
+cat $SERVER_LOG
 
 set +e
 
