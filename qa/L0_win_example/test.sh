@@ -35,12 +35,14 @@ source ../common/util.sh
 
 RET=0
 
-run_server
+run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
 fi
+
+sleep 10
 
 set +e
 
