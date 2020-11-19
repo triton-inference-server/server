@@ -1096,7 +1096,6 @@ main(int argc, char** argv)
       return 1;
     } else if (!using_batch_size) {
       batch_size = 0;
-      return 1;
     }
   } else if (kind == cb::TORCHSERVE) {
     if (user_data.empty()) {
