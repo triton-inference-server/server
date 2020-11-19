@@ -121,22 +121,16 @@ follow the instructions in the
 [pytorch/extension-script](https://github.com/pytorch/extension-script)
 repository and your Torchscript custom operations are compiled into
 libpytcustom.so, starting Triton with the following command makes
-those operations available to all PyTorch models.
+those operations available to all PyTorch models. Since all Pytorch
+custom operations depend on one or more PyTorch shared libraries
+that must be available to the custom shared library when it is
+loading. In practice this means that you must make sure that
+/opt/tritonserver/backends/pytorch is on the library path while
+launching the server. There are several ways to control the library path
+and a common one is to use the LD_LIBRARY_PATH.
 
 ```bash
-$ LD_PRELOAD=libpytcustom.so tritonserver --model-repository=/tmp/models ...
-```
-
-All PyTorch custom operations depend on one or more PyTorch shared
-libraries that must be available to the custom shared library when it
-is loading. In practice this means that you must make sure that
-/opt/tritonserver/backends/pytorch is on the library path before issuing
-the above command. There are several ways to control the library path
-and a common one is to use the LD_LIBRARY_PATH. You can set
-LD_LIBRARY_PATH in the "docker run" command or inside the container.
-
-```bash
-$ export LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH
+$ LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH LD_PRELOAD=libpytcustom.so tritonserver --model-repository=/tmp/models ...
 ```
 
 A limitation of this approach is that the custom operations must be
