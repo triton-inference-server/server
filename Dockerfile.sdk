@@ -69,7 +69,8 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
       tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
     apt-get update && \
-    apt-get install -y --no-install-recommends cmake && \
+    apt-get install -y --no-install-recommends \
+      cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1 && \
     cmake --version
 
 # Build expects "python" executable (not python3).
@@ -124,4 +125,3 @@ RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
-
