@@ -385,7 +385,7 @@ WORKDIR /workspace
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:/workspace/cmake-3.14.3-Linux-x86_64/bin:/opt/miniconda/bin:$PATH
 ENV LD_LIBRARY_PATH /opt/miniconda/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 
-# The Onnx Runtime dockerfile is the collection of steps in 
+# The Onnx Runtime dockerfile is the collection of steps in
 # https://github.com/microsoft/onnxruntime/tree/v1.5.1/dockerfiles
 
 # Install common dependencies
@@ -414,7 +414,7 @@ ENV LANG en_US.UTF-8
 RUN wget https://apt.repos.intel.com/openvino/2020/GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
     apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2020 && rm GPG-PUB-KEY-INTEL-OPENVINO-2020 && \
     cd /etc/apt/sources.list.d && \
-    echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \ 
+    echo "deb https://apt.repos.intel.com/openvino/2020 all main">intel-openvino-2020.list && \
     apt update && \
     apt -y install intel-openvino-dev-ubuntu18-${ONNX_RUNTIME_OPENVINO_VERSION}.287
 # Text replacement to skip installing CMake via distribution
@@ -502,7 +502,7 @@ RUN apt-get update && \
             wget \
             zlib1g-dev \
             pkg-config \
-            uuid-dev && \       
+            uuid-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # grpcio-tools grpcio-channelz are needed by python backend
@@ -698,23 +698,29 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
     [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
     [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 
-# libcurl is needed for GCS
-#
-# FIXME python3, python3-pip and the pip installs should only be
-# installed for python backend and onnxruntime backend (and then only
-# if openvino is enabled)
+# Common dependencies. FIXME (can any of these be conditional? For
+# example libcurl only needed for GCS?)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
          libb64-0d \
          libcurl4-openssl-dev \
-         libre2-4 \
+         libre2-4 && \
+    rm -rf /var/lib/apt/lists/*
+'''
+    # Add dependencies needed for python backend
+    if 'python' in backends:
+        df += '''
+# python3, python3-pip and some pip installs required for the python backend
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
          python3 \
          python3-pip && \
     pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools grpcio-channelz numpy && \
     rm -rf /var/lib/apt/lists/*
-
+'''
+    df += '''
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 LICENSE .
