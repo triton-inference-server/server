@@ -148,8 +148,10 @@ void
 Metrics::EnableGPUMetrics()
 {
   auto singleton = GetSingleton();
+
+  // Ensure thread-safe enabling of GPU Metrics
+  std::lock_guard<std::mutex> lock(singleton->gpu_metrics_enabling_);
   if (singleton->gpu_metrics_enabled_) {
-    LOG_WARNING << "GPU metrics already enabled";
     return;
   }
 
