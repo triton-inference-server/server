@@ -28,6 +28,7 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -78,6 +79,7 @@ class CudaMemoryManager {
   CudaMemoryManager(bool has_allocation) : has_allocation_(has_allocation) {}
   bool has_allocation_;
   static std::unique_ptr<CudaMemoryManager> instance_;
+  static std::mutex instance_mu_;
 };
 
 }}  // namespace nvidia::inferenceserver
