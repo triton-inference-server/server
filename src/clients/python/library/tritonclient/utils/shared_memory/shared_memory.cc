@@ -136,13 +136,13 @@ SharedMemoryRegionDestroy(void* shm_handle)
   size_t byte_size = handle->byte_size_;
   int status = munmap(shm_addr, byte_size);
   if (status == -1) {
-    return -5;
+    return -6;
   }
 
   std::string shm_key = handle->shm_key_.c_str();
   int shm_fd = shm_unlink(shm_key.c_str());
   if (shm_fd == -1) {
-    return -6;
+    return -5;
   }
 
   return 0;
