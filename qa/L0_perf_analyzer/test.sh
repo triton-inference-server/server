@@ -41,6 +41,7 @@ CLIENT_LOG="./perf_analyzer.log"
 PERF_ANALYZER=../clients/perf_analyzer
 
 DATADIR=`pwd`/models
+ENSEMBLE_DATADIR=`pwd`/ensemble_model_repository
 TESTDATADIR=`pwd`/test_data
 
 INT_JSONDATAFILE=`pwd`/json_input_data_files/int_data.json
@@ -53,7 +54,7 @@ SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
 IMAGE_JSONDATAFILE=`pwd`/json_input_data_files/image_data.json
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR} --model-repository=ensemble_model_repository"
+SERVER_ARGS="--model-repository=${DATADIR} --model-repository=${ENSEMBLE_DATADIR}"
 SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
@@ -61,7 +62,7 @@ ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
-rm -rf $DATADIR $TESTDATADIR
+rm -rf $DATADIR $TESTDATADIR $ENSEMBLE_DATADIR
 
 mkdir -p $DATADIR
 # Copy fixed-shape models
@@ -114,7 +115,49 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Sanity check on measurements are not all zero
+
+# Test whether there was a conflict in sending sequences. This should
+# be done before other testing as the server might emit this warning
+# in certain test cases that are expected to raise this warning
+SERVER_ERROR_STRING="The previous sequence did not end before this sequence start"
+
+# Testing with ensemble and sequential model variants
+$PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
+--input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed: Sequence conflict when maintaining concurrency\n***"
+    RET=1
+fi
+
+$PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --streaming \
+--input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ $(cat $SERVER_LOG |  grep "${SERVER_ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $SERVER_LOG |  grep "${SERVER_ERROR_STRING}"
+    echo -e "\n***\n*** Test Failed: Sequence conflict\n***"
+    RET=1
+fi
 
 for PROTOCOL in grpc http; do
 
@@ -539,19 +582,6 @@ for PROTOCOL in grpc http; do
 done
 
 set +e
-# Testing with ensemble and sequential model variants
-$PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
---input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
 
 # Fix me: Uncomment after fixing DLIS-1054
 ## Testing with very large concurrencies and large dataset

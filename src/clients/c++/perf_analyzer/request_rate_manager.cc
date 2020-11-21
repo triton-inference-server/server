@@ -299,32 +299,26 @@ RequestRateManager::Infer(
       // Need lock to protect the order of dispatch across worker threads.
       // This also helps in reporting the realistic latencies.
       std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
-      if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
-        ctx->options_->sequence_start_ = true;
-        InitNewSequence(seq_id);
-      }
-      if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
-        ctx->options_->sequence_end_ = true;
-      }
+      if (!early_exit) {
+        SetInferSequenceOptions(seq_id, ctx->options_);
 
-      ctx->options_->sequence_id_ = sequence_stat_[seq_id]->seq_id_;
-
-      // Update the inputs if required
-      if (using_json_data_) {
-        int step_id = data_loader_->GetTotalSteps(
-                          sequence_stat_[seq_id]->data_stream_id_) -
-                      sequence_stat_[seq_id]->remaining_queries_;
-        thread_stat->status_ = UpdateInputs(
-            ctx->inputs_, sequence_stat_[seq_id]->data_stream_id_, step_id);
-        if (!thread_stat->status_.IsOk()) {
-          return;
+        // Update the inputs if required
+        if (using_json_data_) {
+          int step_id = data_loader_->GetTotalSteps(
+                            sequence_stat_[seq_id]->data_stream_id_) -
+                        sequence_stat_[seq_id]->remaining_queries_;
+          thread_stat->status_ = UpdateInputs(
+              ctx->inputs_, sequence_stat_[seq_id]->data_stream_id_, step_id);
+          if (!thread_stat->status_.IsOk()) {
+            return;
+          }
         }
-      }
 
-      Request(
-          ctx, request_id++, delayed, callback_func, async_req_map,
-          thread_stat);
-      sequence_stat_[seq_id]->remaining_queries_--;
+        Request(
+            ctx, request_id++, delayed, callback_func, async_req_map,
+            thread_stat);
+        sequence_stat_[seq_id]->remaining_queries_--;
+      }
     } else {
       Request(
           ctx, request_id++, delayed, callback_func, async_req_map,
@@ -338,6 +332,7 @@ RequestRateManager::Infer(
              i += thread_config->stride_) {
           std::lock_guard<std::mutex> guard(sequence_stat_[i]->mtx_);
           if (sequence_stat_[i]->remaining_queries_ != 0) {
+            ctx->options_->sequence_start_ = false;
             ctx->options_->sequence_end_ = true;
             ctx->options_->sequence_id_ = sequence_stat_[i]->seq_id_;
             Request(
