@@ -56,7 +56,7 @@ from distutils.dir_util import copy_tree
 #      ORT version,
 #      ORT openvino version
 #     )
-TRITON_VERSION_MAP = {'2.6.0dev': ('20.12dev', '20.11', '1.5.3', '2020.4')}
+TRITON_VERSION_MAP = {'2.6.0': ('20.12', '20.12', '1.5.3', '2020.4')}
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
