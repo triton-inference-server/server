@@ -37,18 +37,15 @@ import os
 import requests as httpreq
 
 from tritonclient.utils import *
-import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 
 
 class PythonTest(tu.TestResultCollector):
-
     def test_async_infer(self):
-        client_util = httpclient
         model_name = "identity_uint8"
         request_parallelism = 4
         shape = [2, 2]
-        with client_util.InferenceServerClient(
+        with httpclient.InferenceServerClient(
                 "localhost:8000", concurrency=request_parallelism) as client:
             input_datas = []
             requests = []
@@ -56,8 +53,8 @@ class PythonTest(tu.TestResultCollector):
                 input_data = (16384 * np.random.randn(*shape)).astype(np.uint8)
                 input_datas.append(input_data)
                 inputs = [
-                    client_util.InferInput("IN", input_data.shape,
-                                           np_to_triton_dtype(input_data.dtype))
+                    httpclient.InferInput("IN", input_data.shape,
+                                          np_to_triton_dtype(input_data.dtype))
                 ]
                 inputs[0].set_data_from_numpy(input_data)
                 requests.append(client.async_infer(model_name, inputs))
@@ -123,18 +120,17 @@ class PythonTest(tu.TestResultCollector):
                     infer_exec_str, infer_exec_val))
 
     def test_infer_pymodel_error(self):
-        client_util = httpclient
         model_name = "wrong_model"
         shape = [2, 2]
-        with client_util.InferenceServerClient("localhost:8000") as client:
+        with httpclient.InferenceServerClient("localhost:8000") as client:
             input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
             inputs = [
-                client_util.InferInput("IN", input_data.shape,
-                                       np_to_triton_dtype(input_data.dtype))
+                httpclient.InferInput("IN", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
             try:
-                response = client.infer(model_name, inputs)
+                client.infer(model_name, inputs)
             except InferenceServerException as e:
                 self.assertTrue(
                     e.message().startswith("GRPC Execute Failed, message:"),
@@ -145,14 +141,13 @@ class PythonTest(tu.TestResultCollector):
                     "Wrong exception raised or did not raise an exception")
 
     def test_infer_pytorch(self):
-        client_util = httpclient
         model_name = "pytorch_fp32_fp32"
         shape = [1, 1, 28, 28]
-        with client_util.InferenceServerClient("localhost:8000") as client:
+        with httpclient.InferenceServerClient("localhost:8000") as client:
             input_data = np.zeros(shape, dtype=np.float32)
             inputs = [
-                client_util.InferInput("IN", input_data.shape,
-                                       np_to_triton_dtype(input_data.dtype))
+                httpclient.InferInput("IN", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
@@ -168,23 +163,22 @@ class PythonTest(tu.TestResultCollector):
                             'Inference result is not correct')
 
     def test_infer_output_error(self):
-        client_util = httpclient
         model_name = "execute_error"
         shape = [2, 2]
-        with client_util.InferenceServerClient("localhost:8000") as client:
+        with httpclient.InferenceServerClient("localhost:8000") as client:
             input_data = np.zeros(shape, dtype=np.float32)
             inputs = [
-                client_util.InferInput("IN", input_data.shape,
-                                       np_to_triton_dtype(input_data.dtype))
+                httpclient.InferInput("IN", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
             try:
-                result = client.infer(model_name, inputs)
-                output_data = result.as_numpy('OUT')
+                client.infer(model_name, inputs)
             except InferenceServerException as e:
                 print(e)
                 self.assertTrue(
-                    e.message().startswith("An error occured during execution"),
+                    e.message().startswith(
+                        "An error occured during execution"),
                     "Exception message is not correct")
             else:
                 self.assertTrue(
@@ -192,14 +186,13 @@ class PythonTest(tu.TestResultCollector):
                     "Wrong exception raised or did not raise an exception")
 
     def test_init_args(self):
-        client_util = httpclient
         model_name = "init_args"
         shape = [2, 2]
-        with client_util.InferenceServerClient("localhost:8000") as client:
+        with httpclient.InferenceServerClient("localhost:8000") as client:
             input_data = np.zeros(shape, dtype=np.float32)
             inputs = [
-                client_util.InferInput("IN", input_data.shape,
-                                       np_to_triton_dtype(input_data.dtype))
+                httpclient.InferInput("IN", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
@@ -207,6 +200,29 @@ class PythonTest(tu.TestResultCollector):
             self.assertTrue(
                 result.as_numpy("OUT") == 7,
                 "Number of keys in the init args is not correct")
+
+    def test_ensemble(self):
+        model_name = "ensemble"
+        shape = [4]
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            input_data_0 = np.random.random(shape).astype(np.float32)
+            input_data_1 = np.random.random(shape).astype(np.float32)
+            inputs = [
+                httpclient.InferInput("INPUT0", input_data_0.shape,
+                                      np_to_triton_dtype(input_data_0.dtype)),
+                httpclient.InferInput("INPUT1", input_data_1.shape,
+                                      np_to_triton_dtype(input_data_1.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data_0)
+            inputs[1].set_data_from_numpy(input_data_1)
+            result = client.infer(model_name, inputs)
+            output0 = result.as_numpy('OUTPUT0')
+            output1 = result.as_numpy('OUTPUT1')
+            self.assertIsNotNone(output0)
+            self.assertIsNotNone(output1)
+
+            self.assertTrue(np.allclose(output0, 2 * input_data_0))
+            self.assertTrue(np.allclose(output1, 2 * input_data_1))
 
 
 if __name__ == '__main__':
