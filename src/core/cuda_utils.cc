@@ -98,44 +98,20 @@ CopyBuffer(
       copy_kind = cudaMemcpyDeviceToHost;
     }
 
-    // Use cudaHostGetDevicePointer + memcpy when supported for iGPU
-    bool zero_copy_support = false;
-    if (copy_kind == cudaMemcpyHostToDevice) {
-      Status status =
-          CheckGPUZeroCopySupport(src_memory_type_id, &zero_copy_support);
-      if (status.IsOk() && zero_copy_support) {
-        void* src_map;
-        cudaHostGetDevicePointer(&src_map, const_cast<void*>(src), 0);
-        memcpy(dst, src_map, byte_size);
-      }
-    } else if (copy_kind == cudaMemcpyDeviceToHost) {
-      Status status =
-          CheckGPUZeroCopySupport(dst_memory_type_id, &zero_copy_support);
-      if (status.IsOk() && zero_copy_support) {
-        void* dst_map;
-        cudaHostGetDevicePointer(&dst_map, dst, 0);
-        memcpy(dst_map, src, byte_size);
-      }
+    if ((src_memory_type_id != dst_memory_type_id) &&
+        (copy_kind == cudaMemcpyDeviceToDevice)) {
+      RETURN_IF_CUDA_ERR(
+          cudaMemcpyPeerAsync(
+              dst, dst_memory_type_id, src, src_memory_type_id, byte_size,
+              cuda_stream),
+          msg + ": failed to perform CUDA copy");
+    } else {
+      RETURN_IF_CUDA_ERR(
+          cudaMemcpyAsync(dst, src, byte_size, copy_kind, cuda_stream),
+          msg + ": failed to perform CUDA copy");
     }
 
-    // If using memcpy instead cudaMemcpy, don't set cuda_used to true
-    if (!zero_copy_support) {
-      if ((src_memory_type_id != dst_memory_type_id) &&
-          (copy_kind == cudaMemcpyDeviceToDevice)) {
-        RETURN_IF_CUDA_ERR(
-            cudaMemcpyPeerAsync(
-                dst, dst_memory_type_id, src, src_memory_type_id, byte_size,
-                cuda_stream),
-            msg + ": failed to perform CUDA copy");
-      } else {
-        RETURN_IF_CUDA_ERR(
-            cudaMemcpyAsync(dst, src, byte_size, copy_kind, cuda_stream),
-            msg + ": failed to perform CUDA copy");
-      }
-
-      *cuda_used = true;
-    }
-
+    *cuda_used = true;
 #else
     return Status(
         Status::Code::INTERNAL,
