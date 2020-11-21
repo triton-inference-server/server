@@ -1,0 +1,72 @@
+name: "ensemble"
+platform: "ensemble"
+max_batch_size: 0
+
+input [
+   {
+      name: "INPUT0"
+      data_type: TYPE_FP32
+      dims: [ 4 ]
+   },
+   {
+      name: "INPUT1"
+      data_type: TYPE_FP32
+      dims: [ 4 ]
+   }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 4 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 4 ]
+  }
+]
+ensemble_scheduling {
+  step [
+    {
+      model_name: "add_sub_1"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "INPUT0"
+      }
+      input_map {
+        key: "INPUT1"
+        value: "INPUT1"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "output_0"
+      }
+      output_map {
+        key: "OUTPUT1"
+        value: "output_1"
+      }
+    },
+    {
+      model_name: "add_sub_2"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "output_0"
+      }
+      input_map {
+        key: "INPUT1"
+        value: "output_1"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "OUTPUT0"
+      }
+      output_map {
+        key: "OUTPUT1"
+        value: "OUTPUT1"
+      }
+    }
+  ]
+}

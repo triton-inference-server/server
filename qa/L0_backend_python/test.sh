@@ -27,7 +27,7 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="5"
+EXPECTED_NUM_TESTS="6"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
@@ -74,6 +74,22 @@ cp ../python_models/execute_error/config.pbtxt ./models/execute_error/
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
+
+# Ensemble Model
+mkdir -p models/ensemble/1/
+cp ../python_models/ensemble/config.pbtxt ./models/ensemble
+
+mkdir -p models/add_sub_1/1/
+cp ../python_models/add_sub/config.pbtxt ./models/add_sub_1
+(cd models/add_sub_1 && \
+          sed -i "s/^name:.*/name: \"add_sub_1\"/" config.pbtxt)
+cp ../python_models/add_sub/model.py ./models/add_sub_1/1/
+
+mkdir -p models/add_sub_2/1/
+cp ../python_models/add_sub/config.pbtxt ./models/add_sub_2/
+(cd models/add_sub_2 && \
+          sed -i "s/^name:.*/name: \"add_sub_2\"/" config.pbtxt)
+cp ../python_models/add_sub/model.py ./models/add_sub_2/1/
 
 pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
