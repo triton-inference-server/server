@@ -105,7 +105,7 @@ Status GetSupportedGPUs(
 /// \param zero_copy_support If true, Zero-copy is supported by this GPU.
 /// \return The error status. A non-OK status means the target GPU is
 /// not supported.
-Status CheckGPUZeroCopySupport(const int gpu_id, bool* zero_copy_support);
+Status SupportsIntegratedZeroCopy(const int gpu_id, bool* zero_copy_support);
 #endif
 
 }}  // namespace nvidia::inferenceserver

@@ -362,7 +362,7 @@ class PlanBackend : public InferenceBackend {
     // allocated GPU buffer across all optimization
     // profile.
     using BatchInputData =
-        std::pair<inference::BatchInput, std::unique_ptr<AllocatedMemory>>;
+        std::pair<inference::BatchInput, std::unique_ptr<MutableMemory>>;
     struct IOBindingInfo {
       IOBindingInfo()
           : byte_size_(0), buffer_(nullptr),

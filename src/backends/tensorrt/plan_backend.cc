@@ -887,7 +887,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
     // been correctly initalized so even for zero-sized tensors always allocate
     // something.
     bool zero_copy_support = false;
-    RETURN_IF_ERROR(CheckGPUZeroCopySupport(gpu_device_, &zero_copy_support));
+    RETURN_IF_ERROR(SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
     void* buffer = nullptr;
     cudaError_t err = cudaSuccess;
     if (zero_copy_support) {
@@ -1103,7 +1103,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   // been correctly initalized so even for zero-sized tensors always allocate
   // something.
   bool zero_copy_support = false;
-  RETURN_IF_ERROR(CheckGPUZeroCopySupport(gpu_device_, &zero_copy_support));
+  RETURN_IF_ERROR(SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
   void* buffer = nullptr;
   cudaError_t err = cudaSuccess;
   if (zero_copy_support) {
@@ -1243,10 +1243,19 @@ PlanBackend::Context::InitializeBatchInputBindings(
 
       int io_index = engine_->getBindingIndex(tensor_name.c_str());
       auto& io_binding_info = io_binding_infos_[io_index];
-      io_binding_info.batch_input_.reset(new BatchInputData(
-          batch_input,
-          new AllocatedMemory(
-              io_binding_info.byte_size_, TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+      if (io_binding_info.memory_type_ != TRITONSERVER_MEMORY_GPU) {
+        // zero-copy is used so the input buffer is direct-writable
+        io_binding_info.batch_input_.reset(new BatchInputData(
+            batch_input,
+            new MutableMemory(
+                reinterpret_cast<char*>(io_binding_info.buffer_), io_binding_info.byte_size_,
+                TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+      } else {
+        io_binding_info.batch_input_.reset(new BatchInputData(
+            batch_input, new AllocatedMemory(
+                             io_binding_info.byte_size_,
+                             TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+      }
     }
   }
 
@@ -1384,7 +1393,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       // been correctly initalized so even for zero-sized tensors always
       // allocate something.
       bool zero_copy_support = false;
-      RETURN_IF_ERROR(CheckGPUZeroCopySupport(gpu_device_, &zero_copy_support));
+      RETURN_IF_ERROR(SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
       void* buffer = nullptr;
       cudaError_t err = cudaSuccess;
       if (zero_copy_support) {
@@ -1538,7 +1547,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
     // been correctly initalized so even for zero-sized tensors always allocate
     // something.
     bool zero_copy_support = false;
-    RETURN_IF_ERROR(CheckGPUZeroCopySupport(gpu_device_, &zero_copy_support));
+    RETURN_IF_ERROR(SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
     void* buffer = nullptr;
     cudaError_t err = cudaSuccess;
     if (zero_copy_support) {
@@ -2491,10 +2500,10 @@ PlanBackend::Context::Run(
                 mem_type_id),
             "error setting the bath input value");
 
-        if (batch_input.kind() !=
-            inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) {
+        if ((batch_input.kind() !=
+             inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) &&
+            (io_binding_info.memory_type_ != TRITONSERVER_MEMORY_GPU)) {
           bool cuda_used = false;
-          // FIXME can this copy be wavied in zero-copy case
           FAIL_ALL_AND_RETURN_IF_ERROR(
               payload_->requests_, payload_->responses_, metric_reporter_.get(),
               CopyBuffer(

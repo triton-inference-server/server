@@ -179,7 +179,7 @@ GetSupportedGPUs(
 }
 
 Status
-CheckGPUZeroCopySupport(const int gpu_id, bool* zero_copy_support)
+SupportsIntegratedZeroCopy(const int gpu_id, bool* zero_copy_support)
 {
   // Query the device to check if integrated
   cudaDeviceProp cuprops;
