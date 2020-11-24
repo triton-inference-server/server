@@ -82,7 +82,7 @@ TritonModelInstance::CreateInstances(
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         RETURN_IF_ERROR(CreateInstance(
             model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
-            -2 /* device_id */, instances));
+            0 /* device_id */, instances));
       } else {
         return Status(
             Status::Code::INVALID_ARG,
