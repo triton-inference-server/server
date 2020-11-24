@@ -180,6 +180,7 @@ done
 # Need to run the tensorflow model with a single instance
 # for fair comparison.
 MODEL_NAME=${TF_MODEL_NAME}
+REPO=$REPODIR/perf_model_store
 STATIC_BATCH=128
 INSTANCE_CNT=1
 CONCURRENCY=4
