@@ -583,6 +583,8 @@ COPY --from=tritonserver_onnx /workspace/ort_onnx_version.txt \
      /opt/tritonserver/backends/onnxruntime/
 COPY --from=tritonserver_onnx /workspace/build/Release/onnxruntime_perf_test \
      /opt/tritonserver/backends/onnxruntime/
+COPY --from=tritonserver_onnx /workspace/build/Release/onnx_test_runner \
+     /opt/tritonserver/backends/onnxruntime/
 RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
 
