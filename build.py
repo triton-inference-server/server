@@ -190,7 +190,9 @@ def core_cmake_args(components, backends, install_dir):
         '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
         '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
         '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core']),
-        '-DTRITON_BACKEND_REPO_TAG:STRING={}'.format(components['backend'])
+        '-DTRITON_BACKEND_REPO_TAG:STRING={}'.format(components['backend']),
+        '-DTRITON_THIRD_PARTY_REPO_TAG:STRING={}'.format(
+            components['thirdparty'])
     ]
 
     cargs.append('-DTRITON_ENABLE_LOGGING:BOOL={}'.format(
@@ -1231,7 +1233,12 @@ if __name__ == '__main__':
         FLAGS.build_parallel = multiprocessing.cpu_count() * 2
 
     # Initialize map of common components and repo-tag for each.
-    components = {'common': 'main', 'core': 'main', 'backend': 'main'}
+    components = {
+        'common': 'main',
+        'core': 'main',
+        'backend': 'main',
+        'thirdparty': 'main'
+    }
     for be in FLAGS.repo_tag:
         parts = be.split(':')
         fail_if(
@@ -1239,7 +1246,7 @@ if __name__ == '__main__':
             '--repo-tag must specific <component-name>:<repo-tag>')
         fail_if(
             parts[0] not in components,
-            '--repo-tag <component-name> must be "common", "core", or "backend"'
+            '--repo-tag <component-name> must be "common", "core", "backend", or "thirdparty"'
         )
         components[parts[0]] = parts[1]
     for c in components:
