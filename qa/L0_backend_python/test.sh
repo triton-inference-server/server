@@ -218,6 +218,30 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test Multi file models
+rm -rf models/
+mkdir -p models/multi_file/1/
+cp ../python_models/multi_file/*.py ./models/multi_file/1/
+cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
+(cd models/multi_file && \
+          sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** multi-file model test failed \n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 # Test environment variable propagation
 rm -rf models/
 mkdir -p models/model_env/1/
