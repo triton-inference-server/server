@@ -79,10 +79,15 @@ TritonModelInstance::CreateInstances(
               model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
               device_id, instances));
         }
+      } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
+        RETURN_IF_ERROR(CreateInstance(
+            model, group.name(), c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
+            -2 /* device_id */, instances));
       } else {
         return Status(
             Status::Code::INVALID_ARG,
-            std::string("instance_group ") + group.name() + " not supported");
+            std::string("instance_group kind ") +
+                ModelInstanceGroup_Kind_Name(group.kind()) + " not supported");
       }
     }
   }
