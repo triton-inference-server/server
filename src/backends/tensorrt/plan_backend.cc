@@ -911,8 +911,8 @@ PlanBackend::Context::InitializeShapeInputBinding(
     if (zero_copy_support) {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
-      // overload 'buffer' for setting buffer binding below
-      err = cudaHostGetDevicePointer(&io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
+      err = cudaHostGetDevicePointer(
+          &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
       if (err != cudaSuccess) {
         return Status(
             Status::Code::INTERNAL,
@@ -1130,8 +1130,8 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   if (zero_copy_support) {
     io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
     io_binding_info.memory_type_id_ = 0;
-    // overload 'buffer' for setting buffer binding below
-    err = cudaHostGetDevicePointer(&io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
+    err = cudaHostGetDevicePointer(
+        &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
     if (err != cudaSuccess) {
       return Status(
           Status::Code::INTERNAL,
@@ -1422,8 +1422,8 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       if (zero_copy_support) {
         io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
         io_binding_info.memory_type_id_ = 0;
-        // overload 'buffer' for setting buffer binding below
-        err = cudaHostGetDevicePointer(&io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
+        err = cudaHostGetDevicePointer(
+            &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
         if (err != cudaSuccess) {
           return Status(
               Status::Code::INTERNAL,
@@ -1592,8 +1592,8 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
     if (zero_copy_support) {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
-      // overload 'buffer' for setting buffer binding below
-      err = cudaHostGetDevicePointer(&io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
+      err = cudaHostGetDevicePointer(
+          &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
       if (err != cudaSuccess) {
         return Status(
             Status::Code::INTERNAL,
