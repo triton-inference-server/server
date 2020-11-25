@@ -45,9 +45,6 @@
 #endif
 
 #include "src/backends/backend/backend_factory.h"
-#ifdef TRITON_ENABLE_CUSTOM
-#include "src/backends/custom/custom_backend_factory.h"
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
 #include "src/backends/ensemble/ensemble_backend_factory.h"
 #endif  // TRITON_ENABLE_ENSEMBLE
@@ -255,15 +252,6 @@ BuildBackendConfigMap(
     (*backend_configs)[kTensorRTPlanPlatform] = plan_config;
   }
 #endif  // TRITON_ENABLE_TENSORRT
-
-#ifdef TRITON_ENABLE_CUSTOM
-  //// Custom
-  {
-    auto custom_config = std::make_shared<CustomBackendFactory::Config>();
-    custom_config->inference_server_version = version;
-    (*backend_configs)[kCustomPlatform] = custom_config;
-  }
-#endif  // TRITON_ENABLE_CUSTOM
 
 #ifdef TRITON_ENABLE_ENSEMBLE
   //// Ensemble
@@ -494,9 +482,6 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::recursive_mutex map_mtx_;
 
   std::unique_ptr<TritonBackendFactory> triton_backend_factory_;
-#ifdef TRITON_ENABLE_CUSTOM
-  std::unique_ptr<CustomBackendFactory> custom_factory_;
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_TENSORRT
   std::unique_ptr<PlanBackendFactory> plan_factory_;
 #endif  // TRITON_ENABLE_TENSORRT
@@ -527,14 +512,6 @@ ModelRepositoryManager::BackendLifeCycle::Create(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_CUSTOM
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_config_map.find(kCustomPlatform)->second;
-    RETURN_IF_ERROR(CustomBackendFactory::Create(
-        config, &(local_life_cycle->custom_factory_)));
-  }
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
   {
     const std::shared_ptr<BackendConfig>& config =
@@ -1152,13 +1129,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             version_path, model_config, min_compute_capability_, &is);
         break;
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_CUSTOM
-      case Platform::PLATFORM_CUSTOM:
-        status = custom_factory_->CreateBackend(
-            backend_info->repository_path_, model_name, version, model_config,
-            min_compute_capability_, &is);
-        break;
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
       case Platform::PLATFORM_ENSEMBLE: {
         status = ensemble_factory_->CreateBackend(

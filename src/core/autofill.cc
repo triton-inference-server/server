@@ -228,7 +228,8 @@ AutoFill::Create(
                        "--log-verbose=1 for more details)";
       } else {
 #ifdef TRITON_ENABLE_CUSTOM
-        if (platform == Platform::PLATFORM_CUSTOM) {
+        if ((platform == Platform::PLATFORM_CUSTOM) ||
+            (backend_type == BackendType::BACKEND_TYPE_CUSTOM)) {
           print_warning = false;
         }
 #endif

@@ -68,10 +68,10 @@ TRITON_VERSION_MAP = {
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
-CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
+CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino'
+    'openvino', 'custom'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None

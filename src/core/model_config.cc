@@ -278,6 +278,13 @@ GetBackendTypeFromPlatform(const std::string& platform_name)
   }
 #endif  // TRITON_ENABLE_PYTORCH
 
+#ifdef TRITON_ENABLE_CUSTOM
+  if (platform_name == kCustomPlatform) {
+    return BackendType::BACKEND_TYPE_CUSTOM;
+  }
+#endif  // TRITON_ENABLE_CUSTOM
+
+
   return BackendType::BACKEND_TYPE_UNKNOWN;
 }
 
@@ -311,6 +318,12 @@ GetBackendType(const std::string& backend_name)
     return BackendType::BACKEND_TYPE_PYTORCH;
   }
 #endif  // TRITON_ENABLE_PYTORCH
+
+#ifdef TRITON_ENABLE_CUSTOM
+  if (backend_name == kCustomBackend) {
+    return BackendType::BACKEND_TYPE_CUSTOM;
+  }
+#endif  // TRITON_ENABLE_CUSTOM
 
   return BackendType::BACKEND_TYPE_UNKNOWN;
 }

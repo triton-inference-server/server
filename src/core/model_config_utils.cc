@@ -655,6 +655,11 @@ GetNormalizedModelConfig(
       config->set_backend(kPyTorchBackend);
     }
 #endif  // TRITON_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_CUSTOM
+    if (config->platform() == kCustomPlatform) {
+      config->set_backend(kCustomBackend);
+    }
+#endif  // TRITON_ENABLE_CUSTOM
     // FIXME: "else if ()" other supported frameworks once they are ported
     // to use backend API.
   }
@@ -676,6 +681,11 @@ GetNormalizedModelConfig(
       config->set_platform(kPyTorchLibTorchPlatform);
     }
 #endif  // TRITON_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_CUSTOM
+    if (config->backend() == kCustomBackend) {
+      config->set_platform(kCustomPlatform);
+    }
+#endif  // TRITON_ENABLE_CUSTOM
   }
 
   // If 'default_model_filename' is not specified set it appropriately
@@ -985,12 +995,6 @@ ValidateModelConfig(
 #ifdef TRITON_ENABLE_TENSORRT
       case BackendType::BACKEND_TYPE_TENSORRT:
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-      case BackendType::BACKEND_TYPE_ONNXRUNTIME:
-#endif  // TRITON_ENABLE_ONNXRUNTIME
-#ifdef TRITON_ENABLE_PYTORCH
-      case BackendType::BACKEND_TYPE_PYTORCH:
-#endif  // TRITON_ENABLE_PYTORCH
         // FIXME: Do nothing for above type until they are ported with backend
         // API
         break;
