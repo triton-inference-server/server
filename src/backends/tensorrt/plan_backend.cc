@@ -893,8 +893,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
     cudaError_t err = cudaSuccess;
     if (zero_copy_support) {
       err = cudaHostAlloc(
-          &buffer, std::max((int64_t)1, max_byte_size),
-          cudaHostAllocPortable | cudaHostAllocMapped);
+          &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
     } else {
       err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
     }
@@ -1111,8 +1110,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   cudaError_t err = cudaSuccess;
   if (zero_copy_support) {
     err = cudaHostAlloc(
-        &buffer, std::max((int64_t)1, max_byte_size),
-        cudaHostAllocPortable | cudaHostAllocMapped);
+        &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
   } else {
     err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
   }
@@ -1404,8 +1402,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       cudaError_t err = cudaSuccess;
       if (zero_copy_support) {
         err = cudaHostAlloc(
-            &buffer, std::max((int64_t)1, max_byte_size),
-            cudaHostAllocPortable | cudaHostAllocMapped);
+            &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
       } else {
         err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
       }
@@ -1561,8 +1558,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
     cudaError_t err = cudaSuccess;
     if (zero_copy_support) {
       err = cudaHostAlloc(
-          &buffer, std::max((int64_t)1, max_byte_size),
-          cudaHostAllocPortable | cudaHostAllocMapped);
+          &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
     } else {
       err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
     }
