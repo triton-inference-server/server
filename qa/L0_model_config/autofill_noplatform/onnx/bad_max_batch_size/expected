@@ -1,0 +1,1 @@
+autofill failed for model 'bad_max_batch_size': model does not support batching while non-zero max_batch_size is specified
