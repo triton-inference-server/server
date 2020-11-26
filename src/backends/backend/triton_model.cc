@@ -27,6 +27,7 @@
 #include "src/backends/backend/triton_model.h"
 
 #include <vector>
+#include "src/backends/backend/triton_backend_config.h"
 #include "src/backends/backend/triton_model_instance.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
@@ -35,62 +36,6 @@
 #include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {
-
-namespace {
-
-Status
-BackendConfiguration(
-    const BackendCmdlineConfig& config, const std::string& key,
-    std::string* val)
-{
-  for (const auto& pr : config) {
-    if (pr.first == key) {
-      *val = pr.second;
-      return Status::Success;
-    }
-  }
-
-  return Status(
-      Status::Code::INTERNAL,
-      std::string("unable to find common backend configuration for '") + key +
-          "'");
-}
-
-Status
-ParseStringToDouble(const std::string& str, double* val)
-{
-  try {
-    *val = std::stod(str);
-  }
-  catch (...) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unable to parse common backend configuration as double");
-  }
-
-  return Status::Success;
-}
-
-Status
-ParseStringToBool(const std::string& str, bool* val)
-{
-  try {
-    std::string lowercase_str{str};
-    std::transform(
-        lowercase_str.begin(), lowercase_str.end(), lowercase_str.begin(),
-        [](unsigned char c) { return std::tolower(c); });
-    *val = (lowercase_str == "true");
-  }
-  catch (...) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unable to parse common backend configuration as bool");
-  }
-
-  return Status::Success;
-}
-
-}  // namespace
 
 Status
 TritonModel::Create(
@@ -101,38 +46,6 @@ TritonModel::Create(
     std::unique_ptr<TritonModel>* model)
 {
   model->reset();
-
-  // Get some internal configuration values needed for initialization.
-  std::string backend_dir;
-#ifdef TRITON_ENABLE_GPU
-  double min_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
-#else
-  double min_compute_capability = 0;
-#endif  // TRITON_ENABLE_GPU
-  bool auto_complete_config = false;
-  {
-    const auto& itr = backend_cmdline_config_map.find(std::string());
-    if (itr == backend_cmdline_config_map.end()) {
-      return Status(
-          Status::Code::INTERNAL,
-          "unable to find common backend configuration");
-    }
-
-    RETURN_IF_ERROR(
-        BackendConfiguration(itr->second, "backend-directory", &backend_dir));
-
-    std::string min_compute_capability_str;
-    RETURN_IF_ERROR(BackendConfiguration(
-        itr->second, "min-compute-capability", &min_compute_capability_str));
-    RETURN_IF_ERROR(ParseStringToDouble(
-        min_compute_capability_str, &min_compute_capability));
-
-    std::string auto_complete_config_str;
-    RETURN_IF_ERROR(BackendConfiguration(
-        itr->second, "auto-complete-config", &auto_complete_config_str));
-    RETURN_IF_ERROR(
-        ParseStringToBool(auto_complete_config_str, &auto_complete_config));
-  }
 
   // The model configuration must specify a backend. The name of the
   // corresponding shared library must be libtriton_<backend>.so.
@@ -149,35 +62,34 @@ TritonModel::Create(
   RETURN_IF_ERROR(LocalizeDirectory(
       JoinPath({model_repository_path, model_name}), &localized_model_dir));
 
-  std::string backend_name = model_config.backend();
-  if (model_config.backend() == "tensorflow") {
-    backend_name += "1";
-    const auto& itr = backend_cmdline_config_map.find(model_config.backend());
-    if (itr != backend_cmdline_config_map.end()) {
-      std::string tf_version_str;
-      if (BackendConfiguration(itr->second, "version", &tf_version_str)
-              .IsOk()) {
-        if ((tf_version_str != "1") && (tf_version_str != "2")) {
-          return Status(
-              Status::Code::INVALID_ARG,
-              "unexpected TensorFlow library version '" + tf_version_str +
-                  "', expects 1 or 2.");
-        }
-        backend_name = model_config.backend() + tf_version_str;
-      }
-    }
-  }
-#ifdef _WIN32
-  const std::string backend_libname = "triton_" + backend_name + ".dll";
-#else
-  const std::string backend_libname = "libtriton_" + backend_name + ".so";
-#endif
+  // Get some internal configuration values needed for initialization.
+  std::string backend_dir;
+  RETURN_IF_ERROR(BackendConfigurationGlobalBackendsDirectory(
+      backend_cmdline_config_map, &backend_dir));
+
+  bool auto_complete_config = false;
+  RETURN_IF_ERROR(BackendConfigurationAutoCompleteConfig(
+      backend_cmdline_config_map, &auto_complete_config));
+
+  double min_compute_capability = 0;
+  RETURN_IF_ERROR(BackendConfigurationMinComputeCapability(
+      backend_cmdline_config_map, &min_compute_capability));
+
+  std::string specialized_backend_name;
+  RETURN_IF_ERROR(BackendConfigurationSpecializeBackendName(
+      backend_cmdline_config_map, model_config.backend(),
+      &specialized_backend_name));
+
+  std::string backend_libname;
+  RETURN_IF_ERROR(BackendConfigurationBackendLibraryName(
+      specialized_backend_name, &backend_libname));
 
   // Get the path to the backend shared library. Search path is
   // version directory, model directory, global backend directory.
   const auto model_path = localized_model_dir->Path();
   const auto version_path = JoinPath({model_path, std::to_string(version)});
-  const std::string global_path = JoinPath({backend_dir, backend_name});
+  const std::string global_path =
+      JoinPath({backend_dir, specialized_backend_name});
   const std::vector<std::string> search_paths = {version_path, model_path,
                                                  global_path};
 
