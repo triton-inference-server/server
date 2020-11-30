@@ -141,6 +141,7 @@ for BACKEND in $BACKENDS; do
 
     echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_benchmark_name\":\"nomodel\"," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_server\":\"triton\"," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_framework\":\"${BACKEND}\"," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${RESULTDIR}/${NAME}.tjson

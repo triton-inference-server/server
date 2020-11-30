@@ -98,6 +98,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
 
             echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
             echo -e "\"s_benchmark_name\":\"deeprecommender\"," >> ${NAME}.tjson
+            echo -e "\"s_server\":\"triton\"," >> ${NAME}.tjson
             echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${NAME}.tjson
             echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >> ${NAME}.tjson
             echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson

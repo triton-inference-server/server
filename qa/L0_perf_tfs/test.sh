@@ -84,8 +84,9 @@ fi
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
 echo -e "\"s_benchmark_name\":\"resnet50\"," >> ${NAME}.tjson
+echo -e "\"s_server\":\"tfserving\"," >> ${NAME}.tjson
 echo -e "\"s_protocol\":\"grpc\"," >> ${NAME}.tjson
-echo -e "\"s_framework\":\"TensorFlow Serving\"," >> ${NAME}.tjson
+echo -e "\"s_framework\":\"savedmodel\"," >> ${NAME}.tjson
 echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
 echo -e "\"l_concurrency\":1," >> ${NAME}.tjson
 echo -e "\"l_batch_size\":1," >> ${NAME}.tjson
@@ -117,8 +118,9 @@ fi
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
 echo -e "\"s_benchmark_name\":\"resnet50\"," >> ${NAME}.tjson
+echo -e "\"s_server\":\"tfserving\"," >> ${NAME}.tjson
 echo -e "\"s_protocol\":\"grpc\"," >> ${NAME}.tjson
-echo -e "\"s_framework\":\"TensorFlow Serving\"," >> ${NAME}.tjson
+echo -e "\"s_framework\":\"savedmodel\"," >> ${NAME}.tjson
 echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
 echo -e "\"l_concurrency\":4," >> ${NAME}.tjson
 echo -e "\"l_batch_size\":128," >> ${NAME}.tjson
