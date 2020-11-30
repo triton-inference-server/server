@@ -61,7 +61,7 @@ Status
 PersistentBackendManager::InitPersistentBackends(
     const BackendCmdlineConfigMap& config_map)
 {
-  for (const auto& be : {"pytorch", "tensorflow", "onnxruntime", "openvino"}) {
+  for (const auto& be : {"pytorch", "tensorflow", "onnxruntime", "openvino", 'custom'}) {
     RETURN_IF_ERROR(InitPersistentBackend(be, config_map));
   }
 
