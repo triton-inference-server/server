@@ -61,7 +61,8 @@ Status
 PersistentBackendManager::InitPersistentBackends(
     const BackendCmdlineConfigMap& config_map)
 {
-  for (const auto& be : {"pytorch", "tensorflow", "onnxruntime"}) {
+  // FIXME this should be customized based on which backend is enabled.
+  for (const auto& be : {"pytorch", "tensorflow", "onnxruntime", "custom"}) {
     RETURN_IF_ERROR(InitPersistentBackend(be, config_map));
   }
 
