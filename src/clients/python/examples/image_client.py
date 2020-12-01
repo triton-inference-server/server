@@ -227,7 +227,7 @@ def preprocess(img, format, dtype, c, h, w, scaling, protocol):
     typed = resized.astype(npdtype)
 
     if scaling == 'INCEPTION':
-        scaled = (typed / 128) - 1
+        scaled = (typed / 127.5) - 1
     elif scaling == 'VGG':
         if c == 1:
             scaled = typed - np.asarray((128,), dtype=npdtype)
