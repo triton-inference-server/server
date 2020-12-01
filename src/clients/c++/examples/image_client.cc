@@ -125,11 +125,11 @@ Preprocess(
   cv::Mat sample_final;
   if (scale == ScaleType::INCEPTION) {
     if (img_channels == 1) {
-      sample_final = sample_type.mul(cv::Scalar(1 / 128.0));
+      sample_final = sample_type.mul(cv::Scalar(1 / 127.5));
       sample_final = sample_final - cv::Scalar(1.0);
     } else {
       sample_final =
-          sample_type.mul(cv::Scalar(1 / 128.0, 1 / 128.0, 1 / 128.0));
+          sample_type.mul(cv::Scalar(1 / 127.5, 1 / 127.5, 1 / 127.5));
       sample_final = sample_final - cv::Scalar(1.0, 1.0, 1.0);
     }
   } else if (scale == ScaleType::VGG) {
