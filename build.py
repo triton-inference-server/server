@@ -548,10 +548,10 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
         df += '''
 # LibTorch and Torchvision headers and libraries
 COPY --from=tritonserver_pytorch \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
+     /opt/conda/lib/python3.8/site-packages/torch/lib/libc10.so \
      /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
+     /opt/conda/lib/python3.8/site-packages/torch/lib/libc10_cuda.so \
      /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_core.so /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_gnu_thread.so /opt/tritonserver/backends/pytorch/
@@ -560,13 +560,13 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_thread.so /opt/trit
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_def.so /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_avx2.so /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libiomp5.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/include \
      /opt/tritonserver/include/torch
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/lib/libtorch.so \
       /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cpu.so \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/lib/libtorch_cpu.so \
       /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cuda.so \
+COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/lib/libtorch_cuda.so \
       /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/pytorch/vision/torchvision/csrc \
     /opt/tritonserver/include/torchvision/torchvision/
