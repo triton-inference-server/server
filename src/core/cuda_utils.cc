@@ -178,6 +178,29 @@ GetSupportedGPUs(
   return Status::Success;
 }
 
+Status
+SupportsIntegratedZeroCopy(const int gpu_id, bool* zero_copy_support)
+{
+  // Query the device to check if integrated
+  cudaDeviceProp cuprops;
+  cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_id);
+  if (cuerr != cudaSuccess) {
+    return Status(
+        Status::Code::INTERNAL,
+        "unable to get CUDA device properties for GPU ID" +
+            std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
+  }
+
+  // Zero-copy supported only on integrated GPU when it can map host memory
+  if (cuprops.integrated && cuprops.canMapHostMemory) {
+    *zero_copy_support = true;
+  } else {
+    *zero_copy_support = false;
+  }
+
+  return Status::Success;
+}
+
 #endif
 
 }}  // namespace nvidia::inferenceserver
