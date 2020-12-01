@@ -27,6 +27,7 @@
 #pragma once
 
 #include <boost/interprocess/managed_external_buffer.hpp>
+#include <map>
 #include <memory>
 #include <mutex>
 #include "src/core/status.h"
