@@ -362,16 +362,20 @@ class PlanBackend : public InferenceBackend {
     // allocated GPU buffer across all optimization
     // profile.
     using BatchInputData =
-        std::pair<inference::BatchInput, std::unique_ptr<AllocatedMemory>>;
+        std::pair<inference::BatchInput, std::unique_ptr<MutableMemory>>;
     struct IOBindingInfo {
       IOBindingInfo()
-          : byte_size_(0), buffer_(nullptr), buffer_is_ragged_(false),
-            is_linear_format_(true), vectorized_dim_(-1),
-            components_per_element_(1)
+          : byte_size_(0), buffer_(nullptr), device_buffer_(nullptr),
+            memory_type_(TRITONSERVER_MEMORY_GPU), memory_type_id_(0),
+            buffer_is_ragged_(false), is_linear_format_(true),
+            vectorized_dim_(-1), components_per_element_(1)
       {
       }
       uint64_t byte_size_;
       void* buffer_;
+      void* device_buffer_;
+      TRITONSERVER_MemoryType memory_type_;
+      int64_t memory_type_id_;
       bool buffer_is_ragged_;
       bool is_linear_format_;
       int vectorized_dim_;

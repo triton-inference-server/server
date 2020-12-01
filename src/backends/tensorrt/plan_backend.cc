@@ -154,9 +154,14 @@ PlanBackend::Context::~Context()
   cudaSetDevice(gpu_device_);
   for (auto& io_binding_info : io_binding_infos_) {
     if (io_binding_info.buffer_ != nullptr) {
-      cudaError_t err = cudaFree(io_binding_info.buffer_);
+      cudaError_t err = cudaSuccess;
+      if (io_binding_info.memory_type_ == TRITONSERVER_MEMORY_GPU) {
+        err = cudaFree(io_binding_info.buffer_);
+      } else {
+        err = cudaFreeHost(io_binding_info.buffer_);
+      }
       if (err != cudaSuccess) {
-        LOG_ERROR << "Failed to free cuda memory for '" << name_
+        LOG_ERROR << "Failed to free allocated memory for '" << name_
                   << "': " << cudaGetErrorString(err);
       }
     }
@@ -877,11 +882,21 @@ PlanBackend::Context::InitializeShapeInputBinding(
   }
 
   if (max_byte_size != NO_BATCHING) {
-    // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
-    // indicate that the buffer has been correctly initalized so even
-    // for zero-sized tensors always allocate something.
-    void* buffer;
-    cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    // Allocate CUDA memory. Use cudaHostAlloc if zero copy supported. We rely
+    // on buffer_bindings_ being non-nullptr to indicate that the buffer has
+    // been correctly initalized so even for zero-sized tensors always allocate
+    // something.
+    bool zero_copy_support = false;
+    RETURN_IF_ERROR(
+        SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
+    void* buffer = nullptr;
+    cudaError_t err = cudaSuccess;
+    if (zero_copy_support) {
+      err = cudaHostAlloc(
+          &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
+    } else {
+      err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    }
     if (err != cudaSuccess) {
       return Status(
           Status::Code::INTERNAL, "unable to allocate memory for input '" +
@@ -891,12 +906,28 @@ PlanBackend::Context::InitializeShapeInputBinding(
 
     io_binding_info.byte_size_ = max_byte_size;
     io_binding_info.buffer_ = buffer;
+    io_binding_info.device_buffer_ = buffer;
+    if (zero_copy_support) {
+      io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
+      io_binding_info.memory_type_id_ = 0;
+      err = cudaHostGetDevicePointer(
+          &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
+      if (err != cudaSuccess) {
+        return Status(
+            Status::Code::INTERNAL,
+            "unable to get mapped device address for input '" + input_name +
+                " for " + name_ + ": " + cudaGetErrorString(err));
+      }
+    } else {
+      io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
+      io_binding_info.memory_type_id_ = gpu_device_;
+    }
 
     // Set buffer bindings of all optimization profile since buffer is allocated
     for (auto& trt_context : trt_contexts_) {
       auto binding_index =
           num_expected_bindings_ * trt_context.first + io_index;
-      buffer_bindings_[binding_index] = io_binding_info.buffer_;
+      buffer_bindings_[binding_index] = io_binding_info.device_buffer_;
     }
   }
 
@@ -1069,11 +1100,20 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     max_byte_size = std::max(max_byte_size, byte_size);
   }
 
-  // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
-  // indicate that the buffer has been correctly initalized so even
-  // for zero-sized tensors always allocate something.
-  void* buffer;
-  cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+  // Allocate CUDA memory. Use cudaHostAlloc if zero copy supported. We rely
+  // on buffer_bindings_ being non-nullptr to indicate that the buffer has
+  // been correctly initalized so even for zero-sized tensors always allocate
+  // something.
+  bool zero_copy_support = false;
+  RETURN_IF_ERROR(SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
+  void* buffer = nullptr;
+  cudaError_t err = cudaSuccess;
+  if (zero_copy_support) {
+    err = cudaHostAlloc(
+        &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
+  } else {
+    err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+  }
   if (err != cudaSuccess) {
     return Status(
         Status::Code::INTERNAL, "unable to allocate memory for input '" +
@@ -1083,7 +1123,23 @@ PlanBackend::Context::InitializeExecuteInputBinding(
 
   io_binding_info.byte_size_ = max_byte_size;
   io_binding_info.buffer_ = buffer;
+  io_binding_info.device_buffer_ = buffer;
   io_binding_info.buffer_is_ragged_ = is_ragged;
+  if (zero_copy_support) {
+    io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
+    io_binding_info.memory_type_id_ = 0;
+    err = cudaHostGetDevicePointer(
+        &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
+    if (err != cudaSuccess) {
+      return Status(
+          Status::Code::INTERNAL,
+          "unable to get mapped device address for input '" + input_name +
+              " for " + name_ + ": " + cudaGetErrorString(err));
+    }
+  } else {
+    io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
+    io_binding_info.memory_type_id_ = gpu_device_;
+  }
   if (io_binding_info.buffer_is_ragged_ && !io_binding_info.is_linear_format_) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -1094,7 +1150,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   // Set buffer bindings of all optimization profile since buffer is allocated
   for (auto& trt_context : trt_contexts_) {
     auto binding_index = num_expected_bindings_ * trt_context.first + io_index;
-    buffer_bindings_[binding_index] = io_binding_info.buffer_;
+    buffer_bindings_[binding_index] = io_binding_info.device_buffer_;
   }
 
   return Status::Success;
@@ -1190,10 +1246,19 @@ PlanBackend::Context::InitializeBatchInputBindings(
 
       int io_index = engine_->getBindingIndex(tensor_name.c_str());
       auto& io_binding_info = io_binding_infos_[io_index];
-      io_binding_info.batch_input_.reset(new BatchInputData(
-          batch_input,
-          new AllocatedMemory(
-              io_binding_info.byte_size_, TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+      if (io_binding_info.memory_type_ != TRITONSERVER_MEMORY_GPU) {
+        // zero-copy is used so the input buffer is direct-writable
+        io_binding_info.batch_input_.reset(new BatchInputData(
+            batch_input, new MutableMemory(
+                             reinterpret_cast<char*>(io_binding_info.buffer_),
+                             io_binding_info.byte_size_,
+                             TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+      } else {
+        io_binding_info.batch_input_.reset(new BatchInputData(
+            batch_input, new AllocatedMemory(
+                             io_binding_info.byte_size_,
+                             TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+      }
     }
   }
 
@@ -1326,28 +1391,53 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
     }
 
     if (max_byte_size != NO_BATCHING) {
-      // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
-      // indicate that the buffer has been correctly initalized so even
-      // for zero-sized tensors always allocate something.
-      void* buffer;
-      cudaError_t err =
-          cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+      // Allocate CUDA memory. Use cudaHostAlloc if zero copy supported. We rely
+      // on buffer_bindings_ being non-nullptr to indicate that the buffer has
+      // been correctly initalized so even for zero-sized tensors always
+      // allocate something.
+      bool zero_copy_support = false;
+      RETURN_IF_ERROR(
+          SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
+      void* buffer = nullptr;
+      cudaError_t err = cudaSuccess;
+      if (zero_copy_support) {
+        err = cudaHostAlloc(
+            &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
+      } else {
+        err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+      }
       if (err != cudaSuccess) {
         return Status(
-            Status::Code::INTERNAL, "unable to allocate memory for input '" +
+            Status::Code::INTERNAL, "unable to allocate memory for output '" +
                                         io.name() + " for " + name_ + ": " +
-                                        std::string(cudaGetErrorString(err)));
+                                        cudaGetErrorString(err));
       }
 
       io_binding_info.byte_size_ = max_byte_size;
       io_binding_info.buffer_ = buffer;
+      io_binding_info.device_buffer_ = buffer;
+      if (zero_copy_support) {
+        io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
+        io_binding_info.memory_type_id_ = 0;
+        err = cudaHostGetDevicePointer(
+            &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
+        if (err != cudaSuccess) {
+          return Status(
+              Status::Code::INTERNAL,
+              "unable to get mapped device address for output '" + io.name() +
+                  " for " + name_ + ": " + cudaGetErrorString(err));
+        }
+      } else {
+        io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
+        io_binding_info.memory_type_id_ = gpu_device_;
+      }
 
       // Set buffer bindings of all optimization profile since buffer is
       // allocated
       for (auto& trt_context : trt_contexts_) {
         auto binding_index =
             num_expected_bindings_ * trt_context.first + io_index;
-        buffer_bindings_[binding_index] = io_binding_info.buffer_;
+        buffer_bindings_[binding_index] = io_binding_info.device_buffer_;
       }
     }
   }
@@ -1457,20 +1547,31 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       max_byte_size = std::max(max_byte_size, byte_size);
     }
 
-    // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
-    // indicate that the buffer has been correctly initalized so even
-    // for zero-sized tensors always allocate something.
-    void* buffer;
-    cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    // Allocate CUDA memory. Use cudaHostAlloc if zero copy supported. We rely
+    // on buffer_bindings_ being non-nullptr to indicate that the buffer has
+    // been correctly initalized so even for zero-sized tensors always allocate
+    // something.
+    bool zero_copy_support = false;
+    RETURN_IF_ERROR(
+        SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
+    void* buffer = nullptr;
+    cudaError_t err = cudaSuccess;
+    if (zero_copy_support) {
+      err = cudaHostAlloc(
+          &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
+    } else {
+      err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    }
     if (err != cudaSuccess) {
       return Status(
-          Status::Code::INTERNAL, "unable to allocate memory for input '" +
+          Status::Code::INTERNAL, "unable to allocate memory for output '" +
                                       io.name() + " for " + name_ + ": " +
-                                      std::string(cudaGetErrorString(err)));
+                                      cudaGetErrorString(err));
     }
 
     io_binding_info.byte_size_ = max_byte_size;
     io_binding_info.buffer_ = buffer;
+    io_binding_info.device_buffer_ = buffer;
     // Whether the output needs to be scattered based on input
     if (io_binding_info.buffer_is_ragged_) {
       std::vector<int64_t> output_shape;
@@ -1484,12 +1585,27 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       }
       io_binding_info.io_shape_mapping_.second = output_shape;
     }
+    if (zero_copy_support) {
+      io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
+      io_binding_info.memory_type_id_ = 0;
+      err = cudaHostGetDevicePointer(
+          &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
+      if (err != cudaSuccess) {
+        return Status(
+            Status::Code::INTERNAL,
+            "unable to get mapped device address for output '" + io.name() +
+                " for " + name_ + ": " + cudaGetErrorString(err));
+      }
+    } else {
+      io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
+      io_binding_info.memory_type_id_ = gpu_device_;
+    }
 
     // Set buffer bindings of all optimization profile since buffer is allocated
     for (auto& trt_context : trt_contexts_) {
       auto binding_index =
           num_expected_bindings_ * trt_context.first + io_index;
-      buffer_bindings_[binding_index] = io_binding_info.buffer_;
+      buffer_bindings_[binding_index] = io_binding_info.device_buffer_;
     }
   }
 
@@ -2391,15 +2507,17 @@ PlanBackend::Context::Run(
                 mem_type_id),
             "error setting the bath input value");
 
-        if (batch_input.kind() !=
-            inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) {
+        if ((batch_input.kind() !=
+             inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) &&
+            (io_binding_info.memory_type_ != TRITONSERVER_MEMORY_GPU)) {
           bool cuda_used = false;
           FAIL_ALL_AND_RETURN_IF_ERROR(
               payload_->requests_, payload_->responses_, metric_reporter_.get(),
               CopyBuffer(
-                  name, mem_type, mem_type_id, TRITONSERVER_MEMORY_GPU,
-                  gpu_device_, total_byte_size, input_buffer,
-                  io_binding_info.buffer_, input_copy_stream_, &cuda_used),
+                  name, mem_type, mem_type_id, io_binding_info.memory_type_,
+                  io_binding_info.memory_type_id_, total_byte_size,
+                  input_buffer, io_binding_info.buffer_, input_copy_stream_,
+                  &cuda_used),
               "error copying the batch input buffer");
           if (cuda_used) {
             cudaEventRecord(
@@ -2431,7 +2549,8 @@ PlanBackend::Context::Run(
 
         collector.ProcessTensor(
             name, datatype, static_cast<char*>(io_binding_info.buffer_),
-            total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
+            total_byte_size, io_binding_info.memory_type_,
+            io_binding_info.memory_type_id_);
       }
     } else {
       const InferenceRequest::Input* repr_input;
@@ -2486,8 +2605,9 @@ PlanBackend::Context::Run(
         // batch size.
         bool cuda_used = false;
         status = CopyBuffer(
-            name, TRITONSERVER_MEMORY_CPU, 0, TRITONSERVER_MEMORY_GPU,
-            gpu_device_, sizeof(int32_t), (void*)&payload_->total_batch_size_,
+            name, TRITONSERVER_MEMORY_CPU, 0, io_binding_info.memory_type_,
+            io_binding_info.memory_type_id_, sizeof(int32_t),
+            (void*)&payload_->total_batch_size_,
             static_cast<char*>(io_binding_info.buffer_), input_copy_stream_,
             &cuda_used);
         FAIL_ALL_AND_RETURN_IF_ERROR(
@@ -2496,8 +2616,8 @@ PlanBackend::Context::Run(
 
         // Copy rest of the shape values to the buffer.
         status = CopyBuffer(
-            name, TRITONSERVER_MEMORY_CPU, 0, TRITONSERVER_MEMORY_GPU,
-            gpu_device_, total_byte_size,
+            name, TRITONSERVER_MEMORY_CPU, 0, io_binding_info.memory_type_,
+            io_binding_info.memory_type_id_, total_byte_size,
             (void*)&request_shape_values[io_index],
             (static_cast<char*>(io_binding_info.buffer_) + sizeof(int32_t)),
             input_copy_stream_, &cuda_used);
@@ -2507,7 +2627,8 @@ PlanBackend::Context::Run(
       } else {
         collector.ProcessTensor(
             name, datatype, static_cast<char*>(io_binding_info.buffer_),
-            total_byte_size, TRITONSERVER_MEMORY_GPU, gpu_device_);
+            total_byte_size, io_binding_info.memory_type_,
+            io_binding_info.memory_type_id_);
       }
     }
   }
@@ -2557,9 +2678,9 @@ PlanBackend::Context::Run(
               payload_->requests_, payload_->responses_, metric_reporter_.get(),
               CopyBuffer(
                   "CUDA graph batch input", mem_type, mem_type_id,
-                  TRITONSERVER_MEMORY_GPU, gpu_device_, total_byte_size,
-                  input_buffer, io_binding_info.buffer_, input_copy_stream_,
-                  &cuda_used),
+                  io_binding_info.memory_type_, io_binding_info.memory_type_id_,
+                  total_byte_size, input_buffer, io_binding_info.buffer_,
+                  input_copy_stream_, &cuda_used),
               "error copying the batch input buffer");
           if (cuda_used) {
             cudaEventRecord(
@@ -2748,10 +2869,13 @@ PlanBackend::Context::Run(
       // FIXME add correctness checking like below
       inference::DataType dt =
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
+      // Process the output tensors with the device memory address even if
+      // zero-copy may be used, so that the memory copies perform asynchronously
+      // and wait for model execution.
       payload_->responder_->ProcessTensor(
           name, io_binding_info.io_shape_mapping_.first, dt,
           io_binding_info.io_shape_mapping_.second,
-          static_cast<const char*>(io_binding_info.buffer_),
+          static_cast<const char*>(io_binding_info.device_buffer_),
           TRITONSERVER_MEMORY_GPU, gpu_device_);
     } else {
       std::vector<int64_t> batchn_shape;
@@ -2789,9 +2913,12 @@ PlanBackend::Context::Run(
             "failed to run TRT response");
       }
 
+      // Process the output tensors with the device memory address even if
+      // zero-copy may be used, so that the memory copies perform asynchronously
+      // and wait for model execution.
       payload_->responder_->ProcessTensor(
           name, dt, batchn_shape,
-          static_cast<const char*>(io_binding_info.buffer_),
+          static_cast<const char*>(io_binding_info.device_buffer_),
           TRITONSERVER_MEMORY_GPU, gpu_device_);
     }
   }
