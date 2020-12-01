@@ -94,6 +94,7 @@ REPORTER=triton-inference-server/qa/common/reporter.py
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> results.tjson
 echo -e "\"s_benchmark_name\":\"kaldi\"," >> results.tjson
+echo -e "\"s_server\":\"triton\"," >> results.tjson
 echo -e "\"s_protocol\":\"grpc\"," >> results.tjson
 echo -e "\"s_model\":\"asr_kaldi\"," >> results.tjson
 echo -e "\"l_concurrency\":${CONCURRENCY}," >> results.tjson

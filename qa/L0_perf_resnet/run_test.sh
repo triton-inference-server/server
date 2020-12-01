@@ -79,6 +79,7 @@ set -e
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
 echo -e "\"s_benchmark_name\":\"resnet50\"," >> ${NAME}.tjson
+echo -e "\"s_server\":\"triton\"," >> ${NAME}.tjson
 echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${NAME}.tjson
 echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >> ${NAME}.tjson
 echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
