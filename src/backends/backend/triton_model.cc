@@ -368,6 +368,15 @@ TRITONBACKEND_ModelConfig(
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_ModelConfigSerializedToString(
+    TRITONBACKEND_Model* model, std::string* serialized_config)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  tm->Config().SerializeToString(serialized_config);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_ModelAutoCompleteConfig(
     TRITONBACKEND_Model* model, bool* auto_complete_config)
 {
