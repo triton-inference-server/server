@@ -192,5 +192,5 @@ MODEL_NAME=${MODEL_NAME} \
     PERF_CLIENT_PROTOCOL="grpc" \
     INSTANCE_CNT=${INSTANCE_CNT} \
     CONCURRENCY=${CONCURRENCY} \
-    BACKEND_CONFIG=" --backend-config=tensorflow,version=2"
+    BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
     bash -x run_test.sh
