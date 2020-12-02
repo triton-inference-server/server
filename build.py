@@ -258,6 +258,8 @@ def backend_cmake_args(images, components, be, install_dir):
         args = tensorflow_cmake_args(1, images)
     elif be == 'tensorflow2':
         args = tensorflow_cmake_args(2, images)
+    elif be == 'custom':
+        args = []
     elif be == 'python':
         args = []
     elif be == 'dali':
