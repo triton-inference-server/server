@@ -27,12 +27,13 @@
 
 STATIC_BATCH=${STATIC_BATCH:=1}
 INSTANCE_CNT=${INSTANCE_CNT:=1}
+BACKEND_CONFIG=${BACKEND_CONFIG:=""}
 
 PERF_CLIENT=../clients/perf_client
 REPORTER=../common/reporter.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=`pwd`/models ${BACKEND_CONFIG}" 
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference
