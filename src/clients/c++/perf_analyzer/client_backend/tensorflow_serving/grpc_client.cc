@@ -514,6 +514,7 @@ GrpcClient::PopulateHalfVal(tensorflow::TensorProto* input_tensor_proto)
 {
   // Building FP16 one by one. Note that since protobuf has no int16 type, we'll
   // have some pointless zero padding for each value here.
+  input_tensor_proto->mutable_half_val()->Reserve(2 * temp_buffer_.size());
   uint64_t copied_byte_size = 0;
   while (copied_byte_size < temp_buffer_.size()) {
     int32_t elem;
@@ -529,9 +530,12 @@ Error
 GrpcClient::PopulateFloatVal(tensorflow::TensorProto* input_tensor_proto)
 {
   input_tensor_proto->mutable_float_val()->Reserve(temp_buffer_.size());
-  memcpy(
-      input_tensor_proto->mutable_float_val()->mutable_data(),
-      temp_buffer_.c_str(), temp_buffer_.size());
+  uint64_t copied_byte_size = 0;
+  while (copied_byte_size < temp_buffer_.size()) {
+    input_tensor_proto->add_float_val(
+        *(float*)(temp_buffer_.c_str() + copied_byte_size));
+    copied_byte_size += sizeof(float);
+  }
 
   return Error::Success;
 }
@@ -540,9 +544,12 @@ Error
 GrpcClient::PopulateDoubleVal(tensorflow::TensorProto* input_tensor_proto)
 {
   input_tensor_proto->mutable_double_val()->Reserve(temp_buffer_.size());
-  memcpy(
-      input_tensor_proto->mutable_double_val()->mutable_data(),
-      temp_buffer_.c_str(), temp_buffer_.size());
+  uint64_t copied_byte_size = 0;
+  while (copied_byte_size < temp_buffer_.size()) {
+    input_tensor_proto->add_double_val(
+        *(double*)(temp_buffer_.c_str() + copied_byte_size));
+    copied_byte_size += sizeof(double);
+  }
 
   return Error::Success;
 }
@@ -553,13 +560,18 @@ GrpcClient::PopulateIntVal(
 {
   if (step_size == 4) {
     input_tensor_proto->mutable_int_val()->Reserve(temp_buffer_.size());
-    memcpy(
-        input_tensor_proto->mutable_int_val()->mutable_data(),
-        temp_buffer_.c_str(), temp_buffer_.size());
+    uint64_t copied_byte_size = 0;
+    while (copied_byte_size < temp_buffer_.size()) {
+      input_tensor_proto->add_int_val(
+          *(int*)(temp_buffer_.c_str() + copied_byte_size));
+      copied_byte_size += sizeof(int);
+    }
   } else {
     // Note that since protobuf has no int16/int8 type, we'll
     // have some pointless zero padding for each value here and
     // need to build the tensor one element at a time
+    input_tensor_proto->mutable_int_val()->Reserve(
+        temp_buffer_.size() * (4 / step_size));
     uint64_t copied_byte_size = 0;
     while (copied_byte_size < temp_buffer_.size()) {
       int32_t elem;
@@ -575,6 +587,7 @@ GrpcClient::PopulateIntVal(
 Error
 GrpcClient::PopulateStrVal(tensorflow::TensorProto* input_tensor_proto)
 {
+  input_tensor_proto->mutable_string_val()->Reserve(temp_buffer_.size());
   uint64_t copied_byte_size = 0;
   while (copied_byte_size < temp_buffer_.size()) {
     int32_t string_length = *((int*)(temp_buffer_.c_str() + copied_byte_size));
@@ -590,9 +603,12 @@ Error
 GrpcClient::PopulateBoolVal(tensorflow::TensorProto* input_tensor_proto)
 {
   input_tensor_proto->mutable_bool_val()->Reserve(temp_buffer_.size());
-  memcpy(
-      input_tensor_proto->mutable_bool_val()->mutable_data(),
-      temp_buffer_.c_str(), temp_buffer_.size());
+  uint64_t copied_byte_size = 0;
+  while (copied_byte_size < temp_buffer_.size()) {
+    input_tensor_proto->add_bool_val(
+        *(bool*)(temp_buffer_.c_str() + copied_byte_size));
+    copied_byte_size += sizeof(bool);
+  }
 
   return Error::Success;
 }
@@ -601,9 +617,12 @@ Error
 GrpcClient::PopulateInt64Val(tensorflow::TensorProto* input_tensor_proto)
 {
   input_tensor_proto->mutable_int64_val()->Reserve(temp_buffer_.size());
-  memcpy(
-      input_tensor_proto->mutable_int64_val()->mutable_data(),
-      temp_buffer_.c_str(), temp_buffer_.size());
+  uint64_t copied_byte_size = 0;
+  while (copied_byte_size < temp_buffer_.size()) {
+    input_tensor_proto->add_bool_val(
+        *(int64_t*)(temp_buffer_.c_str() + copied_byte_size));
+    copied_byte_size += sizeof(int64_t);
+  }
 
   return Error::Success;
 }
@@ -612,9 +631,12 @@ Error
 GrpcClient::PopulateUintVal(tensorflow::TensorProto* input_tensor_proto)
 {
   input_tensor_proto->mutable_uint32_val()->Reserve(temp_buffer_.size());
-  memcpy(
-      input_tensor_proto->mutable_uint32_val()->mutable_data(),
-      temp_buffer_.c_str(), temp_buffer_.size());
+  uint64_t copied_byte_size = 0;
+  while (copied_byte_size < temp_buffer_.size()) {
+    input_tensor_proto->add_uint32_val(
+        *(uint32_t*)(temp_buffer_.c_str() + copied_byte_size));
+    copied_byte_size += sizeof(uint32_t);
+  }
 
   return Error::Success;
 }
@@ -623,9 +645,12 @@ Error
 GrpcClient::PopulateUint64Val(tensorflow::TensorProto* input_tensor_proto)
 {
   input_tensor_proto->mutable_uint64_val()->Reserve(temp_buffer_.size());
-  memcpy(
-      input_tensor_proto->mutable_uint64_val()->mutable_data(),
-      temp_buffer_.c_str(), temp_buffer_.size());
+  uint64_t copied_byte_size = 0;
+  while (copied_byte_size < temp_buffer_.size()) {
+    input_tensor_proto->add_uint64_val(
+        *(uint64_t*)(temp_buffer_.c_str() + copied_byte_size));
+    copied_byte_size += sizeof(uint64_t);
+  }
 
   return Error::Success;
 }
