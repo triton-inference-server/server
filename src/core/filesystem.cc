@@ -1188,9 +1188,13 @@ S3FileSystem::S3FileSystem(
   const char* secret_key = std::getenv("AWS_SECRET_ACCESS_KEY");
   const char* key_id = std::getenv("AWS_ACCESS_KEY_ID");
   const char* region = std::getenv("AWS_DEFAULT_REGION");
+  const char* session_token = std::getenv("AWS_SESSION_TOKEN");
   if ((secret_key != NULL) && (key_id != NULL)) {
     credentials.SetAWSAccessKeyId(key_id);
     credentials.SetAWSSecretKey(secret_key);
+    if (session_token != NULL) {
+      credentials.SetSessionToken(session_token);
+    }
     config = Aws::Client::ClientConfiguration();
     if (region != NULL) {
       config.region = region;
