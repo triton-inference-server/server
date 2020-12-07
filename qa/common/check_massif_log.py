@@ -58,12 +58,11 @@ def parse_massif_out(filename):
     return summary
 
 
-def is_unbounded_growth(summary, max_allowed_alloc_rate):
+def is_unbounded_growth(summary, max_allowed_alloc):
     """
-    Check whether the rate of heap allocations is increasing     
+    Check whether the heap allocations is increasing     
     
     """
-    # Estimate allocation ratef from total bytes over allocations (~second derivative)
     totals = summary['mem_heap_B']
 
     if len(totals) < 5:
@@ -71,23 +70,22 @@ def is_unbounded_growth(summary, max_allowed_alloc_rate):
         return False
 
     # Don't start measuring from the first snapshot
-    start = len(totals) // 6
+    start = len(totals) // 2
+    end = len(totals) - 1
 
     # Compute change in allocation rate
-    alloc_rate_start = float(totals[start] - totals[start - 1]) / 1e6
-    alloc_rate_end = float(totals[-1] - totals[-2]) / 1e6
-    alloc_rate_mb = (alloc_rate_end - alloc_rate_start) / (len(totals) - 2)
+    memory_allocation_delta_mb = (totals[end] - totals[start]) / 1e6
 
-    print("ESTIMATED ALLOC RATE: %f MB/snapshot, MAX ALLOWED RATE: %f" %
-          (alloc_rate_mb, max_allowed_alloc_rate))
+    print("Change in memory allocation: %f MB, MAX ALLOWED: %f MB" %
+          (memory_allocation_delta_mb, max_allowed_alloc))
 
-    return (alloc_rate_mb > max_allowed_alloc_rate)
+    return (memory_allocation_delta_mb > max_allowed_alloc)
 
 
 if __name__ == '__main__':
     summary = parse_massif_out(sys.argv[1])
-    max_allowed_alloc_rate = float(sys.argv[2])
-    if is_unbounded_growth(summary, max_allowed_alloc_rate):
+    max_allowed_alloc = float(sys.argv[2])
+    if is_unbounded_growth(summary, max_allowed_alloc):
         sys.exit(1)
     else:
         sys.exit(0)
