@@ -26,7 +26,7 @@
 #pragma once
 
 #include <stdint.h>
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 

@@ -29,7 +29,7 @@
 #include <string>
 #include "src/core/constants.h"
 #include "src/core/metric_model_reporter.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

@@ -33,7 +33,7 @@
 #include <thread>
 #include <vector>
 
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/persistent_backend_manager.h"
 #include "src/core/status.h"

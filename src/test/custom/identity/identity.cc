@@ -29,7 +29,7 @@
 #include <thread>
 
 #include "src/core/model_config.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/test/custom/sdk/custom_instance.h"
 
 #ifdef TRITON_ENABLE_GPU

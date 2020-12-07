@@ -147,7 +147,7 @@ install(
 #
 # RateLimiter
 #
-protobuf_generate_cpp(MODEL_CONFIG_PROTO_SRC MODEL_CONFIG_PROTO_HDR ../core/model_config.proto)
+protobuf_generate_cpp(MODEL_CONFIG_PROTO_SRC MODEL_CONFIG_PROTO_HDR triton/core/model_config.proto)
 
 set(
   RATE_LIMITER_SRCS

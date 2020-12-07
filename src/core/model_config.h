@@ -27,7 +27,7 @@
 
 #include <google/protobuf/any.pb.h>
 #include <stdint.h>
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {

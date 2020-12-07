@@ -31,7 +31,7 @@
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/metric_model_reporter.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 #include "src/core/sync_queue.h"

@@ -31,7 +31,7 @@
 #include "src/core/backend.h"
 #include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

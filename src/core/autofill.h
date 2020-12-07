@@ -27,7 +27,7 @@
 
 #include <string>
 #include "src/core/model_config.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

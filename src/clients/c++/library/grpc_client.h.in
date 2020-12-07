@@ -39,7 +39,7 @@
 #include "src/clients/c++/library/common.h"
 #include "src/clients/c++/library/ipc.h"
 #include "src/core/grpc_service.grpc.pb.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #endif
 
 namespace nvidia { namespace inferenceserver { namespace client {

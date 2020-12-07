@@ -30,7 +30,7 @@ package inference;
 
 //@@.. cpp:namespace:: inference
 
-import "model_config.proto";
+import "triton/core/model_config.proto";
 
 //@@
 //@@.. cpp:var:: service InferenceService

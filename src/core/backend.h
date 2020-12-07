@@ -28,7 +28,7 @@
 #include "src/core/backend_context.h"
 #include "src/core/infer_stats.h"
 #include "src/core/label_provider.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 

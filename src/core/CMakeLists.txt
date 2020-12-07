@@ -29,9 +29,13 @@ cmake_minimum_required (VERSION 3.18)
 #
 # Protobuf
 #
-file(GLOB proto-srcs *.proto)
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${proto-srcs})
-protobuf_generate_python(PROTO_PY ${proto-srcs})
+file(GLOB PROTO_FILES *.proto)
+set(PROTOBUF_IMPORT_DIRS)
+set(PROTOBUF_IMPORT_DIRS "_deps/repo-core-src/include")
+set(PROTO_FILES ${PROTO_FILES} ${PROTOBUF_IMPORT_DIRS}/triton/core/model_config.proto)
+include_directories(${PROTOBUF_IMPORT_DIRS})
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
+protobuf_generate_python(PROTO_PY ${PROTO_FILES})
 
 set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
 if(${TRITON_ENABLE_GRPC})

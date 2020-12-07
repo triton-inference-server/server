@@ -29,7 +29,7 @@
 
 #include <memory>
 #include "src/core/metric_model_reporter.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"

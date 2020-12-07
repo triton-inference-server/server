@@ -41,7 +41,7 @@
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/core/model_config.pb.h"
+#include "triton/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
