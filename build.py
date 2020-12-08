@@ -734,15 +734,13 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/li
 '''
     if 'pytorch' in backends:
         df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/pytorch/* backends/pytorch/
+COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/pytorch backends/pytorch
 '''
     if 'onnxruntime' in backends:
         df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/onnxruntime/* backends/onnxruntime/
+COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/onnxruntime backends/onnxruntime
 '''
 
-    # Only need the backends directory if we built some non-core
-    # backends.
     for noncore in NONCORE_BACKENDS:
         if noncore in backends:
             df += '''
