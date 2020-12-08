@@ -12,7 +12,7 @@ $ cp ../../../core/*.proto src/main/proto/
 ```
 
 __Note__ the *.proto files are copied from [triton-inference-server
-/server/src/core/](https://github.com/triton-inference-server/server/tree/master/src/core). After copying the The __libray__ dir should look as below.
+/server/src/core/](https://github.com/triton-inference-server/server/tree/master/src/core). After copying the __libray__ dir should look as below.
 
 
 <img src="images/proto-files.png" width="220" />
