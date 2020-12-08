@@ -26,7 +26,7 @@ Once compiled, one should notice the generated *.java files under __target__ fol
 
 ## Use the generated files in any project
 
-To run the examples clients copy the above generated stub into __examples__ folder
+To run the examples clients, copy the above generated stub into __examples__ folder
 
 ```
 $ cd ..
