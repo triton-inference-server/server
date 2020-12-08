@@ -52,9 +52,10 @@ _test_system_shared_memory = bool(
 _test_cuda_shared_memory = bool(
     int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 _test_valgrind = bool(int(os.environ.get('TEST_VALGRIND', 0)))
+_test_jetson = bool(int(os.environ.get('TEST_JETSON', 0)))
 
 _max_sequence_idle_ms = 5000
-_valgrind_delay_ms = 50
+_valgrind_delay_ms = bool(int(os.environ.get('TEST_DELAY_MS', 50)))
 
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = None
@@ -449,7 +450,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                 OUTPUT = "OUTPUT__0" if trial.startswith(
                     "libtorch") else "OUTPUT"
                 for flag_str, value, thresholds, delay_ms in values:
-                    if _test_valgrind:
+                    if _test_valgrind or _test_jetson:
                         if delay_ms is not None:
                             delay_ms[0] = max(_valgrind_delay_ms, delay_ms[0])
                             delay_ms[1] = max(_valgrind_delay_ms, delay_ms[1])
