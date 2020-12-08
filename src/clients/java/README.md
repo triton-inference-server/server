@@ -7,8 +7,10 @@ Maven 3.3+ and JDK 1.8+
 
 ## Generating java GRPC client stub
 
+Copy __*.proto__ files to Library src/main/proto
 ```
 cd library
+cp ../../../core/*.proto src/main/proto/
 ```
 
 __Note__ the location of *.proto files, these files have been copied from [triton-inference-server
