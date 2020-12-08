@@ -13,8 +13,8 @@ cd library
 cp ../../../core/*.proto src/main/proto/
 ```
 
-__Note__ the location of *.proto files, these files have been copied from [triton-inference-server
-/server/src/core/](https://github.com/triton-inference-server/server/tree/master/src/core)
+__Note__ the *.proto files are copied from [triton-inference-server
+/server/src/core/](https://github.com/triton-inference-server/server/tree/master/src/core). The Libray should look as below.
 
 
 <img src="images/proto-files.png" width="220" />
