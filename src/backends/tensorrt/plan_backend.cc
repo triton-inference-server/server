@@ -2509,7 +2509,7 @@ PlanBackend::Context::Run(
 
         if ((batch_input.kind() !=
              inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) &&
-            (io_binding_info.memory_type_ != TRITONSERVER_MEMORY_GPU)) {
+            (io_binding_info.memory_type_ == TRITONSERVER_MEMORY_GPU)) {
           bool cuda_used = false;
           FAIL_ALL_AND_RETURN_IF_ERROR(
               payload_->requests_, payload_->responses_, metric_reporter_.get(),
