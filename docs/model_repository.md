@@ -93,7 +93,8 @@ model files](#model-files).
 ## Model Repository Locations
 
 Triton can access models from one or more locally accessible file
-paths, from Google Cloud Storage, and from Amazon S3.
+paths, from Google Cloud Storage, from Amazon S3, and from Azure
+Storage.
 
 ### Local File System
 
@@ -138,6 +139,15 @@ variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvar
 If the environment variables are set they will take a higher priority
 and will be used by Triton instead of the credentials set using the
 aws config command.
+
+### Azure Storage
+
+For a model repository residing in Azure Storage, the repository path
+must be prefixed with as://.
+
+```bash
+$ tritonserver --model-repository=as://account_name/container_name/path/to/model/repository ...
+```
 
 ## Model Versions
 
@@ -300,11 +310,11 @@ A minimal model repository for a Python model is:
 The [DALI backend](https://github.com/triton-inference-server/dali_backend)
 allows you to run a [DALI pipeline](https://github.com/NVIDIA/DALI) as
 a model within Triton. In order to use this backend, you need to generate
-a file, by default named `model.dali`, and include it in your model repository. 
+a file, by default named `model.dali`, and include it in your model repository.
 Please refer to [DALI backend documentation
 ](https://github.com/triton-inference-server/dali_backend#how-to-use) for the
 description, how to generate `model.dali`. The default model file name can be
-overridden using the *default_model_filename* property in the 
+overridden using the *default_model_filename* property in the
 [model configuration](model_configuration.md).
 
 A minimal model repository for a DALI model is:
