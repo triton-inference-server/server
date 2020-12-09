@@ -44,8 +44,8 @@ EOF
 if [[ "$(find -L /usr -name libcuda.so.1 | grep -v "compat") " == " " || "$(ls /dev/nvidiactl 2>/dev/null) " == " " ]]; then
   echo
   echo "WARNING: The NVIDIA Driver was not detected.  GPU functionality will not be available."
-  echo "   Use 'nvidia-docker run' to start this container; see"
-  echo "   https://github.com/NVIDIA/nvidia-docker/wiki/nvidia-docker ."
+  echo "   Use Docker with NVIDIA Container Toolkit to start this container; see"
+  echo "   https://github.com/NVIDIA/nvidia-docker."
   ln -s `find / -name libnvidia-ml.so -print -quit` /opt/tritonserver/lib/libnvidia-ml.so.1
   export TRITON_SERVER_CPU_ONLY=1
 else
@@ -75,13 +75,6 @@ if ! cat /proc/cpuinfo | grep flags | sort -u | grep avx >& /dev/null; then
   echo "       support for AVX.  An Illegal Instrution exception at runtime is likely to result."
   echo "       See https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#CPUs_with_AVX ."
   sleep 2
-fi
-
-if [[ "$(df -k /dev/shm |grep ^shm |awk '{print $2}') " == "65536 " ]]; then
-  echo
-  echo "NOTE: The SHMEM allocation limit is set to the default of 64MB.  This may be"
-  echo "   insufficient for the inference server.  NVIDIA recommends the use of the following flags:"
-  echo "   nvidia-docker run --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 ..."
 fi
 
 echo
