@@ -2509,7 +2509,7 @@ PlanBackend::Context::Run(
 
         if ((batch_input.kind() !=
              inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) &&
-            (io_binding_info.memory_type_ != TRITONSERVER_MEMORY_GPU)) {
+            (io_binding_info.memory_type_ == TRITONSERVER_MEMORY_GPU)) {
           bool cuda_used = false;
           FAIL_ALL_AND_RETURN_IF_ERROR(
               payload_->requests_, payload_->responses_, metric_reporter_.get(),
@@ -2671,8 +2671,9 @@ PlanBackend::Context::Run(
                 batch_input, input_buffer, total_byte_size, mem_type,
                 mem_type_id),
             "error setting the bath input value");
-        if (batch_input.kind() !=
-            inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) {
+        if ((batch_input.kind() !=
+             inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE) &&
+            (io_binding_info.memory_type_ == TRITONSERVER_MEMORY_GPU)) {
           bool cuda_used = false;
           FAIL_ALL_AND_RETURN_IF_ERROR(
               payload_->requests_, payload_->responses_, metric_reporter_.get(),
