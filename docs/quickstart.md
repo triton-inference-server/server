@@ -35,11 +35,12 @@ The Triton Inference Server is available as [buildable source
 
 ## Install Triton Docker Image
 
-Before you can use the Triton Docker image you must install and
-nvidia-docker.  For DGX users, see [Preparing to use NVIDIA
-Containers](http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html),
-For users other than DGX, see the [nvidia-docker installation
-documentation](https://github.com/NVIDIA/nvidia-docker).
+Before you can use the Triton Docker image you must install
+[Docker](https://docs.docker.com/engine/install). If you plan on using
+a GPU for inference you must also install the [NVIDIA Container
+Toolkit](https://github.com/NVIDIA/nvidia-docker). DGX users should
+follow [Preparing to use NVIDIA
+Containers](http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html).
 
 Pull the image using the following command.
 
@@ -72,8 +73,10 @@ you can use the same Triton Docker image.
 ### Run on System with GPUs
 
 Use the following command to run Triton with the example model
-repository you just created. The --gpus=1 flag indicates that 1 system
-GPU should be made available to Triton for inferencing.
+repository you just created. The [NVIDIA Container
+Toolkit](https://github.com/NVIDIA/nvidia-docker) must be installed
+for Docker to recognize the GPU(s). The --gpus=1 flag indicates that 1
+system GPU should be made available to Triton for inferencing.
 
 ```
 $ docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:<xx.yy>-py3 tritonserver --model-repository=/models
