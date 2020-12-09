@@ -59,6 +59,7 @@ _valgrind_delay_ms = bool(int(os.environ.get('TEST_DELAY_MS', 50)))
 
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = None
+_jetson_slowdown_factor = 1.6
 
 
 class UserData:
@@ -586,6 +587,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                     lt_ms = sequence_thresholds[0]
                     gt_ms = sequence_thresholds[1]
                     if lt_ms is not None:
+                        if _test_jetson:
+                            lt_ms *= _jetson_slowdown_factor
                         self.assertTrue((seq_end_ms - seq_start_ms) < lt_ms,
                                         "sequence expected less than " +
                                         str(lt_ms) + "ms response time, got " +
@@ -733,6 +736,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                 lt_ms = sequence_thresholds[0]
                 gt_ms = sequence_thresholds[1]
                 if lt_ms is not None:
+                    if _test_jetson:
+                        lt_ms *= _jetson_slowdown_factor
                     self.assertTrue((seq_end_ms - seq_start_ms) < lt_ms,
                                     "sequence expected less than " +
                                     str(lt_ms) + "ms response time, got " +
@@ -917,6 +922,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                 lt_ms = sequence_thresholds[0]
                 gt_ms = sequence_thresholds[1]
                 if lt_ms is not None:
+                    if _test_jetson:
+                        lt_ms *= _jetson_slowdown_factor
                     self.assertTrue((seq_end_ms - seq_start_ms) < lt_ms,
                                     "sequence expected less than " +
                                     str(lt_ms) + "ms response time, got " +
