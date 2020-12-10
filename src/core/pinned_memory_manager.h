@@ -26,7 +26,7 @@
 //
 #pragma once
 
-#include <boost/interprocess/managed_external_buffer.hpp>
+//#include <boost/interprocess/managed_external_buffer.hpp>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -82,7 +82,7 @@ class PinnedMemoryManager {
 
   void* pinned_memory_buffer_;
   std::mutex buffer_mtx_;
-  boost::interprocess::managed_external_buffer managed_pinned_memory_;
+//  boost::interprocess::managed_external_buffer managed_pinned_memory_;
 };
 
 }}  // namespace nvidia::inferenceserver

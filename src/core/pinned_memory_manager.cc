@@ -56,8 +56,8 @@ PinnedMemoryManager::PinnedMemoryManager(
     : pinned_memory_buffer_(pinned_memory_buffer)
 {
   if (pinned_memory_buffer_ != nullptr) {
-    managed_pinned_memory_ = boost::interprocess::managed_external_buffer(
-        boost::interprocess::create_only_t{}, pinned_memory_buffer_, size);
+    //managed_pinned_memory_ = boost::interprocess::managed_external_buffer(
+    //    boost::interprocess::create_only_t{}, pinned_memory_buffer_, size);
   }
 }
 
@@ -85,7 +85,7 @@ PinnedMemoryManager::AllocInternal(
   auto status = Status::Success;
   if (pinned_memory_buffer_ != nullptr) {
     std::lock_guard<std::mutex> lk(buffer_mtx_);
-    *ptr = managed_pinned_memory_.allocate(size, std::nothrow_t{});
+    *ptr = nullptr; //managed_pinned_memory_.allocate(size, std::nothrow_t{});
     *allocated_type = TRITONSERVER_MEMORY_CPU_PINNED;
     if (*ptr == nullptr) {
       status = Status(
@@ -137,7 +137,7 @@ PinnedMemoryManager::AllocInternal(
   if ((!status.IsOk()) && (*ptr != nullptr)) {
     if (is_pinned) {
       std::lock_guard<std::mutex> lk(buffer_mtx_);
-      managed_pinned_memory_.deallocate(*ptr);
+      //managed_pinned_memory_.deallocate(*ptr);
     } else {
       free(*ptr);
     }
@@ -169,7 +169,7 @@ PinnedMemoryManager::FreeInternal(void* ptr)
 
   if (is_pinned) {
     std::lock_guard<std::mutex> lk(buffer_mtx_);
-    managed_pinned_memory_.deallocate(ptr);
+    //managed_pinned_memory_.deallocate(ptr);
   } else {
     free(ptr);
   }
