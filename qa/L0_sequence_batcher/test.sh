@@ -63,6 +63,11 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     QUEUE_DELAY_TESTS="test_queue_delay_full_min_util"
 fi
 
+# Shortened tests due to jetson slowdown
+if [ "$TEST_JETSON" -eq 1 ]; then
+    MODEL_TRIALS="0 v"
+fi
+
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 SERVER=${OPTDIR}/tritonserver/bin/tritonserver
