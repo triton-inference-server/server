@@ -288,7 +288,7 @@ class BackendInputCollector {
   cudaStream_t stream_;
   cudaEvent_t event_;
 
-  using RequestsList = std::list<std::pair<
+  using RequestsList = std::vector<std::pair<
       std::unique_ptr<InferenceResponse>*, const InferenceRequest::Input*>>;
 
   size_t pending_pinned_byte_size_;
@@ -325,7 +325,7 @@ class BackendInputCollector {
 
   std::list<DeferredPinned> deferred_pinned_;
   // FIXME use future to maintain an issue-order queue to drop task count
-  SyncQueue<std::tuple<Status, bool, void*>> completion_queue_;
+  SyncQueue<bool> completion_queue_;
   size_t async_task_count_;
 };
 
