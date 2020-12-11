@@ -174,30 +174,15 @@ main(int argc, char** argv)
           input1_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT1");
 
-  // Generate the outputs to be requested.
-  nic::InferRequestedOutput* output0;
-  nic::InferRequestedOutput* output1;
-
-  FAIL_IF_ERR(
-      nic::InferRequestedOutput::Create(&output0, "OUTPUT0"),
-      "unable to get 'OUTPUT0'");
-  std::shared_ptr<nic::InferRequestedOutput> output0_ptr;
-  output0_ptr.reset(output0);
-  FAIL_IF_ERR(
-      nic::InferRequestedOutput::Create(&output1, "OUTPUT1"),
-      "unable to get 'OUTPUT1'");
-  std::shared_ptr<nic::InferRequestedOutput> output1_ptr;
-  output1_ptr.reset(output1);
-
-
   // The inference settings. Will be using default for now.
   nic::InferOptions options(model_name);
   options.model_version_ = model_version;
   options.client_timeout_ = client_timeout;
 
   std::vector<nic::InferInput*> inputs = {input0_ptr.get(), input1_ptr.get()};
-  std::vector<const nic::InferRequestedOutput*> outputs = {output0_ptr.get(),
-                                                           output1_ptr.get()};
+  // Empty output vector will request data for all the output tensors from
+  // the server.
+  std::vector<const nic::InferRequestedOutput*> outputs = {};
 
   nic::InferResult* results;
   FAIL_IF_ERR(
