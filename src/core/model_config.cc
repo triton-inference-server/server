@@ -284,7 +284,6 @@ GetBackendTypeFromPlatform(const std::string& platform_name)
   }
 #endif  // TRITON_ENABLE_CUSTOM
 
-
   return BackendType::BACKEND_TYPE_UNKNOWN;
 }
 
