@@ -26,50 +26,30 @@
 
 cmake_minimum_required (VERSION 3.18)
 
-if(${TRITON_CURL_WITHOUT_CONFIG})
-  find_package(CURL REQUIRED)
-else()
-  find_package(CURL CONFIG REQUIRED)
-endif() # TRITON_CURL_WITHOUT_CONFIG
-message(STATUS "Using curl ${CURL_VERSION}")
-add_definitions(-DCURL_STATICLIB)
-
-add_subdirectory(triton)
-add_subdirectory(tensorflow_serving)
-add_subdirectory(torchserve)
-
 set(
-  CLIENT_BACKEND_SRCS
-  client_backend.cc
-  ../../examples/shm_utils.cc
+    TRITON_CLIENT_BACKEND_SRCS
+    triton_client_backend.cc
 )
 
 set(
-  CLIENT_BACKEND_HDRS
-  client_backend.h
-  ../../examples/shm_utils.h
+    TRITON_CLIENT_BACKEND_HDRS
+    triton_client_backend.h
 )
 
 add_library(
-  client-backend-library
-  ${CLIENT_BACKEND_SRCS}
-  ${CLIENT_BACKEND_HDRS}
-  $<TARGET_OBJECTS:triton-client-backend-library>
-  $<TARGET_OBJECTS:tfs-client-backend-library>
-  $<TARGET_OBJECTS:ts-client-backend-library>
+    triton-client-backend-library  EXCLUDE_FROM_ALL OBJECT
+    ${TRITON_CLIENT_BACKEND_SRCS}
+    ${TRITON_CLIENT_BACKEND_HDRS}
 )
 
 target_link_libraries(
-  client-backend-library
-  PUBLIC triton-common-json        # from repo-common
-  PUBLIC $<TARGET_PROPERTY:triton-client-backend-library, LINK_LIBRARIES>
-  PUBLIC $<TARGET_PROPERTY:tfs-client-backend-library, LINK_LIBRARIES>
-  PUBLIC $<TARGET_PROPERTY:ts-client-backend-library, LINK_LIBRARIES>
+  triton-client-backend-library
+  PUBLIC model-config-library
+  PUBLIC TRITON::grpcclient_static
+  PUBLIC TRITON::httpclient_static
 )
 
-target_include_directories(
-    client-backend-library
-    PRIVATE $<TARGET_PROPERTY:triton-client-backend-library, INCLUDE_DIRECTORIES>
-    PRIVATE $<TARGET_PROPERTY:tfs-client-backend-library, INCLUDE_DIRECTORIES>
-    PRIVATE $<TARGET_PROPERTY:ts-client-backend-library, INCLUDE_DIRECTORIES>
-)
+if(${TRITON_ENABLE_GPU})
+    target_include_directories(triton-client-backend-library PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(triton-client-backend-library PRIVATE ${CUDA_LIBRARIES})
+endif() # TRITON_ENABLE_GPU

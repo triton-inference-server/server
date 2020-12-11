@@ -26,50 +26,33 @@
 
 cmake_minimum_required (VERSION 3.18)
 
-if(${TRITON_CURL_WITHOUT_CONFIG})
-  find_package(CURL REQUIRED)
-else()
-  find_package(CURL CONFIG REQUIRED)
-endif() # TRITON_CURL_WITHOUT_CONFIG
-message(STATUS "Using curl ${CURL_VERSION}")
-add_definitions(-DCURL_STATICLIB)
-
-add_subdirectory(triton)
-add_subdirectory(tensorflow_serving)
-add_subdirectory(torchserve)
-
 set(
-  CLIENT_BACKEND_SRCS
-  client_backend.cc
-  ../../examples/shm_utils.cc
+    TS_CLIENT_BACKEND_SRCS
+    torchserve_client_backend.cc
+    torchserve_infer_input.cc
+    http_client.cc
 )
 
 set(
-  CLIENT_BACKEND_HDRS
-  client_backend.h
-  ../../examples/shm_utils.h
+    TS_CLIENT_BACKEND_HDRS
+    torchserve_client_backend.h
+    torchserve_infer_input.h
+    http_client.h
 )
 
 add_library(
-  client-backend-library
-  ${CLIENT_BACKEND_SRCS}
-  ${CLIENT_BACKEND_HDRS}
-  $<TARGET_OBJECTS:triton-client-backend-library>
-  $<TARGET_OBJECTS:tfs-client-backend-library>
-  $<TARGET_OBJECTS:ts-client-backend-library>
+    ts-client-backend-library  EXCLUDE_FROM_ALL OBJECT
+    ${TS_CLIENT_BACKEND_SRCS}
+    ${TS_CLIENT_BACKEND_HDRS}
 )
 
 target_link_libraries(
-  client-backend-library
-  PUBLIC triton-common-json        # from repo-common
-  PUBLIC $<TARGET_PROPERTY:triton-client-backend-library, LINK_LIBRARIES>
-  PUBLIC $<TARGET_PROPERTY:tfs-client-backend-library, LINK_LIBRARIES>
-  PUBLIC $<TARGET_PROPERTY:ts-client-backend-library, LINK_LIBRARIES>
+  ts-client-backend-library
+  PUBLIC CURL::libcurl
+  PUBLIC TRITON::httpclient_static
 )
 
-target_include_directories(
-    client-backend-library
-    PRIVATE $<TARGET_PROPERTY:triton-client-backend-library, INCLUDE_DIRECTORIES>
-    PRIVATE $<TARGET_PROPERTY:tfs-client-backend-library, INCLUDE_DIRECTORIES>
-    PRIVATE $<TARGET_PROPERTY:ts-client-backend-library, INCLUDE_DIRECTORIES>
-)
+if(${TRITON_ENABLE_GPU})
+    target_include_directories(ts-client-backend-library PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(ts-client-backend-library PRIVATE ${CUDA_LIBRARIES})
+endif() # TRITON_ENABLE_GPU
