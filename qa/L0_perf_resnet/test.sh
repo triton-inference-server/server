@@ -176,14 +176,12 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
     done
 done
 
-# TensorFlow Serving does not support multiple instances.
-# Need to run the tensorflow model with a single instance
-# for fair comparison.
+# Needs this additional test configuration for comparing against TFS.
 MODEL_NAME=${TF_MODEL_NAME}
 REPO=$REPODIR/perf_model_store
 STATIC_BATCH=128
 INSTANCE_CNT=1
-CONCURRENCY=4
+CONCURRENCY=1
 FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
 MODEL_NAME=${MODEL_NAME} \
     MODEL_FRAMEWORK=${FRAMEWORK} \

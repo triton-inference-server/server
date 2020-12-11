@@ -108,10 +108,10 @@ if [ -f $REPORTER ]; then
     set -e
 fi
 
-# To get maximum throughput
+# Large static batch size case.
 STATIC_BATCH=128
 NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}
-$PERF_ANALYZER -m ${MODEL_NAME} --service-kind tfserving -i grpc --concurrency-range 4 -b ${STATIC_BATCH} -p 5000 -f ${NAME}.csv >> ${NAME}.log 2>&1
+$PERF_ANALYZER -m ${MODEL_NAME} --service-kind tfserving -i grpc -b ${STATIC_BATCH} -p 5000 -f ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
     RET=1
 fi
@@ -122,7 +122,7 @@ echo -e "\"s_server\":\"tfserving\"," >> ${NAME}.tjson
 echo -e "\"s_protocol\":\"grpc\"," >> ${NAME}.tjson
 echo -e "\"s_framework\":\"savedmodel\"," >> ${NAME}.tjson
 echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
-echo -e "\"l_concurrency\":4," >> ${NAME}.tjson
+echo -e "\"l_concurrency\":1," >> ${NAME}.tjson
 echo -e "\"l_batch_size\":128," >> ${NAME}.tjson
 echo -e "\"l_instance_count\":1}]" >> ${NAME}.tjson
 
