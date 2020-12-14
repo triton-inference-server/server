@@ -62,14 +62,14 @@ add_library(
 target_link_libraries(
   client-backend-library
   PUBLIC triton-common-json        # from repo-common
-  PUBLIC $<TARGET_PROPERTY:triton-client-backend-library, LINK_LIBRARIES>
-  PUBLIC $<TARGET_PROPERTY:tfs-client-backend-library, LINK_LIBRARIES>
-  PUBLIC $<TARGET_PROPERTY:ts-client-backend-library, LINK_LIBRARIES>
+  PUBLIC $<TARGET_PROPERTY:triton-client-backend-library,LINK_LIBRARIES>
+  PUBLIC $<TARGET_PROPERTY:tfs-client-backend-library,LINK_LIBRARIES>
+  PUBLIC $<TARGET_PROPERTY:ts-client-backend-library,LINK_LIBRARIES>
 )
 
 target_include_directories(
     client-backend-library
-    PRIVATE $<TARGET_PROPERTY:triton-client-backend-library, INCLUDE_DIRECTORIES>
-    PRIVATE $<TARGET_PROPERTY:tfs-client-backend-library, INCLUDE_DIRECTORIES>
-    PRIVATE $<TARGET_PROPERTY:ts-client-backend-library, INCLUDE_DIRECTORIES>
+    PRIVATE $<TARGET_PROPERTY:triton-client-backend-library,INCLUDE_DIRECTORIES>
+    PRIVATE $<TARGET_PROPERTY:tfs-client-backend-library,INCLUDE_DIRECTORIES>
+    PRIVATE $<TARGET_PROPERTY:ts-client-backend-library,INCLUDE_DIRECTORIES>
 )
