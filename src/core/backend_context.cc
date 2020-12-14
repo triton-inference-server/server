@@ -1027,13 +1027,15 @@ BackendInputCollector::FlushPendingPinned(
 
         cuda_used |= SetFixedSizeInputTensor(
             request_input, offset, pinned_buffer, pending_pinned_byte_size_,
-            pinned_memory_type, pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED,
-            response);
+            pinned_memory_type, pinned_memory_id,
+            TRITONSERVER_MEMORY_CPU_PINNED, response);
         offset += request_input->Data()->TotalByteSize();
       }
     } else {
       bool* cuda_used_ptr = &cuda_used;
-      size_t stride = (pending_pinned_inputs_.size() + AsyncWorkQueue::WorkerCount() -1) / AsyncWorkQueue::WorkerCount();
+      size_t stride =
+          (pending_pinned_inputs_.size() + AsyncWorkQueue::WorkerCount() - 1) /
+          AsyncWorkQueue::WorkerCount();
       auto pending_it = pending_pinned_inputs_.begin();
       while (pending_it != pending_pinned_inputs_.end()) {
         auto end_it = pending_it;
@@ -1046,30 +1048,33 @@ BackendInputCollector::FlushPendingPinned(
           }
         }
 
-        auto status = AsyncWorkQueue::AddTask([this, cuda_used_ptr,
-              offset, pinned_buffer, pinned_memory_type, pinned_memory_id,
-              pending_it, end_it]() mutable {
-          for (; pending_it != end_it; pending_it++) {
-            std::unique_ptr<InferenceResponse>* response = (*pending_it).first;
-            const InferenceRequest::Input* request_input = (*pending_it).second;
-            if(SetFixedSizeInputTensor(
-                request_input, offset, pinned_buffer, pending_pinned_byte_size_,
-                pinned_memory_type, pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED,
-                response)) {
-                *cuda_used_ptr = true;
-            }
-            offset += request_input->Data()->TotalByteSize();
-        }
-          completion_queue_.Put(true);
-        });
+        auto status = AsyncWorkQueue::AddTask(
+            [this, cuda_used_ptr, offset, pinned_buffer, pinned_memory_type,
+             pinned_memory_id, pending_it, end_it]() mutable {
+              for (; pending_it != end_it; pending_it++) {
+                std::unique_ptr<InferenceResponse>* response =
+                    (*pending_it).first;
+                const InferenceRequest::Input* request_input =
+                    (*pending_it).second;
+                if (SetFixedSizeInputTensor(
+                        request_input, offset, pinned_buffer,
+                        pending_pinned_byte_size_, pinned_memory_type,
+                        pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED,
+                        response)) {
+                  *cuda_used_ptr = true;
+                }
+                offset += request_input->Data()->TotalByteSize();
+              }
+              completion_queue_.Put(true);
+            });
         if (!status.IsOk()) {
           for (; pending_it != end_it; pending_it++) {
             std::unique_ptr<InferenceResponse>* response = (*pending_it).first;
             if (*response != nullptr) {
               LOG_STATUS_ERROR(
                   InferenceResponse::SendWithStatus(
-                      std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                      status),
+                      std::move(*response),
+                      TRITONSERVER_RESPONSE_COMPLETE_FINAL, status),
                   "error setting failure input tensor");
             }
           }
@@ -1079,8 +1084,8 @@ BackendInputCollector::FlushPendingPinned(
         async_task_count_++;
       }
 
-      // Sync previous async tasks if any. This sync is require because the below
-      // CPU-PINNED to GPU copy.
+      // Sync previous async tasks if any. This sync is require because the
+      // below CPU-PINNED to GPU copy.
       // FIXME: Can the CPU-PINNED to GPU copy be deferred to Finalize() and
       // remove this sync?
       for (size_t i = 0; i < async_task_count_; i++) {

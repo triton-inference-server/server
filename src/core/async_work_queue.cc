@@ -63,8 +63,8 @@ AsyncWorkQueue::Initialize(size_t worker_count)
   std::lock_guard<std::mutex> lk(init_mtx);
   if (GetSingleton()->worker_threads_.size() == 0) {
     for (size_t cnt = 0; cnt < worker_count; cnt++) {
-      GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
-          new std::thread([] { WorkThread(); })));
+      GetSingleton()->worker_threads_.push_back(
+          std::unique_ptr<std::thread>(new std::thread([] { WorkThread(); })));
     }
   }
   return Status::Success;
