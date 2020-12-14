@@ -132,10 +132,8 @@ InferenceServer::Init()
   // maintaining a reference to them).
   status = PersistentBackendManager::Create(
       backend_cmdline_config_map_, &persist_backend_manager_);
-  // Always initialize async work queue for now
-  if (status.IsOk()) {
-    status = AsyncWorkQueue::Initialize(
-        std::max((uint32_t)1, buffer_manager_thread_count_));
+  if (status.IsOk() && (buffer_manager_thread_count_ > 0)) {
+    status = AsyncWorkQueue::Initialize(buffer_manager_thread_count_);
   }
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;

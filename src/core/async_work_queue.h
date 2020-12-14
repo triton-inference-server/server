@@ -52,13 +52,13 @@ class AsyncWorkQueue {
 
   // Add a 'task' to the queue. The function will take ownership of 'task'.
   // Therefore std::move should be used when calling AddTask.
-  static void AddTask(const std::function<void(void)>&& task);
+  static Status AddTask(const std::function<void(void)>&& task);
 
  private:
   AsyncWorkQueue() = default;
   ~AsyncWorkQueue();
   static AsyncWorkQueue* GetSingleton();
-  static void InitializeThread();
+  static void WorkThread();
 
   std::vector<std::unique_ptr<std::thread>> worker_threads_;
   SyncQueue<std::function<void(void)>> task_queue_;

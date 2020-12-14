@@ -1046,7 +1046,7 @@ BackendInputCollector::FlushPendingPinned(
           }
         }
 
-        AsyncWorkQueue::AddTask([this, cuda_used_ptr,
+        auto status = AsyncWorkQueue::AddTask([this, cuda_used_ptr,
               offset, pinned_buffer, pinned_memory_type, pinned_memory_id,
               pending_it, end_it]() mutable {
           for (; pending_it != end_it; pending_it++) {
@@ -1062,6 +1062,18 @@ BackendInputCollector::FlushPendingPinned(
         }
           completion_queue_.Put(true);
         });
+        if (!status.IsOk()) {
+          for (; pending_it != end_it; pending_it++) {
+            std::unique_ptr<InferenceResponse>* response = (*pending_it).first;
+            if (*response != nullptr) {
+              LOG_STATUS_ERROR(
+                  InferenceResponse::SendWithStatus(
+                      std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                      status),
+                  "error setting failure input tensor");
+            }
+          }
+        }
         offset = next_offset;
         pending_it = end_it;
         async_task_count_++;

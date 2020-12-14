@@ -59,9 +59,13 @@ AsyncWorkQueue::Initialize(size_t worker_count)
         Status::Code::INVALID_ARG,
         "Async work queue must be initialized with positive 'worker_count'");
   }
-  for (size_t cnt = 0; cnt < worker_count; cnt++) {
-    GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
-        new std::thread([] { InitializeThread(); })));
+  static std::mutex init_mtx;
+  std::lock_guard<std::mutex> lk(init_mtx);
+  if (GetSingleton()->worker_threads_.size() == 0) {
+    for (size_t cnt = 0; cnt < worker_count; cnt++) {
+      GetSingleton()->worker_threads_.push_back(std::unique_ptr<std::thread>(
+          new std::thread([] { WorkThread(); })));
+    }
   }
   return Status::Success;
 }
@@ -72,14 +76,20 @@ AsyncWorkQueue::WorkerCount()
   return GetSingleton()->worker_threads_.size();
 }
 
-void
+Status
 AsyncWorkQueue::AddTask(const std::function<void(void)>&& task)
 {
+  if (GetSingleton()->worker_threads_.size == 0) {
+    return Status(
+        Status::Code::UNAVAILABLE,
+        "Async work queue must be initialized before adding task")
+  }
   GetSingleton()->task_queue_.Put(std::move(task));
+  return Status::Success;
 }
 
 void
-AsyncWorkQueue::InitializeThread()
+AsyncWorkQueue::WorkThread()
 {
   while (true) {
     auto task = GetSingleton()->task_queue_.Get();
