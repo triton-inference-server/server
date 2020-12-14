@@ -82,7 +82,7 @@ AsyncWorkQueue::AddTask(const std::function<void(void)>&& task)
   if (GetSingleton()->worker_threads_.size() == 0) {
     return Status(
         Status::Code::UNAVAILABLE,
-        "Async work queue must be initialized before adding task")
+        "Async work queue must be initialized before adding task");
   }
   GetSingleton()->task_queue_.Put(std::move(task));
   return Status::Success;
