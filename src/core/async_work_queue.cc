@@ -79,7 +79,7 @@ AsyncWorkQueue::WorkerCount()
 Status
 AsyncWorkQueue::AddTask(const std::function<void(void)>&& task)
 {
-  if (GetSingleton()->worker_threads_.size == 0) {
+  if (GetSingleton()->worker_threads_.size() == 0) {
     return Status(
         Status::Code::UNAVAILABLE,
         "Async work queue must be initialized before adding task")
