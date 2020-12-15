@@ -89,10 +89,27 @@ see output like the following, Triton is ready to accept inference
 requests.
 
 ```
++----------------------+---------+--------+
+| Model                | Version | Status |
++----------------------+---------+--------+
+| densenet_onnx        | 1       | READY  |
+| inception_graphdef   | 1       | READY  |
+| simple               | 1       | READY  |
+| simple_dyna_sequence | 1       | READY  |
+| simple_identity      | 1       | READY  |
+| simple_int8          | 1       | READY  |
+| simple_sequence      | 1       | READY  |
+| simple_string        | 1       | READY  |
++----------------------+---------+--------+
+...
+...
+...
 I1002 21:58:57.891440 62 grpc_server.cc:3914] Started GRPCInferenceService at 0.0.0.0:8001
 I1002 21:58:57.893177 62 http_server.cc:2717] Started HTTPService at 0.0.0.0:8000
 I1002 21:58:57.935518 62 http_server.cc:2736] Started Metrics Service at 0.0.0.0:8002
 ```
+
+If the models are not loaded check your CUDA drivers and the path to the model repository.
 
 ### Run on CPU-Only System
 
