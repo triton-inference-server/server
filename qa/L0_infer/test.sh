@@ -51,7 +51,7 @@ fi
 
 if [ -z "$TEST_VALGRIND" ]; then
     TEST_VALGRIND="0"
-fi 
+fi
 
 if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_LOG_BASE="./valgrind_test"
@@ -65,12 +65,24 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 
     EXPECTED_NUM_TESTS="29"
 fi
 
-MODELDIR=`pwd`/models
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-OPTDIR=${OPTDIR:="/opt"}
-SERVER=${OPTDIR}/tritonserver/bin/tritonserver
-BACKEND_DIR=${OPTDIR}/tritonserver/backends
 TF_VERSION=${TF_VERSION:=1}
+
+# On windows the paths invoked by the script (running in WSL) must use
+# /mnt/c when needed but the paths on the tritonserver command-line
+# must be C:/ style.
+if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    MODELDIR=${MODELDIR:=C:/models}
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
+    SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
+    export USE_HTTP=0
+else
+    MODELDIR=${MODELDIR:=`pwd`/models}
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    OPTDIR=${OPTDIR:="/opt"}
+    SERVER=${OPTDIR}/tritonserver/bin/tritonserver
+    BACKEND_DIR=${OPTDIR}/tritonserver/backends
+fi
 
 # Allow more time to exit. Ensemble brings in too many models
 SERVER_ARGS_EXTRA="--exit-timeout-secs=120 --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
@@ -229,7 +241,7 @@ for TARGET in cpu gpu; do
         LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.log
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    else  
+    else
         run_server
     fi
 
@@ -241,7 +253,7 @@ for TARGET in cpu gpu; do
 
     set +e
 
-    python $INFER_TEST >$CLIENT_LOG 2>&1
+    python3 $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         RET=1
@@ -262,7 +274,7 @@ for TARGET in cpu gpu; do
 
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG 
+        check_valgrind_log $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi
