@@ -2428,9 +2428,9 @@ PlanBackend::Context::Run(
   // For each input, concatenate input values from each request into
   // the corresponding binding.
   std::vector<int64_t> input_dims{(int64_t)payload_->total_batch_size_};
-  BackendInputCollector collector(
+  payload_->collector_.reset(new BackendInputCollector(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
-      input_copy_stream_, events_[next_set_].input_ready_);
+      input_copy_stream_, events_[next_set_].input_ready_));
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
     auto& io_binding_info = io_binding_infos_[io_index];
     int binding_index = binding_offset + io_index;
@@ -2487,7 +2487,7 @@ PlanBackend::Context::Run(
             allocated_memory->MutableBuffer(&mem_type, &mem_type_id);
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
-            collector.BatchInputShape(batch_input, &ragged_shape),
+            payload_->collector_->BatchInputShape(batch_input, &ragged_shape),
             "error getting the bath input shape");
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
@@ -2502,7 +2502,7 @@ PlanBackend::Context::Run(
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
-            collector.ProcessBatchInput(
+            payload_->collector_->ProcessBatchInput(
                 batch_input, input_buffer, total_byte_size, mem_type,
                 mem_type_id),
             "error setting the bath input value");
@@ -2547,7 +2547,7 @@ PlanBackend::Context::Run(
 
         size_t total_byte_size = GetByteSize(datatype, ragged_shape);
 
-        collector.ProcessTensor(
+        payload_->collector_->ProcessTensor(
             name, datatype, static_cast<char*>(io_binding_info.buffer_),
             total_byte_size, io_binding_info.memory_type_,
             io_binding_info.memory_type_id_);
@@ -2625,14 +2625,14 @@ PlanBackend::Context::Run(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             status, "error input data");
       } else {
-        collector.ProcessTensor(
+        payload_->collector_->ProcessTensor(
             name, datatype, static_cast<char*>(io_binding_info.buffer_),
             total_byte_size, io_binding_info.memory_type_,
             io_binding_info.memory_type_id_);
       }
     }
   }
-  collector.Finalize();
+  payload_->collector_->Finalize();
 
   const TensorRTContext::CudaGraph* cuda_graph = nullptr;
   bool found_exact = false;
@@ -2667,7 +2667,7 @@ PlanBackend::Context::Run(
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
-            collector.ProcessBatchInput(
+            payload_->collector_->ProcessBatchInput(
                 batch_input, input_buffer, total_byte_size, mem_type,
                 mem_type_id),
             "error setting the bath input value");
