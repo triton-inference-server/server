@@ -27,6 +27,7 @@
 
 TEST_LOG="./memory_test.log"
 MEMORY_TEST=./memory_test
+PINNED_MEMORY_MANAGER_TEST=./pinned_memory_manager_test
 
 RET=0
 
@@ -38,7 +39,15 @@ rm -f TEST_LOG
 set +e
 $MEMORY_TEST >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Memory Test Failed\n***"
+    RET=1
+fi
+set -e
+
+set +e
+$PINNED_MEMORY_MANAGER_TEST >>$TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Pinned Memory Manager Test Failed\n***"
     RET=1
 fi
 set -e

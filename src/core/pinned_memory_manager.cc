@@ -176,6 +176,12 @@ PinnedMemoryManager::FreeInternal(void* ptr)
   return Status::Success;
 }
 
+void
+PinnedMemoryManager::Reset()
+{
+  instance_.reset();
+}
+
 Status
 PinnedMemoryManager::Create(const Options& options)
 {

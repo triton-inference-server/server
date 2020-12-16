@@ -144,6 +144,47 @@ install(
   RUNTIME DESTINATION bin
 )
 
+set(
+  PINNED_MEMORY_MANAGER_TEST_SRCS
+  pinned_memory_manager_test.cc
+  ${PINNED_MEMORY_MANAGER_SRCS}
+)
+
+set(
+  PINNED_MEMORY_MANAGER_TEST_HDRS
+  ${PINNED_MEMORY_MANAGER_HDRS}
+)
+
+find_package(GTest REQUIRED)
+add_executable(
+  pinned_memory_manager_test
+  ${PINNED_MEMORY_MANAGER_TEST_SRCS}
+  ${PINNED_MEMORY_MANAGER_TEST_HDRS}
+)
+set_target_properties(
+  pinned_memory_manager_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(
+  pinned_memory_manager_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+)
+target_link_libraries(
+  pinned_memory_manager_test
+  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE -lpthread
+)
+install(
+  TARGETS pinned_memory_manager_test
+  RUNTIME DESTINATION bin
+)
+
 #
 # RateLimiter
 #
