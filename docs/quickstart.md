@@ -142,19 +142,19 @@ Use docker pull to get the client libraries and examples image
 from NGC.
 
 ```
-$ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
+$ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 ```
 
 Where <xx.yy> is the version that you want to pull. Run the client
 image.
 
 ```
-$ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
+$ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 ```
 
 ## Running The Image Classification Example
 
-From within the nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
+From within the nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 image, run the example image-client application to perform image
 classification using the example densenet_onnx model.
 
