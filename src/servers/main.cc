@@ -229,6 +229,7 @@ enum OptionId {
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_BACKEND_DIR,
+  OPTION_BUFFER_MANAGER_THREAD_COUNT,
   OPTION_BACKEND_CONFIG
 };
 
@@ -390,6 +391,10 @@ std::vector<Option> options_
       {OPTION_BACKEND_DIR, "backend-directory", Option::ArgStr,
        "The global directory searched for backend shared libraries. Default is "
        "'/opt/tritonserver/backends'."},
+      {OPTION_BUFFER_MANAGER_THREAD_COUNT, "buffer-manager-thread-count",
+       Option::ArgInt,
+       "The number of threads used to accelerate copies and other operations "
+       "required to manage input and output tensor contents. Default is 0."},
   {
     OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
         "Specify a backend-specific configuration setting. The format of this "
@@ -840,6 +845,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
+  int32_t buffer_manager_thread_count = 0;
 
   std::string backend_dir = "/opt/tritonserver/backends";
   std::vector<std::tuple<std::string, std::string, std::string>>
@@ -1026,6 +1032,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_BACKEND_DIR:
         backend_dir = optarg;
         break;
+      case OPTION_BUFFER_MANAGER_THREAD_COUNT:
+        buffer_manager_thread_count = ParseIntOption(optarg);
+        break;
       case OPTION_BACKEND_CONFIG:
         backend_config_settings.push_back(ParseBackendConfigOption(optarg));
         break;
@@ -1128,6 +1137,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       TRITONSERVER_ServerOptionsSetExitTimeout(
           loptions, std::max(0, exit_timeout_secs)),
       "setting exit timeout");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetBufferManagerThreadCount(
+          loptions, std::max(0, buffer_manager_thread_count)),
+      "setting buffer manager thread count");
 
 #ifdef TRITON_ENABLE_LOGGING
   FAIL_IF_ERR(
