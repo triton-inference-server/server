@@ -259,7 +259,7 @@ def backend_cmake_args(images, components, be, install_dir):
     elif be == 'tensorflow2':
         args = tensorflow_cmake_args(2, images)
     elif be == 'custom':
-        args = []
+        args = ['-DTRITON_SERVER_REPO_TAG:STRING={}'.format(components['server'])]
     elif be == 'python':
         args = []
     elif be == 'dali':
@@ -1286,6 +1286,7 @@ if __name__ == '__main__':
     components = {
         'common': 'main',
         'core': 'main',
+        'server': 'master',
         'backend': 'main',
         'thirdparty': 'main'
     }
@@ -1296,7 +1297,7 @@ if __name__ == '__main__':
             '--repo-tag must specific <component-name>:<repo-tag>')
         fail_if(
             parts[0] not in components,
-            '--repo-tag <component-name> must be "common", "core", "backend", or "thirdparty"'
+            '--repo-tag <component-name> must be "common", "core", "server", "backend", or "thirdparty"'
         )
         components[parts[0]] = parts[1]
     for c in components:
