@@ -103,8 +103,7 @@ I1002 21:58:57.891440 62 grpc_server.cc:3914] Started GRPCInferenceService at 0.
 I1002 21:58:57.893177 62 http_server.cc:2717] Started HTTPService at 0.0.0.0:8000
 I1002 21:58:57.935518 62 http_server.cc:2736] Started Metrics Service at 0.0.0.0:8002
 ```
-
-If the models are not displayed in the table or if the status is not READY, then the models are not ready for inference. Check your CUDA drivers and the path to the model repository.
+All the models should show "READY" status to indicate that they loaded correctly. If a model fails to load the status will report the failure and a reason for the failure. If your model is not displayed in the table check the path to the model repository and your CUDA drivers.
 
 ### Run on CPU-Only System
 
