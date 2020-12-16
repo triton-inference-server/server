@@ -332,7 +332,10 @@ class PlanBackend : public InferenceBackend {
       std::vector<std::unique_ptr<InferenceRequest>> requests_;
       // All the generated InferenceResponse objects
       std::vector<std::unique_ptr<InferenceResponse>> responses_;
-      // Responder of the payload
+      // The collector and responder of the payload, need to extend
+      // their lifetime to match the payload to ensure content is intact
+      // until the end of execution.
+      std::unique_ptr<BackendInputCollector> collector_;
       std::unique_ptr<BackendResponder> responder_;
     };
 
