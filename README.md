@@ -101,6 +101,12 @@ release is
 
 ## Documentation
 
+**The master branch documentation tracks the upcoming,
+under-development release and so may not be accurate for the current
+release of Triton. See the [r20.11
+documentation](https://github.com/triton-inference-server/server/tree/r20.11#documentation)
+for the current release.**
+
 [Triton Architecture](docs/architecture.md) gives a high-level
 overview of the structure and capabilities of the inference
 server. There is also an [FAQ](docs/faq.md). Additional documentation
