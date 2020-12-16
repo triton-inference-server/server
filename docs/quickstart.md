@@ -89,10 +89,21 @@ see output like the following, Triton is ready to accept inference
 requests.
 
 ```
++----------------------+---------+--------+
+| Model                | Version | Status |
++----------------------+---------+--------+
+| <model_name>         | <v>     | READY  |
+| ..                   | .       | ..     |
+| ..                   | .       | ..     |
++----------------------+---------+--------+
+...
+...
+...
 I1002 21:58:57.891440 62 grpc_server.cc:3914] Started GRPCInferenceService at 0.0.0.0:8001
 I1002 21:58:57.893177 62 http_server.cc:2717] Started HTTPService at 0.0.0.0:8000
 I1002 21:58:57.935518 62 http_server.cc:2736] Started Metrics Service at 0.0.0.0:8002
 ```
+All the models should show "READY" status to indicate that they loaded correctly. If a model fails to load the status will report the failure and a reason for the failure. If your model is not displayed in the table check the path to the model repository and your CUDA drivers.
 
 ### Run on CPU-Only System
 
