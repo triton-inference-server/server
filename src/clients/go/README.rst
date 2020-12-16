@@ -39,15 +39,14 @@ global instead.
 Usage::
 
   # Clone repo
-  git clone https://github.com/NVIDIA/triton-inference-server.git
+  git clone https://github.com/triton-inference-server/server.git
 
   # Setup "simple" model from example model_repository
-  cd triton-inference-server/docs/examples
+  cd server/docs/examples
   ./fetch_models.sh
 
-  # Launch (detached) TRTIS
-  docker run -d -p8000:8000 -p8001:8001 -p8002:8002 -it -v $(pwd)/model_repository:/models nvcr.io/nvidia/tritonserver:20.03.1-py3 trtserver --model-store=/models
-
+  # Launch (detached) Triton
+  docker run -d -p8000:8000 -p8001:8001 -p8002:8002 -it -v $(pwd)/model_repository:/models nvcr.io/nvidia/tritonserver:20.11-py3 tritonserver --model-store=/models
   # Use client
   cd ../../src/clients/go
   # Compiles *.proto to *.pb.go
@@ -60,8 +59,8 @@ Sample Output::
     FLAGS: {simple  1 localhost:8001}
     Triton Health - Live: true
     Triton Health - Ready: true
-    name:"simple" versions:"1" platform:"tensorflow_graphdef" inputs:<name:"INPUT0" datatype:"INT32" shape:-1 shape:16 > inputs:<name:"INPUT1" datatype:"INT32" shape:-1 shape:16 > outputs:<name:"OUTPUT0" datatype:"INT32" shape:-1 shape:16 > outputs:<name:"OUTPUT1" datatype:"INT32" shape:-1 shape:16 > 
-
+    name:"simple"  versions:"1"  platform:"tensorflow_graphdef"  inputs:{name:"INPUT0"  datatype:"INT32"  shape:-1  shape:16}  inputs:{name:"INPUT1"  datatype:"INT32"  shape:-1  shape:16}  outputs:{name:"OUTPUT0"  datatype:"INT32"  shape:-1  shape:16}  outputs:{name:"OUTPUT1"  datatype:"INT32"  shape:-1  shape:16}
+    
     Checking Inference Outputs
     --------------------------
     0 + 1 = 1
