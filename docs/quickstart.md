@@ -92,14 +92,9 @@ requests.
 +----------------------+---------+--------+
 | Model                | Version | Status |
 +----------------------+---------+--------+
-| densenet_onnx        | 1       | READY  |
-| inception_graphdef   | 1       | READY  |
-| simple               | 1       | READY  |
-| simple_dyna_sequence | 1       | READY  |
-| simple_identity      | 1       | READY  |
-| simple_int8          | 1       | READY  |
-| simple_sequence      | 1       | READY  |
-| simple_string        | 1       | READY  |
+| <model_name>         | <v>     | READY  |
+| ..                   | .       | ..     |
+| ..                   | .       | ..     |
 +----------------------+---------+--------+
 ...
 ...
@@ -109,7 +104,7 @@ I1002 21:58:57.893177 62 http_server.cc:2717] Started HTTPService at 0.0.0.0:800
 I1002 21:58:57.935518 62 http_server.cc:2736] Started Metrics Service at 0.0.0.0:8002
 ```
 
-If the models are not loaded check your CUDA drivers and the path to the model repository.
+If the models are not displayed in the table or if the status is not READY, then the models are not ready for inference. Check your CUDA drivers and the path to the model repository.
 
 ### Run on CPU-Only System
 
