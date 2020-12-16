@@ -122,6 +122,22 @@ CopyBuffer(
   return Status::Success;
 }
 
+void
+CopyBufferHandler(
+    const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
+    const int64_t src_memory_type_id,
+    const TRITONSERVER_MemoryType dst_memory_type,
+    const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
+    void* dst, cudaStream_t cuda_stream, void* response_ptr,
+    SyncQueue<std::tuple<Status, bool, void*>>* completion_queue)
+{
+  bool cuda_used = false;
+  Status status = CopyBuffer(
+      msg, src_memory_type, src_memory_type_id, dst_memory_type,
+      dst_memory_type_id, byte_size, src, dst, cuda_stream, &cuda_used);
+  completion_queue->Put(std::make_tuple(status, cuda_used, response_ptr));
+}
+
 #ifdef TRITON_ENABLE_GPU
 Status
 CheckGPUCompatibility(const int gpu_id, const double min_compute_capability)

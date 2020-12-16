@@ -190,6 +190,11 @@ class InferenceServer {
   int32_t ExitTimeoutSeconds() const { return exit_timeout_secs_; }
   void SetExitTimeoutSeconds(int32_t s) { exit_timeout_secs_ = std::max(0, s); }
 
+  void SetBufferManagerThreadCount(unsigned int c)
+  {
+    buffer_manager_thread_count_ = c;
+  }
+
   // Set a backend command-line configuration
   void SetBackendCmdlineConfig(const BackendCmdlineConfigMap& bc)
   {
@@ -236,6 +241,7 @@ class InferenceServer {
   bool strict_model_config_;
   bool strict_readiness_;
   uint32_t exit_timeout_secs_;
+  uint32_t buffer_manager_thread_count_;
   uint64_t pinned_memory_pool_size_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_supported_compute_capability_;
