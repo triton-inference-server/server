@@ -242,7 +242,8 @@ for TARGET in cpu gpu; do
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
     else
-        run_server
+        run_server_nowait
+        sleep 30
     fi
 
     if [ "$SERVER_PID" == "0" ]; then
