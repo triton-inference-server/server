@@ -65,17 +65,18 @@ class SavedModelShapeTest(tu.TestResultCollector):
                 if bs == 1:
                     iu.infer_exact(tester, "savedmodel_nobatch", tensor_shape,
                                    bs, input_dtype, output0_dtype,
-                                   output1_dtype, output0_raw, output1_raw,
-                                   model_version, swap, outputs, use_http,
-                                   use_grpc, skip_request_id_check,
-                                   use_streaming, correlation_id)
+                                   output1_dtype,
+                                   output0_raw=output0_raw, output1_raw=output1_raw,
+                                   model_version=model_version, swap=swap, outputs=outputs, use_http=use_http,
+                                   use_grpc=use_grpc, skip_request_id_check=skip_request_id_check,
+                                   use_streaming=use_streaming, correlation_id=correlation_id)
                 # model that supports batching
                 iu.infer_exact(tester, "savedmodel", (bs,) + tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
-                               output0_raw, output1_raw, model_version, swap,
-                               outputs, use_http, use_grpc,
-                               skip_request_id_check, use_streaming,
-                               correlation_id)
+                                   output0_raw=output0_raw, output1_raw=output1_raw,
+                                   model_version=model_version, swap=swap, outputs=outputs, use_http=use_http,
+                                   use_grpc=use_grpc, skip_request_id_check=skip_request_id_check,
+                                   use_streaming=use_streaming, correlation_id=correlation_id)
 
         input_size = 16
 
