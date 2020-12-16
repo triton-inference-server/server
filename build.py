@@ -71,7 +71,7 @@ EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'custom'
+    'openvino'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -262,8 +262,6 @@ def core_cmake_args(components, backends, install_dir):
         if (be in CORE_BACKENDS) and (be in backends):
             if be == 'tensorrt':
                 cargs += tensorrt_cmake_args()
-            elif be == 'custom':
-                pass
             elif be == 'ensemble':
                 pass
             else:
@@ -324,8 +322,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = tensorflow_cmake_args(1, images, library_paths)
     elif be == 'tensorflow2':
         args = tensorflow_cmake_args(2, images, library_paths)
-    elif be == 'custom':
-        args = []
     elif be == 'python':
         args = []
     elif be == 'dali':
@@ -1218,7 +1214,7 @@ if __name__ == '__main__':
             '--repo-tag must specific <component-name>:<repo-tag>')
         fail_if(
             parts[0] not in components,
-            '--repo-tag <component-name> must be "common", "core", "backend", or "thirdparty"'
+            '--repo-tag <component-name> must be "common", "core", "server", "backend", or "thirdparty"'
         )
         components[parts[0]] = parts[1]
     for c in components:
