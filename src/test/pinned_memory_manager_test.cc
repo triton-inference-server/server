@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gtest/gtest.h"
 
+#include <cuda_runtime_api.h>
 #include "src/core/tritonserver_apis.h"
 #include "src/core/pinned_memory_manager.h"
-
 #include <thread>
 #include <condition_variable>
 #include <mutex>
