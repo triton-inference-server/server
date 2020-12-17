@@ -95,14 +95,26 @@ void RunMemoryWork(size_t idx, size_t alloc_size, MemoryWorkMetadata* metadata)
   // -> alloc and write to output buffer -> return output data
   TRITONSERVER_MemoryType allocated_type;
   void* input_buffer = nullptr;
-  STORE_RESULT_AND_RETURN_IF_ERROR(ni::PinnedMemoryManager::Alloc(&input_buffer, alloc_size, &allocated_type, false /* allow_nonpinned_fallback */));
+  STORE_RESULT_AND_RETURN_IF_ERROR(
+    metadata, idx,
+    ni::PinnedMemoryManager::Alloc(&input_buffer, alloc_size, &allocated_type, false /* allow_nonpinned_fallback */));
+  if (allocated_type != TRITONSERVER_MEMORY_CPU_PINNED) {
+    ni::Status status(ni::Status::Code::INVALID_ARG, "returned memory buffer is not pinned");
+    STORE_RESULT_AND_RETURN_IF_ERROR(metadata, idx, status);
+  }
   memcpy(input_buffer, input.get(), alloc_size);
   void* output_buffer = nullptr;
-  STORE_RESULT_AND_RETURN_IF_ERROR(ni::PinnedMemoryManager::Alloc(&output_buffer, alloc_size, &allocated_type, false /* allow_nonpinned_fallback */));
+  STORE_RESULT_AND_RETURN_IF_ERROR(
+    metadata, idx,
+    ni::PinnedMemoryManager::Alloc(&output_buffer, alloc_size, &allocated_type, false /* allow_nonpinned_fallback */));
+  if (allocated_type != TRITONSERVER_MEMORY_CPU_PINNED) {
+    ni::Status status(ni::Status::Code::INVALID_ARG, "returned memory buffer is not pinned");
+    STORE_RESULT_AND_RETURN_IF_ERROR(metadata, idx, status);
+  }
   memcpy(output_buffer, input_buffer, alloc_size);
   memcpy(output.get(), output_buffer, alloc_size);
   for (size_t offset = 0; offset < alloc_size; offset++) {
-    if (input[offset] != output[offset]) {
+    if (input.get()[offset] != output.get()[offset]) {
       std::lock_guard<std::mutex> lk(metadata->mtx_);
       metadata->results_[idx] = std::string("mismatch between input and output for work idx ") + std::to_string(idx);
       return;         
@@ -150,7 +162,7 @@ TEST_F(PinnedMemoryManagerTest, InitZeroByte)
   EXPECT_TRUE(status.IsOk()) << status.Message();
 
   void* ptr = nullptr;
-  status = ni::PinnedMemoryManager::Alloc(&ptr, 1, 0);
+  status = ni::PinnedMemoryManager::Alloc(&ptr, 1);
   ASSERT_FALSE(status.IsOk()) << "Unexpected successful allocation";
 }
 
@@ -160,7 +172,7 @@ TEST_F(PinnedMemoryManagerTest, AllocSuccess)
   ASSERT_TRUE(status.IsOk()) << status.Message();
 
   void* ptr = nullptr;
-  status = ni::PinnedMemoryManager::Alloc(&ptr, 1024, 0);
+  status = ni::PinnedMemoryManager::Alloc(&ptr, 1024);
   ASSERT_TRUE(status.IsOk()) << status.Message();
   ASSERT_TRUE(ptr) << "Expect pointer to allocated buffer";
   // check if returned pointer is pinned memory pointer
@@ -173,7 +185,7 @@ TEST_F(PinnedMemoryManagerTest, AllocFail)
   ASSERT_TRUE(status.IsOk()) << status.Message();
 
   void* ptr = nullptr;
-  status = ni::PinnedMemoryManager::Alloc(&ptr, 2048, 0);
+  status = ni::PinnedMemoryManager::Alloc(&ptr, 2048);
   ASSERT_FALSE(status.IsOk()) << "Unexpected successful allocation";
 }
 
@@ -183,7 +195,7 @@ TEST_F(PinnedMemoryManagerTest, MultipleAlloc)
   ASSERT_TRUE(status.IsOk()) << status.Message();
 
   void* first_ptr = nullptr;
-  status = ni::PinnedMemoryManager::Alloc(&first_ptr, 600, 0);
+  status = ni::PinnedMemoryManager::Alloc(&first_ptr, 600);
   ASSERT_TRUE(status.IsOk()) << status.Message();
   ASSERT_TRUE(first_ptr) << "Expect pointer to allocated buffer";
   // check if returned pointer is pinned memory pointer
@@ -191,13 +203,13 @@ TEST_F(PinnedMemoryManagerTest, MultipleAlloc)
 
   // 512 + 600 > 1024
   void* second_ptr = nullptr;
-  status = ni::PinnedMemoryManager::Alloc(&second_ptr, 512, 0);
+  status = ni::PinnedMemoryManager::Alloc(&second_ptr, 512);
   ASSERT_FALSE(status.IsOk()) << "Unexpected successful allocation";
 
   // Free the first pointer and retry the second one
-  status = ni::PinnedMemoryManager::Free(first_ptr, 0);
+  status = ni::PinnedMemoryManager::Free(first_ptr);
   EXPECT_TRUE(status.IsOk()) << status.Message();
-  status = ni::PinnedMemoryManager::Alloc(&second_ptr, 512, 0);
+  status = ni::PinnedMemoryManager::Alloc(&second_ptr, 512);
   ASSERT_TRUE(status.IsOk()) << status.Message();
   ASSERT_TRUE(second_ptr) << "Expect pointer to allocated buffer";
   // check if returned pointer is pinned memory pointer
