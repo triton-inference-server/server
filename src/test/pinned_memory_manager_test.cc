@@ -272,9 +272,8 @@ TEST_F(PinnedMemoryManagerTest, ParallelAlloc)
   ASSERT_TRUE(status.IsOk()) << status.Message();
 
   // Create threads to perform operations on allocated memory in parallel
-  // Seems like for 1 MB alloc size, 100 threads is a good amount for
-  // pool manager not to use CPU fallback. But still low comparing to
-  // theoric limit (256 MB / 1 MB = 256)
+  // Seems like for 1 MB alloc size (2 MB for both input and output),
+  // 100 threads is a good amount for pool manager not to use CPU fallback.
   size_t thread_count = 100;
   size_t allocated_size = 1 << 20 /* 1 MB */;
   MemoryWorkMetadata metadata(thread_count);
