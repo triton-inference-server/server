@@ -172,12 +172,14 @@ set_target_properties(
 target_include_directories(
   pinned_memory_manager_test
   PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${CUDA_INCLUDE_DIRS}
 )
 target_link_libraries(
   pinned_memory_manager_test
   PRIVATE triton-core-serverapi  # from repo-core
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE ${CUDA_LIBRARIES}
   PRIVATE -lpthread
 )
 install(
