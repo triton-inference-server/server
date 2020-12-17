@@ -31,14 +31,12 @@
 #include <stdint.h>
 #include <algorithm>
 #include <cctype>
-#include <condition_variable>
-#include <csignal>
 #include <iomanip>
 #include <iostream>
 #include <list>
-#include <mutex>
 #include <set>
 #include <sstream>
+#include "src/servers/signal.h"
 
 #ifdef TRITON_ENABLE_ASAN
 #include <sanitizer/lsan_interface.h>
@@ -65,12 +63,6 @@ static_assert(
 #endif  // TRITON_ENABLE_GPU
 
 namespace {
-
-// Exit mutex and cv used to signal the main thread that it should
-// close the server and exit.
-volatile bool exiting_ = false;
-std::mutex exit_mu_;
-std::condition_variable exit_cv_;
 
 // Interval, in seconds, when the model repository is polled for
 // changes.
@@ -402,25 +394,6 @@ std::vector<Option> options_
         "<backend_name> is the name of the backend, such as 'tensorrt'."
   }
 };
-
-void
-SignalHandler(int signum)
-{
-  // Don't need a mutex here since signals should be disabled while in
-  // the handler.
-  std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
-
-  // Do nothing if already exiting...
-  if (exiting_)
-    return;
-
-  {
-    std::unique_lock<std::mutex> lock(exit_mu_);
-    exiting_ = true;
-  }
-
-  exit_cv_.notify_all();
-}
 
 bool
 CheckPortCollision()
@@ -1222,11 +1195,15 @@ main(int argc, char** argv)
   }
 
   // Trap SIGINT and SIGTERM to allow server to exit gracefully
-  signal(SIGINT, SignalHandler);
-  signal(SIGTERM, SignalHandler);
+  TRITONSERVER_Error* signal_err =
+      nvidia::inferenceserver::RegisterSignalHandler();
+  if (signal_err != nullptr) {
+    LOG_TRITONSERVER_ERROR(signal_err, "failed to register signal handler");
+    exit(1);
+  }
 
   // Wait until a signal terminates the server...
-  while (!exiting_) {
+  while (!nvidia::inferenceserver::signal_exiting_) {
     // If enabled, poll the model repository to see if there have been
     // any changes.
     if (repository_poll_secs_ > 0) {
@@ -1237,10 +1214,10 @@ main(int argc, char** argv)
 
     // Wait for the polling interval (or a long time if polling is not
     // enabled). Will be woken if the server is exiting.
-    std::unique_lock<std::mutex> lock(exit_mu_);
+    std::unique_lock<std::mutex> lock(nvidia::inferenceserver::signal_exit_mu_);
     std::chrono::seconds wait_timeout(
         (repository_poll_secs_ == 0) ? 3600 : repository_poll_secs_);
-    exit_cv_.wait_for(lock, wait_timeout);
+    nvidia::inferenceserver::signal_exit_cv_.wait_for(lock, wait_timeout);
   }
 
   TRITONSERVER_Error* stop_err = TRITONSERVER_ServerStop(server_ptr);
