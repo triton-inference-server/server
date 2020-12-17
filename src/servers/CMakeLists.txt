@@ -192,6 +192,7 @@ set(
   common.cc
   main.cc
   shared_memory_manager.cc
+  signal.cc
   ../core/logging.cc
 )
 
@@ -200,6 +201,7 @@ set(
   classification.h
   common.h
   shared_memory_manager.h
+  signal.h
   ../core/logging.h
 )
 
