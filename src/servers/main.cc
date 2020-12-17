@@ -403,14 +403,15 @@ SignalHandler(int signum)
 {
   // Don't need a mutex here since signals should be disabled while in
   // the handler.
-  std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
-
-  // Do nothing if already exiting...
-  if (exiting_)
-    return;
+//  std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
 
   {
     std::unique_lock<std::mutex> lock(exit_mu_);
+
+    // Do nothing if already exiting...
+    if (exiting_)
+      return;
+
     exiting_ = true;
   }
 
