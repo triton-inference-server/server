@@ -111,6 +111,7 @@ RUN mkdir -p qa/common && \
     cp /tmp/tritonbuild/install/bin/memory_alloc qa/L0_io/. && \
     cp /tmp/tritonbuild/install/bin/multi_server qa/L0_multi_server/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/memory_test qa/L0_memory/. && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/pinned_memory_manager_test qa/L0_memory/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/rate_limiter_test qa/L0_rate_limiter/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
