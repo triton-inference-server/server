@@ -112,16 +112,16 @@ def infer_exact(tester,
                 use_cuda_shared_memory=False,
                 priority=0,
                 timeout_us=0):
-    tester.assertTrue(use_http or use_http_json_tensors or use_grpc or
-                      use_streaming)
+    tester.assertTrue(use_http or use_grpc or use_streaming)
+    # configs [ url, protocol, async stream, binary data ]
     configs = []
     if use_http:
         configs.append(("localhost:8000", "http", False, True))
-    if output0_raw == output1_raw:
-        # Float16 not supported for Input and Output via JSON
-        if use_http_json_tensors and (input_dtype != np.float16) and \
-            (output0_dtype != np.float16) and (output1_dtype != np.float16):
-            configs.append(("localhost:8000", "http", False, False))
+        if output0_raw == output1_raw:
+            # Float16 not supported for Input and Output via JSON
+            if use_http_json_tensors and (input_dtype != np.float16) and \
+               (output0_dtype != np.float16) and (output1_dtype != np.float16):
+                configs.append(("localhost:8000", "http", False, False))
     if use_grpc:
         configs.append(("localhost:8001", "grpc", False, False))
     if use_streaming:
@@ -223,7 +223,7 @@ def infer_exact(tester,
                                                             verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata.platform
-        
+
     if platform == "pytorch_libtorch":
         OUTPUT0 = "OUTPUT__0"
         OUTPUT1 = "OUTPUT__1"
@@ -787,13 +787,12 @@ def infer_zero(tester,
                use_cuda_shared_memory=False,
                priority=0,
                timeout_us=0):
-    tester.assertTrue(use_http or use_grpc or use_http_json_tensors or
-                      use_streaming)
+    tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
         configs.append(("localhost:8000", "http", False, True))
-    if use_http_json_tensors and (tensor_dtype != np.float16):
-        configs.append(("localhost:8000", "http", False, False))
+        if use_http_json_tensors and (tensor_dtype != np.float16):
+            configs.append(("localhost:8000", "http", False, False))
     if use_grpc:
         configs.append(("localhost:8001", "grpc", False, False))
     if use_streaming:
