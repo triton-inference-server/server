@@ -72,6 +72,8 @@ _cshm_shared_memory_region_destroy = _cshm.SharedMemoryRegionDestroy
 _cshm_shared_memory_region_destroy.restype = c_int
 _cshm_shared_memory_region_destroy.argtypes = [c_void_p]
 
+mapped_shm_regions = []
+
 
 def _raise_if_error(errno):
     """
@@ -117,6 +119,7 @@ def create_shared_memory_region(triton_shm_name, shm_key, byte_size):
         c_int(
             _cshm_shared_memory_region_create(triton_shm_name, shm_key,
                                               byte_size, byref(shm_handle))))
+    mapped_shm_regions.append(shm_key)
 
     return shm_handle
 
@@ -219,6 +222,18 @@ def get_contents_as_numpy(shm_handle, datatype, shape):
     return result
 
 
+def mapped_shared_memory_regions():
+    """Return all shared memory regions that were mapped but not unmapped/destoryed.
+
+    Returns
+    -------
+    list
+        The list of shared memory regions.
+    """
+
+    return mapped_shm_regions
+
+
 def destroy_shared_memory_region(shm_handle):
     """Unlink a shared memory region with the specified handle.
 
@@ -234,6 +249,17 @@ def destroy_shared_memory_region(shm_handle):
     """
 
     _raise_if_error(c_int(_cshm_shared_memory_region_destroy(shm_handle)))
+
+    shm_fd = c_int()
+    offset = c_uint64()
+    byte_size = c_uint64()
+    shm_addr = c_char_p()
+    shm_key = c_char_p()
+    _raise_if_error(
+            c_int(_cshm_get_shared_memory_handle_info(shm_handle, byref(shm_addr), byref(shm_key), byref(shm_fd), \
+                                    byref(offset), byref(byte_size))))
+    mapped_shm_regions.remove(shm_key.value.decode("utf-8"))
+
     return
 
 
