@@ -75,6 +75,8 @@ _ccudashm_shared_memory_region_destroy = _ccudashm.CudaSharedMemoryRegionDestroy
 _ccudashm_shared_memory_region_destroy.restype = c_int
 _ccudashm_shared_memory_region_destroy.argtypes = [c_void_p]
 
+allocated_shm_regions = []
+
 
 def _raise_if_error(errno):
     """
@@ -120,13 +122,13 @@ def create_shared_memory_region(triton_shm_name, byte_size, device_id):
             _ccudashm_shared_memory_region_create(triton_shm_name, byte_size,
                                                   device_id,
                                                   byref(cuda_shm_handle))))
+    allocated_shm_regions.append(cuda_shm_handle)
 
     return cuda_shm_handle
 
 
 def get_raw_handle(cuda_shm_handle):
-    """Returns the underlying raw serialized cudaIPC handle
-    in base64 encoding.
+    """Returns the underlying raw serialized cudaIPC handle in base64 encoding.
 
     Parameters
     ----------
@@ -137,7 +139,7 @@ def get_raw_handle(cuda_shm_handle):
     -------
     bytes
         The raw serialized cudaIPC handle of underlying cuda shared memory
-        in base64 encoding
+        in base64 encoding.
 
     """
     craw_handle = c_char_p()
@@ -148,8 +150,7 @@ def get_raw_handle(cuda_shm_handle):
 
 
 def set_shared_memory_region(cuda_shm_handle, input_values):
-    """Copy the contents of the numpy array into a shared memory region with
-    the specified identifier, offset and size.
+    """Copy the contents of the numpy array into the cuda shared memory region.
 
     Parameters
     ----------
@@ -184,7 +185,7 @@ def set_shared_memory_region(cuda_shm_handle, input_values):
 
 
 def get_contents_as_numpy(cuda_shm_handle, datatype, shape):
-    """Generates a numpy array using the data stored in the shared memory
+    """Generates a numpy array using the data stored in the cuda shared memory
     region specified with the handle.
 
     Parameters
@@ -218,7 +219,7 @@ def get_contents_as_numpy(cuda_shm_handle, datatype, shape):
             cval_len = start_pos + requested_byte_size
             if byte_size.value < cval_len:
                 _raise_error(
-                    "The size of shared memory is unsufficient to provide numpy array with requested size"
+                    "The size of the shared memory region is unsufficient to provide numpy array with requested size"
                 )
             if cval_len == 0:
                 result = np.empty(shape, dtype=datatype)
@@ -254,6 +255,18 @@ def get_contents_as_numpy(cuda_shm_handle, datatype, shape):
         return result
 
 
+def allocated_shared_memory_regions():
+    """Return all cuda shared memory regions that were allocated but not freed.
+
+    Returns
+    -------
+    list
+        The list of cuda shared memory handles corresponding to the allocated regions.
+    """
+
+    return allocated_shm_regions
+
+
 def destroy_shared_memory_region(cuda_shm_handle):
     """Close a cuda shared memory region with the specified handle.
 
@@ -265,11 +278,13 @@ def destroy_shared_memory_region(cuda_shm_handle):
     Raises
     ------
     CudaSharedMemoryException
-        If unable to close the cuda_shm_handle shared memory region and free the device memory.
+        If unable to close the cuda shared memory region and free the device memory.
     """
 
     _raise_if_error(
         c_int(_ccudashm_shared_memory_region_destroy(cuda_shm_handle)))
+    allocated_shm_regions.remove(cuda_shm_handle)
+
     return
 
 
