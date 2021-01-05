@@ -46,7 +46,7 @@ REPODIR=/data/inferenceserver/${REPO_VERSION}
 PERF_ANALYZER=/perf_bin/perf_analyzer
 REPORTER=../common/reporter.py
 
-rm -f *.log *.csv *.tjson *.json
+rm -f *.log *.csv *.tjson *.json log4j.properties
 rm -rf model_store
 rm -rf serve
 
@@ -57,9 +57,10 @@ MODEL_NAME="resnet50_fp32_libtorch"
 mkdir model_store
 torch-model-archiver --model-name resnet50 --version 1.0 --serialized-file ${REPODIR}/perf_model_store/${MODEL_NAME}/1/model.pt \
 --export-path model_store --handler image_classifier -f
-
+# Suppressing the logging for better performance
+echo "log4j.rootLogger = OFF" >> log4j.properties
 # Run server
-torchserve --start --ncs --model-store=model_store --models model_store/resnet50.mar
+torchserve --start --ncs --model-store=model_store --models model_store/resnet50.mar --log-config log4j.properties
 
 sleep 5
 
