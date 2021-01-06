@@ -89,7 +89,7 @@ class CustomLegacyTest(tu.TestResultCollector):
             result = triton_client.infer(model_name=self.model_name_,
                                          inputs=self.inputs_,
                                          outputs=self.outputs_,
-                                         client_timeout=1)
+                                         client_timeout=3)
             # The response should not contain any outputs
             self.assertEqual(result.as_numpy('OUTPUT0'), None)
 
