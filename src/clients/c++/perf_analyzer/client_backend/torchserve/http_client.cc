@@ -72,6 +72,12 @@ static CurlGlobal curl_global;
 
 //==============================================================================
 
+HttpInferRequest::HttpInferRequest()
+    : header_list_(nullptr),
+      file_ptr_(std::unique_ptr<FILE, Deleter>(nullptr, Deleter()))
+{
+}
+
 HttpInferRequest::~HttpInferRequest()
 {
   if (header_list_ != nullptr) {
@@ -86,6 +92,35 @@ HttpInferRequest::InitializeRequest()
   http_code_ = 400;
   // Prepare buffer to record the response
   infer_response_buffer_.reset(new std::string());
+  return Error::Success;
+}
+
+Error
+HttpInferRequest::OpenFileData(std::string& file_path)
+{
+  FILE* pFile = fopen(file_path.c_str(), "rb");
+  if (pFile == nullptr) {
+    return Error("Failed to open the specified file `" + file_path + "`");
+  }
+  file_ptr_.reset(pFile);
+  return Error::Success;
+}
+
+long
+HttpInferRequest::FileSize()
+{
+  long size;
+  fseek(file_ptr_.get(), 0, SEEK_END);
+  size = ftell(file_ptr_.get());
+  rewind(file_ptr_.get());
+  return size;
+}
+
+Error
+HttpInferRequest::CloseFileData()
+{
+  fclose(file_ptr_.get());
+  file_ptr_.reset(nullptr);
   return Error::Success;
 }
 
@@ -136,8 +171,6 @@ HttpClient::Infer(
 
   // During this call SEND_END (except in above case), RECV_START, and
   // RECV_END will be set.
-  // FIXME: Use the curl_mime_data_cb to correctly capture the send_end time.
-  sync_request->Timer().CaptureTimestamp(nic::RequestTimers::Kind::SEND_END);
   auto curl_status = curl_easy_perform(easy_handle_);
   if (curl_status != CURLE_OK) {
     sync_request->http_code_ = 400;
@@ -146,6 +179,7 @@ HttpClient::Infer(
         easy_handle_, CURLINFO_RESPONSE_CODE, &sync_request->http_code_);
   }
 
+  sync_request->CloseFileData();
   curl_mime_free(mime_handle_);
 
   InferResult::Create(result, sync_request);
@@ -160,6 +194,28 @@ HttpClient::Infer(
   err = (*result)->RequestStatus();
 
   return err;
+}
+
+size_t
+HttpClient::ReadCallback(char* buffer, size_t size, size_t nitems, void* userp)
+{
+  size_t retcode =
+      fread(buffer, size, nitems, ((HttpInferRequest*)userp)->FilePtr());
+  if (retcode == 0) {
+    ((HttpInferRequest*)userp)
+        ->Timer()
+        .CaptureTimestamp(nic::RequestTimers::Kind::SEND_END);
+  }
+  return retcode;
+}
+
+int
+HttpClient::SeekCallback(void* userp, curl_off_t offset, int origin)
+{
+  if (fseek(((HttpInferRequest*)userp)->FilePtr(), offset, origin) == 0)
+    return CURL_SEEKFUNC_OK;
+  else
+    return CURL_SEEKFUNC_FAIL;
 }
 
 size_t
@@ -251,15 +307,23 @@ HttpClient::PreRunProcessing(
       std::string file_path(
           reinterpret_cast<const char*>(buf) + 4, buf_size - 4);
       if (buf != nullptr) {
-        curl_mimepart* part = curl_mime_addpart((curl_mime*)mime_handle_);
-        curl_mime_filedata(part, file_path.c_str());
-        curl_mime_name(part, "data");
+        Error err = http_request->OpenFileData(file_path);
+        if (!err.IsOk()) {
+          return err;
+        }
         if (verbose_) {
           input_filepaths.push_back(file_path);
         }
       }
     }
   }
+
+  long file_size = http_request->FileSize();
+  curl_mimepart* part = curl_mime_addpart((curl_mime*)mime_handle_);
+  curl_mime_data_cb(
+      part, file_size, ReadCallback, SeekCallback, NULL, http_request.get());
+  curl_mime_name(part, "data");
+
   curl_easy_setopt(easy_handle_, CURLOPT_MIMEPOST, (curl_mime*)mime_handle_);
 
   // response headers handled by InferResponseHeaderHandler()

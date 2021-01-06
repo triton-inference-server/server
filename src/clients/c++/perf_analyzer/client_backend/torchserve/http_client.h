@@ -30,6 +30,8 @@
 #include "src/clients/c++/perf_analyzer/client_backend/torchserve/torchserve_infer_input.h"
 
 #include <curl/curl.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 namespace nic = nvidia::inferenceserver::client;
 
@@ -91,6 +93,10 @@ class HttpClient : public nic::InferenceServerClient {
       const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs,
       const Headers& headers, std::shared_ptr<HttpInferRequest>& request);
+
+  static size_t ReadCallback(
+      char* buffer, size_t size, size_t nitems, void* userp);
+  static int SeekCallback(void* userp, curl_off_t offset, int origin);
   static size_t InferResponseHeaderHandler(
       void* contents, size_t size, size_t nmemb, void* userp);
   static size_t InferResponseHandler(
@@ -108,11 +114,22 @@ class HttpClient : public nic::InferenceServerClient {
 
 class HttpInferRequest {
  public:
-  HttpInferRequest() : header_list_(nullptr) {}
+  struct Deleter {
+    void operator()(FILE* file)
+    {
+      // Do nothing
+    }
+  };
+
+  HttpInferRequest();
   ~HttpInferRequest();
   Error InitializeRequest();
+  Error OpenFileData(std::string& file_path);
+  long FileSize();
+  Error CloseFileData();
   nic::RequestTimers& Timer() { return timer_; }
   std::string& DebugString() { return *infer_response_buffer_; }
+  FILE* FilePtr() { return file_ptr_.get(); }
   friend HttpClient;
   friend InferResult;
 
@@ -120,6 +137,7 @@ class HttpInferRequest {
   // Pointer to the list of the HTTP request header, keep it such that it will
   // be valid during the transfer and can be freed once transfer is completed.
   struct curl_slist* header_list_;
+  std::unique_ptr<FILE, Deleter> file_ptr_;
   // HTTP response code for the inference request
   long http_code_;
   // Buffer that accumulates the response body.
