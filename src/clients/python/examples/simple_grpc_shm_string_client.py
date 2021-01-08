@@ -185,9 +185,11 @@ if __name__ == '__main__':
 
     print(triton_client.get_system_shared_memory_status())
     triton_client.unregister_system_shared_memory()
+    assert len(shm.mapped_shared_memory_regions()) == 4
     shm.destroy_shared_memory_region(shm_ip0_handle)
     shm.destroy_shared_memory_region(shm_ip1_handle)
     shm.destroy_shared_memory_region(shm_op0_handle)
     shm.destroy_shared_memory_region(shm_op1_handle)
+    assert len(shm.mapped_shared_memory_regions()) == 0
 
     print('PASS: system shared memory')
