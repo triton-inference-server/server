@@ -35,15 +35,58 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-apt update
-apt install -y libb64-dev curl
-# needed by reporter
-apt install -y python3 python3-pip python3-dev
-rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
+DEBIAN_FRONTEND=noninteractive
+
+# Build perf_analyzer from source
+apt-get update &&  \
+apt-get install -y --no-install-recommends \
+        software-properties-common \
+        autoconf \
+        automake \
+        build-essential \
+        curl \
+        git \
+        libb64-dev \
+        libopencv-dev \
+        libopencv-core-dev \
+        libssl-dev \
+        libtool \
+        pkg-config \
+        python3 \
+        python3-pip \
+        python3-dev \
+        rapidjson-dev  \
+        vim \
+        wget && \
+pip3 install --upgrade wheel setuptools && \
+pip3 install --upgrade grpcio-tools && \
+pip3 install --upgrade pip && \
 pip3 install --upgrade requests
+# Build expects "python" executable (not python3).
+rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
+wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+      gpg --dearmor - |  \
+      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends cmake && \
+    cmake --version
+rm -rf server
+git clone --single-branch --depth=1 -b ${BENCHMARK_REPO_BRANCH} \
+                  https://github.com/triton-inference-server/server.git;
+(cd server
+mkdir builddir && cd builddir && \
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DTRITON_COMMON_REPO_TAG:STRING=main \
+      -DTRITON_CORE_REPO_TAG:STRING=main \
+      -DTRITON_ENABLE_GPU=OFF \
+      -DTRITON_ENABLE_METRICS_GPU=OFF \
+      -DTRITON_ENABLE_GRPC=ON \
+      -DTRITON_ENABLE_HTTP=ON ../build && \
+make -j16 client && \
+cp client/install/bin/perf_analyzer /usr/bin/)
 
 REPODIR=/data/inferenceserver/${REPO_VERSION}
-PERF_ANALYZER=/perf_bin/perf_analyzer
 REPORTER=../common/reporter.py
 
 rm -f *.log *.csv *.tjson *.json log4j.properties
@@ -73,9 +116,9 @@ PERF_ANALYZER_ARGS="-m resnet50 --service-kind torchserve -i http -u localhost:8
 
 # Run client
 # To warmup the model
-$PERF_ANALYZER ${PERF_ANALYZER_ARGS}
+perf_analyzer ${PERF_ANALYZER_ARGS}
 # Collect data
-$PERF_ANALYZER ${PERF_ANALYZER_ARGS} -f ${NAME}.csv >> ${NAME}.log 2>&1
+perf_analyzer ${PERF_ANALYZER_ARGS} -f ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
     RET=1
 fi
