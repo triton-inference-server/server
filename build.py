@@ -560,43 +560,6 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     apt-get install -y --no-install-recommends \
       cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
 '''
-    if 'pytorch' in backends:
-        df += '''
-# LibTorch and Torchvision headers and libraries
-COPY --from=tritonserver_pytorch \
-     /opt/conda/lib/python3.8/site-packages/torch/lib/libc10.so \
-     /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch \
-     /opt/conda/lib/python3.8/site-packages/torch/lib/libc10_cuda.so \
-     /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_core.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_gnu_thread.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_thread.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_def.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_avx2.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/libiomp5.so /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/include \
-     /opt/tritonserver/include/torch
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/lib/libtorch.so \
-      /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/lib/libtorch_cpu.so \
-      /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/lib/libtorch_cuda.so \
-      /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/pytorch/vision/torchvision/csrc \
-    /opt/tritonserver/include/torchvision/torchvision/
-COPY --from=tritonserver_pytorch /opt/pytorch/vision/build/libtorchvision.so \
-    /opt/tritonserver/backends/pytorch/
-COPY --from=tritonserver_pytorch /opt/pytorch/pytorch/LICENSE \
-    /opt/tritonserver/backends/pytorch/
-RUN cd /opt/tritonserver/backends/pytorch && \
-    for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
-        patchelf --set-rpath '$ORIGIN' $i; \
-    done
-'''
     if 'onnxruntime' in backends:
         df += '''
 # Onnx Runtime headers and library
@@ -816,10 +779,6 @@ COPY --chown=1000:1000 TRITON_VERSION .
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
 '''
-    if 'pytorch' in backends:
-        df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/pytorch backends/pytorch
-'''
     if 'onnxruntime' in backends:
         df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /opt/tritonserver/backends/onnxruntime backends/onnxruntime
@@ -889,16 +848,6 @@ def container_build(backends, images):
             base_image,
     }
 
-    # If building the pytorch backend then need to include pytorch in
-    # buildbase image.
-    if 'pytorch' in backends:
-        if 'pytorch' in images:
-            pytorch_image = images['pytorch']
-        else:
-            pytorch_image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
-                FLAGS.upstream_container_version)
-        dockerfileargmap['PYTORCH_IMAGE'] = pytorch_image
-
     # If building the ORT backend then need to include ORT in
     # buildbase image.
     if 'onnxruntime' in backends:
@@ -912,11 +861,9 @@ def container_build(backends, images):
                     FLAGS.version][3]
 
     cachefrommap = [
-        'tritonserver_pytorch', 'tritonserver_pytorch_cache0',
-        'tritonserver_pytorch_cache1', 'tritonserver_onnx',
-        'tritonserver_onnx_cache0', 'tritonserver_onnx_cache1',
-        'tritonserver_buildbase', 'tritonserver_buildbase_cache0',
-        'tritonserver_buildbase_cache1'
+        'tritonserver_onnx', 'tritonserver_onnx_cache0',
+        'tritonserver_onnx_cache1', 'tritonserver_buildbase',
+        'tritonserver_buildbase_cache0', 'tritonserver_buildbase_cache1'
     ]
 
     cachefromargs = ['--cache-from={}'.format(k) for k in cachefrommap]
@@ -936,16 +883,6 @@ def container_build(backends, images):
         # First build Dockerfile.buildbase. Because of the way Docker
         # does caching with multi-stage images, we must build each
         # stage separately to make sure it is cached.
-
-        # PyTorch
-        if 'pytorch' in backends:
-            p = subprocess.Popen(commonargs + cachefromargs + [
-                '-t', 'tritonserver_pytorch', '--target',
-                'tritonserver_pytorch', '.'
-            ])
-            p.wait()
-            fail_if(p.returncode != 0,
-                    'docker build tritonserver_pytorch failed')
 
         # ONNX Runtime
         if 'onnxruntime' in backends:
