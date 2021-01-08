@@ -286,7 +286,7 @@ def backend_cmake_args(images, components, be, install_dir):
     elif be == 'dali':
         args = dali_cmake_args()
     elif be == 'pytorch':
-        args = pytorch_cmake_args()
+        args = pytorch_cmake_args(images)
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
@@ -313,10 +313,14 @@ def backend_cmake_args(images, components, be, install_dir):
     return cargs
 
 
-def pytorch_cmake_args():
+def pytorch_cmake_args(images):
+    if "pytorch" in images:
+        image = images["pytorch"]
+    else:
+        image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
+            FLAGS.upstream_container_version)
     return [
-        '-DTRITON_PYTORCH_INCLUDE_PATHS=/opt/tritonserver/include/torch;/opt/tritonserver/include/torch/torch/csrc/api/include;/opt/tritonserver/include/torchvision',
-        '-DTRITON_PYTORCH_LIB_PATHS=/opt/tritonserver/backends/pytorch'
+        '-DTRITON_PYTORCH_DOCKER_IMAGE={}'.format(image),
     ]
 
 
@@ -376,10 +380,6 @@ ARG TRITON_CONTAINER_VERSION={}
 ARG BASE_IMAGE={}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
-    if 'pytorch' in backends:
-        df += '''
-ARG PYTORCH_IMAGE={}
-'''.format(argmap['PYTORCH_IMAGE'])
     if 'onnxruntime' in backends:
         df += '''
 ARG ONNX_RUNTIME_VERSION={}
@@ -388,34 +388,6 @@ ARG ONNX_RUNTIME_VERSION={}
             df += '''
 ARG ONNX_RUNTIME_OPENVINO_VERSION={}
 '''.format(argmap['ONNX_RUNTIME_OPENVINO_VERSION'])
-
-    if 'pytorch' in backends:
-        df += '''
-############################################################################
-## PyTorch stage: Use PyTorch container for libtorch and torchvision
-############################################################################
-FROM ${PYTORCH_IMAGE} AS tritonserver_pytorch
-
-# Must rebuild in the pytorch container to disable some features that
-# are not relevant for inferencing and so that OpenCV libraries are
-# not included in the server (which will likely conflict with custom
-# backends using opencv). The uninstalls seem excessive but is the
-# recommendation from pytorch CONTRIBUTING.md.
-WORKDIR /opt/pytorch
-RUN (conda uninstall -y pytorch || true) && \
-    (conda uninstall -y ninja || true) && \
-    pip uninstall -y torch && \
-    pip uninstall -y torch
-RUN cd pytorch && \
-    python setup.py clean && \
-    TORCH_CUDA_ARCH_LIST="5.2 6.0 6.1 7.0 7.5 8.0 8.6+PTX" \
-    CUDA_HOME="/usr/local/cuda" \
-    CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
-    USE_DISTRIBUTED=OFF USE_OPENMP=OFF USE_NCCL=OFF USE_SYSTEM_NCCL=OFF \
-    USE_OPENCV=OFF USE_LEVELDB=OFF USE_LMDB=OFF USE_REDIS=OFF \
-    BUILD_TEST=OFF \
-    pip install --no-cache-dir -v .
-'''
 
     if 'onnxruntime' in backends:
         df += '''
