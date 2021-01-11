@@ -56,7 +56,7 @@ from distutils.dir_util import copy_tree
 #      ORT version,
 #      ORT openvino version (use None to disable openvino)
 #     )
-TRITON_VERSION_MAP = {'2.7.0dev': ('21.02dev', '20.12', '1.5.3', None)}
+TRITON_VERSION_MAP = {'2.7.0dev': ('21.02dev', '20.12', '1.6.0', '2021.1')}
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
@@ -598,8 +598,11 @@ COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/pr
 '''
         if 'ONNX_RUNTIME_OPENVINO_VERSION' in argmap:
             df += '''
+ARG ONNX_RUNTIME_OPENVINO_VERSION
 COPY --from=tritonserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
      /opt/tritonserver/include/onnxruntime/
+COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime_providers_openvino.so \
+     /opt/tritonserver/backends/onnxruntime/
 '''
         df += '''
 COPY --from=tritonserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
@@ -623,25 +626,35 @@ RUN cd /opt/tritonserver/backends/onnxruntime && \
             df += '''
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/inference_engine/lib/intel64/libinference_engine_legacy.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/inference_engine/lib/intel64/libinference_engine_transformations.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/ngraph/lib/libngraph.so \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/ngraph/lib/libngraph.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/ngraph/lib/libonnx_importer.so \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/ngraph/lib/libonnx_importer.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/plugins.xml \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/inference_engine/lib/intel64/plugins.xml \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libinference_engine_lp_transformations.so \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/deployment_tools/inference_engine/lib/intel64/libinference_engine_lp_transformations.so \
      /opt/tritonserver/backends/onnxruntime/
-COPY --from=tritonserver_onnx /opt/intel/openvino/licensing \
+COPY --from=tritonserver_onnx \
+     /opt/intel/openvino_${ONNX_RUNTIME_OPENVINO_VERSION}.110/licensing \
      /opt/tritonserver/backends/onnxruntime/LICENSE.openvino
 RUN cd /opt/tritonserver/backends/onnxruntime && \
     ln -sf libtbb.so.2 libtbb.so && \
