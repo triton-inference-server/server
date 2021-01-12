@@ -64,27 +64,23 @@ RUN apt-get update && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
 
+ARG CMAKE_UBUNTU_VERSION
 # Client build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
       gpg --dearmor - |  \
       tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    if [[ "$CMAKE_UBUNTU_VERSION" == '20.04' ]] ; \
-      then \
-        apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-        apt-get update && \
-        apt-get install -y --no-install-recommends \
-          cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1 ; \
-    elif [[ "$CMAKE_UBUNTU_VERSION" == '18.04' ]] ; \
-      then \
-        apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
-        apt-get update && \
-        apt-get install -y --no-install-recommends cmake ; \
+    if [ "$CMAKE_UBUNTU_VERSION" = "20.04" ]; then \
+      apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
+        cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1; \
+    elif [ "$CMAKE_UBUNTU_VERSION" = "18.04" ]; then \
+      apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends cmake; \
     else \
-      echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false ; \
+      echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false; \
     fi && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-      cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1 && \
     cmake --version
 
 # Build expects "python" executable (not python3).

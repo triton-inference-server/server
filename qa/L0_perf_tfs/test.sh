@@ -34,58 +34,13 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-DEBIAN_FRONTEND=noninteractive
-# Build perf_analyzer from source
-apt-get update &&  \
-apt-get install -y --no-install-recommends \
-        software-properties-common \
-        autoconf \
-        automake \
-        build-essential \
-        curl \
-        git \
-        libb64-dev \
-        libopencv-dev \
-        libopencv-core-dev \
-        libssl-dev \
-        libtool \
-        pkg-config \
-        python3 \
-        python3-pip \
-        python3-dev \
-        rapidjson-dev  \
-        vim \
-        wget && \
-pip3 install --upgrade wheel setuptools && \
-pip3 install --upgrade grpcio-tools && \
-pip3 install --upgrade pip && \
-pip3 install --upgrade requests
-
-# Build expects "python" executable (not python3).
+apt update
+ # needed by perf_analyzer
+apt install -y libb64-dev
+# needed by reporter
+apt install -y python3 python3-pip python3-dev
 rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
-ln -s /usr/bin/python3 /usr/bin/python3.5
-
-wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends cmake && \
-    cmake --version
-
-rm -rf server
-git clone --single-branch --depth=1 -b ${BENCHMARK_REPO_BRANCH} \
-                  https://github.com/triton-inference-server/server.git;
-
-(cd server
-mkdir builddir && cd builddir && \
-cmake -DCMAKE_BUILD_TYPE=Release \
-      -DTRITON_COMMON_REPO_TAG:STRING=main \
-      -DTRITON_CORE_REPO_TAG:STRING=main \
-      -DTRITON_ENABLE_GRPC=ON \
-      -DTRITON_ENABLE_HTTP=ON ../build && \
-make -j16 client && \
-cp client/install/bin/perf_analyzer /usr/bin/)
+pip3 install --upgrade requests
 
 REPODIR=/data/inferenceserver/${REPO_VERSION}
 rm -f *.log *.csv *.tjson *.json
@@ -110,6 +65,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+PERF_ANALYZER=/perf_bin/perf_analyzer
 REPORTER=../common/reporter.py
 
 # To get the minimum latency
@@ -118,9 +74,9 @@ NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}
 
 # Run client
 # To warmup the model
-perf_analyzer -m ${MODEL_NAME} --service-kind tfserving -i grpc -b 1 -p 5000
+$PERF_ANALYZER -m ${MODEL_NAME} --service-kind tfserving -i grpc -b 1 -p 5000
 # Collect data
-perf_analyzer -m ${MODEL_NAME} --service-kind tfserving -i grpc -b ${STATIC_BATCH} -p 5000 -f ${NAME}.csv >> ${NAME}.log 2>&1
+$PERF_ANALYZER -m ${MODEL_NAME} --service-kind tfserving -i grpc -b ${STATIC_BATCH} -p 5000 -f ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
     RET=1
 fi
@@ -154,7 +110,7 @@ fi
 # Large static batch size case.
 STATIC_BATCH=128
 NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}
-perf_analyzer -m ${MODEL_NAME} --service-kind tfserving -i grpc -b ${STATIC_BATCH} -p 5000 -f ${NAME}.csv >> ${NAME}.log 2>&1
+$PERF_ANALYZER -m ${MODEL_NAME} --service-kind tfserving -i grpc -b ${STATIC_BATCH} -p 5000 -f ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
     RET=1
 fi
