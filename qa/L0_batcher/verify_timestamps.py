@@ -72,12 +72,10 @@ def verify_timestamps(traces, preserve):
         timestamps = dict()
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
-        # Hardcoded delay value here (knowing large delay is 400ms)
-        compute_span = timestamps["COMPUTE_END"] - timestamps["COMPUTE_START"]
+        # TODO Add back COMPUTE timestamp check after fixing for new Backend API
         # If the 3rd batch is also processed by large delay instance, we don't
         # want to use its responses as baseline
-        if trace["id"] <= (
-                8 + grpc_id_offset) and compute_span >= 400 * 1000 * 1000:
+        if trace["id"] <= (8 + grpc_id_offset):
             send_end = timestamps["HTTP_SEND_END"]
             large_delay_send_end = max(large_delay_send_end, send_end)
         else:
@@ -89,7 +87,7 @@ def verify_timestamps(traces, preserve):
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
         send_end = timestamps["HTTP_SEND_END"]
-        if send_end > large_delay_send_end:
+        if (send_end > large_delay_send_end) and preserve :
             response_request_after_large_delay_count += 1
 
     # Hardcoded expected count here
