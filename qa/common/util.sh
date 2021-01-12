@@ -209,34 +209,23 @@ function run_server_tolive () {
     fi
 }
 
-# Run inference server and return immediately. Sets SERVER_PID (and
-# SERVER_WIN_PID if running on windows) to pid of SERVER, or 0 if
-# error. On windows also need SERVER_PIDDIR and SERVER_PIDDIR_WP.
+# Run inference server and return immediately. Sets SERVER_PID to pid
+# of SERVER, or 0 if error.
 function run_server_nowait () {
     SERVER_PID=0
-    SERVER_WIN_PID=0
 
     if [ -z "$SERVER" ]; then
         echo "=== SERVER must be defined"
         return
     fi
 
-    # WSL doesn't implement full bash job control so we must follow
-    # the example from
-    # https://gist.github.com/davidbailey00/004da18b89fff0534edd9b6f6082bcaf
-    # when launching and capture both win and linux pids and then use
-    # them appropriately in kill_server().
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        if [ -z "$SERVER_PIDDIR" ]; then
-            echo "=== SERVER_PIDDIR must be defined"
-            return
-        fi
-        if [ -z "$SERVER_PIDDIR_WP" ]; then
-            echo "=== SERVER_PIDDIR_WP must be defined"
-            return
-        fi
+    if [ ! -f "$SERVER" ]; then
+        echo "=== $SERVER does not exist"
+        return
+    fi
 
-        # LD_PRELOAD not yet supported
+    if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+        # LD_PRELOAD not yet supported on windows
         if [ -z "$SERVER_LD_PRELOAD" ]; then
             echo "=== Running $SERVER $SERVER_ARGS"
         else
@@ -244,50 +233,10 @@ function run_server_nowait () {
             return
         fi
 
-        if [[ $SERVER_ARGS != '' ]]; then
-            argumentlist="-ArgumentList \"$SERVER_ARGS\""
-        fi
-
-        powershell_command="\$process = Start-Process -NoNewWindow -PassThru \"$SERVER\" $argumentlist
-                            if (\$process) {
-                              \$pidfile = \"$SERVER_PIDDIR_WP\" + \"/proc.\" + \$process.id
-                              echo \$null >> \$pidfile
-                              Wait-Process \$process.id
-                              exit \$process.ExitCode
-                            } else {
-                              \$pidfile = \"$SERVER_PIDDIR_WP\" + \"/proc.0\"
-                              echo \$null >> \$pidfile
-                            }"
-
-        powershell.exe -Command "$powershell_command" > $SERVER_LOG 2>&1 &
+        $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
         SERVER_PID=$!
-
-        echo "=== Waiting for windows pid..."
-        wait_secs=5
-        until test $wait_secs -eq 0 -o -f $SERVER_PIDDIR/proc.* ; do sleep 1; ((wait_secs--)); done
-        if [ "$wait_secs" == "0" ]; then
-            echo "=== Timeout. Unable to find windows pid"
-            return
-        fi
-
-        pidfiles=($SERVER_PIDDIR/proc.*)
-        rm -f $SERVER_PIDDIR/proc.*
-        echo "${#pidfiles[@]}"
-        echo "${pidfiles[@]}"
-        pidbase=`basename ${pidfiles[0]}`
-        SERVER_WIN_PID=${pidbase#proc.}
-        if [[ $SERVER_WIN_PID == 0 ]]; then
-            echo "=== Failed launching windows server."
-            SERVER_PID=0
-            SERVER_WIN_PID=0
-        fi
     else
-        # Non-windows...
-        if [ ! -f "$SERVER" ]; then
-            echo "=== $SERVER does not exist"
-            return
-        fi
-
+        # Non-windows
         if [ -z "$SERVER_LD_PRELOAD" ]; then
             echo "=== Running $SERVER $SERVER_ARGS"
         else
@@ -336,31 +285,47 @@ function run_server_leakcheck () {
     fi
 }
 
-# Kill inference server. SERVER_PID must be set to the server's pid
-# (on windows SERVER_WIN_PID must also be set).
+# Kill inference server. SERVER_PID must be set to the server's pid.
 function kill_server () {
-    # Under WSL the linux PID is not the same as the windows PID so we
-    # must explicitly kill both.
+    # Under WSL the linux PID is not the same as the windows PID and
+    # there doesn't seem to be a way to find the mapping between
+    # them. So we instead assume that this test is the only test
+    # running on the system and just SIGINT all the tritonserver
+    # windows executables running on the system. At least, ideally we
+    # would like to use windows-kill to SIGINT, unfortunately that
+    # causes the entire WSL shell to just exit. So instead we must use
+    # taskkill.exe which can only forcefully kill tritonserver which
+    # means that it does not gracefully exit.
     if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
         # Disable -x as it makes output below hard to read
         [ -o xtrace ] && ts='set -x' || ts='set +x'
         set +x
-
+        
         tasklist=$(/mnt/c/windows/system32/tasklist.exe /FI 'IMAGENAME eq tritonserver.exe' /FO CSV)
         echo "=== Windows tritonserver tasks"
         echo "$tasklist"
-
-        echo "=== sending sigint to tritonserver.exe task $SERVER_WIN_PID"
-        windows-kill.exe -SIGINT $SERVER_WIN_PID
-
-        # Restore -x
+        
+        taskcount=$(echo "$tasklist" | grep -c tritonserver)
+        if (( $taskcount > 0 )); then
+            echo "$tasklist" | while IFS=, read -r taskname taskpid taskrest; do
+                if [[ "$taskname" == "\"tritonserver.exe\"" ]]; then
+                    taskpid="${taskpid%\"}"
+                    taskpid="${taskpid#\"}"
+                    echo "=== killing windows tritonserver.exe task $taskpid"
+                    # windows-kill.exe -SIGINT $taskpid
+                    /mnt/c/windows/system32/taskkill.exe /PID $taskpid /F /T
+                fi
+            done
+        fi
+        
         eval "$ts"
+    else
+        # Non-windows...
+        kill $SERVER_PID
+        wait $SERVER_PID
     fi
-    
-    kill $SERVER_PID || true
-    wait $SERVER_PID || true
 }
-
+          
 # Run nvidia-smi to monitor GPU utilization.
 # Writes utilization into MONITOR_LOG. If MONITOR_ID is specified only
 # that GPU PCI bus ID is monitored.
