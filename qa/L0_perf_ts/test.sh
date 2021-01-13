@@ -37,9 +37,7 @@ fi
 
 apt update
 apt install -y libb64-dev curl
-# needed by reporter
 apt install -y python3 python3-pip python3-dev
-rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
 pip3 install --upgrade requests
 
 REPODIR=/data/inferenceserver/${REPO_VERSION}
@@ -83,7 +81,7 @@ fi
 torchserve --stop
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
-echo -e "\"s_benchmark_name\":\"resnet50\"," >> ${NAME}.tjson
+echo -e "\"s_benchmark_name\":\"preprocess+resnet50\"," >> ${NAME}.tjson
 echo -e "\"s_server\":\"torchserve\"," >> ${NAME}.tjson
 echo -e "\"s_protocol\":\"http\"," >> ${NAME}.tjson
 echo -e "\"s_framework\":\"libtorch\"," >> ${NAME}.tjson
@@ -101,7 +99,7 @@ if [ -f $REPORTER ]; then
         URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
     fi
 
-    $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
+    python $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
     if (( $? != 0 )); then
         RET=1
     fi
