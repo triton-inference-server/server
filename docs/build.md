@@ -58,13 +58,13 @@ invocation builds all features and backends.
 $ ./build.py --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --backend=custom --backend=ensemble --backend=tensorrt --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=pytorch:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=python:<container tag> --backend=dali:<container tag>
 ```
 
-If you are building on master/main branch then <container tag> should
-be set to "main". If you are building on a release branch you should
-set the <container tag> to match. For example, if you are building on
-the r20.11 branch you should set <container tag> to be "r20.11". You
-can use a different <container tag> for a component to instead use the
-corresponding branch/tag in the build. For example, if you have a
-branch called "mybranch" in the
+If you are building on master/main branch then \<container tag\>
+should be set to "main". If you are building on a release branch you
+should set \<container tag\> to match the branch name. For example, if
+you are building on the r20.11 branch you should set \<container tag\>
+to be "r20.11". You can use a different \<container tag\> for a
+component to instead use the corresponding branch/tag in the
+build. For example, if you have a branch called "mybranch" in the
 [identity_backend](https://github.com/triton-inference-server/identity_backend)
 repo that you want to use in the build, you would specify
 --backend=identity:mybranch.
