@@ -119,7 +119,6 @@ HttpInferRequest::FileSize()
 Error
 HttpInferRequest::CloseFileData()
 {
-  fclose(file_ptr_.get());
   file_ptr_.reset(nullptr);
   return Error::Success;
 }

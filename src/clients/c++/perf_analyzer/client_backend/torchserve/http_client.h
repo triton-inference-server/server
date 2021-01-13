@@ -117,7 +117,9 @@ class HttpInferRequest {
   struct Deleter {
     void operator()(FILE* file)
     {
-      // Do nothing
+      if (file != nullptr) {
+        fclose(file);
+      }
     }
   };
 
