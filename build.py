@@ -542,7 +542,7 @@ SHELL ["cmd", "/S", "/C"]
 # Download and install Build Tools for Visual Studio.  Use 16.8.3
 # explicitly. https://docs.microsoft.com/en-us/visualstudio/releases/2019/history
 RUN if not exist "c:\\tmp\\" mkdir c:\\tmp
-ADD https://download.visualstudio.microsoft.com/download/pr/9b3476ff-6d0a-4ff8-956d-270147f21cd4/0df5becfebf4ae2418f5fae653feebf3888b0af00d3df0415cb64875147e9be3/vs_BuildTools.exe /tmp/vs_buildtools.exe
+ADD https://aka.ms/vs/16/release/vs_buildtools.exe /tmp/vs_buildtools.exe
 ADD https://aka.ms/vs/16/release/channel /tmp/VisualStudio.chman
 RUN /tmp/vs_buildtools.exe --quiet --wait --norestart --nocache --installPath C:\\BuildTools --channelUri C:\\tmp\\VisualStudio.chman --installChannelUri C:\\tmp\\VisualStudio.chman --add Microsoft.VisualStudio.Workload.VCTools;includeRecommended --add Microsoft.Component.MSBuild || IF "%ERRORLEVEL%"=="3010" EXIT 0
 
