@@ -839,9 +839,6 @@ BackendInputCollector::Finalize()
   // [TODO] good if the synchronize can be more discrete so the deferred pinned
   // can issue as it's ready instead of waiting for all deferred pinned to be ready
   if ((!deferred_pinned_.empty()) && need_sync_) {
-    for (size_t i = 0; i < async_task_count_; i++) {
-        completion_queue_.Get();
-      }
     if (event_ != nullptr) {
       cudaEventSynchronize(event_);
     } else {
@@ -854,33 +851,12 @@ BackendInputCollector::Finalize()
   // After the above sync all the GPU->pinned copies are complete. Any
   // deferred copies of pinned->CPU can now be done.
   for (auto& def : deferred_pinned_) {
-    auto pinned_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
-    int64_t pinned_memory_id = 0;
-    char* pinned_buffer = def.pinned_memory_->MutableBuffer(
-        &pinned_memory_type, &pinned_memory_id);
-
-    bool cuda_used = false;
-    Status status = CopyBuffer(
-        "pinned buffer", pinned_memory_type, pinned_memory_id,
-        def.tensor_memory_type_, def.tensor_memory_id_,
-        def.pinned_memory_->TotalByteSize(), pinned_buffer,
-        def.tensor_buffer_ + def.tensor_buffer_offset_, stream_, &cuda_used);
-    need_sync_ |= cuda_used;
-
-    // If something goes wrong with the copy all the pending
-    // responses fail...
-    if (!status.IsOk()) {
-      for (auto& pr : def.requests_) {
-        std::unique_ptr<InferenceResponse>* response = pr.first;
-        if (*response != nullptr) {
-          LOG_STATUS_ERROR(
-              InferenceResponse::SendWithStatus(
-                  std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-                  status),
-              "error setting failure input tensor");
-        }
-      }
+    if (!def.finalized_) {
+      need_sync_ |= def.Finalize(stream_);
     }
+  }
+  for (size_t i = 0; i < async_task_count_; i++) {
+    need_sync_ |= completion_queue_.Get();
   }
 
 #ifdef TRITON_ENABLE_GPU
@@ -891,6 +867,38 @@ BackendInputCollector::Finalize()
 #endif  // TRITON_ENABLE_GPU
 
   return need_sync_;
+}
+
+bool
+BackendInputCollector::DeferredPinned::Finalize(cudaStream_t stream)
+{
+  auto pinned_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
+  int64_t pinned_memory_id = 0;
+  char* pinned_buffer = pinned_memory_->MutableBuffer(
+      &pinned_memory_type, &pinned_memory_id);
+
+  bool cuda_used = false;
+  Status status = CopyBuffer(
+      "pinned buffer", pinned_memory_type, pinned_memory_id,
+      tensor_memory_type_, tensor_memory_id_,
+      pinned_memory_->TotalByteSize(), pinned_buffer,
+      tensor_buffer_ + tensor_buffer_offset_, stream, &cuda_used);
+
+  // If something goes wrong with the copy all the pending
+  // responses fail...
+  if (!status.IsOk()) {
+    for (auto& pr : requests_) {
+      std::unique_ptr<InferenceResponse>* response = pr.first;
+      if (*response != nullptr) {
+        LOG_STATUS_ERROR(
+            InferenceResponse::SendWithStatus(
+                std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                status),
+            "error setting failure input tensor");
+      }
+    }
+  }
+  return cuda_used;
 }
 
 bool
@@ -1078,10 +1086,14 @@ BackendInputCollector::FlushPendingPinned(
     } else {
       // Overloadding the parameter to indicate that synchronization is needed
       cuda_copy = true;
+      // [WIP] put deferred pinned finalization into async work
       deferred_pinned_.emplace_back(
           std::move(pinned_memory), tensor_buffer, pending_pinned_offset_,
           tensor_memory_type, tensor_memory_type_id,
           std::move(pending_pinned_inputs_));
+      // Mark finalized to avoid duplicated call to DeferredPinned::Finalized() in BackendInputCollector::Finalize()
+      deferred_pinned_.back().finalized_ = true;
+      auto incomplete_count = new std::atomic<size_t>(std::min(deferred_pinned_.back().requests_.size(), AsyncWorkQueue::WorkerCount()));
       auto pending_pinned_byte_size = pending_pinned_byte_size_;
       size_t stride =
           (deferred_pinned_.back().requests_.size() + AsyncWorkQueue::WorkerCount() - 1) /
@@ -1101,7 +1113,7 @@ BackendInputCollector::FlushPendingPinned(
         auto status = AsyncWorkQueue::AddTask(
             [this, offset, pinned_buffer, pinned_memory_type,
              pending_pinned_byte_size,
-             pinned_memory_id, pending_it, end_it]() mutable {
+             pinned_memory_id, pending_it, end_it, incomplete_count]() mutable {
               for (; pending_it != end_it; pending_it++) {
                 std::unique_ptr<InferenceResponse>* response =
                     (*pending_it).first;
@@ -1114,7 +1126,12 @@ BackendInputCollector::FlushPendingPinned(
                         response);
                 offset += request_input->Data()->TotalByteSize();
               }
-              completion_queue_.Put(true);
+              if (incomplete_count->fetch_sub(1) == 1) {
+                completion_queue_.Put(deferred_pinned->Finalize(stream_));
+                delete incomplete_count;
+              } else {
+                completion_queue_.Put(false);
+              }
             });
         if (!status.IsOk()) {
           for (; pending_it != end_it; pending_it++) {
