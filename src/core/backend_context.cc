@@ -1091,6 +1091,7 @@ BackendInputCollector::FlushPendingPinned(
           std::move(pinned_memory), tensor_buffer, pending_pinned_offset_,
           tensor_memory_type, tensor_memory_type_id,
           std::move(pending_pinned_inputs_));
+      auto& deferred_pinned = deferred_pinned_.back();
       // Mark finalized to avoid duplicated call to DeferredPinned::Finalized() in BackendInputCollector::Finalize()
       deferred_pinned_.back().finalized_ = true;
       auto incomplete_count = new std::atomic<size_t>(std::min(deferred_pinned_.back().requests_.size(), AsyncWorkQueue::WorkerCount()));
@@ -1113,7 +1114,7 @@ BackendInputCollector::FlushPendingPinned(
         auto status = AsyncWorkQueue::AddTask(
             [this, offset, pinned_buffer, pinned_memory_type,
              pending_pinned_byte_size,
-             pinned_memory_id, pending_it, end_it, incomplete_count]() mutable {
+             pinned_memory_id, pending_it, end_it, incomplete_count, &deferred_pinned]() mutable {
               for (; pending_it != end_it; pending_it++) {
                 std::unique_ptr<InferenceResponse>* response =
                     (*pending_it).first;
@@ -1127,7 +1128,7 @@ BackendInputCollector::FlushPendingPinned(
                 offset += request_input->Data()->TotalByteSize();
               }
               if (incomplete_count->fetch_sub(1) == 1) {
-                completion_queue_.Put(deferred_pinned->Finalize(stream_));
+                completion_queue_.Put(deferred_pinned.Finalize(stream_));
                 delete incomplete_count;
               } else {
                 completion_queue_.Put(false);
