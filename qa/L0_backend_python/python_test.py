@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -244,6 +244,22 @@ class PythonTest(tu.TestResultCollector):
 
             self.assertTrue(np.allclose(output0, 2 * input_data_0))
             self.assertTrue(np.allclose(output1, 2 * input_data_1))
+
+    def test_unicode(self):
+        model_name = "string"
+        shape = [1]
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            utf8 = '😀'
+            input_data = np.array([bytes(utf8, encoding='utf-8')], dtype=np.bytes_)
+            inputs = [
+                httpclient.InferInput("INPUT0", shape,
+                                      np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            result = client.infer(model_name, inputs)
+            output0 = result.as_numpy('OUTPUT0')
+            self.assertTrue(output0 is not None)
+            self.assertTrue(str(output0[0], encoding='ascii') == 'success')
 
 
 if __name__ == '__main__':
