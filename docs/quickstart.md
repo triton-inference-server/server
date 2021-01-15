@@ -48,7 +48,7 @@ Pull the image using the following command.
 $ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3
 ```
 
-Where <xx.yy> is the version of Triton that you want to pull.
+Where \<xx.yy\> is the version of Triton that you want to pull.
 
 ## Create A Model Repository
 
@@ -82,7 +82,7 @@ system GPU should be made available to Triton for inferencing.
 $ docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:<xx.yy>-py3 tritonserver --model-repository=/models
 ```
 
-Where <xx.yy> is the version of Triton that you want to use (and
+Where \<xx.yy\> is the version of Triton that you want to use (and
 pulled above). After you start Triton you will see output on the
 console showing the server starting up and loading the model. When you
 see output like the following, Triton is ready to accept inference
@@ -145,7 +145,7 @@ from NGC.
 $ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
 ```
 
-Where <xx.yy> is the version that you want to pull. Run the client
+Where \<xx.yy\> is the version that you want to pull. Run the client
 image.
 
 ```

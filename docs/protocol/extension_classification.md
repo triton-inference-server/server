@@ -39,8 +39,8 @@ An inference request can use the “classification” parameter to request
 that one or more classifications be returned for an output. For such
 an output the returned tensor will not be the shape and type produced
 by the model, but will instead be type BYTES with shape [ batch-size,
-<count> ] where each element returns the classification index and
-label as a single string. The <count> dimension of the returned tensor
+\<count\> ] where each element returns the classification index and
+label as a single string. The \<count\> dimension of the returned tensor
 will equal the “count” value specified in the classification
 parameter.
 
@@ -52,10 +52,10 @@ an output tensor is [ 1, 5, 10, 4 ], the highest-valued element is 10
 by 1 (index 0). So, for example, the top-2 classifications by index
 are [ 2, 1 ].
 
-The format of the returned string will be “<value>:<index>[:<label>]”,
-where <index> is the index of the class in the model output tensor,
-<value> is the value associated with that index in the model output,
-and the <label> associated with that index is optional. For example,
+The format of the returned string will be “\<value\>:\<index\>[:\<label\>]”,
+where \<index\> is the index of the class in the model output tensor,
+\<value\> is the value associated with that index in the model output,
+and the \<label\> associated with that index is optional. For example,
 continuing the example from above, the returned tensor will be [
 “10:2”, “5:1” ]. If the model has labels associated with those
 indices, the returned tensor will be [ “10:2:apple”, “5:1:pickle” ].

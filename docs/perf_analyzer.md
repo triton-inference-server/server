@@ -84,7 +84,7 @@ windows. The number of outstanding inference requests is referred to
 as the *request concurrency*, and so by default perf_analyzer uses a
 request concurrency of 1.
 
-Using the --concurrency-range <start>:<end>:<step> option you can have
+Using the --concurrency-range \<start\>:\<end\>:\<step\> option you can have
 perf_analyzer collect data for a range of request concurrency
 levels. Use the --help option to see complete documentation for this
 and other options. For example, to see the latency and throughput of
