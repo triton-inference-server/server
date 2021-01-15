@@ -114,7 +114,7 @@ expected by the model. **TorchScript Naming Convention:** Due to the
 absence of names for inputs and outputs in a TorchScript model, the
 "name" attribute of both the inputs and outputs in the configuration
 must follow a specific naming convention i.e. "\<name\>__\<index\>".
-Where <name> can be any string and <index> refers to the position of
+Where \<name\> can be any string and \<index\> refers to the position of
 the corresponding input/output. This means if there are two inputs and
 two outputs they must be named as: "INPUT__0", "INPUT__1" and
 "OUTPUT__0", "OUTPUT__1" such that "INPUT__0" refers to first input

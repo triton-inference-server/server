@@ -134,7 +134,7 @@ from NGC.
 $ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
 ```
 
-Where <xx.yy> is the version that you want to pull. Within the
+Where \<xx.yy\> is the version that you want to pull. Within the
 container the client libraries are in /workspace/install/lib, the
 corresponding headers in /workspace/install/include, and the Python
 wheel files in /workspace/install/python. The image will also contain
@@ -160,7 +160,7 @@ the Python wheel files for the Python client library.
 $ docker build -t tritonserver_sdk -f Dockerfile.sdk .
 ```
 
-You can optionally add *--build-arg "BASE_IMAGE=<base_image>"* to set
+You can optionally add *--build-arg "BASE_IMAGE=\<base_image\>"* to set
 the base image that you want the client library built against. This
 base image must be an Ubuntu CUDA image to be able to build CUDA
 shared memory support. If CUDA shared memory support is not required,
@@ -263,8 +263,8 @@ following cmake configuration.
 > cmake -G"Visual Studio 16 2019" -DTRITON_ENABLE_GPU=OFF -DTRITON_ENABLE_METRICS_GPU=OFF -DCMAKE_BUILD_TYPE=Release -DTRITON_COMMON_REPO_TAG:STRING=<tag> -DTRITON_CORE_REPO_TAG:STRING=<tag>
 ```
 
-Where <tag> is "main" if you are building the clients from the master
-branch, or <tag> is "r<x>.<y>" if you are building on a release
+Where \<tag\> is "main" if you are building the clients from the master
+branch, or \<tag\> is "r\<x\>.\<y\>" if you are building on a release
 branch.
 
 When the build completes the libraries can be found in

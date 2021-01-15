@@ -46,8 +46,8 @@ version 2.
   * The default for --model-control-mode is changed to *none*.
 
   * --tf-allow-soft-placement and --tf-gpu-memory-fraction are renamed
-     to --backend-config="tensorflow,allow-soft-placement=<true,false>"
-     and --backend-config="tensorflow,gpu-memory-fraction=<float>".
+     to --backend-config="tensorflow,allow-soft-placement=\<true,false\>"
+     and --backend-config="tensorflow,gpu-memory-fraction=\<float\>".
 
 * The HTTP/REST and GRPC protocols, while conceptually similar to
   version 1, are completely changed in version 2. See [inference
