@@ -259,7 +259,7 @@ class PythonTest(tu.TestResultCollector):
             result = client.infer(model_name, inputs)
             output0 = result.as_numpy('OUTPUT0')
             self.assertTrue(output0 is not None)
-            self.assertTrue(str(output0[0], encoding='ascii') == 'success')
+            self.assertTrue(output0[0] == input_data)
 
 
 if __name__ == '__main__':

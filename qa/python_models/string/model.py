@@ -45,11 +45,7 @@ class TritonPythonModel:
         for request in requests:
             input_tensors = request.inputs()
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            unicode_character = '😀'
-            if str(in_0.as_numpy().tobytes(), encoding='utf-8') == unicode_character:
-                out_tensor_0 = pb_utils.Tensor("OUTPUT0", np.array(['success'], dtype=np.bytes_))
-            else:
-                out_tensor_0 = pb_utils.Tensor("OUTPUT0", np.array(['failure'], dtype=np.bytes_))
+            out_tensor_0 = pb_utils.Tensor("OUTPUT0", in_0.as_numpy())
             responses.append(
                 pb_utils.InferenceResponse([out_tensor_0]))
         return responses
