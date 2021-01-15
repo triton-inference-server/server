@@ -1084,9 +1084,7 @@ BackendInputCollector::FlushPendingPinned(
             std::move(pending_pinned_inputs_));
       }
     } else {
-      // Overloadding the parameter to indicate that synchronization is needed
-      cuda_copy = true;
-      // [WIP] put deferred pinned finalization into async work
+      async_task_count_++;
       deferred_pinned_.emplace_back(
           std::move(pinned_memory), tensor_buffer, pending_pinned_offset_,
           tensor_memory_type, tensor_memory_type_id,
@@ -1127,11 +1125,11 @@ BackendInputCollector::FlushPendingPinned(
                         response);
                 offset += request_input->Data()->TotalByteSize();
               }
+              // The last segmented task will start the next phase of
+              // the internal pinned buffer copy
               if (incomplete_count->fetch_sub(1) == 1) {
                 completion_queue_.Put(deferred_pinned.Finalize(stream_));
                 delete incomplete_count;
-              } else {
-                completion_queue_.Put(false);
               }
             });
         if (!status.IsOk()) {
@@ -1148,7 +1146,6 @@ BackendInputCollector::FlushPendingPinned(
         }
         offset = next_offset;
         pending_it = end_it;
-        async_task_count_++;
       }
     }
   }
