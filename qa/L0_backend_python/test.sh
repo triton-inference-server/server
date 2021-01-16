@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="6"
+EXPECTED_NUM_TESTS="7"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
@@ -105,6 +105,11 @@ cp -r ${DATADIR}/qa_model_repository/libtorch_float32_float32_float32/ ./models
           sed -i "s/^version_policy:.*//" config.pbtxt)
 rm -rf models/libtorch_float32_float32_float32/2
 rm -rf models/libtorch_float32_float32_float32/3
+
+# Unicode Characters
+mkdir -p models/string/1/
+cp ../python_models/string/model.py ./models/string/1/
+cp ../python_models/string/config.pbtxt ./models/string
 
 pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
