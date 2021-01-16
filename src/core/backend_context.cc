@@ -836,8 +836,6 @@ bool
 BackendInputCollector::Finalize()
 {
 #ifdef TRITON_ENABLE_GPU
-  // [TODO] good if the synchronize can be more discrete so the deferred pinned
-  // can issue as it's ready instead of waiting for all deferred pinned to be ready
   if ((!deferred_pinned_.empty()) && need_sync_) {
     if (event_ != nullptr) {
       cudaEventSynchronize(event_);
