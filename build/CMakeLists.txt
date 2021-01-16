@@ -85,7 +85,7 @@ set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server
 set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/third_party repo")
 
 # Version
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" TRITON_VERSION)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../TRITON_VERSION" TRITON_VERSION)
 
 if(TRITON_ENABLE_METRICS AND NOT TRITON_ENABLE_STATS)
   message(FATAL_ERROR "TRITON_ENABLE_METRICS=ON requires TRITON_ENABLE_STATS=ON")
@@ -369,7 +369,7 @@ ExternalProject_Add(google-cloud-cpp
 )
 
 #
-# Build azure-storage-cpplite 
+# Build azure-storage-cpplite
 #
 ExternalProject_Add(azure-storage-cpplite
   PREFIX azure-storage-cpplite

@@ -54,7 +54,7 @@ SKIP_PATHS = (
     'qa/L0_model_config/special_cases', 'qa/L0_perf_nomodel/baseline',
     'qa/L0_perf_nomodel/legacy_baseline', 'qa/L0_warmup/raw_mug_data',
     'src/clients/c++/library/cencode.c', 'src/clients/c++/library/cencode.h',
-    'src/clients/java', 'VERSION')
+    'src/clients/java', 'TRITON_VERSION')
 
 COPYRIGHT_YEAR_RE0 = 'Copyright \\(c\\) (20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
 COPYRIGHT_YEAR_RE1 = 'Copyright \\(c\\) (20[0-9][0-9])-(20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'

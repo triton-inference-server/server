@@ -33,7 +33,7 @@ if(WIN32)
 else()
   install(
     FILES
-      ${CMAKE_SOURCE_DIR}/../../VERSION
+      ${CMAKE_SOURCE_DIR}/../../TRITON_VERSION
     DESTINATION .
   )
 
