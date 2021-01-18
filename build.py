@@ -560,6 +560,7 @@ COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_intel_thread.so /opt/trit
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_def.so /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_avx2.so /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tritonserver/backends/pytorch/
+COPY --from=tritonserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/libiomp5.so /opt/tritonserver/backends/pytorch/
 COPY --from=tritonserver_pytorch /opt/conda/lib/python3.8/site-packages/torch/include \
      /opt/tritonserver/include/torch
