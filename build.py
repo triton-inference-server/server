@@ -41,8 +41,8 @@ from distutils.dir_util import copy_tree
 # Build Triton Inference Server.
 #
 
-# By default build.py builds the Triton container. The VERSION file
-# indicates the Triton version and TRITON_VERSION_MAP is used to
+# By default build.py builds the Triton container. The TRITON_VERSION
+# file indicates the Triton version and TRITON_VERSION_MAP is used to
 # determine the corresponding container version and upstream container
 # version (upstream containers are dependencies required by
 # Triton). These versions may be overridden. See docs/build.md for
@@ -777,7 +777,7 @@ RUN apt-get update && \
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 LICENSE .
-COPY --chown=1000:1000 VERSION .
+COPY --chown=1000:1000 TRITON_VERSION .
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
 '''
@@ -1113,7 +1113,7 @@ if __name__ == '__main__':
         type=str,
         required=False,
         help=
-        'The Triton version. If not specified defaults to the value in VERSION file.'
+        'The Triton version. If not specified defaults to the value in the TRITON_VERSION file.'
     )
     parser.add_argument(
         '--container-version',
@@ -1225,9 +1225,9 @@ if __name__ == '__main__':
         FLAGS.filesystem = []
 
     # Determine the versions. Start with Triton version, if --version
-    # is not explicitly specified read from VERSION file.
+    # is not explicitly specified read from TRITON_VERSION file.
     if FLAGS.version is None:
-        with open('VERSION', "r") as vfile:
+        with open('TRITON_VERSION', "r") as vfile:
             FLAGS.version = vfile.readline().strip()
     # For other versions use the TRITON_VERSION_MAP unless explicitly
     # given.

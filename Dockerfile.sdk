@@ -89,7 +89,7 @@ RUN rm -f /usr/bin/python && \
 
 # Build the client library and examples
 WORKDIR /workspace
-COPY VERSION .
+COPY TRITON_VERSION .
 COPY build build
 COPY src/clients src/clients
 COPY src/core src/core
@@ -105,7 +105,7 @@ RUN mkdir builddir && cd builddir && \
           -DTRITON_ENABLE_HTTP=ON ../build && \
     make -j16 client
 RUN cd install && \
-    export VERSION=`cat /workspace/VERSION` && \
+    export VERSION=`cat /workspace/TRITON_VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
 
 # For CI testing need to install a test script.

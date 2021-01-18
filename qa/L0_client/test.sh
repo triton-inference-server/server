@@ -153,7 +153,7 @@ else
 fi
 
 # Check wheels
-WHLVERSION=`cat /workspace/VERSION | sed 's/dev/\.dev0/'`
+WHLVERSION=`cat /workspace/TRITON_VERSION | sed 's/dev/\.dev0/'`
 WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
       tritonclient-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"
 for l in $WHLS; do

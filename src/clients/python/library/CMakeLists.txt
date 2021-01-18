@@ -43,19 +43,19 @@ if (NOT WIN32)
 endif() # NOT WIN32
 ####################################
 
-configure_file(../../../../VERSION VERSION COPYONLY)
+configure_file(../../../../TRITON_VERSION TRITON_VERSION COPYONLY)
 configure_file(LICENSE.txt LICENSE.txt COPYONLY)
 configure_file(setup.py setup.py COPYONLY)
 file(COPY requirements DESTINATION .)
 
-set(WHEEL_DEPENDS 
-      ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+set(WHEEL_DEPENDS
+      ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION
       ${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt
       ${CMAKE_CURRENT_BINARY_DIR}/setup.py
 )
 
 if(${TRITON_ENABLE_GRPC})
-  set(WHEEL_DEPENDS 
+  set(WHEEL_DEPENDS
         ${CMAKE_CURRENT_BINARY_DIR}/tritonclient/grpc
         proto-py-library
         grpc-py-library
@@ -64,7 +64,7 @@ if(${TRITON_ENABLE_GRPC})
 endif() # TRITON_ENABLE_GRPC
 
 if(${TRITON_ENABLE_HTTP})
-  set(WHEEL_DEPENDS 
+  set(WHEEL_DEPENDS
         ${CMAKE_CURRENT_BINARY_DIR}/tritonclient/http
         ${WHEEL_DEPENDS}
   )

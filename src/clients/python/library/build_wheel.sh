@@ -33,12 +33,12 @@ function main() {
     exit 1
   fi
 
-  if [[ ! -f "VERSION" ]]; then
-    echo "Could not find VERSION"
+  if [[ ! -f "TRITON_VERSION" ]]; then
+    echo "Could not find TRITON_VERSION"
     exit 1
   fi
 
-  VERSION=`cat VERSION`
+  VERSION=`cat TRITON_VERSION`
   DEST="$1"
   WHLDIR="$DEST/wheel"
 
@@ -104,7 +104,7 @@ function main() {
       cp tritonclient/utils/libccudashm.so \
         "${WHLDIR}/tritonclient/utils/cuda_shared_memory/."
     fi
-  
+
     # Copies the pre-compiled perf_analyzer binary
     if [ -f $3 ]; then
       cp $3 "${WHLDIR}"
@@ -112,7 +112,7 @@ function main() {
       (cd $WHLDIR; ln -sf ./perf_analyzer perf_client)
     fi
   fi
-  
+
   cp LICENSE.txt "${WHLDIR}"
   cp -r requirements "${WHLDIR}"
   cp setup.py "${WHLDIR}"
