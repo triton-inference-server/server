@@ -29,12 +29,12 @@ import os
 import numpy as np
 import test_util as tu
 import shm_util as su
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-import tritonshmutils.shared_memory as shm
-import tritonshmutils.cuda_shared_memory as cudashm
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+import tritonclient.utils.shared_memory as shm
+import tritonclient.utils.cuda_shared_memory as cudashm
 from functools import partial
-from tritonclientutils import *
+from tritonclient.utils import *
 
 if sys.version_info >= (3, 0):
     import queue

@@ -36,14 +36,22 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 
-import tritongrpcclient as grpcclient
-import tritonshmutils.shared_memory as shm
-import tritonshmutils.cuda_shared_memory as cudashm
+import tritonclient.grpc as grpcclient
 
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
+
+if TEST_SYSTEM_SHARED_MEMORY:
+    import tritonclient.utils.shared_memory as shm
+if TEST_CUDA_SHARED_MEMORY:
+    import tritonclient.utils.cuda_shared_memory as cudashm
+
+USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
+USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
+assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
+
 BACKENDS = os.environ.get('BACKENDS',
                           "graphdef savedmodel onnx libtorch plan custom")
 
@@ -69,14 +77,15 @@ class BatcherTest(tu.TestResultCollector):
         _deferred_exceptions = []
 
     def tearDown(self):
-        self.triton_client_.unregister_system_shared_memory()
-        self.triton_client_.unregister_cuda_shared_memory()
         if TEST_SYSTEM_SHARED_MEMORY:
-            destroy_fun = shm.destroy_shared_memory_region
-        else:
-            destroy_fun = cudashm.destroy_shared_memory_region
+            self.triton_client_.unregister_system_shared_memory()
+        if TEST_CUDA_SHARED_MEMORY:
+            self.triton_client_.unregister_cuda_shared_memory()
         for precreated_shm_region in self.precreated_shm_regions_:
-            destroy_fun(precreated_shm_region)
+            if TEST_SYSTEM_SHARED_MEMORY:
+                shm.destroy_shared_memory_region(precreated_shm_region)
+            elif TEST_CUDA_SHARED_MEMORY:
+                cudashm.destroy_shared_memory_region(precreated_shm_region)
         super().tearDown()
 
     # FIXME why only used for outputs
@@ -140,7 +149,8 @@ class BatcherTest(tu.TestResultCollector):
                     model_version=1,
                     outputs=requested_outputs,
                     use_http_json_tensors=False,
-                    use_grpc=False,
+                    use_grpc=USE_GRPC,
+                    use_http=USE_HTTP,
                     skip_request_id_check=True,
                     use_streaming=False,
                     shm_region_names=shm_region_names,
@@ -331,7 +341,6 @@ class BatcherTest(tu.TestResultCollector):
                                      args=(self, trial, 1, dtype, ([1, 16],),
                                            ([1, 16],)),
                                      kwargs={
-                                         'use_grpc': False,
                                          'use_http_json_tensors': False,
                                          'use_streaming': False
                                      }))
@@ -340,7 +349,6 @@ class BatcherTest(tu.TestResultCollector):
                                      args=(self, trial, 1, dtype, ([1, 8],),
                                            ([1, 8],)),
                                      kwargs={
-                                         'use_grpc': False,
                                          'use_http_json_tensors': False,
                                          'use_streaming': False
                                      }))
@@ -1106,7 +1114,7 @@ class BatcherTest(tu.TestResultCollector):
 
     def test_multi_batch_use_biggest_preferred(self):
         # Send multiple requests that sum to multiple preferred sizes
-        # and make sure the largest preferred size if used for the
+        # and make sure the largest preferred size is used for the
         # batch. Use TRITONSERVER_DELAY_SCHEDULER in the environment so
         # that requests can be queued up before scheduler starts
         # servicing.
@@ -1291,8 +1299,6 @@ class BatcherTest(tu.TestResultCollector):
                                      args=(self, model_base, 1, dtype, shapes,
                                            shapes),
                                      kwargs={
-                                         'use_grpc':
-                                             False,
                                          'use_http_json_tensors':
                                              False,
                                          'use_streaming':
