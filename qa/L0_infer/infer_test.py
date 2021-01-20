@@ -40,8 +40,11 @@ TEST_SYSTEM_SHARED_MEMORY = bool(
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
 CPU_ONLY = (os.environ.get('TRITON_SERVER_CPU_ONLY') is not None)
+
 USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
 USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
+assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
+
 BACKENDS = os.environ.get(
     'BACKENDS', "graphdef savedmodel onnx libtorch plan custom python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
