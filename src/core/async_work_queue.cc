@@ -66,6 +66,10 @@ AsyncWorkQueue::Initialize(size_t worker_count)
       GetSingleton()->worker_threads_.push_back(
           std::unique_ptr<std::thread>(new std::thread([] { WorkThread(); })));
     }
+  } else {
+    Status(
+        Status::Code::ALREADY_EXISTS,
+        "Async work queue has been initialized with " + std::to_string(GetSingleton()->worker_threads_.size()) + " 'worker_count'");
   }
   return Status::Success;
 }
@@ -99,6 +103,14 @@ AsyncWorkQueue::WorkThread()
       break;
     }
   }
+}
+
+void
+AsyncWorkQueue::Reset()
+{
+  // Reconstruct the singleton to reset it
+  GetSingleton()->~AsyncWorkQueue();
+  new (GetSingleton()) AsyncWorkQueue();
 }
 
 }}  // namespace nvidia::inferenceserver
