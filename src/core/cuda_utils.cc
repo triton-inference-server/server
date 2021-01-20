@@ -90,26 +90,9 @@ CopyBuffer(
     memcpy(dst, src, byte_size);
   } else {
 #ifdef TRITON_ENABLE_GPU
-    // [TODO] use cudaMemcpyDefault if UVM is supported for the device
-    auto copy_kind = cudaMemcpyDeviceToDevice;
-    if (src_memory_type != TRITONSERVER_MEMORY_GPU) {
-      copy_kind = cudaMemcpyHostToDevice;
-    } else if (dst_memory_type != TRITONSERVER_MEMORY_GPU) {
-      copy_kind = cudaMemcpyDeviceToHost;
-    }
-
-    if ((src_memory_type_id != dst_memory_type_id) &&
-        (copy_kind == cudaMemcpyDeviceToDevice)) {
-      RETURN_IF_CUDA_ERR(
-          cudaMemcpyPeerAsync(
-              dst, dst_memory_type_id, src, src_memory_type_id, byte_size,
-              cuda_stream),
-          msg + ": failed to perform CUDA copy");
-    } else {
-      RETURN_IF_CUDA_ERR(
-          cudaMemcpyAsync(dst, src, byte_size, copy_kind, cuda_stream),
-          msg + ": failed to perform CUDA copy");
-    }
+    RETURN_IF_CUDA_ERR(
+        cudaMemcpyAsync(dst, src, byte_size, cudaMemcpyDefault, cuda_stream),
+        msg + ": failed to perform CUDA copy");
 
     *cuda_used = true;
 #else
