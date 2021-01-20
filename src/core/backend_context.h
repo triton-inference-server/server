@@ -308,13 +308,15 @@ class BackendInputCollector {
         const size_t tensor_buffer_offset,
         const TRITONSERVER_MemoryType tensor_memory_type,
         const int64_t tensor_memory_id, RequestsList&& requests)
-        : pinned_memory_(std::move(pinned_memory)),
+        : finalized_(false), pinned_memory_(std::move(pinned_memory)),
           tensor_buffer_(tensor_buffer),
           tensor_buffer_offset_(tensor_buffer_offset),
           tensor_memory_type_(tensor_memory_type),
           tensor_memory_id_(tensor_memory_id), requests_(std::move(requests))
     {
     }
+    bool Finalize(cudaStream_t stream);
+    bool finalized_;
     std::unique_ptr<AllocatedMemory> pinned_memory_;
     char* tensor_buffer_;
     const size_t tensor_buffer_offset_;
