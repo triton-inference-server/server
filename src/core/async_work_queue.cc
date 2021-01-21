@@ -67,9 +67,11 @@ AsyncWorkQueue::Initialize(size_t worker_count)
           std::unique_ptr<std::thread>(new std::thread([] { WorkThread(); })));
     }
   } else {
-    Status(
+    return Status(
         Status::Code::ALREADY_EXISTS,
-        "Async work queue has been initialized with " + std::to_string(GetSingleton()->worker_threads_.size()) + " 'worker_count'");
+        "Async work queue has been initialized with " +
+            std::to_string(GetSingleton()->worker_threads_.size()) +
+            " 'worker_count'");
   }
   return Status::Success;
 }
