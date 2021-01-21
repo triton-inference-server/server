@@ -36,11 +36,9 @@ import infer_util as iu
 import test_util as tu
 from functools import partial
 
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-import tritonshmutils.shared_memory as shm
-import tritonshmutils.cuda_shared_memory as cudashm
-from tritonclientutils import *
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import *
 
 if sys.version_info >= (3, 0):
     import queue
@@ -51,6 +49,12 @@ _test_system_shared_memory = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 _test_cuda_shared_memory = bool(
     int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+
+if _test_system_shared_memory:
+    import tritonclient.utils.shared_memory as shm
+if _test_cuda_shared_memory:
+    import tritonclient.utils.cuda_shared_memory as cudashm
+
 _test_valgrind = bool(int(os.environ.get('TEST_VALGRIND', 0)))
 _test_jetson = bool(int(os.environ.get('TEST_JETSON', 0)))
 
@@ -365,8 +369,10 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
     def cleanup_shm_regions(self, shm_handles):
         # Make sure unregister is before shared memory destruction
-        self.triton_client_.unregister_system_shared_memory()
-        self.triton_client_.unregister_cuda_shared_memory()
+        if _test_system_shared_memory:
+            self.triton_client_.unregister_system_shared_memory()
+        if _test_cuda_shared_memory:
+            self.triton_client_.unregister_cuda_shared_memory()
         for shm_tmp_handle in shm_handles:
             if _test_system_shared_memory:
                 shm.destroy_shared_memory_region(shm_tmp_handle[2])

@@ -43,6 +43,17 @@ TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
+
+USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
+USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
+assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
+if USE_GRPC and USE_HTTP:
+    _protocols = ("http", "grpc")
+elif USE_GRPC:
+    _protocols = ("grpc",)
+else:
+    _protocols = ("http",)
+
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
@@ -90,7 +101,6 @@ if os.environ['BATCHER_TYPE'] == "VARIABLE":
     if "onnx" in _trials:
         _ragged_batch_not_supported_trials.append("onnx")
 
-_protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
 
 

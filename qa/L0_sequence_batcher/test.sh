@@ -44,7 +44,7 @@ BATCHER_TEST=sequence_batcher_test.py
 
 if [ -z "$TEST_VALGRIND" ]; then
     TEST_VALGRIND="0"
-fi 
+fi
 
 if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
@@ -68,11 +68,26 @@ if [ "$TEST_JETSON" -eq 1 ]; then
     MODEL_TRIALS="0 v"
 fi
 
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-OPTDIR=${OPTDIR:="/opt"}
-SERVER=${OPTDIR}/tritonserver/bin/tritonserver
-BACKEND_DIR=${OPTDIR}/tritonserver/backends
 TF_VERSION=${TF_VERSION:=1}
+
+# On windows the paths invoked by the script (running in WSL) must use
+# /mnt/c when needed but the paths on the tritonserver command-line
+# must be C:/ style.
+if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    MODELDIR=${MODELDIR:=C:/models}
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
+    SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
+    export USE_HTTP=0
+    export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER:TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+else
+    MODELDIR=${MODELDIR:=`pwd`}
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    OPTDIR=${OPTDIR:="/opt"}
+    BACKEND_DIR=${OPTDIR}/tritonserver/backends
+    SERVER=${OPTDIR}/tritonserver/bin/tritonserver
+fi
+
 SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
 
 source ../common/util.sh
@@ -251,11 +266,11 @@ for model_trial in $MODEL_TRIALS; do
         [[ "$model_trial" != "v" ]] && export MODEL_INSTANCES=4 &&
         [[ "$model_trial" != "0" ]] && export MODEL_INSTANCES=$model_trial
 
-    MODEL_DIR=models${model_trial}
+    MODEL_PATH=models${model_trial}
 
     if [ "$ENSEMBLES" == "1" ]; then
-      cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_DIR/.
-      create_nop_modelfile `pwd`/libidentity.so `pwd`/$MODEL_DIR
+      cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_PATH/.
+      create_nop_modelfile `pwd`/libidentity.so `pwd`/$MODEL_PATH
     fi
 
     # Need to launch the server for each test so that the model status
@@ -266,27 +281,32 @@ for model_trial in $MODEL_TRIALS; do
         [[ "$model_trial" != "v" ]] && export BATCHER_TYPE="FIXED"
 
     for i in $NO_DELAY_TESTS; do
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-        
+        SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+        SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            LEAKCHECK_LOG="./$i.$MODEL_DIR.valgrind.log"
+            LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
             LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
             run_server_leakcheck
-        else  
+        elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+            # We rely on HTTP endpoint in run_server so until HTTP is
+            # implemented for win we do this hack...
+            run_server_nowait
+            sleep 15
+        else
             run_server
         fi
-        
+
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
             cat $SERVER_LOG
             exit 1
         fi
 
-        echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+        echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
         set +e
-        python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+        python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
@@ -301,12 +321,11 @@ for model_trial in $MODEL_TRIALS; do
         fi
         set -e
 
-        kill $SERVER_PID
-        wait $SERVER_PID
+        kill_server
 
         set +e
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            check_valgrind_log $LEAKCHECK_LOG 
+            check_valgrind_log $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 RET=1
             fi
@@ -327,27 +346,32 @@ for model_trial in $MODEL_TRIALS; do
             [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRITONSERVER_DELAY_SCHEDULER=8 &&
             [[ "$i" != "test_half_batch" ]] && export TRITONSERVER_DELAY_SCHEDULER=4 &&
             [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRITONSERVER_DELAY_SCHEDULER=12
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-        
+        SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+        SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            LEAKCHECK_LOG="./$i.$MODEL_DIR.valgrind.log"
+            LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
             LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
             run_server_leakcheck
-        else  
+        elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+            # We rely on HTTP endpoint in run_server so until HTTP is
+            # implemented for win we do this hack...
+            run_server_nowait
+            sleep 15
+        else
             run_server
         fi
-        
+
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
             cat $SERVER_LOG
             exit 1
         fi
 
-        echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+        echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
         set +e
-        python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+        python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
@@ -364,12 +388,11 @@ for model_trial in $MODEL_TRIALS; do
 
         unset TRITONSERVER_DELAY_SCHEDULER
         unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-        kill $SERVER_PID
-        wait $SERVER_PID
+        kill_server
 
         set +e
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            check_valgrind_log $LEAKCHECK_LOG 
+            check_valgrind_log $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 RET=1
             fi
@@ -388,7 +411,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
   export NO_BATCHING=0
   export MODEL_INSTANCES=1
   export BATCHER_TYPE="FIXED"
-  MODEL_DIR=ragged_models
+  MODEL_PATH=ragged_models
 
   # Need to launch the server for each test so that the model status
   # is reset (which is used to make sure the correct batch size was
@@ -398,27 +421,32 @@ if [[ $BACKENDS == *"custom"* ]]; then
       export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
       export TRITONSERVER_DELAY_SCHEDULER=12
 
-      SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR ${SERVER_ARGS_EXTRA}"
-      SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-      
+      SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+      SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+
       if [ "$TEST_VALGRIND" -eq 1 ]; then
-          LEAKCHECK_LOG="./$i.$MODEL_DIR.valgrind.log"
+          LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
           LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
           run_server_leakcheck
-      else  
+      elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+          # We rely on HTTP endpoint in run_server so until HTTP is
+          # implemented for win we do this hack...
+          run_server_nowait
+          sleep 15
+      else
           run_server
       fi
-      
+
       if [ "$SERVER_PID" == "0" ]; then
           echo -e "\n***\n*** Failed to start $SERVER\n***"
           cat $SERVER_LOG
           exit 1
       fi
 
-      echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+      echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
       set +e
-      python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+      python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
       if [ $? -ne 0 ]; then
           echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
           echo -e "\n***\n*** Test $i Failed\n***"
@@ -435,12 +463,11 @@ if [[ $BACKENDS == *"custom"* ]]; then
 
       unset TRITONSERVER_DELAY_SCHEDULER
       unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-      kill $SERVER_PID
-      wait $SERVER_PID
-    
+      kill_server
+
       set +e
       if [ "$TEST_VALGRIND" -eq 1 ]; then
-          check_valgrind_log $LEAKCHECK_LOG 
+          check_valgrind_log $LEAKCHECK_LOG
           if [ $? -ne 0 ]; then
               RET=1
           fi
@@ -450,34 +477,39 @@ if [[ $BACKENDS == *"custom"* ]]; then
 fi
 
 # max queue delay
-MODEL_DIR=queue_delay_models
+MODEL_PATH=queue_delay_models
 # remove ensemble models from the test model repo
 rm -rf queue_delay_models/simple_* queue_delay_models/fan_* queue_delay_models/sequence_*
 for i in $QUEUE_DELAY_TESTS ; do
     export NO_BATCHING=0
     export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
     export TRITONSERVER_DELAY_SCHEDULER=2
-    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-    
+    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        LEAKCHECK_LOG="./$i.$MODEL_DIR.valgrind.log"
+        LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    else  
+    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+        # We rely on HTTP endpoint in run_server so until HTTP is
+        # implemented for win we do this hack...
+        run_server_nowait
+        sleep 15
+    else
         run_server
     fi
-    
+
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
         exit 1
     fi
 
-    echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+    echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
     set +e
-    python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
         echo -e "\n***\n*** Test $i Failed\n***"
@@ -494,12 +526,11 @@ for i in $QUEUE_DELAY_TESTS ; do
 
     unset TRITONSERVER_DELAY_SCHEDULER
     unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-    kill $SERVER_PID
-    wait $SERVER_PID
-  
+    kill_server
+
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG 
+        check_valgrind_log $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi
