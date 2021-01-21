@@ -54,6 +54,9 @@ class AsyncWorkQueue {
   // Therefore std::move should be used when calling AddTask.
   static Status AddTask(const std::function<void(void)>&& task);
 
+ protected:
+  static void Reset();
+
  private:
   AsyncWorkQueue() = default;
   ~AsyncWorkQueue();
