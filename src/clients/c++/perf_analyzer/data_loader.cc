@@ -359,6 +359,20 @@ DataLoader::ReadInputTensorData(
               ", step id: " + std::to_string(step_index) + ")");
         }
       }
+
+      // Validate if a fixed shape is available for the input tensor.
+      int element_count;
+      auto shape_it = input_shapes_.find(key_name);
+      if (shape_it != input_shapes_.end()) {
+        element_count = ElementCount(shape_it->second);
+      } else {
+        element_count = ElementCount(input.second.shape_);
+      }
+      if (element_count < 0) {
+        return cb::Error(
+            "The variable-sized input tensor \"" + input.second.name_ +
+            "\" is missing shape, see --shape option.");
+      }
     } else {
       return cb::Error(
           "missing input " + input.first +
