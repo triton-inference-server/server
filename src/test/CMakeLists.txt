@@ -188,6 +188,62 @@ install(
 )
 
 #
+# Unit test for AsyncWorkQueue
+#
+set(
+  ASYNC_WORK_QUEUE_SRCS
+  ../core/async_work_queue.cc
+  ../core/status.cc
+)
+
+set(
+  ASYNC_WORK_QUEUE_HDRS
+  ../core/async_work_queue.h
+  ../core/status.h
+)
+
+set(
+  ASYNC_WORK_QUEUE_TEST_SRCS
+  async_work_queue_test.cc
+  ${ASYNC_WORK_QUEUE_SRCS}
+)
+
+set(
+  ASYNC_WORK_QUEUE_TEST_HDRS
+  ${ASYNC_WORK_QUEUE_HDRS}
+)
+
+find_package(GTest REQUIRED)
+add_executable(
+  async_work_queue_test
+  ${ASYNC_WORK_QUEUE_TEST_SRCS}
+  ${ASYNC_WORK_QUEUE_TEST_HDRS}
+)
+set_target_properties(
+  async_work_queue_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(
+  async_work_queue_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+)
+target_link_libraries(
+  async_work_queue_test
+  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE -lpthread
+)
+install(
+  TARGETS async_work_queue_test
+  RUNTIME DESTINATION bin
+)
+
+#
 # RateLimiter
 #
 protobuf_generate_cpp(MODEL_CONFIG_PROTO_SRC MODEL_CONFIG_PROTO_HDR ../core/model_config.proto)
