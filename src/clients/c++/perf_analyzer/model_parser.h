@@ -61,6 +61,7 @@ class ModelParser {
 
   explicit ModelParser(cb::BackendKind backend_kind)
       : backend_kind_(backend_kind),
+        input_names_(std::make_shared<std::vector<std::string>>()),
         inputs_(std::make_shared<ModelTensorMap>()),
         outputs_(std::make_shared<ModelTensorMap>()),
         composing_models_map_(std::make_shared<ComposingModelMap>()),
@@ -131,6 +132,14 @@ class ModelParser {
   /// \return the truth value of whether the model is decoupled
   bool IsDecoupled() const { return is_decoupled_; }
 
+  /// Get the name of model inputs.
+  /// \return The vector with names of tensor inputs in the order
+  /// returned in model configuration.
+  const std::shared_ptr<std::vector<std::string>>& InputNames()
+  {
+    return input_names_;
+  }
+
   /// Get the details about the model inputs.
   /// \return The map with tensor_name and the tensor details
   /// stored as key-value pair.
@@ -156,6 +165,7 @@ class ModelParser {
 
   cb::BackendKind backend_kind_;
 
+  std::shared_ptr<std::vector<std::string>> input_names_;
   std::shared_ptr<ModelTensorMap> inputs_;
   std::shared_ptr<ModelTensorMap> outputs_;
   std::shared_ptr<ComposingModelMap> composing_models_map_;

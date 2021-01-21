@@ -112,9 +112,9 @@ ModelParser::InitTriton(
   const auto inputs_itr = metadata.FindMember("inputs");
   if (inputs_itr != metadata.MemberEnd()) {
     for (const auto& input : inputs_itr->value.GetArray()) {
-      auto it =
-          inputs_->emplace(input["name"].GetString(), ModelTensor()).first;
-      it->second.name_ = input["name"].GetString();
+      input_names_->emplace_back(input["name"].GetString());
+      auto it = inputs_->emplace(input_names_->back(), ModelTensor()).first;
+      it->second.name_ = input_names_->back();
       it->second.datatype_ = input["datatype"].GetString();
       bool is_dynamic = false;
       bool skip = (max_batch_size_ > 0);
@@ -236,9 +236,9 @@ ModelParser::InitTFServe(
         signature_config[model_signature_name.c_str()]["inputs"];
     for (rapidjson::Value::ConstMemberIterator json_itr = inputs.MemberBegin();
          json_itr != inputs.MemberEnd(); ++json_itr) {
-      auto it =
-          inputs_->emplace(json_itr->name.GetString(), ModelTensor()).first;
-      it->second.name_ = json_itr->name.GetString();
+      input_names_->emplace_back(json_itr->name.GetString());
+      auto it = inputs_->emplace(input_names_->back(), ModelTensor()).first;
+      it->second.name_ = input_names_->back();
       RETURN_IF_ERROR(ConvertDTypeFromTFS(
           json_itr->value["dtype"].GetString(), &it->second.datatype_));
 
@@ -307,8 +307,9 @@ ModelParser::InitTorchServe(
 
   // TorchServe needs to upload a file to the server. The input will hold the
   // path to the file which should be provided as json to --input-data
-  auto it = inputs_->emplace("TORCHSERVE_INPUT", ModelTensor()).first;
-  it->second.name_ = "TORCHSERVE_INPUT";
+  input_names_->emplace_back("TORCHSERVE_INPUT");
+  auto it = inputs_->emplace(input_names_->back(), ModelTensor()).first;
+  it->second.name_ = input_names_->back();
   it->second.datatype_ = "BYTES";
   // Supports only a single input file
   it->second.shape_.push_back(1);

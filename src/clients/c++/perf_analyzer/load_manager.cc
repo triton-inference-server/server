@@ -438,28 +438,28 @@ cb::Error
 LoadManager::PrepareInfer(InferContext* ctx)
 {
   // Initialize inputs
-  for (const auto& input : *(parser_->Inputs())) {
+  for (const auto& input_name : *(parser_->InputNames())) {
+    const auto& input = (*(parser_->Inputs()))[input_name];
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
     // Set input shape before getting the input data
     std::vector<int64_t> shape;
-    RETURN_IF_ERROR(data_loader_->GetInputShape(input.second, 0, 0, &shape));
+    RETURN_IF_ERROR(data_loader_->GetInputShape(input, 0, 0, &shape));
     if (shape.empty() && (backend_->Kind() == cb::BackendKind::TRITON)) {
       return cb::Error("unable to set shape for the input");
     }
 
-    if ((parser_->MaxBatchSize() != 0) && (!input.second.is_shape_tensor_)) {
+    if ((parser_->MaxBatchSize() != 0) && (!input.is_shape_tensor_)) {
       shape.insert(shape.begin(), (int64_t)batch_size_);
     }
 
     cb::InferInput* infer_input;
     RETURN_IF_ERROR(cb::InferInput::Create(
-        &infer_input, backend_->Kind(), input.first, shape,
-        input.second.datatype_));
+        &infer_input, backend_->Kind(), input.name_, shape, input.datatype_));
     ctx->inputs_.push_back(infer_input);
 
-    RETURN_IF_ERROR(data_loader_->GetInputData(
-        input.second, 0, 0, &data_ptr, &batch1_bytesize));
+    RETURN_IF_ERROR(
+        data_loader_->GetInputData(input, 0, 0, &data_ptr, &batch1_bytesize));
 
     if (!shape.empty()) {
       size_t max_count = (parser_->MaxBatchSize() == 0) ? 1 : batch_size_;
@@ -484,15 +484,16 @@ LoadManager::PrepareInfer(InferContext* ctx)
 cb::Error
 LoadManager::PrepareSharedMemoryInfer(InferContext* ctx)
 {
-  for (const auto& input : *(parser_->Inputs())) {
+  for (const auto& input_name : *(parser_->InputNames())) {
+    const auto& input = (*(parser_->Inputs()))[input_name];
     std::string region_name(
-        TensorToRegionName(input.first) + "_" + std::to_string(0) + "_" +
+        TensorToRegionName(input.name_) + "_" + std::to_string(0) + "_" +
         std::to_string(0));
 
     std::vector<int64_t> shape;
-    RETURN_IF_ERROR(data_loader_->GetInputShape(input.second, 0, 0, &shape));
+    RETURN_IF_ERROR(data_loader_->GetInputShape(input, 0, 0, &shape));
     if (!shape.empty()) {
-      if ((parser_->MaxBatchSize() != 0) && (!input.second.is_shape_tensor_)) {
+      if ((parser_->MaxBatchSize() != 0) && (!input.is_shape_tensor_)) {
         shape.insert(shape.begin(), (int64_t)batch_size_);
       }
     } else {
@@ -501,8 +502,7 @@ LoadManager::PrepareSharedMemoryInfer(InferContext* ctx)
 
     cb::InferInput* infer_input;
     RETURN_IF_ERROR(cb::InferInput::Create(
-        &infer_input, backend_->Kind(), input.first, shape,
-        input.second.datatype_));
+        &infer_input, backend_->Kind(), input.name_, shape, input.datatype_));
     ctx->inputs_.push_back(infer_input);
 
     RETURN_IF_ERROR(infer_input->SetSharedMemory(
