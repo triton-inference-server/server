@@ -29,11 +29,11 @@ import os
 import numpy as np
 from ctypes import *
 
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-import tritonshmutils.shared_memory as shm
-import tritonshmutils.cuda_shared_memory as cudashm
-from tritonclientutils import *
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+import tritonclient.utils.shared_memory as shm
+import tritonclient.utils.cuda_shared_memory as cudashm
+from tritonclient.utils import *
 
 
 def _range_repr_dtype(dtype):
