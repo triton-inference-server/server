@@ -229,9 +229,10 @@ TritonBackend::~TritonBackend()
 void
 TritonBackend::SetUnloadEnabled(const bool enable)
 {
-  // For memory leak debugging do not allow shared libraries to be
-  // unloaded, so that the shared library is available for stack trace
-  // generation when the server exits.
+  // If TRITONSERVER_DISABLE_BACKEND_UNLOAD defined, do not allow
+  // backend shared libraries to be unloaded. This is used, for
+  // example, by memory leak testing so that the shared library is
+  // available for stack trace generation when the server exits.
   if (enable && !unload_enabled_) {
     const char* dstr = getenv("TRITONSERVER_DISABLE_BACKEND_UNLOAD");
     if (dstr != nullptr) {

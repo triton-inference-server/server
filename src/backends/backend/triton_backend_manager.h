@@ -135,7 +135,7 @@ class TritonBackend {
   // Opaque state associated with the backend.
   void* state_;
 
-  // Should be backend shared library be unloaded (e.g. dlclose) when
+  // Should the backend shared library be unloaded (e.g. dlclose) when
   // the backend is no longer needed.
   bool unload_enabled_;
 };
