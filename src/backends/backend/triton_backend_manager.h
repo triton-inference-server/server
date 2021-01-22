@@ -74,6 +74,9 @@ class TritonBackend {
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
+  bool UnloadEnabled() const { return unload_enabled_; }
+  void SetUnloadEnabled(const bool enable);
+
   TritonModelInitFn_t ModelInitFn() const { return model_init_fn_; }
   TritonModelFiniFn_t ModelFiniFn() const { return model_fini_fn_; }
   TritonModelInstanceInitFn_t ModelInstanceInitFn() const
@@ -131,6 +134,10 @@ class TritonBackend {
 
   // Opaque state associated with the backend.
   void* state_;
+
+  // Should be backend shared library be unloaded (e.g. dlclose) when
+  // the backend is no longer needed.
+  bool unload_enabled_;
 };
 
 //

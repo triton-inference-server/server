@@ -204,9 +204,11 @@ TritonBackend::TritonBackend(
     const TritonServerMessage& backend_config)
     : name_(name), dir_(dir), libpath_(libpath),
       backend_config_(backend_config),
-      exec_policy_(TRITONBACKEND_EXECUTION_BLOCKING), state_(nullptr)
+      exec_policy_(TRITONBACKEND_EXECUTION_BLOCKING), state_(nullptr),
+      unload_enabled_(false)
 {
   ClearHandles();
+  SetUnloadEnabled(true);
 }
 
 TritonBackend::~TritonBackend()
@@ -222,6 +224,25 @@ TritonBackend::~TritonBackend()
   }
 
   LOG_STATUS_ERROR(UnloadBackendLibrary(), "failed unloading backend");
+}
+
+void
+TritonBackend::SetUnloadEnabled(const bool enable)
+{
+  // For memory leak debugging do not allow shared libraries to be
+  // unloaded, so that the shared library is available for stack trace
+  // generation when the server exits.
+  if (enable && !unload_enabled_) {
+    const char* dstr = getenv("TRITONSERVER_DISABLE_BACKEND_UNLOAD");
+    if (dstr != nullptr) {
+      LOG_VERBOSE(1) << "TRITONSERVER_DISABLE_BACKEND_UNLOAD disables "
+                        "shared-library unload for backend '"
+                     << Name() << "'";
+      return;
+    }
+  }
+
+  unload_enabled_ = enable;
 }
 
 void
@@ -295,19 +316,7 @@ TritonBackend::LoadBackendLibrary()
 Status
 TritonBackend::UnloadBackendLibrary()
 {
-  bool enable_unload = true;
-
-  // For memory leak debugging do not unload the shared library so
-  // that it is available for stack trace generation when the server
-  // exits.
-  const char* dstr = getenv("TRITONSERVER_DISABLE_BACKEND_UNLOAD");
-  if (dstr != nullptr) {
-    enable_unload = (atoi(dstr) == 0);
-    LOG_VERBOSE(1) << "Disable shared-library unload for backend '" << Name()
-                   << "'";
-  }
-
-  if (enable_unload) {
+  if (unload_enabled_) {
     RETURN_IF_ERROR(CloseLibraryHandle(dlhandle_));
   }
 
