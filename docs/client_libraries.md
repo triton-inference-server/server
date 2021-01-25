@@ -54,7 +54,8 @@ It is also possible to build build the client libraries with
 ### Download Using Python Package Installer (pip)
 
 The GRPC and HTTP client libraries are available as a Python package
-that can be installed using a recent version of pip.
+that can be installed using a recent version of pip. **Currently pip
+install is only available on Linux**.
 
 ```
 $ pip install nvidia-pyindex
