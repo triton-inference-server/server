@@ -234,26 +234,30 @@ the optional portions of the model configuration.
 
 The following table shows the tensor datatypes supported by
 Triton. The first column shows the name of the datatype as it appears
-in the model configuration file. The other columns show the
-corresponding datatype for the model frameworks and for the Python
-numpy library. If a model framework does not have an entry for a given
-datatype, then Triton does not support that datatype for that model.
+in the model configuration file. The next four columns show the
+corresponding datatype for supported model frameworks. If a model
+framework does not have an entry for a given datatype, then Triton
+does not support that datatype for that model. The sixth column,
+labeled "API", shows the corresponding datatype for the TRITONSERVER C
+API, TRITONBACKEND C API, HTTP/REST protocol and GRPC protocol. The
+last column shows the corresponding datatype for the Python numpy
+library.
 
-|Type          |TensorRT      |TensorFlow    |ONNX Runtime  |PyTorch  |NumPy         |
-|--------------|--------------|--------------|--------------|---------|--------------|
-|TYPE_BOOL     | kBOOL        |DT_BOOL       |BOOL          |kBool    |bool          |
-|TYPE_UINT8    |              |DT_UINT8      |UINT8         |kByte    |uint8         |
-|TYPE_UINT16   |              |DT_UINT16     |UINT16        |         |uint16        |
-|TYPE_UINT32   |              |DT_UINT32     |UINT32        |         |uint32        |
-|TYPE_UINT64   |              |DT_UINT64     |UINT64        |         |uint64        |
-|TYPE_INT8     | kINT8        |DT_INT8       |INT8          |kChar    |int8          |
-|TYPE_INT16    |              |DT_INT16      |INT16         |kShort   |int16         |
-|TYPE_INT32    | kINT32       |DT_INT32      |INT32         |kInt     |int32         |
-|TYPE_INT64    |              |DT_INT64      |INT64         |kLong    |int64         |
-|TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |         |float16       |
-|TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |kFloat   |float32       |
-|TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |kDouble  |float64       |
-|TYPE_STRING   |              |DT_STRING     |STRING        |         |dtype(object) |
+|Model Config  |TensorRT      |TensorFlow    |ONNX Runtime  |PyTorch  |API      |NumPy         |
+|--------------|--------------|--------------|--------------|---------|---------|--------------|
+|TYPE_BOOL     | kBOOL        |DT_BOOL       |BOOL          |kBool    |BOOL     |bool          |
+|TYPE_UINT8    |              |DT_UINT8      |UINT8         |kByte    |UINT8    |uint8         |
+|TYPE_UINT16   |              |DT_UINT16     |UINT16        |         |UINT16   |uint16        |
+|TYPE_UINT32   |              |DT_UINT32     |UINT32        |         |UINT32   |uint32        |
+|TYPE_UINT64   |              |DT_UINT64     |UINT64        |         |UINT64   |uint64        |
+|TYPE_INT8     | kINT8        |DT_INT8       |INT8          |kChar    |INT8     |int8          |
+|TYPE_INT16    |              |DT_INT16      |INT16         |kShort   |INT16    |int16         |
+|TYPE_INT32    | kINT32       |DT_INT32      |INT32         |kInt     |INT32    |int32         |
+|TYPE_INT64    |              |DT_INT64      |INT64         |kLong    |INT64    |int64         |
+|TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |         |FP16     |float16       |
+|TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |kFloat   |FP32     |float32       |
+|TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |kDouble  |FP64     |float64       |
+|TYPE_STRING   |              |DT_STRING     |STRING        |         |BYTES    |dtype(object) |
 
 For TensorRT each value is in the nvinfer1::DataType namespace. For
 example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point
