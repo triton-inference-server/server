@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -538,29 +538,6 @@ ARG TRITON_CONTAINER_VERSION
     if platform.system() == 'Windows':
         df += '''
 SHELL ["cmd", "/S", "/C"]
-
-# Download and install Build Tools for Visual Studio.  Use 16.8.3
-# explicitly. https://docs.microsoft.com/en-us/visualstudio/releases/2019/history
-RUN if not exist "c:\\tmp\\" mkdir c:\\tmp
-ADD https://aka.ms/vs/16/release/vs_buildtools.exe /tmp/vs_buildtools.exe
-ADD https://aka.ms/vs/16/release/channel /tmp/VisualStudio.chman
-RUN /tmp/vs_buildtools.exe --quiet --wait --norestart --nocache --installPath C:\\BuildTools --channelUri C:\\tmp\\VisualStudio.chman --installChannelUri C:\\tmp\\VisualStudio.chman --add Microsoft.VisualStudio.Workload.VCTools;includeRecommended --add Microsoft.Component.MSBuild || IF "%ERRORLEVEL%"=="3010" EXIT 0
-
-# Specific cmake version is needed to avoid find_package(zlib) failure
-# when building grpc
-RUN powershell.exe -ExecutionPolicy RemoteSigned iex (new-object net.webclient).downloadstring('https://get.scoop.sh')
-RUN scoop install python git docker
-
-WORKDIR /vcpkg
-RUN git clone --depth=1 --single-branch -b 2020.11-1 https://github.com/microsoft/vcpkg.git
-WORKDIR /vcpkg/vcpkg
-RUN bootstrap-vcpkg.bat
-RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows zlib:x64-windows
-RUN vcpkg.exe integrate install
-
-WORKDIR /workspace
-RUN pip3 install --upgrade wheel setuptools docker
 '''
     else:
         df += '''
@@ -744,7 +721,7 @@ WORKDIR /workspace
 RUN rmdir /S/Q * || exit 0
 COPY . .
 
-ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/vcpkg/scripts/buildsystems/vcpkg.cmake
+ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV TRITONBUILD_VCPKG_TARGET_TRIPLET x64-windows
 ENTRYPOINT C:\BuildTools\Common7\Tools\VsDevCmd.bat &&
 '''
