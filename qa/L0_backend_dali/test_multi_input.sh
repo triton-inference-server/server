@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,17 +25,48 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-DALI_BACKEND_DIR=`pwd`/dali_backend_dir
+export CUDA_VISIBLE_DEVICES=0
 
-if [ -z ${DALI_BACKEND_REPO_TAG+unused} ]; then
-  echo -e "\n***\n*** Test FAILED: DALI_BACKEND_REPO_TAG is undefined\n***"
+DALI_BACKEND_DIR=$1
+
+CLIENT_PY=$DALI_BACKEND_DIR/qa/multi_input/multi_input_client.py
+CLIENT_LOG="./client.log"
+
+MODEL_REPO=$DALI_BACKEND_DIR/docs/examples/multi_input/model_repository
+
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=$MODEL_REPO"
+SERVER_LOG="./inference_server.log"
+source ../common/util.sh
+
+pushd $MODEL_REPO/..
+/bin/bash -x ./setup_mutli_input_example.sh
+popd
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+  echo -e "\n***\n*** Failed to start $SERVER $SERVER_ARGS\n***"
+  cat $SERVER_LOG
   exit 1
 fi
 
-pip3 install --extra-index-url https://developer.download.nvidia.com/compute/redist nvidia-dali-cuda110
+RET=0
 
-git clone --single-branch --depth=1 -b $DALI_BACKEND_REPO_TAG https://github.com/triton-inference-server/dali_backend.git $DALI_BACKEND_DIR
+set +e
+python $CLIENT_PY --model_name dali_multi_input -v --batch_size 32 >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+set -e
 
-/bin/bash -x ./test_identity.sh $DALI_BACKEND_DIR
-/bin/bash -x ./test_inception_ensemble.sh $DALI_BACKEND_DIR
-/bin/bash -x ./test_multi_input.sh $DALI_BACKEND_DIR
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+else
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET
