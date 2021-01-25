@@ -214,7 +214,7 @@ ExternalProject_Add(absl
 # Build googletest project from grpc-repo
 #
 ExternalProject_Add(googletest
-  PREFIX protobuf
+  PREFIX googletest
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/googletest"
   DOWNLOAD_COMMAND ""
   CMAKE_CACHE_ARGS
@@ -234,24 +234,6 @@ else()
 endif()
 
 #
-# Build c-area project from grpc-repo
-#
-ExternalProject_Add(c-ares
-  PREFIX c-ares
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/cares/cares"
-  DOWNLOAD_COMMAND ""
-  CMAKE_CACHE_ARGS
-    ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
-    ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
-    -DCARES_SHARED:BOOL=OFF
-    -DCARES_STATIC:BOOL=ON
-    -DCARES_STATIC_PIC:BOOL=ON
-    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares
-  DEPENDS grpc-repo
-)
-
-#
 # Build GRPC
 #
 ExternalProject_Add(grpc
@@ -267,7 +249,6 @@ ExternalProject_Add(grpc
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -DgRPC_ZLIB_PROVIDER:STRING=package
     -DgRPC_CARES_PROVIDER:STRING=package
-    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     -DgRPC_SSL_PROVIDER:STRING=package
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
@@ -275,7 +256,7 @@ ExternalProject_Add(grpc
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
     -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
-  DEPENDS grpc-repo c-ares protobuf absl
+  DEPENDS grpc-repo protobuf absl crc32c
 )
 
 #
@@ -407,6 +388,7 @@ ExternalProject_Add(crc32c
     -DCRC32C_BUILD_BENCHMARKS:BOOL=OFF
     -DCRC32C_USE_GLOG:BOOL=OFF
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c
 )
 
@@ -414,7 +396,6 @@ ExternalProject_Add(crc32c
 # does not pass protobuf_DIR and gRPC_DIR etc to its
 # external projects but expects them in CMAKE_PREFIX_PATH
 set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
-   ${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
    ${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
    ${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
    ${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
@@ -549,7 +530,6 @@ ExternalProject_Add(client
   CMAKE_CACHE_ARGS
     -DCURL_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/curl/install/${CMAKE_INSTALL_LIBDIR}/cmake/CURL
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
-    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
@@ -610,7 +590,6 @@ ExternalProject_Add(server
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
-    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
