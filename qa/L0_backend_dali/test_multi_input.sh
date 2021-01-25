@@ -40,7 +40,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 pushd $MODEL_REPO/..
-/bin/bash -x ./setup_mutli_input_example.sh
+/bin/bash -x ./setup_multi_input_example.sh
 popd
 
 run_server
