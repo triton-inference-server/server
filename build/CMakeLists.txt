@@ -553,6 +553,8 @@ ExternalProject_Add(client
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
+    -Dnlohmann_json_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json/lib/cmake/nlohmann_json
     ${_CMAKE_TRITON_DIR}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
