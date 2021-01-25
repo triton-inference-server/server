@@ -27,10 +27,24 @@
 replicaCount: 1
 
 image:
-  imageName: nvcr.io/nvidia/tritonserver:20.11-py3
+  imageName: nvcr.io/nvidia/tritonserver:20.12-py3
   pullPolicy: IfNotPresent
-  modelRepositoryPath: gs://triton-inference-server-repository/model_repository
-  numGpus: 1
+  modelRepositoryPath: /model_repository
+  numGpus: 0
+
+livenessProbe:
+  livenessFailureThreshold: 30
+  initialDelaySeconds: 5
+  periodSeconds: 5
+readinessProbe:
+  livenessFailureThreshold: 30
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+securityContext:
+  enabled: false
+  userId: 1000
+  groupId: 1000
 
 service:
   type: LoadBalancer

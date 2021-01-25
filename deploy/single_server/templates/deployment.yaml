@@ -47,6 +47,11 @@ spec:
         release: {{ .Release.Name }}
 
     spec:
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        fsGroup:    {{ .Values.securityContext.userId }}
+        runAsUser:  {{ .Values.securityContext.groupId }}
+      {{- end }}  
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageName }}"
@@ -66,16 +71,17 @@ spec:
             - containerPort: 8002
               name: metrics
           livenessProbe:
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
             httpGet:
               path: /v2/health/live
               port: http
           readinessProbe:
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
             httpGet:
               path: /v2/health/ready
               port: http
 
-          securityContext:
-            runAsUser: 1000
-            fsGroup: 1000
