@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -93,10 +93,11 @@ for ENV_VAR in "env" "env_dummy" "config"; do
 
     KIND="KIND_GPU"
 
-    for MAYBE_SLASH in "" "/"; do
+    # Test coverage for extra slashes 
+    for MAYBE_SLASH in "" "/" "//"; do
 
         ROOT_REPO="$BUCKET_URL$MAYBE_SLASH"
-        MODEL_REPO="${BUCKET_URL_SLASH}models${MAYBE_SLASH}"
+        MODEL_REPO="${BUCKET_URL}/${MAYBE_SLASH}models${MAYBE_SLASH}"
 
         # copy models in model directory
         rm -rf models && mkdir -p models
