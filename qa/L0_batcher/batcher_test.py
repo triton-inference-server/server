@@ -48,8 +48,12 @@ if TEST_SYSTEM_SHARED_MEMORY:
 if TEST_CUDA_SHARED_MEMORY:
     import tritonclient.utils.cuda_shared_memory as cudashm
 
+# Test with either GRPC of HTTP, but not both since when we check
+# results we expect only one to run
 USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
 USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
+if USE_GRPC and USE_HTTP:
+    USE_GRPC = False
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get('BACKENDS',
@@ -341,6 +345,8 @@ class BatcherTest(tu.TestResultCollector):
                                      args=(self, trial, 1, dtype, ([1, 16],),
                                            ([1, 16],)),
                                      kwargs={
+                                         'use_grpc': USE_GRPC,
+                                         'use_http': USE_HTTP,
                                          'use_http_json_tensors': False,
                                          'use_streaming': False
                                      }))
@@ -349,6 +355,8 @@ class BatcherTest(tu.TestResultCollector):
                                      args=(self, trial, 1, dtype, ([1, 8],),
                                            ([1, 8],)),
                                      kwargs={
+                                         'use_grpc': USE_GRPC,
+                                         'use_http': USE_HTTP,
                                          'use_http_json_tensors': False,
                                          'use_streaming': False
                                      }))
@@ -1299,6 +1307,8 @@ class BatcherTest(tu.TestResultCollector):
                                      args=(self, model_base, 1, dtype, shapes,
                                            shapes),
                                      kwargs={
+                                         'use_grpc': USE_GRPC,
+                                         'use_http': USE_HTTP,
                                          'use_http_json_tensors':
                                              False,
                                          'use_streaming':
