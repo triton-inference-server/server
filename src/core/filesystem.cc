@@ -2020,22 +2020,23 @@ GetFileSystemType(const std::string& path, FileSystemType* type)
 const std::string&
 FileSystemTypeString(const FileSystemType type)
 {
+  static const std::string local_str("LOCAL");
+  static const std::string gcs_str("GCS");
+  static const std::string s3_str("S3");
+  static const std::string as_str("AS");
+  static const std::string unknown_str("UNKNOWN");
   switch (type) {
     case FileSystemType::LOCAL:
-      static const std::string local_str("LOCAL");
       return local_str;
     case FileSystemType::GCS:
-      static const std::string gcs_str("GCS");
       return gcs_str;
     case FileSystemType::S3:
-      static const std::string s3_str("S3");
       return s3_str;
     case FileSystemType::AS:
-      static const std::string as_str("AS");
       return as_str;
+    default:
+      return unknown_str;
   }
-  static const std::string empty_str;
-  return empty_str;
 }
 
 }}  // namespace nvidia::inferenceserver
