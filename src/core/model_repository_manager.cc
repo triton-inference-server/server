@@ -38,6 +38,7 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/triton_repo_agent.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -219,6 +220,7 @@ struct ModelRepositoryManager::ModelInfo {
   inference::ModelConfig model_config_;
   Platform platform_;
   std::string model_repository_path_;
+  std::set<int64_t> expected_versions_;
 };
 
 class ModelRepositoryManager::BackendLifeCycle {
@@ -1143,6 +1145,7 @@ ModelRepositoryManager::LoadModelByDependency()
     DependencyNode* node_;
     Status status_;
     std::promise<void> ready_;
+    std::shared_ptr<TritonRepoAgentModel> agent_model_;
   };
   NodeSet loaded_models;
   auto set_pair = ModelsToLoadUnload(loaded_models);
@@ -1164,21 +1167,44 @@ ModelRepositoryManager::LoadModelByDependency()
     // load valid models and wait for load results
     std::vector<std::unique_ptr<ModelState>> model_states;
     for (auto& valid_model : set_pair.first) {
-      std::string repository_path;
-      const auto itr = infos_.find(valid_model->model_name_);
-      repository_path = itr->second->model_repository_path_;
-
       model_states.emplace_back(new ModelState(valid_model));
       auto model_state = model_states.back().get();
-      std::set<int64_t> versions;
-      Status status;
-      status = VersionsToLoad(
-          repository_path, valid_model->model_name_, valid_model->model_config_,
-          &versions);
+      const auto itr = infos_.find(valid_model->model_name_);
+      // FIXME clean up version logic and move agent invocation into
+      // backend life cycle to take advantage of the async loading
+      Status status = TritonRepoAgentManager::CreateAgentModel(
+          itr->second->model_repository_path_, valid_model->model_config_,
+          &model_state->agent_model_);
+      if (status.IsOk()) {
+        auto action_type = TRITONREPOAGENT_ACTION_LOAD;
+        const auto version_states =
+            backend_life_cycle_->VersionStates(model_name);
+        for (const auto& vs : version_states) {
+          if ((vs.second.first == ModelReadyState::READY) ||
+              (vs.second.first == ModelReadyState::LOADING)) {
+            action_type = TRITONREPOAGENT_ACTION_RELOAD;
+            break;
+          }
+        }
+        status = model_state->agent_model_->InvokeAgents(action_type);
+      }
+      std::string repository_path;
+      if (status.IsOk()) {
+        const char* location;
+        FileSystemType filesystem_type;
+        status =
+            model_state->agent_model_->Location(&filesystem_type, &location);
+        repository_path = location;
+      }
+      if (status.IsOk()) {
+        status = VersionsToLoad(
+            repository_path, valid_model->model_name_,
+            valid_model->model_config_, &it->second->expected_versions_);
+      }
       if (status.IsOk()) {
         status = backend_life_cycle_->AsyncLoad(
-            repository_path, valid_model->model_name_, versions,
-            valid_model->model_config_, true,
+            repository_path, valid_model->model_name_,
+            it->second->expected_versions_, valid_model->model_config_, true,
             [model_state](Status load_status) {
               model_state->status_ = load_status;
               model_state->ready_.set_value();
@@ -1244,11 +1270,7 @@ ModelRepositoryManager::LoadUnloadModel(
 
     const auto& info = it->second;
     const auto& config = info->model_config_;
-    const auto& repository = info->model_repository_path_;
-    std::set<int64_t> expected_versions;
-    RETURN_IF_ERROR(
-        VersionsToLoad(repository, model_name, config, &expected_versions));
-
+    const auto& expected_versions = info->expected_versions_;
     if (expected_versions.empty()) {
       return Status(
           Status::Code::INVALID_ARG,
