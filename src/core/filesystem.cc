@@ -1141,6 +1141,7 @@ class S3FileSystem : public FileSystem {
  private:
   Status ParsePath(
       const std::string& path, std::string* bucket, std::string* object);
+  Status CleanPath(const std::string& path, std::string* clean_path);
   Aws::SDKOptions options_;
   s3::S3Client client_;
   re2::RE2 s3_regex_;
@@ -1150,19 +1151,23 @@ Status
 S3FileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
+  // Cleanup trailing and leading slashes
+  std::string clean_path;
+  RETURN_IF_ERROR(CleanPath(path, &clean_path));
+
   // Get the bucket name and the object path. Return error if input is malformed
   std::string host_name, host_port;
   if (!RE2::FullMatch(
-          path, s3_regex_, &host_name, &host_port, bucket, object)) {
-    int bucket_start = path.find("s3://") + strlen("s3://");
-    int bucket_end = path.find("/", bucket_start);
+          clean_path, s3_regex_, &host_name, &host_port, bucket, object)) {
+    int bucket_start = clean_path.find("s3://") + strlen("s3://");
+    int bucket_end = clean_path.find("/", bucket_start);
 
     // If there isn't a second slash, the address has only the bucket
     if (bucket_end > bucket_start) {
-      *bucket = path.substr(bucket_start, bucket_end - bucket_start);
-      *object = path.substr(bucket_end + 1);
+      *bucket = clean_path.substr(bucket_start, bucket_end - bucket_start);
+      *object = clean_path.substr(bucket_end + 1);
     } else {
-      *bucket = path.substr(bucket_start);
+      *bucket = clean_path.substr(bucket_start);
       *object = "";
     }
   }
@@ -1170,6 +1175,40 @@ S3FileSystem::ParsePath(
   if (bucket->empty()) {
     return Status(
         Status::Code::INTERNAL, "No bucket name found in path: " + path);
+  }
+
+  return Status::Success;
+}
+
+Status
+S3FileSystem::CleanPath(const std::string& path, std::string* clean_path)
+{
+  // Remove extra slashes
+  *clean_path = "s3://";
+  int true_length = path.size();
+  for (size_t i = path.size() - 1; i++) {
+    if (path[i] == '/') {
+      true_length -= 1;
+    }
+  }
+  std::string true_path = path.substr(0, true_length);
+  int search_start = path.find("s3://") + strlen("s3://");
+  int slash_pos = path.find("/", search_start);
+  while (slash_pos > search_start) {
+    *clean_path += true_path.substr(search_start, slash_pos + 1);
+    for (size_t pos = 0; pos < true_length; pos++) {
+      if (true_path[pos] == '/') {
+        slash_pos += 1;
+      } else {
+        search_start = pos;
+        break;
+      }
+    }
+    slash_pos = true_path.find("/", search_start);
+  }
+
+  if (slash_pos == -1) {
+    *clean_path += true_path.substr(search_start);
   }
 
   return Status::Success;
@@ -1205,9 +1244,13 @@ S3FileSystem::S3FileSystem(
     config = Aws::Client::ClientConfiguration("default");
   }
 
+  // Cleanup trailing and leading slashes
+  std::string clean_path;
+  RETURN_IF_ERROR(CleanPath(s3_path, &clean_path));
+
   std::string host_name, host_port, bucket, object;
   if (RE2::FullMatch(
-          s3_path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
+          clean_path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
     config.endpointOverride = Aws::String(host_name + ":" + host_port);
     config.scheme = Aws::Http::Scheme::HTTP;
   }
