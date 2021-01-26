@@ -1178,7 +1178,7 @@ ModelRepositoryManager::LoadModelByDependency()
       if (status.IsOk()) {
         auto action_type = TRITONREPOAGENT_ACTION_LOAD;
         const auto version_states =
-            backend_life_cycle_->VersionStates(model_name);
+            backend_life_cycle_->VersionStates(valid_model->model_name_);
         for (const auto& vs : version_states) {
           if ((vs.second.first == ModelReadyState::READY) ||
               (vs.second.first == ModelReadyState::LOADING)) {
@@ -1199,12 +1199,12 @@ ModelRepositoryManager::LoadModelByDependency()
       if (status.IsOk()) {
         status = VersionsToLoad(
             repository_path, valid_model->model_name_,
-            valid_model->model_config_, &it->second->expected_versions_);
+            valid_model->model_config_, &itr->second->expected_versions_);
       }
       if (status.IsOk()) {
         status = backend_life_cycle_->AsyncLoad(
             repository_path, valid_model->model_name_,
-            it->second->expected_versions_, valid_model->model_config_, true,
+            itr->second->expected_versions_, valid_model->model_config_, true,
             [model_state](Status load_status) {
               model_state->status_ = load_status;
               model_state->ready_.set_value();
@@ -1268,9 +1268,7 @@ ModelRepositoryManager::LoadUnloadModel(
               "', failed to poll from model repository");
     }
 
-    const auto& info = it->second;
-    const auto& config = info->model_config_;
-    const auto& expected_versions = info->expected_versions_;
+    const auto& expected_versions = it->second->expected_versions_;
     if (expected_versions.empty()) {
       return Status(
           Status::Code::INVALID_ARG,
