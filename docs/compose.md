@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 
 # Customize Triton Container
 
-Starting with the r20.10 release, two Docker images are available from
+Starting with the r21.02 release, two Docker images are available from
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com>) that make it
 possible to easily construct customized versions of Triton. By
 customizing Triton you can significantly reduce the size of the Triton

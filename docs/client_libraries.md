@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -151,7 +151,7 @@ under-development version). The branch you use for the client build
 should match the version of Triton you are using.
 
 ```bash
-$ git checkout r20.11
+$ git checkout r21.02
 ```
 
 Then, issue the following command to build the C++ client library and
@@ -190,7 +190,7 @@ want to build (or the master branch if you want to build the
 under-development version).
 
 ```bash
-$ git checkout r20.11
+$ git checkout r21.02
 ```
 
 #### Ubuntu 20.04
