@@ -1153,7 +1153,7 @@ S3FileSystem::ParsePath(
 {
   // Cleanup extra slashes
   std::string clean_path;
-  LOG_STATUS_ERROR(CleanPath(path, &clean_path), "failed to parse S3 path");
+  RETURN_IF_ERROR(CleanPath(path, &clean_path));
 
   // Get the bucket name and the object path. Return error if path is malformed
   std::string host_name, host_port;
@@ -1530,7 +1530,7 @@ S3FileSystem::LocalizeDirectory(
 
   // Cleanup extra slashes
   std::string clean_path;
-  LOG_STATUS_ERROR(CleanPath(path, &clean_path), "failed to parse S3 path");
+  RETURN_IF_ERROR(CleanPath(path, &clean_path));
 
   std::string effective_path, host_name, host_port, bucket, object;
   if (RE2::FullMatch(
