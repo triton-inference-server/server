@@ -1141,7 +1141,7 @@ class S3FileSystem : public FileSystem {
  private:
   Status ParsePath(
       const std::string& path, std::string* bucket, std::string* object);
-  Status CleanPath(const std::string& path, std::string* clean_path);
+  Status CleanPath(const std::string& s3_path, std::string* clean_path);
   Aws::SDKOptions options_;
   s3::S3Client client_;
   re2::RE2 s3_regex_;
@@ -1151,18 +1151,18 @@ Status
 S3FileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
-  // Cleanup trailing and leading slashes
+  // Cleanup extra slashes
   std::string clean_path;
-  RETURN_IF_ERROR(CleanPath(path, &clean_path));
+  LOG_STATUS_ERROR(CleanPath(path, &clean_path), "failed to parse S3 path");
 
-  // Get the bucket name and the object path. Return error if input is malformed
+  // Get the bucket name and the object path. Return error if path is malformed
   std::string host_name, host_port;
   if (!RE2::FullMatch(
           clean_path, s3_regex_, &host_name, &host_port, bucket, object)) {
     int bucket_start = clean_path.find("s3://") + strlen("s3://");
     int bucket_end = clean_path.find("/", bucket_start);
 
-    // If there isn't a second slash, the address has only the bucket
+    // If there isn't a slash, the address has only the bucket
     if (bucket_end > bucket_start) {
       *bucket = clean_path.substr(bucket_start, bucket_end - bucket_start);
       *object = clean_path.substr(bucket_end + 1);
@@ -1181,34 +1181,47 @@ S3FileSystem::ParsePath(
 }
 
 Status
-S3FileSystem::CleanPath(const std::string& path, std::string* clean_path)
+S3FileSystem::CleanPath(const std::string& s3_path, std::string* clean_path)
 {
-  // Remove extra slashes
-  *clean_path = "s3://";
-  int true_length = path.size();
-  for (size_t i = path.size() - 1; i++) {
-    if (path[i] == '/') {
-      true_length -= 1;
-    }
-  }
-  std::string true_path = path.substr(0, true_length);
-  int search_start = path.find("s3://") + strlen("s3://");
-  int slash_pos = path.find("/", search_start);
-  while (slash_pos > search_start) {
-    *clean_path += true_path.substr(search_start, slash_pos + 1);
-    for (size_t pos = 0; pos < true_length; pos++) {
-      if (true_path[pos] == '/') {
-        slash_pos += 1;
-      } else {
-        search_start = pos;
-        break;
-      }
-    }
-    slash_pos = true_path.find("/", search_start);
+  // Must handle paths with s3 prefix
+  size_t start = s3_path.find("s3://");
+  std::string path = "";
+  if (start != std::string::npos) {
+    path = s3_path.substr(start + strlen("s3://"));
+    *clean_path = "s3://";
+  } else {
+    path = s3_path;
+    *clean_path = "";
   }
 
-  if (slash_pos == -1) {
-    *clean_path += true_path.substr(search_start);
+  // Remove trailing slashes
+  size_t rtrim_length = path.find_last_not_of('/');
+  if (rtrim_length == std::string::npos) {
+    return Status(
+        Status::Code::INVALID_ARG, "Invalid bucket name: '" + path + "'");
+  }
+
+  // Remove leading slashes
+  size_t ltrim_length = path.find_first_not_of('/');
+  if (ltrim_length == std::string::npos) {
+    return Status(
+        Status::Code::INVALID_ARG, "Invalid bucket name: '" + path + "'");
+  }
+
+  // Remove extra internal slashes
+  std::string true_path = path.substr(ltrim_length, rtrim_length + 1);
+  std::vector<int> slash_locations;
+  bool previous_slash = false;
+  for (size_t i = 0; i < true_path.size(); i++) {
+    if (true_path[i] == '/') {
+      if (!previous_slash) {
+        *clean_path += true_path[i];
+      }
+      previous_slash = true;
+    } else {
+      *clean_path += true_path[i];
+      previous_slash = false;
+    }
   }
 
   return Status::Success;
@@ -1244,9 +1257,9 @@ S3FileSystem::S3FileSystem(
     config = Aws::Client::ClientConfiguration("default");
   }
 
-  // Cleanup trailing and leading slashes
+  // Cleanup extra slashes
   std::string clean_path;
-  RETURN_IF_ERROR(CleanPath(s3_path, &clean_path));
+  LOG_STATUS_ERROR(CleanPath(s3_path, &clean_path), "failed to parse S3 path");
 
   std::string host_name, host_port, bucket, object;
   if (RE2::FullMatch(
@@ -1515,9 +1528,13 @@ S3FileSystem::LocalizeDirectory(
         Status::Code::INTERNAL, "directory does not exist at " + path);
   }
 
+  // Cleanup extra slashes
+  std::string clean_path;
+  LOG_STATUS_ERROR(CleanPath(path, &clean_path), "failed to parse S3 path");
+
   std::string effective_path, host_name, host_port, bucket, object;
   if (RE2::FullMatch(
-          path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
+          clean_path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
     effective_path = "s3://" + bucket + object;
   } else {
     effective_path = path;
