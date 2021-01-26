@@ -177,6 +177,7 @@ set(
   scheduler_utils.cc
   sequence_batch_scheduler.cc
   server.cc
+  shared_library.cc
   infer_stats.cc
   infer_trace.cc
   status.cc
