@@ -109,6 +109,33 @@ if(${TRITON_ENABLE_GPU})
 endif() # TRITON_ENABLE_GPU
 
 #
+# Triton generic repo agent
+#
+set(
+  REPOAGENT_SRCS
+  triton_repo_agent.cc
+)
+
+set(
+  REPOAGENT_HDRS
+  triton_repo_agent.h
+)
+
+add_library(
+  triton-repoagent-library EXCLUDE_FROM_ALL OBJECT
+  ${REPOAGENT_SRCS} ${REPOAGENT_HDRS}
+)
+add_dependencies(triton-repoagent-library proto-library)
+
+target_link_libraries(
+  triton-repoagent-library
+  PUBLIC
+    triton-core-repoagentapi  # from repo-core
+    triton-core-serverapi   # from repo-core
+    triton-common-json      # from repo-common
+)
+
+#
 # Inference server core
 #
 if(${TRITON_ENABLE_GCS})
@@ -188,6 +215,7 @@ set(
   sequence_batch_scheduler.h
   server.h
   server_message.h
+  shared_library.h
   infer_stats.h
   infer_trace.h
   status.h
