@@ -105,10 +105,17 @@ TritonRepoAgent::~TritonRepoAgent()
 {
   // Finalize if needed
   if (fini_fn_ != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(
-        fini_fn_(reinterpret_cast<TRITONREPOAGENT_Agent*>(lagent.get())));
+    auto err = fini_fn_(reinterpret_cast<TRITONREPOAGENT_Agent*>(this));
+    if (err != nullptr) {
+      LOG_ERROR << "~TritonRepoAgent: " << Status(TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)), TRITONSERVER_ErrorMessage(err)).AsString();
+      TRITONSERVER_ErrorDelete(err);
+    }
+    ;  
   }
-  RETURN_IF_ERROR(CloseLibraryHandle(dlhandle_));
+  auto status = CloseLibraryHandle(dlhandle_);
+  if (!status.IsOk()) {
+    LOG_ERROR << "~TritonRepoAgent: " << status.AsString();
+  }
 }
 
 //
@@ -116,18 +123,18 @@ TritonRepoAgent::~TritonRepoAgent()
 //
 TritonRepoAgentModel::~TritonRepoAgentModel()
 {
-  if (!acquired_path_.empty()) {
-    auto status = DeleteDirectory(acquired_path_);
+  if (!acquired_location_.empty()) {
+    auto status = DeleteDirectory(acquired_location_);
     if (!status.IsOk()) {
       LOG_ERROR << "Failed to delete previously committed location '"
-                << acquired_path_ << "': " << status.AsString();
+                << acquired_location_ << "': " << status.AsString();
     }
   }
-  if (has_committed_ && !committed_path_.empty()) {
-    auto status = DeleteDirectory(committed_path_);
+  if (has_committed_ && !committed_location_.empty()) {
+    auto status = DeleteDirectory(committed_location_);
     if (!status.IsOk()) {
       LOG_ERROR << "Failed to delete previously committed location '"
-                << committed_path_ << "': " << status.AsString();
+                << committed_location_ << "': " << status.AsString();
     }
   }
 }
@@ -149,7 +156,7 @@ Status
 TritonRepoAgentModel::Location(FileSystemType* type, const char** location)
 {
   *type = committed_type_;
-  *location = committed_path_.c_str();
+  *location = committed_location_.c_str();
   return Status::Success;
 }
 
@@ -182,18 +189,18 @@ TritonRepoAgentModel::AcquireMutableLocation(
 Status
 TritonRepoAgentModel::CommitMutableLocation()
 {
-  if (acquired_path_.empty()) {
+  if (acquired_location_.empty()) {
     return Status(
         Status::Code::UNAVAILABLE, "No mutable location to be commited");
   }
   if (has_committed_) {
-    auto status = DeleteDirectory(committed_path_);
+    auto status = DeleteDirectory(committed_location_);
     if (!status.IsOk()) {
       LOG_ERROR << "Failed to delete previously committed location '"
-                << committed_path_ << "': " << status.AsString();
+                << committed_location_ << "': " << status.AsString();
     }
   }
-  committed_path_ = std::move(acquired_path_);
+  committed_location_ = std::move(acquired_location_);
   has_committed_ = true;
   return Status::Success;
 }
@@ -201,17 +208,17 @@ TritonRepoAgentModel::CommitMutableLocation()
 Status
 TritonRepoAgentModel::DeleteMutableLocation()
 {
-  if (acquired_path_.empty()) {
+  if (acquired_location_.empty()) {
     return Status(
         Status::Code::UNAVAILABLE, "No mutable location to be deleted");
   }
 
-  auto status = DeleteDirectory(acquired_path_);
+  auto status = DeleteDirectory(acquired_location_);
   if (!status.IsOk()) {
     LOG_ERROR << "Failed to delete previously acquired location '"
-              << acquired_path_ << "': " << status.AsString();
+              << acquired_location_ << "': " << status.AsString();
   }
-  acquired_path_.clear();
+  acquired_location_.clear();
   return Status::Success;
 }
 
@@ -261,13 +268,13 @@ TritonRepoAgentManager::CreateAgentModel(
         return Status(
             Status::Code::INVALID_ARG,
             "unable to find '" + agent_libname + "' for repo agent '" +
-                agent_config.first + "', searched: " + model_dir + ", " +
+                agent_config.name() + "', searched: " + model_dir + ", " +
                 global_path);
       }
 
       std::shared_ptr<TritonRepoAgent> agent;
-      const auto& itr = singleton_manager.backend_map_.find(libpath);
-      if (itr != singleton_manager.backend_map_.end()) {
+      const auto& itr = singleton_manager.agent_map_.find(libpath);
+      if (itr != singleton_manager.agent_map_.end()) {
         // Found in map. If the weak_ptr is still valid that means that
         // there are other models using the backend and we just reuse that
         // same backend. If the weak_ptr is not valid then backend has
@@ -278,11 +285,11 @@ TritonRepoAgentManager::CreateAgentModel(
           return Status::Success;
         }
 
-        singleton_manager.backend_map_.erase(itr);
+        singleton_manager.agent_map_.erase(itr);
       } else {
         RETURN_IF_ERROR(
-            TritonRepoAgent::Create(agent_config.first, libpath, &agent));
-        singleton_manager.backend_map_.insert({libpath, agent});
+            TritonRepoAgent::Create(agent_config.name(), libpath, &agent));
+        singleton_manager.agent_map_.insert({libpath, agent});
       }
       TritonRepoAgent::Parameters agent_params;
       for (const auto& parameter : agent_config.parameters()) {
@@ -294,7 +301,7 @@ TritonRepoAgentManager::CreateAgentModel(
   FileSystemType type;
   RETURN_IF_ERROR(GetFileSystemType(model_dir, &type));
   agent_model->reset(
-      new TritonRepoAgentModel(model_dir, type, std::move(agents)));
+      new TritonRepoAgentModel(model_dir, type, config, std::move(agents)));
 
   return Status::Success;
 }
@@ -393,15 +400,8 @@ TRITONREPOAGENT_ModelConfig(
   std::string model_config_json;
   RETURN_TRITONSERVER_ERROR_IF_ERROR(
       ModelConfigToJson(tam->Config(), config_version, &model_config_json));
-  if (!status.IsOk()) {
-    return TRITONSERVER_ErrorNew(
-        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
-  }
-
-  *model_config = reinterpret_cast<TRITONSERVER_Message*>(
-      new TritonServerMessage(std::move(model_config_json)));
-
-  return nullptr;  // success
+  return TRITONSERVER_MessageNewFromSerializedJson(
+    model_config, model_config_json.c_str(), model_config_json.length());
 }
 
 }  // extern C

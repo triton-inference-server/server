@@ -23,6 +23,7 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
 #include "src/core/tritonserver_apis.h"
 
@@ -30,6 +31,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
+#include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/model_config_utils.h"
 
@@ -82,7 +84,7 @@ class TritonRepoAgentModel {
           agents)
       : current_idx_(0), config_(config), agents_(std::move(agents)),
         has_committed_(false), committed_type_(model_dir_type),
-        committed_path_(model_dir)
+        committed_location_(model_dir)
   {
   }
   Status InvokeAgents(const TRITONREPOAGENT_ActionType action_type);
@@ -106,9 +108,9 @@ class TritonRepoAgentModel {
       agents_;
   bool has_committed_;
   FileSystemType committed_type_;
-  std::string committed_path_;
+  std::string committed_location_;
   FileSystemType acquired_type_;
-  std::string acquired_path_;
+  std::string acquired_location_;
 };
 
 class TritonRepoAgentManager {
@@ -119,6 +121,7 @@ class TritonRepoAgentManager {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonRepoAgentManager);
+  
   TritonRepoAgentManager() = default;
   static TritonRepoAgentManager& Singleton();
   std::mutex mu_;
