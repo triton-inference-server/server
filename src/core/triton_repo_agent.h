@@ -121,7 +121,7 @@ class TritonRepoAgentManager {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonRepoAgentManager);
-  
+
   TritonRepoAgentManager() = default;
   static TritonRepoAgentManager& Singleton();
   std::mutex mu_;

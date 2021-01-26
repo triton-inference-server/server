@@ -107,10 +107,13 @@ TritonRepoAgent::~TritonRepoAgent()
   if (fini_fn_ != nullptr) {
     auto err = fini_fn_(reinterpret_cast<TRITONREPOAGENT_Agent*>(this));
     if (err != nullptr) {
-      LOG_ERROR << "~TritonRepoAgent: " << Status(TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)), TRITONSERVER_ErrorMessage(err)).AsString();
+      LOG_ERROR << "~TritonRepoAgent: "
+                << Status(
+                       TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
+                       TRITONSERVER_ErrorMessage(err))
+                       .AsString();
       TRITONSERVER_ErrorDelete(err);
-    }
-    ;  
+    };
   }
   auto status = CloseLibraryHandle(dlhandle_);
   if (!status.IsOk()) {
@@ -401,7 +404,7 @@ TRITONREPOAGENT_ModelConfig(
   RETURN_TRITONSERVER_ERROR_IF_ERROR(
       ModelConfigToJson(tam->Config(), config_version, &model_config_json));
   return TRITONSERVER_MessageNewFromSerializedJson(
-    model_config, model_config_json.c_str(), model_config_json.length());
+      model_config, model_config_json.c_str(), model_config_json.length());
 }
 
 }  // extern C

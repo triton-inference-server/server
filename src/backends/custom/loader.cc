@@ -26,8 +26,8 @@
 
 #include "src/backends/custom/loader.h"
 
-#include "src/core/shared_library.h"
 #include "src/core/logging.h"
+#include "src/core/shared_library.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -54,28 +54,32 @@ LoadCustom(
 
   // Get shared library entrypoints.
   void* init_fn;
-  status = GetEntrypoint(handle, "CustomInitialize", false /* optional */, &init_fn);
+  status =
+      GetEntrypoint(handle, "CustomInitialize", false /* optional */, &init_fn);
   if (!status.IsOk()) {
     CloseLibraryHandle(handle);
     return status;
   }
 
   void* fini_fn;
-  status = GetEntrypoint(handle, "CustomFinalize", false /* optional */, &fini_fn);
+  status =
+      GetEntrypoint(handle, "CustomFinalize", false /* optional */, &fini_fn);
   if (!status.IsOk()) {
     CloseLibraryHandle(handle);
     return status;
   }
 
   void* errstr_fn;
-  status = GetEntrypoint(handle, "CustomErrorString", false /* optional */, &errstr_fn);
+  status = GetEntrypoint(
+      handle, "CustomErrorString", false /* optional */, &errstr_fn);
   if (!status.IsOk()) {
     CloseLibraryHandle(handle);
     return status;
   }
 
   void* ver_fn;
-  status = GetEntrypoint(handle, "CustomVersion", false /* optional */, &ver_fn);
+  status =
+      GetEntrypoint(handle, "CustomVersion", false /* optional */, &ver_fn);
   if (!status.IsOk()) {
     *custom_version = 1;
   } else {
@@ -86,10 +90,12 @@ LoadCustom(
   void* exec_fn;
   switch (*custom_version) {
     case 1:
-      status = GetEntrypoint(handle, "CustomExecute", false /* optional */, &exec_fn);
+      status = GetEntrypoint(
+          handle, "CustomExecute", false /* optional */, &exec_fn);
       break;
     case 2:
-      status = GetEntrypoint(handle, "CustomExecuteV2", false /* optional */, &exec_fn);
+      status = GetEntrypoint(
+          handle, "CustomExecuteV2", false /* optional */, &exec_fn);
       break;
     default:
       status = Status(
