@@ -29,6 +29,7 @@
 #define _COMPILING_TRITONBACKEND 1
 
 #include "triton/core/tritonbackend.h"
+#include "triton/core/tritonrepoagent.h"
 #include "triton/core/tritonserver.h"
 
 #undef _COMPILING_TRITONSERVER
