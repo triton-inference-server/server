@@ -31,6 +31,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+enum FileSystemType { LOCAL, GCS, S3, AS };
+
 // This class stores the paths of local temporary files needed for loading
 // models from Cloud repositories and performs necessary cleanup after the
 // models are loaded.
@@ -60,8 +62,6 @@ class LocalizedDirectory {
   }
 
  private:
-  Status DeleteDirectory(const std::string& path);
-
   std::string original_path_;
   std::string local_path_;
 };
@@ -166,5 +166,27 @@ Status WriteTextProto(
 /// \return Error status
 Status ReadBinaryProto(
     const std::string& path, google::protobuf::MessageLite* msg);
+
+/// Create a temporary directory of the specified filesystem type.
+/// \param type The type of the filesystem.
+/// \param temp_dir Returns the path to the temporary directory.
+/// \return Error status
+Status MakeTemporaryDirectory(const FileSystemType type, std::string* temp_dir);
+
+/// Delete a directory.
+/// \param path Returns the path to the directory.
+/// \return Error status
+Status DeleteDirectory(const std::string& path);
+
+/// Infer the filesystem type from the given path.
+/// \param path The path to infer the filesystem type from.
+/// \param type Returns the filesystem type of the path.
+/// \return Error status
+Status GetFileSystemType(const std::string& path, FileSystemType* type);
+
+/// Return the string representation of the filesystem type.
+/// \param type The filesystem type.
+/// \return The string representation of the type.
+const std::string& FileSystemTypeString(const FileSystemType type);
 
 }}  // namespace nvidia::inferenceserver

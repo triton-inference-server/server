@@ -105,56 +105,6 @@ IsPathDirectory(const std::string& path, bool* is_dir)
   return Status::Success;
 }
 
-#if defined(TRITON_ENABLE_S3) || defined(TRITON_ENABLE_GCS)
-Status
-MakeTemporaryDirectory(std::string* temp_dir)
-{
-#ifdef _WIN32
-  char temp_path[MAX_PATH + 1];
-  size_t temp_path_length = GetTempPath(MAX_PATH + 1, temp_path);
-  if (temp_path_length == 0) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Failed to get local directory for temporary files");
-  }
-  // There is no single operation like 'mkdtemp' in Windows, thus generating
-  // unique temporary directory is a process of getting temporary file name,
-  // deleting the file (file creation is side effect fo getting anme), creating
-  // corresponding directory, so mutex is used to avoid possible race condition.
-  // However, it doesn't prevent other process on creating temporary file and
-  // thus the race condition may still happen. One possible solution is
-  // to reserve a temporary directory for the process and generate temporary
-  // model directories inside it.
-  static std::mutex mtx;
-  std::lock_guard<std::mutex> lk(mtx);
-  // Construct a std::string as filled 'temp_path' is not C string,
-  // and so that we can reuse 'temp_path' to hold the temp file name.
-  std::string temp_path_str(temp_path, temp_path_length);
-  if (GetTempFileName(temp_path_str.c_str(), "folder", 0, temp_path) == 0) {
-    return Status(Status::Code::INTERNAL, "Failed to create local temp folder");
-  }
-  *temp_dir = temp_path;
-  DeleteFile(temp_dir->c_str());
-  if (CreateDirectory(temp_dir->c_str(), NULL) == 0) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Failed to create local temp folder: " + *temp_dir);
-  }
-#else
-  std::string folder_template = "/tmp/folderXXXXXX";
-  char* res = mkdtemp(const_cast<char*>(folder_template.c_str()));
-  if (res == nullptr) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Failed to create local temp folder: " + folder_template +
-            ", errno:" + strerror(errno));
-  }
-  *temp_dir = res;
-#endif
-  return Status::Success;
-}
-#endif
-
 }  // namespace
 
 LocalizedDirectory::~LocalizedDirectory()
@@ -164,27 +114,6 @@ LocalizedDirectory::~LocalizedDirectory()
         DeleteDirectory(local_path_),
         "failed to delete localized model directory");
   }
-}
-
-Status
-LocalizedDirectory::DeleteDirectory(const std::string& path)
-{
-  std::set<std::string> contents;
-  RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
-
-  for (const auto& content : contents) {
-    std::string full_path = JoinPath({path, content});
-    bool is_dir = false;
-    RETURN_IF_ERROR(IsPathDirectory(full_path.c_str(), &is_dir));
-    if (is_dir) {
-      DeleteDirectory(full_path);
-    } else {
-      remove(full_path.c_str());
-    }
-  }
-  rmdir(path.c_str());
-
-  return Status::Success;
 }
 
 namespace {
@@ -208,6 +137,8 @@ class FileSystem {
       std::shared_ptr<LocalizedDirectory>* localized) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
+  virtual Status MakeTemporaryDirectory(std::string* temp_dir) = 0;
+  virtual Status DeleteDirectory(const std::string& path) = 0;
 };
 
 class LocalFileSystem : public FileSystem {
@@ -228,6 +159,8 @@ class LocalFileSystem : public FileSystem {
       std::shared_ptr<LocalizedDirectory>* localized) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
+  Status MakeTemporaryDirectory(std::string* temp_dir) override;
+  Status DeleteDirectory(const std::string& path) override;
 };
 
 Status
@@ -389,6 +322,75 @@ LocalFileSystem::WriteTextFile(
   return Status::Success;
 }
 
+Status
+LocalFileSystem::MakeTemporaryDirectory(std::string* temp_dir)
+{
+#ifdef _WIN32
+  char temp_path[MAX_PATH + 1];
+  size_t temp_path_length = GetTempPath(MAX_PATH + 1, temp_path);
+  if (temp_path_length == 0) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to get local directory for temporary files");
+  }
+  // There is no single operation like 'mkdtemp' in Windows, thus generating
+  // unique temporary directory is a process of getting temporary file name,
+  // deleting the file (file creation is side effect fo getting name), creating
+  // corresponding directory, so mutex is used to avoid possible race condition.
+  // However, it doesn't prevent other process on creating temporary file and
+  // thus the race condition may still happen. One possible solution is
+  // to reserve a temporary directory for the process and generate temporary
+  // model directories inside it.
+  static std::mutex mtx;
+  std::lock_guard<std::mutex> lk(mtx);
+  // Construct a std::string as filled 'temp_path' is not C string,
+  // and so that we can reuse 'temp_path' to hold the temp file name.
+  std::string temp_path_str(temp_path, temp_path_length);
+  if (GetTempFileName(temp_path_str.c_str(), "folder", 0, temp_path) == 0) {
+    return Status(Status::Code::INTERNAL, "Failed to create local temp folder");
+  }
+  *temp_dir = temp_path;
+  DeleteFile(temp_dir->c_str());
+  if (CreateDirectory(temp_dir->c_str(), NULL) == 0) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder: " + *temp_dir);
+  }
+#else
+  std::string folder_template = "/tmp/folderXXXXXX";
+  char* res = mkdtemp(const_cast<char*>(folder_template.c_str()));
+  if (res == nullptr) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to create local temp folder: " + folder_template +
+            ", errno:" + strerror(errno));
+  }
+  *temp_dir = res;
+#endif
+  return Status::Success;
+}
+
+Status
+LocalFileSystem::DeleteDirectory(const std::string& path)
+{
+  std::set<std::string> contents;
+  RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
+
+  for (const auto& content : contents) {
+    std::string full_path = JoinPath({path, content});
+    bool is_dir = false;
+    RETURN_IF_ERROR(IsDirectory(full_path, &is_dir));
+    if (is_dir) {
+      DeleteDirectory(full_path);
+    } else {
+      remove(full_path.c_str());
+    }
+  }
+  rmdir(path.c_str());
+
+  return Status::Success;
+}
+
 #if defined(TRITON_ENABLE_GCS) || defined(TRITON_ENABLE_S3) || \
     defined(TRITON_ENABLE_AZURE_STORAGE)
 // Helper function to take care of lack of trailing slashes
@@ -427,6 +429,8 @@ class GCSFileSystem : public FileSystem {
       std::shared_ptr<LocalizedDirectory>* localized) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
+  Status MakeTemporaryDirectory(std::string* temp_dir) override;
+  Status DeleteDirectory(const std::string& path) override;
 
  private:
   Status ParsePath(
@@ -699,7 +703,7 @@ GCSFileSystem::LocalizeDirectory(
   }
 
   std::string tmp_folder;
-  RETURN_IF_ERROR(MakeTemporaryDirectory(&tmp_folder));
+  RETURN_IF_ERROR(MakeTemporaryDirectory(FileSystemType::LOCAL, &tmp_folder));
 
   localized->reset(new LocalizedDirectory(path, tmp_folder));
 
@@ -777,6 +781,22 @@ GCSFileSystem::WriteTextFile(
       "Write text file operation not yet implemented " + path);
 }
 
+Status
+GCSFileSystem::MakeTemporaryDirectory(std::string* temp_dir)
+{
+  return Status(
+      Status::Code::UNSUPPORTED,
+      "Make temporary directory operation not yet implemented");
+}
+
+Status
+GCSFileSystem::DeleteDirectory(const std::string& path)
+{
+  return Status(
+      Status::Code::UNSUPPORTED,
+      "Delete directory operation not yet implemented");
+}
+
 #endif  // TRITON_ENABLE_GCS
 
 
@@ -803,6 +823,8 @@ class ASFileSystem : public FileSystem {
   Status LocalizeDirectory(
       const std::string& path, std::shared_ptr<LocalizedDirectory>* localized);
   Status WriteTextFile(const std::string& path, const std::string& contents);
+  Status MakeTemporaryDirectory(std::string* temp_dir) override;
+  Status DeleteDirectory(const std::string& path) override;
 
  private:
   Status ParsePath(
@@ -1110,6 +1132,23 @@ ASFileSystem::WriteTextFile(
   }
   return Status::Success;
 }
+
+Status
+ASFileSystem::MakeTemporaryDirectory(std::string* temp_dir)
+{
+  return Status(
+      Status::Code::UNSUPPORTED,
+      "Make temporary directory operation not yet implemented");
+}
+
+Status
+ASFileSystem::DeleteDirectory(const std::string& path)
+{
+  return Status(
+      Status::Code::UNSUPPORTED,
+      "Delete directory operation not yet implemented");
+}
+
 #endif  // TRITON_ENABLE_AZURE_STORAGE
 
 
@@ -1137,6 +1176,8 @@ class S3FileSystem : public FileSystem {
       std::shared_ptr<LocalizedDirectory>* localized) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
+  Status MakeTemporaryDirectory(std::string* temp_dir) override;
+  Status DeleteDirectory(const std::string& path) override;
 
  private:
   Status ParsePath(
@@ -1541,7 +1582,7 @@ S3FileSystem::LocalizeDirectory(
   }
 
   std::string tmp_folder;
-  RETURN_IF_ERROR(MakeTemporaryDirectory(&tmp_folder));
+  RETURN_IF_ERROR(MakeTemporaryDirectory(FileSystemType::LOCAL, &tmp_folder));
 
   localized->reset(new LocalizedDirectory(effective_path, tmp_folder));
 
@@ -1620,6 +1661,22 @@ S3FileSystem::WriteTextFile(
       "Write text file operation not yet implemented " + path);
 }
 
+Status
+S3FileSystem::MakeTemporaryDirectory(std::string* temp_dir)
+{
+  return Status(
+      Status::Code::UNSUPPORTED,
+      "Make temporary directory operation not yet implemented");
+}
+
+Status
+S3FileSystem::DeleteDirectory(const std::string& path)
+{
+  return Status(
+      Status::Code::UNSUPPORTED,
+      "Delete directory operation not yet implemented");
+}
+
 
 #endif  // TRITON_ENABLE_S3
 
@@ -1677,6 +1734,25 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
   *file_system = &local_fs;
 
   return Status::Success;
+}
+
+Status
+GetFileSystemByType(FileSystemType type, FileSystem** file_system)
+{
+  // FIXME currently this function only work for LOCAL, GCS because their
+  // construction is not path-dependent. And in my opinion here should be
+  // where the fs instances are placed and GetFileSystem() should call this
+  // function after it identifies the fs type from path.
+  switch (type) {
+    case FileSystemType::LOCAL:
+      return GetFileSystem("", file_system);
+    case FileSystemType::GCS:
+      return GetFileSystem("gs://", file_system);
+    default:
+      return Status(
+          Status::Code::UNSUPPORTED,
+          "The requested filesteam can not be accessed by type");
+  }
 }
 
 }  // namespace
@@ -1886,6 +1962,80 @@ ReadBinaryProto(const std::string& path, google::protobuf::MessageLite* msg)
   }
 
   return Status::Success;
+}
+
+Status
+MakeTemporaryDirectory(const FileSystemType type, std::string* temp_dir)
+{
+  FileSystem* fs;
+  RETURN_IF_ERROR(GetFileSystemByType(type, &fs));
+  return fs->MakeTemporaryDirectory(temp_dir);
+}
+
+Status
+DeleteDirectory(const std::string& path)
+{
+  FileSystem* fs;
+  RETURN_IF_ERROR(GetFileSystem(path, &fs));
+  return fs->DeleteDirectory(path);
+}
+
+Status
+GetFileSystemType(const std::string& path, FileSystemType* type)
+{
+  if (path.empty()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "Can not infer filesystem type from empty path");
+  }
+#ifdef TRITON_ENABLE_GCS
+  // Check if this is a GCS path (gs://$BUCKET_NAME)
+  if (!path.rfind("gs://", 0)) {
+    *type = FileSystemType::GCS;
+    return Status::Success;
+  }
+#endif  // TRITON_ENABLE_GCS
+
+#ifdef TRITON_ENABLE_S3
+  // Check if this is an S3 path (s3://$BUCKET_NAME)
+  if (!path.rfind("s3://", 0)) {
+    *type = FileSystemType::S3;
+    return Status::Success;
+  }
+#endif  // TRITON_ENABLE_S3
+
+#ifdef TRITON_ENABLE_AZURE_STORAGE
+  // Check if this is an Azure Storage path
+  if (!path.rfind("as://", 0)) {
+    *type = FileSystemType::AS;
+    return Status::Success;
+  }
+#endif  // TRITON_ENABLE_AZURE_STORAGE
+
+  // Assume path is for local filesystem
+  *type = FileSystemType::LOCAL;
+  return Status::Success;
+}
+
+const std::string&
+FileSystemTypeString(const FileSystemType type)
+{
+  switch (type) {
+    case FileSystemType::LOCAL:
+      static const std::string local_str("LOCAL");
+      return local_str;
+    case FileSystemType::GCS:
+      static const std::string gcs_str("GCS");
+      return gcs_str;
+    case FileSystemType::S3:
+      static const std::string s3_str("S3");
+      return s3_str;
+    case FileSystemType::AS:
+      static const std::string as_str("AS");
+      return as_str;
+  }
+  static const std::string empty_str;
+  return empty_str;
 }
 
 }}  // namespace nvidia::inferenceserver
