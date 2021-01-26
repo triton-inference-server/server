@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -53,6 +53,14 @@ struct LoadStatus {
   double avg_ips = 0;
   // Stores the average latency within the stability window
   uint64_t avg_latency = 0;
+};
+
+// Holds the total of the timiming components of composing models of an
+// ensemble.
+struct EnsembleDurations {
+  EnsembleDurations() : total_queue_time_us(0), total_compute_time_us(0) {}
+  uint64_t total_queue_time_us;
+  uint64_t total_compute_time_us;
 };
 
 /// Holds the server-side inference statisitcs of the target model and its

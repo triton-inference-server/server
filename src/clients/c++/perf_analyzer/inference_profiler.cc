@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,6 +35,48 @@
 namespace perfanalyzer {
 
 namespace {
+
+inline uint64_t
+AverageDurationInUs(const uint64_t total_time_in_ns, const uint64_t cnt)
+{
+  return total_time_in_ns / (cnt * 1000);
+}
+
+EnsembleDurations
+GetTotalEnsembleDurations(const ServerSideStats& stats)
+{
+  EnsembleDurations result;
+  for (const auto& model_stats : stats.composing_models_stat) {
+    if (model_stats.second.composing_models_stat.empty()) {
+      const uint64_t cnt = model_stats.second.success_count;
+      if (cnt != 0) {
+        result.total_queue_time_us +=
+            AverageDurationInUs(model_stats.second.queue_time_ns, cnt);
+        result.total_compute_time_us +=
+            AverageDurationInUs(model_stats.second.compute_input_time_ns, cnt) +
+            AverageDurationInUs(model_stats.second.compute_infer_time_ns, cnt) +
+            AverageDurationInUs(model_stats.second.compute_output_time_ns, cnt);
+      }
+    } else {
+      const auto this_ensemble_duration =
+          GetTotalEnsembleDurations(model_stats.second);
+      result.total_queue_time_us += this_ensemble_duration.total_queue_time_us;
+      result.total_compute_time_us +=
+          this_ensemble_duration.total_compute_time_us;
+    }
+  }
+  return result;
+}
+
+
+size_t
+GetOverheadDuration(size_t total_time, size_t queue_time, size_t compute_time)
+{
+  return (total_time > queue_time + compute_time)
+             ? (total_time - queue_time - compute_time)
+             : 0;
+}
+
 cb::Error
 ReportServerSideStats(const ServerSideStats& stats, const int iteration)
 {
@@ -49,32 +91,25 @@ ReportServerSideStats(const ServerSideStats& stats, const int iteration)
     return cb::Error::Success;
   }
 
-  const uint64_t cumm_time_us = stats.cumm_time_ns / 1000;
-  const uint64_t cumm_avg_us = cumm_time_us / cnt;
+  const uint64_t cumm_avg_us = AverageDurationInUs(stats.cumm_time_ns, cnt);
 
-  const uint64_t queue_time_us = stats.queue_time_ns / 1000;
-  const uint64_t queue_avg_us = queue_time_us / cnt;
-
-  const uint64_t compute_input_time_us = stats.compute_input_time_ns / 1000;
-  const uint64_t compute_input_avg_us = compute_input_time_us / cnt;
-
-  const uint64_t compute_infer_time_us = stats.compute_infer_time_ns / 1000;
-  const uint64_t compute_infer_avg_us = compute_infer_time_us / cnt;
-
-  const uint64_t compute_output_time_us = stats.compute_output_time_ns / 1000;
-  const uint64_t compute_output_avg_us = compute_output_time_us / cnt;
-
-  const uint64_t compute_avg_us =
-      compute_input_avg_us + compute_infer_avg_us + compute_output_avg_us;
-  const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
-                                ? (cumm_avg_us - queue_avg_us - compute_avg_us)
-                                : 0;
   std::cout << ident << "  Inference count: " << infer_cnt << std::endl
             << ident << "  Execution count: " << exec_cnt << std::endl
             << ident << "  Successful request count: " << exec_cnt << std::endl
             << ident << "  Avg request latency: " << cumm_avg_us << " usec";
   if (stats.composing_models_stat.empty()) {
-    std::cout << " (overhead " << overhead << " usec + "
+    const uint64_t queue_avg_us = AverageDurationInUs(stats.queue_time_ns, cnt);
+    const uint64_t compute_input_avg_us =
+        AverageDurationInUs(stats.compute_input_time_ns, cnt);
+    const uint64_t compute_infer_avg_us =
+        AverageDurationInUs(stats.compute_infer_time_ns, cnt);
+    const uint64_t compute_output_avg_us =
+        AverageDurationInUs(stats.compute_output_time_ns, cnt);
+    const uint64_t compute_avg_us =
+        compute_input_avg_us + compute_infer_avg_us + compute_output_avg_us;
+    std::cout << " (overhead "
+              << GetOverheadDuration(cumm_avg_us, queue_avg_us, compute_avg_us)
+              << " usec + "
               << "queue " << queue_avg_us << " usec + "
               << "compute input " << compute_input_avg_us << " usec + "
               << "compute infer " << compute_infer_avg_us << " usec + "
@@ -82,17 +117,14 @@ ReportServerSideStats(const ServerSideStats& stats, const int iteration)
               << std::endl
               << std::endl;
   } else {
-    std::cout << std::endl;
-    std::cout << ident
-              << "  Total avg compute input time : " << compute_input_avg_us
-              << " usec" << std::endl;
-    std::cout << ident
-              << "  Total avg compute infer time : " << compute_infer_avg_us
-              << " usec" << std::endl;
-    std::cout << ident
-              << "  Total avg compute output time : " << compute_output_avg_us
-              << " usec" << std::endl;
-    std::cout << ident << "  Total avg queue time : " << queue_avg_us << " usec"
+    const auto ensemble_times = GetTotalEnsembleDurations(stats);
+    std::cout << " (overhead "
+              << GetOverheadDuration(
+                     cumm_avg_us, ensemble_times.total_queue_time_us,
+                     ensemble_times.total_compute_time_us)
+              << " usec + "
+              << "queue " << ensemble_times.total_queue_time_us << " usec + "
+              << "compute " << ensemble_times.total_compute_time_us << " usec)"
               << std::endl
               << std::endl;
 
