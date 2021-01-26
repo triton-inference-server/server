@@ -191,6 +191,7 @@ ExternalProject_Add(protobuf
     -Dprotobuf_WITH_ZLIB:BOOL=OFF
     -Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF
     -DCMAKE_BUILD_TYPE:STRING=RELEASE
+    -DBUILD_SHARED_LIBS:STRING=no
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/protobuf
   DEPENDS grpc-repo
 )
@@ -214,7 +215,7 @@ ExternalProject_Add(absl
 # Build googletest project from grpc-repo
 #
 ExternalProject_Add(googletest
-  PREFIX googletest
+  PREFIX protobuf
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/googletest"
   DOWNLOAD_COMMAND ""
   CMAKE_CACHE_ARGS
@@ -234,6 +235,24 @@ else()
 endif()
 
 #
+# Build c-area project from grpc-repo
+#
+ExternalProject_Add(c-ares
+  PREFIX c-ares
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/cares/cares"
+  DOWNLOAD_COMMAND ""
+  CMAKE_CACHE_ARGS
+    ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
+    ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
+    -DCARES_SHARED:BOOL=OFF
+    -DCARES_STATIC:BOOL=ON
+    -DCARES_STATIC_PIC:BOOL=ON
+    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares
+  DEPENDS grpc-repo
+)
+
+#
 # Build GRPC
 #
 ExternalProject_Add(grpc
@@ -246,17 +265,18 @@ ExternalProject_Add(grpc
     -DgRPC_ABSL_PROVIDER:STRING=package
     -DgRPC_PROTOBUF_PROVIDER:STRING=package
     -DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -DgRPC_ZLIB_PROVIDER:STRING=package
     -DgRPC_CARES_PROVIDER:STRING=package
     -DgRPC_SSL_PROVIDER:STRING=package
+    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
+    -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
+    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
-    -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
-  DEPENDS grpc-repo protobuf absl crc32c
+  DEPENDS grpc-repo c-ares absl protobuf
 )
 
 #
@@ -378,7 +398,7 @@ ExternalProject_Add(prometheus-cpp
 ExternalProject_Add(crc32c
   PREFIX crc32c
   GIT_REPOSITORY "https://github.com/google/crc32c.git"
-  GIT_TAG "1.1.0"
+  GIT_TAG "1.1.1"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/crc32c/src/crc32c"
   CMAKE_CACHE_ARGS
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
@@ -396,6 +416,7 @@ ExternalProject_Add(crc32c
 # does not pass protobuf_DIR and gRPC_DIR etc to its
 # external projects but expects them in CMAKE_PREFIX_PATH
 set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
+   ${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
    ${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
    ${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
    ${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
@@ -419,7 +440,9 @@ ExternalProject_Add(google-cloud-cpp
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install
     -Dnlohmann_json_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json/lib/cmake/nlohmann_json
-  DEPENDS grpc protobuf crc32c absl nlohmann-json
+    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
+  DEPENDS grpc c-ares protobuf crc32c absl nlohmann-json
 )
 
 #
@@ -534,8 +557,8 @@ ExternalProject_Add(client
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
-    -Dnlohmann_json_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json/lib/cmake/nlohmann_json
     ${_CMAKE_TRITON_DIR}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
@@ -594,6 +617,7 @@ ExternalProject_Add(server
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
     -Dnlohmann_json_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json/lib/cmake/nlohmann_json
     -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
