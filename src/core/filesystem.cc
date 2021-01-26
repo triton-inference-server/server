@@ -703,7 +703,7 @@ GCSFileSystem::LocalizeDirectory(
   }
 
   std::string tmp_folder;
-  RETURN_IF_ERROR(MakeTemporaryDirectory(FileSystemType::LOCAL, &tmp_folder));
+  RETURN_IF_ERROR(nvidia::inferenceserver::MakeTemporaryDirectory(FileSystemType::LOCAL, &tmp_folder));
 
   localized->reset(new LocalizedDirectory(path, tmp_folder));
 
@@ -1582,7 +1582,7 @@ S3FileSystem::LocalizeDirectory(
   }
 
   std::string tmp_folder;
-  RETURN_IF_ERROR(MakeTemporaryDirectory(FileSystemType::LOCAL, &tmp_folder));
+  RETURN_IF_ERROR(nvidia::inferenceserver::MakeTemporaryDirectory(FileSystemType::LOCAL, &tmp_folder));
 
   localized->reset(new LocalizedDirectory(effective_path, tmp_folder));
 
