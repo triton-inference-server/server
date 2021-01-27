@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -149,12 +149,29 @@ endif()
 ExternalProject_Add(grpc-repo
   PREFIX grpc-repo
   GIT_REPOSITORY "https://github.com/grpc/grpc.git"
-  GIT_TAG "v1.25.0"
+  GIT_TAG "v1.29.1"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc"
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ""
   INSTALL_COMMAND ""
   TEST_COMMAND ""
+)
+
+#
+# Get and build nlohmann/json
+#
+ExternalProject_Add(nlohmann-json
+  PREFIX nlohmann-json
+  GIT_REPOSITORY "https://github.com/nlohmann/json.git"
+  GIT_TAG "v3.9.0"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/json"
+  CMAKE_CACHE_ARGS
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=TRUE
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json
+    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+    -DBUILD_SHARED_LIBS:STRING=yes
+    -DBUILD_TESTING:BOOL=OFF
+    -H. -Bcmake-out
 )
 
 #
@@ -174,7 +191,23 @@ ExternalProject_Add(protobuf
     -Dprotobuf_WITH_ZLIB:BOOL=OFF
     -Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF
     -DCMAKE_BUILD_TYPE:STRING=RELEASE
+    -DBUILD_SHARED_LIBS:STRING=no
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/protobuf
+  DEPENDS grpc-repo
+)
+
+#
+# Build absl (abseil) project from grpc-repo
+#
+ExternalProject_Add(absl
+  PREFIX absl
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/abseil-cpp"
+  DOWNLOAD_COMMAND ""
+  CMAKE_CACHE_ARGS
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=TRUE
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl
+    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+    -DBUILD_TESTING:BOOL=OFF
   DEPENDS grpc-repo
 )
 
@@ -229,19 +262,21 @@ ExternalProject_Add(grpc
   CMAKE_CACHE_ARGS
     -DgRPC_INSTALL:BOOL=ON
     -DgRPC_BUILD_TESTS:BOOL=OFF
+    -DgRPC_ABSL_PROVIDER:STRING=package
     -DgRPC_PROTOBUF_PROVIDER:STRING=package
     -DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -DgRPC_ZLIB_PROVIDER:STRING=package
     -DgRPC_CARES_PROVIDER:STRING=package
-    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     -DgRPC_SSL_PROVIDER:STRING=package
+    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
+    -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
+    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
-  DEPENDS grpc-repo c-ares protobuf
+  DEPENDS grpc-repo c-ares absl protobuf
 )
 
 #
@@ -363,7 +398,7 @@ ExternalProject_Add(prometheus-cpp
 ExternalProject_Add(crc32c
   PREFIX crc32c
   GIT_REPOSITORY "https://github.com/google/crc32c.git"
-  GIT_TAG "1.1.0"
+  GIT_TAG "1.1.1"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/crc32c/src/crc32c"
   CMAKE_CACHE_ARGS
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
@@ -371,7 +406,9 @@ ExternalProject_Add(crc32c
     -DCRC32C_BUILD_TESTS:BOOL=OFF
     -DBUILD_SHARED_LIBS:STRING=no
     -DCRC32C_BUILD_BENCHMARKS:BOOL=OFF
+    -DCRC32C_USE_GLOG:BOOL=OFF
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c
 )
 
@@ -382,6 +419,8 @@ set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
    ${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
    ${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
    ${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
+   ${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
+   ${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json/lib/cmake/nlohmann_json
    ${_FINDPACKAGE_PROTOBUF_CONFIG_DIR})
 
 #
@@ -390,7 +429,7 @@ set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
 ExternalProject_Add(google-cloud-cpp
   PREFIX google-cloud-cpp
   GIT_REPOSITORY "https://github.com/googleapis/google-cloud-cpp.git"
-  GIT_TAG "v0.10.0"
+  GIT_TAG "v1.22.0"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/src/google-cloud-cpp"
   CMAKE_CACHE_ARGS
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
@@ -400,7 +439,10 @@ ExternalProject_Add(google-cloud-cpp
     -DCMAKE_PREFIX_PATH:PATH=${GCS_CMAKE_PREFIX_PATH}
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install
-  DEPENDS grpc protobuf crc32c
+    -Dnlohmann_json_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json/lib/cmake/nlohmann_json
+    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
+  DEPENDS grpc c-ares protobuf crc32c absl nlohmann-json
 )
 
 #
@@ -417,8 +459,8 @@ ExternalProject_Add(azure-storage-cpplite
     -DBUILD_SHARED_LIBS:BOOL=OFF
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-    -DCURL_INCLUDE_DIR=${CMAKE_CURRENT_BINARY_DIR}/curl/install/include
-    -DCURL_LIBRARY=${CMAKE_CURRENT_BINARY_DIR}/curl/install/lib
+    -DCURL_INCLUDE_DIR:STRING=${CMAKE_CURRENT_BINARY_DIR}/curl/install/include
+    -DCURL_LIBRARY:STRING=${CMAKE_CURRENT_BINARY_DIR}/curl/install/lib
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/azure-storage-cpplite/install
   DEPENDS curl
 )
@@ -511,11 +553,12 @@ ExternalProject_Add(client
   CMAKE_CACHE_ARGS
     -DCURL_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/curl/install/${CMAKE_INSTALL_LIBDIR}/cmake/CURL
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
-    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
+    -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
     ${_CMAKE_TRITON_DIR}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
@@ -570,11 +613,13 @@ ExternalProject_Add(server
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
-    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
+    -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
+    -Dnlohmann_json_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json/lib/cmake/nlohmann_json
     -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
     -Dlibevhtp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install/lib/cmake/libevhtp
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp

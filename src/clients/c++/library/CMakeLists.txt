@@ -147,25 +147,23 @@ if(${TRITON_ENABLE_GRPC})
 
   if (NOT WIN32)
      install(
-         FILES
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib/libcares.a
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgpr.a
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgrpc.a
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libgrpc++.a
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/libaddress_sorting.a
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/lib/libprotobuf.a
-         DESTINATION lib
+         DIRECTORY
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../../../absl/lib
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/lib
+         DESTINATION .
+         FILES_MATCHING PATTERN "*.a"
      )
   else()
      install(
-         FILES
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib/cares.lib
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/gpr.lib
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/grpc.lib
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/grpc++.lib
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib/address_sorting.lib
-         ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/lib/libprotobuf.lib
-         DESTINATION lib
+         DIRECTORY
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../../../absl/lib
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../../../c-ares/lib
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../../../grpc/lib
+           ${CMAKE_CURRENT_BINARY_DIR}/../../../../../protobuf/lib
+         DESTINATION .
+         FILES_MATCHING PATTERN "*.lib"
      )
   endif() # NOT WIN32
 

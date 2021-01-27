@@ -82,11 +82,9 @@ fi
 # Test linking against static library
 #
 
-static_libs="$client_lib/libgrpcclient_static.a $client_lib/libgrpc++.a $client_lib/libgrpc.a \
-             $client_lib/libgpr.a $client_lib/libcares.a $client_lib/libaddress_sorting.a $client_lib/libprotobuf.a \
-             $client_lib/libcurl.a"
+grpc_static_libs="-Wl,--start-group $client_lib/*.a -Wl,--end-group"
 
-g++ grpc_test.cc $static_libs -o grpc_test_static -I$client_inc -lz -lssl -lcrypto -lpthread
+g++ grpc_test.cc $grpc_static_libs -o grpc_test_static -I$client_inc -lz -lssl -lcrypto -lpthread
 
 if [ $? -eq 0 ]; then
     if [[ ! -x "./grpc_test_static" ]]; then
