@@ -80,7 +80,9 @@ The components of the install packages are:
 * utils [ linux distribution will include `shared_memory` and `cuda_shared_memory`]
 
 The Linux version of the package also includes the
-[perf_analyzer](perf_analyzer.md) binary. To run the perf_analyzer the following dependency must be installed:
+[perf_analyzer](perf_analyzer.md) binary. The perf_analyzer binary is
+built on Ubuntu 20.04 and may not run on other Linux distributions. To
+run the perf_analyzer the following dependency must be installed:
 
 ```bash
 sudo apt update
@@ -89,7 +91,8 @@ sudo apt install libb64-dev
 
 ### Download From GitHub
 
-The client libraries can be downloaded from the [Triton GitHub release
+The client libraries and the perf_analyzer executable can be
+downloaded from the [Triton GitHub release
 page](https://github.com/triton-inference-server/server/releases)
 corresponding to the release you are interested in. The client
 libraries are found in the "Assets" section of the release page in a
@@ -112,7 +115,9 @@ include/, and the Python wheel files in python/. The bin/ and python/
 directories contain the built examples that you can learn more about
 in [Examples](client_examples.md).
 
-To use the C++ libraries you must install some dependencies.
+The perf_analyzer binary is built on Ubuntu 20.04 and may not run on
+other Linux distributions. To use the C++ libraries or perf_analyzer
+executable you must install some dependencies.
 
 ```bash
 $ apt-get update
