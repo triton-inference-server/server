@@ -109,7 +109,7 @@ if(${TRITON_ENABLE_GPU})
 endif() # TRITON_ENABLE_GPU
 
 #
-# Triton generic repo agent
+# Triton repo agent API
 #
 set(
   REPOAGENT_SRCS

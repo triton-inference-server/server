@@ -1739,7 +1739,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 }
 
 Status
-GetFileSystemByType(FileSystemType type, FileSystem** file_system)
+GetFileSystem(FileSystemType type, FileSystem** file_system)
 {
   // FIXME currently this function only work for LOCAL, GCS because their
   // construction is not path-dependent. And in my opinion here should be
@@ -1970,7 +1970,7 @@ Status
 MakeTemporaryDirectory(const FileSystemType type, std::string* temp_dir)
 {
   FileSystem* fs;
-  RETURN_IF_ERROR(GetFileSystemByType(type, &fs));
+  RETURN_IF_ERROR(GetFileSystem(type, &fs));
   return fs->MakeTemporaryDirectory(temp_dir);
 }
 

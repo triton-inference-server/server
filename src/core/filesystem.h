@@ -31,7 +31,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-enum FileSystemType { LOCAL, GCS, S3, AS };
+enum class FileSystemType { LOCAL, GCS, S3, AS };
 
 // This class stores the paths of local temporary files needed for loading
 // models from Cloud repositories and performs necessary cleanup after the

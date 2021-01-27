@@ -1478,7 +1478,7 @@ message ModelRepositoryAgents
   //@@
   //@@  .. cpp:var:: message Agent
   //@@
-  //@@     A repository agent that should be invoked @@ for the specified
+  //@@     A repository agent that should be invoked for the specified
   //@@     repository actions for this model.
   //@@
   message Agent
