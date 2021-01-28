@@ -52,7 +52,7 @@ if(${TRITON_ENABLE_GPU})
 target_include_directories(identity PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   identity
-  PUBLIC ${CUDA_nvml_LIBRARY}
+  PUBLIC -ldcgm
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRITON_ENABLE_GPU
