@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -188,7 +188,7 @@ NVIDIA publishes a number of [deep learning
 examples](https://github.com/NVIDIA/DeepLearningExamples) that use
 Triton.
 
-As part of you deployment strategy you may want to [explicitly manage
+As part of your deployment strategy you may want to [explicitly manage
 what models are available by loading and unloading
 models](docs/model_management.md) from a running Triton server. If you
 are using Kubernetes for deployment a simple example of how to [deploy
