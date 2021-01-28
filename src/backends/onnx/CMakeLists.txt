@@ -44,6 +44,14 @@ add_library(
   ${ONNXRUNTIME_SRCS} ${ONNXRUNTIME_HDRS}
 )
 
+if(${TRITON_ENABLE_GPU})
+target_include_directories(identity PRIVATE ${CUDA_INCLUDE_DIRS})
+target_link_libraries(
+  identity
+  PUBLIC -ldcgm
+  PRIVATE ${CUDA_LIBRARIES}
+)
+
 target_link_libraries(
   onnxruntime-backend-library
   PRIVATE
