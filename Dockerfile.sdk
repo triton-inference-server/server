@@ -77,7 +77,8 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     elif [ "$CMAKE_UBUNTU_VERSION" = "18.04" ]; then \
       apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
       apt-get update && \
-      apt-get install -y --no-install-recommends cmake; \
+      apt-get install -y --no-install-recommends \
+        cmake-data=3.18.4-0kitware1 cmake=3.18.4-0kitware1; \
     else \
       echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false; \
     fi && \
