@@ -292,7 +292,7 @@ if(${TRITON_ENABLE_GPU})
 target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   simple
-  PUBLIC -ldcgm
+  PUBLIC ${CUDA_nvml_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRITON_ENABLE_GPU
@@ -374,7 +374,7 @@ set_target_properties(
 )
 target_link_libraries(
   memory_alloc
-  PUBLIC -ldcgm
+  PUBLIC ${CUDA_nvml_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE tritonserver
@@ -515,11 +515,17 @@ if(${TRITON_ENABLE_GPU})
   find_library(CNMEM_LIBRARY NAMES cnmem PATHS ${CNMEM_PATH}/lib)
   target_link_libraries(
     tritonserver
-    PUBLIC -ldcgm
     PRIVATE ${CUDA_LIBRARIES}
     PRIVATE ${CNMEM_LIBRARY}
   )
 endif() # TRITON_ENABLE_GPU
+
+if(${TRITON_ENABLE_METRICS_GPU})
+  target_link_libraries(
+    tritonserver
+    PUBLIC -ldcgm
+  )
+endif() # TRITON_ENABLE_METRICS_GPU
 
 install(
   TARGETS tritonserver

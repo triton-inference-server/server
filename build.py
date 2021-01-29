@@ -580,7 +580,7 @@ RUN pip3 install --upgrade pip && \
     pip3 install grpcio-tools grpcio-channelz
 
 # Install DCGM
-ENV DCGM_VERSION=2.0.13
+ARG DCGM_VERSION=2.0.13
 RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
     dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb
 
