@@ -77,7 +77,7 @@ for BACKEND in $BACKENDS; do
     fi
 
     # plan model support max batch size of 32 only. Skip for 16MB I/O tests
-    if [ $BACKEND == "plan" ]; then
+    if [ $BACKEND == "plan" ] && [ $TENSOR_SIZE != 1 ]; then
         continue
     fi
 
