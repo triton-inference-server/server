@@ -319,6 +319,11 @@ RUN pip3 install --upgrade wheel setuptools && \
 RUN go get github.com/golang/protobuf/protoc-gen-go && \
     go get google.golang.org/grpc
 
+# DCGM needed for GPU Metrics
+ARG DCGM_VERSION=2.0.13
+RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
+    dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb
+
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
 # user.
