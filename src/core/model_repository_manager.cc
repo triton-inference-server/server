@@ -754,6 +754,12 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     RETURN_IF_ERROR(agent_model_list->InvokeAgentModels(TRITONREPOAGENT_ACTION_LOAD));
   }
 
+  std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
+  auto it = map_.find(model_name);
+  if (it == map_.end()) {
+    it = map_.emplace(std::make_pair(model_name, VersionMap())).first;
+  }
+
   // Get the latest repository path
   std::string current_repository_path = repository_path;
   if (agent_model_list != nullptr) {
@@ -771,12 +777,6 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
         "at least one version must be available under the version policy of "
         "model '" +
             model_name + "'");
-  }
-
-  std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
-  auto it = map_.find(model_name);
-  if (it == map_.end()) {
-    it = map_.emplace(std::make_pair(model_name, VersionMap())).first;
   }
 
   for (const auto& version : versions) {
