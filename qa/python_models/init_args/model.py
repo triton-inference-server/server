@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,10 +33,13 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         self.args = args
-        print(args)
+        if args['model_name'] != 'init_args' or args[
+                'model_instance_name'] != 'init_args_0':
+            raise pb_utils.TritonModelException(
+                'model_instance_name/model_name does not contain correct value.'
+            )
 
     def execute(self, requests):
         """ This function is called on inference request.
