@@ -37,12 +37,21 @@ updated to work with 1.16.x versions of Google Kubernetes Engine
 A helm chart for installing a single cluster of Triton Inference
 Server is provided. By default the cluster contains a single instance
 of the inference server but the *replicaCount* configuration parameter
-can be set to create a cluster of any size, as described below. This
-guide assumes you already have a functional Kubernetes cluster and
-helm installed (see below for instructions on installing helm). If you
-want Triton Server to use GPUs for inferencing, your cluster must be
-configured with support for the NVIDIA driver and CUDA version
-required by the version of the inference server you are using.
+can be set to create a cluster of any size, as described below.
+
+This guide assumes you already have a functional Kubernetes cluster
+and helm installed (see below for instructions on installing
+helm). Note the following requirements:
+
+* The helm chart deploys Prometheus and Grafana to collect and display
+Triton metrics. Your cluster must contain sufficient CPU resourses to
+support these services. At a minimum you will likely require 2 CPU
+nodes with machine type of n1-standard-2 or greater.
+
+* If you want Triton Server to use GPUs for inferencing, your cluster
+must be configured to contain the desired number of GPU nodes with
+support for the NVIDIA driver and CUDA version required by the version
+of the inference server you are using.
 
 This helm chart is available from [Triton Inference Server
 GitHub](https://github.com/triton-inference-server/server) or from the
