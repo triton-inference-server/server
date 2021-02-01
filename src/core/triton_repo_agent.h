@@ -33,7 +33,7 @@
 #include <vector>
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
-#include "src/core/model_config_utils.h"
+#include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -59,6 +59,7 @@ class TritonRepoAgent {
       std::shared_ptr<TritonRepoAgent>* agent);
   ~TritonRepoAgent();
 
+  const std::string& Name() { return name_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 

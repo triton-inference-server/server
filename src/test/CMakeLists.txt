@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -243,10 +243,73 @@ install(
   RUNTIME DESTINATION bin
 )
 
+# Generate C++ protobuf files for the following tests
+protobuf_generate_cpp(MODEL_CONFIG_PROTO_SRC MODEL_CONFIG_PROTO_HDR ../core/model_config.proto)
+
+#
+# Unit test for TritonRepoAgent ... (TODO specify the other classes)
+#
+set(
+  TRITON_REPO_AGENT_SRCS
+  ../core/triton_repo_agent.cc
+  ../core/status.cc
+  ../core/filesystem.cc
+)
+
+set(
+  TRITON_REPO_AGENT_HDRS
+  ../core/triton_repo_agent.h
+  ../core/shared_library.h
+  ../core/logging.h
+  ../core/status.h
+  ../core/filesystem.h
+  ${MODEL_CONFIG_PROTO_HDR}
+)
+
+set(
+  TRITON_REPO_AGENT_TEST_SRCS
+  triton_repo_agent_test.cc
+  ${TRITON_REPO_AGENT_SRCS}
+)
+
+set(
+  TRITON_REPO_AGENT_TEST_HDRS
+  ${TRITON_REPO_AGENT_HDRS}
+)
+
+find_package(GTest REQUIRED)
+add_executable(
+  triton_repo_agent_test
+  ${TRITON_REPO_AGENT_TEST_SRCS}
+  ${TRITON_REPO_AGENT_TEST_HDRS}
+)
+set_target_properties(
+  triton_repo_agent_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(
+  triton_repo_agent_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+)
+target_link_libraries(
+  triton_repo_agent_test
+  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-core-repoagentapi  # from repo-core
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+)
+install(
+  TARGETS triton_repo_agent_test
+  RUNTIME DESTINATION bin
+)
+
 #
 # RateLimiter
 #
-protobuf_generate_cpp(MODEL_CONFIG_PROTO_SRC MODEL_CONFIG_PROTO_HDR ../core/model_config.proto)
 
 set(
   RATE_LIMITER_SRCS
