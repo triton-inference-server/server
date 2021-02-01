@@ -28,10 +28,43 @@
 #include <map>
 #include <memory>
 #include "src/core/triton_repo_agent.h"
+#include "src/core/server_message.h"
 
 namespace ni = nvidia::inferenceserver;
 
 namespace {
+
+//
+// Duplication of TRITONSERVER_Error implementation
+//
+class TritonServerError {
+ public:
+  static TRITONSERVER_Error* Create(
+      TRITONSERVER_Error_Code code, const char* msg);
+
+  TRITONSERVER_Error_Code Code() const { return code_; }
+  const std::string& Message() const { return msg_; }
+
+ private:
+  TritonServerError(TRITONSERVER_Error_Code code, const std::string& msg)
+      : code_(code), msg_(msg)
+  {
+  }
+  TritonServerError(TRITONSERVER_Error_Code code, const char* msg)
+      : code_(code), msg_(msg)
+  {
+  }
+
+  TRITONSERVER_Error_Code code_;
+  const std::string msg_;
+};
+
+TRITONSERVER_Error*
+TritonServerError::Create(TRITONSERVER_Error_Code code, const char* msg)
+{
+  return reinterpret_cast<TRITONSERVER_Error*>(
+      new TritonServerError(code, msg));
+}
 
 class MockSharedLibraryHandle {
  public:
@@ -55,6 +88,61 @@ static std::map<std::string, MockSharedLibraryHandle> global_mock_agents;
 
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+TRITONSERVER_Error*
+TRITONSERVER_ErrorNew(TRITONSERVER_Error_Code code, const char* msg)
+{
+  return reinterpret_cast<TRITONSERVER_Error*>(
+      TritonServerError::Create(code, msg));
+}
+
+void
+TRITONSERVER_ErrorDelete(TRITONSERVER_Error* error)
+{
+  TritonServerError* lerror = reinterpret_cast<TritonServerError*>(error);
+  delete lerror;
+}
+
+TRITONSERVER_Error_Code
+TRITONSERVER_ErrorCode(TRITONSERVER_Error* error)
+{
+  TritonServerError* lerror = reinterpret_cast<TritonServerError*>(error);
+  return lerror->Code();
+}
+
+const char*
+TRITONSERVER_ErrorCodeString(TRITONSERVER_Error* error)
+{
+  TritonServerError* lerror = reinterpret_cast<TritonServerError*>(error);
+  return ni::Status::CodeString(ni::TritonCodeToStatusCode(lerror->Code()));
+}
+
+const char*
+TRITONSERVER_ErrorMessage(TRITONSERVER_Error* error)
+{
+  TritonServerError* lerror = reinterpret_cast<TritonServerError*>(error);
+  return lerror->Message().c_str();
+}
+
+//
+// TRITONSERVER_Message
+//
+TRITONSERVER_Error*
+TRITONSERVER_MessageNewFromSerializedJson(
+    TRITONSERVER_Message** message, const char* base, size_t byte_size)
+{
+  *message = reinterpret_cast<TRITONSERVER_Message*>(
+      new ni::TritonServerMessage({base, byte_size}));
+  return nullptr;
+}
+
+#ifdef __cplusplus
+}
+#endif
+
 namespace nvidia::inferenceserver {
 
 Status OpenLibraryHandle(const std::string& path, void** handle)
@@ -71,7 +159,7 @@ Status OpenLibraryHandle(const std::string& path, void** handle)
 
 Status CloseLibraryHandle(void* handle)
 {
-  for (const auto& global_mock_agent : global_mock_agents) {
+  for (auto& global_mock_agent : global_mock_agents) {
     if (reinterpret_cast<void*>(&global_mock_agent.second) == handle) {
       return Status::Success;
     }
@@ -100,25 +188,26 @@ namespace {
 
 class TritonRepoAgentTest : public ::testing::Test {
  protected:
-  void TearDown() override { global_mock_agents.clear() }
+  void TearDown() override { global_mock_agents.clear(); }
 };
 
 TEST_F(TritonRepoAgentTest, MinimalAgent)
 {
-  auto CheckNameModelActionFn = [](TRITONREPOAGENT_Agent* agent, TRITONREPOAGENT_AgentModel* model,
-      const TRITONREPOAGENT_ActionType action_type) {
-        auto lagent = reinterpret_cast<TritonRepoAgent*>(agent);
+   ni::TritonRepoAgent::TritonRepoAgentModelActionFn_t CheckNameModelActionFn = [](TRITONREPOAGENT_Agent* agent, TRITONREPOAGENT_AgentModel* model,
+      const TRITONREPOAGENT_ActionType action_type) -> TRITONSERVER_Error* {
+        auto lagent = reinterpret_cast<ni::TritonRepoAgent*>(agent);
         EXPECT_EQ(lagent->Name(), "minimal_agent");
         return nullptr;
   };
   auto minimal_agent_handle = MockSharedLibraryHandle();
-  minimal_agent.AddEntryPoint("TRITONREPOAGENT_ModelAction", CheckNameModelActionFn)
+  minimal_agent_handle.AddEntryPoint("TRITONREPOAGENT_ModelAction", reinterpret_cast<void*>(CheckNameModelActionFn));
   global_mock_agents.emplace("minimal_agent_path", minimal_agent_handle);
-  std::shared_ptr<TritonRepoAgent> minimal_agent;
-  ASSERT_TRUE(TritonRepoAgent::Create("minimal_agent", "minimal_agent_path", &minimal_agent).IsOk());
-  ASSERT_TRUE(minimal_agent->AgentModelActionFn()(
+  std::shared_ptr<ni::TritonRepoAgent> minimal_agent;
+  ASSERT_TRUE(ni::TritonRepoAgent::Create("minimal_agent", "minimal_agent_path", &minimal_agent).IsOk());
+  auto err = minimal_agent->AgentModelActionFn()(
     reinterpret_cast<TRITONREPOAGENT_Agent*>(minimal_agent.get()),
-    nullptr, TRITONREPOAGENT_ACTION_LOAD));
+    nullptr, TRITONREPOAGENT_ACTION_LOAD);
+  ASSERT_EQ(err, nullptr);
 }
 
 }  // namespace

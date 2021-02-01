@@ -33,7 +33,7 @@
 #include <vector>
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
-#include "src/core/model_config.pb.h"
+#include "src/core/model_config_utils.h"
 
 namespace nvidia { namespace inferenceserver {
 

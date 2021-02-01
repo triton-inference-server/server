@@ -254,6 +254,9 @@ set(
   ../core/triton_repo_agent.cc
   ../core/status.cc
   ../core/filesystem.cc
+  ../core/model_config_utils.cc
+  ../core/model_config.cc
+  ../core/autofill.cc
 )
 
 set(
@@ -263,6 +266,8 @@ set(
   ../core/logging.h
   ../core/status.h
   ../core/filesystem.h
+  ../core/model_config_utils.h
+  ../core/model_config.h
   ${MODEL_CONFIG_PROTO_HDR}
 )
 
@@ -282,6 +287,7 @@ add_executable(
   triton_repo_agent_test
   ${TRITON_REPO_AGENT_TEST_SRCS}
   ${TRITON_REPO_AGENT_TEST_HDRS}
+  $<TARGET_OBJECTS:proto-library>
 )
 set_target_properties(
   triton_repo_agent_test
@@ -299,9 +305,35 @@ target_link_libraries(
   triton_repo_agent_test
   PRIVATE triton-core-serverapi  # from repo-core
   PRIVATE triton-core-repoagentapi  # from repo-core
+  PRIVATE triton-common-json        # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE protobuf::libprotobuf
+  PRIVATE -lpthread
 )
+#  add_definitions(-DTRITON_ENABLE_GCS=1)
+#  add_definitions(-DTRITON_ENABLE_AZURE_STORAGE=1)
+#  add_definitions(-DTRITON_ENABLE_S3=1)
+
+# Remove all TRITON_ENABLE_XXX definitions for this test
+target_compile_options(triton_repo_agent_test PRIVATE -UTRITON_ENABLE_ASAN
+-UTRITON_ENABLE_NVTX -UTRITON_ENABLE_TRACING
+-UTRITON_ENABLE_LOGGING
+-UTRITON_ENABLE_STATS
+-UTRITON_ENABLE_GPU
+-UTRITON_ENABLE_METRICS
+-UTRITON_ENABLE_METRICS_GPU
+-UTRITON_ENABLE_TENSORFLOW
+-UTRITON_ENABLE_PYTHON
+-UTRITON_ENABLE_TENSORRT
+-UTRITON_ENABLE_ONNXRUNTIME
+-UTRITON_ENABLE_ONNXRUNTIME_TENSORRT
+-UTRITON_ENABLE_ONNXRUNTIME_OPENVINO
+-UTRITON_ENABLE_PYTORCH
+-UTRITON_ENABLE_CUSTOM
+-UTRITON_ENABLE_ENSEMBLE
+-UTRITON_ENABLE_CUDA_GRAPH)
+
 install(
   TARGETS triton_repo_agent_test
   RUNTIME DESTINATION bin

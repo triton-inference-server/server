@@ -356,7 +356,7 @@ TRITONREPOAGENT_ModelRepositoryLocation(
     TRITONREPOAGENT_ArtifactType* artifact_type, const char** location)
 {
   TritonRepoAgentModel* tam = reinterpret_cast<TritonRepoAgentModel*>(model);
-  FileSystemType type;
+  FileSystemType type = FileSystemType::LOCAL;
   RETURN_TRITONSERVER_ERROR_IF_ERROR(tam->Location(&type, location));
   RETURN_TRITONSERVER_ERROR_IF_ERROR(
       FileSystemTypeToTritonArtifactType(type, artifact_type));
