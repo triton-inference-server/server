@@ -126,6 +126,17 @@ Metrics::~Metrics()
   if (dcgm_thread_ != nullptr) {
     dcgm_thread_exit_.store(true);
     dcgm_thread_->join();
+
+    // Stop and shutdown DCGM
+    dcgmReturn_t derr = dcgmStopEmbedded(dcgm_handle_);
+    if (derr != DCGM_ST_OK) {
+      LOG_WARNING << "error, unable to stop DCGM: " << errorString(derr);
+    }
+
+    derr = dcgmShutdown();
+    if (derr != DCGM_ST_OK) {
+      LOG_WARNING << "error, unable to shutdown DCGM: " << errorString(derr);
+    }
   }
 #endif  // TRITON_ENABLE_METRICS_GPU
 }
