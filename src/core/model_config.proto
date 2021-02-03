@@ -749,6 +749,14 @@ message ModelOptimizationPolicy
     //@@       Currently only recognized by TensorRT backend.
     //@@
     repeated GraphSpec graph_spec = 3;
+
+    //@@    .. cpp:var:: bool separate_output_stream
+    //@@
+    //@@       Uses a CUDA stream separate from the inference stream to copy the
+    //@@       output to host. Default value is false.
+    //@@       Currently only recognized by TensorRT backend.
+    //@@
+    bool separate_output_copy_stream = 4;
   }
 
   //@@

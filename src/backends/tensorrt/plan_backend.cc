@@ -127,15 +127,18 @@ WarmupRequestComplete(
 PlanBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size,
     const bool enable_pinned_input, const bool enable_pinned_output,
-    std::unique_ptr<MetricModelReporter>&& metric_reporter)
+    std::unique_ptr<MetricModelReporter>&& metric_reporter,
+    bool separate_output_stream)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
           enable_pinned_output, std::move(metric_reporter)),
       engine_(nullptr), is_shared_engine_(true), total_bindings_(0),
-      num_expected_bindings_(0)
+      num_expected_bindings_(0),
+      separate_output_copy_stream_(separate_output_stream)
 {
   stream_ = nullptr;
   input_copy_stream_ = nullptr;
+  output_copy_stream_ = nullptr;
 
   next_set_ = 0;
   for (size_t idx = 0; idx < EVENT_SET_COUNT; idx++) {
@@ -200,6 +203,22 @@ PlanBackend::Context::~Context()
       LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
     }
     stream_ = nullptr;
+  }
+
+  if (input_copy_stream_ != nullptr) {
+    cudaError_t err = cudaStreamDestroy(input_copy_stream_);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
+    }
+    input_copy_stream_ = nullptr;
+  }
+
+  if (output_copy_stream_ != nullptr) {
+    cudaError_t err = cudaStreamDestroy(output_copy_stream_);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
+    }
+    output_copy_stream_ = nullptr;
   }
 
   if ((engine_ != nullptr) && (!is_shared_engine_)) {
@@ -504,9 +523,11 @@ PlanBackend::CreateExecutionContext(
   }
 #endif  // TRITON_ENABLE_METRICS
 
+  const bool separate_output_stream =
+      Config().optimization().cuda().separate_output_copy_stream();
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
-      std::move(metric_reporter)));
+      std::move(metric_reporter), separate_output_stream));
   Context* context = static_cast<Context*>(contexts_.back().get());
   auto context_idx = contexts_.size() - 1;
 
@@ -524,7 +545,10 @@ PlanBackend::CreateExecutionContext(
   RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
   RETURN_IF_ERROR(context->CreateCudaStream(
       cuda_stream_priority, &context->input_copy_stream_));
-
+  if (separate_output_stream) {
+    RETURN_IF_ERROR(context->CreateCudaStream(
+        cuda_stream_priority, &context->output_copy_stream_));
+  }
   // Create CUDA events associated with the execution states
   RETURN_IF_ERROR(
       context->InitEventSet(Config().optimization().cuda().busy_wait_events()));
@@ -2693,9 +2717,11 @@ PlanBackend::Context::Run(
     }
   }
 
-  // Ensure inputs are ready before execution. Output buffers will always be
-  // available at this point as the execution and output copy are on the same
-  // stream.
+  // Ensure inputs are ready before execution.
+  // Output buffers are guaranteed to be available at this point when the
+  // execution and output copy are on the same stream. If a separate stream is
+  // being used to copy the output, the user provides the guarantee that the
+  // output buffers will be available by the end of inference
   cudaStreamWaitEvent(stream_, events_[next_set_].input_ready_, 0);
 
   // Async execute the inference using a CUDA graph if available for
@@ -2780,11 +2806,20 @@ PlanBackend::Context::Run(
     }
   }
 
+  // Wait for the inference to be completed before copying output if output
+  // copy is on a separate stream
+  if (separate_output_copy_stream_) {
+    cudaStreamWaitEvent(
+        output_copy_stream_, events_[next_set_].ready_for_output_, 0);
+  }
+
+  const auto output_stream =
+      separate_output_copy_stream_ ? output_copy_stream_ : stream_;
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
   payload_->responder_.reset(new BackendResponder(
       payload_->requests_, &payload_->responses_, max_batch_size_,
-      enable_pinned_output_, stream_, events_[next_set_].output_ready_));
+      enable_pinned_output_, output_stream, events_[next_set_].output_ready_));
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
     auto& io_binding_info = io_binding_infos_[io_index];
     int binding_index = binding_offset + io_index;
@@ -2990,6 +3025,7 @@ PlanBackend::Context::ProcessResponse(
     cudaEventSynchronize(event_set.ready_for_input_);
     context_queue->Put(context_idx);
     NVTX_MARKER("plan_input_available");
+
 
 #ifdef TRITON_ENABLE_STATS
     cudaEventSynchronize(event_set.ready_for_output_);

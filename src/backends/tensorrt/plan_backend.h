@@ -93,7 +93,8 @@ class PlanBackend : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device, const int max_batch_size,
         const bool enable_pinned_input, const bool enable_pinned_output,
-        std::unique_ptr<MetricModelReporter>&& metric_reporter);
+        std::unique_ptr<MetricModelReporter>&& metric_reporter,
+        bool separate_output_copy_stream);
     ~Context();
 
     DISALLOW_MOVE(Context);
@@ -292,8 +293,9 @@ class PlanBackend : public InferenceBackend {
     nvinfer1::ICudaEngine* engine_;
     bool is_shared_engine_;
 
-    // Additional CUDA stream to overlap copy and execution.
+    // Additional CUDA streams to overlap copy and execution.
     cudaStream_t input_copy_stream_;
+    cudaStream_t output_copy_stream_;
 
     // Use two sets of events each for current request and next request.
     CUDAEventSet events_[EVENT_SET_COUNT];
@@ -360,6 +362,9 @@ class PlanBackend : public InferenceBackend {
     // it is the number of expected bindings to the configured optimization
     // profile.
     int num_expected_bindings_;
+
+    // Whether or not to use a separate stream to copy output
+    bool separate_output_copy_stream_;
 
     // The maximum possible size of the TensorRT tensor and the corresponding
     // allocated GPU buffer across all optimization
