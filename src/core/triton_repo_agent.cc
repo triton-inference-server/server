@@ -477,7 +477,7 @@ TRITONREPOAGENT_ModelRepositoryLocationAcquire(
 }
 
 TRITONSERVER_Error*
-TRITONREPOAGENT_ModelRepositoryLocationDelete(
+TRITONREPOAGENT_ModelRepositoryLocationRelease(
     TRITONREPOAGENT_Agent* agent, TRITONREPOAGENT_AgentModel* model,
     const char* location)
 {
@@ -487,7 +487,7 @@ TRITONREPOAGENT_ModelRepositoryLocationDelete(
 }
 
 TRITONSERVER_Error*
-TRITONREPOAGENT_ModelRepositoryLocationUpdate(
+TRITONREPOAGENT_ModelRepositoryUpdate(
     TRITONREPOAGENT_Agent* agent, TRITONREPOAGENT_AgentModel* model,
     const TRITONREPOAGENT_ArtifactType artifact_type, const char* location)
 {
@@ -557,7 +557,7 @@ TRITONREPOAGENT_ModelSetState(TRITONREPOAGENT_AgentModel* model, void* state)
 }
 
 TRITONSERVER_Error*
-TRITONREPOAGENT_AgentState(TRITONREPOAGENT_Agent* agent, void** state)
+TRITONREPOAGENT_State(TRITONREPOAGENT_Agent* agent, void** state)
 {
   TritonRepoAgent* ta = reinterpret_cast<TritonRepoAgent*>(agent);
   *state = ta->State();
@@ -565,7 +565,7 @@ TRITONREPOAGENT_AgentState(TRITONREPOAGENT_Agent* agent, void** state)
 }
 
 TRITONSERVER_Error*
-TRITONREPOAGENT_AgentSetState(TRITONREPOAGENT_Agent* agent, void* state)
+TRITONREPOAGENT_SetState(TRITONREPOAGENT_Agent* agent, void* state)
 {
   TritonRepoAgent* ta = reinterpret_cast<TritonRepoAgent*>(agent);
   ta->SetState(state);
