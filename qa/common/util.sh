@@ -404,7 +404,7 @@ function check_test_results () {
 function check_valgrind_log () {
     local valgrind_log=$1
 
-    leak_records=$(grep "are definitely lost" -A 8 $valgrind_log | awk \
+    leak_records=$(grep "are definitely lost" -A 12 $valgrind_log | awk \
     'BEGIN{RS="--";acc=0} !(/cnmem/||/tensorflow::NewSession/||/dl-init/|| \
     /dl-open/||/dlerror/||/libtorch/) \
     {print;acc+=1} END{print acc}')
