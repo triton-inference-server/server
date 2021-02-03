@@ -92,71 +92,28 @@ namespace {
 // Helper class to manage the lifecycle of a list of associated agent models
 class TritonRepoAgentModelList {
  public:
-  TritonRepoAgentModelList(const std::string& model_repository_path) :
-   original_model_repository_path_(model_repository_path), current_action_type_(TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE) {}
-  Status AddAgentModel(std::unique_ptr<TritonRepoAgentModel>&& agent_model) {
+  TritonRepoAgentModelList() = default;
+  Status AddAgentModel(std::unique_ptr<TritonRepoAgentModel>&& agent_model)
+  {
     agent_models_.emplace_back(std::move(agent_model));
     return Status::Success;
   }
 
-  TritonRepoAgentModel* Back()
-  {
-    return agent_models_.back().get();
-  }
+  size_t Size() { return agent_models_.size(); }
 
-  Status InvokeAgentModels(const TRITONREPOAGENT_ActionType action_type) {
-    switch (action_type)
-    {
-    case TRITONREPOAGENT_ACTION_LOAD:
-      if (action_type != TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE) {
-        return Status(Status::Code::INTERNAL, "Unexpected lifecycle state transition from " + 
-        TRITONREPOAGENT_ActionTypeString(current_action_type_) + " to " + TRITONREPOAGENT_ActionTypeString(action_type));
-      }
-      break;
-    case TRITONREPOAGENT_ACTION_LOAD_COMPLETE:
-    case TRITONREPOAGENT_ACTION_LOAD_FAIL:
-      if (action_type != TRITONREPOAGENT_ACTION_LOAD) {
-        return Status(Status::Code::INTERNAL, "Unexpected lifecycle state transition from " + 
-        TRITONREPOAGENT_ActionTypeString(current_action_type_) + " to " + TRITONREPOAGENT_ActionTypeString(action_type));
-      }
-      break;
-    case TRITONREPOAGENT_ACTION_UNLOAD:
-      if (action_type != TRITONREPOAGENT_ACTION_LOAD_COMPLETE) {
-        return Status(Status::Code::INTERNAL, "Unexpected lifecycle state transition from " + 
-        TRITONREPOAGENT_ActionTypeString(current_action_type_) + " to " + TRITONREPOAGENT_ActionTypeString(action_type));
-      }
-      break;
-    case TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE:
-      if (action_type != TRITONREPOAGENT_ACTION_UNLOAD) {
-        return Status(Status::Code::INTERNAL, "Unexpected lifecycle state transition from " + 
-        TRITONREPOAGENT_ActionTypeString(current_action_type_) + " to " + TRITONREPOAGENT_ActionTypeString(action_type));
-      }
-      break;
-    }
-    current_action_type_ = action_type;
+  TritonRepoAgentModel* Back() { return agent_models_.back().get(); }
+
+  Status InvokeAgentModels(const TRITONREPOAGENT_ActionType action_type)
+  {
     for (size_t idx = 0; idx < agent_models_.size(); idx++) {
-      // If 'action_type' is LOAD, need to establish a chain of locations between agent models
-      if (action_type == TRITONREPOAGENT_ACTION_LOAD) {
-        if (idx == 0) {
-          FileSystemType filesystem_type;
-          RETURN_IF_ERROR(GetFileSystemType(original_model_repository_path_, &filesystem_type));
-          RETURN_IF_ERROR(agent_models_[idx]->SetLocation(filesystem_type, original_model_repository_path_));
-        } else {
-          const char* chained_location;
-          FileSystemType chained_filesystem_type;
-          RETURN_IF_ERROR(agent_models_[idx-1]->Location(&chained_filesystem_type, &chained_location));
-          RETURN_IF_ERROR(agent_models_[idx]->SetLocation(chained_filesystem_type, chained_location));
-        }
-      }
       RETURN_IF_ERROR(agent_models_[idx]->InvokeAgent(action_type));
     }
     return Status::Success;
   }
-private:
+
+ private:
   DISALLOW_COPY_AND_ASSIGN(TritonRepoAgentModelList);
 
-  const std::string original_model_repository_path_;
-  TRITONREPOAGENT_ActionType current_action_type_;
   std::vector<std::unique_ptr<TritonRepoAgentModel>> agent_models_;
 };
 
@@ -689,7 +646,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncUnload(
   std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
   auto it = map_.find(model_name);
   if (it == map_.end()) {
-    return Status(Status::Code::INVALID_ARG, "Model to be unloaded has not been served");
+    return Status(
+        Status::Code::INVALID_ARG, "Model to be unloaded has not been served");
   }
 
   // Get the existing agent models and notify the unload action
@@ -698,16 +656,22 @@ ModelRepositoryManager::BackendLifeCycle::AsyncUnload(
     if (backend_info->agent_model_list_ != nullptr) {
       auto unloading_agent_model_list = backend_info->agent_model_list_;
       // Only log the error because the model should be unloaded regardless
-      auto status = unloading_agent_model_list->InvokeAgentModels(TRITONREPOAGENT_ACTION_UNLOAD);
+      auto status = unloading_agent_model_list->InvokeAgentModels(
+          TRITONREPOAGENT_ACTION_UNLOAD);
       if (!status.IsOk()) {
-        LOG_ERROR << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD: " << status.AsString();
+        LOG_ERROR
+            << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD: "
+            << status.AsString();
       }
       backend_info->OnComplete_ = [this, unloading_agent_model_list]() {
-                  auto status = unloading_agent_model_list->InvokeAgentModels(TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
-                  if (!status.IsOk()) {
-                    LOG_ERROR << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: " << status.AsString();
-                  }
-                };
+        auto status = unloading_agent_model_list->InvokeAgentModels(
+            TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
+        if (!status.IsOk()) {
+          LOG_ERROR << "Agent model returns error on "
+                       "TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: "
+                    << status.AsString();
+        }
+      };
       break;
     }
   }
@@ -736,8 +700,12 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   // Create the associated repo agent models when a model is to be loaded
   std::shared_ptr<TritonRepoAgentModelList> agent_model_list;
   if (model_config.has_model_repository_agents()) {
-    agent_model_list.reset(new TritonRepoAgentModelList(repository_path));
-    for (const auto& agent_config : model_config.model_repository_agents().agents()) {
+    FileSystemType filesystem_type;
+    RETURN_IF_ERROR(GetFileSystemType(repository_path, &filesystem_type));
+    const char* location = repository_path.c_str();
+    agent_model_list.reset(new TritonRepoAgentModelList());
+    for (const auto& agent_config :
+         model_config.model_repository_agents().agents()) {
       std::shared_ptr<TritonRepoAgent> agent;
       Status status = TritonRepoAgentManager::CreateAgent(
           repository_path, agent_config.name(), &agent);
@@ -747,11 +715,16 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
           agent_params.emplace_back(parameter.first, parameter.second);
         }
         std::unique_ptr<TritonRepoAgentModel> agent_model;
-        RETURN_IF_ERROR(TritonRepoAgentModel::Create(model_config, agent, std::move(agent_params), &agent_model));
+        if (agent_model_list->Size() != 0) {
+          agent_model_list->Back()->Location(&filesystem_type, &location);
+        }
+        RETURN_IF_ERROR(TritonRepoAgentModel::Create(
+            filesystem_type, location, model_config, agent,
+            std::move(agent_params), &agent_model));
+        RETURN_IF_ERROR(agent_model->InvokeAgent(TRITONREPOAGENT_ACTION_LOAD));
         agent_model_list->AddAgentModel(std::move(agent_model));
       }
     }
-    RETURN_IF_ERROR(agent_model_list->InvokeAgentModels(TRITONREPOAGENT_ACTION_LOAD));
   }
 
   std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
@@ -765,12 +738,13 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   if (agent_model_list != nullptr) {
     const char* location;
     FileSystemType filesystem_type;
-    RETURN_IF_ERROR(agent_model_list->Back()->Location(&filesystem_type, &location));
+    RETURN_IF_ERROR(
+        agent_model_list->Back()->Location(&filesystem_type, &location));
     current_repository_path = location;
   }
   std::set<int64_t> versions;
   RETURN_IF_ERROR(VersionsToLoad(
-        current_repository_path, model_name, model_config, &versions));
+      current_repository_path, model_name, model_config, &versions));
   if (versions.empty()) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -821,8 +795,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     std::set<int64_t> defer_unload_set_;
     std::mutex mtx_;
   };
-  std::shared_ptr<LoadTracker> load_tracker(
-      new LoadTracker(versions.size()));
+  std::shared_ptr<LoadTracker> load_tracker(new LoadTracker(versions.size()));
   for (auto& version_backend : it->second) {
     auto version = version_backend.first;
     BackendInfo* backend_info = (version_backend.second.second == nullptr)
@@ -863,9 +836,12 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
             // If any of the versions fails to load, abort the load and unload
             // all newly loaded versions
             if (backend_info->agent_model_list_) {
-              auto status = backend_info->agent_model_list_->InvokeAgentModels(TRITONREPOAGENT_ACTION_LOAD_FAIL);
+              auto status = backend_info->agent_model_list_->InvokeAgentModels(
+                  TRITONREPOAGENT_ACTION_LOAD_FAIL);
               if (!status.IsOk()) {
-                LOG_ERROR << "Agent model returns error on TRITONREPOAGENT_ACTION_LOAD_FAIL: " << status.AsString();
+                LOG_ERROR << "Agent model returns error on "
+                             "TRITONREPOAGENT_ACTION_LOAD_FAIL: "
+                          << status.AsString();
               }
             }
             for (auto& loaded : load_tracker->load_set_) {
@@ -891,10 +867,13 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
             }
           } else {
             if (backend_info->agent_model_list_) {
-            auto status = backend_info->agent_model_list_->InvokeAgentModels(TRITONREPOAGENT_ACTION_LOAD_COMPLETE);
-            if (!status.IsOk()) {
-              LOG_ERROR << "Agent model returns error on TRITONREPOAGENT_ACTION_LOAD_COMPLETE: " << status.AsString();
-            }
+              auto status = backend_info->agent_model_list_->InvokeAgentModels(
+                  TRITONREPOAGENT_ACTION_LOAD_COMPLETE);
+              if (!status.IsOk()) {
+                LOG_ERROR << "Agent model returns error on "
+                             "TRITONREPOAGENT_ACTION_LOAD_COMPLETE: "
+                          << status.AsString();
+              }
             }
             bool notified_agent = false;
             for (auto& loaded : load_tracker->load_set_) {
@@ -910,15 +889,23 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
                     unload_backend->mtx_);
                 unload_backend->next_action_ = ActionType::UNLOAD;
                 if (unload_backend->agent_model_list_ && !notified_agent) {
-                  auto unloading_agent_model_list = unload_backend->agent_model_list_;
-                  auto status = unloading_agent_model_list->InvokeAgentModels(TRITONREPOAGENT_ACTION_UNLOAD);
+                  auto unloading_agent_model_list =
+                      unload_backend->agent_model_list_;
+                  auto status = unloading_agent_model_list->InvokeAgentModels(
+                      TRITONREPOAGENT_ACTION_UNLOAD);
                   if (!status.IsOk()) {
-                    LOG_ERROR << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD: " << status.AsString();
+                    LOG_ERROR << "Agent model returns error on "
+                                 "TRITONREPOAGENT_ACTION_UNLOAD: "
+                              << status.AsString();
                   }
-                  unload_backend->OnComplete_ = [this, unload_backend, unloading_agent_model_list]() {
-                    auto status = unloading_agent_model_list->InvokeAgentModels(TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
+                  unload_backend->OnComplete_ = [this, unload_backend,
+                                                 unloading_agent_model_list]() {
+                    auto status = unloading_agent_model_list->InvokeAgentModels(
+                        TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
                     if (!status.IsOk()) {
-                      LOG_ERROR << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: " << status.AsString();
+                      LOG_ERROR << "Agent model returns error on "
+                                   "TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: "
+                                << status.AsString();
                     }
                     std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
                     unloading_backends_.erase((uintptr_t)unload_backend);
@@ -940,16 +927,24 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
               auto unload_backend = vit->second.first.get();
               std::lock_guard<std::recursive_mutex> lock(unload_backend->mtx_);
               unload_backend->next_action_ = ActionType::UNLOAD;
-               if (unload_backend->agent_model_list_ && !notified_agent) {
-                auto unloading_agent_model_list = unload_backend->agent_model_list_;
-                auto status = unloading_agent_model_list->InvokeAgentModels(TRITONREPOAGENT_ACTION_UNLOAD);
+              if (unload_backend->agent_model_list_ && !notified_agent) {
+                auto unloading_agent_model_list =
+                    unload_backend->agent_model_list_;
+                auto status = unloading_agent_model_list->InvokeAgentModels(
+                    TRITONREPOAGENT_ACTION_UNLOAD);
                 if (!status.IsOk()) {
-                  LOG_ERROR << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD: " << status.AsString();
+                  LOG_ERROR << "Agent model returns error on "
+                               "TRITONREPOAGENT_ACTION_UNLOAD: "
+                            << status.AsString();
                 }
-                unload_backend->OnComplete_ = [this, unloading_agent_model_list]() {
-                  auto status = unloading_agent_model_list->InvokeAgentModels(TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
+                unload_backend->OnComplete_ = [this,
+                                               unloading_agent_model_list]() {
+                  auto status = unloading_agent_model_list->InvokeAgentModels(
+                      TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
                   if (!status.IsOk()) {
-                    LOG_ERROR << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: " << status.AsString();
+                    LOG_ERROR << "Agent model returns error on "
+                                 "TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: "
+                              << status.AsString();
                   }
                 };
                 notified_agent = true;
@@ -1413,12 +1408,11 @@ ModelRepositoryManager::LoadModelByDependency()
       auto model_state = model_states.back().get();
       const auto itr = infos_.find(valid_model->model_name_);
       auto status = backend_life_cycle_->AsyncLoad(
-            itr->second->model_repository_path_, valid_model->model_name_,
-            valid_model->model_config_,
-            [model_state](Status load_status) {
-              model_state->status_ = load_status;
-              model_state->ready_.set_value();
-            });
+          itr->second->model_repository_path_, valid_model->model_name_,
+          valid_model->model_config_, [model_state](Status load_status) {
+            model_state->status_ = load_status;
+            model_state->ready_.set_value();
+          });
       if (!status.IsOk()) {
         model_state->status_ = status;
         model_state->ready_.set_value();

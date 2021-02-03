@@ -37,7 +37,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
-std::string TRITONREPOAGENT_ActionTypeString(const TRITONREPOAGENT_ActionType type);
+std::string TRITONREPOAGENT_ActionTypeString(
+    const TRITONREPOAGENT_ActionType type);
 
 class TritonRepoAgent {
  public:
@@ -82,9 +83,8 @@ class TritonRepoAgent {
   DISALLOW_COPY_AND_ASSIGN(TritonRepoAgent);
 
   TritonRepoAgent(const std::string& name)
-      : name_(name), state_(nullptr),
-        dlhandle_(nullptr), init_fn_(nullptr), fini_fn_(nullptr),
-        model_init_fn_(nullptr), model_fini_fn_(nullptr),
+      : name_(name), state_(nullptr), dlhandle_(nullptr), init_fn_(nullptr),
+        fini_fn_(nullptr), model_init_fn_(nullptr), model_fini_fn_(nullptr),
         model_action_fn_(nullptr)
   {
   }
@@ -103,6 +103,7 @@ class TritonRepoAgent {
 class TritonRepoAgentModel {
  public:
   static Status Create(
+      const FileSystemType type, const std::string& location,
       const inference::ModelConfig& config,
       const std::shared_ptr<TritonRepoAgent> agent,
       TritonRepoAgent::Parameters&& agent_parameters,
@@ -120,7 +121,8 @@ class TritonRepoAgentModel {
 
   Status SetLocation(const FileSystemType type, const std::string& location);
   Status Location(FileSystemType* type, const char** location);
-  Status AcquireMutableLocation(const FileSystemType type, const char** location);
+  Status AcquireMutableLocation(
+      const FileSystemType type, const char** location);
   Status DeleteMutableLocation();
   const inference::ModelConfig Config() { return config_; }
 
@@ -128,10 +130,14 @@ class TritonRepoAgentModel {
   DISALLOW_COPY_AND_ASSIGN(TritonRepoAgentModel);
 
   TritonRepoAgentModel(
+      const FileSystemType type, const std::string& location,
       const inference::ModelConfig& config,
       const std::shared_ptr<TritonRepoAgent> agent,
       TritonRepoAgent::Parameters&& agent_parameters)
-      : state_(nullptr), config_(config), agent_(agent), agent_parameters_(std::move(agent_parameters))
+      : state_(nullptr), config_(config), agent_(agent),
+        agent_parameters_(std::move(agent_parameters)), type_(type),
+        location_(location), action_type_set_(false),
+        current_action_type_(TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE)
   {
   }
 
@@ -143,6 +149,8 @@ class TritonRepoAgentModel {
   std::string location_;
   FileSystemType acquired_type_;
   std::string acquired_location_;
+  bool action_type_set_;
+  TRITONREPOAGENT_ActionType current_action_type_;
 };
 
 class TritonRepoAgentManager {

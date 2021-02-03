@@ -91,12 +91,13 @@ TritonArtifactTypeToFileSystemType(
       RETURN_IF_ERROR(GetFileSystemType(path, converted_type));
       if (*converted_type == FileSystemType::LOCAL) {
         return Status(
-          Status::Code::INTERNAL,
-          "Can not convert to matching filesystem type from artifact type 'TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM' with location " +
-              path);
+            Status::Code::INTERNAL,
+            "Can not convert to matching filesystem type from artifact type "
+            "'TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM' with location " +
+                path);
       }
       return Status::Success;
-      }
+    }
     default:
       return Status(
           Status::Code::INTERNAL,
@@ -107,11 +108,11 @@ TritonArtifactTypeToFileSystemType(
 
 }  // namespace
 
-std::string TRITONREPOAGENT_ActionTypeString(const TRITONREPOAGENT_ActionType type)
+std::string
+TRITONREPOAGENT_ActionTypeString(const TRITONREPOAGENT_ActionType type)
 {
-  switch (type)
-  {
-  case TRITONREPOAGENT_ACTION_LOAD:
+  switch (type) {
+    case TRITONREPOAGENT_ACTION_LOAD:
       return "TRITONREPOAGENT_ACTION_LOAD";
     case TRITONREPOAGENT_ACTION_LOAD_COMPLETE:
       return "TRITONREPOAGENT_ACTION_LOAD_COMPLETE";
@@ -184,16 +185,18 @@ TritonRepoAgent::~TritonRepoAgent()
 //
 Status
 TritonRepoAgentModel::Create(
-      const inference::ModelConfig& config,
-      const std::shared_ptr<TritonRepoAgent> agent,
-      TritonRepoAgent::Parameters&& agent_parameters,
-      std::unique_ptr<TritonRepoAgentModel>* agent_model)
+    const FileSystemType type, const std::string& location,
+    const inference::ModelConfig& config,
+    const std::shared_ptr<TritonRepoAgent> agent,
+    TritonRepoAgent::Parameters&& agent_parameters,
+    std::unique_ptr<TritonRepoAgentModel>* agent_model)
 {
-  std::unique_ptr<TritonRepoAgentModel> lagent_model(new TritonRepoAgentModel(config, agent, std::move(agent_parameters)));
+  std::unique_ptr<TritonRepoAgentModel> lagent_model(new TritonRepoAgentModel(
+      type, location, config, agent, std::move(agent_parameters)));
   if (agent->AgentModelInitFn() != nullptr) {
     RETURN_IF_TRITONSERVER_ERROR(agent->AgentModelInitFn()(
-      reinterpret_cast<TRITONREPOAGENT_Agent*>(agent.get()),
-      reinterpret_cast<TRITONREPOAGENT_AgentModel*>(lagent_model.get())));
+        reinterpret_cast<TRITONREPOAGENT_Agent*>(agent.get()),
+        reinterpret_cast<TRITONREPOAGENT_AgentModel*>(lagent_model.get())));
   }
   *agent_model = std::move(lagent_model);
   return Status::Success;
@@ -201,10 +204,44 @@ TritonRepoAgentModel::Create(
 
 TritonRepoAgentModel::~TritonRepoAgentModel()
 {
+  // Need to ensure the proper lifecycle is informed
+  if (action_type_set_) {
+    switch (current_action_type_) {
+      case TRITONREPOAGENT_ACTION_LOAD:
+        LOG_TRITONSERVER_ERROR(
+            agent_->AgentModelActionFn()(
+                reinterpret_cast<TRITONREPOAGENT_Agent*>(agent_.get()),
+                reinterpret_cast<TRITONREPOAGENT_AgentModel*>(this),
+                TRITONREPOAGENT_ACTION_LOAD_FAIL),
+            "Inform TRITONREPOAGENT_ACTION_LOAD_FAIL");
+        break;
+      case TRITONREPOAGENT_ACTION_LOAD_COMPLETE:
+        LOG_TRITONSERVER_ERROR(
+            agent_->AgentModelActionFn()(
+                reinterpret_cast<TRITONREPOAGENT_Agent*>(agent_.get()),
+                reinterpret_cast<TRITONREPOAGENT_AgentModel*>(this),
+                TRITONREPOAGENT_ACTION_UNLOAD),
+            "Inform TRITONREPOAGENT_ACTION_UNLOAD");
+        __attribute__((fallthrough));
+      case TRITONREPOAGENT_ACTION_UNLOAD:
+        LOG_TRITONSERVER_ERROR(
+            agent_->AgentModelActionFn()(
+                reinterpret_cast<TRITONREPOAGENT_Agent*>(agent_.get()),
+                reinterpret_cast<TRITONREPOAGENT_AgentModel*>(this),
+                TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE),
+            "Inform TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE");
+        break;
+      case TRITONREPOAGENT_ACTION_LOAD_FAIL:
+      case TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE:
+        break;
+    }
+  }
   if (agent_->AgentModelFiniFn() != nullptr) {
-    LOG_TRITONSERVER_ERROR(agent_->AgentModelFiniFn()(
-      reinterpret_cast<TRITONREPOAGENT_Agent*>(agent_.get()),
-      reinterpret_cast<TRITONREPOAGENT_AgentModel*>(this)), "~TritonRepoAgentModel");
+    LOG_TRITONSERVER_ERROR(
+        agent_->AgentModelFiniFn()(
+            reinterpret_cast<TRITONREPOAGENT_Agent*>(agent_.get()),
+            reinterpret_cast<TRITONREPOAGENT_AgentModel*>(this)),
+        "~TritonRepoAgentModel");
   }
   if (!acquired_location_.empty()) {
     DeleteMutableLocation();
@@ -214,6 +251,53 @@ TritonRepoAgentModel::~TritonRepoAgentModel()
 Status
 TritonRepoAgentModel::InvokeAgent(const TRITONREPOAGENT_ActionType action_type)
 {
+  if ((!action_type_set_) && (action_type != TRITONREPOAGENT_ACTION_LOAD)) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Unexpected lifecycle start state " +
+            TRITONREPOAGENT_ActionTypeString(action_type));
+  }
+  switch (action_type) {
+    case TRITONREPOAGENT_ACTION_LOAD:
+      if (action_type_set_) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Unexpected lifecycle state transition from " +
+                TRITONREPOAGENT_ActionTypeString(current_action_type_) +
+                " to " + TRITONREPOAGENT_ActionTypeString(action_type));
+      }
+      break;
+    case TRITONREPOAGENT_ACTION_LOAD_COMPLETE:
+    case TRITONREPOAGENT_ACTION_LOAD_FAIL:
+      if (current_action_type_ != TRITONREPOAGENT_ACTION_LOAD) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Unexpected lifecycle state transition from " +
+                TRITONREPOAGENT_ActionTypeString(current_action_type_) +
+                " to " + TRITONREPOAGENT_ActionTypeString(action_type));
+      }
+      break;
+    case TRITONREPOAGENT_ACTION_UNLOAD:
+      if (current_action_type_ != TRITONREPOAGENT_ACTION_LOAD_COMPLETE) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Unexpected lifecycle state transition from " +
+                TRITONREPOAGENT_ActionTypeString(current_action_type_) +
+                " to " + TRITONREPOAGENT_ActionTypeString(action_type));
+      }
+      break;
+    case TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE:
+      if (current_action_type_ != TRITONREPOAGENT_ACTION_UNLOAD) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Unexpected lifecycle state transition from " +
+                TRITONREPOAGENT_ActionTypeString(current_action_type_) +
+                " to " + TRITONREPOAGENT_ActionTypeString(action_type));
+      }
+      break;
+  }
+  current_action_type_ = action_type;
+  action_type_set_ = true;
   RETURN_IF_TRITONSERVER_ERROR(agent_->AgentModelActionFn()(
       reinterpret_cast<TRITONREPOAGENT_Agent*>(agent_.get()),
       reinterpret_cast<TRITONREPOAGENT_AgentModel*>(this), action_type));
@@ -221,8 +305,18 @@ TritonRepoAgentModel::InvokeAgent(const TRITONREPOAGENT_ActionType action_type)
 }
 
 Status
-TritonRepoAgentModel::SetLocation(const FileSystemType type, const std::string& location)
+TritonRepoAgentModel::SetLocation(
+    const FileSystemType type, const std::string& location)
 {
+  if (current_action_type_ != TRITONREPOAGENT_ACTION_LOAD) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "location can only be updated during TRITONREPOAGENT_ACTION_LOAD, "
+        "current action type is " +
+            (action_type_set_
+                 ? TRITONREPOAGENT_ActionTypeString(current_action_type_)
+                 : "not set"));
+  }
   type_ = type;
   location_ = location;
   return Status::Success;
@@ -232,7 +326,8 @@ Status
 TritonRepoAgentModel::Location(FileSystemType* type, const char** location)
 {
   if (location_.empty()) {
-    return Status(Status::Code::INTERNAL, "Model repository location is not set");
+    return Status(
+        Status::Code::INTERNAL, "Model repository location is not set");
   }
   *type = type_;
   *location = location_.c_str();
@@ -247,10 +342,14 @@ TritonRepoAgentModel::AcquireMutableLocation(
     std::string lacquired_location;
     RETURN_IF_ERROR(MakeTemporaryDirectory(type, &lacquired_location));
     acquired_location_.swap(lacquired_location);
+    acquired_type_ = type;
   }
 
   if (type != acquired_type_) {
-    return Status(Status::Code::INVALID_ARG, "The requested filesystem type is different from existing acquired location");
+    return Status(
+        Status::Code::INVALID_ARG,
+        "The requested filesystem type is different from existing acquired "
+        "location");
   }
   *location = acquired_location_.c_str();
   return Status::Success;
@@ -297,8 +396,7 @@ TritonRepoAgentManager::CreateAgent(
   static const std::string global_path = "/opt/tritonserver/agents";
   const std::vector<std::string> search_paths = {model_dir, global_path};
 
-  std::string agent_libname =
-      TritonRepoAgentLibraryName(agent_name);
+  std::string agent_libname = TritonRepoAgentLibraryName(agent_name);
   std::string libpath;
   for (const auto& path : search_paths) {
     const auto full_path = JoinPath({path, agent_libname});
@@ -313,9 +411,8 @@ TritonRepoAgentManager::CreateAgent(
   if (libpath.empty()) {
     return Status(
         Status::Code::INVALID_ARG,
-        "unable to find '" + agent_libname + "' for repo agent '" +
-            agent_name + "', searched: " + model_dir + ", " +
-            global_path);
+        "unable to find '" + agent_libname + "' for repo agent '" + agent_name +
+            "', searched: " + model_dir + ", " + global_path);
   }
 
   const auto& itr = singleton_manager.agent_map_.find(libpath);
@@ -332,8 +429,7 @@ TritonRepoAgentManager::CreateAgent(
 
     singleton_manager.agent_map_.erase(itr);
   } else {
-    RETURN_IF_ERROR(
-        TritonRepoAgent::Create(agent_name, libpath, agent));
+    RETURN_IF_ERROR(TritonRepoAgent::Create(agent_name, libpath, agent));
     singleton_manager.agent_map_.insert({libpath, *agent});
   }
 
@@ -371,7 +467,8 @@ TRITONREPOAGENT_ModelRepositoryLocationAcquire(
   if (artifact_type != TRITONREPOAGENT_ARTIFACT_FILESYSTEM) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        "Unexpected artifact type, expects 'TRITONREPOAGENT_ARTIFACT_FILESYSTEM'");
+        "Unexpected artifact type, expects "
+        "'TRITONREPOAGENT_ARTIFACT_FILESYSTEM'");
   }
   TritonRepoAgentModel* tam = reinterpret_cast<TritonRepoAgentModel*>(model);
   RETURN_TRITONSERVER_ERROR_IF_ERROR(
@@ -396,7 +493,8 @@ TRITONREPOAGENT_ModelRepositoryLocationUpdate(
 {
   TritonRepoAgentModel* tam = reinterpret_cast<TritonRepoAgentModel*>(model);
   FileSystemType type;
-  RETURN_TRITONSERVER_ERROR_IF_ERROR(TritonArtifactTypeToFileSystemType(artifact_type, location, &type));
+  RETURN_TRITONSERVER_ERROR_IF_ERROR(
+      TritonArtifactTypeToFileSystemType(artifact_type, location, &type));
   RETURN_TRITONSERVER_ERROR_IF_ERROR(tam->SetLocation(type, location));
   return nullptr;  // success
 }
@@ -442,32 +540,32 @@ TRITONREPOAGENT_ModelConfig(
       model_config, model_config_json.c_str(), model_config_json.length());
 }
 
-TRITONSERVER_Error* TRITONREPOAGENT_ModelState(
-    TRITONREPOAGENT_AgentModel* model, void** state)
+TRITONSERVER_Error*
+TRITONREPOAGENT_ModelState(TRITONREPOAGENT_AgentModel* model, void** state)
 {
   TritonRepoAgentModel* tam = reinterpret_cast<TritonRepoAgentModel*>(model);
   *state = tam->State();
   return nullptr;  // success
 }
 
-TRITONSERVER_Error* TRITONREPOAGENT_ModelSetState(
-    TRITONREPOAGENT_AgentModel* model, void* state)
+TRITONSERVER_Error*
+TRITONREPOAGENT_ModelSetState(TRITONREPOAGENT_AgentModel* model, void* state)
 {
   TritonRepoAgentModel* tam = reinterpret_cast<TritonRepoAgentModel*>(model);
   tam->SetState(state);
   return nullptr;  // success
 }
 
-TRITONSERVER_Error* TRITONREPOAGENT_AgentState(
-    TRITONREPOAGENT_Agent* agent, void** state)
+TRITONSERVER_Error*
+TRITONREPOAGENT_AgentState(TRITONREPOAGENT_Agent* agent, void** state)
 {
   TritonRepoAgent* ta = reinterpret_cast<TritonRepoAgent*>(agent);
   *state = ta->State();
   return nullptr;  // success
 }
 
-TRITONSERVER_Error* TRITONREPOAGENT_AgentSetState(
-    TRITONREPOAGENT_Agent* agent, void* state)
+TRITONSERVER_Error*
+TRITONREPOAGENT_AgentSetState(TRITONREPOAGENT_Agent* agent, void* state)
 {
   TritonRepoAgent* ta = reinterpret_cast<TritonRepoAgent*>(agent);
   ta->SetState(state);

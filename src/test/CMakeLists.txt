@@ -311,12 +311,10 @@ target_link_libraries(
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
 )
-#  add_definitions(-DTRITON_ENABLE_GCS=1)
-#  add_definitions(-DTRITON_ENABLE_AZURE_STORAGE=1)
-#  add_definitions(-DTRITON_ENABLE_S3=1)
 
 # Remove all TRITON_ENABLE_XXX definitions for this test
-target_compile_options(triton_repo_agent_test PRIVATE -UTRITON_ENABLE_ASAN
+target_compile_options(triton_repo_agent_test PRIVATE
+-UTRITON_ENABLE_ASAN
 -UTRITON_ENABLE_NVTX -UTRITON_ENABLE_TRACING
 -UTRITON_ENABLE_LOGGING
 -UTRITON_ENABLE_STATS
@@ -332,7 +330,10 @@ target_compile_options(triton_repo_agent_test PRIVATE -UTRITON_ENABLE_ASAN
 -UTRITON_ENABLE_PYTORCH
 -UTRITON_ENABLE_CUSTOM
 -UTRITON_ENABLE_ENSEMBLE
--UTRITON_ENABLE_CUDA_GRAPH)
+-UTRITON_ENABLE_CUDA_GRAPH
+-UTRITON_ENABLE_GCS
+-UTRITON_ENABLE_AZURE_STORAGE
+-UTRITON_ENABLE_S3)
 
 install(
   TARGETS triton_repo_agent_test
