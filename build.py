@@ -375,9 +375,6 @@ def dali_cmake_args():
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
     df = '''
-#
-# Multistage build.
-#
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
 ARG BASE_IMAGE={}
@@ -385,9 +382,6 @@ ARG BASE_IMAGE={}
            argmap['BASE_IMAGE'])
 
     df += '''
-############################################################################
-## Final stage: Install and arrange all dependencies needed for build
-############################################################################
 FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
@@ -481,13 +475,16 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
         dfile.write(df)
 
 
-def create_dockerfile_build(ddir, dockerfile_name, argmap):
+def create_dockerfile_build(ddir, dockerfile_name, argmap, backends):
     df = '''
 FROM tritonserver_builder_image AS build
 FROM tritonserver_buildbase
 COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
+'''
 
-# Copy ONNX custom op library and model (Needed for testing)
+    if 'onnxruntime' in backends:
+        df += '''
+# Copy ONNX custom op library and model (needed for testing)
 RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
       cp /tmp/tritonbuild/onnxruntime/install/test/libcustom_op_library.so /workspace/qa/L0_custom_ops/.; \
       cp /tmp/tritonbuild/onnxruntime/install/test/custom_op_test.onnx /workspace/qa/L0_custom_ops/.; \
@@ -769,7 +766,7 @@ def container_build(backends, images):
         container.remove(force=True)
 
         create_dockerfile_build(FLAGS.build_dir, 'Dockerfile.build',
-                                dockerfileargmap)
+                                dockerfileargmap, backends)
         p = subprocess.Popen([
             'docker', 'build', '-t', 'tritonserver_build', '-f',
             os.path.join(FLAGS.build_dir, 'Dockerfile.build'), '.'
