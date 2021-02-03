@@ -93,6 +93,7 @@ class PlanBackend : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device, const int max_batch_size,
         const bool enable_pinned_input, const bool enable_pinned_output,
+        const bool separate_output_copy_stream,
         std::unique_ptr<MetricModelReporter>&& metric_reporter);
     ~Context();
 
@@ -292,8 +293,10 @@ class PlanBackend : public InferenceBackend {
     nvinfer1::ICudaEngine* engine_;
     bool is_shared_engine_;
 
-    // Additional CUDA stream to overlap copy and execution.
+    // Additional CUDA streams to overlap copy and execution.
     cudaStream_t input_copy_stream_;
+    cudaStream_t output_copy_stream_;
+    int num_copy_streams_;
 
     // Use two sets of events each for current request and next request.
     CUDAEventSet events_[EVENT_SET_COUNT];
@@ -361,6 +364,9 @@ class PlanBackend : public InferenceBackend {
     // profile.
     int num_expected_bindings_;
 
+    // Whether or not to use a separate stream to copy output
+    bool use_output_copy_stream_;
+
     // The maximum possible size of the TensorRT tensor and the corresponding
     // allocated GPU buffer across all optimization
     // profile.
@@ -391,14 +397,20 @@ class PlanBackend : public InferenceBackend {
       std::pair<std::string, std::vector<int64_t>> io_shape_mapping_;
     };
 
-    // The array sizes are equal to Context::num_expected_bindings_
-    std::vector<IOBindingInfo> io_binding_infos_;
+    // There will be two sets of input/output buffers when
+    // separate_output_stream is selected to overlap copy and execution safely.
+    int next_buffer_binding_set_;
+
+    // The aer Context::num_expected_bindings_ number of IOBindingInfo elements
+    // for copy stream
+    std::vector<std::vector<IOBindingInfo>> io_binding_infos_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
     // engine. This is used to match the TensorRT context execution declaration
     // while minimizing memory allocation.
     // The array size is equal to Context::total_bindings_
-    std::vector<void*> buffer_bindings_;
+    // One of for each copy stream
+    std::vector<std::vector<void*>> buffer_bindings_;
 
     // The request details of the ongoing model execution
     std::unique_ptr<Payload> payload_;
