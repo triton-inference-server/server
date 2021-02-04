@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,11 @@
 CLIENT_LOG="./client.log"
 SHM_TEST=shared_memory_test.py
 
-SERVER=/opt/tritonserver/bin/tritonserver
+# Configure to support test on jetson as well
+OPTDIR=${OPTDIR:="/opt"}
+SERVER=${OPTDIR}/tritonserver/bin/tritonserver
+BACKEND_DIR=${OPTDIR}/tritonserver/backends
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 
 RET=0
@@ -46,7 +50,7 @@ for i in \
         test_mixed_raw_shm \
         test_unregisterall; do
     for client_type in http grpc; do
-        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$client_type.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
