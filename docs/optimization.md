@@ -357,7 +357,7 @@ optimization { execution_accelerators {
 ```
 
 The options are described in detail in the
-[ModelOptimizationPolicy](../src/core/model_configuration.proto)
+[ModelOptimizationPolicy](../src/core/model_config.proto)
 section of the model configuration protobuf.
 
 You can follow the steps described above for TensorRT to see how this
