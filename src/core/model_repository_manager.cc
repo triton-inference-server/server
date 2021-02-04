@@ -702,6 +702,11 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   if (model_config.has_model_repository_agents()) {
     FileSystemType filesystem_type;
     RETURN_IF_ERROR(GetFileSystemType(repository_path, &filesystem_type));
+    TRITONREPOAGENT_ArtifactType artifact_type =
+        TRITONREPOAGENT_ARTIFACT_FILESYSTEM;
+    if (filesystem_type != FileSystemType::LOCAL) {
+      artifact_type = TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM;
+    }
     const char* location = repository_path.c_str();
     agent_model_list.reset(new TritonRepoAgentModelList());
     for (const auto& agent_config :
@@ -716,11 +721,11 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
         }
         std::unique_ptr<TritonRepoAgentModel> agent_model;
         if (agent_model_list->Size() != 0) {
-          agent_model_list->Back()->Location(&filesystem_type, &location);
+          agent_model_list->Back()->Location(&artifact_type, &location);
         }
         RETURN_IF_ERROR(TritonRepoAgentModel::Create(
-            filesystem_type, location, model_config, agent,
-            std::move(agent_params), &agent_model));
+            artifact_type, location, model_config, agent, agent_params,
+            &agent_model));
         RETURN_IF_ERROR(agent_model->InvokeAgent(TRITONREPOAGENT_ACTION_LOAD));
         agent_model_list->AddAgentModel(std::move(agent_model));
       }
@@ -737,9 +742,9 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   std::string current_repository_path = repository_path;
   if (agent_model_list != nullptr) {
     const char* location;
-    FileSystemType filesystem_type;
+    TRITONREPOAGENT_ArtifactType artifact_type;
     RETURN_IF_ERROR(
-        agent_model_list->Back()->Location(&filesystem_type, &location));
+        agent_model_list->Back()->Location(&artifact_type, &location));
     current_repository_path = location;
   }
   std::set<int64_t> versions;

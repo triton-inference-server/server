@@ -27,6 +27,7 @@
 #include "src/core/triton_repo_agent.h"
 
 #include <string>
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/shared_library.h"
 
@@ -44,56 +45,6 @@ namespace {
           status__.Message().c_str());                   \
     }                                                    \
   } while (false)
-
-Status
-FileSystemTypeToTritonArtifactType(
-    const FileSystemType type, TRITONREPOAGENT_ArtifactType* converted_type)
-{
-  switch (type) {
-    case FileSystemType::LOCAL:
-      *converted_type = TRITONREPOAGENT_ARTIFACT_FILESYSTEM;
-      break;
-    case FileSystemType::AS:
-    case FileSystemType::GCS:
-    case FileSystemType::S3:
-      *converted_type = TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM;
-      break;
-    default:
-      return Status(
-          Status::Code::INTERNAL,
-          "Can not convert to matching artifact type for filesystem type " +
-              FileSystemTypeString(type));
-  }
-  return Status::Success;
-}
-
-Status
-TritonArtifactTypeToFileSystemType(
-    const TRITONREPOAGENT_ArtifactType type, const std::string& path,
-    FileSystemType* converted_type)
-{
-  switch (type) {
-    case TRITONREPOAGENT_ARTIFACT_FILESYSTEM:
-      *converted_type = FileSystemType::LOCAL;
-      return Status::Success;
-    case TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM: {
-      RETURN_IF_ERROR(GetFileSystemType(path, converted_type));
-      if (*converted_type == FileSystemType::LOCAL) {
-        return Status(
-            Status::Code::INTERNAL,
-            "Can not convert to matching filesystem type from artifact type "
-            "'TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM' with location " +
-                path);
-      }
-      return Status::Success;
-    }
-    default:
-      return Status(
-          Status::Code::INTERNAL,
-          "Can not convert to matching filesystem type from artifact type " +
-              std::to_string(type));
-  }
-}
 
 }  // namespace
 
@@ -123,6 +74,18 @@ TRITONREPOAGENT_ActionTypeString(const TRITONREPOAGENT_ActionType type)
       return "TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE";
   }
   return "Unknown TRITONREPOAGENT_ActionType";
+}
+
+std::string
+TRITONREPOAGENT_ArtifactTypeString(const TRITONREPOAGENT_ArtifactType type)
+{
+  switch (type) {
+    case TRITONREPOAGENT_ARTIFACT_FILESYSTEM:
+      return "TRITONREPOAGENT_ARTIFACT_FILESYSTEM";
+    case TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM:
+      return "TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM";
+  }
+  return "Unknown TRITONREPOAGENT_ArtifactType";
 }
 
 //
@@ -184,14 +147,14 @@ TritonRepoAgent::~TritonRepoAgent()
 //
 Status
 TritonRepoAgentModel::Create(
-    const FileSystemType type, const std::string& location,
+    const TRITONREPOAGENT_ArtifactType type, const std::string& location,
     const inference::ModelConfig& config,
     const std::shared_ptr<TritonRepoAgent> agent,
-    TritonRepoAgent::Parameters&& agent_parameters,
+    const TritonRepoAgent::Parameters& agent_parameters,
     std::unique_ptr<TritonRepoAgentModel>* agent_model)
 {
   std::unique_ptr<TritonRepoAgentModel> lagent_model(new TritonRepoAgentModel(
-      type, location, config, agent, std::move(agent_parameters)));
+      type, location, config, agent, agent_parameters));
   if (agent->AgentModelInitFn() != nullptr) {
     RETURN_IF_TRITONSERVER_ERROR(agent->AgentModelInitFn()(
         reinterpret_cast<TRITONREPOAGENT_Agent*>(agent.get()),
@@ -312,7 +275,7 @@ TritonRepoAgentModel::InvokeAgent(const TRITONREPOAGENT_ActionType action_type)
 
 Status
 TritonRepoAgentModel::SetLocation(
-    const FileSystemType type, const std::string& location)
+    const TRITONREPOAGENT_ArtifactType type, const std::string& location)
 {
   if (current_action_type_ != TRITONREPOAGENT_ACTION_LOAD) {
     return Status(
@@ -329,7 +292,8 @@ TritonRepoAgentModel::SetLocation(
 }
 
 Status
-TritonRepoAgentModel::Location(FileSystemType* type, const char** location)
+TritonRepoAgentModel::Location(
+    TRITONREPOAGENT_ArtifactType* type, const char** location)
 {
   if (location_.empty()) {
     return Status(
@@ -342,20 +306,20 @@ TritonRepoAgentModel::Location(FileSystemType* type, const char** location)
 
 Status
 TritonRepoAgentModel::AcquireMutableLocation(
-    const FileSystemType type, const char** location)
+    const TRITONREPOAGENT_ArtifactType type, const char** location)
 {
-  if (acquired_location_.empty()) {
-    std::string lacquired_location;
-    RETURN_IF_ERROR(MakeTemporaryDirectory(type, &lacquired_location));
-    acquired_location_.swap(lacquired_location);
-    acquired_type_ = type;
-  }
-
-  if (type != acquired_type_) {
+  if (type != TRITONREPOAGENT_ARTIFACT_FILESYSTEM) {
     return Status(
         Status::Code::INVALID_ARG,
-        "The requested filesystem type is different from existing acquired "
-        "location");
+        "Unexpected artifact type, expects "
+        "'TRITONREPOAGENT_ARTIFACT_FILESYSTEM'");
+  }
+  if (acquired_location_.empty()) {
+    std::string lacquired_location;
+    RETURN_IF_ERROR(
+        MakeTemporaryDirectory(FileSystemType::LOCAL, &lacquired_location));
+    acquired_location_.swap(lacquired_location);
+    acquired_type_ = type;
   }
   *location = acquired_location_.c_str();
   return Status::Success;
@@ -467,10 +431,7 @@ TRITONREPOAGENT_ModelRepositoryLocation(
     TRITONREPOAGENT_ArtifactType* artifact_type, const char** location)
 {
   TritonRepoAgentModel* tam = reinterpret_cast<TritonRepoAgentModel*>(model);
-  FileSystemType type = FileSystemType::LOCAL;
-  RETURN_TRITONSERVER_ERROR_IF_ERROR(tam->Location(&type, location));
-  RETURN_TRITONSERVER_ERROR_IF_ERROR(
-      FileSystemTypeToTritonArtifactType(type, artifact_type));
+  RETURN_TRITONSERVER_ERROR_IF_ERROR(tam->Location(artifact_type, location));
   return nullptr;  // success
 }
 
@@ -479,15 +440,9 @@ TRITONREPOAGENT_ModelRepositoryLocationAcquire(
     TRITONREPOAGENT_Agent* agent, TRITONREPOAGENT_AgentModel* model,
     const TRITONREPOAGENT_ArtifactType artifact_type, const char** location)
 {
-  if (artifact_type != TRITONREPOAGENT_ARTIFACT_FILESYSTEM) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        "Unexpected artifact type, expects "
-        "'TRITONREPOAGENT_ARTIFACT_FILESYSTEM'");
-  }
   TritonRepoAgentModel* tam = reinterpret_cast<TritonRepoAgentModel*>(model);
   RETURN_TRITONSERVER_ERROR_IF_ERROR(
-      tam->AcquireMutableLocation(FileSystemType::LOCAL, location));
+      tam->AcquireMutableLocation(artifact_type, location));
   return nullptr;  // success
 }
 
@@ -507,10 +462,7 @@ TRITONREPOAGENT_ModelRepositoryUpdate(
     const TRITONREPOAGENT_ArtifactType artifact_type, const char* location)
 {
   TritonRepoAgentModel* tam = reinterpret_cast<TritonRepoAgentModel*>(model);
-  FileSystemType type;
-  RETURN_TRITONSERVER_ERROR_IF_ERROR(
-      TritonArtifactTypeToFileSystemType(artifact_type, location, &type));
-  RETURN_TRITONSERVER_ERROR_IF_ERROR(tam->SetLocation(type, location));
+  RETURN_TRITONSERVER_ERROR_IF_ERROR(tam->SetLocation(artifact_type, location));
   return nullptr;  // success
 }
 
