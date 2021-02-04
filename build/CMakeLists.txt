@@ -144,13 +144,30 @@ if (OPENSSL_ROOT_DIR)
 endif()
 
 #
-# Get the protobuf and grpc source
+# Get the protobuf and grpc source used for the GRPC endpoint. We must
+# use v1.25.0 because later GRPC has significant performance
+# regressions (e.g. resnet50 bs128).
 #
 ExternalProject_Add(grpc-repo
   PREFIX grpc-repo
   GIT_REPOSITORY "https://github.com/grpc/grpc.git"
-  GIT_TAG "v1.29.1"
+  GIT_TAG "v1.25.0"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc"
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+  TEST_COMMAND ""
+)
+
+#
+# The GCS build requires a abseil newer than the one found in grpc
+# v1.25.0 so grab a newer grpc just for abseil.
+#
+ExternalProject_Add(grpc-repo-new
+  PREFIX grpc-repo-new
+  GIT_REPOSITORY "https://github.com/grpc/grpc.git"
+  GIT_TAG "v1.29.1"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo-new/src/grpc"
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ""
   INSTALL_COMMAND ""
@@ -197,18 +214,18 @@ ExternalProject_Add(protobuf
 )
 
 #
-# Build absl (abseil) project from grpc-repo
+# Build absl (abseil) project from grpc-repo-new (see comment above).
 #
 ExternalProject_Add(absl
   PREFIX absl
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/abseil-cpp"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo-new/src/grpc/third_party/abseil-cpp"
   DOWNLOAD_COMMAND ""
   CMAKE_CACHE_ARGS
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=TRUE
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DBUILD_TESTING:BOOL=OFF
-  DEPENDS grpc-repo
+  DEPENDS grpc-repo-new
 )
 
 #
@@ -262,21 +279,19 @@ ExternalProject_Add(grpc
   CMAKE_CACHE_ARGS
     -DgRPC_INSTALL:BOOL=ON
     -DgRPC_BUILD_TESTS:BOOL=OFF
-    -DgRPC_ABSL_PROVIDER:STRING=package
     -DgRPC_PROTOBUF_PROVIDER:STRING=package
     -DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG
     -DgRPC_ZLIB_PROVIDER:STRING=package
     -DgRPC_CARES_PROVIDER:STRING=package
     -DgRPC_SSL_PROVIDER:STRING=package
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
-    -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
-  DEPENDS grpc-repo c-ares absl protobuf
+  DEPENDS grpc-repo c-ares protobuf
 )
 
 #
@@ -414,12 +429,15 @@ ExternalProject_Add(crc32c
 
 # This is necessary because google-cloud-cpp
 # does not pass protobuf_DIR and gRPC_DIR etc to its
-# external projects but expects them in CMAKE_PREFIX_PATH
+# external projects but expects them in CMAKE_PREFIX_PATH.
+#
+# absl must preceed grpc to ensure that the absl from the newer grpc
+# repo is used and not the absl from the older grpc.
 set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
    ${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
-   ${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
-   ${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
    ${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
+   ${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
+   ${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
    ${CMAKE_CURRENT_BINARY_DIR}/nlohmann_json/lib/cmake/nlohmann_json
    ${_FINDPACKAGE_PROTOBUF_CONFIG_DIR})
 
@@ -558,7 +576,6 @@ ExternalProject_Add(client
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
-    -Dabsl_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/absl/lib/cmake/absl
     ${_CMAKE_TRITON_DIR}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
