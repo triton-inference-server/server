@@ -37,6 +37,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+std::string TritonRepoAgentLibraryName(const std::string& agent_name);
+
 std::string TRITONREPOAGENT_ActionTypeString(
     const TRITONREPOAGENT_ActionType type);
 
@@ -155,6 +157,7 @@ class TritonRepoAgentModel {
 
 class TritonRepoAgentManager {
  public:
+  static Status SetGlobalSearchPath(const std::string& path);
   static Status CreateAgent(
       const std::string& model_dir, const std::string& agent_name,
       std::shared_ptr<TritonRepoAgent>* agent);
@@ -162,9 +165,10 @@ class TritonRepoAgentManager {
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonRepoAgentManager);
 
-  TritonRepoAgentManager() = default;
+  TritonRepoAgentManager() : global_search_path_("/opt/tritonserver/agents"){};
   static TritonRepoAgentManager& Singleton();
   std::mutex mu_;
+  std::string global_search_path_;
   std::unordered_map<std::string, std::weak_ptr<TritonRepoAgent>> agent_map_;
 };
 

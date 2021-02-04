@@ -45,17 +45,6 @@ namespace {
     }                                                    \
   } while (false)
 
-
-std::string
-TritonRepoAgentLibraryName(const std::string& agent_name)
-{
-#ifdef _WIN32
-  return std::string("tritonrepoagent_") + agent_name + ".dll";
-#else
-  return std::string("libtritonrepoagent_") + agent_name + ".so";
-#endif
-}
-
 Status
 FileSystemTypeToTritonArtifactType(
     const FileSystemType type, TRITONREPOAGENT_ArtifactType* converted_type)
@@ -107,6 +96,16 @@ TritonArtifactTypeToFileSystemType(
 }
 
 }  // namespace
+
+std::string
+TritonRepoAgentLibraryName(const std::string& agent_name)
+{
+#ifdef _WIN32
+  return std::string("tritonrepoagent_") + agent_name + ".dll";
+#else
+  return std::string("libtritonrepoagent_") + agent_name + ".so";
+#endif
+}
 
 std::string
 TRITONREPOAGENT_ActionTypeString(const TRITONREPOAGENT_ActionType type)
@@ -222,7 +221,14 @@ TritonRepoAgentModel::~TritonRepoAgentModel()
                 reinterpret_cast<TRITONREPOAGENT_AgentModel*>(this),
                 TRITONREPOAGENT_ACTION_UNLOAD),
             "Inform TRITONREPOAGENT_ACTION_UNLOAD");
-        __attribute__((fallthrough));
+        // Fallthough is not yet an language feature until C++17
+        LOG_TRITONSERVER_ERROR(
+            agent_->AgentModelActionFn()(
+                reinterpret_cast<TRITONREPOAGENT_Agent*>(agent_.get()),
+                reinterpret_cast<TRITONREPOAGENT_AgentModel*>(this),
+                TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE),
+            "Inform TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE");
+        break;
       case TRITONREPOAGENT_ACTION_UNLOAD:
         LOG_TRITONSERVER_ERROR(
             agent_->AgentModelActionFn()(
@@ -383,6 +389,15 @@ TritonRepoAgentManager::Singleton()
 }
 
 Status
+TritonRepoAgentManager::SetGlobalSearchPath(const std::string& path)
+{
+  auto& singleton_manager = Singleton();
+  std::lock_guard<std::mutex> lock(singleton_manager.mu_);
+  singleton_manager.global_search_path_ = path;
+  return Status::Success;
+}
+
+Status
 TritonRepoAgentManager::CreateAgent(
     const std::string& model_dir, const std::string& agent_name,
     std::shared_ptr<TritonRepoAgent>* agent)
@@ -393,8 +408,8 @@ TritonRepoAgentManager::CreateAgent(
   // Get the path to the backend shared library. Search path is
   // model directory, global agent directory.
   // FIXME expose global path as Triton option
-  static const std::string global_path = "/opt/tritonserver/agents";
-  const std::vector<std::string> search_paths = {model_dir, global_path};
+  const std::vector<std::string> search_paths = {
+      model_dir, singleton_manager.global_search_path_};
 
   std::string agent_libname = TritonRepoAgentLibraryName(agent_name);
   std::string libpath;
@@ -410,9 +425,10 @@ TritonRepoAgentManager::CreateAgent(
 
   if (libpath.empty()) {
     return Status(
-        Status::Code::INVALID_ARG,
-        "unable to find '" + agent_libname + "' for repo agent '" + agent_name +
-            "', searched: " + model_dir + ", " + global_path);
+        Status::Code::INVALID_ARG, "unable to find '" + agent_libname +
+                                       "' for repo agent '" + agent_name +
+                                       "', searched: " + model_dir + ", " +
+                                       singleton_manager.global_search_path_);
   }
 
   const auto& itr = singleton_manager.agent_map_.find(libpath);
@@ -428,10 +444,9 @@ TritonRepoAgentManager::CreateAgent(
     }
 
     singleton_manager.agent_map_.erase(itr);
-  } else {
-    RETURN_IF_ERROR(TritonRepoAgent::Create(agent_name, libpath, agent));
-    singleton_manager.agent_map_.insert({libpath, *agent});
   }
+  RETURN_IF_ERROR(TritonRepoAgent::Create(agent_name, libpath, agent));
+  singleton_manager.agent_map_.insert({libpath, *agent});
 
   return Status::Success;
 }

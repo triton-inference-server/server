@@ -25,6 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gtest/gtest.h"
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fstream>
 #include <future>
 #include <map>
 #include <memory>
@@ -252,6 +255,20 @@ TEST_F(TritonRepoAgentTest, Create)
   EXPECT_TRUE(err == nullptr) << "Expect successful action function invocation";
 }
 
+TEST_F(TritonRepoAgentTest, CreateFailInvalidSharedLibrary)
+{
+  // Passing a agent path that is not in global_mock_agents to
+  // simulate failure on opening shared library handle
+  std::shared_ptr<ni::TritonRepoAgent> invalid_agent;
+  auto status = ni::TritonRepoAgent::Create(
+      "invalid_agent", "invalid_agent_path", &invalid_agent);
+  ASSERT_FALSE(status.IsOk()) << "Unexpect successful agent creation";
+  EXPECT_NE(
+      status.Message().find("unable to load shared library"), std::string::npos)
+      << "Unexpect error message: '" << status.Message()
+      << "', expect 'unable to load shared library...'";
+}
+
 TEST_F(TritonRepoAgentTest, CreateFailMissingEndpoint)
 {
   // Set up agent with nothing defined
@@ -400,6 +417,233 @@ TEST_F(TritonRepoAgentTest, ModelLifecycle)
   EXPECT_TRUE(err == nullptr)
       << "Expect successful model fini function invocation";
   EXPECT_FALSE(f.valid()) << "Expect future value is retrieved";
+}
+
+class TritonRepoAgentManagerTest : public ::testing::Test {
+ public:
+  static size_t agent_init_counter_;
+  static size_t agent_fini_counter_;
+
+ protected:
+  void SetUp() override
+  {
+    // Set up agent with init / fini function defined
+    ni::TritonRepoAgent::TritonRepoAgentInitFn_t InitFn =
+        [](TRITONREPOAGENT_Agent* agent) -> TRITONSERVER_Error* {
+      agent_init_counter_++;
+      return nullptr;
+    };
+    ni::TritonRepoAgent::TritonRepoAgentFiniFn_t FiniFn =
+        [](TRITONREPOAGENT_Agent* agent) -> TRITONSERVER_Error* {
+      agent_fini_counter_++;
+      return nullptr;
+    };
+    ni::TritonRepoAgent::TritonRepoAgentModelActionFn_t ActionFn =
+        [](TRITONREPOAGENT_Agent* agent, TRITONREPOAGENT_AgentModel* model,
+           const TRITONREPOAGENT_ActionType action_type)
+        -> TRITONSERVER_Error* { return nullptr; };
+    auto agent_handle = MockSharedLibraryHandle();
+    agent_handle.AddEntryPoint(
+        "TRITONREPOAGENT_Initialize", reinterpret_cast<void*>(InitFn));
+    agent_handle.AddEntryPoint(
+        "TRITONREPOAGENT_Finalize", reinterpret_cast<void*>(FiniFn));
+    agent_handle.AddEntryPoint(
+        "TRITONREPOAGENT_ModelAction", reinterpret_cast<void*>(ActionFn));
+
+    // Reserve valid shared library paths because manager searches the libraries
+    // via the FileSystem API
+    const ni::FileSystemType type = ni::FileSystemType::LOCAL;
+    auto status = ni::MakeTemporaryDirectory(type, &root_agent_path_);
+    ASSERT_TRUE(status.IsOk()) << "TritonRepoAgentManagerTest set up failed: "
+                                  "create temporary directory: "
+                               << status.AsString();
+    // FIXME make the following platform independent
+    global_agent_path_ = ni::JoinPath({root_agent_path_, "global"});
+    local_agent_path_ = ni::JoinPath({root_agent_path_, "local"});
+    int err = mkdir(
+        global_agent_path_.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    ASSERT_EQ(err, 0) << "TritonRepoAgentManagerTest set up failed: create "
+                         "global agent directory: "
+                      << err;
+    err =
+        mkdir(local_agent_path_.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    ASSERT_EQ(err, 0) << "TritonRepoAgentManagerTest set up failed: create "
+                         "local agent directory: "
+                      << err;
+    auto local_agent = ni::JoinPath(
+        {local_agent_path_, ni::TritonRepoAgentLibraryName("local_agent")});
+    auto global_agent = ni::JoinPath(
+        {global_agent_path_, ni::TritonRepoAgentLibraryName("global_agent")});
+    {
+      std::ofstream local_agent_file(local_agent);
+      std::ofstream global_agent_file(global_agent);
+    }
+    status =
+        ni::TritonRepoAgentManager::SetGlobalSearchPath(global_agent_path_);
+    ASSERT_TRUE(status.IsOk()) << "TritonRepoAgentManagerTest set up failed: "
+                                  "create temporary directory: "
+                               << status.AsString();
+
+    global_mock_agents.emplace(global_agent, agent_handle);
+    global_mock_agents.emplace(local_agent, agent_handle);
+  }
+  void TearDown() override
+  {
+    agent_init_counter_ = 0;
+    agent_fini_counter_ = 0;
+    if (!root_agent_path_.empty()) {
+      ni::DeleteDirectory(root_agent_path_);
+    }
+    global_mock_agents.clear();
+  }
+
+  std::string root_agent_path_;
+  std::string global_agent_path_;
+  std::string local_agent_path_;
+};
+size_t TritonRepoAgentManagerTest::agent_init_counter_ = 0;
+size_t TritonRepoAgentManagerTest::agent_fini_counter_ = 0;
+
+TEST_F(TritonRepoAgentManagerTest, CreateFailureFileNotExist)
+{
+  // Passing a agent path that is not in global_mock_agents to
+  // simulate failure on opening shared library handle
+  std::shared_ptr<ni::TritonRepoAgent> invalid_agent;
+  auto status = ni::TritonRepoAgentManager::CreateAgent(
+      local_agent_path_, "invalid_agent_name", &invalid_agent);
+  ASSERT_FALSE(status.IsOk()) << "Unexpect successful agent creation";
+  EXPECT_NE(status.Message().find("unable to find"), std::string::npos)
+      << "Unexpect error message: '" << status.Message()
+      << "', expect 'unable to find...'";
+}
+
+TEST_F(TritonRepoAgentManagerTest, CreateFailureFileNotExist2)
+{
+  // Passing a agent path that is not in global_mock_agents to
+  // simulate failure on opening shared library handle
+  std::shared_ptr<ni::TritonRepoAgent> invalid_agent;
+  auto status = ni::TritonRepoAgentManager::CreateAgent(
+      "invalid_path", "local_agent", &invalid_agent);
+  ASSERT_FALSE(status.IsOk()) << "Unexpect successful agent creation";
+  EXPECT_NE(status.Message().find("unable to find"), std::string::npos)
+      << "Unexpect error message: '" << status.Message()
+      << "', expect 'unable to find...'";
+}
+
+TEST_F(TritonRepoAgentManagerTest, CreateLocalAgent)
+{
+  std::shared_ptr<ni::TritonRepoAgent> agent;
+  auto status = ni::TritonRepoAgentManager::CreateAgent(
+      local_agent_path_, "local_agent", &agent);
+  ASSERT_TRUE(status.IsOk())
+      << "Expect successful agent creation" << status.AsString();
+  agent.reset();
+  EXPECT_EQ(agent_init_counter_, (size_t)1) << "Expect 1 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)1) << "Expect 1 agent finalization";
+}
+
+TEST_F(TritonRepoAgentManagerTest, CreateGlobalAgent)
+{
+  std::shared_ptr<ni::TritonRepoAgent> agent;
+  auto status = ni::TritonRepoAgentManager::CreateAgent(
+      local_agent_path_, "global_agent", &agent);
+  ASSERT_TRUE(status.IsOk())
+      << "Expect successful agent creation" << status.AsString();
+  agent.reset();
+  EXPECT_EQ(agent_init_counter_, (size_t)1) << "Expect 1 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)1) << "Expect 1 agent finalization";
+}
+
+TEST_F(TritonRepoAgentManagerTest, SearchOrder)
+{
+  // Set up same name agent ("local_agent") with different init / fini function
+  // defined
+  ni::TritonRepoAgent::TritonRepoAgentInitFn_t InitFn =
+      [](TRITONREPOAGENT_Agent* agent) -> TRITONSERVER_Error* {
+    agent_init_counter_ += 2;
+    return nullptr;
+  };
+  ni::TritonRepoAgent::TritonRepoAgentFiniFn_t FiniFn =
+      [](TRITONREPOAGENT_Agent* agent) -> TRITONSERVER_Error* {
+    agent_fini_counter_ += 2;
+    return nullptr;
+  };
+  ni::TritonRepoAgent::TritonRepoAgentModelActionFn_t ActionFn =
+      [](TRITONREPOAGENT_Agent* agent, TRITONREPOAGENT_AgentModel* model,
+         const TRITONREPOAGENT_ActionType action_type) -> TRITONSERVER_Error* {
+    return nullptr;
+  };
+  auto agent_handle = MockSharedLibraryHandle();
+  agent_handle.AddEntryPoint(
+      "TRITONREPOAGENT_Initialize", reinterpret_cast<void*>(InitFn));
+  agent_handle.AddEntryPoint(
+      "TRITONREPOAGENT_Finalize", reinterpret_cast<void*>(FiniFn));
+  agent_handle.AddEntryPoint(
+      "TRITONREPOAGENT_ModelAction", reinterpret_cast<void*>(ActionFn));
+
+  auto global_agent = ni::JoinPath(
+      {global_agent_path_, ni::TritonRepoAgentLibraryName("local_agent")});
+  {
+    std::ofstream global_agent_file(global_agent);
+  }
+  global_mock_agents.emplace(global_agent, agent_handle);
+
+  // Expecting the local one will be called with proper local agent path
+  // provided
+  std::shared_ptr<ni::TritonRepoAgent> agent;
+  auto status = ni::TritonRepoAgentManager::CreateAgent(
+      local_agent_path_, "local_agent", &agent);
+  ASSERT_TRUE(status.IsOk())
+      << "Expect successful agent creation" << status.AsString();
+  agent.reset();
+  EXPECT_EQ(agent_init_counter_, (size_t)1) << "Expect 1 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)1) << "Expect 1 agent finalization";
+
+  // The global one is created
+  status = ni::TritonRepoAgentManager::CreateAgent(
+      "invalid_path", "local_agent", &agent);
+  ASSERT_TRUE(status.IsOk())
+      << "Expect successful agent creation" << status.AsString();
+  agent.reset();
+  EXPECT_EQ(agent_init_counter_, (size_t)3) << "Expect 1 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)3) << "Expect 1 agent finalization";
+}
+
+TEST_F(TritonRepoAgentManagerTest, AgentPersistence)
+{
+  std::shared_ptr<ni::TritonRepoAgent> agent1;
+  std::shared_ptr<ni::TritonRepoAgent> agent2;
+  auto status = ni::TritonRepoAgentManager::CreateAgent(
+      local_agent_path_, "local_agent", &agent1);
+  ASSERT_TRUE(status.IsOk())
+      << "Expect successful agent creation" << status.AsString();
+  EXPECT_EQ(agent_init_counter_, (size_t)1) << "Expect 1 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)0) << "Expect 0 agent finalization";
+
+  status = ni::TritonRepoAgentManager::CreateAgent(
+      local_agent_path_, "local_agent", &agent2);
+  ASSERT_TRUE(status.IsOk())
+      << "Expect successful agent creation" << status.AsString();
+  EXPECT_EQ(agent_init_counter_, (size_t)1) << "Expect 1 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)0) << "Expect 0 agent finalization";
+
+  agent1.reset();
+  EXPECT_EQ(agent_init_counter_, (size_t)1) << "Expect 1 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)0) << "Expect 0 agent finalization";
+  agent2.reset();
+  EXPECT_EQ(agent_init_counter_, (size_t)1) << "Expect 1 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)1) << "Expect 1 agent finalization";
+
+  // Create again after all previous agents are reset
+  status = ni::TritonRepoAgentManager::CreateAgent(
+      local_agent_path_, "local_agent", &agent1);
+  ASSERT_TRUE(status.IsOk())
+      << "Expect successful agent creation" << status.AsString();
+  EXPECT_EQ(agent_init_counter_, (size_t)2) << "Expect 2 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)1) << "Expect 1 agent finalization";
+  agent1.reset();
+  EXPECT_EQ(agent_init_counter_, (size_t)2) << "Expect 2 agent initialization";
+  EXPECT_EQ(agent_fini_counter_, (size_t)2) << "Expect 2 agent finalization";
 }
 
 class TritonRepoAgentModelTest : public ::testing::Test {
