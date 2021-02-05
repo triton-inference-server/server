@@ -64,6 +64,7 @@ CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch'
 ]
+EXAMPLE_REPOAGENTS = ['checksum',]
 FLAGS = None
 
 
@@ -298,6 +299,36 @@ def backend_cmake_args(images, components, be, install_dir):
         '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
         '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core']),
         '-DTRITON_BACKEND_REPO_TAG:STRING={}'.format(components['backend'])
+    ]
+
+    cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
+        cmake_enable(FLAGS.enable_gpu)))
+
+    # If TRITONBUILD_* is defined in the env then we use it to set
+    # corresponding cmake value.
+    for evar, eval in os.environ.items():
+        if evar.startswith('TRITONBUILD_'):
+            cargs.append('-D{}={}'.format(evar[len('TRITONBUILD_'):], eval))
+
+    cargs.append('..')
+    return cargs
+
+
+def repoagent_repo(ra):
+    return '{}_repository_agent'.format(ra)
+
+
+def repoagent_cmake_args(images, components, ra, install_dir):
+    if ra in EXAMPLE_REPOAGENTS:
+        args = []
+    else:
+        fail('unknown agent {}'.format(ra))
+
+    cargs = args + [
+        '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
+        '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
+        '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
+        '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core'])
     ]
 
     cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
@@ -960,6 +991,13 @@ if __name__ == '__main__':
         help=
         'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", or "backend". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. Default is "main".'
     )
+    parser.add_argument(
+        '--repoagent',
+        action='append',
+        required=False,
+        help=
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build, default is "main".'
+    )
 
     FLAGS = parser.parse_args()
 
@@ -973,6 +1011,8 @@ if __name__ == '__main__':
         FLAGS.endpoint = []
     if FLAGS.filesystem is None:
         FLAGS.filesystem = []
+    if FLAGS.repoagent is None:
+        FLAGS.repoagent = []
 
     # Determine the versions. Start with Triton version, if --version
     # is not explicitly specified read from TRITON_VERSION file.
@@ -999,6 +1039,15 @@ if __name__ == '__main__':
             parts.append('main')
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
+
+    # Initialize map of repo agents to build and repo-tag for each.
+    repoagents = {}
+    for be in FLAGS.repoagent:
+        parts = be.split(':')
+        if len(parts) == 1:
+            parts.append('main')
+        log('repoagent "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
+        repoagents[parts[0]] = parts[1]
 
     # Initialize map of docker images.
     images = {}
@@ -1090,3 +1139,21 @@ if __name__ == '__main__':
         mkdir(backend_install_dir)
         cpdir(os.path.join(repo_install_dir, 'backends', be),
               backend_install_dir)
+
+    # Build each repo agent...
+    for ra in repoagents:
+        repo_build_dir = os.path.join(FLAGS.build_dir, ra, 'build')
+        repo_install_dir = os.path.join(FLAGS.build_dir, ra, 'install')
+
+        mkdir(FLAGS.build_dir)
+        gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra)
+        mkdir(repo_build_dir)
+        cmake(repo_build_dir,
+              repoagent_cmake_args(images, components, ra, repo_install_dir))
+        makeinstall(repo_build_dir)
+
+        repoagent_install_dir = os.path.join(FLAGS.install_dir, 'repoagents', ra)
+        rmdir(repoagent_install_dir)
+        mkdir(repoagent_install_dir)
+        cpdir(os.path.join(repo_install_dir, 'repoagents', ra),
+              repoagent_install_dir)
