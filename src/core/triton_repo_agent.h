@@ -168,7 +168,7 @@ class TritonRepoAgentManager {
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonRepoAgentManager);
 
-  TritonRepoAgentManager() : global_search_path_("/opt/tritonserver/agents"){};
+  TritonRepoAgentManager() : global_search_path_("/opt/tritonserver/repoagents"){};
   static TritonRepoAgentManager& Singleton();
   std::mutex mu_;
   std::string global_search_path_;

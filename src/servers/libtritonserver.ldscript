@@ -27,5 +27,6 @@
   global:
     TRITONSERVER_*;
     TRITONBACKEND_*;
+    TRITONREPOAGENT_*;
   local: *;
 };

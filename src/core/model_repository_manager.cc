@@ -700,21 +700,21 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   // Create the associated repo agent models when a model is to be loaded
   std::shared_ptr<TritonRepoAgentModelList> agent_model_list;
   if (model_config.has_model_repository_agents()) {
+    std::string model_path = JoinPath({repository_path, model_name});
     FileSystemType filesystem_type;
-    RETURN_IF_ERROR(GetFileSystemType(repository_path, &filesystem_type));
+    RETURN_IF_ERROR(GetFileSystemType(model_path, &filesystem_type));
     TRITONREPOAGENT_ArtifactType artifact_type =
         TRITONREPOAGENT_ARTIFACT_FILESYSTEM;
     if (filesystem_type != FileSystemType::LOCAL) {
       artifact_type = TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM;
     }
-    const char* location = repository_path.c_str();
+    const char* location = model_path.c_str();
     agent_model_list.reset(new TritonRepoAgentModelList());
     for (const auto& agent_config :
          model_config.model_repository_agents().agents()) {
       std::shared_ptr<TritonRepoAgent> agent;
-      Status status = TritonRepoAgentManager::CreateAgent(
-          repository_path, agent_config.name(), &agent);
-      if (status.IsOk()) {
+      RETURN_IF_ERROR(TritonRepoAgentManager::CreateAgent(
+          model_path, agent_config.name(), &agent));
         TritonRepoAgent::Parameters agent_params;
         for (const auto& parameter : agent_config.parameters()) {
           agent_params.emplace_back(parameter.first, parameter.second);
@@ -728,7 +728,6 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
             &agent_model));
         RETURN_IF_ERROR(agent_model->InvokeAgent(TRITONREPOAGENT_ACTION_LOAD));
         agent_model_list->AddAgentModel(std::move(agent_model));
-      }
     }
   }
 
@@ -745,7 +744,17 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     TRITONREPOAGENT_ArtifactType artifact_type;
     RETURN_IF_ERROR(
         agent_model_list->Back()->Location(&artifact_type, &location));
-    current_repository_path = location;
+    // RepoAgentModel uses model path while backend creation needs
+    // repository path, so need to go up one level.
+    // FIXME backend create should take model path directly
+    auto location_string = std::string(location);
+    size_t pos = location_string.length() - 1;
+    for (; (int64_t)pos >= 0; pos--) {
+      if (location_string[pos] != '/') {
+        break;
+      }
+    }
+    current_repository_path = location_string.substr(0, location_string.rfind('/', pos));
   }
   std::set<int64_t> versions;
   RETURN_IF_ERROR(VersionsToLoad(
