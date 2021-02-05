@@ -31,10 +31,10 @@ import numpy as np
 import unittest
 import os
 import test_util as tu
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-import tritonshmutils.shared_memory as shm
-from tritonclientutils import *
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+import tritonclient.utils.shared_memory as shm
+from tritonclient import utils
 
 
 class SharedMemoryTest(tu.TestResultCollector):
@@ -207,11 +207,12 @@ class SharedMemoryTest(tu.TestResultCollector):
             else:
                 output_datatype = output.datatype
                 output_shape = output.shape
-            output_dtype = triton_to_np_dtype(output_datatype)
+            output_dtype = utils.triton_to_np_dtype(output_datatype)
             output_data = shm.get_contents_as_numpy(shm_op0_handle,
                                                     output_dtype, output_shape)
             self.assertTrue(
-                (output_data[0] == (input0_data + input1_data)).all())
+                (output_data[0] == (input0_data + input1_data)).all(),
+                "Model output does not match expected output")
         except Exception as ex:
             error_msg.append(str(ex))
 
