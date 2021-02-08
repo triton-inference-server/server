@@ -1440,7 +1440,7 @@ message ModelWarmup
 //@@
 message ModelOperations
 {
-  //@@  .. cpp:var:: string op_library_filename
+  //@@  .. cpp:var:: string op_library_filename (repeated)
   //@@
   //@@     Optional paths of the libraries providing custom operations for
   //@@     this model. Valid only for ONNX models.
@@ -1466,6 +1466,44 @@ message ModelTransactionPolicy
   //@@     exactly one response for each request.
   //@@
   bool decoupled = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ModelRepositoryAgents
+//@@
+//@@   The repository agents for the model.
+//@@
+message ModelRepositoryAgents
+{
+  //@@
+  //@@  .. cpp:var:: message Agent
+  //@@
+  //@@     A repository agent that should be invoked for the specified
+  //@@     repository actions for this model.
+  //@@
+  message Agent
+  {
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name of the agent.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: map<string, string> parameters
+    //@@
+    //@@       The parameters for the agent.
+    //@@
+    map<string, string> parameters = 2;
+  }
+
+  //@@
+  //@@  .. cpp:var:: Agent agents (repeated)
+  //@@
+  //@@     The ordered list of agents for the model. These agents will be
+  //@@     invoked in order to respond to repository actions occuring for the
+  //@@     model.
+  //@@
+  repeated Agent agents = 1;
 }
 
 //@@
@@ -1657,4 +1695,11 @@ message ModelConfig
   //@@     to be expected from the model.
   //@@
   ModelTransactionPolicy model_transaction_policy = 19;
+
+  //@@  .. cpp:var:: ModelRepositoryAgents model_repository_agents
+  //@@
+  //@@     Optional specification of the agent(s) that should be invoked
+  //@@     with repository actions are performed for this model.
+  //@@
+  ModelRepositoryAgents model_repository_agents = 23;
 }

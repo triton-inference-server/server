@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,10 +24,30 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-{
-  global:
-    TRITONSERVER_*;
-    TRITONBACKEND_*;
-    TRITONREPOAGENT_*;
-  local: *;
-};
+
+TEST_LOG="./triton_repo_agent_test.log"
+TRITON_REPO_AGENT_TEST=./triton_repo_agent_test
+
+
+RET=0
+
+export CUDA_VISIBLE_DEVICES=0
+
+rm -f TEST_LOG
+
+set +e
+$TRITON_REPO_AGENT_TEST >>$TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Memory Test Failed\n***"
+    RET=1
+fi
+set -e
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    cat $TEST_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET

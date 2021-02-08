@@ -26,116 +26,10 @@
 
 #include "src/backends/custom/loader.h"
 
-#ifdef _WIN32
-// suppress the min and max definitions in Windef.h.
-#define NOMINMAX
-#include <Windows.h>
-#else
-#include <dlfcn.h>
-#endif
 #include "src/core/logging.h"
+#include "src/core/shared_library.h"
 
 namespace nvidia { namespace inferenceserver {
-
-namespace {
-
-Status
-OpenLibraryHandle(const std::string& path, void** handle)
-{
-#ifdef _WIN32
-  // HMODULE is typedef of void*
-  // https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types
-  *handle = LoadLibrary(path.c_str());
-  if (*handle == nullptr) {
-    LPSTR err_buffer = nullptr;
-    size_t size = FormatMessageA(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPSTR)&err_buffer, 0, NULL);
-    std::string errstr(err_buffer, size);
-    LocalFree(err_buffer);
-
-    return Status(
-        Status::Code::NOT_FOUND, "unable to load custom library: " + errstr);
-  }
-#else
-  *handle = dlopen(path.c_str(), RTLD_LAZY);
-  if (*handle == nullptr) {
-    return Status(
-        Status::Code::NOT_FOUND,
-        "unable to load custom library: " + std::string(dlerror()));
-  }
-#endif
-  return Status::Success;
-}
-
-void
-CloseLibraryHandle(void* handle)
-{
-  if (handle != nullptr) {
-#ifdef _WIN32
-    if (FreeLibrary((HMODULE)handle) == 0) {
-      LPSTR err_buffer = nullptr;
-      size_t size = FormatMessageA(
-          FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-              FORMAT_MESSAGE_IGNORE_INSERTS,
-          NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-          (LPSTR)&err_buffer, 0, NULL);
-      std::string errstr(err_buffer, size);
-      LocalFree(err_buffer);
-      LOG_ERROR << "unable to unload custom library: " << errstr;
-    }
-#else
-    if (dlclose(handle) != 0) {
-      LOG_ERROR << "unable to unload custom library: " << dlerror();
-    }
-#endif
-  }
-}
-
-Status
-GetEntrypoint(void* handle, const std::string& name, void** fn)
-{
-#ifdef _WIN32
-  *fn = GetProcAddress((HMODULE)handle, name.c_str());
-  if (*fn == nullptr) {
-    LPSTR err_buffer = nullptr;
-    size_t size = FormatMessageA(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPSTR)&err_buffer, 0, NULL);
-    std::string errstr(err_buffer, size);
-    LocalFree(err_buffer);
-    return Status(
-        Status::Code::NOT_FOUND,
-        "unable to find '" + name +
-            "' entrypoint in custom library: " + errstr);
-  }
-#else
-  dlerror();
-  *fn = dlsym(handle, name.c_str());
-  const char* dlsym_error = dlerror();
-  if (dlsym_error != nullptr) {
-    std::string errstr(dlsym_error);  // need copy as dlclose overwrites
-    return Status(
-        Status::Code::NOT_FOUND,
-        "unable to find '" + name +
-            "' entrypoint in custom library: " + errstr);
-  }
-
-  if (*fn == nullptr) {
-    return Status(
-        Status::Code::NOT_FOUND,
-        "unable to find '" + name + "' entrypoint in custom library");
-  }
-#endif
-
-  return Status::Success;
-}
-
-}  // namespace
 
 Status
 LoadCustom(
@@ -160,28 +54,32 @@ LoadCustom(
 
   // Get shared library entrypoints.
   void* init_fn;
-  status = GetEntrypoint(handle, "CustomInitialize", &init_fn);
+  status =
+      GetEntrypoint(handle, "CustomInitialize", false /* optional */, &init_fn);
   if (!status.IsOk()) {
     CloseLibraryHandle(handle);
     return status;
   }
 
   void* fini_fn;
-  status = GetEntrypoint(handle, "CustomFinalize", &fini_fn);
+  status =
+      GetEntrypoint(handle, "CustomFinalize", false /* optional */, &fini_fn);
   if (!status.IsOk()) {
     CloseLibraryHandle(handle);
     return status;
   }
 
   void* errstr_fn;
-  status = GetEntrypoint(handle, "CustomErrorString", &errstr_fn);
+  status = GetEntrypoint(
+      handle, "CustomErrorString", false /* optional */, &errstr_fn);
   if (!status.IsOk()) {
     CloseLibraryHandle(handle);
     return status;
   }
 
   void* ver_fn;
-  status = GetEntrypoint(handle, "CustomVersion", &ver_fn);
+  status =
+      GetEntrypoint(handle, "CustomVersion", false /* optional */, &ver_fn);
   if (!status.IsOk()) {
     *custom_version = 1;
   } else {
@@ -192,10 +90,12 @@ LoadCustom(
   void* exec_fn;
   switch (*custom_version) {
     case 1:
-      status = GetEntrypoint(handle, "CustomExecute", &exec_fn);
+      status = GetEntrypoint(
+          handle, "CustomExecute", false /* optional */, &exec_fn);
       break;
     case 2:
-      status = GetEntrypoint(handle, "CustomExecuteV2", &exec_fn);
+      status = GetEntrypoint(
+          handle, "CustomExecuteV2", false /* optional */, &exec_fn);
       break;
     default:
       status = Status(

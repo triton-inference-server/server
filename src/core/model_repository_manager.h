@@ -304,19 +304,6 @@ class ModelRepositoryManager {
   Status CircularcyCheck(
       DependencyNode* current_node, const DependencyNode* start_node);
 
-  /// Get the list of versions to be loaded for a named model based on version
-  /// policy. Version directories that are not numerically named,
-  /// or that have zero prefix will be ignored.
-  /// \param model_repository_path The file-system path of the repository that
-  /// the model is at.
-  /// \param name The model name.
-  /// \param model_config The model configuration.
-  /// \param versions Returns the versions to be loaded
-  /// \return The error status.
-  Status VersionsToLoad(
-      const std::string model_repository_path, const std::string& name,
-      const inference::ModelConfig& model_config, std::set<int64_t>* versions);
-
   const std::set<std::string> repository_paths_;
   const BackendConfigMap backend_config_map_;
   const bool autofill_;
