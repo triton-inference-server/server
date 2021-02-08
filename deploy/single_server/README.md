@@ -140,6 +140,11 @@ following steps:
         secretName: gcpcreds
 ```
 
+### S3 Permissions
+
+An example of values to be used with S3 can be found in values_s3.yaml.
+Provide the AWS_ACCESS_KEY_ID and the AWS_SECRET_ACCESS_KEY (AWS_DEFAULT_REGION is optional)
+
 ## Deploy Prometheus and Grafana
 
 The inference server metrics are collected by Prometheus and viewable

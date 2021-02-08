@@ -56,11 +56,16 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageName }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-
+          {{- if .Values.s3 }}
+          envFrom:
+          - configMapRef:
+              name: {{ template "triton-inference-server.fullname" . }}-s3-config
+          {{- end }}
+          {{- if .Values.image.numGpus }}
           resources:
             limits:
               nvidia.com/gpu: {{ .Values.image.numGpus }}
-
+          {{- end }}
           args: ["tritonserver", "--model-store={{ .Values.image.modelRepositoryPath }}"]
 
           ports:
@@ -84,4 +89,15 @@ spec:
             httpGet:
               path: /v2/health/ready
               port: http
-
+              
+          {{- if not .Values.s3 }}
+          volumeMounts:
+            - name: models-repository
+              mountPath: {{ .Values.image.modelRepositoryPath }}
+          {{- end }}
+        
+      {{- if not .Values.s3 }}
+      volumes:
+        - name: models-repository
+          emptyDir: {}
+      {{- end }}       

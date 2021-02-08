@@ -29,8 +29,8 @@ replicaCount: 1
 image:
   imageName: nvcr.io/nvidia/tritonserver:20.11-py3
   pullPolicy: IfNotPresent
-  modelRepositoryPath: /model_repository
-  numGpus: 0
+  modelRepositoryPath: s3://http://s3.address:8080/bucket
+  numGpus: 1
 
 livenessProbe:
   livenessFailureThreshold: 30
@@ -41,6 +41,14 @@ readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 5
 
+s3:
+  creds:
+    s3Bucket: bucket
+    s3AccessKey: xxx
+    s3SecretKey: yyy
+    s3Url: http://s3.address:8080
+    s3Zone: eu-west-3
+    
 securityContext:
   enabled: false
   userId: 1000
