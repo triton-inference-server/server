@@ -112,6 +112,7 @@ RUN mkdir -p qa/common && \
     cp /tmp/tritonbuild/install/bin/multi_server qa/L0_multi_server/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/memory_test qa/L0_memory/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/pinned_memory_manager_test qa/L0_memory/. && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/triton_repo_agent_test qa/L0_triton_repo_agent/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/rate_limiter_test qa/L0_rate_limiter/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/async_work_queue_test qa/L0_async_work_queue/.
 
@@ -254,6 +255,11 @@ RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
     mkdir -p qa/L0_decoupled/models/nested_square/1
+RUN cp /tmp/tritonbuild/install/repoagents/checksum/libtritonrepoagent_checksum.so \
+        qa/L0_repoagent_checksum/models/identity_int32/.
+RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
+    cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
+        qa/L0_repoagent_checksum/models/identity_int32/1/.
 
 ############################################################################
 ## Copy artifacts from sdk container

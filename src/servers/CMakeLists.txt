@@ -410,6 +410,7 @@ if(${TRITON_ENABLE_ENSEMBLE})
 endif() # TRITON_ENABLE_ENSEMBLE
 
 set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:triton-backend-library>)
+set(REPOAGENT_OBJS ${REPOAGENT_OBJS} $<TARGET_OBJECTS:triton-repoagent-library>)
 
 set(CUDA_OBJS "")
 if(${TRITON_ENABLE_GPU})
@@ -425,6 +426,7 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   ${CUDA_OBJS}
   ${BACKEND_OBJS}
+  ${REPOAGENT_OBJS}
 )
 # FIXME need to check how Windows exposes symbols
 if (WIN32)
@@ -455,6 +457,7 @@ endif()
 target_link_libraries(
   tritonserver
   PRIVATE triton-core-backendapi
+  PRIVATE triton-core-repoagentapi
   PRIVATE triton-core-serverapi
   PRIVATE triton-common-json
   PRIVATE triton-common-table-printer

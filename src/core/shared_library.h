@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,14 +25,16 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#define _COMPILING_TRITONSERVER 1
-#define _COMPILING_TRITONBACKEND 1
-#define _COMPILING_TRITONREPOAGENT 1
+#include <string>
+#include "src/core/status.h"
 
-#include "triton/core/tritonbackend.h"
-#include "triton/core/tritonrepoagent.h"
-#include "triton/core/tritonserver.h"
+namespace nvidia { namespace inferenceserver {
 
-#undef _COMPILING_TRITONSERVER
-#undef _COMPILING_TRITONBACKEND
-#undef _COMPILING_TRITONREPOAGENT
+Status OpenLibraryHandle(const std::string& path, void** handle);
+
+Status CloseLibraryHandle(void* handle);
+
+Status GetEntrypoint(
+    void* handle, const std::string& name, const bool optional, void** befn);
+
+}}  // namespace nvidia::inferenceserver

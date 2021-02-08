@@ -38,6 +38,7 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/triton_repo_agent.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -87,6 +88,95 @@ ModelReadyStateString(ModelReadyState state)
 }
 
 namespace {
+
+// Helper class to manage the lifecycle of a list of associated agent models
+class TritonRepoAgentModelList {
+ public:
+  TritonRepoAgentModelList() = default;
+  Status AddAgentModel(std::unique_ptr<TritonRepoAgentModel>&& agent_model)
+  {
+    agent_models_.emplace_back(std::move(agent_model));
+    return Status::Success;
+  }
+
+  size_t Size() { return agent_models_.size(); }
+
+  TritonRepoAgentModel* Back() { return agent_models_.back().get(); }
+
+  Status InvokeAgentModels(const TRITONREPOAGENT_ActionType action_type)
+  {
+    for (size_t idx = 0; idx < agent_models_.size(); idx++) {
+      RETURN_IF_ERROR(agent_models_[idx]->InvokeAgent(action_type));
+    }
+    return Status::Success;
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(TritonRepoAgentModelList);
+
+  std::vector<std::unique_ptr<TritonRepoAgentModel>> agent_models_;
+};
+
+Status
+VersionsToLoad(
+    const std::string model_repository_path, const std::string& name,
+    const inference::ModelConfig& model_config, std::set<int64_t>* versions)
+{
+  versions->clear();
+
+  // Get integral number of the version directory
+  const auto model_path = JoinPath({model_repository_path, name});
+  std::set<std::string> subdirs;
+  RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &subdirs));
+  std::set<int64_t, std::greater<int64_t>> existing_versions;
+  for (const auto& subdir : subdirs) {
+    if (subdir == kWarmupDataFolder) {
+      continue;
+    }
+    if ((subdir.length() > 1) && (subdir.front() == '0')) {
+      LOG_WARNING << "ignore version directory '" << subdir
+                  << "' which contains leading zeros in its directory name";
+      continue;
+    }
+    try {
+      int64_t version = std::stoll(subdir);
+      existing_versions.insert(version);
+    }
+    catch (const std::invalid_argument& ia) {
+      LOG_WARNING << "ignore version directory '" << subdir
+                  << "' which fails to convert to integral number";
+    }
+  }
+
+  if (model_config.version_policy().has_specific()) {
+    for (const auto& v : model_config.version_policy().specific().versions()) {
+      // Only load the specific versions that are presented in model directory
+      bool version_not_exist = existing_versions.insert(v).second;
+      if (!version_not_exist) {
+        versions->emplace(v);
+      } else {
+        LOG_ERROR << "version " << v << " is specified for model '" << name
+                  << "', but the version directory is not present";
+      }
+    }
+  } else {
+    if (model_config.version_policy().has_latest()) {
+      // std::set is sorted with std::greater
+      for (const auto& v : existing_versions) {
+        if (versions->size() >=
+            model_config.version_policy().latest().num_versions()) {
+          break;
+        }
+        versions->emplace(v);
+      }
+    } else {
+      // all
+      versions->insert(existing_versions.begin(), existing_versions.end());
+    }
+  }
+
+  return Status::Success;
+}
 
 void
 BuildBackendConfigMap(
@@ -237,9 +327,11 @@ class ModelRepositoryManager::BackendLifeCycle {
   // not specified in the load will be unloaded after the load is finished.
   Status AsyncLoad(
       const std::string& repository_path, const std::string& model_name,
-      const std::set<int64_t>& versions,
-      const inference::ModelConfig& model_config, bool defer_unload = false,
-      std::function<void(Status)> OnComplete = nullptr);
+      const inference::ModelConfig& model_config,
+      std::function<void(Status)> OnComplete);
+
+  // Unload model backends asynchronously.
+  Status AsyncUnload(const std::string& model_name);
 
   // Get specified model version's backend. Latest ready version will
   // be retrieved if 'version' is -1. Return error if the version specified is
@@ -292,6 +384,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::function<void()> OnComplete_;
     inference::ModelConfig model_config_;
 
+    std::shared_ptr<TritonRepoAgentModelList> agent_model_list_;
     std::shared_ptr<InferenceBackend> backend_;
   };
 
@@ -546,17 +639,132 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
 }
 
 Status
+ModelRepositoryManager::BackendLifeCycle::AsyncUnload(
+    const std::string& model_name)
+{
+  LOG_VERBOSE(1) << "AsyncUnload() '" << model_name << "'";
+  std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
+  auto it = map_.find(model_name);
+  if (it == map_.end()) {
+    return Status(
+        Status::Code::INVALID_ARG, "Model to be unloaded has not been served");
+  }
+
+  // Get the existing agent models and notify the unload action
+  for (auto& version_backend : it->second) {
+    BackendInfo* backend_info = version_backend.second.first.get();
+    if (backend_info->agent_model_list_ != nullptr) {
+      auto unloading_agent_model_list = backend_info->agent_model_list_;
+      // Only log the error because the model should be unloaded regardless
+      auto status = unloading_agent_model_list->InvokeAgentModels(
+          TRITONREPOAGENT_ACTION_UNLOAD);
+      if (!status.IsOk()) {
+        LOG_ERROR
+            << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD: "
+            << status.AsString();
+      }
+      backend_info->OnComplete_ = [this, unloading_agent_model_list]() {
+        auto status = unloading_agent_model_list->InvokeAgentModels(
+            TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
+        if (!status.IsOk()) {
+          LOG_ERROR << "Agent model returns error on "
+                       "TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: "
+                    << status.AsString();
+        }
+      };
+      break;
+    }
+  }
+
+  Status status = Status::Success;
+  for (auto& version_backend : it->second) {
+    auto version = version_backend.first;
+    BackendInfo* backend_info = version_backend.second.first.get();
+    backend_info->next_action_ = ActionType::UNLOAD;
+    Status action_status = TriggerNextAction(model_name, version, backend_info);
+    if (!action_status.IsOk()) {
+      status = action_status;
+    }
+  }
+
+  return status;
+}
+
+Status
 ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     const std::string& repository_path, const std::string& model_name,
-    const std::set<int64_t>& versions,
-    const inference::ModelConfig& model_config, bool defer_unload,
+    const inference::ModelConfig& model_config,
     std::function<void(Status)> OnComplete)
 {
   LOG_VERBOSE(1) << "AsyncLoad() '" << model_name << "'";
+  // Create the associated repo agent models when a model is to be loaded
+  std::shared_ptr<TritonRepoAgentModelList> agent_model_list;
+  if (model_config.has_model_repository_agents()) {
+    std::string model_path = JoinPath({repository_path, model_name});
+    FileSystemType filesystem_type;
+    RETURN_IF_ERROR(GetFileSystemType(model_path, &filesystem_type));
+    TRITONREPOAGENT_ArtifactType artifact_type =
+        TRITONREPOAGENT_ARTIFACT_FILESYSTEM;
+    if (filesystem_type != FileSystemType::LOCAL) {
+      artifact_type = TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM;
+    }
+    const char* location = model_path.c_str();
+    agent_model_list.reset(new TritonRepoAgentModelList());
+    for (const auto& agent_config :
+         model_config.model_repository_agents().agents()) {
+      std::shared_ptr<TritonRepoAgent> agent;
+      RETURN_IF_ERROR(TritonRepoAgentManager::CreateAgent(
+          model_path, agent_config.name(), &agent));
+        TritonRepoAgent::Parameters agent_params;
+        for (const auto& parameter : agent_config.parameters()) {
+          agent_params.emplace_back(parameter.first, parameter.second);
+        }
+        std::unique_ptr<TritonRepoAgentModel> agent_model;
+        if (agent_model_list->Size() != 0) {
+          agent_model_list->Back()->Location(&artifact_type, &location);
+        }
+        RETURN_IF_ERROR(TritonRepoAgentModel::Create(
+            artifact_type, location, model_config, agent, agent_params,
+            &agent_model));
+        RETURN_IF_ERROR(agent_model->InvokeAgent(TRITONREPOAGENT_ACTION_LOAD));
+        agent_model_list->AddAgentModel(std::move(agent_model));
+    }
+  }
+
   std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
   auto it = map_.find(model_name);
   if (it == map_.end()) {
     it = map_.emplace(std::make_pair(model_name, VersionMap())).first;
+  }
+
+  // Get the latest repository path
+  std::string current_repository_path = repository_path;
+  if (agent_model_list != nullptr) {
+    const char* location;
+    TRITONREPOAGENT_ArtifactType artifact_type;
+    RETURN_IF_ERROR(
+        agent_model_list->Back()->Location(&artifact_type, &location));
+    // RepoAgentModel uses model path while backend creation needs
+    // repository path, so need to go up one level.
+    // FIXME backend create should take model path directly
+    auto location_string = std::string(location);
+    size_t pos = location_string.length() - 1;
+    for (; (int64_t)pos >= 0; pos--) {
+      if (location_string[pos] != '/') {
+        break;
+      }
+    }
+    current_repository_path = location_string.substr(0, location_string.rfind('/', pos));
+  }
+  std::set<int64_t> versions;
+  RETURN_IF_ERROR(VersionsToLoad(
+      current_repository_path, model_name, model_config, &versions));
+  if (versions.empty()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "at least one version must be available under the version policy of "
+        "model '" +
+            model_name + "'");
   }
 
   for (const auto& version : versions) {
@@ -584,8 +792,6 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   }
 
   Status status = Status::Success;
-  size_t affected_version_cnt =
-      defer_unload ? versions.size() : it->second.size();
 
   struct LoadTracker {
     LoadTracker(size_t affected_version_cnt)
@@ -603,8 +809,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     std::set<int64_t> defer_unload_set_;
     std::mutex mtx_;
   };
-  std::shared_ptr<LoadTracker> load_tracker(
-      new LoadTracker(affected_version_cnt));
+  std::shared_ptr<LoadTracker> load_tracker(new LoadTracker(versions.size()));
   for (auto& version_backend : it->second) {
     auto version = version_backend.first;
     BackendInfo* backend_info = (version_backend.second.second == nullptr)
@@ -617,8 +822,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
       backend_info->model_config_ = model_config;
       backend_info->next_action_ = ActionType::LOAD;
       backend_info->platform_ = GetPlatform(model_config.platform());
-    } else if (!defer_unload) {
-      backend_info->next_action_ = ActionType::UNLOAD;
+      backend_info->agent_model_list_ = agent_model_list;
     } else {
       load_tracker->defer_unload_set_.emplace(version);
       continue;
@@ -645,6 +849,15 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
           if (load_tracker->load_failed_) {
             // If any of the versions fails to load, abort the load and unload
             // all newly loaded versions
+            if (backend_info->agent_model_list_) {
+              auto status = backend_info->agent_model_list_->InvokeAgentModels(
+                  TRITONREPOAGENT_ACTION_LOAD_FAIL);
+              if (!status.IsOk()) {
+                LOG_ERROR << "Agent model returns error on "
+                             "TRITONREPOAGENT_ACTION_LOAD_FAIL: "
+                          << status.AsString();
+              }
+            }
             for (auto& loaded : load_tracker->load_set_) {
               std::lock_guard<std::recursive_mutex> lock(loaded.second->mtx_);
               if (loaded.second->state_ == ModelReadyState::READY) {
@@ -667,6 +880,16 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
               }
             }
           } else {
+            if (backend_info->agent_model_list_) {
+              auto status = backend_info->agent_model_list_->InvokeAgentModels(
+                  TRITONREPOAGENT_ACTION_LOAD_COMPLETE);
+              if (!status.IsOk()) {
+                LOG_ERROR << "Agent model returns error on "
+                             "TRITONREPOAGENT_ACTION_LOAD_COMPLETE: "
+                          << status.AsString();
+              }
+            }
+            bool notified_agent = false;
             for (auto& loaded : load_tracker->load_set_) {
               auto vit = it->second.find(loaded.first);
               // Check if the version backend is loaded in background, if so,
@@ -679,10 +902,35 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
                 std::lock_guard<std::recursive_mutex> lock(
                     unload_backend->mtx_);
                 unload_backend->next_action_ = ActionType::UNLOAD;
-                unload_backend->OnComplete_ = [this, unload_backend]() {
-                  std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
-                  unloading_backends_.erase((uintptr_t)unload_backend);
-                };
+                if (unload_backend->agent_model_list_ && !notified_agent) {
+                  auto unloading_agent_model_list =
+                      unload_backend->agent_model_list_;
+                  auto status = unloading_agent_model_list->InvokeAgentModels(
+                      TRITONREPOAGENT_ACTION_UNLOAD);
+                  if (!status.IsOk()) {
+                    LOG_ERROR << "Agent model returns error on "
+                                 "TRITONREPOAGENT_ACTION_UNLOAD: "
+                              << status.AsString();
+                  }
+                  unload_backend->OnComplete_ = [this, unload_backend,
+                                                 unloading_agent_model_list]() {
+                    auto status = unloading_agent_model_list->InvokeAgentModels(
+                        TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
+                    if (!status.IsOk()) {
+                      LOG_ERROR << "Agent model returns error on "
+                                   "TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: "
+                                << status.AsString();
+                    }
+                    std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
+                    unloading_backends_.erase((uintptr_t)unload_backend);
+                  };
+                  notified_agent = true;
+                } else {
+                  unload_backend->OnComplete_ = [this, unload_backend]() {
+                    std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
+                    unloading_backends_.erase((uintptr_t)unload_backend);
+                  };
+                }
                 TriggerNextAction(model_name, version, unload_backend);
               }
             }
@@ -693,7 +941,30 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
               auto unload_backend = vit->second.first.get();
               std::lock_guard<std::recursive_mutex> lock(unload_backend->mtx_);
               unload_backend->next_action_ = ActionType::UNLOAD;
-              unload_backend->OnComplete_ = nullptr;
+              if (unload_backend->agent_model_list_ && !notified_agent) {
+                auto unloading_agent_model_list =
+                    unload_backend->agent_model_list_;
+                auto status = unloading_agent_model_list->InvokeAgentModels(
+                    TRITONREPOAGENT_ACTION_UNLOAD);
+                if (!status.IsOk()) {
+                  LOG_ERROR << "Agent model returns error on "
+                               "TRITONREPOAGENT_ACTION_UNLOAD: "
+                            << status.AsString();
+                }
+                unload_backend->OnComplete_ = [this,
+                                               unloading_agent_model_list]() {
+                  auto status = unloading_agent_model_list->InvokeAgentModels(
+                      TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
+                  if (!status.IsOk()) {
+                    LOG_ERROR << "Agent model returns error on "
+                                 "TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: "
+                              << status.AsString();
+                  }
+                };
+                notified_agent = true;
+              } else {
+                unload_backend->OnComplete_ = nullptr;
+              }
               TriggerNextAction(model_name, deferred_version, unload_backend);
             }
           }
@@ -705,18 +976,9 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
       };
     }
     Status action_status = TriggerNextAction(model_name, version, backend_info);
-    // Only care about status on unloading case
-    if (!action_status.IsOk() && versions.empty()) {
+    if (!action_status.IsOk()) {
       status = action_status;
     }
-  }
-
-  if (versions.empty()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "at least one version must be available under the version policy of "
-        "model '" +
-            model_name + "'");
   }
 
   return status;
@@ -821,6 +1083,7 @@ ModelRepositoryManager::BackendLifeCycle::Unload(
       backend_info->state_ = ModelReadyState::UNLOADING;
       backend_info->state_reason_.clear();
       backend_info->backend_.reset();
+      backend_info->agent_model_list_.reset();
       break;
     case ModelReadyState::LOADING:
     case ModelReadyState::UNLOADING:
@@ -1121,11 +1384,7 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
   UpdateDependencyGraph(added, deleted, modified);
 
   for (const auto& name : deleted) {
-    inference::ModelConfig model_config;
-    std::set<int64_t> versions;
-    std::string empty_path;
-    // Utilize "defer_unload" argument of AsyncLoad()
-    backend_life_cycle_->AsyncLoad(empty_path, name, versions, model_config);
+    backend_life_cycle_->AsyncUnload(name);
   }
 
   // model loading / unloading error will be printed but ignored
@@ -1151,12 +1410,7 @@ ModelRepositoryManager::LoadModelByDependency()
     loaded_models.clear();
     // Unload invalid models first
     for (auto& invalid_model : set_pair.second) {
-      inference::ModelConfig model_config;
-      std::set<int64_t> versions;
-      std::string empty_path;
-      // Utilize "defer_unload" argument of AsyncLoad()
-      backend_life_cycle_->AsyncLoad(
-          empty_path, invalid_model->model_name_, versions, model_config);
+      backend_life_cycle_->AsyncUnload(invalid_model->model_name_);
       LOG_ERROR << invalid_model->status_.AsString();
       invalid_model->loaded_versions_ = std::set<int64_t>();
       loaded_models.emplace(invalid_model);
@@ -1164,32 +1418,20 @@ ModelRepositoryManager::LoadModelByDependency()
     // load valid models and wait for load results
     std::vector<std::unique_ptr<ModelState>> model_states;
     for (auto& valid_model : set_pair.first) {
-      std::string repository_path;
-      const auto itr = infos_.find(valid_model->model_name_);
-      repository_path = itr->second->model_repository_path_;
-
       model_states.emplace_back(new ModelState(valid_model));
       auto model_state = model_states.back().get();
-      std::set<int64_t> versions;
-      Status status;
-      status = VersionsToLoad(
-          repository_path, valid_model->model_name_, valid_model->model_config_,
-          &versions);
-      if (status.IsOk()) {
-        status = backend_life_cycle_->AsyncLoad(
-            repository_path, valid_model->model_name_, versions,
-            valid_model->model_config_, true,
-            [model_state](Status load_status) {
-              model_state->status_ = load_status;
-              model_state->ready_.set_value();
-            });
-      }
+      const auto itr = infos_.find(valid_model->model_name_);
+      auto status = backend_life_cycle_->AsyncLoad(
+          itr->second->model_repository_path_, valid_model->model_name_,
+          valid_model->model_config_, [model_state](Status load_status) {
+            model_state->status_ = load_status;
+            model_state->ready_.set_value();
+          });
       if (!status.IsOk()) {
-        model_states.pop_back();
+        model_state->status_ = status;
+        model_state->ready_.set_value();
         LOG_ERROR << "failed to load model '" << valid_model->model_name_
                   << "': " << status.Message();
-        valid_model->status_ = status;
-        valid_model->loaded_versions_ = std::set<int64_t>();
       }
       loaded_models.emplace(valid_model);
     }
@@ -1240,38 +1482,6 @@ ModelRepositoryManager::LoadUnloadModel(
           Status::Code::INTERNAL,
           "failed to load '" + model_name +
               "', failed to poll from model repository");
-    }
-
-    const auto& info = it->second;
-    const auto& config = info->model_config_;
-    const auto& repository = info->model_repository_path_;
-    std::set<int64_t> expected_versions;
-    RETURN_IF_ERROR(
-        VersionsToLoad(repository, model_name, config, &expected_versions));
-
-    if (expected_versions.empty()) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "at least one version must be available under the version policy of "
-          "model '" +
-              model_name + "'");
-    }
-
-    std::string not_ready_version_str;
-    for (const auto version : expected_versions) {
-      const auto it = version_states.find(version);
-      if ((it == version_states.end()) ||
-          (it->second.first != ModelReadyState::READY)) {
-        not_ready_version_str += std::to_string(version);
-        not_ready_version_str += ",";
-      }
-    }
-    if (!not_ready_version_str.empty()) {
-      not_ready_version_str.pop_back();
-      return Status(
-          Status::Code::INTERNAL,
-          "failed to load '" + model_name +
-              "', versions that are not available: " + not_ready_version_str);
     }
   } else {
     std::string ready_version_str;
@@ -1360,11 +1570,7 @@ ModelRepositoryManager::LoadUnloadModels(
   // In all cases, should unload them and remove from 'infos_' explicitly.
   for (const auto& name : deleted) {
     infos_.erase(name);
-    inference::ModelConfig model_config;
-    std::set<int64_t> versions;
-    std::string empty_path;
-    // Utilize "defer_unload" argument of AsyncLoad()
-    backend_life_cycle_->AsyncLoad(empty_path, name, versions, model_config);
+    backend_life_cycle_->AsyncUnload(name);
   }
 
   // Update dependency graph and load
@@ -1397,13 +1603,8 @@ Status
 ModelRepositoryManager::UnloadAllModels()
 {
   Status status;
-  // Reload an empty version list to cause the model to unload.
-  inference::ModelConfig model_config;
-  std::set<int64_t> versions;
-  std::string empty_path;
   for (const auto& name_info : infos_) {
-    Status unload_status = backend_life_cycle_->AsyncLoad(
-        empty_path, name_info.first, versions, model_config);
+    Status unload_status = backend_life_cycle_->AsyncUnload(name_info.first);
     if (!unload_status.IsOk()) {
       status = Status(
           Status::Code::INTERNAL,
@@ -1989,67 +2190,6 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
 #endif  // TRITON_ENABLE_ENSEMBLE
   }
   return node_ready;
-}
-
-Status
-ModelRepositoryManager::VersionsToLoad(
-    const std::string model_repository_path, const std::string& name,
-    const inference::ModelConfig& model_config, std::set<int64_t>* versions)
-{
-  versions->clear();
-
-  // Get integral number of the version directory
-  const auto model_path = JoinPath({model_repository_path, name});
-  std::set<std::string> subdirs;
-  RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &subdirs));
-  std::set<int64_t, std::greater<int64_t>> existing_versions;
-  for (const auto& subdir : subdirs) {
-    if (subdir == kWarmupDataFolder) {
-      continue;
-    }
-    if ((subdir.length() > 1) && (subdir.front() == '0')) {
-      LOG_WARNING << "ignore version directory '" << subdir
-                  << "' which contains leading zeros in its directory name";
-      continue;
-    }
-    try {
-      int64_t version = std::stoll(subdir);
-      existing_versions.insert(version);
-    }
-    catch (const std::invalid_argument& ia) {
-      LOG_WARNING << "ignore version directory '" << subdir
-                  << "' which fails to convert to integral number";
-    }
-  }
-
-  if (model_config.version_policy().has_specific()) {
-    for (const auto& v : model_config.version_policy().specific().versions()) {
-      // Only load the specific versions that are presented in model directory
-      bool version_not_exist = existing_versions.insert(v).second;
-      if (!version_not_exist) {
-        versions->emplace(v);
-      } else {
-        LOG_ERROR << "version " << v << " is specified for model '" << name
-                  << "', but the version directory is not present";
-      }
-    }
-  } else {
-    if (model_config.version_policy().has_latest()) {
-      // std::set is sorted with std::greater
-      for (const auto& v : existing_versions) {
-        if (versions->size() >=
-            model_config.version_policy().latest().num_versions()) {
-          break;
-        }
-        versions->emplace(v);
-      }
-    } else {
-      // all
-      versions->insert(existing_versions.begin(), existing_versions.end());
-    }
-  }
-
-  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
