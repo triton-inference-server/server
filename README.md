@@ -204,6 +204,7 @@ version 2 of Triton from previously using version 1.
 - [Build](docs/build.md)
 - [Protocols and APIs](docs/inference_protocols.md).
 - [Backends](https://github.com/triton-inference-server/backend)
+- [Repository Agents](docs/repository_agents.md)
 - [Test](docs/test.md)
 
 Triton can be [built using
@@ -230,12 +231,16 @@ is the implementation that executes a model. A backend can interface
 with a deep learning framework, like PyTorch, TensorFlow, TensorRT or
 ONNX Runtime; or it can interface with a data processing framework
 like [DALI](https://github.com/triton-inference-server/dali_backend);
-or it can be custom
+or you can extend Triton by [writing your own
+backend](https://github.com/triton-inference-server/backend) in either
 [C/C++](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
-or [Python](https://github.com/triton-inference-server/python_backend)
-code for performing any operation. You can even extend Triton by
-[writing your own
-backend](https://github.com/triton-inference-server/backend).
+or
+[Python](https://github.com/triton-inference-server/python_backend).
+
+A [Triton repository agent](docs/repository_agents.md) extends Triton
+with new functionality that operates when a model is loaded or
+unloaded. You can introduce your own code to perform authentication,
+decryption, conversion, or similar operations when a model is loaded.
 
 ## Papers and Presentation
 
