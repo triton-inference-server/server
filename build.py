@@ -27,7 +27,6 @@
 
 import argparse
 import logging
-import docker
 import os.path
 import multiprocessing
 import pathlib
@@ -256,7 +255,8 @@ def core_cmake_args(components, backends, install_dir):
             else:
                 fail('unknown core backend {}'.format(be))
 
-    cargs.append('-DTRITON_EXTRA_LIB_PATHS=/opt/tritonserver/lib')
+    opt_dir = "/opt" if FLAGS.opt_dir is None else FLAGS.opt_dir
+    cargs.append('-DTRITON_EXTRA_LIB_PATHS={}/tritonserver/lib'.format(opt_dir))
 
     # If TRITONBUILD_* is defined in the env then we use it to set
     # corresponding cmake value.
@@ -266,6 +266,8 @@ def core_cmake_args(components, backends, install_dir):
 
     if platform.system() == 'Windows':
         cargs.append('c:/workspace/build')
+    if FLAGS.jetson_build:
+        cargs.append(FLAGS.cmake_dir)
     else:
         cargs.append('/workspace/build')
     return cargs
@@ -384,22 +386,25 @@ def tensorrt_cmake_args():
 
 
 def tensorflow_cmake_args(ver, images):
-    # If a specific TF image is specified use it, otherwise pull from
-    # NGC.
-    image_name = "tensorflow{}".format(ver)
-    if image_name in images:
-        image = images[image_name]
+    # If jetson build is specified do not use docker images
+    if FLAGS.jetson_build:
+        opt_dir = "/opt" if FLAGS.opt_dir is None else FLAGS.opt_dir
+        extra_args = ['-DTRITON_TENSORFLOW_LIB_PATHS={}/tritonserver/backends/tensorflow{}'.format(opt_dir, ver)]
     else:
-        if ver == 2:
-            image = 'nvcr.io/nvidia/tensorflow:{}-py3'.format(
-                FLAGS.upstream_container_version)
+        # If a specific TF image is specified use it, otherwise pull from
+        # NGC.
+        image_name = "tensorflow{}".format(ver)
+        if image_name in images:
+            image = images[image_name]
         else:
-            image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
-                FLAGS.upstream_container_version, ver)
-    return [
-        '-DTRITON_TENSORFLOW_VERSION={}'.format(ver),
-        '-DTRITON_TENSORFLOW_DOCKER_IMAGE={}'.format(image)
-    ]
+            if ver == 2:
+                image = 'nvcr.io/nvidia/tensorflow:{}-py3'.format(
+                    FLAGS.upstream_container_version)
+            else:
+                image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
+                    FLAGS.upstream_container_version, ver)
+        extra_args = ['-DTRITON_TENSORFLOW_DOCKER_IMAGE={}'.format(image)]
+    return ['-DTRITON_TENSORFLOW_VERSION={}'.format(ver)] + extra_args
 
 
 def dali_cmake_args():
@@ -857,6 +862,10 @@ if __name__ == '__main__':
         action="store_true",
         required=False,
         help='Do not use Docker --pull argument when building container.')
+    parser.add_argument('--jetson-build',
+                        action="store_true",
+                        required=False,
+                        help='Use jetson build process.')
 
     parser.add_argument('--build-id',
                         type=str,
@@ -878,6 +887,14 @@ if __name__ == '__main__':
         required=False,
         default=None,
         help='Install directory, default is <builddir>/opt/tritonserver.')
+    parser.add_argument('--cmake-dir',
+                        required=False,
+                        default=None,
+                        help='cmake directory. Folder for CMakeLists.txt.')
+    parser.add_argument('--opt-dir',
+                        required=False,
+                        default=None,
+                        help='Opt directory. Directory to replace "/opt" with.')
     parser.add_argument(
         '--build-type',
         required=False,
@@ -1071,7 +1088,7 @@ if __name__ == '__main__':
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
 
-    # If --container-build is specified then we perform the actual
+    # If --no-container-build or jetson_build is not specified then we perform the actual
     # build within a build container and then from that create a
     # tritonserver container holding the results of the build.
     if not FLAGS.no_container_build:
