@@ -1673,7 +1673,13 @@ PlanBackend::InitializeGraphSpecs(
     // default build for batch sizes 1, 2, 3, 4, 6, 8, 12, 16, 'max_batch_size'.
     // If preferred batch size is specified, then the batch sizes will be
     // 1, preferred batch sizes, 'max_batch_size'.
-    std::set<int> cuda_graph_batch_sizes{1};
+    std::set<int> cuda_graph_batch_sizes;
+    if (Config().max_batch_size() == 0) {
+      cuda_graph_batch_sizes = {0};
+    } else {
+      cuda_graph_batch_sizes = {1};
+    }
+
     if (Config().has_dynamic_batching()) {
       for (const auto bs : Config().dynamic_batching().preferred_batch_size()) {
         cuda_graph_batch_sizes.emplace(bs);
@@ -1687,6 +1693,9 @@ PlanBackend::InitializeGraphSpecs(
       }
     } else {
       cuda_graph_batch_sizes = {1, 2, 3, 4, 6, 8, 12, 16};
+      if (Config().max_batch_size() == 0) {
+        cuda_graph_batch_sizes.emplace(0);
+      }
     }
     if (Config().max_batch_size() > 0) {
       cuda_graph_batch_sizes.emplace(Config().max_batch_size());
