@@ -153,7 +153,8 @@ Triton follows these steps when unloading a model:
   config.pbtxt file, even if during loading one or more agents
   modified its contents.
 
-* For each repository agent specified, in reverse order:
+* For each repository agent that was invoked with
+  TRITONREPOAGENT_ACTION_LOAD, in the same order:
 
   * Triton invokes the repository agent's
     *TRITONREPOAGENT_ModelAction* function with action
@@ -161,7 +162,8 @@ Triton follows these steps when unloading a model:
 
 * Triton unloads the model.
 
-* For each repository agent specified, in reverse order:
+* For each repository agent that was invoked with
+  TRITONREPOAGENT_ACTION_UNLOAD, in reverse order:
 
   * Triton invokes the repository agent's
     *TRITONREPOAGENT_ModelAction* function with action
