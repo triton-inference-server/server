@@ -46,6 +46,7 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
+#include "src/core/triton_repo_agent.h"
 #include "triton/common/table_printer.h"
 
 #ifdef TRITON_ENABLE_GPU
@@ -467,11 +468,31 @@ InferenceServer::UnloadModel(const std::string& model_name)
 Status
 InferenceServer::PrintBackendAndModelSummary()
 {
+  // Repository Agents Summary
+  std::vector<std::string> repoagent_headers;
+  repoagent_headers.emplace_back("Repository Agent");
+  repoagent_headers.emplace_back("Path");
+
+  triton::common::TablePrinter repoagents_table(repoagent_headers);
+
+  std::unique_ptr<std::unordered_map<std::string, std::string>>
+      repoagent_state;
+  RETURN_IF_ERROR(TritonRepoAgentManager::AgentState(&repoagent_state));
+
+  for (const auto& repoagent_pair : *repoagent_state) {
+    std::vector<std::string> repoagent_record;
+    repoagent_record.emplace_back(repoagent_pair.first);
+    repoagent_record.emplace_back(repoagent_pair.second);
+    repoagents_table.InsertRow(repoagent_record);
+  }
+  std::string repoagents_table_string = repoagents_table.PrintTable();
+  LOG_INFO << repoagents_table_string;
+
   // Backends Summary
   std::vector<std::string> backend_headers;
   backend_headers.emplace_back("Backend");
-  backend_headers.emplace_back("Config");
   backend_headers.emplace_back("Path");
+  backend_headers.emplace_back("Config");
 
   triton::common::TablePrinter backends_table(backend_headers);
 
