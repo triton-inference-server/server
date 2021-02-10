@@ -369,9 +369,9 @@ TritonRepoAgentManager::CreateAgent(
   auto& singleton_manager = Singleton();
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
-  // Get the path to the backend shared library. Search path is
-  // model directory, global agent directory.
-  // FIXME expose global path as Triton option
+  // Get the path to the agent shared library. Search path is model
+  // directory, global agent directory.  FIXME expose global path as
+  // Triton option
   const std::vector<std::string> search_paths = {
       model_dir, singleton_manager.global_search_path_};
 
@@ -398,10 +398,10 @@ TritonRepoAgentManager::CreateAgent(
   const auto& itr = singleton_manager.agent_map_.find(libpath);
   if (itr != singleton_manager.agent_map_.end()) {
     // Found in map. If the weak_ptr is still valid that means that
-    // there are other models using the backend and we just reuse that
-    // same backend. If the weak_ptr is not valid then backend has
-    // been unloaded so we need to remove the weak_ptr from the map
-    // and create the backend again.
+    // there are other models using the agent and we just reuse that
+    // same agent. If the weak_ptr is not valid then agent has been
+    // unloaded so we need to remove the weak_ptr from the map and
+    // create the agent again.
     *agent = itr->second.lock();
     if (*agent != nullptr) {
       return Status::Success;
@@ -411,6 +411,32 @@ TritonRepoAgentManager::CreateAgent(
   }
   RETURN_IF_ERROR(TritonRepoAgent::Create(agent_name, libpath, agent));
   singleton_manager.agent_map_.insert({libpath, *agent});
+
+  return Status::Success;
+}
+
+Status
+TritonRepoAgentManager::AgentState(
+      std::unique_ptr<
+          std::unordered_map<std::string, std::string>>*
+          agent_state)
+{
+  auto& singleton_manager = Singleton();
+  std::lock_guard<std::mutex> lock(singleton_manager.mu_);
+
+  std::unique_ptr<std::unordered_map<std::string, std::string>>
+      agent_state_map(
+          new std::unordered_map<std::string, std::string>);
+  for (const auto& agent_pair : singleton_manager.agent_map_) {
+    auto& libpath = agent_pair.first;
+    auto agent = agent_pair.second.lock();
+
+    if (agent != nullptr) {
+      agent_state_map->insert({agent->Name(), libpath});
+    }
+  }
+
+  *agent_state = std::move(agent_state_map);
 
   return Status::Success;
 }

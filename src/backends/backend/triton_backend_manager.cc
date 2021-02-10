@@ -333,13 +333,11 @@ TritonBackendManager::BackendState(
   TritonBackendManager& singleton_manager = Singleton();
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
-  auto backend_map = singleton_manager.backend_map_;
-
   std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
       backend_state_map(
           new std::unordered_map<std::string, std::vector<std::string>>);
-  for (const auto& backend_pair : backend_map) {
-    auto libpath = backend_pair.first;
+  for (const auto& backend_pair : singleton_manager.backend_map_) {
+    auto& libpath = backend_pair.first;
     auto backend = backend_pair.second.lock();
 
     if (backend != nullptr) {
