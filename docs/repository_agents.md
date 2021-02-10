@@ -33,6 +33,9 @@ operates when a model is loaded or unloaded. You can introduce your
 own code to perform authentication, decryption, conversion, or similar
 operations when a model is loaded.
 
+**BETA: The repository agent API is beta quality and is subject to
+non-backward-compatible changes for one or more releases.**
+
 A repository agent comunicates with Triton using the [repository agent
 API](https://github.com/triton-inference-server/core/tree/main/include/triton/core/tritonrepoagent.h). The
 [checksum_repository_agent GitHub
