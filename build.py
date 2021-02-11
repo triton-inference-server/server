@@ -866,7 +866,7 @@ if __name__ == '__main__':
         '--target-platform',
         required=False,
         default=None,
-        help='Platform to build for. If not specified, auto-detect the same.')
+        help='Platform to build for. Can be "ubuntu", "windows" or "jetpack". If not specified, auto-detect the same.')
 
     parser.add_argument('--build-id',
                         type=str,
