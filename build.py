@@ -84,8 +84,8 @@ def fail(msg):
     fail_if(True, msg)
 
 
-def get_platform():
-    if FLAGS.platform is not None:
+def target_platform():
+    if FLAGS.target_platform is not None:
         return platform
     return platform.system().lower()
 
@@ -179,7 +179,7 @@ def cmake(cwd, args):
 def makeinstall(cwd, target='install'):
     log_verbose('make {}'.format(target))
 
-    if get_platform() == 'windows':
+    if target_platform() == 'windows':
         verbose_flag = '-v:detailed' if FLAGS.verbose else '-clp:ErrorsOnly'
         buildtype_flag = '-p:Configuration={}'.format(FLAGS.build_type)
         p = subprocess.Popen([
@@ -373,7 +373,7 @@ def onnxruntime_cmake_args():
 
 
 def tensorrt_cmake_args():
-    if get_platform() == 'windows':
+    if target_platform() == 'windows':
         return [
             '-DTRITON_TENSORRT_INCLUDE_PATHS=c:/TensorRT/include',
         ]
@@ -385,7 +385,7 @@ def tensorflow_cmake_args(ver, images, library_paths):
     backend_name = "tensorflow{}".format(ver)
 
     # If platform is jetpack build is specified do not use docker images
-    if get_platform() == 'jetpack':
+    if target_platform() == 'jetpack':
         if backend_name in library_paths:
             extra_args = [
                 '-DTRITON_TENSORFLOW_LIB_PATHS={}'.format(
@@ -428,7 +428,7 @@ ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 '''
     # Install the windows- or linux-specific buildbase dependencies
-    if get_platform() == 'windows':
+    if target_platform() == 'windows':
         df += '''
 SHELL ["cmd", "/S", "/C"]
 '''
@@ -488,7 +488,7 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     # environment otherwise the build will fail. Also set
     # TRITONBUILD_CMAKE_TOOLCHAIN_FILE and VCPKG_TARGET_TRIPLET so
     # that cmake can find the packages installed by vcpkg.
-    if get_platform() == 'windows':
+    if target_platform() == 'windows':
         df += '''
 WORKDIR /workspace
 RUN rmdir /S/Q * || exit 0
@@ -665,7 +665,7 @@ def container_build(images, backends, repoagents):
     # build.
     if 'base' in images:
         base_image = images['base']
-    elif get_platform() == 'windows':
+    elif target_platform() == 'windows':
         base_image = 'mcr.microsoft.com/dotnet/framework/sdk:4.8'
     else:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
@@ -758,7 +758,7 @@ def container_build(images, backends, repoagents):
             'docker', 'run', '--name', 'tritonserver_builder', '-w',
             '/workspace'
         ]
-        if get_platform() == 'windows':
+        if target_platform() == 'windows':
             dockerrunargs += [
                 '-v', '\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine'
             ]
@@ -823,7 +823,7 @@ def container_build(images, backends, repoagents):
         # the install artifacts from the tritonserver_build
         # container. Windows containers can't access GPUs so we don't
         # bother to create the base image for windows.
-        if get_platform() == 'windows':
+        if target_platform() == 'windows':
             create_dockerfile(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
                               backends, repoagents)
             p = subprocess.Popen([
