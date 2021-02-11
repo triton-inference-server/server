@@ -823,7 +823,7 @@ def container_build(images, backends, repoagents):
         # the install artifacts from the tritonserver_build
         # container. Windows containers can't access GPUs so we don't
         # bother to create the base image for windows.
-        if target_platform() == 'windows':
+        if target_platform() != 'windows':
             create_dockerfile(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
                               backends, repoagents)
             p = subprocess.Popen([
