@@ -369,11 +369,10 @@ TritonRepoAgentManager::CreateAgent(
   auto& singleton_manager = Singleton();
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
-  // Get the path to the agent shared library. Search path is model
-  // directory, global agent directory.  FIXME expose global path as
-  // Triton option
+  // Get the path to the agent shared library. Search path is global
+  // agent directory.  FIXME expose global path as Triton option
   const std::vector<std::string> search_paths = {
-      model_dir, singleton_manager.global_search_path_};
+      JoinPath({singleton_manager.global_search_path_, agent_name})};
 
   std::string agent_libname = TritonRepoAgentLibraryName(agent_name);
   std::string libpath;
@@ -389,10 +388,9 @@ TritonRepoAgentManager::CreateAgent(
 
   if (libpath.empty()) {
     return Status(
-        Status::Code::INVALID_ARG, "unable to find '" + agent_libname +
-                                       "' for repo agent '" + agent_name +
-                                       "', searched: " + model_dir + ", " +
-                                       singleton_manager.global_search_path_);
+        Status::Code::INVALID_ARG,
+        "unable to find '" + agent_libname + "' for repo agent '" + agent_name +
+            "', searched: " + singleton_manager.global_search_path_);
   }
 
   const auto& itr = singleton_manager.agent_map_.find(libpath);
@@ -417,16 +415,13 @@ TritonRepoAgentManager::CreateAgent(
 
 Status
 TritonRepoAgentManager::AgentState(
-      std::unique_ptr<
-          std::unordered_map<std::string, std::string>>*
-          agent_state)
+    std::unique_ptr<std::unordered_map<std::string, std::string>>* agent_state)
 {
   auto& singleton_manager = Singleton();
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);
 
-  std::unique_ptr<std::unordered_map<std::string, std::string>>
-      agent_state_map(
-          new std::unordered_map<std::string, std::string>);
+  std::unique_ptr<std::unordered_map<std::string, std::string>> agent_state_map(
+      new std::unordered_map<std::string, std::string>);
   for (const auto& agent_pair : singleton_manager.agent_map_) {
     auto& libpath = agent_pair.first;
     auto agent = agent_pair.second.lock();
