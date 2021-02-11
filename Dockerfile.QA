@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -68,7 +68,7 @@ RUN mkdir -p inception_graphdef/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libimagepreprocess.so \
         image_preprocess_nhwc_299x299x3_inception/1/. && \
     mkdir -p preprocess_inception_ensemble/1
-    
+
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
@@ -255,8 +255,6 @@ RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
     mkdir -p qa/L0_decoupled/models/nested_square/1
-RUN cp /tmp/tritonbuild/install/repoagents/checksum/libtritonrepoagent_checksum.so \
-        qa/L0_repoagent_checksum/models/identity_int32/.
 RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
     cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
         qa/L0_repoagent_checksum/models/identity_int32/1/.
@@ -319,7 +317,7 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six boofuzz grpcio-channelz azure-cli 
+    pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six boofuzz grpcio-channelz azure-cli
 
 # need protoc-gen-go to generate go specific gRPC modules
 RUN go get github.com/golang/protobuf/protoc-gen-go && \

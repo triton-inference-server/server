@@ -64,7 +64,9 @@ CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch'
 ]
-EXAMPLE_REPOAGENTS = ['checksum',]
+EXAMPLE_REPOAGENTS = [
+    'checksum',
+]
 FLAGS = None
 
 
@@ -358,8 +360,10 @@ def pytorch_cmake_args(images):
 def onnxruntime_cmake_args():
     cargs = [
         '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
-        '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(TRITON_VERSION_MAP[FLAGS.version][2]),
-        '-DTRITON_BUILD_CONTAINER_VERSION={}'.format(TRITON_VERSION_MAP[FLAGS.version][1])
+        '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][2]),
+        '-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][1])
     ]
 
     if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
@@ -527,7 +531,7 @@ RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
         dfile.write(df)
 
 
-def create_dockerfile(ddir, dockerfile_name, argmap, backends):
+def create_dockerfile(ddir, dockerfile_name, argmap, backends, repoagents):
     df = '''
 #
 # Multistage build.
@@ -618,6 +622,11 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backen
 '''
             break
 
+    if len(repoagents) > 0:
+        df += '''
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
+'''
+
     df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${{_CUDA_COMPAT_PATH}}/lib.real ${{_CUDA_COMPAT_PATH}}/lib \
@@ -640,7 +649,7 @@ LABEL com.nvidia.build.ref={}
         dfile.write(df)
 
 
-def container_build(backends, images):
+def container_build(images, backends, repoagents):
     # The build and install directories within the container.
     build_dir = os.path.join(os.sep, 'tmp', 'tritonbuild')
     install_dir = os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
@@ -811,7 +820,7 @@ def container_build(backends, images):
         # bother to create the base image for windows.
         if platform.system() != 'Windows':
             create_dockerfile(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends)
+                              backends, repoagents)
             p = subprocess.Popen([
                 'docker', 'build', '-f',
                 os.path.join(FLAGS.build_dir, 'Dockerfile')
@@ -1066,7 +1075,7 @@ if __name__ == '__main__':
     # build within a build container and then from that create a
     # tritonserver container holding the results of the build.
     if not FLAGS.no_container_build:
-        container_build(backends, images)
+        container_build(images, backends, repoagents)
         sys.exit(0)
 
     # If there is a container pre-build command assume this invocation
@@ -1152,7 +1161,8 @@ if __name__ == '__main__':
               repoagent_cmake_args(images, components, ra, repo_install_dir))
         makeinstall(repo_build_dir)
 
-        repoagent_install_dir = os.path.join(FLAGS.install_dir, 'repoagents', ra)
+        repoagent_install_dir = os.path.join(FLAGS.install_dir, 'repoagents',
+                                             ra)
         rmdir(repoagent_install_dir)
         mkdir(repoagent_install_dir)
         cpdir(os.path.join(repo_install_dir, 'repoagents', ra),
