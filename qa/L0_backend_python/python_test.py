@@ -119,6 +119,20 @@ class PythonTest(tu.TestResultCollector):
                 "error: expected metric {} == 1, got {}".format(
                     infer_exec_str, infer_exec_val))
 
+    def test_bool(self):
+        model_name = 'identity_bool'
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            input_data = np.array([[True, False, True]], dtype=np.bool)
+            inputs = [
+                httpclient.InferInput("IN", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            result = client.infer(model_name, inputs)
+            output0 = result.as_numpy('OUT')
+            self.assertTrue(output0 is not None)
+            self.assertTrue(np.all(output0 == input_data))
+
     def test_infer_pymodel_error(self):
         model_name = "wrong_model"
         shape = [2, 2]
@@ -250,7 +264,8 @@ class PythonTest(tu.TestResultCollector):
         shape = [1]
         with httpclient.InferenceServerClient("localhost:8000") as client:
             utf8 = '😀'
-            input_data = np.array([bytes(utf8, encoding='utf-8')], dtype=np.bytes_)
+            input_data = np.array([bytes(utf8, encoding='utf-8')],
+                                  dtype=np.bytes_)
             inputs = [
                 httpclient.InferInput("INPUT0", shape,
                                       np_to_triton_dtype(input_data.dtype))
