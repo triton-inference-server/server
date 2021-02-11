@@ -532,6 +532,10 @@ main(int argc, char** argv)
           server_options, "/opt/tritonserver/backends"),
       "setting backend directory");
   FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
+          server_options, "/opt/tritonserver/repoagents"),
+      "setting repository agent directory");
+  FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetStrictModelConfig(server_options, true),
       "setting strict model configuration");
 #ifdef TRITON_ENABLE_GPU

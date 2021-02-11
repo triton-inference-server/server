@@ -238,6 +238,9 @@ class TritonServerOptions {
     AddBackendConfig(std::string(), "backend-directory", bd);
   }
 
+  const std::string& RepoAgentDir() const { return repoagent_dir_; }
+  void SetRepoAgentDir(const std::string& rad) { repoagent_dir_ = rad; }
+
   // The backend config map is a map from backend name to the
   // setting=value pairs for that backend. The empty backend name ("")
   // is used to communicate configuration information that is used
@@ -272,6 +275,7 @@ class TritonServerOptions {
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_compute_capability_;
   std::string backend_dir_;
+  std::string repoagent_dir_;
   ni::BackendCmdlineConfigMap backend_cmdline_config_map_;
 
   bool tf_soft_placement_;
@@ -1088,6 +1092,16 @@ TRITONSERVER_ServerOptionsSetBackendDirectory(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
+    TRITONSERVER_ServerOptions* options, const char* repoagent_dir)
+{
+  TritonServerOptions* loptions =
+      reinterpret_cast<TritonServerOptions*>(options);
+  loptions->SetRepoAgentDir(repoagent_dir);
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetBackendConfig(
     TRITONSERVER_ServerOptions* options, const char* backend_name,
     const char* setting, const char* value)
@@ -1547,6 +1561,7 @@ TRITONSERVER_ServerNew(
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
+  lserver->SetRepoAgentDir(loptions->RepoAgentDir());
   lserver->SetBufferManagerThreadCount(loptions->BufferManagerThreadCount());
 
   // FIXME these should be removed once all backends use

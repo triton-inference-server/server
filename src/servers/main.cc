@@ -221,6 +221,7 @@ enum OptionId {
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_BACKEND_DIR,
+  OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
   OPTION_BACKEND_CONFIG
 };
@@ -383,6 +384,9 @@ std::vector<Option> options_
       {OPTION_BACKEND_DIR, "backend-directory", Option::ArgStr,
        "The global directory searched for backend shared libraries. Default is "
        "'/opt/tritonserver/backends'."},
+      {OPTION_REPOAGENT_DIR, "repoagent-directory", Option::ArgStr,
+       "The global directory searched for repository agent shared libraries. Default is "
+       "'/opt/tritonserver/repoagents'."},
       {OPTION_BUFFER_MANAGER_THREAD_COUNT, "buffer-manager-thread-count",
        Option::ArgInt,
        "The number of threads used to accelerate copies and other operations "
@@ -821,6 +825,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t buffer_manager_thread_count = 0;
 
   std::string backend_dir = "/opt/tritonserver/backends";
+  std::string repoagent_dir = "/opt/tritonserver/repoagents";
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
 
@@ -1005,6 +1010,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_BACKEND_DIR:
         backend_dir = optarg;
         break;
+      case OPTION_REPOAGENT_DIR:
+        repoagent_dir = optarg;
+        break;
       case OPTION_BUFFER_MANAGER_THREAD_COUNT:
         buffer_manager_thread_count = ParseIntOption(optarg);
         break;
@@ -1143,6 +1151,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       TRITONSERVER_ServerOptionsSetBackendDirectory(
           loptions, backend_dir.c_str()),
       "setting backend directory");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
+          loptions, repoagent_dir.c_str()),
+      "setting repository agent directory");
   for (const auto& bcs : backend_config_settings) {
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetBackendConfig(
