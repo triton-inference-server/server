@@ -162,18 +162,17 @@ class TritonRepoAgentManager {
  public:
   static Status SetGlobalSearchPath(const std::string& path);
   static Status CreateAgent(
-      const std::string& model_dir, const std::string& agent_name,
-      std::shared_ptr<TritonRepoAgent>* agent);
+      const std::string& agent_name, std::shared_ptr<TritonRepoAgent>* agent);
 
   static Status AgentState(
-      std::unique_ptr<
-          std::unordered_map<std::string, std::string>>*
+      std::unique_ptr<std::unordered_map<std::string, std::string>>*
           agent_state);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonRepoAgentManager);
 
-  TritonRepoAgentManager() : global_search_path_("/opt/tritonserver/repoagents"){};
+  TritonRepoAgentManager()
+      : global_search_path_("/opt/tritonserver/repoagents"){};
   static TritonRepoAgentManager& Singleton();
   std::mutex mu_;
   std::string global_search_path_;
