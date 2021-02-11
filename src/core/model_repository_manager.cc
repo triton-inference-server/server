@@ -105,8 +105,25 @@ class TritonRepoAgentModelList {
 
   Status InvokeAgentModels(const TRITONREPOAGENT_ActionType action_type)
   {
-    for (size_t idx = 0; idx < agent_models_.size(); idx++) {
-      RETURN_IF_ERROR(agent_models_[idx]->InvokeAgent(action_type));
+    switch (action_type) {
+      case TRITONREPOAGENT_ACTION_LOAD:
+      case TRITONREPOAGENT_ACTION_UNLOAD: {
+        for (size_t idx = 0; idx < agent_models_.size(); --idx) {
+          RETURN_IF_ERROR(agent_models_[idx]->InvokeAgent(action_type));
+        }
+        break;
+      }
+      case TRITONREPOAGENT_ACTION_LOAD_COMPLETE:
+      case TRITONREPOAGENT_ACTION_LOAD_FAIL:
+      case TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE: {
+        // reverse order
+        for (size_t one_pass_idx = agent_models_.size(); one_pass_idx > 0;
+             --one_pass_idx) {
+          RETURN_IF_ERROR(
+              agent_models_[one_pass_idx - 1]->InvokeAgent(action_type));
+        }
+        break;
+      }
     }
     return Status::Success;
   }
@@ -714,20 +731,20 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
          model_config.model_repository_agents().agents()) {
       std::shared_ptr<TritonRepoAgent> agent;
       RETURN_IF_ERROR(TritonRepoAgentManager::CreateAgent(
-          model_path, agent_config.name(), &agent));
-        TritonRepoAgent::Parameters agent_params;
-        for (const auto& parameter : agent_config.parameters()) {
-          agent_params.emplace_back(parameter.first, parameter.second);
-        }
-        std::unique_ptr<TritonRepoAgentModel> agent_model;
-        if (agent_model_list->Size() != 0) {
-          agent_model_list->Back()->Location(&artifact_type, &location);
-        }
-        RETURN_IF_ERROR(TritonRepoAgentModel::Create(
-            artifact_type, location, model_config, agent, agent_params,
-            &agent_model));
-        RETURN_IF_ERROR(agent_model->InvokeAgent(TRITONREPOAGENT_ACTION_LOAD));
-        agent_model_list->AddAgentModel(std::move(agent_model));
+          agent_config.name(), &agent));
+      TritonRepoAgent::Parameters agent_params;
+      for (const auto& parameter : agent_config.parameters()) {
+        agent_params.emplace_back(parameter.first, parameter.second);
+      }
+      std::unique_ptr<TritonRepoAgentModel> agent_model;
+      if (agent_model_list->Size() != 0) {
+        agent_model_list->Back()->Location(&artifact_type, &location);
+      }
+      RETURN_IF_ERROR(TritonRepoAgentModel::Create(
+          artifact_type, location, model_config, agent, agent_params,
+          &agent_model));
+      RETURN_IF_ERROR(agent_model->InvokeAgent(TRITONREPOAGENT_ACTION_LOAD));
+      agent_model_list->AddAgentModel(std::move(agent_model));
     }
   }
 
@@ -754,7 +771,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
         break;
       }
     }
-    current_repository_path = location_string.substr(0, location_string.rfind('/', pos));
+    current_repository_path =
+        location_string.substr(0, location_string.rfind('/', pos));
   }
   std::set<int64_t> versions;
   RETURN_IF_ERROR(VersionsToLoad(
