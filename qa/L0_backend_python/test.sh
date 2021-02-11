@@ -27,7 +27,7 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="7"
+EXPECTED_NUM_TESTS="8"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
@@ -55,6 +55,11 @@ cp -r ./models/identity_fp32 ./models/identity_uint32
 (cd models/identity_uint32 && \
           sed -i "s/^name:.*/name: \"identity_uint32\"/" config.pbtxt && \
           sed -i "s/TYPE_FP32/TYPE_UINT32/g" config.pbtxt)
+
+cp -r ./models/identity_fp32 ./models/identity_bool
+(cd models/identity_bool && \
+          sed -i "s/^name:.*/name: \"identity_bool\"/" config.pbtxt && \
+          sed -i "s/TYPE_FP32/TYPE_BOOL/g" config.pbtxt)
 
 mkdir -p models/wrong_model/1/
 cp ../python_models/wrong_model/model.py ./models/wrong_model/1/
