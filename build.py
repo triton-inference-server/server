@@ -63,9 +63,7 @@ CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch'
 ]
-EXAMPLE_REPOAGENTS = [
-    'checksum',
-]
+EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
 
 
@@ -84,6 +82,12 @@ def log_verbose(msg):
 
 def fail(msg):
     fail_if(True, msg)
+
+
+def get_platform():
+    if FLAGS.platform is not None:
+        return platform
+    return platform.system().lower()
 
 
 def fail_if(p, msg):
@@ -175,7 +179,7 @@ def cmake(cwd, args):
 def makeinstall(cwd, target='install'):
     log_verbose('make {}'.format(target))
 
-    if platform.system() == 'Windows':
+    if get_platform() == 'windows':
         verbose_flag = '-v:detailed' if FLAGS.verbose else '-clp:ErrorsOnly'
         buildtype_flag = '-p:Configuration={}'.format(FLAGS.build_type)
         p = subprocess.Popen([
@@ -255,21 +259,13 @@ def core_cmake_args(components, backends, install_dir):
             else:
                 fail('unknown core backend {}'.format(be))
 
-    opt_dir = "/opt" if FLAGS.opt_dir is None else FLAGS.opt_dir
-    cargs.append('-DTRITON_EXTRA_LIB_PATHS={}/tritonserver/lib'.format(opt_dir))
-
     # If TRITONBUILD_* is defined in the env then we use it to set
     # corresponding cmake value.
     for evar, eval in os.environ.items():
         if evar.startswith('TRITONBUILD_'):
             cargs.append('-D{}={}'.format(evar[len('TRITONBUILD_'):], eval))
 
-    if platform.system() == 'Windows':
-        cargs.append('c:/workspace/build')
-    if FLAGS.jetson_build:
-        cargs.append(FLAGS.cmake_dir)
-    else:
-        cargs.append('/workspace/build')
+    cargs.append(FLAGS.cmake_dir)
     return cargs
 
 
@@ -279,13 +275,13 @@ def backend_repo(be):
     return '{}_backend'.format(be)
 
 
-def backend_cmake_args(images, components, be, install_dir):
+def backend_cmake_args(images, components, be, install_dir, library_paths):
     if be == 'onnxruntime':
         args = onnxruntime_cmake_args()
     elif be == 'tensorflow1':
-        args = tensorflow_cmake_args(1, images)
+        args = tensorflow_cmake_args(1, images, library_paths)
     elif be == 'tensorflow2':
-        args = tensorflow_cmake_args(2, images)
+        args = tensorflow_cmake_args(2, images, library_paths)
     elif be == 'python':
         args = []
     elif be == 'dali':
@@ -377,7 +373,7 @@ def onnxruntime_cmake_args():
 
 
 def tensorrt_cmake_args():
-    if platform.system() == 'Windows':
+    if get_platform() == 'windows':
         return [
             '-DTRITON_TENSORRT_INCLUDE_PATHS=c:/TensorRT/include',
         ]
@@ -385,17 +381,21 @@ def tensorrt_cmake_args():
     return []
 
 
-def tensorflow_cmake_args(ver, images):
-    # If jetson build is specified do not use docker images
-    if FLAGS.jetson_build:
-        opt_dir = "/opt" if FLAGS.opt_dir is None else FLAGS.opt_dir
-        extra_args = ['-DTRITON_TENSORFLOW_LIB_PATHS={}/tritonserver/backends/tensorflow{}'.format(opt_dir, ver)]
+def tensorflow_cmake_args(ver, images, library_paths):
+    backend_name = "tensorflow{}".format(ver)
+
+    # If platform is jetpack build is specified do not use docker images
+    if get_platform() == 'jetpack':
+        if backend_name in library_paths:
+            extra_args = [
+                '-DTRITON_TENSORFLOW_LIB_PATHS={}'.format(
+                    library_paths[backend_name])
+            ]
     else:
-        # If a specific TF image is specified use it, otherwise pull from
-        # NGC.
-        image_name = "tensorflow{}".format(ver)
-        if image_name in images:
-            image = images[image_name]
+        # If a specific TF image is specified use it, otherwise pull from NGC.
+        backend_name = "tensorflow{}".format(ver)
+        if backend_name in images:
+            image = images[backend_name]
         else:
             if ver == 2:
                 image = 'nvcr.io/nvidia/tensorflow:{}-py3'.format(
@@ -428,7 +428,7 @@ ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 '''
     # Install the windows- or linux-specific buildbase dependencies
-    if platform.system() == 'Windows':
+    if get_platform() == 'windows':
         df += '''
 SHELL ["cmd", "/S", "/C"]
 '''
@@ -488,7 +488,7 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     # environment otherwise the build will fail. Also set
     # TRITONBUILD_CMAKE_TOOLCHAIN_FILE and VCPKG_TARGET_TRIPLET so
     # that cmake can find the packages installed by vcpkg.
-    if platform.system() == 'Windows':
+    if get_platform() == 'windows':
         df += '''
 WORKDIR /workspace
 RUN rmdir /S/Q * || exit 0
@@ -665,7 +665,7 @@ def container_build(images, backends, repoagents):
     # build.
     if 'base' in images:
         base_image = images['base']
-    elif platform.system() == 'Windows':
+    elif get_platform() == 'windows':
         base_image = 'mcr.microsoft.com/dotnet/framework/sdk:4.8'
     else:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
@@ -758,7 +758,7 @@ def container_build(images, backends, repoagents):
             'docker', 'run', '--name', 'tritonserver_builder', '-w',
             '/workspace'
         ]
-        if platform.system() == 'Windows':
+        if get_platform() == 'windows':
             dockerrunargs += [
                 '-v', '\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine'
             ]
@@ -823,7 +823,7 @@ def container_build(images, backends, repoagents):
         # the install artifacts from the tritonserver_build
         # container. Windows containers can't access GPUs so we don't
         # bother to create the base image for windows.
-        if platform.system() != 'Windows':
+        if get_platform() == 'windows':
             create_dockerfile(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
                               backends, repoagents)
             p = subprocess.Popen([
@@ -862,10 +862,11 @@ if __name__ == '__main__':
         action="store_true",
         required=False,
         help='Do not use Docker --pull argument when building container.')
-    parser.add_argument('--jetson-build',
-                        action="store_true",
-                        required=False,
-                        help='Use jetson build process.')
+    parser.add_argument(
+        '--target-platform',
+        required=False,
+        default=None,
+        help='Platform to build for. If not specified, auto-detect the same.')
 
     parser.add_argument('--build-id',
                         type=str,
@@ -888,13 +889,15 @@ if __name__ == '__main__':
         default=None,
         help='Install directory, default is <builddir>/opt/tritonserver.')
     parser.add_argument('--cmake-dir',
-                        required=False,
-                        default=None,
-                        help='cmake directory. Folder for CMakeLists.txt.')
-    parser.add_argument('--opt-dir',
-                        required=False,
-                        default=None,
-                        help='Opt directory. Directory to replace "/opt" with.')
+                        type=str,
+                        required=True,
+                        help='CMake directory. Folder for CMakeLists.txt.')
+    parser.add_argument('--library-paths',
+        action='append',
+        required=False,
+        help=
+        'Include specified library paths for respective backends in build as <backend-name>[:<library_path>].'
+    )
     parser.add_argument(
         '--build-type',
         required=False,
@@ -1039,6 +1042,8 @@ if __name__ == '__main__':
         FLAGS.filesystem = []
     if FLAGS.repoagent is None:
         FLAGS.repoagent = []
+    if FLAGS.library_paths is None:
+        FLAGS.library_paths = []
 
     # Determine the versions. Start with Triton version, if --version
     # is not explicitly specified read from TRITON_VERSION file.
@@ -1088,11 +1093,20 @@ if __name__ == '__main__':
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
 
-    # If --no-container-build or jetson_build is not specified then we perform the actual
-    # build within a build container and then from that create a
-    # tritonserver container holding the results of the build.
+    # Initialize map of repo agents to build and repo-tag for each.
+    library_paths = {}
+    for lpath in FLAGS.library_paths:
+        parts = lpath.split(':')
+        if len(parts) == 2:
+            log('backend "{}" library path "{}"'.format(parts[0], parts[1]))
+            library_paths[parts[0]] = parts[1]
+
+    # If --container-build is specified then we perform the actual
+    # then we perform the actual build within a build container and
+    # then from that create a tritonserver container holding the results of the build.
     if not FLAGS.no_container_build:
-        container_build(images, backends, repoagents)
+        import docker
+        container_build(backends, images)
         sys.exit(0)
 
     # If there is a container pre-build command assume this invocation
@@ -1156,8 +1170,10 @@ if __name__ == '__main__':
         mkdir(FLAGS.build_dir)
         gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be)
         mkdir(repo_build_dir)
-        cmake(repo_build_dir,
-              backend_cmake_args(images, components, be, repo_install_dir))
+        cmake(
+            repo_build_dir,
+            backend_cmake_args(images, components, be, repo_install_dir,
+                               library_paths))
         makeinstall(repo_build_dir)
 
         backend_install_dir = os.path.join(FLAGS.install_dir, 'backends', be)
