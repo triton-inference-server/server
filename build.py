@@ -86,7 +86,7 @@ def fail(msg):
 
 def target_platform():
     if FLAGS.target_platform is not None:
-        return platform
+        return FLAGS.target_platform
     return platform.system().lower()
 
 
@@ -384,7 +384,8 @@ def tensorrt_cmake_args():
 def tensorflow_cmake_args(ver, images, library_paths):
     backend_name = "tensorflow{}".format(ver)
 
-    # If platform is jetpack build is specified do not use docker images
+    # If platform is jetpack do not use docker images
+    extra_args = []
     if target_platform() == 'jetpack':
         if backend_name in library_paths:
             extra_args = [
@@ -867,7 +868,7 @@ if __name__ == '__main__':
         required=False,
         default=None,
         help=
-        'Target Platform, can be "ubuntu", "windows" or "jetpack". If not specified, auto-detect the same.'
+        'Target for build, can be "ubuntu", "windows" or "jetpack". If not specified, build targets the current platform.'
     )
 
     parser.add_argument('--build-id',
@@ -891,17 +892,18 @@ if __name__ == '__main__':
         required=False,
         default=None,
         help='Install directory, default is <builddir>/opt/tritonserver.')
-    parser.add_argument('--cmake-dir',
-                        type=str,
-                        required=True,
-                        help='CMake directory. Folder for CMakeLists.txt.')
+    parser.add_argument(
+        '--cmake-dir',
+        type=str,
+        required=True,
+        help='Directory containing the CMakeLists.txt file for Triton server.')
     parser.add_argument(
         '--library-paths',
         action='append',
         required=False,
         default=None,
         help=
-        'Include specified library paths for respective backends in build as <backend-name>[:<library_path>].'
+        'Specify library paths for respective backends in build as <backend-name>[:<library_path>].'
     )
     parser.add_argument(
         '--build-type',
@@ -1098,7 +1100,7 @@ if __name__ == '__main__':
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
 
-    # Initialize map of repo agents to build and repo-tag for each.
+    # Initialize map of library paths for each backend.
     library_paths = {}
     for lpath in FLAGS.library_paths:
         parts = lpath.split(':')
@@ -1107,8 +1109,8 @@ if __name__ == '__main__':
             library_paths[parts[0]] = parts[1]
 
     # If --container-build is specified then we perform the actual
-    # then we perform the actual build within a build container and
-    # then from that create a tritonserver container holding the results of the build.
+    # build within a build container and then from that create a
+    # tritonserver container holding the results of the build.
     if not FLAGS.no_container_build:
         import docker
         container_build(backends, images, repoagents)
