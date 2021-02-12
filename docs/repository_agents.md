@@ -102,7 +102,10 @@ symbols.
 
 The shared library will be dynamically loaded by Triton when it is
 needed. For a repository agent called *A*, the shared library must be
-installed as /opt/tritonserver/repoagents/A/libtritonrepoagent_A.so.
+installed as \<repository_agent_directory\>/A/libtritonrepoagent_A.so.
+Where \<repository_agent_directory\> is by default
+/opt/tritonserver/repoagents.  The --repoagent-directory flag can be
+used to override the default.
 
 Your repository agent must implement the repository agent API as
 documented in
