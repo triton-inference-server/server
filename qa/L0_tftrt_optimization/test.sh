@@ -151,15 +151,9 @@ for MODEL in \
         RET=1
     fi
 
-    grep "failed to load '${MODEL}_cpu_trt' version 1: Invalid argument: GPU Execution Accelerator can only be set on non-CPU backend context" $SERVER_LOG
+    grep "GPU Execution Accelerator will be ignored for model instance on CPU" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected GPU Execution Accelerator on CPU context returns error\n***"
-        RET=1
-    fi
-
-    grep "failed to load '${MODEL}_cpu_trt' version 1: Invalid argument: GPU Execution Accelerator can only be set on non-CPU backend context" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected GPU Execution Accelerator on CPU context returns error\n***"
+        echo -e "\n***\n*** Failed. Expected logged warning: GPU Execution Accelerator will be ignored for model instance on CPU\n***"
         RET=1
     fi
 
