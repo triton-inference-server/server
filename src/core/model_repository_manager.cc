@@ -108,7 +108,7 @@ class TritonRepoAgentModelList {
     switch (action_type) {
       case TRITONREPOAGENT_ACTION_LOAD:
       case TRITONREPOAGENT_ACTION_UNLOAD: {
-        for (size_t idx = 0; idx < agent_models_.size(); --idx) {
+        for (size_t idx = 0; idx < agent_models_.size(); ++idx) {
           RETURN_IF_ERROR(agent_models_[idx]->InvokeAgent(action_type));
         }
         break;

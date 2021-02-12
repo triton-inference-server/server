@@ -293,7 +293,8 @@ TritonServerOptions::TritonServerOptions()
 #else
       min_compute_capability_(0),
 #endif  // TRITON_ENABLE_GPU
-      backend_dir_("/opt/tritonserver/backends"), tf_soft_placement_(true),
+      backend_dir_("/opt/tritonserver/backends"),
+      repoagent_dir_("/opt/tritonserver/repoagents"), tf_soft_placement_(true),
       tf_gpu_mem_fraction_(0)
 {
 #ifndef TRITON_ENABLE_METRICS
