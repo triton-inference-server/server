@@ -263,8 +263,9 @@ INPUT1, shape [4, 4] and data type INT32:
 Note that the [4, 4] tensor has been flattened in a row-major format
 for the inputs. In addition to specifying explicit tensors, you can
 also provide Base64 encoded binary data for the tensors. Each data
-object must list its data in a row-major order. The following example
-highlights how this can be acheived:
+object must list its data in a row-major order. Binary data must be in
+little-endian byte order. The following example highlights how this
+can be acheived:
 
 ```
   {
