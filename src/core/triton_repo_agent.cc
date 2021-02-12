@@ -363,8 +363,7 @@ TritonRepoAgentManager::SetGlobalSearchPath(const std::string& path)
 
 Status
 TritonRepoAgentManager::CreateAgent(
-    const std::string& model_dir, const std::string& agent_name,
-    std::shared_ptr<TritonRepoAgent>* agent)
+    const std::string& agent_name, std::shared_ptr<TritonRepoAgent>* agent)
 {
   auto& singleton_manager = Singleton();
   std::lock_guard<std::mutex> lock(singleton_manager.mu_);

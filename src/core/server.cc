@@ -125,6 +125,18 @@ InferenceServer::Init()
         Status::Code::INVALID_ARG, "--model-repository must be specified");
   }
 
+  if (repoagent_dir_.empty()) {
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return Status(
+        Status::Code::INVALID_ARG, "--repoagent-directory can not be empty");
+  }
+
+  status = TritonRepoAgentManager::SetGlobalSearchPath(repoagent_dir_);
+  if (!status.IsOk()) {
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return status;
+  }
+
   // Some backends have difficulty being loaded/unloaded dynamically,
   // for example, non-deterministic hanging while trying to initialize
   // a shared library. The hangs seems to be related to other
@@ -475,8 +487,7 @@ InferenceServer::PrintBackendAndModelSummary()
 
   triton::common::TablePrinter repoagents_table(repoagent_headers);
 
-  std::unique_ptr<std::unordered_map<std::string, std::string>>
-      repoagent_state;
+  std::unique_ptr<std::unordered_map<std::string, std::string>> repoagent_state;
   RETURN_IF_ERROR(TritonRepoAgentManager::AgentState(&repoagent_state));
 
   for (const auto& repoagent_pair : *repoagent_state) {
