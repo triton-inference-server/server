@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -519,6 +519,7 @@ if(${TRITON_ENABLE_GPU})
   target_link_libraries(
     tritonserver
     PUBLIC ${CUDA_nvml_LIBRARY}
+    PRIVATE gather_kernel
     PRIVATE ${CUDA_LIBRARIES}
     PRIVATE ${CNMEM_LIBRARY}
   )

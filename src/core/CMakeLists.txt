@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -151,6 +151,15 @@ if(${TRITON_ENABLE_S3})
   message(STATUS "Using aws-sdk-cpp ${AWSSDK_VERSION}")
 endif()
 
+if(${TRITON_ENABLE_GPU})
+  set(CUDA_LIBRARIES PUBLIC ${CUDA_LIBRARIES})
+  cuda_add_library(
+    gather_kernel 
+    kernel.cu kernel.h
+    STATIC
+  )
+endif() # TRITON_ENABLE_GPU
+
 set(
   SERVER_SRCS
   autofill.cc
@@ -191,6 +200,7 @@ set(
   backend_context.h
   constants.h
   cuda_utils.h
+  kernel.h
   async_work_queue.h
   dynamic_batch_scheduler.h
   ensemble_scheduler.h
@@ -240,6 +250,9 @@ add_library(
   ${SERVER_SRCS} ${SERVER_HDRS}
 )
 add_dependencies(server-library proto-library)
+if(${TRITON_ENABLE_GPU})
+  add_dependencies(server-library gather_kernel)
+endif() # TRITON_ENABLE_GPU
 
 if(${TRITON_ENABLE_GPU})
   target_include_directories(
