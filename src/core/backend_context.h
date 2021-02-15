@@ -280,6 +280,7 @@ class BackendInputCollector {
       const TRITONSERVER_MemoryType tensor_memory_type,
       const int64_t tensor_memory_type_id,
       const TRITONSERVER_MemoryType use_pinned_memory_type,
+      const bool use_kernel,
       std::unique_ptr<InferenceResponse>* response);
   template <typename T>
   Status SetElementCount(

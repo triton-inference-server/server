@@ -666,7 +666,7 @@ BackendInputCollector::ProcessTensor(
     } else {
       need_sync_ |= SetFixedSizeInputTensor(
           request_input, buffer_offset, buffer, buffer_byte_size, memory_type,
-          memory_type_id, use_pinned_memory_type, &response);
+          memory_type_id, use_pinned_memory_type, true, &response);
     }
 
     buffer_offset += request_input->Data()->TotalByteSize();
@@ -916,6 +916,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
     const TRITONSERVER_MemoryType tensor_memory_type,
     const int64_t tensor_memory_type_id,
     const TRITONSERVER_MemoryType use_pinned_memory_type,
+    const bool use_kernel,
     std::unique_ptr<InferenceResponse>* response)
 {
   bool cuda_copy = false;
@@ -988,10 +989,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
     // pinned -> device
     // same device -> device
     // different device -> device
-    if ((idx == 0) &&
-        // overload 'use_pinned_memory_type' as a mean to fallback when copy kernel
-        // fails to launch in FlushPendingCopyKernel()
-        (use_pinned_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) &&
+    if (use_kernel && (idx == 0) &&
         (src_memory_type != TRITONSERVER_MEMORY_CPU) &&
         (tensor_memory_type == TRITONSERVER_MEMORY_GPU)) {
       if (pending_copy_kernel_buffer_byte_size_ == 0) {
@@ -1061,7 +1059,7 @@ BackendInputCollector::FlushPendingPinned(
       cuda_copy |= SetFixedSizeInputTensor(
           request_input, pending_pinned_offset_ + offset, tensor_buffer,
           tensor_buffer_byte_size, tensor_memory_type, tensor_memory_type_id,
-          TRITONSERVER_MEMORY_CPU_PINNED, response);
+          TRITONSERVER_MEMORY_CPU_PINNED, false, response);
       offset += request_input->Data()->TotalByteSize();
     }
   }
@@ -1078,7 +1076,7 @@ BackendInputCollector::FlushPendingPinned(
         cuda_used |= SetFixedSizeInputTensor(
             request_input, offset, pinned_buffer, pending_pinned_byte_size_,
             pinned_memory_type, pinned_memory_id,
-            TRITONSERVER_MEMORY_CPU_PINNED, response);
+            TRITONSERVER_MEMORY_CPU_PINNED, false, response);
         offset += request_input->Data()->TotalByteSize();
       }
 
@@ -1160,7 +1158,7 @@ BackendInputCollector::FlushPendingPinned(
                         request_input, offset, pinned_buffer,
                         pending_pinned_byte_size, pinned_memory_type,
                         pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED,
-                        response);
+                        false, response);
                 offset += request_input->Data()->TotalByteSize();
               }
               // The last segmented task will start the next phase of
@@ -1224,7 +1222,7 @@ BackendInputCollector::FlushPendingCopyKernel(
       cuda_copy |= SetFixedSizeInputTensor(
           request_input, pending_copy_kernel_buffer_offset_ + offset, tensor_buffer,
           tensor_buffer_byte_size, tensor_memory_type, tensor_memory_type_id,
-          TRITONSERVER_MEMORY_CPU_PINNED, response);
+          TRITONSERVER_MEMORY_CPU_PINNED, false, response);
       offset += request_input->Data()->TotalByteSize();
     }
   }
