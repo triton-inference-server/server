@@ -1222,7 +1222,7 @@ BackendInputCollector::FlushPendingCopyKernel(
       const InferenceRequest::Input* request_input = pr.second;
 
       cuda_copy |= SetFixedSizeInputTensor(
-          request_input, pending_pinned_offset_ + offset, tensor_buffer,
+          request_input, pending_copy_kernel_buffer_offset_ + offset, tensor_buffer,
           tensor_buffer_byte_size, tensor_memory_type, tensor_memory_type_id,
           TRITONSERVER_MEMORY_CPU_PINNED, response);
       offset += request_input->Data()->TotalByteSize();
@@ -1232,7 +1232,6 @@ BackendInputCollector::FlushPendingCopyKernel(
   // Pending kernel copies are handled...
   pending_copy_kernel_buffer_byte_size_ = 0;
   pending_copy_kernel_buffer_offset_ = 0;
-  RequestsList pending_copy_kernel_inputs_;
   pending_copy_kernel_input_buffer_counts_ = 0;
   pending_copy_kernel_inputs_.clear();
 
@@ -1263,18 +1262,17 @@ BackendInputCollector::LaunchCopyKernel(
   size_t buffer_byte_size = 0;
 
   size_t byte_size_offset = 0;
-  size_t buffer_count = 0;
   for (const auto& response_input : pending_copy_kernel_inputs_) {
     const auto& input = response_input.second;
 
     for (size_t buffer_idx = 0; buffer_idx < input->DataBufferCount(); ++buffer_idx) {
-      RETURN_IF_ERROR(input->DataBuffer(buffer_idx, (const void**)(&input_ptr_buffer_host[buffer_count]),
+      input_ptr_buffer_host.emplace_back();
+      RETURN_IF_ERROR(input->DataBuffer(buffer_idx, (const void**)(&input_ptr_buffer_host.back()),
           &buffer_byte_size, &kernel_buffer_memory_type, &kernel_buffer_memory_id));
 
-      byte_size_offset_buffer_host[buffer_count] = byte_size_offset;
-      byte_size_buffer_host[buffer_count] = buffer_byte_size;
+      byte_size_offset_buffer_host.emplace_back(byte_size_offset);
+      byte_size_buffer_host.emplace_back(buffer_byte_size);
       byte_size_offset += buffer_byte_size;
-      ++buffer_count;
     }
   }
 
@@ -1307,7 +1305,7 @@ BackendInputCollector::LaunchCopyKernel(
       (const int8_t **)input_ptr_buffer,
       (const size_t *)byte_size_buffer,
       (const size_t *)byte_size_offset_buffer,
-      (int8_t*)tensor_buffer + pending_pinned_offset_,
+      (int8_t*)tensor_buffer + pending_copy_kernel_buffer_offset_,
       pending_copy_kernel_input_buffer_counts_, stream_);
   return Status::Success;
 }
