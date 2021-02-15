@@ -1208,6 +1208,9 @@ BackendInputCollector::FlushPendingCopyKernel(
     const TRITONSERVER_MemoryType tensor_memory_type,
     const int64_t tensor_memory_type_id)
 {
+  if (pending_copy_kernel_inputs_.size() == 0) {
+    return false;
+  }
   auto status = LaunchCopyKernel(tensor_buffer, tensor_buffer_byte_size, tensor_memory_type, tensor_memory_type_id);
   bool cuda_copy = status.IsOk();
 
