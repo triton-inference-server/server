@@ -993,7 +993,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
       // but server can still runs even if it fails to enable peer-to-peer.
       // Should provide a utility to check whether a device pair allows direct
       // access and use gather kernel accordingly
-      if ((src_memory_type == TRITONSERVER_MEMORY_GPU) && (src_memory_type_id == tensor_memory_type_id)) {
+      if ((src_memory_type != TRITONSERVER_MEMORY_GPU) || (src_memory_type_id == tensor_memory_type_id)) {
         if (pending_copy_kernel_buffer_byte_size_ == 0) {
           pending_copy_kernel_buffer_offset_ = tensor_buffer_offset;
         }
