@@ -1113,7 +1113,7 @@ if __name__ == '__main__':
     # tritonserver container holding the results of the build.
     if not FLAGS.no_container_build:
         import docker
-        container_build(backends, images, repoagents)
+        container_build(images, backends, repoagents)
         sys.exit(0)
 
     # If there is a container pre-build command assume this invocation
