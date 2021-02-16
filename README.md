@@ -95,6 +95,10 @@ release is
   developed [KFServing
   protocol](https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2).
 
+* A [C API](docs/inference_protocols.md#c-api) allows Triton to be
+  linked directly into your application for edge and other in-process
+  use cases.
+
 * [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency. The metrics are provided in
   Prometheus data format.
