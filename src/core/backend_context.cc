@@ -1242,6 +1242,7 @@ BackendInputCollector::LaunchCopyKernel(
     const TRITONSERVER_MemoryType tensor_memory_type,
     const int64_t tensor_memory_type_id)
 {
+#ifdef TRITON_ENABLE_GPU
   input_ptr_buffer_host_.emplace_back(new std::vector<int8_t*>());
   byte_size_buffer_host_.emplace_back(new std::vector<size_t>());
   byte_size_offset_buffer_host_.emplace_back(new std::vector<size_t>());
@@ -1306,6 +1307,9 @@ BackendInputCollector::LaunchCopyKernel(
       (int8_t*)tensor_buffer + pending_copy_kernel_buffer_offset_,
       pending_copy_kernel_input_buffer_counts_, stream_);
   return Status::Success;
+#else
+  return Status(Status::Code::UNSUPPORTED, "Copy kernel can not be launched with TRITON_ENABLE_GPU=OFF");
+#endif  // TRITON_ENABLE_GPU
 }
 
 }}  // namespace nvidia::inferenceserver
