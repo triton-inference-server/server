@@ -36,17 +36,24 @@ __global__ void tritonBytesizeGatherKernel(
     const size_t * __restrict byte_size_offset_buffer,
     int8_t * __restrict output_buffer)
 {
-    int request_idx = blockIdx.x;
-    int laneId = threadIdx.x;
-    const int8_t * request_input_buffer = input_ptr_buffer[request_idx];
-    int byte_size = byte_size_buffer[request_idx];
-    int byte_size_offset = byte_size_offset_buffer[request_idx];
+  int request_idx = blockIdx.x;
+  int laneId = threadIdx.x;
+  const int8_t * request_input_buffer = input_ptr_buffer[request_idx];
+  int byte_size = byte_size_buffer[request_idx];
+  int byte_size_offset = byte_size_offset_buffer[request_idx];
 
-    int8_t * output_buffer_with_offset = output_buffer + byte_size_offset;
-    for(int elemId = laneId; elemId < byte_size; elemId += THREADBLOCK_SIZE)
-    {
+  int8_t * output_buffer_with_offset = output_buffer + byte_size_offset;
+  if ((byte_size%4)==0 && ((uint64_t)request_input_buffer%4)==0 && ((uint64_t)output_buffer_with_offset%4)==0) {
+      int32_t* input4 = (int32_t*)request_input_buffer;
+      int32_t* output4 = (int32_t*)output_buffer_with_offset;
+      for(int elemId = laneId; elemId < byte_size/4; elemId += THREADBLOCK_SIZE) {
+          output4[elemId] = input4[elemId];
+      }
+  } else {
+    for(int elemId = laneId; elemId < byte_size; elemId += THREADBLOCK_SIZE) {
         output_buffer_with_offset[elemId] = __ldg(request_input_buffer + elemId);
     }
+  }
 }
 
 void runGatherKernel(
