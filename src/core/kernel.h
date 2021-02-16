@@ -25,13 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
-#include <stdint.h>
 #include <cuda_runtime_api.h>
+#include <stdint.h>
 
-void runGatherKernel(
-    const int8_t ** input_ptr_buffer,
-    const size_t * byte_size_buffer,
-    const size_t * byte_size_offset_buffer,
-    int8_t * output_buffer,
-    size_t request_count,
-    cudaStream_t stream);
+void RunGatherKernel(
+    const int8_t** input_ptr_buffer, const size_t* byte_size_buffer,
+    const size_t* byte_size_offset_buffer, int8_t* output_buffer,
+    size_t request_count, cudaStream_t stream);
