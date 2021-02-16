@@ -974,9 +974,6 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
     // [FIXME] support other direction if prove to be faster, all kernel
     // handling code in this class asssumes the destination buffer is on device
-    // [FIXME] peer-to-peer is enabled by default, but server can still runs
-    // even if it fails to enable peer-to-peer. In such case, the kernel
-    // can't access memory across device directly.
     // If the request buffer and the destination buffer are accessible by all
     // GPUs (i.e. pinned, device), initiate the copy via copy CUDA kernel.
     // We only do this check for the
@@ -991,17 +988,24 @@ BackendInputCollector::SetFixedSizeInputTensor(
     if (use_kernel && (idx == 0) &&
         (src_memory_type != TRITONSERVER_MEMORY_CPU) &&
         (tensor_memory_type == TRITONSERVER_MEMORY_GPU)) {
-      if (pending_copy_kernel_buffer_byte_size_ == 0) {
-        pending_copy_kernel_buffer_offset_ = tensor_buffer_offset;
-      }
+      // [FIXME] Currently not allowing copy between devices as it requires
+      // peer-to-peer access to be enabled. Peer-to-peer is enabled by default,
+      // but server can still runs even if it fails to enable peer-to-peer.
+      // Should provide a utility to check whether a device pair allows direct
+      // access and use gather kernel accordingly
+      if ((src_memory_type == TRITONSERVER_MEMORY_GPU) && (src_memory_type_id == tensor_memory_type_id)) {
+        if (pending_copy_kernel_buffer_byte_size_ == 0) {
+          pending_copy_kernel_buffer_offset_ = tensor_buffer_offset;
+        }
 
-      pending_copy_kernel_buffer_byte_size_ +=
-          request_input->Data()->TotalByteSize();
-      pending_copy_kernel_input_buffer_counts_ +=
-          request_input->DataBufferCount();
-      pending_copy_kernel_inputs_.push_back(
-          std::make_pair(response, request_input));
-      return cuda_copy;
+        pending_copy_kernel_buffer_byte_size_ +=
+            request_input->Data()->TotalByteSize();
+        pending_copy_kernel_input_buffer_counts_ +=
+            request_input->DataBufferCount();
+        pending_copy_kernel_inputs_.push_back(
+            std::make_pair(response, request_input));
+        return cuda_copy;
+      }
     }
 
     // Direct copy without intermediate pinned memory.
@@ -1198,7 +1202,7 @@ BackendInputCollector::FlushPendingPinned(
   // Need to hold on to the allocated pinned buffer as there are still
   // copies in flight. Will delete it in finalize.
   if (pinned_memory != nullptr) {
-    in_used_memories_.push_back(std::move(pinned_memory));
+    in_use_memories_.push_back(std::move(pinned_memory));
   }
 
   return cuda_copy;
@@ -1286,10 +1290,10 @@ BackendInputCollector::LaunchCopyKernel(
     }
   }
 
-  in_used_memories_.emplace_back(new AllocatedMemory(
+  in_use_memories_.emplace_back(new AllocatedMemory(
       pending_copy_kernel_input_buffer_counts_ * sizeof(int8_t*),
       tensor_memory_type, tensor_memory_type_id));
-  char* input_ptr_buffer = in_used_memories_.back()->MutableBuffer(
+  char* input_ptr_buffer = in_use_memories_.back()->MutableBuffer(
       &kernel_buffer_memory_type, &kernel_buffer_memory_id);
   if ((kernel_buffer_memory_type != tensor_memory_type) ||
       (kernel_buffer_memory_id != tensor_memory_type_id)) {
@@ -1297,10 +1301,10 @@ BackendInputCollector::LaunchCopyKernel(
         Status::Code::INTERNAL,
         "Failed to obtain memory buffer for copy kernel input");
   }
-  in_used_memories_.emplace_back(new AllocatedMemory(
+  in_use_memories_.emplace_back(new AllocatedMemory(
       pending_copy_kernel_input_buffer_counts_ * sizeof(size_t),
       tensor_memory_type, tensor_memory_type_id));
-  char* byte_size_buffer = in_used_memories_.back()->MutableBuffer(
+  char* byte_size_buffer = in_use_memories_.back()->MutableBuffer(
       &kernel_buffer_memory_type, &kernel_buffer_memory_id);
   if ((kernel_buffer_memory_type != tensor_memory_type) ||
       (kernel_buffer_memory_id != tensor_memory_type_id)) {
@@ -1308,10 +1312,10 @@ BackendInputCollector::LaunchCopyKernel(
         Status::Code::INTERNAL,
         "Failed to obtain memory buffer for copy kernel input");
   }
-  in_used_memories_.emplace_back(new AllocatedMemory(
+  in_use_memories_.emplace_back(new AllocatedMemory(
       pending_copy_kernel_input_buffer_counts_ * sizeof(size_t),
       tensor_memory_type, tensor_memory_type_id));
-  char* byte_size_offset_buffer = in_used_memories_.back()->MutableBuffer(
+  char* byte_size_offset_buffer = in_use_memories_.back()->MutableBuffer(
       &kernel_buffer_memory_type, &kernel_buffer_memory_id);
   if ((kernel_buffer_memory_type != tensor_memory_type) ||
       (kernel_buffer_memory_id != tensor_memory_type_id)) {

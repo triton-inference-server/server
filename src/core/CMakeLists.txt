@@ -154,9 +154,8 @@ endif()
 if(${TRITON_ENABLE_GPU})
   set(CUDA_LIBRARIES PUBLIC ${CUDA_LIBRARIES})
   cuda_add_library(
-    gather_kernel 
+    kernel-library 
     kernel.cu kernel.h
-    STATIC
   )
 endif() # TRITON_ENABLE_GPU
 
@@ -250,9 +249,6 @@ add_library(
   ${SERVER_SRCS} ${SERVER_HDRS}
 )
 add_dependencies(server-library proto-library)
-if(${TRITON_ENABLE_GPU})
-  add_dependencies(server-library gather_kernel)
-endif() # TRITON_ENABLE_GPU
 
 if(${TRITON_ENABLE_GPU})
   target_include_directories(

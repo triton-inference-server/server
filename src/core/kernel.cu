@@ -24,9 +24,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <cuda.h>
-#include <cuda_runtime_api.h>
 #include "src/core/kernel.h"
+
+#include <cuda.h>
 
 #define THREADBLOCK_SIZE 512
 __launch_bounds__(THREADBLOCK_SIZE) __global__ void TritonGatherKernel(

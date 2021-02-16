@@ -519,7 +519,7 @@ if(${TRITON_ENABLE_GPU})
   target_link_libraries(
     tritonserver
     PUBLIC ${CUDA_nvml_LIBRARY}
-    PRIVATE gather_kernel
+    PRIVATE kernel-library
     PRIVATE ${CUDA_LIBRARIES}
     PRIVATE ${CNMEM_LIBRARY}
   )

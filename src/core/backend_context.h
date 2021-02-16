@@ -308,7 +308,7 @@ class BackendInputCollector {
 
   // Allocated memories that need to live over the lifetime of this
   // BackendInputCollector object.
-  std::list<std::unique_ptr<AllocatedMemory>> in_used_memories_;
+  std::list<std::unique_ptr<AllocatedMemory>> in_use_memories_;
 
   size_t pending_copy_kernel_buffer_byte_size_;
   size_t pending_copy_kernel_buffer_offset_;
