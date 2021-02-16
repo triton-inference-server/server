@@ -219,16 +219,21 @@ configuration file.
 
 When using --strict-model-config=false you can see the model
 configuration that was generated for a model by using the [model
-metadata
-endpoint](https://github.com/kubeflow/kfserving/blob/master/docs/predict-api/v2/required_api.md). The easiest way to do this is to use a utility like *curl*:
+configuration
+endpoint](https://github.com/triton-inference-server/server/blob/master/docs/protocol/extension_model_configuration.md). The
+easiest way to do this is to use a utility like *curl*:
 
 ```bash
-$ curl localhost:8000/v2/models/<model name>
+$ curl localhost:8000/v2/models/<model name>/config
 ```
 
+This will return a JSON representation of the generated model
+configuration. From this you can take the max_batch_size, inputs, and
+outputs sections of the JSON and convert it to a config.pbtxt file.
 Triton only generates the [minimal portion of the model
 configuration](#minimal-model-configuration). You must still provide
-the optional portions of the model configuration.
+the optional portions of the model configuration by editing the
+config.pbtxt file.
 
 ## Datatypes
 
