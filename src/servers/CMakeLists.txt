@@ -519,10 +519,15 @@ if(${TRITON_ENABLE_GPU})
   target_link_libraries(
     tritonserver
     PUBLIC ${CUDA_nvml_LIBRARY}
-    PRIVATE kernel-library
     PRIVATE ${CUDA_LIBRARIES}
     PRIVATE ${CNMEM_LIBRARY}
   )
+if ((NOT WIN32) AND (NOT ${ARCH} MATCHES "aarch64"))
+  target_link_libraries(
+    tritonserver
+    PRIVATE kernel-library
+  )
+endif() # NOT WIN32 AND NOT "aarch64"
 endif() # TRITON_ENABLE_GPU
 
 install(
