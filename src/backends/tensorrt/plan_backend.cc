@@ -2776,7 +2776,11 @@ PlanBackend::Context::Run(
   // Output buffers are guaranteed to be available at this point when the
   // execution and output copy are on the same stream.
   cudaStreamWaitEvent(stream_, events_[next_set_].input_ready_, 0);
-
+  // Wait for the output buffers to be available at this point when the
+  // execution and output copy are on separate streams
+  if (use_output_copy_stream_) {
+    cudaStreamWaitEvent(stream_, events_[next_set_].output_ready_, 0);
+  }
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
   if (cuda_graph != nullptr) {
