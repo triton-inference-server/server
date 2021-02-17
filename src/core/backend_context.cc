@@ -37,19 +37,6 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
-// Detect ARC
-#if MSVC
-#ifdef _M_ARM64
-#define TRITON_ARCH_ARM64
-#endif
-#endif
-
-#if GCC
-#ifdef __aarch64__
-#define TRITON_ARCH_ARM64
-#endif
-#endif
-
 TRITONSERVER_MemoryType
 GetUsePinnedMemoryType(TRITONSERVER_MemoryType ref_buffer_type)
 {
