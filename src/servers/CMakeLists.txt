@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -522,6 +522,12 @@ if(${TRITON_ENABLE_GPU})
     PRIVATE ${CUDA_LIBRARIES}
     PRIVATE ${CNMEM_LIBRARY}
   )
+if ((NOT WIN32) AND (NOT ${ARCH} MATCHES "aarch64"))
+  target_link_libraries(
+    tritonserver
+    PRIVATE kernel-library
+  )
+endif() # NOT WIN32 AND NOT "aarch64"
 endif() # TRITON_ENABLE_GPU
 
 install(
