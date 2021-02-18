@@ -64,7 +64,8 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Run test for both HTTP and GRPC, synchronous and asynchronous. 1000 inferences each.
+# Run test for both HTTP and GRPC, re-using and not re-using client object. 
+# 1000 inferences in each case.
 EXTRA_ARGS="-r 1000"
 for PROTOCOL in http grpc; do
     for REUSE in reuse no_reuse; do
