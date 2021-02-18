@@ -40,11 +40,12 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 LEAKCHECK=/usr/bin/valgrind
-LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
+LEAKCHECK_ARGS_BASE="--max-threads=3000 --tool=massif --time-unit=B"
 SERVER_TIMEOUT=3600
-rm -f *.log
+rm -f *.log *.massif
 
 MEMORY_GROWTH_TEST=../clients/memory_leak_test
+MASSIF_TEST=../common/check_massif_log.py
 
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -56,51 +57,59 @@ cp libidentity.so $DATADIR/custom_identity_int32/1/.
 
 RET=0
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+# Threshold memory growth in MB
+MAX_ALLOWED_ALLOC="0"
+export MAX_ALLOWED_ALLOC
 
-# Run test for both HTTP and GRPC, re-using and not re-using client object. 
-# 1000 inferences in each case.
-EXTRA_ARGS="-r 1000"
+# Run test for both HTTP and GRPC, not re-using client object. 
+# 10000 inferences in each case.
+EXTRA_ARGS="-r 10000"
 for PROTOCOL in http grpc; do
-    for REUSE in reuse no_reuse; do
-        LEAKCHECK_LOG="./valgrind.${PROTOCOL}.${REUSE}.c++.log"
-        CLIENT_LOG="./client.${PROTOCOL}.${REUSE}.c++.log"
-        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-        if [ "$REUSE" == "reuse" ]; then
-            EXTRA_CLIENT_ARGS="${EXTRA_ARGS} -i ${PROTOCOL} -R"
-        else
-            EXTRA_CLIENT_ARGS="${EXTRA_ARGS} -i ${PROTOCOL}"
-        fi
+    LEAKCHECK_LOG="./valgrind.${PROTOCOL}.c++.log"
+    CLIENT_LOG="./client.${PROTOCOL}.c++.log"
+    MASSIF_LOG="./${PROTOCOL}.c++.massif"
+    LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG --massif-out-file=$MASSIF_LOG"
+    EXTRA_CLIENT_ARGS="${EXTRA_ARGS} -i ${PROTOCOL}"
 
-        echo "$LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_CLIENT_ARGS >> ${CLIENT_LOG}"
-        $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_CLIENT_ARGS >> ${CLIENT_LOG} 2>&1
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_CLIENT_ARGS >> ${CLIENT_LOG} 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}
+        RET=1
+        echo -e "\n***\n*** Test FAILED\n***"
+    else
+        check_valgrind_log $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
-            cat ${CLIENT_LOG}
-            RET=1
-            echo -e "\n***\n*** Test FAILED\n***"
-        else
-            check_valgrind_log $LEAKCHECK_LOG
-            if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Memory leak detected\n***"
-            RET=1
-            fi
+        echo -e "\n***\n*** Memory leak detected\n***"
+        RET=1
         fi
-    done
-done
 
-# Stop Server
-kill $SERVER_PID
-wait $SERVER_PID
+        set +e
+        # Check for memory growth
+        python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC >> ${CLIENT_LOG}.massif 2>&1
+        if [ $? -ne 0 ]; then
+            cat ${CLIENT_LOG}.massif
+            echo -e "\n***\n*** Massif Test for ${PROTOCOL} Failed\n***"
+            RET=1
+        fi
+        echo ${CLIENT_LOG}.massif
+        cat ${CLIENT_LOG}.massif
+        set -e
+    fi
+    # Stop Server
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
