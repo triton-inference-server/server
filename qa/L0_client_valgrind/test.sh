@@ -68,7 +68,7 @@ fi
 EXTRA_ARGS="-r 1000"
 for PROTOCOL in http grpc; do
     for REUSE in reuse no_reuse; do
-        LEAKCHECK_LOG="./valgrind.${PROTOCOL}.${TYPE}.c++.log"
+        LEAKCHECK_LOG="./valgrind.${PROTOCOL}.${REUSE}.c++.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         if [ "$REUSE" == "reuse" ]; then
             EXTRA_CLIENT_ARGS="${EXTRA_ARGS} -i ${PROTOCOL} -R"
