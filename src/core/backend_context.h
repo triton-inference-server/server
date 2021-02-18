@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -228,7 +228,10 @@ class BackendInputCollector {
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
         use_async_cpu_copy_(AsyncWorkQueue::WorkerCount() > 1), stream_(stream),
-        event_(event), pending_pinned_byte_size_(0), async_task_count_(0)
+        event_(event), pending_pinned_byte_size_(0), pending_pinned_offset_(0),
+        pending_copy_kernel_buffer_byte_size_(0),
+        pending_copy_kernel_buffer_offset_(0),
+        pending_copy_kernel_input_buffer_counts_(0), async_task_count_(0)
   {
   }
 
@@ -263,6 +266,14 @@ class BackendInputCollector {
       char* tensor_buffer, const size_t tensor_buffer_byte_size,
       const TRITONSERVER_MemoryType tensor_memory_type,
       const int64_t tensor_memory_type_id);
+  bool FlushPendingCopyKernel(
+      char* tensor_buffer, const size_t tensor_buffer_byte_size,
+      const TRITONSERVER_MemoryType tensor_memory_type,
+      const int64_t tensor_memory_type_id);
+  Status LaunchCopyKernel(
+      char* tensor_buffer, const size_t tensor_buffer_byte_size,
+      const TRITONSERVER_MemoryType tensor_memory_type,
+      const int64_t tensor_memory_type_id);
   bool SetFixedSizeInputTensor(
       const InferenceRequest::Input* request_input,
       const size_t tensor_buffer_offset, char* tensor_buffer,
@@ -270,7 +281,7 @@ class BackendInputCollector {
       const TRITONSERVER_MemoryType tensor_memory_type,
       const int64_t tensor_memory_type_id,
       const TRITONSERVER_MemoryType use_pinned_memory_type,
-      std::unique_ptr<InferenceResponse>* response);
+      const bool use_kernel, std::unique_ptr<InferenceResponse>* response);
   template <typename T>
   Status SetElementCount(
       const std::string& source_input, char* buffer,
@@ -295,9 +306,18 @@ class BackendInputCollector {
   size_t pending_pinned_offset_;
   RequestsList pending_pinned_inputs_;
 
-  // Pinned memories that need to live over the lifetime of this
-  // BackendResponder object.
-  std::list<std::unique_ptr<AllocatedMemory>> pinned_memories_;
+  // Allocated memories that need to live over the lifetime of this
+  // BackendInputCollector object.
+  std::list<std::unique_ptr<AllocatedMemory>> in_use_memories_;
+
+  size_t pending_copy_kernel_buffer_byte_size_;
+  size_t pending_copy_kernel_buffer_offset_;
+  size_t pending_copy_kernel_input_buffer_counts_;
+  RequestsList pending_copy_kernel_inputs_;
+  std::vector<std::unique_ptr<std::vector<int8_t*>>> input_ptr_buffer_host_;
+  std::vector<std::unique_ptr<std::vector<size_t>>> byte_size_buffer_host_;
+  std::vector<std::unique_ptr<std::vector<size_t>>>
+      byte_size_offset_buffer_host_;
 
   // Pinned memory buffers and the corresponding request_inputs where
   // the final copy to the tensor is deferred until Finalize() after
