@@ -77,7 +77,6 @@ for PROTOCOL in http grpc; do
             EXTRA_CLIENT_ARGS="${EXTRA_ARGS} -i ${PROTOCOL}"
         fi
 
-        echo "$LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_CLIENT_ARGS >> ${CLIENT_LOG}"
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_CLIENT_ARGS >> ${CLIENT_LOG} 2>&1
         if [ $? -ne 0 ]; then
             cat ${CLIENT_LOG}
@@ -100,7 +99,6 @@ wait $SERVER_PID
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 

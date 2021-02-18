@@ -94,11 +94,9 @@ for PROTOCOL in http grpc; do
         # Check for memory growth
         python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC >> ${CLIENT_LOG}.massif 2>&1
         if [ $? -ne 0 ]; then
-            cat ${CLIENT_LOG}.massif
             echo -e "\n***\n*** Massif Test for ${PROTOCOL} Failed\n***"
             RET=1
         fi
-        echo ${CLIENT_LOG}.massif
         cat ${CLIENT_LOG}.massif
         set -e
     fi
