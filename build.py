@@ -484,20 +484,12 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
 '''
 
     # Copy in the triton source. We remove existing contents first in
-    # case the FROM container has something there already. On windows
-    # it is important that the entrypoint initialize VisualStudio
-    # environment otherwise the build will fail. Also set
-    # TRITONBUILD_CMAKE_TOOLCHAIN_FILE and VCPKG_TARGET_TRIPLET so
-    # that cmake can find the packages installed by vcpkg.
+    # case the FROM container has something there already.
     if target_platform() == 'windows':
         df += '''
 WORKDIR /workspace
 RUN rmdir /S/Q * || exit 0
 COPY . .
-
-ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
-ENV TRITONBUILD_VCPKG_TARGET_TRIPLET x64-windows
-ENTRYPOINT C:\BuildTools\Common7\Tools\VsDevCmd.bat &&
 '''
     else:
         df += '''
