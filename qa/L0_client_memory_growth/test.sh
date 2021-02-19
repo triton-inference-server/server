@@ -97,7 +97,10 @@ for PROTOCOL in http grpc; do
             echo -e "\n***\n*** Massif Test for ${PROTOCOL} Failed\n***"
             RET=1
         fi
+
+        # Log the graph for memory growth and the change between Average and Max memory usage
         cat ${CLIENT_LOG}.massif
+        ms_print ${MASSIF_LOG} | head -n35
         set -e
     fi
     # Stop Server
