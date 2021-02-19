@@ -111,104 +111,69 @@ ValidateResult(
 
 void
 RunSynchronousInference(
-    std::unique_ptr<nic::InferenceServerGrpcClient>& grpc_client,
-    std::unique_ptr<nic::InferenceServerHttpClient>& http_client,
     std::vector<nic::InferInput*>& inputs,
     std::vector<const nic::InferRequestedOutput*>& outputs,
     nic::InferOptions& options, std::vector<int32_t>& input0_data, bool reuse,
-    std::string url, bool verbose)
+    std::string url, bool verbose, std::string protocol, uint32_t repetitions)
 {
-  nic::InferResult* results;
-  if (grpc_client.get() != nullptr) {
+  // If re-use is enabled then use these client objects else use new objects for
+  // each inference request.
+  std::unique_ptr<nic::InferenceServerGrpcClient> grpc_client_reuse;
+  std::unique_ptr<nic::InferenceServerHttpClient> http_client_reuse;
+
+  for (size_t i = 0; i < repetitions; ++i) {
+    nic::InferResult* results;
     if (!reuse) {
-      FAIL_IF_ERR(
-          nic::InferenceServerGrpcClient::Create(&grpc_client, url, verbose),
-          "unable to create grpc client");
-    }
-    FAIL_IF_ERR(
-        grpc_client->Infer(&results, options, inputs, outputs),
-        "unable to run model");
-  } else {
-    if (!reuse) {
-      FAIL_IF_ERR(
-          nic::InferenceServerHttpClient::Create(&http_client, url, verbose),
-          "unable to create http client");
-    }
-    FAIL_IF_ERR(
-        http_client->Infer(&results, options, inputs, outputs),
-        "unable to run model");
-  }
-  std::shared_ptr<nic::InferResult> results_ptr;
-  results_ptr.reset(results);
-
-  // Validate results
-  if (results_ptr->RequestStatus().IsOk()) {
-    ValidateResult(results_ptr, input0_data);
-  } else {
-    std::cerr << "error: Inference failed: " << results_ptr->RequestStatus()
-              << std::endl;
-    exit(1);
-  }
-}
-
-void
-RunAsynchronousInference(
-    std::unique_ptr<nic::InferenceServerGrpcClient>& grpc_client,
-    std::unique_ptr<nic::InferenceServerHttpClient>& http_client,
-    std::vector<nic::InferInput*>& inputs,
-    std::vector<const nic::InferRequestedOutput*>& outputs,
-    nic::InferOptions& options, std::vector<int32_t>& input0_data, bool reuse,
-    std::string url, bool verbose)
-{
-  std::mutex mtx;
-  std::condition_variable cv;
-  bool done = false;
-
-  auto callback = [&](nic::InferResult* result) {
-    {
-      std::shared_ptr<nic::InferResult> result_ptr;
-      result_ptr.reset(result);
-      std::lock_guard<std::mutex> lk(mtx);
-      std::cout << "Callback called" << std::endl;
-      done = true;
-      if (result_ptr->RequestStatus().IsOk()) {
-        ValidateResult(result_ptr, input0_data);
+      if (protocol == "grpc") {
+        std::unique_ptr<nic::InferenceServerGrpcClient> grpc_client;
+        FAIL_IF_ERR(
+            nic::InferenceServerGrpcClient::Create(&grpc_client, url, verbose),
+            "unable to create grpc client");
+        FAIL_IF_ERR(
+            grpc_client->Infer(&results, options, inputs, outputs),
+            "unable to run model");
       } else {
-        std::cerr << "error: Inference failed: " << result_ptr->RequestStatus()
-                  << std::endl;
-        exit(1);
+        std::unique_ptr<nic::InferenceServerHttpClient> http_client;
+        FAIL_IF_ERR(
+            nic::InferenceServerHttpClient::Create(&http_client, url, verbose),
+            "unable to create http client");
+        FAIL_IF_ERR(
+            http_client->Infer(&results, options, inputs, outputs),
+            "unable to run model");
+      }
+    } else {
+      if (protocol == "grpc") {
+        FAIL_IF_ERR(
+            nic::InferenceServerGrpcClient::Create(
+                &grpc_client_reuse, url, verbose),
+            "unable to create grpc client");
+        FAIL_IF_ERR(
+            grpc_client_reuse->Infer(&results, options, inputs, outputs),
+            "unable to run model");
+      } else {
+        FAIL_IF_ERR(
+            nic::InferenceServerHttpClient::Create(
+                &http_client_reuse, url, verbose),
+            "unable to create http client");
+        FAIL_IF_ERR(
+            http_client_reuse->Infer(&results, options, inputs, outputs),
+            "unable to run model");
       }
     }
-    cv.notify_all();
-  };
 
-  if (grpc_client.get() != nullptr) {
-    if (!reuse) {
-      FAIL_IF_ERR(
-          nic::InferenceServerGrpcClient::Create(&grpc_client, url, verbose),
-          "unable to create grpc client");
-    }
-    FAIL_IF_ERR(
-        grpc_client->AsyncInfer(callback, options, inputs, outputs),
-        "unable to run model");
-  } else {
-    if (!reuse) {
-      FAIL_IF_ERR(
-          nic::InferenceServerHttpClient::Create(&http_client, url, verbose),
-          "unable to create http client");
-    }
-    FAIL_IF_ERR(
-        http_client->AsyncInfer(callback, options, inputs, outputs),
-        "unable to run model");
-  }
+    std::shared_ptr<nic::InferResult> results_ptr;
+    results_ptr.reset(results);
 
-  // Wait until all callbacks are invoked
-  {
-    std::unique_lock<std::mutex> lk(mtx);
-    cv.wait(lk, [&]() { return done; });
+    // Validate results
+    if (results_ptr->RequestStatus().IsOk()) {
+      ValidateResult(results_ptr, input0_data);
+    } else {
+      std::cerr << "error: Inference failed: " << results_ptr->RequestStatus()
+                << std::endl;
+      exit(1);
+    }
   }
 }
-
 
 void
 Usage(char** argv, const std::string& msg = std::string())
@@ -221,7 +186,6 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-v" << std::endl;
   std::cerr << "\t-i <http/grpc>" << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
-  std::cerr << "\t-a Run in asynchronous mode." << std::endl;
   std::cerr << "\t-t <client timeout in microseconds>" << std::endl;
   std::cerr << "\t-r <number of repetitions for inference> default is 100."
             << std::endl;
@@ -238,12 +202,12 @@ main(int argc, char** argv)
   bool verbose = false;
   std::string protocol = "http";
   std::string url;
-  bool async = false, reuse = false;
+  bool reuse = false;
   uint32_t repetitions = 100;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u:ar:R")) != -1) {
+  while ((opt = getopt(argc, argv, "vi:u:r:R")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -260,9 +224,6 @@ main(int argc, char** argv)
       }
       case 'u':
         url = optarg;
-        break;
-      case 'a':
-        async = true;
         break;
       case 'r':
         repetitions = std::stoi(optarg);
@@ -285,25 +246,15 @@ main(int argc, char** argv)
   std::string model_name = "custom_identity_int32";
   std::string model_version = "";
 
-  // Create a InferenceServerGrpcClient instance to communicate with the
-  // server using gRPC protocol.
-  std::unique_ptr<nic::InferenceServerGrpcClient> grpc_client;
-  std::unique_ptr<nic::InferenceServerHttpClient> http_client;
-
   if (protocol == "grpc") {
     if (url.empty()) {
       url = "localhost:8001";
     }
-    FAIL_IF_ERR(
-        nic::InferenceServerGrpcClient::Create(&grpc_client, url, verbose),
-        "unable to create grpc client");
   } else {
     if (url.empty()) {
       url = "localhost:8000";
     }
-    FAIL_IF_ERR(
-        nic::InferenceServerHttpClient::Create(&http_client, url, verbose),
-        "unable to create http client");
+    protocol = "http";
   }
 
   // Initialize the tensor data
@@ -337,26 +288,17 @@ main(int argc, char** argv)
   std::shared_ptr<nic::InferRequestedOutput> output0_ptr;
   output0_ptr.reset(output0);
 
-
   // The inference settings. Will be using default for now.
   nic::InferOptions options(model_name);
   options.model_version_ = model_version;
 
-  for (size_t i = 0; i < repetitions; ++i) {
-    std::vector<nic::InferInput*> inputs = {input0_ptr.get()};
-    std::vector<const nic::InferRequestedOutput*> outputs = {output0_ptr.get()};
+  std::vector<nic::InferInput*> inputs = {input0_ptr.get()};
+  std::vector<const nic::InferRequestedOutput*> outputs = {output0_ptr.get()};
 
-    // Send inference request to the inference server.
-    if (async) {
-      RunAsynchronousInference(
-          grpc_client, http_client, inputs, outputs, options, input0_data,
-          reuse, url, verbose);
-    } else {
-      RunSynchronousInference(
-          grpc_client, http_client, inputs, outputs, options, input0_data,
-          reuse, url, verbose);
-    }
-  }
+  // Send 'repetitions' number of inference requests to the inference server.
+  RunSynchronousInference(
+      inputs, outputs, options, input0_data, reuse, url, verbose, protocol,
+      repetitions);
 
   return 0;
 }
