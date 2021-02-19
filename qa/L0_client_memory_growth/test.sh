@@ -58,12 +58,12 @@ cp libidentity.so $DATADIR/custom_identity_int32/1/.
 RET=0
 
 # Threshold memory growth in MB
-MAX_ALLOWED_ALLOC="0"
+MAX_ALLOWED_ALLOC="50"
 export MAX_ALLOWED_ALLOC
 
 # Run test for both HTTP and GRPC, not re-using client object. 
-# 10000 inferences in each case.
-EXTRA_ARGS="-r 10000"
+# 100000 inferences in each case.
+EXTRA_ARGS="-r 100000"
 for PROTOCOL in http grpc; do
     LEAKCHECK_LOG="./valgrind.${PROTOCOL}.c++.log"
     CLIENT_LOG="./client.${PROTOCOL}.c++.log"

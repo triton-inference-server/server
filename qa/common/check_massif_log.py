@@ -69,12 +69,12 @@ def is_unbounded_growth(summary, max_allowed_alloc):
         print("Error: Not enough snapshots")
         return False
 
-    # Don't start measuring from the first snapshot
-    start = len(totals) // 2
-    end = len(totals) - 1
+    # Measure difference between mean and maximum memory usage
+    mem_heap_avg = sum(totals) / len(totals)
+    mem_heap_max = max(totals)
 
     # Compute change in allocation rate
-    memory_allocation_delta_mb = (totals[end] - totals[start]) / 1e6
+    memory_allocation_delta_mb = (mem_heap_max - mem_heap_avg) / 1e6
 
     print("Change in memory allocation: %f MB, MAX ALLOWED: %f MB" %
           (memory_allocation_delta_mb, max_allowed_alloc))
