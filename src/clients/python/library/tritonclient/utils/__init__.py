@@ -193,13 +193,10 @@ def serialize_byte_tensor(input_tensor):
             # If directly passing bytes to BYTES type,
             # don't convert it to str as Python will encode the
             # bytes which may distort the meaning
-            if obj.dtype.type == np.bytes_ or obj.dtype.type == np.object_:
-                if type(obj.item()) == bytes:
-                    s = obj.item()
-                else:
-                    s = bytes(obj)
+            if type(obj.item()) == bytes:
+                s = obj.item()
             else:
-                s = str(obj).encode('utf-8')
+                s = bytes(obj)
             flattened += struct.pack("<I", len(s))
             flattened += s
         flattened_array = np.asarray(flattened)
