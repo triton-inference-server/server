@@ -65,8 +65,8 @@ backends.
 ```
 FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full
 FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
-COPY --from full /opt/tritonserver/bin /opt/tritonserver/bin
-COPY --from full /opt/tritonserver/lib /opt/tritonserver/lib
+COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
+COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib
 ```
 
 Then build the image.
@@ -94,9 +94,9 @@ following Dockerfile.
 ```
 FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full
 FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
-COPY --from full /opt/tritonserver/bin /opt/tritonserver/bin
-COPY --from full /opt/tritonserver/lib /opt/tritonserver/lib
-COPY --from full /opt/tritonserver/backends/tensorflow1 /opt/tritonserver/backends/tensorflow1
+COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
+COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib
+COPY --from=full /opt/tritonserver/backends/tensorflow1 /opt/tritonserver/backends/tensorflow1
 ```
 
 Depending on the backend it may also be necessary to include
