@@ -159,25 +159,27 @@ def triton_to_np_dtype(dtype):
 
 def serialize_byte_tensor(input_tensor):
     """
-        Serializes a bytes tensor into a flat numpy array of length prepend bytes.
-        Can pass bytes tensor as numpy array of bytes with dtype of np.bytes_,
-        numpy strings with dtype of np.str_ or python strings with dtype of np.object.
+    Serializes a bytes tensor into a flat numpy array of length prepended bytes.
+    Can pass bytes tensor as numpy array of bytes with dtype of np.bytes_,
+    or python strings with dtype of np.object_. np.object_ is the recommended
+    type to be used. np.str_ and np.bytes_ remove trailing zeros at the end of
+    byte sequence and because of this it should be avoided.
 
-        Parameters
-        ----------
-        input_tensor : np.array
-            The bytes tensor to serialize.
+    Parameters
+    ----------
+    input_tensor : np.array
+        The bytes tensor to serialize.
 
-        Returns
-        -------
-        serialized_bytes_tensor : np.array
-            The 1-D numpy array of type uint8 containing the serialized bytes in 'C' order.
+    Returns
+    -------
+    serialized_bytes_tensor : np.array
+        The 1-D numpy array of type uint8 containing the serialized bytes in 'C' order.
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to serialize the given tensor.
-        """
+    Raises
+    ------
+    InferenceServerException
+        If unable to serialize the given tensor.
+    """
 
     if input_tensor.size == 0:
         return np.empty([0])
