@@ -75,8 +75,17 @@ def serialize_byte_tensor_list(tensor_values):
     return tensor_list
 
 
-class UserData:
+def get_number_of_bytes_for_npobject(tensor_value):
+    if tensor_value.size > 0:
+        total_bytes = 0
+        for obj in np.nditer(tensor_value, flags=["refs_ok"], order='C'):
+            total_bytes += len(obj.item())
+        return total_bytes
+    else:
+        return 0
 
+
+class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -170,27 +179,33 @@ def infer_exact(tester,
 
     if output0_dtype == np.object:
         output0_array = np.array([
-            unicode(str(x), encoding='utf-8') for x in (output0_array.flatten())
+            unicode(str(x), encoding='utf-8')
+            for x in (output0_array.flatten())
         ],
                                  dtype=object).reshape(output0_array.shape)
     else:
         output0_array = output0_array.astype(output0_dtype)
     if output1_dtype == np.object:
         output1_array = np.array([
-            unicode(str(x), encoding='utf-8') for x in (output1_array.flatten())
+            unicode(str(x), encoding='utf-8')
+            for x in (output1_array.flatten())
         ],
                                  dtype=object).reshape(output1_array.shape)
     else:
         output1_array = output1_array.astype(output1_dtype)
 
     if input_dtype == np.object:
-        in0n = np.array(
-            [str(x).encode('utf-8') for x in input0_array.reshape(input0_array.size)],
-            dtype=object)
+        in0n = np.array([
+            str(x).encode('utf-8')
+            for x in input0_array.reshape(input0_array.size)
+        ],
+                        dtype=object)
         input0_array = in0n.reshape(input0_array.shape)
-        in1n = np.array(
-            [str(x).encode('utf-8') for x in input1_array.reshape(input1_array.size)],
-            dtype=object)
+        in1n = np.array([
+            str(x).encode('utf-8')
+            for x in input1_array.reshape(input1_array.size)
+        ],
+                        dtype=object)
         input1_array = in1n.reshape(input1_array.shape)
 
     # prepend size of string to output string data
@@ -212,15 +227,15 @@ def infer_exact(tester,
 
     # Get model platform
     model_name = tu.get_model_name(pf, input_dtype, output0_dtype,
-                                    output1_dtype)
+                                   output1_dtype)
     if configs[0][1] == "http":
         metadata_client = httpclient.InferenceServerClient(configs[0][0],
-                                                            verbose=True)
+                                                           verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata["platform"]
     else:
         metadata_client = grpcclient.InferenceServerClient(configs[0][0],
-                                                            verbose=True)
+                                                           verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata.platform
 
@@ -235,8 +250,17 @@ def infer_exact(tester,
         INPUT0 = "INPUT0"
         INPUT1 = "INPUT1"
 
-    output0_byte_size = sum([o0.nbytes for o0 in output0_array_tmp])
-    output1_byte_size = sum([o1.nbytes for o1 in output1_array_tmp])
+    if output0_dtype == np.object:
+        output0_byte_size = sum(
+            [get_number_of_bytes_for_npobject(o0) for o0 in output0_array_tmp])
+    else:
+        output0_byte_size = sum([o0.nbytes for o0 in output0_array_tmp])
+
+    if output1_dtype == np.object:
+        output1_byte_size = sum(
+            [get_number_of_bytes_for_npobject(o1) for o1 in output1_array_tmp])
+    else:
+        output1_byte_size = sum([o1.nbytes for o1 in output1_array_tmp])
 
     if batch_size == 1:
         input0_list = [input0_array]
@@ -253,8 +277,14 @@ def infer_exact(tester,
         input0_list_tmp = input0_list
         input1_list_tmp = input1_list
 
-    input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
-    input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
+    if input_dtype == np.object:
+        input0_byte_size = sum(
+            [get_number_of_bytes_for_npobject(i0) for i0 in input0_list_tmp])
+        input1_byte_size = sum(
+            [get_number_of_bytes_for_npobject(i1) for i1 in input1_list_tmp])
+    else:
+        input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
+        input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
 
     # Create system/cuda shared memory regions if needed
     shm_regions, shm_handles = su.create_set_shm_regions(
@@ -316,11 +346,11 @@ def infer_exact(tester,
         if batch_size == 1:
             expected0_sort_idx = [
                 np.flip(np.argsort(x.flatten()), 0)
-                for x in output0_array.reshape((1,) + tensor_shape)
+                for x in output0_array.reshape((1, ) + tensor_shape)
             ]
             expected1_sort_idx = [
                 np.flip(np.argsort(x.flatten()), 0)
-                for x in output1_array.reshape((1,) + tensor_shape)
+                for x in output1_array.reshape((1, ) + tensor_shape)
             ]
         else:
             expected0_sort_idx = [
@@ -459,8 +489,8 @@ def infer_exact(tester,
             else:
                 result_name = result.name
 
-            if ((result_name == OUTPUT0 and output0_raw) or
-                (result_name == OUTPUT1 and output1_raw)):
+            if ((result_name == OUTPUT0 and output0_raw)
+                    or (result_name == OUTPUT1 and output1_raw)):
                 if use_system_shared_memory or use_cuda_shared_memory:
                     if result_name == OUTPUT0:
                         shm_handle = shm_handles[2]
@@ -525,8 +555,8 @@ def infer_exact(tester,
                         if type(class_label) == str:
                             ctuple = class_label.split(':')
                         else:
-                            ctuple = "".join(
-                                chr(x) for x in class_label).split(':')
+                            ctuple = "".join(chr(x)
+                                             for x in class_label).split(':')
                         cval = float(ctuple[0])
                         cidx = int(ctuple[1])
                         if result_name == OUTPUT0:
@@ -634,11 +664,9 @@ def infer_shape_tensor(tester,
                                                  '/' + input_name + shm_suffix,
                                                  input_byte_size),
                  input_byte_size))
-            output_shm_handle_list.append(
-                (shm.create_shared_memory_region(output_name + shm_suffix,
-                                                 '/' + output_name + shm_suffix,
-                                                 output_byte_size),
-                 output_byte_size))
+            output_shm_handle_list.append((shm.create_shared_memory_region(
+                output_name + shm_suffix, '/' + output_name + shm_suffix,
+                output_byte_size), output_byte_size))
             shm.set_shared_memory_region(input_shm_handle_list[-1][0], [
                 in0,
             ])
@@ -667,7 +695,8 @@ def infer_shape_tensor(tester,
             inputs.append(
                 client_utils.InferInput(input_name, input_list[io_num].shape,
                                         "INT32"))
-            outputs.append(client_utils.InferRequestedOutput(dummy_output_name))
+            outputs.append(
+                client_utils.InferRequestedOutput(dummy_output_name))
             outputs.append(client_utils.InferRequestedOutput(output_name))
 
             # -2: dummy; -1: input
@@ -812,12 +841,12 @@ def infer_zero(tester,
     model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
     if configs[0][1] == "http":
         metadata_client = httpclient.InferenceServerClient(configs[0][0],
-                                                            verbose=True)
+                                                           verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata["platform"]
     else:
         metadata_client = grpcclient.InferenceServerClient(configs[0][0],
-                                                            verbose=True)
+                                                           verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata.platform
 
@@ -849,13 +878,17 @@ def infer_zero(tester,
                 for x in input_array.flatten()
             ],
                                       dtype=object)
-            input_array = np.array([str(x).encode('utf-8') for x in input_array.flatten()],
-                                   dtype=object).reshape(input_array.shape)
+            input_array = np.array(
+                [str(x).encode('utf-8') for x in input_array.flatten()],
+                dtype=object).reshape(input_array.shape)
 
         expected_array = expected_array.reshape(output_shape)
         expected_dict[output_name] = expected_array
 
-        output_byte_size = expected_array.nbytes
+        if tensor_dtype == np.object:
+            output_byte_size = get_number_of_bytes_for_npobject(expected_array)
+        else:
+            output_byte_size = expected_array.nbytes
 
         if batch_size == 1:
             input_list = [input_array]
@@ -868,7 +901,12 @@ def infer_zero(tester,
         else:
             input_list_tmp = input_list
 
-        input_byte_size = sum([ip.nbytes for ip in input_list_tmp])
+        if tensor_dtype == np.object:
+            input_byte_size = sum([
+                get_number_of_bytes_for_npobject(ip) for ip in input_list_tmp
+            ])
+        else:
+            input_byte_size = sum([ip.nbytes for ip in input_list_tmp])
 
         # create and register shared memory region for inputs and outputs
         shm_io_handles = su.create_set_either_shm_region(
@@ -904,8 +942,15 @@ def infer_zero(tester,
         for io_num, (input_name, output_name) in enumerate(
                 zip(input_dict.keys(), expected_dict.keys())):
             input_data = input_dict[input_name]
-            input_byte_size = input_data.nbytes
-            output_byte_size = expected_dict[output_name].nbytes
+            output_data = expected_dict[output_name]
+            if tensor_dtype == np.object:
+                input_byte_size = get_number_of_bytes_for_npobject(
+                    serialize_byte_tensor(input_data))
+                output_byte_size = get_number_of_bytes_for_npobject(
+                    serialize_byte_tensor(output_data))
+            else:
+                input_byte_size = input_data.nbytes
+                output_byte_size = output_data.nbytes
             if config[1] == "http":
                 inputs.append(
                     httpclient.InferInput(input_name, input_data.shape,
@@ -1004,9 +1049,8 @@ def infer_zero(tester,
                     output_shape = output.shape
                 output_dtype = triton_to_np_dtype(output_datatype)
             if use_system_shared_memory:
-                output_data = shm.get_contents_as_numpy(shm_handle,
-                                                        output_dtype,
-                                                        output_shape)
+                output_data = shm.get_contents_as_numpy(
+                    shm_handle, output_dtype, output_shape)
             elif use_cuda_shared_memory:
                 output_data = cudashm.get_contents_as_numpy(
                     shm_handle, output_dtype, output_shape)

@@ -176,10 +176,17 @@ def set_shared_memory_region(cuda_shm_handle, input_values):
     offset_current = 0
     for input_value in input_values:
         input_value = np.ascontiguousarray(input_value).flatten()
-        byte_size = input_value.size * input_value.itemsize
-        _raise_if_error(
-            c_int(_ccudashm_shared_memory_region_set(cuda_shm_handle, c_uint64(offset_current), \
-                c_uint64(byte_size), input_value.ctypes.data_as(c_void_p))))
+        if input_value.dtype == np.object_:
+            input_value = input_value.item()
+            byte_size = np.dtype(np.byte).itemsize * len(input_value)
+            _raise_if_error(
+                c_int(_ccudashm_shared_memory_region_set(cuda_shm_handle, c_uint64(offset_current), \
+                    c_uint64(byte_size), cast(input_value, c_void_p))))
+        else:
+            byte_size = input_value.size * input_value.itemsize
+            _raise_if_error(
+                c_int(_ccudashm_shared_memory_region_set(cuda_shm_handle, c_uint64(offset_current), \
+                    c_uint64(byte_size), input_value.ctypes.data_as(c_void_p))))
         offset_current += byte_size
     return
 

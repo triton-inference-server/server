@@ -200,9 +200,10 @@ def serialize_byte_tensor(input_tensor):
                 s = bytes(obj)
             flattened += struct.pack("<I", len(s))
             flattened += s
-        flattened_array = np.asarray(flattened)
+        flattened_array = np.asarray(flattened, dtype=np.object_)
         if not flattened_array.flags['C_CONTIGUOUS']:
-            flattened_array = np.ascontiguousarray(flattened_array)
+            flattened_array = np.ascontiguousarray(flattened_array,
+                                                   dtype=np.object_)
         return flattened_array
     else:
         raise_error("cannot serialize bytes tensor: invalid datatype")
@@ -236,4 +237,4 @@ def deserialize_bytes_tensor(encoded_tensor):
         sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
         offset += l
         strs.append(sb)
-    return (np.array(strs, dtype=bytes))
+    return (np.array(strs, dtype=np.object_))
