@@ -98,10 +98,11 @@ class ClientStringTest(tu.TestResultCollector):
         self.assertTrue(np.array_equal(in0, out0))
 
         # Same test but for np.object_
-        in0_object = in0.astype(np.object)
+        in0_object = in0.astype(np.object_)
         inputs = []
         outputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT0', in0_object.shape, "BYTES"))
+        inputs.append(
+            tritonhttpclient.InferInput('INPUT0', in0_object.shape, "BYTES"))
         inputs[0].set_data_from_numpy(in0_object)
 
         outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
@@ -122,7 +123,8 @@ class ClientStringTest(tu.TestResultCollector):
         in0_bytes = in0.astype(np.bytes_)
         inputs = []
         outputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT0', in0_bytes.shape, "BYTES"))
+        inputs.append(
+            tritonhttpclient.InferInput('INPUT0', in0_bytes.shape, "BYTES"))
         inputs[0].set_data_from_numpy(in0_object)
 
         outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))

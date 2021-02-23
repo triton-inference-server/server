@@ -78,9 +78,9 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
     # If the input type is string the output type must be string or
     # int32. This is because the QA models we generate convert strings
     # internally to int32 for compute.
-    if ((input_dtype == np.object) and
-        (((output0_dtype != np.object) and (output0_dtype != np.int32)) or
-         ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
+    if ((input_dtype == np.object_) and
+        (((output0_dtype != np.object_) and (output0_dtype != np.int32)) or
+         ((output1_dtype != np.object_) and (output1_dtype != np.int32)))):
         return False
 
     return True
@@ -136,13 +136,13 @@ def validate_for_ensemble_model(ensemble_type, input_dtype, output0_dtype,
     # data type
     # Test types that use identity for both input and output
     test_type_involved = ["reshape", "zero", "fan"]
-    if input_dtype == np.object or output0_dtype == np.object or output1_dtype == np.object:
+    if input_dtype == np.object_ or output0_dtype == np.object_ or output1_dtype == np.object_:
         for type_str in test_type_involved:
             if type_str in ensemble_type:
                 return False
 
     # Otherwise, check input / output separately
-    if input_dtype == np.object and "sequence" in ensemble_type:
+    if input_dtype == np.object_ and "sequence" in ensemble_type:
         return False
 
     return True
@@ -155,9 +155,9 @@ def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
     # If the input type is string the output type must be string or
     # int32. This is because the QA models we generate convert strings
     # internally to int32 for compute.
-    if ((input_dtype == np.object) and
-        (((output0_dtype != np.object) and (output0_dtype != np.int32)) or
-         ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
+    if ((input_dtype == np.object_) and
+        (((output0_dtype != np.object_) and (output0_dtype != np.int32)) or
+         ((output1_dtype != np.object_) and (output1_dtype != np.int32)))):
         return False
 
     return True
@@ -168,9 +168,9 @@ def validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
     """Return True if input and output dtypes are supported by a libtorch model."""
 
     # STRING, FLOAT16 and UINT16 data types are not supported currently
-    if (input_dtype == np.object) or (output0_dtype
-                                      == np.object) or (output1_dtype
-                                                        == np.object):
+    if (input_dtype == np.object_) or (output0_dtype
+                                       == np.object_) or (output1_dtype
+                                                          == np.object_):
         return False
     if (input_dtype == np.uint16) or (output0_dtype
                                       == np.uint16) or (output1_dtype

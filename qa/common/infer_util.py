@@ -63,7 +63,7 @@ def _range_repr_dtype(dtype):
         return np.int16
     elif dtype == np.float16:
         return np.int8
-    elif dtype == np.object:  # TYPE_STRING
+    elif dtype == np.object_:  # TYPE_STRING
         return np.int32
     return dtype
 
@@ -86,6 +86,7 @@ def get_number_of_bytes_for_npobject(tensor_value):
 
 
 class UserData:
+
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -166,7 +167,7 @@ def infer_exact(tester,
                                      high=val_max,
                                      size=tensor_shape,
                                      dtype=rinput_dtype)
-    if input_dtype != np.object:
+    if input_dtype != np.object_:
         input0_array = input0_array.astype(input_dtype)
         input1_array = input1_array.astype(input_dtype)
 
@@ -177,24 +178,22 @@ def infer_exact(tester,
         output0_array = input0_array - input1_array
         output1_array = input0_array + input1_array
 
-    if output0_dtype == np.object:
+    if output0_dtype == np.object_:
         output0_array = np.array([
-            unicode(str(x), encoding='utf-8')
-            for x in (output0_array.flatten())
+            unicode(str(x), encoding='utf-8') for x in (output0_array.flatten())
         ],
                                  dtype=object).reshape(output0_array.shape)
     else:
         output0_array = output0_array.astype(output0_dtype)
     if output1_dtype == np.object:
         output1_array = np.array([
-            unicode(str(x), encoding='utf-8')
-            for x in (output1_array.flatten())
+            unicode(str(x), encoding='utf-8') for x in (output1_array.flatten())
         ],
                                  dtype=object).reshape(output1_array.shape)
     else:
         output1_array = output1_array.astype(output1_dtype)
 
-    if input_dtype == np.object:
+    if input_dtype == np.object_:
         in0n = np.array([
             str(x).encode('utf-8')
             for x in input0_array.reshape(input0_array.size)
@@ -209,7 +208,7 @@ def infer_exact(tester,
         input1_array = in1n.reshape(input1_array.shape)
 
     # prepend size of string to output string data
-    if output0_dtype == np.object:
+    if output0_dtype == np.object_:
         if batch_size == 1:
             output0_array_tmp = serialize_byte_tensor_list([output0_array])
         else:
@@ -217,7 +216,7 @@ def infer_exact(tester,
     else:
         output0_array_tmp = output0_array
 
-    if output1_dtype == np.object:
+    if output1_dtype == np.object_:
         if batch_size == 1:
             output1_array_tmp = serialize_byte_tensor_list([output1_array])
         else:
@@ -250,13 +249,13 @@ def infer_exact(tester,
         INPUT0 = "INPUT0"
         INPUT1 = "INPUT1"
 
-    if output0_dtype == np.object:
+    if output0_dtype == np.object_:
         output0_byte_size = sum(
             [get_number_of_bytes_for_npobject(o0) for o0 in output0_array_tmp])
     else:
         output0_byte_size = sum([o0.nbytes for o0 in output0_array_tmp])
 
-    if output1_dtype == np.object:
+    if output1_dtype == np.object_:
         output1_byte_size = sum(
             [get_number_of_bytes_for_npobject(o1) for o1 in output1_array_tmp])
     else:
@@ -270,14 +269,14 @@ def infer_exact(tester,
         input1_list = [x for x in input1_array]
 
     # Serialization of string tensors in the case of shared memory must be done manually
-    if input_dtype == np.object:
+    if input_dtype == np.object_:
         input0_list_tmp = serialize_byte_tensor_list(input0_list)
         input1_list_tmp = serialize_byte_tensor_list(input1_list)
     else:
         input0_list_tmp = input0_list
         input1_list_tmp = input1_list
 
-    if input_dtype == np.object:
+    if input_dtype == np.object_:
         input0_byte_size = sum(
             [get_number_of_bytes_for_npobject(i0) for i0 in input0_list_tmp])
         input1_byte_size = sum(
@@ -346,11 +345,11 @@ def infer_exact(tester,
         if batch_size == 1:
             expected0_sort_idx = [
                 np.flip(np.argsort(x.flatten()), 0)
-                for x in output0_array.reshape((1, ) + tensor_shape)
+                for x in output0_array.reshape((1,) + tensor_shape)
             ]
             expected1_sort_idx = [
                 np.flip(np.argsort(x.flatten()), 0)
-                for x in output1_array.reshape((1, ) + tensor_shape)
+                for x in output1_array.reshape((1,) + tensor_shape)
             ]
         else:
             expected0_sort_idx = [
@@ -489,8 +488,8 @@ def infer_exact(tester,
             else:
                 result_name = result.name
 
-            if ((result_name == OUTPUT0 and output0_raw)
-                    or (result_name == OUTPUT1 and output1_raw)):
+            if ((result_name == OUTPUT0 and output0_raw) or
+                (result_name == OUTPUT1 and output1_raw)):
                 if use_system_shared_memory or use_cuda_shared_memory:
                     if result_name == OUTPUT0:
                         shm_handle = shm_handles[2]
@@ -514,8 +513,8 @@ def infer_exact(tester,
                 else:
                     output_data = results.as_numpy(result_name)
 
-                if (output_data.dtype == np.object) and (config[3] == False):
-                    output_data = output_data.astype(np.bytes_)
+                if (output_data.dtype == np.object_) and (config[3] == False):
+                    output_data = output_data.astype(np.object_)
 
                 if result_name == OUTPUT0:
                     tester.assertTrue(
@@ -555,8 +554,8 @@ def infer_exact(tester,
                         if type(class_label) == str:
                             ctuple = class_label.split(':')
                         else:
-                            ctuple = "".join(chr(x)
-                                             for x in class_label).split(':')
+                            ctuple = "".join(
+                                chr(x) for x in class_label).split(':')
                         cval = float(ctuple[0])
                         cidx = int(ctuple[1])
                         if result_name == OUTPUT0:
@@ -640,7 +639,7 @@ def infer_shape_tensor(tester,
         else:
             dummy_in0 = np.random.choice(a=[False, True],
                                          size=dummy_input_shapes[io_num])
-        if tensor_dtype != np.object:
+        if tensor_dtype != np.object_:
             dummy_in0 = dummy_in0.astype(tensor_dtype)
         else:
             dummy_in0 = np.array([str(x) for x in dummy_in0.flatten()],
@@ -664,9 +663,11 @@ def infer_shape_tensor(tester,
                                                  '/' + input_name + shm_suffix,
                                                  input_byte_size),
                  input_byte_size))
-            output_shm_handle_list.append((shm.create_shared_memory_region(
-                output_name + shm_suffix, '/' + output_name + shm_suffix,
-                output_byte_size), output_byte_size))
+            output_shm_handle_list.append(
+                (shm.create_shared_memory_region(output_name + shm_suffix,
+                                                 '/' + output_name + shm_suffix,
+                                                 output_byte_size),
+                 output_byte_size))
             shm.set_shared_memory_region(input_shm_handle_list[-1][0], [
                 in0,
             ])
@@ -695,8 +696,7 @@ def infer_shape_tensor(tester,
             inputs.append(
                 client_utils.InferInput(input_name, input_list[io_num].shape,
                                         "INT32"))
-            outputs.append(
-                client_utils.InferRequestedOutput(dummy_output_name))
+            outputs.append(client_utils.InferRequestedOutput(dummy_output_name))
             outputs.append(client_utils.InferRequestedOutput(output_name))
 
             # -2: dummy; -1: input
@@ -869,7 +869,7 @@ def infer_zero(tester,
                                             dtype=rtensor_dtype)
         else:
             input_array = np.random.choice(a=[False, True], size=input_shape)
-        if tensor_dtype != np.object:
+        if tensor_dtype != np.object_:
             input_array = input_array.astype(tensor_dtype)
             expected_array = np.ndarray.copy(input_array)
         else:
@@ -885,7 +885,7 @@ def infer_zero(tester,
         expected_array = expected_array.reshape(output_shape)
         expected_dict[output_name] = expected_array
 
-        if tensor_dtype == np.object:
+        if tensor_dtype == np.object_:
             output_byte_size = get_number_of_bytes_for_npobject(expected_array)
         else:
             output_byte_size = expected_array.nbytes
@@ -896,15 +896,14 @@ def infer_zero(tester,
             input_list = [x for x in input_array]
 
         # Serialization of string tensors in the case of shared memory must be done manually
-        if tensor_dtype == np.object:
+        if tensor_dtype == np.object_:
             input_list_tmp = serialize_byte_tensor_list(input_list)
         else:
             input_list_tmp = input_list
 
-        if tensor_dtype == np.object:
-            input_byte_size = sum([
-                get_number_of_bytes_for_npobject(ip) for ip in input_list_tmp
-            ])
+        if tensor_dtype == np.object_:
+            input_byte_size = sum(
+                [get_number_of_bytes_for_npobject(ip) for ip in input_list_tmp])
         else:
             input_byte_size = sum([ip.nbytes for ip in input_list_tmp])
 
@@ -943,7 +942,7 @@ def infer_zero(tester,
                 zip(input_dict.keys(), expected_dict.keys())):
             input_data = input_dict[input_name]
             output_data = expected_dict[output_name]
-            if tensor_dtype == np.object:
+            if tensor_dtype == np.object_:
                 input_byte_size = get_number_of_bytes_for_npobject(
                     serialize_byte_tensor(input_data))
                 output_byte_size = get_number_of_bytes_for_npobject(
@@ -1049,16 +1048,17 @@ def infer_zero(tester,
                     output_shape = output.shape
                 output_dtype = triton_to_np_dtype(output_datatype)
             if use_system_shared_memory:
-                output_data = shm.get_contents_as_numpy(
-                    shm_handle, output_dtype, output_shape)
+                output_data = shm.get_contents_as_numpy(shm_handle,
+                                                        output_dtype,
+                                                        output_shape)
             elif use_cuda_shared_memory:
                 output_data = cudashm.get_contents_as_numpy(
                     shm_handle, output_dtype, output_shape)
             else:
                 output_data = results.as_numpy(result_name)
 
-            if (output_data.dtype == np.object) and (config[3] == False):
-                output_data = output_data.astype(np.bytes_)
+            if (output_data.dtype == np.object_) and (config[3] == False):
+                output_data = output_data.astype(np.object_)
 
             expected = expected_dict[result_name]
             tester.assertEqual(output_data.shape, expected.shape)

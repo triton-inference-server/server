@@ -244,10 +244,24 @@ def create_plugin_models(models_dir):
                           np.float32, np.float32)
 
     # custom Normalize_TRT
-    create_plan_modelconfig(models_dir, 8, model_version, "Normalize_TRT",
-                            (16, 16, 16,), (16, 16, 16,), np.float32, np.float32)
-    create_plan_modelfile(models_dir, 8, model_version, "Normalize_TRT",
-                          (16, 16, 16,), (16, 16, 16,), np.float32, np.float32)
+    create_plan_modelconfig(models_dir, 8, model_version, "Normalize_TRT", (
+        16,
+        16,
+        16,
+    ), (
+        16,
+        16,
+        16,
+    ), np.float32, np.float32)
+    create_plan_modelfile(models_dir, 8, model_version, "Normalize_TRT", (
+        16,
+        16,
+        16,
+    ), (
+        16,
+        16,
+        16,
+    ), np.float32, np.float32)
 
 
 if __name__ == '__main__':

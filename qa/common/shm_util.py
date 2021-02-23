@@ -36,7 +36,6 @@ import tritonclient.utils.cuda_shared_memory as cudashm
 from tritonclient.utils import *
 
 
-
 def _range_repr_dtype(dtype):
     if dtype == np.float64:
         return np.int32
@@ -44,7 +43,7 @@ def _range_repr_dtype(dtype):
         return np.int16
     elif dtype == np.float16:
         return np.int8
-    elif dtype == np.object:  # TYPE_STRING
+    elif dtype == np.object_:  # TYPE_STRING
         return np.int32
     return dtype
 
@@ -62,13 +61,13 @@ def create_set_shm_regions(input0_list, input1_list, output0_byte_size,
     if not (use_system_shared_memory or use_cuda_shared_memory):
         return [], []
 
-    if input0_list[0].dtype == np.object:
+    if input0_list[0].dtype == np.object_:
         input0_byte_size = sum(
             [get_number_of_bytes_for_npobject(i0) for i0 in input0_list])
     else:
         input0_byte_size = sum([i0.nbytes for i0 in input0_list])
 
-    if input1_list[0].dtype == np.object:
+    if input1_list[0].dtype == np.object_:
         input1_byte_size = sum(
             [get_number_of_bytes_for_npobject(i1) for i1 in input1_list])
     else:

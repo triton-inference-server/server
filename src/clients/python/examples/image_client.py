@@ -269,7 +269,7 @@ def postprocess(results, output_name, batch_size, batching):
         if not batching:
             results = [results]
         for result in results:
-            if output_array.dtype.type == np.bytes_:
+            if output_array.dtype.type == np.object_:
                 cls = "".join(chr(x) for x in result).split(':')
             else:
                 cls = result.split(':')
