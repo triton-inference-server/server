@@ -134,6 +134,47 @@ class TritonRepoAgentModelList {
   std::vector<std::unique_ptr<TritonRepoAgentModel>> agent_models_;
 };
 
+Status CreateAgentModelListWithLoadAction(
+  const inference::ModelConfig& model_config,
+  const std::string& original_model_path,
+  std::shared_ptr<TritonRepoAgentModelList>* agent_model_list)
+{
+  std::shared_ptr<TritonRepoAgentModelList> lagent_model_list;
+  if (model_config.has_model_repository_agents()) {
+    FileSystemType filesystem_type;
+    RETURN_IF_ERROR(GetFileSystemType(original_model_path, &filesystem_type));
+    TRITONREPOAGENT_ArtifactType artifact_type =
+        TRITONREPOAGENT_ARTIFACT_FILESYSTEM;
+    if (filesystem_type != FileSystemType::LOCAL) {
+      artifact_type = TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM;
+    }
+    const char* location = original_model_path.c_str();
+    lagent_model_list.reset(new TritonRepoAgentModelList());
+    for (const auto& agent_config :
+        model_config.model_repository_agents().agents()) {
+      std::shared_ptr<TritonRepoAgent> agent;
+      RETURN_IF_ERROR(TritonRepoAgentManager::CreateAgent(
+          agent_config.name(), &agent));
+      TritonRepoAgent::Parameters agent_params;
+      for (const auto& parameter : agent_config.parameters()) {
+        agent_params.emplace_back(parameter.first, parameter.second);
+      }
+      std::unique_ptr<TritonRepoAgentModel> agent_model;
+      if (lagent_model_list->Size() != 0) {
+        lagent_model_list->Back()->Location(&artifact_type, &location);
+      }
+      // FIXME which model config?
+      RETURN_IF_ERROR(TritonRepoAgentModel::Create(
+          artifact_type, location, model_config, agent, agent_params,
+          &agent_model));
+      RETURN_IF_ERROR(agent_model->InvokeAgent(TRITONREPOAGENT_ACTION_LOAD));
+      lagent_model_list->AddAgentModel(std::move(agent_model));
+    }
+  }
+  *agent_model_list = std::move(lagent_model_list);
+  return Status::Success;
+}
+
 Status
 VersionsToLoad(
     const std::string model_repository_path, const std::string& name,
@@ -326,6 +367,10 @@ struct ModelRepositoryManager::ModelInfo {
   inference::ModelConfig model_config_;
   Platform platform_;
   std::string model_repository_path_;
+  // Temporary location to hold agent model list before creating the model
+  // backend, the ownership must transfer to BackendLifeCycle to ensure
+  // the list's life cycle is handled properly.
+  std::shared_ptr<TritonRepoAgentModelList> agent_model_list_;
 };
 
 class ModelRepositoryManager::BackendLifeCycle {
@@ -345,6 +390,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   Status AsyncLoad(
       const std::string& repository_path, const std::string& model_name,
       const inference::ModelConfig& model_config,
+      const std::shared_ptr<TritonRepoAgentModelList>& agent_model_list,
       std::function<void(Status)> OnComplete);
 
   // Unload model backends asynchronously.
@@ -711,42 +757,10 @@ Status
 ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     const std::string& repository_path, const std::string& model_name,
     const inference::ModelConfig& model_config,
+    const std::shared_ptr<TritonRepoAgentModelList>& agent_model_list,
     std::function<void(Status)> OnComplete)
 {
   LOG_VERBOSE(1) << "AsyncLoad() '" << model_name << "'";
-  // Create the associated repo agent models when a model is to be loaded
-  std::shared_ptr<TritonRepoAgentModelList> agent_model_list;
-  if (model_config.has_model_repository_agents()) {
-    std::string model_path = JoinPath({repository_path, model_name});
-    FileSystemType filesystem_type;
-    RETURN_IF_ERROR(GetFileSystemType(model_path, &filesystem_type));
-    TRITONREPOAGENT_ArtifactType artifact_type =
-        TRITONREPOAGENT_ARTIFACT_FILESYSTEM;
-    if (filesystem_type != FileSystemType::LOCAL) {
-      artifact_type = TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM;
-    }
-    const char* location = model_path.c_str();
-    agent_model_list.reset(new TritonRepoAgentModelList());
-    for (const auto& agent_config :
-         model_config.model_repository_agents().agents()) {
-      std::shared_ptr<TritonRepoAgent> agent;
-      RETURN_IF_ERROR(TritonRepoAgentManager::CreateAgent(
-          agent_config.name(), &agent));
-      TritonRepoAgent::Parameters agent_params;
-      for (const auto& parameter : agent_config.parameters()) {
-        agent_params.emplace_back(parameter.first, parameter.second);
-      }
-      std::unique_ptr<TritonRepoAgentModel> agent_model;
-      if (agent_model_list->Size() != 0) {
-        agent_model_list->Back()->Location(&artifact_type, &location);
-      }
-      RETURN_IF_ERROR(TritonRepoAgentModel::Create(
-          artifact_type, location, model_config, agent, agent_params,
-          &agent_model));
-      RETURN_IF_ERROR(agent_model->InvokeAgent(TRITONREPOAGENT_ACTION_LOAD));
-      agent_model_list->AddAgentModel(std::move(agent_model));
-    }
-  }
 
   std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
   auto it = map_.find(model_name);
@@ -754,29 +768,9 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     it = map_.emplace(std::make_pair(model_name, VersionMap())).first;
   }
 
-  // Get the latest repository path
-  std::string current_repository_path = repository_path;
-  if (agent_model_list != nullptr) {
-    const char* location;
-    TRITONREPOAGENT_ArtifactType artifact_type;
-    RETURN_IF_ERROR(
-        agent_model_list->Back()->Location(&artifact_type, &location));
-    // RepoAgentModel uses model path while backend creation needs
-    // repository path, so need to go up one level.
-    // FIXME backend create should take model path directly
-    auto location_string = std::string(location);
-    size_t pos = location_string.length() - 1;
-    for (; (int64_t)pos >= 0; pos--) {
-      if (location_string[pos] != '/') {
-        break;
-      }
-    }
-    current_repository_path =
-        location_string.substr(0, location_string.rfind('/', pos));
-  }
   std::set<int64_t> versions;
   RETURN_IF_ERROR(VersionsToLoad(
-      current_repository_path, model_name, model_config, &versions));
+      repository_path, model_name, model_config, &versions));
   if (versions.empty()) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -1441,7 +1435,8 @@ ModelRepositoryManager::LoadModelByDependency()
       const auto itr = infos_.find(valid_model->model_name_);
       auto status = backend_life_cycle_->AsyncLoad(
           itr->second->model_repository_path_, valid_model->model_name_,
-          valid_model->model_config_, [model_state](Status load_status) {
+          valid_model->model_config_, itr->second->agent_model_list_,
+          [model_state](Status load_status) {
             model_state->status_ = load_status;
             model_state->ready_.set_value();
           });
@@ -1466,6 +1461,10 @@ ModelRepositoryManager::LoadModelByDependency()
       }
     }
     set_pair = ModelsToLoadUnload(loaded_models);
+  }
+  // Clear temporary stored agent model list after all loads are triggerred
+  for (auto& info : infos_) {
+    info.second->agent_model_list_.reset();
   }
   return res;
 }
@@ -1808,7 +1807,7 @@ ModelRepositoryManager::Poll(
     const auto& repository = pair.second;
 
     auto model_poll_state = STATE_UNMODIFIED;
-    const auto full_path = JoinPath({repository, child});
+    auto full_path = JoinPath({repository, child});
 
 
     std::unique_ptr<ModelInfo> model_info;
@@ -1833,6 +1832,38 @@ ModelRepositoryManager::Poll(
       inference::ModelConfig& model_config = model_info->model_config_;
       model_info->mtime_nsec_ = mtime_ns;
       model_info->model_repository_path_ = repository;
+
+      // Create the associated repo agent models when a model is to be loaded,
+      // this must be done before normalizing model config as agents might
+      // redirect to use the model config at a different location
+      {
+        const auto config_path = JoinPath({full_path, kModelConfigPbTxt});
+        status = ReadTextProto(config_path, &model_config);
+      }
+      if (status.IsOk()) {
+        status = CreateAgentModelListWithLoadAction(model_config, full_path, &model_info->agent_model_list_);
+        if (status.IsOk() && model_info->agent_model_list_ != nullptr) {
+          // Get the latest repository path
+          const char* location;
+          TRITONREPOAGENT_ArtifactType artifact_type;
+          RETURN_IF_ERROR(
+              model_info->agent_model_list_->Back()->Location(&artifact_type, &location));
+          // RepoAgentModel uses model path while backend creation needs
+          // repository path, so need to go up one level.
+          // [FIXME] Should just passing model path directly as we don't really
+          // look at the repository path but just create model path from it
+          auto location_string = std::string(location);
+          size_t pos = location_string.length() - 1;
+          for (; (int64_t)pos >= 0; pos--) {
+            if (location_string[pos] != '/') {
+              break;
+            }
+          }
+          model_info->model_repository_path_ =
+              location_string.substr(0, location_string.rfind('/', pos));
+          full_path = location_string;
+        }
+      }
 
       // If enabled, try to automatically generate missing parts of
       // the model configuration (autofill) from the model
