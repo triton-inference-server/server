@@ -135,12 +135,12 @@ class TritonRepoAgentModelList {
 };
 
 Status CreateAgentModelListWithLoadAction(
-  const inference::ModelConfig& model_config,
+  const inference::ModelConfig& original_model_config,
   const std::string& original_model_path,
   std::shared_ptr<TritonRepoAgentModelList>* agent_model_list)
 {
   std::shared_ptr<TritonRepoAgentModelList> lagent_model_list;
-  if (model_config.has_model_repository_agents()) {
+  if (original_model_config.has_model_repository_agents()) {
     FileSystemType filesystem_type;
     RETURN_IF_ERROR(GetFileSystemType(original_model_path, &filesystem_type));
     TRITONREPOAGENT_ArtifactType artifact_type =
@@ -149,9 +149,10 @@ Status CreateAgentModelListWithLoadAction(
       artifact_type = TRITONREPOAGENT_ARTIFACT_REMOTE_FILESYSTEM;
     }
     const char* location = original_model_path.c_str();
+    inference::ModelConfig model_config = original_model_config;
     lagent_model_list.reset(new TritonRepoAgentModelList());
     for (const auto& agent_config :
-        model_config.model_repository_agents().agents()) {
+        original_model_config.model_repository_agents().agents()) {
       std::shared_ptr<TritonRepoAgent> agent;
       RETURN_IF_ERROR(TritonRepoAgentManager::CreateAgent(
           agent_config.name(), &agent));
@@ -162,8 +163,11 @@ Status CreateAgentModelListWithLoadAction(
       std::unique_ptr<TritonRepoAgentModel> agent_model;
       if (lagent_model_list->Size() != 0) {
         lagent_model_list->Back()->Location(&artifact_type, &location);
+        const auto config_path = JoinPath({location, kModelConfigPbTxt});
+        if(!ReadTextProto(config_path, &model_config).IsOk()) {
+          model_config.Clear();
+        }
       }
-      // FIXME which model config?
       RETURN_IF_ERROR(TritonRepoAgentModel::Create(
           artifact_type, location, model_config, agent, agent_params,
           &agent_model));
