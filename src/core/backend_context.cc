@@ -1219,11 +1219,19 @@ BackendInputCollector::FlushPendingCopyKernel(
   if (pending_copy_kernel_inputs_.size() == 0) {
     return false;
   }
-  auto status = LaunchCopyKernel(
-      tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
-      tensor_memory_type_id);
-  bool cuda_copy = status.IsOk();
 
+  bool cuda_copy = false;
+  Status status = Status(Status::Code::INTERNAL, "");
+  // empirical value of the minimum buffer count
+  static size_t MIN_BUFFER_COUNT = 64;
+  // Only try to launch kernel if buffer count is large enough for
+  // good GPU utilization
+  if (pending_copy_kernel_input_buffer_counts_ >= MIN_BUFFER_COUNT) {
+    status = LaunchCopyKernel(
+        tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
+        tensor_memory_type_id);
+    cuda_copy = status.IsOk();
+  }
   // If kernel can't be launched then just perform a direct copy.
   if (!status.IsOk()) {
     size_t offset = 0;
