@@ -59,15 +59,12 @@ cp libidentity.so $DATADIR/custom_identity_int32/1/.
 RET=0
 
 # Run test for both HTTP and GRPC, not re-using client object. 
-# 100000 inferences in each case.
-EXTRA_ARGS="-r 100000"
 for PROTOCOL in http grpc; do
     for LANG in c++ python; do
         LEAKCHECK_LOG="./valgrind.${PROTOCOL}.${LANG}.log"
         CLIENT_LOG="./client.${PROTOCOL}.${LANG}.log"
         MASSIF_LOG="./${PROTOCOL}.${LANG}.massif"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG --massif-out-file=$MASSIF_LOG"
-        EXTRA_CLIENT_ARGS="${EXTRA_ARGS} -i ${PROTOCOL}"
 
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -80,12 +77,14 @@ for PROTOCOL in http grpc; do
         if [ "$LANG" == "c++" ]; then
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="50"
+            EXTRA_ARGS="-r 100000 -i ${PROTOCOL}"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
-            MAX_ALLOWED_ALLOC="0.5"
+            MAX_ALLOWED_ALLOC="1"
+            EXTRA_ARGS="-r 10000 -i ${PROTOCOL}"
         fi
 
-        $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_CLIENT_ARGS >> ${CLIENT_LOG} 2>&1
+        $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
         if [ $? -ne 0 ]; then
             cat ${CLIENT_LOG}
             RET=1
@@ -101,7 +100,7 @@ for PROTOCOL in http grpc; do
             # Check for memory growth
             python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC >> ${CLIENT_LOG}.massif 2>&1
             if [ $? -ne 0 ]; then
-                echo -e "\n***\n*** Massif Test for ${PROTOCOL} C++ Failed\n***"
+                echo -e "\n***\n*** Massif Test for ${PROTOCOL} ${LANG} Failed\n***"
                 RET=1
             fi
 
