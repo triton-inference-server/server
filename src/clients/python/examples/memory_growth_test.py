@@ -78,16 +78,15 @@ if __name__ == '__main__':
             inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
             inputs[0].set_data_from_numpy(input0_data, binary_data=True)
             outputs.append(
-                httpclient.InferRequestedOutput('OUTPUT0',
-                                                binary_data=True))
+                httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
         else:
             inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "INT32"))
             inputs[0].set_data_from_numpy(input0_data)
             outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
 
         results = triton_client.infer(model_name=model_name,
-                                        inputs=inputs,
-                                        outputs=outputs)
+                                      inputs=inputs,
+                                      outputs=outputs)
 
         # Get the output arrays from the results and verify
         output0_data = results.as_numpy('OUTPUT0')
