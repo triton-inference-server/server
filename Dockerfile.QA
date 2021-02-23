@@ -197,6 +197,10 @@ RUN cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so 
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
         qa/L0_client_timeout/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
+        qa/L0_client_valgrind/. && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
+        qa/L0_client_memory_growth/. && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
         qa/L0_custom_legacy/. && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
