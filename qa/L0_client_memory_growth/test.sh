@@ -44,7 +44,8 @@ LEAKCHECK_ARGS_BASE="--max-threads=3000 --tool=massif --time-unit=B"
 SERVER_TIMEOUT=3600
 rm -f *.log *.massif
 
-MEMORY_GROWTH_TEST=../clients/memory_leak_test
+MEMORY_GROWTH_TEST_CPP=../clients/memory_leak_test
+MEMORY_GROWTH_TEST_PY=../clients/memory_growth_test.py
 MASSIF_TEST=../common/check_massif_log.py
 
 DATADIR=`pwd`/models
@@ -57,55 +58,63 @@ cp libidentity.so $DATADIR/custom_identity_int32/1/.
 
 RET=0
 
-# Threshold memory growth in MB
-MAX_ALLOWED_ALLOC="50"
-export MAX_ALLOWED_ALLOC
-
 # Run test for both HTTP and GRPC, not re-using client object. 
 # 100000 inferences in each case.
 EXTRA_ARGS="-r 100000"
 for PROTOCOL in http grpc; do
-    LEAKCHECK_LOG="./valgrind.${PROTOCOL}.c++.log"
-    CLIENT_LOG="./client.${PROTOCOL}.c++.log"
-    MASSIF_LOG="./${PROTOCOL}.c++.massif"
-    LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG --massif-out-file=$MASSIF_LOG"
-    EXTRA_CLIENT_ARGS="${EXTRA_ARGS} -i ${PROTOCOL}"
+    for LANG in c++ python; do
+        LEAKCHECK_LOG="./valgrind.${PROTOCOL}.${LANG}.log"
+        CLIENT_LOG="./client.${PROTOCOL}.${LANG}.log"
+        MASSIF_LOG="./${PROTOCOL}.${LANG}.massif"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG --massif-out-file=$MASSIF_LOG"
+        EXTRA_CLIENT_ARGS="${EXTRA_ARGS} -i ${PROTOCOL}"
 
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_CLIENT_ARGS >> ${CLIENT_LOG} 2>&1
-    if [ $? -ne 0 ]; then
-        cat ${CLIENT_LOG}
-        RET=1
-        echo -e "\n***\n*** Test FAILED\n***"
-    else
-        check_valgrind_log $LEAKCHECK_LOG
-        if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Memory leak detected\n***"
-        RET=1
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
         fi
 
-        set +e
-        # Check for memory growth
-        python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC >> ${CLIENT_LOG}.massif 2>&1
+        # MAX_ALLOWED_ALLOC is the threshold memory growth in MB
+        if [ "$LANG" == "c++" ]; then
+            MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
+            MAX_ALLOWED_ALLOC="50"
+        else
+            MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
+            MAX_ALLOWED_ALLOC="0.5"
+        fi
+
+        $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_CLIENT_ARGS >> ${CLIENT_LOG} 2>&1
         if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Massif Test for ${PROTOCOL} Failed\n***"
+            cat ${CLIENT_LOG}
             RET=1
+            echo -e "\n***\n*** Test FAILED\n***"
+        else
+            check_valgrind_log $LEAKCHECK_LOG
+            if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Memory leak detected\n***"
+            RET=1
+            fi
+
+            set +e
+            # Check for memory growth
+            python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC >> ${CLIENT_LOG}.massif 2>&1
+            if [ $? -ne 0 ]; then
+                echo -e "\n***\n*** Massif Test for ${PROTOCOL} C++ Failed\n***"
+                RET=1
+            fi
+
+            # Log the graph for memory growth and the change between Average and Max memory usage
+            cat ${CLIENT_LOG}.massif
+            ms_print ${MASSIF_LOG} | head -n35
+            set -e
         fi
 
-        # Log the graph for memory growth and the change between Average and Max memory usage
-        cat ${CLIENT_LOG}.massif
-        ms_print ${MASSIF_LOG} | head -n35
-        set -e
-    fi
-    # Stop Server
-    kill $SERVER_PID
-    wait $SERVER_PID
+        # Stop Server
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
 done
 
 if [ $RET -eq 0 ]; then
