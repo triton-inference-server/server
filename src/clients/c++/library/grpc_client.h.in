@@ -401,7 +401,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   std::mutex stream_mutex_;
 
   // GRPC end point.
-  std::unique_ptr<inference::GRPCInferenceService::Stub> stub_;
+  std::shared_ptr<inference::GRPCInferenceService::Stub> stub_;
   // request for GRPC call, one request object can be used for multiple calls
   // since it can be overwritten as soon as the GRPC send finishes.
   inference::ModelInferRequest infer_request_;

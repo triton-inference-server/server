@@ -46,8 +46,12 @@ namespace {
 
 // Use map to keep track of GRPC channels. <key, value> : <url, Channel*>
 // If context is created on url that has established Channel, then reuse it.
-std::map<std::string, std::shared_ptr<grpc::Channel>> grpc_channel_map_;
-std::mutex grpc_channel_map_mtx_;
+std::map<
+    std::string, std::pair<
+                     std::shared_ptr<grpc::Channel>,
+                     std::shared_ptr<inference::GRPCInferenceService::Stub>>>
+    grpc_channel_stub_map_;
+std::mutex grpc_channel_stub_map_mtx_;
 
 void
 ReadFile(const std::string& filename, std::string& data)
@@ -64,13 +68,16 @@ ReadFile(const std::string& filename, std::string& data)
   }
 }
 
-std::shared_ptr<grpc::Channel>
-GetChannel(const std::string& url, bool use_ssl, const SslOptions& ssl_options)
+std::pair<
+    std::shared_ptr<grpc::Channel>,
+    std::shared_ptr<inference::GRPCInferenceService::Stub>>
+GetChannelStub(
+    const std::string& url, bool use_ssl, const SslOptions& ssl_options)
 {
-  std::lock_guard<std::mutex> lock(grpc_channel_map_mtx_);
+  std::lock_guard<std::mutex> lock(grpc_channel_stub_map_mtx_);
 
-  const auto& channel_itr = grpc_channel_map_.find(url);
-  if (channel_itr != grpc_channel_map_.end()) {
+  const auto& channel_itr = grpc_channel_stub_map_.find(url);
+  if (channel_itr != grpc_channel_stub_map_.end()) {
     return channel_itr->second;
   } else {
     grpc::ChannelArguments arguments;
@@ -91,8 +98,12 @@ GetChannel(const std::string& url, bool use_ssl, const SslOptions& ssl_options)
     }
     std::shared_ptr<grpc::Channel> channel =
         grpc::CreateCustomChannel(url, credentials, arguments);
-    grpc_channel_map_.insert(std::make_pair(url, channel));
-    return channel;
+    std::shared_ptr<inference::GRPCInferenceService::Stub> stub =
+        inference::GRPCInferenceService::NewStub(channel);
+    grpc_channel_stub_map_.insert(
+        std::make_pair(url, std::make_pair(channel, stub)));
+
+    return std::make_pair(channel, stub);
   }
 }
 }  // namespace
@@ -1293,10 +1304,10 @@ InferenceServerGrpcClient::AsyncStreamTransfer()
 InferenceServerGrpcClient::InferenceServerGrpcClient(
     const std::string& url, bool verbose, bool use_ssl,
     const SslOptions& ssl_options)
-    : InferenceServerClient(verbose),
-      stub_(inference::GRPCInferenceService::NewStub(
-          GetChannel(url, use_ssl, ssl_options)))
+    : InferenceServerClient(verbose)
 {
+  auto channel_stub = GetChannelStub(url, use_ssl, ssl_options);
+  stub_ = channel_stub.second;
 }
 
 InferenceServerGrpcClient::~InferenceServerGrpcClient()
