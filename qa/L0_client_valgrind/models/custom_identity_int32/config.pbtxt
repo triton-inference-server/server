@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,47 +24,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.18)
+name: "custom_identity_int32"
+platform: "custom"
+max_batch_size: 1024
+version_policy: { latest { num_versions: 1 }}
+default_model_filename: "libidentity.so"
+instance_group [ { kind: KIND_CPU } ]
 
-if(WIN32)
-  message("Currently, CMake will not build perf_analyzer because it uses functionalities that "
-		      "are UNIX specific.")
-else()
-
-#
-# client_timeout_test
-#
-add_executable(
-  client_timeout_test
-  client_timeout_test.cc
-)
-
-target_link_libraries(
-  client_timeout_test
-  PRIVATE TRITON::grpcclient_static
-  PRIVATE TRITON::httpclient_static
-)
-install(
-  TARGETS client_timeout_test
-  RUNTIME DESTINATION bin
-)
-
-#
-# memory_leak_test
-#
-add_executable(
-  memory_leak_test
-  memory_leak_test.cc
-)
-
-target_link_libraries(
-  memory_leak_test
-  PRIVATE TRITON::grpcclient_static
-  PRIVATE TRITON::httpclient_static
-)
-install(
-  TARGETS memory_leak_test
-  RUNTIME DESTINATION bin
-)
-
-endif()
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+    
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }
+]
