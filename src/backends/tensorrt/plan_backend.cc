@@ -127,11 +127,12 @@ WarmupRequestComplete(
 PlanBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size,
     const bool enable_pinned_input, const bool enable_pinned_output,
-    const bool separate_output_stream,
+    const size_t gather_kernel_buffer_threshold, const bool separate_output_stream,
     std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
-          enable_pinned_output, std::move(metric_reporter)),
+          enable_pinned_output, gather_kernel_buffer_threshold,
+          std::move(metric_reporter)),
       engine_(nullptr), is_shared_engine_(true), total_bindings_(0),
       num_expected_bindings_(0), use_output_copy_stream_(separate_output_stream)
 {
@@ -521,6 +522,8 @@ PlanBackend::CreateExecutionContext(
       Config().optimization().input_pinned_memory().enable();
   const bool pinned_output =
       Config().optimization().output_pinned_memory().enable();
+  const size_t gather_kernel_buffer_threshold =
+      Config().optimization().gather_kernel_buffer_threshold();
 
   std::unique_ptr<MetricModelReporter> metric_reporter;
 #ifdef TRITON_ENABLE_METRICS
@@ -534,7 +537,8 @@ PlanBackend::CreateExecutionContext(
       Config().optimization().cuda().output_copy_stream();
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
-      separate_output_stream, std::move(metric_reporter)));
+      gather_kernel_buffer_threshold, separate_output_stream,
+      std::move(metric_reporter)));
   Context* context = static_cast<Context*>(contexts_.back().get());
   auto context_idx = contexts_.size() - 1;
 
@@ -2507,7 +2511,8 @@ PlanBackend::Context::Run(
   std::vector<int64_t> input_dims{(int64_t)payload_->total_batch_size_};
   payload_->collector_.reset(new BackendInputCollector(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
-      input_copy_stream_, events_[next_set_].input_ready_));
+      gather_kernel_buffer_threshold_, input_copy_stream_,
+      events_[next_set_].input_ready_));
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
     auto& io_binding_info =
         io_binding_infos_[next_buffer_binding_set_][io_index];

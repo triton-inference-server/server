@@ -911,6 +911,18 @@ message ModelOptimizationPolicy
   //@@     Default is true.
   //@@
   PinnedMemoryBuffer output_pinned_memory = 6;
+
+  //@@  .. cpp:var:: uint32 gather_kernel_buffer_threshold
+  //@@
+  //@@     The backend may use a gather kernel to gather input data if the
+  //@@     device has direct access to the source buffer and the destination
+  //@@     buffer. In such case, the gather kernel will be used only if the
+  //@@     number of buffers to be gathered is greater or equal to
+  //@@     the specifed value. If 0, the gather kernel will be disabled.
+  //@@     Default value is 0.
+  //@@     Currently only recognized by TensorRT backend.
+  //@@
+  uint32 gather_kernel_buffer_threshold = 7;
 }
 
 //@@
