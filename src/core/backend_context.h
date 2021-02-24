@@ -66,6 +66,7 @@ struct BackendContext {
   BackendContext(
       const std::string& name, const int gpu_device, const int max_batch_size,
       const bool enable_pinned_input, const bool enable_pinned_output,
+      const size_t gather_kernel_buffer_threshold,
       std::unique_ptr<MetricModelReporter>&& metric_reporter);
 
   virtual ~BackendContext();
@@ -114,6 +115,10 @@ struct BackendContext {
   // Whether to use indirect pinned buffer for the corresponding data copy type.
   const bool enable_pinned_input_;
   const bool enable_pinned_output_;
+
+  // The threshold that the number of buffers to be transferred must be larger
+  // or equal to for launching the gather kernel
+  const size_t gather_kernel_buffer_threshold_;
 
   // The stream that executes data transfer operations.
   cudaStream_t stream_;
@@ -223,10 +228,11 @@ class BackendInputCollector {
   explicit BackendInputCollector(
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
-      const bool pinned_enabled, cudaStream_t stream,
-      cudaEvent_t event = nullptr)
+      const bool pinned_enabled, const size_t kernel_buffer_threshold,
+      cudaStream_t stream, cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
+        kernel_buffer_threshold_(kernel_buffer_threshold),
         use_async_cpu_copy_(AsyncWorkQueue::WorkerCount() > 1), stream_(stream),
         event_(event), pending_pinned_byte_size_(0), pending_pinned_offset_(0),
         pending_copy_kernel_buffer_byte_size_(0),
@@ -295,6 +301,7 @@ class BackendInputCollector {
   const std::vector<std::unique_ptr<InferenceRequest>>& requests_;
   std::vector<std::unique_ptr<InferenceResponse>>* responses_;
   const bool pinned_enabled_;
+  const size_t kernel_buffer_threshold_;
   const bool use_async_cpu_copy_;
   cudaStream_t stream_;
   cudaEvent_t event_;

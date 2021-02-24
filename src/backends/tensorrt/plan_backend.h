@@ -93,6 +93,7 @@ class PlanBackend : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device, const int max_batch_size,
         const bool enable_pinned_input, const bool enable_pinned_output,
+        const size_t gather_kernel_buffer_threshold,
         const bool separate_output_copy_stream,
         std::unique_ptr<MetricModelReporter>&& metric_reporter);
     ~Context();
