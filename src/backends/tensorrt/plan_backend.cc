@@ -161,8 +161,8 @@ PlanBackend::Context::~Context()
   LOG_VERBOSE(1) << "~PlanBackend::Context ";
 
   cudaSetDevice(gpu_device_);
-  for (int s = 0; s < num_copy_streams_; s++) {
-    for (auto& io_binding_info : io_binding_infos_[s]) {
+  for (auto& io_binding_infos : io_binding_infos_) {
+    for (auto& io_binding_info : io_binding_infos) {
       if (io_binding_info.buffer_ != nullptr) {
         cudaError_t err = cudaSuccess;
         if (io_binding_info.memory_type_ == TRITONSERVER_MEMORY_GPU) {
