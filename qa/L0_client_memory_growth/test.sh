@@ -76,7 +76,7 @@ for PROTOCOL in http grpc; do
         # MAX_ALLOWED_ALLOC is the threshold memory growth in MB
         if [ "$LANG" == "c++" ]; then
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
-            MAX_ALLOWED_ALLOC="50"
+            MAX_ALLOWED_ALLOC="10"
             EXTRA_ARGS="-r 100000 -i ${PROTOCOL}"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
