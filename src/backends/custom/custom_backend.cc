@@ -78,7 +78,7 @@ CustomBackend::Context::Context(
     std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
-          enable_pinned_output, std::move(metric_reporter)),
+          enable_pinned_output, 0, std::move(metric_reporter)),
       library_handle_(nullptr), library_context_handle_(nullptr),
       InitializeFn_(nullptr), FinalizeFn_(nullptr), ErrorStringFn_(nullptr),
       ExecuteFn_(nullptr)

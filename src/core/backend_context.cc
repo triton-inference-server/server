@@ -61,10 +61,12 @@ GetUsePinnedMemoryType(TRITONSERVER_MemoryType ref_buffer_type)
 BackendContext::BackendContext(
     const std::string& name, const int gpu_device, const int max_batch_size,
     const bool enable_pinned_input, const bool enable_pinned_output,
+    const size_t gather_kernel_buffer_threshold,
     std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
       enable_pinned_input_(enable_pinned_input),
       enable_pinned_output_(enable_pinned_output),
+      gather_kernel_buffer_threshold_(gather_kernel_buffer_threshold),
       metric_reporter_(std::move(metric_reporter))
 {
 #ifdef TRITON_ENABLE_GPU
@@ -634,6 +636,7 @@ BackendInputCollector::ProcessTensor(
   if (pinned_enabled_) {
     use_pinned_memory_type = GetUsePinnedMemoryType(memory_type);
   }
+  const bool use_kernel = (kernel_buffer_threshold_ != 0);
 
   size_t buffer_offset = 0;
 
@@ -666,7 +669,7 @@ BackendInputCollector::ProcessTensor(
     } else {
       need_sync_ |= SetFixedSizeInputTensor(
           request_input, buffer_offset, buffer, buffer_byte_size, memory_type,
-          memory_type_id, use_pinned_memory_type, true, &response);
+          memory_type_id, use_pinned_memory_type, use_kernel, &response);
     }
 
     buffer_offset += request_input->Data()->TotalByteSize();
@@ -994,7 +997,8 @@ BackendInputCollector::SetFixedSizeInputTensor(
       // but server can still runs even if it fails to enable peer-to-peer.
       // Should provide a utility to check whether a device pair allows direct
       // access and use gather kernel accordingly
-      if ((src_memory_type != TRITONSERVER_MEMORY_GPU) || (src_memory_type_id == tensor_memory_type_id)) {
+      if ((src_memory_type != TRITONSERVER_MEMORY_GPU) ||
+          (src_memory_type_id == tensor_memory_type_id)) {
         if (pending_copy_kernel_buffer_byte_size_ == 0) {
           pending_copy_kernel_buffer_offset_ = tensor_buffer_offset;
         }
@@ -1219,11 +1223,17 @@ BackendInputCollector::FlushPendingCopyKernel(
   if (pending_copy_kernel_inputs_.size() == 0) {
     return false;
   }
-  auto status = LaunchCopyKernel(
-      tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
-      tensor_memory_type_id);
-  bool cuda_copy = status.IsOk();
 
+  bool cuda_copy = false;
+  Status status = Status(Status::Code::INTERNAL, "");
+  // Only try to launch kernel if buffer count is large enough for
+  // good GPU utilization
+  if (pending_copy_kernel_input_buffer_counts_ >= kernel_buffer_threshold_) {
+    status = LaunchCopyKernel(
+        tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
+        tensor_memory_type_id);
+    cuda_copy = status.IsOk();
+  }
   // If kernel can't be launched then just perform a direct copy.
   if (!status.IsOk()) {
     size_t offset = 0;
