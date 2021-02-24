@@ -50,7 +50,14 @@ def get_number_of_bytes_for_npobject(tensor_value):
     -------
     int
         Number of bytes present in this tensor
+
+    Raises
+    ------
+    InferenceServerException
+        If the tensor_value type is not np.object_
     """
+    if tensor_value.dtype != np.object_:
+        utils.raise_error(f'Tensor dtype must np.object_')
     if tensor_value.size > 0:
         total_bytes = 0
         for obj in np.nditer(tensor_value, flags=["refs_ok"], order='C'):

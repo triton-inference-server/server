@@ -119,6 +119,28 @@ class ClientStringTest(tu.TestResultCollector):
         # Verify that np.bytes_ and np.object_ are the same.
         self.assertTrue(np.array_equal(out0, output0_object))
 
+        # Same test but for np.object
+        in0_object = in0.astype(np.object)
+        inputs = []
+        outputs = []
+        inputs.append(
+            tritonhttpclient.InferInput('INPUT0', in0_object.shape, "BYTES"))
+        inputs[0].set_data_from_numpy(in0_object)
+
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+
+        results = triton_client.infer(model_name=model_name,
+                                      inputs=inputs,
+                                      outputs=outputs)
+
+        output0_object = results.as_numpy('OUTPUT0')
+        # We expect there to be 1 results (with batch-size 1). Verify
+        # that all 8 result elements are the same as the input.
+        self.assertTrue(np.array_equal(in0_object, output0_object))
+
+        # Verify that np.bytes_ and np.object_ are the same.
+        self.assertTrue(np.array_equal(out0, output0_object))
+
         # Same test but for np.bytes_
         in0_bytes = in0.astype(np.bytes_)
         inputs = []

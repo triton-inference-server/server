@@ -318,22 +318,15 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
                 if dtype == np.object_:
                     input_list_tmp = iu.serialize_byte_tensor_list(input_list)
-                    dummy_input_list_tmp = iu.serialize_byte_tensor_list(
-                        dummy_input_list)
                     input_byte_size = sum([
                         iu.get_number_of_bytes_for_npobject(i0)
                         for i0 in input_list_tmp
                     ])
-                    dummy_input_byte_size = sum([
-                        iu.get_number_of_bytes_for_npobject(i0)
-                        for i0 in dummy_input_list_tmp
-                    ])
                 else:
                     input_list_tmp = input_list
-                    dummy_input_list_tmp = dummy_input_list
-                    input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
-                    dummy_input_byte_size = sum(
-                        [i0.nbytes for i0 in dummy_input_list])
+
+                dummy_input_byte_size = sum(
+                    [i0.nbytes for i0 in dummy_input_list])
 
                 shape_input_byte_size = sum(
                     [i0.nbytes for i0 in shape_input_list])
@@ -366,7 +359,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                 shm.set_shared_memory_region(shm_shape_ip_handle,
                                              shape_input_list)
                 shm.set_shared_memory_region(shm_dummy_ip_handle,
-                                             dummy_input_list_tmp)
+                                             dummy_input_list)
                 self.triton_client_.register_system_shared_memory(
                     ip_name, '/' + ip_name, input_byte_size)
                 self.triton_client_.register_system_shared_memory(

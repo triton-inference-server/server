@@ -76,6 +76,9 @@ def serialize_byte_tensor_list(tensor_values):
 
 
 def get_number_of_bytes_for_npobject(tensor_value):
+    if tensor_value.dtype != np.object_:
+        raise_error(f'Tensor dtype must np.object_, {tensor_value.dtype} is'
+                    ' provided.')
     if tensor_value.size > 0:
         total_bytes = 0
         for obj in np.nditer(tensor_value, flags=["refs_ok"], order='C'):
@@ -512,9 +515,18 @@ def infer_exact(tester,
                         shm_handle, output_dtype, output_shape)
                 else:
                     output_data = results.as_numpy(result_name)
-
-                if (output_data.dtype == np.object_) and (config[3] == False):
-                    output_data = output_data.astype(np.object_)
+                    if (output_data.dtype == np.object_) and (not config[3]):
+                        if config[1] == 'http':
+                            output_data = np.array([
+                                unicode(str(x), encoding='utf-8')
+                                for x in (output_data.flatten())
+                            ],
+                                                   dtype=np.object_).reshape(
+                                                       output_data.shape)
+                        elif config[1] == 'grpc':
+                            output_data = np.array(
+                                [x for x in (output_data.flatten())],
+                                dtype=np.object_).reshape(output_data.shape)
 
                 if result_name == OUTPUT0:
                     tester.assertTrue(
@@ -1057,8 +1069,18 @@ def infer_zero(tester,
             else:
                 output_data = results.as_numpy(result_name)
 
-            if (output_data.dtype == np.object_) and (config[3] == False):
-                output_data = output_data.astype(np.object_)
+                if (output_data.dtype == np.object_) and (config[3] == False):
+                    if config[1] == 'http':
+                        output_data = np.array([
+                            unicode(str(x), encoding='utf-8')
+                            for x in (output_data.flatten())
+                        ],
+                                               dtype=np.object_).reshape(
+                                                   output_data.shape)
+                    elif config[1] == 'grpc':
+                        output_data = np.array(
+                            [x for x in (output_data.flatten())],
+                            dtype=np.object_).reshape(output_data.shape)
 
             expected = expected_dict[result_name]
             tester.assertEqual(output_data.shape, expected.shape)
