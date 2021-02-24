@@ -281,7 +281,7 @@ def backend_repo(be):
 
 def backend_cmake_args(images, components, be, install_dir, library_paths):
     if be == 'onnxruntime':
-        args = onnxruntime_cmake_args()
+        args = onnxruntime_cmake_args(images)
     elif be == 'openvino':
         args = openvino_cmake_args()
     elif be == 'tensorflow1':
@@ -361,19 +361,24 @@ def pytorch_cmake_args(images):
     ]
 
 
-def onnxruntime_cmake_args():
+def onnxruntime_cmake_args(images):
     cargs = [
         '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][2]),
-        '-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][1])
+            TRITON_VERSION_MAP[FLAGS.version][2])
     ]
 
-    if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
-        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
-        cargs.append('-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][3]))
+    if target_platform() == 'windows':
+        if 'base' in images:
+            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    else:
+        cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][1]))
+
+        if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
+            cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
+            cargs.append('-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][3]))
 
     return cargs
 
@@ -528,7 +533,8 @@ COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
 '''
 
     if 'onnxruntime' in backends:
-        df += '''
+        if target_platform() != 'windows':
+            df += '''
 # Copy ONNX custom op library and model (needed for testing)
 RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
       cp /tmp/tritonbuild/onnxruntime/install/test/libcustom_op_library.so /workspace/qa/L0_custom_ops/.; \
