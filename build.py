@@ -54,14 +54,18 @@ from distutils.dir_util import copy_tree
 #     (triton container version,
 #      upstream container version,
 #      ORT version,
-#      ORT openvino version (use None to disable openvino)
+#      ORT openvino version (use None to disable openvino in ORT),
+#      OpenVINO version
 #     )
-TRITON_VERSION_MAP = {'2.8.0dev': ('21.03dev', '20.12', '1.6.0', '2021.1')}
+TRITON_VERSION_MAP = {
+    '2.8.0dev': ('21.03dev', '20.12', '1.6.0', '2021.1', '2021.2.200')
+}
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
 NONCORE_BACKENDS = [
-    'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch'
+    'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
+    'openvino'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -278,6 +282,8 @@ def backend_repo(be):
 def backend_cmake_args(images, components, be, install_dir, library_paths):
     if be == 'onnxruntime':
         args = onnxruntime_cmake_args()
+    elif be == 'openvino':
+        args = openvino_cmake_args()
     elif be == 'tensorflow1':
         args = tensorflow_cmake_args(1, images, library_paths)
     elif be == 'tensorflow2':
@@ -368,6 +374,17 @@ def onnxruntime_cmake_args():
         cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
         cargs.append('-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][3]))
+
+    return cargs
+
+
+def openvino_cmake_args():
+    cargs = [
+        '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][4]),
+        '-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][1])
+    ]
 
     return cargs
 
