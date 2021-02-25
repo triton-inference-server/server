@@ -186,25 +186,26 @@ def triton_to_np_dtype(dtype):
 
 def serialize_byte_tensor(input_tensor):
     """
-        Serializes a bytes tensor into a flat numpy array of length prepend bytes.
-        Can pass bytes tensor as numpy array of bytes with dtype of np.bytes_,
-        numpy strings with dtype of np.str_ or python strings with dtype of np.object.
+    Serializes a bytes tensor into a flat numpy array of length prepended
+    bytes. The numpy array should use dtype of np.object_. For np.bytes_,
+    numpy will remove trailing zeros at the end of byte sequence and because
+    of this it should be avoided.
 
-        Parameters
-        ----------
-        input_tensor : np.array
-            The bytes tensor to serialize.
+    Parameters
+    ----------
+    input_tensor : np.array
+        The bytes tensor to serialize.
 
-        Returns
-        -------
-        serialized_bytes_tensor : np.array
-            The 1-D numpy array of type uint8 containing the serialized bytes in 'C' order.
+    Returns
+    -------
+    serialized_bytes_tensor : np.array
+        The 1-D numpy array of type uint8 containing the serialized bytes in 'C' order.
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to serialize the given tensor.
-        """
+    Raises
+    ------
+    InferenceServerException
+        If unable to serialize the given tensor.
+    """
 
     if input_tensor.size == 0:
         return np.empty([0], dtype=np.object_)
@@ -220,13 +221,10 @@ def serialize_byte_tensor(input_tensor):
             # If directly passing bytes to BYTES type,
             # don't convert it to str as Python will encode the
             # bytes which may distort the meaning
-            if obj.dtype.type == np.bytes_:
-                if type(obj.item()) == bytes:
-                    s = obj.item()
-                else:
-                    s = bytes(obj)
+            if type(obj.item()) == bytes:
+                s = obj.item()
             else:
-                s = str(obj).encode('utf-8')
+                s = bytes(obj)
             flattened += struct.pack("<I", len(s))
             flattened += s
         flattened_array = np.asarray(flattened, dtype=np.object_)

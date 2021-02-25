@@ -39,12 +39,10 @@ import test_util as tu
 
 class ClientStringTest(tu.TestResultCollector):
 
-    def _test_unicode_bytes(self):
+    def _test_unicode_bytes(self, model_name):
         # We use a simple model that takes an input tensor of 8 byte strings
         # and returns an output tensors of 8 strings. The output tensor
         # is the same as the input tensor.
-        model_name = "graphdef_nobatch_zero_1_object"
-        model_version = ""
 
         # Create the inference server client for the model.
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000",
