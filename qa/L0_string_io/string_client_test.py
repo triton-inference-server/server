@@ -39,7 +39,7 @@ import test_util as tu
 
 class ClientStringTest(tu.TestResultCollector):
 
-    def test_tf_unicode_bytes(self):
+    def _test_unicode_bytes(self):
         # We use a simple model that takes an input tensor of 8 byte strings
         # and returns an output tensors of 8 strings. The output tensor
         # is the same as the input tensor.
@@ -70,10 +70,10 @@ class ClientStringTest(tu.TestResultCollector):
                 b'\nJ\n\r\n\x01b\x12\x08\x1a\x06\n\x04\x9b\x94\xad\x04\n\r\n\x01c\x12\x08\x12\x06\n\x04\xc3\x8a\x08\xbf\n*\n\x01a\x12%\x1a#\n!\x9c\x02\xb2\x02\xcd\x02\x9d\x07\x8d\x01\xb6\x05a\xf1\x01\xf0\x05\xdb\x02\xac\x04\xbd\x05\xe0\x04\xd2\x06\xaf\x02\xa8\x01\x8b\x04'
             ],
             [
-                b'\n3\n\x13\n\x01a\x12\x0e\x1a\x0c\n\n<\xe2\x05\x8a\x01\xb3\x07?\xfd\x01\n\r\n\x01b\x12\x08\x1a\x06\n\x04\xf6\xa2\xc5\x01\n\r\n\x01c\x12\x08\x12\x06\n\x04\x1b\x931\xbf'
+                b'\n3\n\x13\n\x01a\x12\x0e\x1a\x0c\n\n<\xe2\x05\x8a\x01\xb3\x07?\xfd\x01\n\r\n\x01b\x12\x08\x1a\x06\n\x04\xf6\xa2\xc5\x01\n\r\n\x01c\x12\x08\x12\x06\n\x04\x1b\x931\xbf\x00\x00'
             ],
             [
-                b'\n&\n\x07\n\x01a\x12\x02\x1a\x00\n\x0c\n\x01b\x12\x07\x1a\x05\n\x03\x89\xcc=\n\r\n\x01c\x12\x08\x12\x06\n\x04{\xbc\x0e>'
+                b'\n&\n\x07\n\x01a\x12\x02\x1a\x00\n\x0c\n\x01b\x12\x07\x1a\x05\n\x03\x89\xcc=\n\r\n\x01c\x12\x08\x12\x06\n\x04{\xbc\x0e>\x00\x00\x00'
             ],
             [
                 b'\nF\n\'\n\x01a\x12"\x1a \n\x1e\x97\x01\x93\x02\x9e\x01\xac\x06\xff\x01\xd8\x05\xe1\x07\xd8\x04g]\x9a\x05\xff\x06\xde\x07\x8f\x04\x97\x04\xda\x03\n\x0c\n\x01b\x12\x07\x1a\x05\n\x03\x9a\xb7I\n\r\n\x01c\x12\x08\x12\x06\n\x04\xfb\x87\x83\xbf'
@@ -92,12 +92,81 @@ class ClientStringTest(tu.TestResultCollector):
 
         results = triton_client.infer(model_name=model_name,
                                       inputs=inputs,
-                                      outputs=outputs,
-                                      model_version=model_version)
+                                      outputs=outputs)
+
+        out0 = results.as_numpy('OUTPUT0')
+        # We expect there to be 1 results (with batch-size 1). Verify
+        # that all 8 result elements are the same as the input.
+        self.assertTrue(np.array_equal(in0, out0))
+
+        # Same test but for np.object_
+        in0_object = in0.astype(np.object_)
+        inputs = []
+        outputs = []
+        inputs.append(
+            tritonhttpclient.InferInput('INPUT0', in0_object.shape, "BYTES"))
+        inputs[0].set_data_from_numpy(in0_object)
+
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+
+        results = triton_client.infer(model_name=model_name,
+                                      inputs=inputs,
+                                      outputs=outputs)
+
+        output0_object = results.as_numpy('OUTPUT0')
+        # We expect there to be 1 results (with batch-size 1). Verify
+        # that all 8 result elements are the same as the input.
+        self.assertTrue(np.array_equal(in0_object, output0_object))
+
+        # Verify that np.bytes_ and np.object_ are the same.
+        self.assertTrue(np.array_equal(out0, output0_object))
+
+        # Same test but for np.object
+        in0_object = in0.astype(np.object)
+        inputs = []
+        outputs = []
+        inputs.append(
+            tritonhttpclient.InferInput('INPUT0', in0_object.shape, "BYTES"))
+        inputs[0].set_data_from_numpy(in0_object)
+
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+
+        results = triton_client.infer(model_name=model_name,
+                                      inputs=inputs,
+                                      outputs=outputs)
 
         # We expect there to be 1 results (with batch-size 1). Verify
         # that all 8 result elements are the same as the input.
-        self.assertTrue(np.array_equal(in0, results.as_numpy('OUTPUT0')))
+        self.assertTrue(np.array_equal(in0_object, output0_object))
+
+        # Verify that np.bytes_ and np.object_ are the same.
+        self.assertTrue(np.array_equal(out0, output0_object))
+
+        # Same test but for np.bytes_
+        in0_bytes = in0.astype(np.bytes_)
+        inputs = []
+        outputs = []
+        inputs.append(
+            tritonhttpclient.InferInput('INPUT0', in0_bytes.shape, "BYTES"))
+        inputs[0].set_data_from_numpy(in0_object)
+
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+
+        results = triton_client.infer(model_name=model_name,
+                                      inputs=inputs,
+                                      outputs=outputs)
+
+        output0_byte = results.as_numpy('OUTPUT0')
+        # We expect there to be 1 results (with batch-size 1). Verify
+        # that all 8 result elements are the same as the input.
+        self.assertTrue(np.array_equal(in0_bytes, output0_byte))
+
+        # Verify that the output is the same as before
+        self.assertTrue(np.array_equal(out0, output0_byte))
+
+    def test_tf_unicode_bytes(self):
+        self._test_unicode_bytes("graphdef_nobatch_zero_1_object")
+        self._test_unicode_bytes("string")
 
 
 if __name__ == '__main__':

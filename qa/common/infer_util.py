@@ -25,7 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-import os
 import numpy as np
 import test_util as tu
 import shm_util as su
@@ -63,7 +62,7 @@ def _range_repr_dtype(dtype):
         return np.int16
     elif dtype == np.float16:
         return np.int8
-    elif dtype == np.object:  # TYPE_STRING
+    elif dtype == np.object_:  # TYPE_STRING
         return np.int32
     return dtype
 
@@ -157,7 +156,7 @@ def infer_exact(tester,
                                      high=val_max,
                                      size=tensor_shape,
                                      dtype=rinput_dtype)
-    if input_dtype != np.object:
+    if input_dtype != np.object_:
         input0_array = input0_array.astype(input_dtype)
         input1_array = input1_array.astype(input_dtype)
 
@@ -168,7 +167,7 @@ def infer_exact(tester,
         output0_array = input0_array - input1_array
         output1_array = input0_array + input1_array
 
-    if output0_dtype == np.object:
+    if output0_dtype == np.object_:
         output0_array = np.array([
             unicode(str(x), encoding='utf-8') for x in (output0_array.flatten())
         ],
@@ -183,18 +182,22 @@ def infer_exact(tester,
     else:
         output1_array = output1_array.astype(output1_dtype)
 
-    if input_dtype == np.object:
-        in0n = np.array(
-            [str(x) for x in input0_array.reshape(input0_array.size)],
-            dtype=object)
+    if input_dtype == np.object_:
+        in0n = np.array([
+            str(x).encode('utf-8')
+            for x in input0_array.reshape(input0_array.size)
+        ],
+                        dtype=object)
         input0_array = in0n.reshape(input0_array.shape)
-        in1n = np.array(
-            [str(x) for x in input1_array.reshape(input1_array.size)],
-            dtype=object)
+        in1n = np.array([
+            str(x).encode('utf-8')
+            for x in input1_array.reshape(input1_array.size)
+        ],
+                        dtype=object)
         input1_array = in1n.reshape(input1_array.shape)
 
     # prepend size of string to output string data
-    if output0_dtype == np.object:
+    if output0_dtype == np.object_:
         if batch_size == 1:
             output0_array_tmp = serialize_byte_tensor_list([output0_array])
         else:
@@ -202,7 +205,7 @@ def infer_exact(tester,
     else:
         output0_array_tmp = output0_array
 
-    if output1_dtype == np.object:
+    if output1_dtype == np.object_:
         if batch_size == 1:
             output1_array_tmp = serialize_byte_tensor_list([output1_array])
         else:
@@ -212,15 +215,15 @@ def infer_exact(tester,
 
     # Get model platform
     model_name = tu.get_model_name(pf, input_dtype, output0_dtype,
-                                    output1_dtype)
+                                   output1_dtype)
     if configs[0][1] == "http":
         metadata_client = httpclient.InferenceServerClient(configs[0][0],
-                                                            verbose=True)
+                                                           verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata["platform"]
     else:
         metadata_client = grpcclient.InferenceServerClient(configs[0][0],
-                                                            verbose=True)
+                                                           verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata.platform
 
@@ -235,8 +238,17 @@ def infer_exact(tester,
         INPUT0 = "INPUT0"
         INPUT1 = "INPUT1"
 
-    output0_byte_size = sum([o0.nbytes for o0 in output0_array_tmp])
-    output1_byte_size = sum([o1.nbytes for o1 in output1_array_tmp])
+    if output0_dtype == np.object_:
+        output0_byte_size = sum(
+            [serialized_byte_size(o0) for o0 in output0_array_tmp])
+    else:
+        output0_byte_size = sum([o0.nbytes for o0 in output0_array_tmp])
+
+    if output1_dtype == np.object_:
+        output1_byte_size = sum(
+            [serialized_byte_size(o1) for o1 in output1_array_tmp])
+    else:
+        output1_byte_size = sum([o1.nbytes for o1 in output1_array_tmp])
 
     if batch_size == 1:
         input0_list = [input0_array]
@@ -246,15 +258,21 @@ def infer_exact(tester,
         input1_list = [x for x in input1_array]
 
     # Serialization of string tensors in the case of shared memory must be done manually
-    if input_dtype == np.object:
+    if input_dtype == np.object_:
         input0_list_tmp = serialize_byte_tensor_list(input0_list)
         input1_list_tmp = serialize_byte_tensor_list(input1_list)
     else:
         input0_list_tmp = input0_list
         input1_list_tmp = input1_list
 
-    input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
-    input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
+    if input_dtype == np.object_:
+        input0_byte_size = sum(
+            [serialized_byte_size(i0) for i0 in input0_list_tmp])
+        input1_byte_size = sum(
+            [serialized_byte_size(i1) for i1 in input1_list_tmp])
+    else:
+        input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
+        input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
 
     # Create system/cuda shared memory regions if needed
     shm_regions, shm_handles = su.create_set_shm_regions(
@@ -483,9 +501,18 @@ def infer_exact(tester,
                         shm_handle, output_dtype, output_shape)
                 else:
                     output_data = results.as_numpy(result_name)
-
-                if (output_data.dtype == np.object) and (config[3] == False):
-                    output_data = output_data.astype(np.bytes_)
+                    if (output_data.dtype == np.object_) and (not config[3]):
+                        if config[1] == 'http':
+                            output_data = np.array([
+                                unicode(str(x), encoding='utf-8')
+                                for x in (output_data.flatten())
+                            ],
+                                                   dtype=np.object_).reshape(
+                                                       output_data.shape)
+                        elif config[1] == 'grpc':
+                            output_data = np.array(
+                                [x for x in (output_data.flatten())],
+                                dtype=np.object_).reshape(output_data.shape)
 
                 if result_name == OUTPUT0:
                     tester.assertTrue(
@@ -610,7 +637,7 @@ def infer_shape_tensor(tester,
         else:
             dummy_in0 = np.random.choice(a=[False, True],
                                          size=dummy_input_shapes[io_num])
-        if tensor_dtype != np.object:
+        if tensor_dtype != np.object_:
             dummy_in0 = dummy_in0.astype(tensor_dtype)
         else:
             dummy_in0 = np.array([str(x) for x in dummy_in0.flatten()],
@@ -812,12 +839,12 @@ def infer_zero(tester,
     model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
     if configs[0][1] == "http":
         metadata_client = httpclient.InferenceServerClient(configs[0][0],
-                                                            verbose=True)
+                                                           verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata["platform"]
     else:
         metadata_client = grpcclient.InferenceServerClient(configs[0][0],
-                                                            verbose=True)
+                                                           verbose=True)
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata.platform
 
@@ -840,7 +867,7 @@ def infer_zero(tester,
                                             dtype=rtensor_dtype)
         else:
             input_array = np.random.choice(a=[False, True], size=input_shape)
-        if tensor_dtype != np.object:
+        if tensor_dtype != np.object_:
             input_array = input_array.astype(tensor_dtype)
             expected_array = np.ndarray.copy(input_array)
         else:
@@ -849,13 +876,17 @@ def infer_zero(tester,
                 for x in input_array.flatten()
             ],
                                       dtype=object)
-            input_array = np.array([str(x) for x in input_array.flatten()],
-                                   dtype=object).reshape(input_array.shape)
+            input_array = np.array(
+                [str(x).encode('utf-8') for x in input_array.flatten()],
+                dtype=object).reshape(input_array.shape)
 
         expected_array = expected_array.reshape(output_shape)
         expected_dict[output_name] = expected_array
 
-        output_byte_size = expected_array.nbytes
+        if tensor_dtype == np.object_:
+            output_byte_size = serialized_byte_size(expected_array)
+        else:
+            output_byte_size = expected_array.nbytes
 
         if batch_size == 1:
             input_list = [input_array]
@@ -863,12 +894,16 @@ def infer_zero(tester,
             input_list = [x for x in input_array]
 
         # Serialization of string tensors in the case of shared memory must be done manually
-        if tensor_dtype == np.object:
+        if tensor_dtype == np.object_:
             input_list_tmp = serialize_byte_tensor_list(input_list)
         else:
             input_list_tmp = input_list
 
-        input_byte_size = sum([ip.nbytes for ip in input_list_tmp])
+        if tensor_dtype == np.object_:
+            input_byte_size = sum(
+                [serialized_byte_size(ip) for ip in input_list_tmp])
+        else:
+            input_byte_size = sum([ip.nbytes for ip in input_list_tmp])
 
         # create and register shared memory region for inputs and outputs
         shm_io_handles = su.create_set_either_shm_region(
@@ -904,8 +939,15 @@ def infer_zero(tester,
         for io_num, (input_name, output_name) in enumerate(
                 zip(input_dict.keys(), expected_dict.keys())):
             input_data = input_dict[input_name]
-            input_byte_size = input_data.nbytes
-            output_byte_size = expected_dict[output_name].nbytes
+            output_data = expected_dict[output_name]
+            if tensor_dtype == np.object_:
+                input_byte_size = serialized_byte_size(
+                    serialize_byte_tensor(input_data))
+                output_byte_size = serialized_byte_size(
+                    serialize_byte_tensor(output_data))
+            else:
+                input_byte_size = input_data.nbytes
+                output_byte_size = output_data.nbytes
             if config[1] == "http":
                 inputs.append(
                     httpclient.InferInput(input_name, input_data.shape,
@@ -1013,8 +1055,18 @@ def infer_zero(tester,
             else:
                 output_data = results.as_numpy(result_name)
 
-            if (output_data.dtype == np.object) and (config[3] == False):
-                output_data = output_data.astype(np.bytes_)
+                if (output_data.dtype == np.object_) and (config[3] == False):
+                    if config[1] == 'http':
+                        output_data = np.array([
+                            unicode(str(x), encoding='utf-8')
+                            for x in (output_data.flatten())
+                        ],
+                                               dtype=np.object_).reshape(
+                                                   output_data.shape)
+                    elif config[1] == 'grpc':
+                        output_data = np.array(
+                            [x for x in (output_data.flatten())],
+                            dtype=np.object_).reshape(output_data.shape)
 
             expected = expected_dict[result_name]
             tester.assertEqual(output_data.shape, expected.shape)

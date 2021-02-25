@@ -59,8 +59,7 @@ def parse_model_grpc(model_metadata, model_config):
     input_metadata = model_metadata.inputs[0]
     output_metadata = model_metadata.outputs
 
-    return (input_metadata.name, output_metadata,
-            model_config.max_batch_size)
+    return (input_metadata.name, output_metadata, model_config.max_batch_size)
 
 
 def parse_model_http(model_metadata, model_config):
@@ -101,7 +100,7 @@ def postprocess(results, output_names, filenames, batch_size):
         for output_name in output_names:
             print('  [{}]:'.format(output_name))
             for result in output_dict[output_name][n]:
-                if output_dict[output_name][n].dtype.type == np.bytes_:
+                if output_dict[output_name][n].dtype.type == np.object_:
                     cls = "".join(chr(x) for x in result).split(':')
                 else:
                     cls = result.split(':')
@@ -116,12 +115,13 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
-    parser.add_argument('-m',
-                        '--model-name',
-                        type=str,
-                        required=False,
-                        default='preprocess_inception_ensemble',
-                        help='Name of model. Default is preprocess_inception_ensemble.')
+    parser.add_argument(
+        '-m',
+        '--model-name',
+        type=str,
+        required=False,
+        default='preprocess_inception_ensemble',
+        help='Name of model. Default is preprocess_inception_ensemble.')
     parser.add_argument('-c',
                         '--classes',
                         type=int,
@@ -237,18 +237,22 @@ if __name__ == '__main__':
                                   "BYTES"))
         inputs[0].set_data_from_numpy(batched_image_data, binary_data=True)
 
-    output_names = [ output.name if FLAGS.protocol.lower() == "grpc"
-                        else output['name'] for output in output_metadata ]
+    output_names = [
+        output.name if FLAGS.protocol.lower() == "grpc" else output['name']
+        for output in output_metadata
+    ]
 
     outputs = []
     for output_name in output_names:
         if FLAGS.protocol.lower() == "grpc":
-            outputs.append(grpcclient.InferRequestedOutput(output_name,
-                                            class_count=FLAGS.classes))
+            outputs.append(
+                grpcclient.InferRequestedOutput(output_name,
+                                                class_count=FLAGS.classes))
         else:
-            outputs.append(httpclient.InferRequestedOutput(output_name,
-                                            binary_data=True,
-                                            class_count=FLAGS.classes))
+            outputs.append(
+                httpclient.InferRequestedOutput(output_name,
+                                                binary_data=True,
+                                                class_count=FLAGS.classes))
 
     # Send request
     result = triton_client.infer(model_name, inputs, outputs=outputs)

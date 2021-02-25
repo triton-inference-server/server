@@ -29,6 +29,7 @@ import sys
 import re
 from collections import defaultdict
 
+
 def parse_massif_out(filename):
     """
     Extract the allocation data from the massif output file, and compile
