@@ -27,11 +27,14 @@
 #include "src/core/backend_context.h"
 
 #include "src/core/cuda_utils.h"
-#include "src/core/kernel.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/nvtx.h"
 #include "src/core/sync_queue.h"
+
+#ifdef TRITON_ENABLE_GPU
+#include "src/core/kernel.h"
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -725,10 +728,12 @@ BackendInputCollector::ProcessBatchInput(
     const size_t buffer_byte_size, const TRITONSERVER_MemoryType memory_type,
     const int64_t memory_type_id)
 {
+#ifdef TRITON_ENABLE_GPU
   if (buffer_ready_event_ != nullptr) {
     cudaEventSynchronize(buffer_ready_event_);
     buffer_ready_event_ = nullptr;
   }
+#endif  // TRITON_ENABLE_GPU
   char* input_buffer = buffer;
   std::unique_ptr<AllocatedMemory> internal_buffer;
   // Need a CPU buffer for modifying the value
@@ -864,10 +869,12 @@ BackendInputCollector::Finalize()
 
   // After the above sync all the GPU->pinned copies are complete. Any
   // deferred copies of pinned->CPU can now be done.
+#ifdef TRITON_ENABLE_GPU
   if (buffer_ready_event_ != nullptr) {
     cudaEventSynchronize(buffer_ready_event_);
     buffer_ready_event_ = nullptr;
   }
+#endif  // TRITON_ENABLE_GPU
   for (auto& def : deferred_pinned_) {
     if (!def.finalized_) {
       need_sync_ |= def.Finalize(stream_);
@@ -1022,10 +1029,12 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 #endif  // !defined(TRITON_ARCH_ARM64) && !defined(_WIN32)
 
+#ifdef TRITON_ENABLE_GPU
     if (wait_buffer && (buffer_ready_event_ != nullptr)) {
       cudaEventSynchronize(buffer_ready_event_);
       buffer_ready_event_ = nullptr;
     }
+#endif  // TRITON_ENABLE_GPU
 
     // Direct copy without intermediate pinned memory.
     bool cuda_used = false;
@@ -1117,10 +1126,12 @@ BackendInputCollector::FlushPendingPinned(
       // request inputs so that we can do the pinned->CPU copies in
       // finalize after we have waited for all async copies to complete.
       if (!cuda_used) {
+#ifdef TRITON_ENABLE_GPU
         if (buffer_ready_event_ != nullptr) {
           cudaEventSynchronize(buffer_ready_event_);
           buffer_ready_event_ = nullptr;
         }
+#endif  // TRITON_ENABLE_GPU
         Status status = CopyBuffer(
             "pinned input buffer H2D", pinned_memory_type, pinned_memory_id,
             tensor_memory_type, tensor_memory_type_id,
@@ -1195,10 +1206,12 @@ BackendInputCollector::FlushPendingPinned(
           // The last segmented task will start the next phase of
           // the internal pinned buffer copy
           if (incomplete_count->fetch_sub(1) == 1) {
+#ifdef TRITON_ENABLE_GPU
             if (buffer_ready_event_ != nullptr) {
               cudaEventSynchronize(buffer_ready_event_);
               buffer_ready_event_ = nullptr;
             }
+#endif  // TRITON_ENABLE_GPU
             completion_queue_.Put(deferred_pinned.Finalize(stream_));
             delete incomplete_count;
           }
@@ -1241,6 +1254,7 @@ BackendInputCollector::FlushPendingCopyKernel(
     const TRITONSERVER_MemoryType tensor_memory_type,
     const int64_t tensor_memory_type_id)
 {
+  LOG_ERROR << "before launching gather kernel";
   if (pending_copy_kernel_inputs_.size() == 0) {
     return false;
   }
@@ -1254,6 +1268,7 @@ BackendInputCollector::FlushPendingCopyKernel(
         tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
         tensor_memory_type_id);
     cuda_copy = status.IsOk();
+    LOG_ERROR << "gather kernel launched with status: " << status.AsString();
   }
   // If kernel can't be launched then just perform a direct copy.
   if (!status.IsOk()) {

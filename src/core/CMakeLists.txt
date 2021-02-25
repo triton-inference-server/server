@@ -201,7 +201,6 @@ set(
   backend_context.h
   constants.h
   cuda_utils.h
-  kernel.h
   async_work_queue.h
   dynamic_batch_scheduler.h
   ensemble_scheduler.h
@@ -243,6 +242,7 @@ if(${TRITON_ENABLE_GPU})
     SERVER_HDRS
     ${SERVER_HDRS}
     cuda_memory_manager.h
+    kernel.h
   )
 endif() # TRITON_ENABLE_GPU
 
