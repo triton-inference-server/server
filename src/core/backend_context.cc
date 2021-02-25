@@ -1254,7 +1254,6 @@ BackendInputCollector::FlushPendingCopyKernel(
     const TRITONSERVER_MemoryType tensor_memory_type,
     const int64_t tensor_memory_type_id)
 {
-  LOG_ERROR << "before launching gather kernel";
   if (pending_copy_kernel_inputs_.size() == 0) {
     return false;
   }
@@ -1268,7 +1267,6 @@ BackendInputCollector::FlushPendingCopyKernel(
         tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
         tensor_memory_type_id);
     cuda_copy = status.IsOk();
-    LOG_ERROR << "gather kernel launched with status: " << status.AsString();
   }
   // If kernel can't be launched then just perform a direct copy.
   if (!status.IsOk()) {
