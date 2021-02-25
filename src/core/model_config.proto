@@ -923,6 +923,17 @@ message ModelOptimizationPolicy
   //@@     Currently only recognized by TensorRT backend.
   //@@
   uint32 gather_kernel_buffer_threshold = 7;
+
+  //@@  .. cpp:var:: bool eager_batching
+  //@@
+  //@@     Start preparing the next batch before the model instance is ready
+  //@@     for the next inference. This option can be used to overlap the
+  //@@     batch preparation with model execution, with the trade-off that
+  //@@     the next batch might be smaller than what it could have been.
+  //@@     Default value is false.
+  //@@     Currently only recognized by TensorRT backend.
+  //@@
+  bool eager_batching = 8;
 }
 
 //@@
