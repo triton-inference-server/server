@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1638,7 +1638,7 @@ class InferResult:
                     if not has_binary_data:
                         np_array = np.array(output['data'],
                                             dtype=triton_to_np_dtype(datatype))
-                    np_array = np.resize(np_array, output['shape'])
+                    np_array = np_array.reshape(output['shape'])
                     return np_array
         return None
 
