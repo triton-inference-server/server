@@ -1370,7 +1370,10 @@ S3FileSystem::IsDirectory(const std::string& path, bool* is_dir)
   if (!head_bucket_outcome.IsSuccess()) {
     return Status(
         Status::Code::INTERNAL,
-        "Could not get MetaData for bucket with name " + bucket);
+        "Could not get MetaData for bucket with name " + bucket +
+            " due to exception: " +
+            head_bucket_outcome.GetError().GetExceptionName() +
+            ", error message: " + head_bucket_outcome.GetError().GetMessage());
   }
 
   // Root case - bucket exists and object path is empty
@@ -1389,7 +1392,10 @@ S3FileSystem::IsDirectory(const std::string& path, bool* is_dir)
     *is_dir = !list_objects_outcome.GetResult().GetContents().empty();
   } else {
     return Status(
-        Status::Code::INTERNAL, "Failed to list objects with prefix " + path);
+        Status::Code::INTERNAL,
+        "Failed to list objects with prefix " + path + " due to exception: " +
+            list_objects_outcome.GetError().GetExceptionName() +
+            ", error message: " + list_objects_outcome.GetError().GetMessage());
   }
   return Status::Success;
 }
@@ -1419,7 +1425,10 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   } else {
     return Status(
         Status::Code::INTERNAL,
-        "Failed to get modification time for object at " + path);
+        "Failed to get modification time for object at " + path +
+            " due to exception: " +
+            head_object_outcome.GetError().GetExceptionName() +
+            ", error message: " + head_object_outcome.GetError().GetMessage());
   }
   return Status::Success;
 }
@@ -1464,7 +1473,10 @@ S3FileSystem::GetDirectoryContents(
   } else {
     return Status(
         Status::Code::INTERNAL,
-        "Could not list contents of directory at " + true_path);
+        "Could not list contents of directory at " + true_path +
+            " due to exception: " +
+            list_objects_outcome.GetError().GetExceptionName() +
+            ", error message: " + list_objects_outcome.GetError().GetMessage());
   }
   return Status::Success;
 }
@@ -1547,7 +1559,11 @@ S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
     *contents = data;
   } else {
-    return Status(Status::Code::INTERNAL, "Failed to get object at " + path);
+    return Status(
+        Status::Code::INTERNAL,
+        "Failed to get object at " + path + " due to exception: " +
+            get_object_outcome.GetError().GetExceptionName() +
+            ", error message: " + get_object_outcome.GetError().GetMessage());
   }
 
   return Status::Success;
@@ -1645,7 +1661,11 @@ S3FileSystem::LocalizeDirectory(
           output_file.close();
         } else {
           return Status(
-              Status::Code::INTERNAL, "Failed to get object at " + s3_fpath);
+              Status::Code::INTERNAL,
+              "Failed to get object at " + s3_fpath + " due to exception: " +
+                  get_object_outcome.GetError().GetExceptionName() +
+                  ", error message: " +
+                  get_object_outcome.GetError().GetMessage());
         }
       }
     }
