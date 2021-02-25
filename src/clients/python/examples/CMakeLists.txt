@@ -83,6 +83,7 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
       ensemble_image_client.py
       image_client.py
       reuse_infer_objects_client.py
+      memory_growth_test.py
     DESTINATION python
   )
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_GRPC
