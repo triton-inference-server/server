@@ -36,37 +36,6 @@ import tritonclient.utils.shared_memory as shm
 
 FLAGS = None
 
-
-def get_number_of_bytes_for_npobject(tensor_value):
-    """
-    Get the underlying number of bytes for np.object_
-
-    Parameters
-    ----------
-    tensor_value : numpy.ndarray
-        Numpy array to calculate the number of bytes for.
-
-    Returns
-    -------
-    int
-        Number of bytes present in this tensor
-
-    Raises
-    ------
-    InferenceServerException
-        If the tensor_value type is not np.object_
-    """
-    if tensor_value.dtype != np.object_:
-        utils.raise_error(f'Tensor dtype must np.object_')
-    if tensor_value.size > 0:
-        total_bytes = 0
-        for obj in np.nditer(tensor_value, flags=["refs_ok"], order='C'):
-            total_bytes += len(obj.item())
-        return total_bytes
-    else:
-        return 0
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v',
@@ -126,12 +95,10 @@ if __name__ == '__main__':
 
     input0_data_serialized = utils.serialize_byte_tensor(input0_data)
     input1_data_serialized = utils.serialize_byte_tensor(input1_data)
-    input0_byte_size = get_number_of_bytes_for_npobject(input0_data_serialized)
-    input1_byte_size = get_number_of_bytes_for_npobject(input1_data_serialized)
-    output0_byte_size = get_number_of_bytes_for_npobject(
-        expected_sum_serialized)
-    output1_byte_size = get_number_of_bytes_for_npobject(
-        expected_diff_serialized)
+    input0_byte_size = utils.serialized_byte_size(input0_data_serialized)
+    input1_byte_size = utils.serialized_byte_size(input1_data_serialized)
+    output0_byte_size = utils.serialized_byte_size(expected_sum_serialized)
+    output1_byte_size = utils.serialized_byte_size(expected_diff_serialized)
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handles
     shm_op0_handle = shm.create_shared_memory_region("output0_data",

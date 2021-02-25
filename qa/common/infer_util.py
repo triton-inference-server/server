@@ -25,7 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-import os
 import numpy as np
 import test_util as tu
 import shm_util as su
@@ -73,19 +72,6 @@ def serialize_byte_tensor_list(tensor_values):
     for tensor_value in tensor_values:
         tensor_list.append(serialize_byte_tensor(tensor_value))
     return tensor_list
-
-
-def get_number_of_bytes_for_npobject(tensor_value):
-    if tensor_value.dtype != np.object_:
-        raise_error(f'Tensor dtype must np.object_, {tensor_value.dtype} is'
-                    ' provided.')
-    if tensor_value.size > 0:
-        total_bytes = 0
-        for obj in np.nditer(tensor_value, flags=["refs_ok"], order='C'):
-            total_bytes += len(obj.item())
-        return total_bytes
-    else:
-        return 0
 
 
 class UserData:
@@ -254,13 +240,13 @@ def infer_exact(tester,
 
     if output0_dtype == np.object_:
         output0_byte_size = sum(
-            [get_number_of_bytes_for_npobject(o0) for o0 in output0_array_tmp])
+            [serialized_byte_size(o0) for o0 in output0_array_tmp])
     else:
         output0_byte_size = sum([o0.nbytes for o0 in output0_array_tmp])
 
     if output1_dtype == np.object_:
         output1_byte_size = sum(
-            [get_number_of_bytes_for_npobject(o1) for o1 in output1_array_tmp])
+            [serialized_byte_size(o1) for o1 in output1_array_tmp])
     else:
         output1_byte_size = sum([o1.nbytes for o1 in output1_array_tmp])
 
@@ -281,9 +267,9 @@ def infer_exact(tester,
 
     if input_dtype == np.object_:
         input0_byte_size = sum(
-            [get_number_of_bytes_for_npobject(i0) for i0 in input0_list_tmp])
+            [serialized_byte_size(i0) for i0 in input0_list_tmp])
         input1_byte_size = sum(
-            [get_number_of_bytes_for_npobject(i1) for i1 in input1_list_tmp])
+            [serialized_byte_size(i1) for i1 in input1_list_tmp])
     else:
         input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
         input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
@@ -898,7 +884,7 @@ def infer_zero(tester,
         expected_dict[output_name] = expected_array
 
         if tensor_dtype == np.object_:
-            output_byte_size = get_number_of_bytes_for_npobject(expected_array)
+            output_byte_size = serialized_byte_size(expected_array)
         else:
             output_byte_size = expected_array.nbytes
 
@@ -915,7 +901,7 @@ def infer_zero(tester,
 
         if tensor_dtype == np.object_:
             input_byte_size = sum(
-                [get_number_of_bytes_for_npobject(ip) for ip in input_list_tmp])
+                [serialized_byte_size(ip) for ip in input_list_tmp])
         else:
             input_byte_size = sum([ip.nbytes for ip in input_list_tmp])
 
@@ -955,9 +941,9 @@ def infer_zero(tester,
             input_data = input_dict[input_name]
             output_data = expected_dict[output_name]
             if tensor_dtype == np.object_:
-                input_byte_size = get_number_of_bytes_for_npobject(
+                input_byte_size = serialized_byte_size(
                     serialize_byte_tensor(input_data))
-                output_byte_size = get_number_of_bytes_for_npobject(
+                output_byte_size = serialized_byte_size(
                     serialize_byte_tensor(output_data))
             else:
                 input_byte_size = input_data.nbytes

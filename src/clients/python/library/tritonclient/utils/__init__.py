@@ -35,6 +35,33 @@ def raise_error(msg):
     raise InferenceServerException(msg=msg) from None
 
 
+def serialized_byte_size(tensor_value):
+    """
+    Get the underlying number of bytes for a numpy ndarray.
+
+    Parameters
+    ----------
+    tensor_value : numpy.ndarray
+        Numpy array to calculate the number of bytes for.
+
+    Returns
+    -------
+    int
+        Number of bytes present in this tensor
+    """
+
+    if tensor_value.dtype != np.object_:
+        raise_error('The tensor_value dtype must be np.object_')
+
+    if tensor_value.size > 0:
+        total_bytes = 0
+        for obj in np.nditer(tensor_value, flags=["refs_ok"], order='C'):
+            total_bytes += len(obj.item())
+        return total_bytes
+    else:
+        return 0
+
+
 class InferenceServerException(Exception):
     """Exception indicating non-Success status.
 
@@ -45,7 +72,7 @@ class InferenceServerException(Exception):
 
     status : str
         The error code
-    
+
     debug_details : str
         The additional details on the error
 

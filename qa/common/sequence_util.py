@@ -142,10 +142,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
                 if dtype == np.object_:
                     input_list_tmp = iu.serialize_byte_tensor_list(input_list)
-                    input_byte_size = sum([
-                        iu.get_number_of_bytes_for_npobject(i0)
-                        for i0 in input_list_tmp
-                    ])
+                    input_byte_size = sum(
+                        [serialized_byte_size(i0) for i0 in input_list_tmp])
                 else:
                     input_list_tmp = input_list
                     input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
@@ -218,10 +216,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
                 if dtype == np.object_:
                     input_list_tmp = iu.serialize_byte_tensor_list(input_list)
-                    input_byte_size = sum([
-                        iu.get_number_of_bytes_for_npobject(i0)
-                        for i0 in input_list_tmp
-                    ])
+                    input_byte_size = sum(
+                        [serialized_byte_size(i0) for i0 in input_list_tmp])
                 else:
                     input_list_tmp = input_list
                     input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
@@ -318,10 +314,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
                 if dtype == np.object_:
                     input_list_tmp = iu.serialize_byte_tensor_list(input_list)
-                    input_byte_size = sum([
-                        iu.get_number_of_bytes_for_npobject(i0)
-                        for i0 in input_list_tmp
-                    ])
+                    input_byte_size = sum(
+                        [serialized_byte_size(i0) for i0 in input_list_tmp])
                 else:
                     input_list_tmp = input_list
 
@@ -522,7 +516,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                             input_list_tmp = iu.serialize_byte_tensor_list(
                                 [in0])
                             input_byte_size = sum([
-                                iu.get_number_of_bytes_for_npobject(i0)
+                                serialized_byte_size(i0)
                                 for i0 in input_list_tmp
                             ])
                         else:
