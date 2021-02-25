@@ -161,8 +161,8 @@ PlanBackend::Context::~Context()
   LOG_VERBOSE(1) << "~PlanBackend::Context ";
 
   cudaSetDevice(gpu_device_);
-  for (int s = 0; s < num_copy_streams_; s++) {
-    for (auto& io_binding_info : io_binding_infos_[s]) {
+  for (auto& io_binding_infos : io_binding_infos_) {
+    for (auto& io_binding_info : io_binding_infos) {
       if (io_binding_info.buffer_ != nullptr) {
         cudaError_t err = cudaSuccess;
         if (io_binding_info.memory_type_ == TRITONSERVER_MEMORY_GPU) {
@@ -370,6 +370,25 @@ PlanBackend::CreateExecutionContexts(
     }
   }
 
+  // If eager batching is set, we duplicate the context idx in
+  // available_context_queue_ to allow Run() return before the context is
+  // actually ready for next batch. The number of duplicates are limited
+  // by number of event sets to prevent too many iterations are run ahead and
+  // to avoid interference of the event communication in the previous execution
+  if (Config().optimization().eager_batching()) {
+    for (auto& queue : available_context_queue_) {
+      std::vector<size_t> context_in_queue;
+      while (!queue->Empty()) {
+        context_in_queue.emplace_back(queue->Get());
+      }
+      for (int count = 0; count < Context::EVENT_SET_COUNT; ++count) {
+        for (const auto context_idx : context_in_queue) {
+          queue->Put(context_idx);
+        }
+      }
+    }
+  }
+
   // Create a scheduler with one thread for each context queue specified for
   // this model. Each runner is responsible to dispatch tasks to contexts
   // assigned to the corresponding queue. For different scheduler type, the
@@ -541,6 +560,8 @@ PlanBackend::CreateExecutionContext(
       std::move(metric_reporter)));
   Context* context = static_cast<Context*>(contexts_.back().get());
   auto context_idx = contexts_.size() - 1;
+
+  context->eager_batching_ = Config().optimization().eager_batching();
 
   // Set the device before preparing the context.
   auto cuerr = cudaSetDevice(gpu_device);
@@ -2506,13 +2527,20 @@ PlanBackend::Context::Run(
   }
 
 
-  // For each input, concatenate input values from each request into
-  // the corresponding binding.
+  // Calculate the set of event used with the current buffer set
+  // in previous execution
+  int prev_set = (EVENT_SET_COUNT -
+                  (buffer_bindings_.size() % EVENT_SET_COUNT) + next_set_) %
+                 EVENT_SET_COUNT;
+  auto prev_input_ready_event =
+      eager_batching_ ? events_[prev_set].ready_for_input_ : nullptr;
   std::vector<int64_t> input_dims{(int64_t)payload_->total_batch_size_};
   payload_->collector_.reset(new BackendInputCollector(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
       gather_kernel_buffer_threshold_, input_copy_stream_,
-      events_[next_set_].input_ready_));
+      events_[next_set_].input_ready_, prev_input_ready_event));
+  // For each input, concatenate input values from each request into
+  // the corresponding binding.
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
     auto& io_binding_info =
         io_binding_infos_[next_buffer_binding_set_][io_index];

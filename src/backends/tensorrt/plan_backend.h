@@ -415,6 +415,9 @@ class PlanBackend : public InferenceBackend {
 
     // The request details of the ongoing model execution
     std::unique_ptr<Payload> payload_;
+
+    // Whether to prepare the next batch before the context is ready for it
+    bool eager_batching_;
   };
 
   // CUDA engine shared across all model instances on the same device.
