@@ -112,10 +112,11 @@ def check_sequence_async(client_metadata,
             seq_start = ("start" in flag_str)
             seq_end = ("end" in flag_str)
 
-        if input_dtype == np.object:
+        if input_dtype == np.object_:
             in0 = np.full(tensor_shape, value, dtype=np.int32)
-            in0n = np.array([str(x) for x in in0.reshape(in0.size)],
-                            dtype=object)
+            in0n = np.array(
+                [str(x).encode('utf-8') for x in in0.reshape(in0.size)],
+                dtype=object)
             in0 = in0n.reshape(tensor_shape)
         else:
             in0 = np.full(tensor_shape, value, dtype=input_dtype)
@@ -157,7 +158,7 @@ def check_sequence_async(client_metadata,
                                             result))
 
         if expected is not None:
-            if input_dtype == np.object:
+            if input_dtype == np.object_:
                 assert int(
                     result
                 ) == expected, "{}: expected result {}, got {}".format(

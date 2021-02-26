@@ -76,25 +76,29 @@ if __name__ == '__main__':
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
     in0 = np.arange(start=0, stop=16, dtype=np.int32)
-    in0n = np.array([str(x) for x in in0.flatten()], dtype=object)
+    in0n = np.array([str(x).encode('utf-8') for x in in0.flatten()],
+                    dtype=object)
     input0_data = in0n.reshape(in0.shape)
     in1 = np.ones(shape=16, dtype=np.int32)
-    in1n = np.array([str(x) for x in in1.flatten()], dtype=object)
+    in1n = np.array([str(x).encode('utf-8') for x in in1.flatten()],
+                    dtype=object)
     input1_data = in1n.reshape(in1.shape)
 
-    expected_sum = np.array([str(x) for x in np.add(in0, in1).flatten()],
-                            dtype=object)
-    expected_diff = np.array([str(x) for x in np.subtract(in0, in1).flatten()],
-                             dtype=object)
+    expected_sum = np.array(
+        [str(x).encode('utf-8') for x in np.add(in0, in1).flatten()],
+        dtype=object)
+    expected_diff = np.array(
+        [str(x).encode('utf-8') for x in np.subtract(in0, in1).flatten()],
+        dtype=object)
     expected_sum_serialized = utils.serialize_byte_tensor(expected_sum)
     expected_diff_serialized = utils.serialize_byte_tensor(expected_diff)
 
     input0_data_serialized = utils.serialize_byte_tensor(input0_data)
     input1_data_serialized = utils.serialize_byte_tensor(input1_data)
-    input0_byte_size = input0_data_serialized.size * input0_data_serialized.itemsize
-    input1_byte_size = input1_data_serialized.size * input1_data_serialized.itemsize
-    output0_byte_size = expected_sum_serialized.size * expected_sum_serialized.itemsize
-    output1_byte_size = expected_diff_serialized.size * expected_diff_serialized.itemsize
+    input0_byte_size = utils.serialized_byte_size(input0_data_serialized)
+    input1_byte_size = utils.serialized_byte_size(input1_data_serialized)
+    output0_byte_size = utils.serialized_byte_size(expected_sum_serialized)
+    output1_byte_size = utils.serialized_byte_size(expected_diff_serialized)
     output_byte_size = max(input0_byte_size, input1_byte_size) + 1
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handles
@@ -171,10 +175,12 @@ if __name__ == '__main__':
         sys.exit(1)
 
     for i in range(16):
-        r0 = output0_data[0][i].decode("utf-8")
-        r1 = output1_data[0][i].decode("utf-8")
-        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + r0)
-        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + r1)
+        r0 = output0_data[0][i]
+        r1 = output1_data[0][i]
+        print(
+            str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(r0))
+        print(
+            str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(r1))
 
         if expected_sum[i] != r0:
             print("shm infer error: incorrect sum")
