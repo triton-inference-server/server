@@ -28,8 +28,6 @@
 
 import argparse
 import numpy as np
-import os
-import re
 import sys
 import requests as httpreq
 from builtins import range
@@ -160,7 +158,7 @@ if __name__ == '__main__':
     with client_util.InferenceServerClient(FLAGS.url,
                                            verbose=FLAGS.verbose) as client:
         for model_name, np_dtype, shape in (
-            # yapf: disable
+                # yapf: disable
             ("identity_fp32", np.float32, [1, 0]),
             ("identity_fp32", np.float32, [1, 5]),
             ("identity_uint32", np.uint32, [4, 0]),
@@ -173,8 +171,9 @@ if __name__ == '__main__':
                 input_data = (16384 * np.random.randn(*shape)).astype(np_dtype)
             else:
                 in0 = (16384 * np.ones(shape, dtype='int'))
-                in0n = np.array([str(x) for x in in0.reshape(in0.size)],
-                                dtype=object)
+                in0n = np.array(
+                    [str(x).encode('utf-8') for x in in0.reshape(in0.size)],
+                    dtype=object)
                 input_data = in0n.reshape(in0.shape)
             inputs = [
                 client_util.InferInput("INPUT0", input_data.shape,
@@ -190,9 +189,6 @@ if __name__ == '__main__':
             if output_data is None:
                 print("error: expected 'OUTPUT0'")
                 sys.exit(1)
-
-            if np_dtype == object:
-                output_data = np.char.decode(output_data)
 
             if not np.array_equal(output_data, input_data):
                 print("error: expected output {} to match input {}".format(

@@ -1402,7 +1402,11 @@ class InferInput:
         else:
             self._data = None
             if self._datatype == "BYTES":
-                self._raw_data = serialize_byte_tensor(input_tensor).tobytes()
+                serialized_output = serialize_byte_tensor(input_tensor)
+                if serialized_output.size > 0:
+                    self._raw_data = serialized_output.item()
+                else:
+                    self._raw_data = b''
             else:
                 self._raw_data = input_tensor.tobytes()
             self._parameters['binary_data_size'] = len(self._raw_data)

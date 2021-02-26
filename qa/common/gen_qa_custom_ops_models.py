@@ -357,7 +357,8 @@ def create_visionop_modelfile(models_dir, model_version):
             super(CustomVisionNet, self).__init__()
 
         def forward(self, input, boxes):
-            return torch.ops.torchvision.roi_align(input, boxes, 1.0, 5, 5, -1, False)
+            return torch.ops.torchvision.roi_align(input, boxes, 1.0, 5, 5, -1,
+                                                   False)
 
     visionCustomModel = CustomVisionNet()
     visionCustomModel.eval()

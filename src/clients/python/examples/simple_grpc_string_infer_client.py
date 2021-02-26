@@ -68,9 +68,11 @@ if __name__ == '__main__':
     expected_sum = np.add(in0, in1)
     expected_diff = np.subtract(in0, in1)
 
-    in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+    in0n = np.array([str(x).encode('utf-8') for x in in0.reshape(in0.size)],
+                    dtype=object)
     input0_data = in0n.reshape(in0.shape)
-    in1n = np.array([str(x) for x in in1.reshape(in1.size)], dtype=object)
+    in1n = np.array([str(x).encode('utf-8') for x in in1.reshape(in1.size)],
+                    dtype=object)
     input1_data = in1n.reshape(in1.shape)
 
     # Initialize the data

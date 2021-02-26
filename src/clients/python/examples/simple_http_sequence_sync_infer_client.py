@@ -137,11 +137,11 @@ if __name__ == '__main__':
         sys.exit(1)
 
     for i in range(len(result0_list)):
-        seq0_expected = 1 if (i == 0) else values[i-1]
-        seq1_expected = 101 if (i == 0) else values[i-1] * -1
+        seq0_expected = 1 if (i == 0) else values[i - 1]
+        seq1_expected = 101 if (i == 0) else values[i - 1] * -1
         # The dyna_sequence custom backend adds the correlation ID
         # to the last request in a sequence.
-        if FLAGS.dyna and (i != 0) and (values[i-1] == 1):
+        if FLAGS.dyna and (i != 0) and (values[i - 1] == 1):
             seq0_expected += sequence_id0
             seq1_expected += sequence_id1
 

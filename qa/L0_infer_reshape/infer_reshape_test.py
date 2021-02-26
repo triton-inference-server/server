@@ -308,7 +308,7 @@ class InferReshapeTest(tu.TestResultCollector):
         self._full_reshape(np.int32, input_shapes=([1, 4, 1], [8], [2, 2, 3]))
 
     def test_oo1(self):
-        self._full_reshape(np.object, input_shapes=([1],), no_batch=False)
+        self._full_reshape(np.object_, input_shapes=([1],), no_batch=False)
 
 
 if __name__ == '__main__':

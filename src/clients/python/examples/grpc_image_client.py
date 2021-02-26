@@ -76,7 +76,7 @@ def deserialize_bytes_tensor(encoded_tensor):
         sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
         offset += l
         strs.append(sb)
-    return (np.array(strs, dtype=bytes))
+    return (np.array(strs, dtype=np.object_))
 
 
 def parse_model(model_metadata, model_config):

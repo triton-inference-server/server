@@ -33,6 +33,7 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
+
     def initialize(self, args):
         self.args = args
         if args['model_name'] != 'init_args' or args[

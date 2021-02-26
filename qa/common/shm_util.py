@@ -43,7 +43,7 @@ def _range_repr_dtype(dtype):
         return np.int16
     elif dtype == np.float16:
         return np.int8
-    elif dtype == np.object:  # TYPE_STRING
+    elif dtype == np.object_:  # TYPE_STRING
         return np.int32
     return dtype
 
@@ -59,8 +59,15 @@ def create_set_shm_regions(input0_list, input1_list, output0_byte_size,
     if not (use_system_shared_memory or use_cuda_shared_memory):
         return [], []
 
-    input0_byte_size = sum([i0.nbytes for i0 in input0_list])
-    input1_byte_size = sum([i1.nbytes for i1 in input1_list])
+    if input0_list[0].dtype == np.object_:
+        input0_byte_size = sum([serialized_byte_size(i0) for i0 in input0_list])
+    else:
+        input0_byte_size = sum([i0.nbytes for i0 in input0_list])
+
+    if input1_list[0].dtype == np.object_:
+        input1_byte_size = sum([serialized_byte_size(i1) for i1 in input1_list])
+    else:
+        input1_byte_size = sum([i1.nbytes for i1 in input1_list])
 
     if shm_region_names is None:
         shm_region_names = ['input0', 'input1', 'output0', 'output1']

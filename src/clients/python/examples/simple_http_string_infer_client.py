@@ -31,6 +31,11 @@ import sys
 
 import tritonclient.http as httpclient
 
+# unicode() doesn't exist on python3, for how we use it the
+# corresponding function is bytes()
+if sys.version_info.major == 3:
+    unicode = bytes
+
 
 def TestIdentityInference(np_array, binary_data):
     model_name = "simple_identity"
@@ -46,14 +51,20 @@ def TestIdentityInference(np_array, binary_data):
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
                                   outputs=outputs)
-    if (np_array.dtype == np.object):
+    if (np_array.dtype == np.object_):
+        print(results.as_numpy('OUTPUT0'))
         if binary_data:
-            if not np.array_equal(np_array,
-                                  np.char.decode(results.as_numpy('OUTPUT0'))):
+            if not np.array_equal(np_array, results.as_numpy('OUTPUT0')):
                 print(results.as_numpy('OUTPUT0'))
                 sys.exit(1)
         else:
-            if not np.array_equal(np_array, results.as_numpy('OUTPUT0')):
+            expected_array = np.array([
+                unicode(str(x), encoding='utf-8')
+                for x in results.as_numpy('OUTPUT0').flatten()
+            ],
+                                      dtype=object)
+            expected_array = expected_array.reshape([1, 16])
+            if not np.array_equal(np_array, expected_array):
                 print(results.as_numpy('OUTPUT0'))
                 sys.exit(1)
     else:
@@ -102,9 +113,11 @@ if __name__ == '__main__':
     expected_sum = np.add(in0, in1)
     expected_diff = np.subtract(in0, in1)
 
-    in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+    in0n = np.array([str(x).encode('utf-8') for x in in0.reshape(in0.size)],
+                    dtype=object)
     input0_data = in0n.reshape(in0.shape)
-    in1n = np.array([str(x) for x in in1.reshape(in1.size)], dtype=object)
+    in1n = np.array([str(x).encode('utf-8') for x in in1.reshape(in1.size)],
+                    dtype=object)
     input1_data = in1n.reshape(in1.shape)
 
     # Initialize the data
@@ -142,7 +155,8 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Test with null character
-    null_chars_array = np.array(["he\x00llo" for i in range(16)], dtype=object)
+    null_chars_array = np.array(
+        ["he\x00llo".encode('utf-8') for i in range(16)], dtype=object)
     null_char_data = null_chars_array.reshape([1, 16])
     TestIdentityInference(null_char_data, True)  # Using binary data
     TestIdentityInference(null_char_data, False)  # Using JSON data
