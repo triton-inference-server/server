@@ -157,6 +157,8 @@ if ((NOT WIN32) AND (NOT ${ARCH} MATCHES "aarch64"))
   cuda_add_library(
     kernel-library 
     kernel.cu kernel.h
+    OPTIONS -arch compute_60
+    OPTIONS -code compute_60,sm_60,sm_61,sm_62,sm_70,sm_72,sm_75,sm_80
   )
 endif() # NOT WIN32 AND NOT "aarch64"
 endif() # TRITON_ENABLE_GPU

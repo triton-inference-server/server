@@ -1254,6 +1254,7 @@ BackendInputCollector::FlushPendingCopyKernel(
         tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
         tensor_memory_type_id);
     cuda_copy = status.IsOk();
+    LOG_VERBOSE(1) << "gather kernel launched with status: " << status.AsString();
   }
   // If kernel can't be launched then just perform a direct copy.
   if (!status.IsOk()) {
@@ -1377,11 +1378,12 @@ BackendInputCollector::LaunchCopyKernel(
     cudaEventSynchronize(buffer_ready_event_);
     buffer_ready_event_ = nullptr;
   }
-  RunGatherKernel(
+  RETURN_IF_CUDA_ERR(RunGatherKernel(
       (const int8_t**)input_ptr_buffer, (const size_t*)byte_size_buffer,
       (const size_t*)byte_size_offset_buffer,
       (int8_t*)tensor_buffer + pending_copy_kernel_buffer_offset_,
-      pending_copy_kernel_input_buffer_counts_, stream_);
+      pending_copy_kernel_input_buffer_counts_, stream_),
+      std::string("Failed to launch gather kernel"));
   return Status::Success;
 #else
   return Status(
