@@ -411,16 +411,11 @@ def tensorflow_cmake_args(ver, images, library_paths):
             ]
     else:
         # If a specific TF image is specified use it, otherwise pull from NGC.
-        backend_name = "tensorflow{}".format(ver)
         if backend_name in images:
             image = images[backend_name]
         else:
-            if ver == 2:
-                image = 'nvcr.io/nvidia/tensorflow:{}-py3'.format(
-                    FLAGS.upstream_container_version)
-            else:
-                image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
-                    FLAGS.upstream_container_version, ver)
+            image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
+                FLAGS.upstream_container_version, ver)
         extra_args = ['-DTRITON_TENSORFLOW_DOCKER_IMAGE={}'.format(image)]
     return ['-DTRITON_TENSORFLOW_VERSION={}'.format(ver)] + extra_args
 
