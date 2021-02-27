@@ -348,12 +348,8 @@ def tensorflow_cmake_args(ver, images):
     if image_name in images:
         image = images[image_name]
     else:
-        if ver == 2:
-            image = 'nvcr.io/nvidia/tensorflow:{}-py3'.format(
-                FLAGS.upstream_container_version)
-        else:
-            image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
-                FLAGS.upstream_container_version, ver)
+        image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
+            FLAGS.upstream_container_version, ver)
     return [
         '-DTRITON_TENSORFLOW_VERSION={}'.format(ver),
         '-DTRITON_TENSORFLOW_DOCKER_IMAGE={}'.format(image)
