@@ -199,6 +199,7 @@ enum OptionId {
   OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
   OPTION_GRPC_USE_SSL,
+  OPTION_GRPC_USE_SSL_MUTUAL,
   OPTION_GRPC_SERVER_CERT,
   OPTION_GRPC_SERVER_KEY,
   OPTION_GRPC_ROOT_CERT,
@@ -308,6 +309,9 @@ std::vector<Option> options_
        "request/response objects."},
       {OPTION_GRPC_USE_SSL, "grpc-use-ssl", Option::ArgBool,
        "Use SSL authentication for GRPC requests. Default is false."},
+      {OPTION_GRPC_USE_SSL_MUTUAL, "grpc-use-ssl-mutual", Option::ArgBool,
+       "Use mututal SSL authentication for GRPC requests. Default is false. If "
+       "true, set --grpc-use-ssl to true."},
       {OPTION_GRPC_SERVER_CERT, "grpc-server-cert", Option::ArgStr,
        "File holding PEM-encoded server certificate. Ignored unless "
        "--grpc-use-ssl is true."},
@@ -385,7 +389,8 @@ std::vector<Option> options_
        "The global directory searched for backend shared libraries. Default is "
        "'/opt/tritonserver/backends'."},
       {OPTION_REPOAGENT_DIR, "repoagent-directory", Option::ArgStr,
-       "The global directory searched for repository agent shared libraries. Default is "
+       "The global directory searched for repository agent shared libraries. "
+       "Default is "
        "'/opt/tritonserver/repoagents'."},
       {OPTION_BUFFER_MANAGER_THREAD_COUNT, "buffer-manager-thread-count",
        Option::ArgInt,
@@ -445,7 +450,7 @@ StartGrpcService(
         shm_manager)
 {
   TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
-      server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
+      server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_, 
       grpc_ssl_options_, grpc_infer_allocation_pool_size_, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -937,6 +942,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_GRPC_USE_SSL:
         grpc_use_ssl = ParseBoolOption(optarg);
         break;
+      case OPTION_GRPC_USE_SSL_MUTUAL:
+        grpc_ssl_options_.use_mutual_auth = ParseBoolOption(optarg);
+        grpc_use_ssl = true;
+        break;
       case OPTION_GRPC_SERVER_CERT:
         grpc_ssl_options_.server_cert = optarg;
         break;
@@ -1055,7 +1064,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
-  metrics_port_ = allow_metrics_ ? metrics_port : -1;
+      metrics_port_ = allow_metrics_ ? metrics_port : -1;
   allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
 #endif  // TRITON_ENABLE_METRICS
 

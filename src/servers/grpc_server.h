@@ -41,6 +41,8 @@ struct SslOptions {
   std::string server_key;
   // File holding PEM-encoded root certificate
   std::string root_cert;
+  // Whether to use Mutual Authentication
+  bool use_mutual_auth;
 };
 
 class GRPCServer {
