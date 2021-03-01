@@ -114,9 +114,8 @@ def check_sequence_async(client_metadata,
 
         if input_dtype == np.object_:
             in0 = np.full(tensor_shape, value, dtype=np.int32)
-            in0n = np.array(
-                [str(x).encode('utf-8') for x in in0.reshape(in0.size)],
-                dtype=object)
+            in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                            dtype=object)
             in0 = in0n.reshape(tensor_shape)
         else:
             in0 = np.full(tensor_shape, value, dtype=input_dtype)

@@ -171,9 +171,8 @@ if __name__ == '__main__':
                 input_data = (16384 * np.random.randn(*shape)).astype(np_dtype)
             else:
                 in0 = (16384 * np.ones(shape, dtype='int'))
-                in0n = np.array(
-                    [str(x).encode('utf-8') for x in in0.reshape(in0.size)],
-                    dtype=object)
+                in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                dtype=object)
                 input_data = in0n.reshape(in0.shape)
             inputs = [
                 client_util.InferInput("INPUT0", input_data.shape,

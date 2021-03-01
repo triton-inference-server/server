@@ -183,17 +183,13 @@ def infer_exact(tester,
         output1_array = output1_array.astype(output1_dtype)
 
     if input_dtype == np.object_:
-        in0n = np.array([
-            str(x).encode('utf-8')
-            for x in input0_array.reshape(input0_array.size)
-        ],
-                        dtype=object)
+        in0n = np.array(
+            [str(x) for x in input0_array.reshape(input0_array.size)],
+            dtype=object)
         input0_array = in0n.reshape(input0_array.shape)
-        in1n = np.array([
-            str(x).encode('utf-8')
-            for x in input1_array.reshape(input1_array.size)
-        ],
-                        dtype=object)
+        in1n = np.array(
+            [str(x) for x in input1_array.reshape(input1_array.size)],
+            dtype=object)
         input1_array = in1n.reshape(input1_array.shape)
 
     # prepend size of string to output string data
@@ -876,9 +872,8 @@ def infer_zero(tester,
                 for x in input_array.flatten()
             ],
                                       dtype=object)
-            input_array = np.array(
-                [str(x).encode('utf-8') for x in input_array.flatten()],
-                dtype=object).reshape(input_array.shape)
+            input_array = np.array([str(x) for x in input_array.flatten()],
+                                   dtype=object).reshape(input_array.shape)
 
         expected_array = expected_array.reshape(output_shape)
         expected_dict[output_name] = expected_array

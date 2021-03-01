@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
     # Create the data for the input tensor. It contains a null character in
     # the middle of the string.
-    tmp_str = "abc\0def".encode('utf-8')
+    tmp_str = "abc\0def"
     input0_data = np.array([tmp_str], dtype=object)
 
     # Send inference request to the inference server. Get results for
@@ -98,4 +98,4 @@ if __name__ == '__main__':
     output0_data = results.as_numpy('OUTPUT0')
 
     print(input0_data, "?=?", output0_data)
-    assert np.equal(input0_data, output0_data).all()
+    assert np.equal(input0_data.astype(np.bytes_), output0_data).all()
