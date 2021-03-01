@@ -28,11 +28,15 @@
 
 # Building Triton
 
-Triton is built using the [build.py](../build.py) script. The build.py
-script currently supports building for the following platforms. See
-[Building on Unsupported
-Platforms](#building-on-unsupported-platforms) if you are
-attempting to build Triton on a platform that is not listed here.
+This section gives an overview of how to build the Triton server. For
+information on building the Triton client libraries and examples see
+[Client Libraries](client_libraries.md).
+
+Triton server is built using the [build.py](../build.py) script. The
+build.py script currently supports building for the following
+platforms. See [Building on Unsupported
+Platforms](#building-on-unsupported-platforms) if you are attempting
+to build Triton on a platform that is not listed here.
 
 * [Ubuntu 20.04, x86-64](#ubuntu)
 
@@ -123,7 +127,7 @@ The first step for any build is to checkout the
 [triton-inference-server/server](https://github.com/triton-inference-server/server)
 repo branch for the release you are interested in building (or the
 master branch to build from the development branch). Then run build.py
-as described below.  The build.py script will perform the following
+as described below. The build.py script will perform the following
 steps (note that if you are building with Docker that these same steps
 will be performed during the Docker build within the
 *tritonserver_build* container).
@@ -131,7 +135,7 @@ will be performed during the Docker build within the
 * Use the CMake files in [build](../build) to build Triton's core
   shared library and *tritonserver* executable.
 
-* Fetch each request backend and build it using the CMake file from
+* Fetch each requested backend and build it using the CMake file from
   the corresponding backend repo. For example, the ONNX Runtime
   backend is built using
   [triton-inference-server/onnxruntime_backend/CMakeLists.txt](https://github.com/triton-inference-server/onnxruntime_backend/blob/main/CMakeLists.txt). Some
@@ -150,7 +154,7 @@ will be performed during the Docker build within the
   [triton-inference-server/checksum_repository_agent/CMakeLists.txt](https://github.com/triton-inference-server/checksum_repository_agent/blob/main/CMakeLists.txt).
 
 By default build.py clones Triton repos from
-https://github.com/triton-inference-server.  Use the
+https://github.com/triton-inference-server. Use the
 --github-organization options to select a different URL.
 
 The backends can also be built independently in each of the backend
@@ -197,7 +201,7 @@ Building for an unsupported OS and/or hardware platform is
 possible. All of the build scripting and CMake files are included in
 the public repos. However, due to differences in compilers, libraries,
 package management, etc. you may have to make changes in the build
-scripts and CMake files and even in the source code.
+scripts, CMake files and the source code.
 
 You should familiarize yourself with the build process for supported
 platforms by reading the above documentation and then follow the
@@ -223,13 +227,13 @@ changes in the following areas.
 
 * Triton depends on a large number of open-source packages that it
   builds from source. If one of these packages does not support your
-  platform them you may need to diable the Triton feature that depends
-  on that package. For example, Triton supports the S3 filesystem by
-  building the aws-sdk-cpp package. If aws-sdk-cpp doesn't build for
-  your platform then you can remove the need for that package by not
-  specifying --filesystem=s3 when you run build.py. In general, you
-  should start by running build.py with the minimal required feature
-  set.
+  platform them you may need to disable the Triton feature that
+  depends on that package. For example, Triton supports the S3
+  filesystem by building the aws-sdk-cpp package. If aws-sdk-cpp
+  doesn't build for your platform then you can remove the need for
+  that package by not specifying --filesystem=s3 when you run
+  build.py. In general, you should start by running build.py with the
+  minimal required feature set.
 
 * The
   [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
@@ -244,7 +248,7 @@ changes in the following areas.
 
 * By default, the
   [PyTorch](https://github.com/triton-inference-server/pytorch_backend)
-  backend build extracts pre-built shared libraries from an NGC
-  container. But the build can also use PyTorch shared libaries that
-  you build separately for your platform. See the pytorch_backend
+  backend build extracts pre-built shared libraries from The PyTorch
+  NGC container. But the build can also use PyTorch shared libraries
+  that you build separately for your platform. See the pytorch_backend
   build process for details.
