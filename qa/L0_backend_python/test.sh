@@ -116,6 +116,11 @@ mkdir -p models/string/1/
 cp ../python_models/string/model.py ./models/string/1/
 cp ../python_models/string/config.pbtxt ./models/string
 
+# More string tests
+mkdir -p models/string_fixed/1/
+cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
+cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
+
 pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
 run_server

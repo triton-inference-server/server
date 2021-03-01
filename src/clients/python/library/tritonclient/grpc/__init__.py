@@ -1625,7 +1625,8 @@ class InferResult:
                             self._result.raw_output_contents[index],
                             dtype=triton_to_np_dtype(datatype))
                 elif len(output.contents.byte_contents) != 0:
-                    np_array = np.array(output.contents.byte_contents, copy=False)
+                    np_array = np.array(output.contents.byte_contents,
+                                        copy=False)
                 else:
                     np_array = np.empty(0)
                 np_array = np_array.reshape(shape)
