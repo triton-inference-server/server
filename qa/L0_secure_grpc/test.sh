@@ -45,7 +45,7 @@ TEST_CLIENT=../clients/simple_grpc_infer_client
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --grpc-use-ssl=1 --grpc-server-cert server.crt --grpc-server-key server.key --grpc-root-cert ca.crt"
+SERVER_BASE_ARGS="--model-repository=$DATADIR --grpc-use-ssl=1 --grpc-server-cert server.crt --grpc-server-key server.key --grpc-root-cert ca.crt"
 source ../common/util.sh
 
 rm -fr *.log *.log.*
@@ -70,32 +70,43 @@ openssl x509 -passin pass:1234 -req -days 365 -in client.csr -CA ca.crt -CAkey c
 # Remove passphrase from Client Key
 openssl rsa -passin pass:1234 -in client.key -out client.key
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+# Test all 3 SSL/TLS cases, server authentication, mutual authentication and when both flags are specified
+for CASE in server mutual both; do
+    if [ "$CASE" == "server" ]; then
+        SERVER_ARGS="$SERVER_BASE_ARGS --grpc-use-ssl=1"
+    elif [ "$CASE" == "mutual" ]; then
+        SERVER_ARGS="$SERVER_BASE_ARGS --grpc-use-ssl-mutual=1"
+    else
+        SERVER_ARGS="$SERVER_BASE_ARGS --grpc-use-ssl=1 --grpc-use-ssl-mutual=1"
+    fi
 
-set +e
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-# Test basic inference using grpc secure channel
-$TEST_CLIENT_PY -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.ssl_infer 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.ssl_infer
-    RET=1
-fi
+    set +e
 
-$TEST_CLIENT -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.c++.ssl_infer 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.c++.ssl_infer
-    RET=1
-fi
+    # Test basic inference using grpc secure channel
+    $TEST_CLIENT_PY -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.ssl_infer 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.ssl_infer
+        RET=1
+    fi
 
-set -e
+    $TEST_CLIENT -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.c++.ssl_infer 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.c++.ssl_infer
+        RET=1
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

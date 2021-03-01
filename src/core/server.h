@@ -201,10 +201,7 @@ class InferenceServer {
     backend_cmdline_config_map_ = bc;
   }
 
-  void SetRepoAgentDir(const std::string& d)
-  {
-    repoagent_dir_ = d;
-  }
+  void SetRepoAgentDir(const std::string& d) { repoagent_dir_ = d; }
 
   // FIXME TF specific functions should be removed once all backends
   // use BackendConfig.
