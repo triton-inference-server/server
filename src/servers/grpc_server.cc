@@ -3940,6 +3940,10 @@ GRPCServer::Start()
     grpc::SslServerCredentialsOptions sslOpts;
     sslOpts.pem_root_certs = root;
     sslOpts.pem_key_cert_pairs.push_back(keycert);
+    if (ssl_options_.use_mutual_auth) {
+      sslOpts.client_certificate_request =
+          GRPC_SSL_REQUEST_AND_REQUIRE_CLIENT_CERTIFICATE_AND_VERIFY;
+    }
     credentials = grpc::SslServerCredentials(sslOpts);
   } else {
     credentials = grpc::InsecureServerCredentials();
