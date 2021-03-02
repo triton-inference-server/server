@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@
 
 REPO_VERSION=$1
 
-BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch"}
+BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python"}
 STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
 DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
@@ -60,6 +60,13 @@ rm -fr ./custom_models && mkdir ./custom_models && \
     mkdir -p ./custom_models/custom_zero_1_float32/1 && \
     cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
 
+cp /opt/tritonserver/backends/python/triton_python_backend_utils.py .
+
+mkdir -p python_models/identity_fp32/1/
+cp ../python_models/identity_fp32/model.py ./python_models/python_zero_1_float32/1/model.py
+cp ../python_models/identity_fp32/config.pbtxt ./python_models/python_zero_1_float32/config.pbtxt
+(cd python_models/python_zero_1_float32 && \
+    sed -i "s/^name:.*/name: \"python_zero_1_float32\"/" config.pbtxt)
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
@@ -81,9 +88,15 @@ for BACKEND in $BACKENDS; do
         continue
     fi
 
-    # set naming (special case for libtorch model)
-    INPUT_NAME="INPUT0" && [ $BACKEND == "libtorch" ] && INPUT_NAME="INPUT__0"
-
+    # set input name (special case for libtorch and python model)
+    if [ $BACKEND == "libtorch" ]; then
+        INPUT_NAME="INPUT__0"
+    elif [ $BACKEND == "python" ]; then
+        INPUT_NAME="IN"
+    else
+        INPUT_NAME="INPUT0"
+    fi
+    
     MAX_LATENCY=300
     MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
 
@@ -93,11 +106,18 @@ for BACKEND in $BACKENDS; do
         NAME=${BACKEND}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}
     fi
 
+    # set input name (special case for custom and python model)
     MODEL_NAME=${BACKEND}_zero_1_float32
-    REPO_DIR=./custom_models && \
-        [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_identity_model_repository
+    if [ $BACKEND == "custom" ]; then
+        REPO_DIR=./custom_models 
+    elif [ $BACKEND == "python" ]; then
+        REPO_DIR=./python_models 
+    else
+        REPO_DIR=$DATADIR/qa_identity_model_repository
+    fi
+
     SHAPE=${TENSOR_SIZE}
-    KIND="KIND_GPU" && [ $BACKEND == "custom" ] && KIND="KIND_CPU"
+    KIND="KIND_GPU" && [ $BACKEND == "custom" ] || [ $BACKEND == "python" ] && KIND="KIND_CPU"
 
     rm -fr models && mkdir -p models && \
         cp -r $REPO_DIR/$MODEL_NAME models/. && \
@@ -136,6 +156,7 @@ for BACKEND in $BACKENDS; do
     curl localhost:8002/metrics -o ${RESULTDIR}/${NAME}.metrics >> ${RESULTDIR}/${NAME}.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
+        exit $RET
     fi
     set -e
 
