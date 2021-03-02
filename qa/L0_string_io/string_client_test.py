@@ -182,7 +182,7 @@ class ClientStringTest(tu.TestResultCollector):
 
     def test_tf_unicode_bytes(self):
         self._test_bytes("graphdef_nobatch_zero_1_object")
-        self._test_bytes("string")
+        self._test_bytes("string_identity")
 
 
 if __name__ == '__main__':
