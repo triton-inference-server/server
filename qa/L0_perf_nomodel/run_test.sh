@@ -55,18 +55,14 @@ export CUDA_VISIBLE_DEVICES=0
 mkdir -p ${RESULTDIR}
 RET=0
 
-rm -fr ./custom_models && mkdir ./custom_models && \
-    cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
-    mkdir -p ./custom_models/custom_zero_1_float32/1 && \
-    cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
-
 cp /opt/tritonserver/backends/python/triton_python_backend_utils.py .
 
-mkdir -p python_models/identity_fp32/1/
-cp ../python_models/identity_fp32/model.py ./python_models/python_zero_1_float32/1/model.py
-cp ../python_models/identity_fp32/config.pbtxt ./python_models/python_zero_1_float32/config.pbtxt
+mkdir -p python_models/python_zero_1_float32/1 && \
+    cp ../python_models/identity_fp32/model.py ./python_models/python_zero_1_float32/1/model.py && \
+    cp ../python_models/identity_fp32/config.pbtxt ./python_models/python_zero_1_float32/config.pbtxt
 (cd python_models/python_zero_1_float32 && \
     sed -i "s/^name:.*/name: \"python_zero_1_float32\"/" config.pbtxt)
+
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
