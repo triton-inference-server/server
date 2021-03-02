@@ -1869,12 +1869,14 @@ ModelRepositoryManager::Poll(
         }
       }
 
-      // If enabled, try to automatically generate missing parts of
-      // the model configuration (autofill) from the model
-      // definition. In all cases normalize and validate the config.
-      status = GetNormalizedModelConfig(
-          full_path, backend_config_map_, autofill_, min_compute_capability_,
-          &model_config);
+      if (status.IsOk()) {
+        // If enabled, try to automatically generate missing parts of
+        // the model configuration (autofill) from the model
+        // definition. In all cases normalize and validate the config.
+        status = GetNormalizedModelConfig(
+            full_path, backend_config_map_, autofill_, min_compute_capability_,
+            &model_config);
+      }
       if (status.IsOk()) {
         // Note that the model inputs and outputs are not validated until
         // the model backend is intialized as they may not be auto-completed
@@ -1933,7 +1935,7 @@ ModelRepositoryManager::Poll(
     }
 
     if (!status.IsOk()) {
-      LOG_ERROR << status.Message();
+      LOG_ERROR << "Poll failed for model directory '" << child << "': " << status.Message();
       *all_models_polled = false;
     }
   }
