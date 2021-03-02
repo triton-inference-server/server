@@ -84,14 +84,8 @@ for BACKEND in $BACKENDS; do
         continue
     fi
 
-    # set input name (special case for libtorch and python model)
-    if [ $BACKEND == "libtorch" ]; then
-        INPUT_NAME="INPUT__0"
-    elif [ $BACKEND == "python" ]; then
-        INPUT_NAME="IN"
-    else
-        INPUT_NAME="INPUT0"
-    fi
+    # set input name (special case for libtorch model)
+    INPUT_NAME="INPUT0" && [ $BACKEND == "libtorch" ] && INPUT_NAME="INPUT__0"
     
     MAX_LATENCY=300
     MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
