@@ -1842,30 +1842,29 @@ ModelRepositoryManager::Poll(
       // redirect to use the model config at a different location
       {
         const auto config_path = JoinPath({full_path, kModelConfigPbTxt});
-        status = ReadTextProto(config_path, &model_config);
-      }
-      if (status.IsOk()) {
-        status = CreateAgentModelListWithLoadAction(model_config, full_path, &model_info->agent_model_list_);
-        if (status.IsOk() && model_info->agent_model_list_ != nullptr) {
-          // Get the latest repository path
-          const char* location;
-          TRITONREPOAGENT_ArtifactType artifact_type;
-          RETURN_IF_ERROR(
-              model_info->agent_model_list_->Back()->Location(&artifact_type, &location));
-          // RepoAgentModel uses model path while backend creation needs
-          // repository path, so need to go up one level.
-          // [FIXME] Should just passing model path directly as we don't really
-          // look at the repository path but just create model path from it
-          auto location_string = std::string(location);
-          size_t pos = location_string.length() - 1;
-          for (; (int64_t)pos >= 0; pos--) {
-            if (location_string[pos] != '/') {
-              break;
+        if (ReadTextProto(config_path, &model_config).IsOk()) {
+          status = CreateAgentModelListWithLoadAction(model_config, full_path, &model_info->agent_model_list_);
+          if (status.IsOk() && model_info->agent_model_list_ != nullptr) {
+            // Get the latest repository path
+            const char* location;
+            TRITONREPOAGENT_ArtifactType artifact_type;
+            RETURN_IF_ERROR(
+                model_info->agent_model_list_->Back()->Location(&artifact_type, &location));
+            // RepoAgentModel uses model path while backend creation needs
+            // repository path, so need to go up one level.
+            // [FIXME] Should just passing model path directly as we don't really
+            // look at the repository path but just create model path from it
+            auto location_string = std::string(location);
+            size_t pos = location_string.length() - 1;
+            for (; (int64_t)pos >= 0; pos--) {
+              if (location_string[pos] != '/') {
+                break;
+              }
             }
+            model_info->model_repository_path_ =
+                location_string.substr(0, location_string.rfind('/', pos));
+            full_path = location_string;
           }
-          model_info->model_repository_path_ =
-              location_string.substr(0, location_string.rfind('/', pos));
-          full_path = location_string;
         }
       }
 
