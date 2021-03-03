@@ -41,6 +41,7 @@ import tritonclient.http as httpclient
 
 
 class PythonTest(tu.TestResultCollector):
+
     def test_async_infer(self):
         model_name = "identity_uint8"
         request_parallelism = 4
@@ -53,7 +54,7 @@ class PythonTest(tu.TestResultCollector):
                 input_data = (16384 * np.random.randn(*shape)).astype(np.uint8)
                 input_datas.append(input_data)
                 inputs = [
-                    httpclient.InferInput("IN", input_data.shape,
+                    httpclient.InferInput("INPUT0", input_data.shape,
                                           np_to_triton_dtype(input_data.dtype))
                 ]
                 inputs[0].set_data_from_numpy(input_data)
@@ -65,8 +66,8 @@ class PythonTest(tu.TestResultCollector):
                 results = requests[i].get_result()
                 print(results)
 
-                output_data = results.as_numpy("OUT")
-                self.assertIsNotNone(output_data, "error: expected 'OUT'")
+                output_data = results.as_numpy("OUTPUT0")
+                self.assertIsNotNone(output_data, "error: expected 'OUTPUT0'")
                 self.assertTrue(
                     np.array_equal(output_data, input_datas[i]),
                     "error: expected output {} to match input {}".format(
@@ -124,12 +125,12 @@ class PythonTest(tu.TestResultCollector):
         with httpclient.InferenceServerClient("localhost:8000") as client:
             input_data = np.array([[True, False, True]], dtype=np.bool)
             inputs = [
-                httpclient.InferInput("IN", input_data.shape,
+                httpclient.InferInput("INPUT0", input_data.shape,
                                       np_to_triton_dtype(input_data.dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
-            output0 = result.as_numpy('OUT')
+            output0 = result.as_numpy('OUTPUT0')
             self.assertTrue(output0 is not None)
             self.assertTrue(np.all(output0 == input_data))
 
@@ -191,8 +192,7 @@ class PythonTest(tu.TestResultCollector):
             except InferenceServerException as e:
                 print(e)
                 self.assertTrue(
-                    e.message().startswith(
-                        "An error occured during execution"),
+                    e.message().startswith("An error occured during execution"),
                     "Exception message is not correct")
             else:
                 self.assertTrue(
