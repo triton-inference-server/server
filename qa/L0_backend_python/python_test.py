@@ -130,7 +130,7 @@ class PythonTest(tu.TestResultCollector):
             ]
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
-            output0 = result.as_numpy('OUT')
+            output0 = result.as_numpy('OUTPUT0')
             self.assertTrue(output0 is not None)
             self.assertTrue(np.all(output0 == input_data))
 
@@ -140,7 +140,7 @@ class PythonTest(tu.TestResultCollector):
         with httpclient.InferenceServerClient("localhost:8000") as client:
             input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
             inputs = [
-                httpclient.InferInput("INPUT0", input_data.shape,
+                httpclient.InferInput("IN", input_data.shape,
                                       np_to_triton_dtype(input_data.dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
