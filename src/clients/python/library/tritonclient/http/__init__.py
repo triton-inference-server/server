@@ -1412,7 +1412,7 @@ class InferInput:
                                 self._data.append(str(obj.item(), encoding='utf-8'))
                 except UnicodeDecodeError:
                     raise_error(f'Failed to encode "{obj.item()}" using UTF-8. Please use binary_data=True, if'
-                                ' you want to a pass byte array.')
+                                ' you want to pass a byte array.')
             else:
                 self._data = [val.item() for val in input_tensor.flatten()]
         else:
@@ -1595,7 +1595,7 @@ class InferResult:
                 self._result = json.loads(content)
             except UnicodeDecodeError as e:
                 raise_error(f'Failed to encode using UTF-8. Please use binary_data=True, if'
-                            f' you want to a pass byte array. UnicodeError: {e}')
+                            f' you want to pass a byte array. UnicodeError: {e}')
         else:
             header_length = int(header_length)
             content = response.read(length=header_length)
