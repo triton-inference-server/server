@@ -660,9 +660,13 @@ LABEL com.nvidia.build.ref={}
 
 
 def container_build(images, backends, repoagents):
-    # The build and install directories within the container.
+    # The cmake, build and install directories within the container.
     build_dir = os.path.join(os.sep, 'tmp', 'tritonbuild')
     install_dir = os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
+    if target_platform() == 'windows':
+        cmake_dir = os.path.normpath('c:/workspace/build')
+    else:
+        cmake_dir = '/workspace/build'
 
     # We can't use docker module for building container because it
     # doesn't stream output and it also seems to handle cache-from
@@ -736,6 +740,8 @@ def container_build(images, backends, repoagents):
         # --upstream-container-version flags since they can be set
         # automatically and so may not be in sys.argv
         #
+        # --cmake-dir is overridden to 'cmake_dir'
+        #
         # --build-dir is added/overridden to 'build_dir'
         #
         # --install-dir is added/overridden to 'install_dir'
@@ -756,6 +762,7 @@ def container_build(images, backends, repoagents):
                 '--upstream-container-version', FLAGS.upstream_container_version
             ]
 
+        runargs += ['--cmake-dir', cmake_dir]
         runargs += ['--build-dir', build_dir]
         runargs += ['--install-dir', install_dir]
 
@@ -899,7 +906,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--cmake-dir',
         type=str,
-        required=True,
+        required=False,
         help='Directory containing the CMakeLists.txt file for Triton server.')
     parser.add_argument(
         '--library-paths',
@@ -1055,6 +1062,13 @@ if __name__ == '__main__':
         FLAGS.repoagent = []
     if FLAGS.library_paths is None:
         FLAGS.library_paths = []
+
+    # FLAGS.cmake_dir is required for non-container builds. For
+    # container builds it is set above to the value appropriate for
+    # building within the buildbase container.
+    if FLAGS.no_container_build:
+        if FLAGS.cmake_dir is None:
+            fail('--cmake-dir required for Triton core build')
 
     # Determine the versions. Start with Triton version, if --version
     # is not explicitly specified read from TRITON_VERSION file.
