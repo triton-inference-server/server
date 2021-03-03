@@ -163,7 +163,7 @@ class LargePayLoadTest(tu.TestResultCollector):
         for client in self._clients:
             model_name = tu.get_zero_model_name("python_nobatch", 1,
                                                 self._data_type)
-            self._test_helper(client, model_name, "IN", "OUT")
+            self._test_helper(client, model_name)
 
     def test_plan(self):
         # plan_nobatch_zero_1_float32 is identity model with input shape [-1]
