@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -70,6 +70,10 @@ openssl x509 -passin pass:1234 -req -days 365 -in client.csr -CA ca.crt -CAkey c
 # Remove passphrase from Client Key
 openssl rsa -passin pass:1234 -in client.key -out client.key
 
+# Create mutated client key (Make first char of each like capital)
+cp client.key client2.key && sed -i "s/\b\(.\)/\u\1/g" client2.key
+cp client.crt client2.crt && sed -i "s/\b\(.\)/\u\1/g" client2.crt
+
 # Test all 3 SSL/TLS cases, server authentication, mutual authentication and when both flags are specified
 for CASE in server mutual both; do
     if [ "$CASE" == "server" ]; then
@@ -90,15 +94,72 @@ for CASE in server mutual both; do
     set +e
 
     # Test basic inference using grpc secure channel
-    $TEST_CLIENT_PY -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.ssl_infer 2>&1
+    $TEST_CLIENT_PY -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.${CASE}.ssl_infer 2>&1
     if [ $? -ne 0 ]; then
-        cat ${CLIENT_LOG}.ssl_infer
+        cat ${CLIENT_LOG}.${CASE}.ssl_infer
         RET=1
     fi
 
-    $TEST_CLIENT -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.c++.ssl_infer 2>&1
+    $TEST_CLIENT -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.${CASE}.c++.ssl_infer 2>&1
     if [ $? -ne 0 ]; then
-        cat ${CLIENT_LOG}.c++.ssl_infer
+        cat ${CLIENT_LOG}.${CASE}.c++.ssl_infer
+        RET=1
+    fi
+
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+# Test failure cases for SSL
+for CASE in server mutual; do
+    if [ "$CASE" == "server" ]; then
+        SERVER_ARGS="$SERVER_BASE_ARGS --grpc-use-ssl=1"
+    elif [ "$CASE" == "mutual" ]; then
+        SERVER_ARGS="$SERVER_BASE_ARGS --grpc-use-ssl-mutual=1"
+    fi
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+
+    # Test inference client using grpc secure channel without ssl
+    $TEST_CLIENT_PY -v >> ${CLIENT_LOG}.${CASE}.no_ssl_fail_infer 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.${CASE}.no_ssl_fail_infer
+        echo -e "\n***\n*** Expected test failure\n***"
+    else
+        RET=1
+    fi
+
+    $TEST_CLIENT -v >> ${CLIENT_LOG}.${CASE}.no_ssl_fail_infer 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.${CASE}.c++.no_ssl_fail_infer
+        echo -e "\n***\n*** Expected test failure\n***"
+    else
+        RET=1
+    fi
+
+    # Test inference client using grpc secure channel with incorrect ssl creds
+    $TEST_CLIENT_PY -v --ssl --root-certificates ca.crt --private-key client2.key --certificate-chain client2.crt >> ${CLIENT_LOG}.${CASE}.wrong_ssl_fail_infer 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.${CASE}.wrong_ssl_fail_infer
+        echo -e "\n***\n*** Expected test failure\n***"
+    else
+        RET=1
+    fi
+
+    $TEST_CLIENT -v --ssl --root-certificates ca.crt --private-key client2.key --certificate-chain client2.crt >> ${CLIENT_LOG}.${CASE}.wrong_ssl_fail_infer 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.${CASE}.c++.wrong_ssl_fail_infer
+        echo -e "\n***\n*** Expected test failure\n***"
+    else
         RET=1
     fi
 
