@@ -34,6 +34,7 @@ import os
 from builtins import range
 import tritonclient.http as tritonhttpclient
 import tritonclient.grpc as tritongrpcclient
+import tritonclient.utils as tritonutils
 import unittest
 import test_util as tu
 
@@ -142,43 +143,52 @@ class ClientStringTest(tu.TestResultCollector):
                              dtype=dtype)
         self._test_infer_non_unicode(model_name, client, in0_bytes)
 
-        in0_bytes = np.array([i for i in range(10000, 10008)],
-                             dtype=dtype)
+        in0_bytes = np.array([i for i in range(10000, 10008)], dtype=dtype)
         self._test_infer_non_unicode(model_name, client, in0_bytes)
 
     def _test_bytes(self, model_name):
         dtypes = [np.object_, np.object, np.bytes_]
-        # Create the inference server clients.
-        clients = [(tritonhttpclient.InferenceServerClient("localhost:8000",
-                                                           verbose=True),
-                    tritonhttpclient, True, False),
-                   (tritonhttpclient.InferenceServerClient("localhost:8000",
-                                                           verbose=True),
-                    tritonhttpclient, False, False),
-                   (tritonhttpclient.InferenceServerClient("localhost:8000",
-                                                           verbose=True),
-                    tritonhttpclient, True, True),
-                   (tritonhttpclient.InferenceServerClient("localhost:8000",
-                                                           verbose=True),
-                    tritonhttpclient, False, True),
-                   (tritongrpcclient.InferenceServerClient("localhost:8001",
-                                                           verbose=True),
-                    tritongrpcclient, False)]
 
-        # TODO: Only test clients[2] and clients[4]. Currently,
-        # binary_data=False is broken for non-unicode characters.
-        # The reason is that JSON depends on the binary data to
-        # be encodable by unicode.
-        for client in [clients[2], clients[4]]:
+        # This clients will fail for binary_data=False when the binary input
+        # is not UTF-8 encodable. They should work for other cases however.
+        binary_false_clients = [
+            (tritonhttpclient.InferenceServerClient("localhost:8000",
+                                                    verbose=True),
+             tritonhttpclient, True, False),
+            (tritonhttpclient.InferenceServerClient("localhost:8000",
+                                                    verbose=True),
+             tritonhttpclient, False, False),
+            (tritonhttpclient.InferenceServerClient("localhost:8000",
+                                                    verbose=True),
+             tritonhttpclient, False, True),
+        ]
+
+        # These clients work for every data type
+        other_clients = [
+            (tritongrpcclient.InferenceServerClient("localhost:8001",
+                                                    verbose=True),
+             tritongrpcclient, False),
+            (tritonhttpclient.InferenceServerClient("localhost:8000",
+                                                    verbose=True),
+             tritonhttpclient, True, True),
+        ]
+
+        for client in other_clients + binary_false_clients:
             self._test_str_dtype(client, model_name)
             for dtype in dtypes:
                 self._test_str_dtype(client, model_name, dtype)
 
+        for client in other_clients:
+            self._test_unicode_bytes_dtype(client, model_name)
             for dtype in dtypes:
+                self._test_unicode_bytes_dtype(client, model_name, dtype)
+
+        for client in binary_false_clients:
+            with self.assertRaises(tritonutils.InferenceServerException):
                 self._test_unicode_bytes_dtype(client, model_name)
-                self._test_unicode_bytes_dtype(client, model_name, np.object_)
-                self._test_unicode_bytes_dtype(client, model_name, np.object)
-                self._test_unicode_bytes_dtype(client, model_name, np.bytes_)
+            for dtype in dtypes:
+                with self.assertRaises(tritonutils.InferenceServerException):
+                    self._test_unicode_bytes_dtype(client, model_name, dtype)
 
     def test_tf_unicode_bytes(self):
         self._test_bytes("graphdef_nobatch_zero_1_object")
