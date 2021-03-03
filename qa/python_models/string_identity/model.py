@@ -33,13 +33,10 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-    """This model loops through different dtypes to make sure that
-    serialize_byte_tensor works correctly in the Python backend.
+    """This model always returns the input that it has received.
     """
     def initialize(self, args):
         self.model_config = json.loads(args['model_config'])
-        self._index = 0
-        self._dtypes = [np.bytes_, np.object_, np.object]
 
     def execute(self, requests):
         """ This function is called on inference request.
@@ -50,7 +47,6 @@ class TritonPythonModel:
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             out_tensor_0 = pb_utils.Tensor(
                 "OUTPUT0",
-                in_0.as_numpy().astype(self._dtypes[self._index]))
-            self._index += 1
+                in_0.as_numpy())
             responses.append(pb_utils.InferenceResponse([out_tensor_0]))
         return responses

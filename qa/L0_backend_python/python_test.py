@@ -262,19 +262,41 @@ class PythonTest(tu.TestResultCollector):
     def test_unicode(self):
         model_name = "string"
         shape = [1]
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            utf8 = '😀'
-            input_data = np.array([bytes(utf8, encoding='utf-8')],
-                                  dtype=np.bytes_)
-            inputs = [
-                httpclient.InferInput("INPUT0", shape,
-                                      np_to_triton_dtype(input_data.dtype))
-            ]
-            inputs[0].set_data_from_numpy(input_data)
-            result = client.infer(model_name, inputs)
-            output0 = result.as_numpy('OUTPUT0')
-            self.assertTrue(output0 is not None)
-            self.assertTrue(output0[0] == input_data)
+
+        for i in range(3):
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                utf8 = '😀'
+                input_data = np.array([bytes(utf8, encoding='utf-8')],
+                                      dtype=np.bytes_)
+                inputs = [
+                    httpclient.InferInput("INPUT0", shape,
+                                          np_to_triton_dtype(input_data.dtype))
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                result = client.infer(model_name, inputs)
+                output0 = result.as_numpy('OUTPUT0')
+                self.assertTrue(output0 is not None)
+                self.assertTrue(output0[0] == input_data)
+
+    def test_string(self):
+        model_name = "string_fixed"
+        shape = [1]
+
+        # Each time inference is performed with a new
+        # API
+        for i in range(3):
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                sample_input = '123456'
+                input_data = np.array([sample_input], dtype=np.object_)
+                inputs = [
+                    httpclient.InferInput("INPUT0", shape,
+                                          np_to_triton_dtype(input_data.dtype))
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                result = client.infer(model_name, inputs)
+                output0 = result.as_numpy('OUTPUT0')
+                self.assertTrue(output0 is not None)
+                self.assertTrue(output0[0] == input_data.astype(np.bytes_))
 
 
 if __name__ == '__main__':
