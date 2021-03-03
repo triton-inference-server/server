@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -69,15 +69,15 @@ COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
 COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib
 ```
 
-Then build the image.
+Then use Docker to create the image.
 
 ```
 $ docker build -t tritonserver_min .
 ```
 
-### Triton with Specific Backends
+### Triton with Supported Backends
 
-One or more of the
+One or more of the supported
 [PyTorch](https://github.com/triton-inference-server/pytorch_backend),
 [TensorFlow1](https://github.com/triton-inference-server/tensorflow_backend),
 [TensorFlow2](https://github.com/triton-inference-server/tensorflow_backend),
@@ -102,3 +102,34 @@ COPY --from=full /opt/tritonserver/backends/tensorflow1 /opt/tritonserver/backen
 Depending on the backend it may also be necessary to include
 additional dependencies in the image. For example, the Python backend
 requires that Python3 be installed in the image.
+
+Then use Docker to create the image.
+
+```
+$ docker build -t tritonserver_custom .
+```
+
+### Triton with Unsupported and Custom Backends
+
+You can [create and build your own Triton
+backend](https://github.com/triton-inference-server/backend).  The
+result of that build should be a directory containing your backend
+shared library and any additional files required by the
+backend. Assuming your backend is called "mybackend" and that the
+directory is "./mkbackend", the following Dockerfile will create a
+Triton image that contains all the supported Triton backends plus your
+custom backend.
+
+```
+FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full
+COPY ./mybackend /opt/tritonserver/backends/mybackend
+```
+
+You also need to install any additional dependencies required by your
+backend as part of the Dockerfile. Then use Docker to create the
+image.
+
+```
+$ docker build -t tritonserver_custom .
+```
+
