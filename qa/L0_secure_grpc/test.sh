@@ -138,7 +138,7 @@ for CASE in server mutual; do
         RET=1
     fi
 
-    $TEST_CLIENT -v >> ${CLIENT_LOG}.${CASE}.no_ssl_fail_infer 2>&1
+    $TEST_CLIENT -v >> ${CLIENT_LOG}.${CASE}.c++.no_ssl_fail_infer 2>&1
     if [ $? -ne 0 ]; then
         cat ${CLIENT_LOG}.${CASE}.c++.no_ssl_fail_infer
         echo -e "\n***\n*** Expected test failure\n***"
@@ -155,7 +155,7 @@ for CASE in server mutual; do
         RET=1
     fi
 
-    $TEST_CLIENT -v --ssl --root-certificates ca.crt --private-key client2.key --certificate-chain client2.crt >> ${CLIENT_LOG}.${CASE}.wrong_ssl_fail_infer 2>&1
+    $TEST_CLIENT -v --ssl --root-certificates ca.crt --private-key client2.key --certificate-chain client2.crt >> ${CLIENT_LOG}.${CASE}.c++.wrong_ssl_fail_infer 2>&1
     if [ $? -ne 0 ]; then
         cat ${CLIENT_LOG}.${CASE}.c++.wrong_ssl_fail_infer
         echo -e "\n***\n*** Expected test failure\n***"
