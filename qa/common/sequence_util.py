@@ -316,6 +316,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                         [serialized_byte_size(i0) for i0 in input_list_tmp])
                 else:
                     input_list_tmp = input_list
+                    input_byte_size = sum(
+                        [i0.nbytes for i0 in input_list_tmp])
 
                 dummy_input_byte_size = sum(
                     [i0.nbytes for i0 in dummy_input_list])
