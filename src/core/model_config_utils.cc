@@ -1698,6 +1698,13 @@ ModelConfigToJson(
             " not supported, supported versions are: 1");
   }
 
+  // Config will have 0 byte size if all fields are with default value,
+  // in other word the config is empty.
+  if (config.ByteSize() == 0) {
+    json_str->clear();
+    return Status::Success;
+  }
+
   std::string config_json_str;
   ::google::protobuf::util::JsonPrintOptions options;
   options.preserve_proto_field_names = true;
