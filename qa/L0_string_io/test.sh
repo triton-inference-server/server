@@ -49,11 +49,11 @@ source ../common/util.sh
 rm -f $CLIENT_LOG $SERVER_LOG
 rm -fr models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/graphdef_nobatch_zero_1_object models/.
-cp -r ../python_models/string models/.
-mkdir models/string/1/
-mv models/string/model.py models/string/1/model.py
+cp -r ../python_models/string_identity models/.
+mkdir models/string_identity/1/
+mv models/string_identity/model.py models/string_identity/1/model.py
 
-(cd models/string && \
+(cd models/string_identity && \
           sed -i "s/\[ 1 \]/\[ 8 \]/" config.pbtxt)
 
 run_server

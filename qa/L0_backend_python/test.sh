@@ -27,7 +27,7 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="8"
+EXPECTED_NUM_TESTS="9"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
@@ -115,6 +115,11 @@ rm -rf models/libtorch_float32_float32_float32/3
 mkdir -p models/string/1/
 cp ../python_models/string/model.py ./models/string/1/
 cp ../python_models/string/config.pbtxt ./models/string
+
+# More string tests
+mkdir -p models/string_fixed/1/
+cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
+cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
 pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
