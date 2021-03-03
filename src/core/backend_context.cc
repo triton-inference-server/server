@@ -983,7 +983,6 @@ BackendInputCollector::SetFixedSizeInputTensor(
       pending_pinned_inputs_.push_back(std::make_pair(response, request_input));
       return cuda_copy;
     }
-#if !defined(TRITON_ARCH_ARM64) && !defined(_WIN32)
     // [FIXME] support other direction if prove to be faster, all kernel
     // handling code in this class asssumes the destination buffer is on device
     // If the request buffer and the destination buffer are accessible by all
@@ -1020,7 +1019,6 @@ BackendInputCollector::SetFixedSizeInputTensor(
         return cuda_copy;
       }
     }
-#endif  // !defined(TRITON_ARCH_ARM64) && !defined(_WIN32)
 
     if (wait_buffer && (buffer_ready_event_ != nullptr)) {
       cudaEventSynchronize(buffer_ready_event_);
@@ -1287,11 +1285,7 @@ BackendInputCollector::LaunchCopyKernel(
     const TRITONSERVER_MemoryType tensor_memory_type,
     const int64_t tensor_memory_type_id)
 {
-#if defined(TRITON_ARCH_ARM64) || defined(_WIN32)
-  return Status(
-      Status::Code::UNSUPPORTED,
-      "Copy kernel can not be launched for Windows or ARM");
-#elif defined(TRITON_ENABLE_GPU)
+#ifdef TRITON_ENABLE_GPU
   input_ptr_buffer_host_.emplace_back(new std::vector<int8_t*>());
   byte_size_buffer_host_.emplace_back(new std::vector<size_t>());
   byte_size_offset_buffer_host_.emplace_back(new std::vector<size_t>());
