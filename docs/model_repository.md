@@ -87,8 +87,8 @@ specific
 [backend](https://github.com/triton-inference-server/backend/blob/main/README.md).
 Within each version sub-directory there must be the files required by
 that backend. For example, models that use framework backends such as
-PyTorch, ONNX and TensorFlow must provide the [framework-specific
-model files](#model-files).
+TensorRT, PyTorch, ONNX, OpenVINO and TensorFlow must provide the
+[framework-specific model files](#model-files).
 
 ## Model Repository Locations
 
@@ -284,6 +284,24 @@ A minimal model repository for a TensorFlow SavedModel model is:
       1/
         model.savedmodel/
            <saved-model files>
+```
+
+### OpenVINO Models
+
+An OpenVINO model is represented by two files, a *.xml and *.bin
+file. By default the *.xml file must be named model.xml. This default
+name can be overridden using the *default_model_filename* property in
+the [model configuration](model_configuration.md).
+
+A minimal model repository for an OpenVINO model is:
+
+```
+  <model-repository-path>/
+    <model-name>/
+      config.pbtxt
+      1/
+        model.xml
+        model.bin
 ```
 
 ### Python Models
