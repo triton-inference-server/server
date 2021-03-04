@@ -56,7 +56,7 @@ release is
   frameworks](https://github.com/triton-inference-server/backend). Triton
   can manage any number and mix of models (limited by system disk and
   memory resources). Triton supports TensorRT, TensorFlow GraphDef,
-  TensorFlow SavedModel, ONNX, and PyTorch TorchScript model
+  TensorFlow SavedModel, ONNX, PyTorch TorchScript and OpenVINO model
   formats. Both TensorFlow 1.x and TensorFlow 2.x are
   supported. Triton also supports TensorFlow-TensorRT and
   ONNX-TensorRT integrated models.

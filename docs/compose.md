@@ -83,6 +83,7 @@ One or more of the supported
 [TensorFlow2](https://github.com/triton-inference-server/tensorflow_backend),
 [ONNX
 Runtime](https://github.com/triton-inference-server/onnxruntime_backend),
+[OpenVINO](https://github.com/triton-inference-server/openvino_backend),
 [Python](https://github.com/triton-inference-server/python_backend),
 and [DALI](https://github.com/triton-inference-server/dali_backend)
 backends can be added to the minimum Triton image. The backend can be
@@ -132,4 +133,3 @@ image.
 ```
 $ docker build -t tritonserver_custom .
 ```
-
