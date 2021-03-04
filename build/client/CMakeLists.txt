@@ -83,18 +83,16 @@ if(${TRITON_ENABLE_GRPC})
   add_definitions(-DTRITON_ENABLE_GRPC=1)
 endif() # TRITON_ENABLE_GRPC
 
-if(NOT WIN32)
-  #
-  # CUDA
-  #
-  if(${TRITON_ENABLE_GPU})
-    find_package(CUDA REQUIRED)
-    message(STATUS "Using CUDA ${CUDA_VERSION}")
+#
+# CUDA
+#
+if(${TRITON_ENABLE_GPU})
+  find_package(CUDA REQUIRED)
+  message(STATUS "Using CUDA ${CUDA_VERSION}")
 
-    add_definitions(-DTRITON_ENABLE_GPU=1)
-    set(CUDA_NVCC_FLAGS -std=c++11)
-  endif() # TRITON_ENABLE_GPU
-endif() # NOT WIN32
+  add_definitions(-DTRITON_ENABLE_GPU=1)
+  set(CUDA_NVCC_FLAGS -std=c++11)
+endif() # TRITON_ENABLE_GPU
 
 if(${TRITON_ENABLE_GRPC})
   #
