@@ -990,7 +990,6 @@ BackendInputCollector::SetFixedSizeInputTensor(
       pending_pinned_inputs_.push_back(std::make_pair(response, request_input));
       return cuda_copy;
     }
-#if !defined(TRITON_ARCH_ARM64) && !defined(_WIN32)
     // [FIXME] support other direction if prove to be faster, all kernel
     // handling code in this class asssumes the destination buffer is on device
     // If the request buffer and the destination buffer are accessible by all
@@ -1027,7 +1026,6 @@ BackendInputCollector::SetFixedSizeInputTensor(
         return cuda_copy;
       }
     }
-#endif  // !defined(TRITON_ARCH_ARM64) && !defined(_WIN32)
 
 #ifdef TRITON_ENABLE_GPU
     if (wait_buffer && (buffer_ready_event_ != nullptr)) {
@@ -1267,6 +1265,7 @@ BackendInputCollector::FlushPendingCopyKernel(
         tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
         tensor_memory_type_id);
     cuda_copy = status.IsOk();
+    LOG_VERBOSE(1) << "gather kernel launched with status: " << status.AsString();
   }
   // If kernel can't be launched then just perform a direct copy.
   if (!status.IsOk()) {
@@ -1299,11 +1298,7 @@ BackendInputCollector::LaunchCopyKernel(
     const TRITONSERVER_MemoryType tensor_memory_type,
     const int64_t tensor_memory_type_id)
 {
-#if defined(TRITON_ARCH_ARM64) || defined(_WIN32)
-  return Status(
-      Status::Code::UNSUPPORTED,
-      "Copy kernel can not be launched for Windows or ARM");
-#elif defined(TRITON_ENABLE_GPU)
+#ifdef TRITON_ENABLE_GPU
   input_ptr_buffer_host_.emplace_back(new std::vector<int8_t*>());
   byte_size_buffer_host_.emplace_back(new std::vector<size_t>());
   byte_size_offset_buffer_host_.emplace_back(new std::vector<size_t>());
@@ -1390,11 +1385,12 @@ BackendInputCollector::LaunchCopyKernel(
     cudaEventSynchronize(buffer_ready_event_);
     buffer_ready_event_ = nullptr;
   }
-  RunGatherKernel(
+  RETURN_IF_CUDA_ERR(RunGatherKernel(
       (const int8_t**)input_ptr_buffer, (const size_t*)byte_size_buffer,
       (const size_t*)byte_size_offset_buffer,
       (int8_t*)tensor_buffer + pending_copy_kernel_buffer_offset_,
-      pending_copy_kernel_input_buffer_counts_, stream_);
+      pending_copy_kernel_input_buffer_counts_, stream_),
+      std::string("Failed to launch gather kernel"));
   return Status::Success;
 #else
   return Status(

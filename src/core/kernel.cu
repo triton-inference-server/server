@@ -60,7 +60,12 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__ void TritonGatherKernel(
   }
 }
 
-void
+#ifdef __cplusplus
+extern "C" 
+{
+#endif
+
+cudaError_t
 RunGatherKernel(
     const int8_t** input_ptr_buffer, const size_t* byte_size_buffer,
     const size_t* byte_size_offset_buffer, int8_t* output_buffer,
@@ -69,4 +74,9 @@ RunGatherKernel(
   TritonGatherKernel<<<request_count, THREADBLOCK_SIZE, 0, stream>>>(
       input_ptr_buffer, byte_size_buffer, byte_size_offset_buffer,
       output_buffer);
+  return cudaGetLastError();
 }
+
+#ifdef __cplusplus
+}
+#endif
