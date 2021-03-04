@@ -28,6 +28,7 @@ import os
 import sys
 import re
 from collections import defaultdict
+import math
 
 
 def parse_massif_out(filename):
@@ -59,7 +60,7 @@ def parse_massif_out(filename):
     return summary
 
 
-def is_unbounded_growth(summary, max_allowed_alloc):
+def is_unbounded_growth(summary, max_allowed_alloc, start_from_middle):
     """
     Check whether the heap allocations is increasing     
     
@@ -71,8 +72,14 @@ def is_unbounded_growth(summary, max_allowed_alloc):
         return False
 
     # Measure difference between mean and maximum memory usage
-    mem_heap_avg = sum(totals) / len(totals)
-    mem_heap_max = max(totals)
+    # Remove 1% of the max / min value which will be treated as outlier
+    processed_snapshot = totals[len(totals)//2:] if start_from_middle else totals
+    processed_snapshot.sort()
+    num_max_min_dropout = math.ceil(0.01 * len(processed_snapshot))
+    start = num_max_min_dropout
+    end = len(processed_snapshot) - num_max_min_dropout
+    mem_heap_avg = sum(processed_snapshot[start:end]) / len(processed_snapshot[start:end])
+    mem_heap_max = max(processed_snapshot[start:end])
 
     # Compute change in allocation rate
     memory_allocation_delta_mb = (mem_heap_max - mem_heap_avg) / 1e6
@@ -84,9 +91,11 @@ def is_unbounded_growth(summary, max_allowed_alloc):
 
 
 if __name__ == '__main__':
+    # FIXME turn to proper argument handling
     summary = parse_massif_out(sys.argv[1])
     max_allowed_alloc = float(sys.argv[2])
-    if is_unbounded_growth(summary, max_allowed_alloc):
+    start_from_middle = ((len(sys.argv) == 4) and (sys.argv[3] == "--start-from-middle"))
+    if is_unbounded_growth(summary, max_allowed_alloc, start_from_middle):
         sys.exit(1)
     else:
         sys.exit(0)
