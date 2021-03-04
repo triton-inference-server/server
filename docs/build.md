@@ -100,8 +100,8 @@ $ ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --e
 If you are building on master/main branch then \<container tag\>
 should be set to "main". If you are building on a release branch you
 should set \<container tag\> to match the branch name. For example, if
-you are building on the r21.02 branch you should set \<container tag\>
-to be "r21.02". You can use a different \<container tag\> for a
+you are building on the r21.03 branch you should set \<container tag\>
+to be "r21.03". You can use a different \<container tag\> for a
 component to instead use the corresponding branch/tag in the
 build. For example, if you have a branch called "mybranch" in the
 [identity_backend](https://github.com/triton-inference-server/identity_backend)

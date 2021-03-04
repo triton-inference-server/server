@@ -58,7 +58,7 @@ from distutils.dir_util import copy_tree
 #      OpenVINO version
 #     )
 TRITON_VERSION_MAP = {
-    '2.8.0dev': ('21.03dev', '21.02', '1.6.0', '2021.1.110', '2021.1.110')
+    '2.8.0': ('21.03', '21.03', '1.6.0', '2021.1.110', '2021.2.200')
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
