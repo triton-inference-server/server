@@ -25,6 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "src/core/shared_library.h"
 
+#include "src/core/filesystem.h"
+#include "src/core/logging.h"
+
 #ifdef _WIN32
 // suppress the min and max definitions in Windef.h.
 #define NOMINMAX
@@ -38,10 +41,35 @@ namespace nvidia { namespace inferenceserver {
 Status
 OpenLibraryHandle(const std::string& path, void** handle)
 {
+ LOG_VERBOSE(1) << "OpenLibraryHandle: " << path;
+
 #ifdef _WIN32
+  // Need to put backend directory on the DLL path so that any
+  // dependencies of the backend shared library are found
+  const std::string backend_dir = DirName(path);
+  LOG_VERBOSE(1) << "OpenLibraryHandle: backend dir = " << backend_dir;
+  if (!SetDllDirectory(backend_dir.c_str())) {
+    LPSTR err_buffer = nullptr;
+    size_t size = FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPSTR)&err_buffer, 0, NULL);
+    std::string errstr(err_buffer, size);
+    LocalFree(err_buffer);
+
+    return Status(
+        Status::Code::NOT_FOUND, "unable to set dll path for custom library: " + errstr);
+  }
+
   // HMODULE is typedef of void*
   // https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types
   *handle = LoadLibrary(path.c_str());
+
+  // Remove the dll path added above... do this unconditionally before
+  // check for failure in dll load.
+  SetDllDirectory(NULL);
+
   if (*handle == nullptr) {
     LPSTR err_buffer = nullptr;
     size_t size = FormatMessageA(
