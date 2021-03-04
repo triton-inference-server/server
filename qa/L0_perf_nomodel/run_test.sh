@@ -90,7 +90,8 @@ for BACKEND in $BACKENDS; do
     MAX_LATENCY=300
     MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
 
-    # openvino model does also not support batching/dynamic shapes
+    # TODO Add openvino identity model that supports batching/dynamic batching
+    # The current openvino identity model does also not support batching
     if [ $BACKEND == "openvino" ]; then
         if [ $MAX_BATCH != 1 ]; then
             continue
