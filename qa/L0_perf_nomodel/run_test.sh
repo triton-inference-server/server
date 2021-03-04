@@ -27,7 +27,7 @@
 
 REPO_VERSION=$1
 
-BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python"}
+BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python openvino"}
 STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
 DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
@@ -79,8 +79,8 @@ for BACKEND in $BACKENDS; do
         continue
     fi
 
-    # plan model support max batch size of 32 only. Skip for 16MB I/O tests
-    if [ $BACKEND == "plan" ] && [ $TENSOR_SIZE != 1 ]; then
+    # plan and openvino models do not support 16MB I/O tests
+    if ([ $BACKEND == "plan" ] || [ $BACKEND == "openvino" ]) && [ $TENSOR_SIZE != 1 ]; then
         continue
     fi
 
@@ -90,14 +90,25 @@ for BACKEND in $BACKENDS; do
     MAX_LATENCY=300
     MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
 
+    # TODO Add openvino identity model that supports batching/dynamic batching
+    # The current openvino identity model does also not support batching
+    if [ $BACKEND == "openvino" ]; then
+        if [ $MAX_BATCH != 1 ]; then
+            continue
+        else
+            MAX_BATCH=0
+        fi
+    fi
+
     if [ $DYNAMIC_BATCH > 1 ]; then
         NAME=${BACKEND}_sbatch${STATIC_BATCH}_dbatch${DYNAMIC_BATCH}_instance${INSTANCE_CNT}
     else
         NAME=${BACKEND}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}
     fi
 
-    # set input name (special case for custom and python model)
-    MODEL_NAME=${BACKEND}_zero_1_float32
+    # set model name (special case for openvino i.e. nobatch)
+    MODEL_NAME=${BACKEND}_zero_1_float32 && [ $BACKEND == "openvino" ] && MODEL_NAME=${BACKEND}_nobatch_zero_1_float32
+
     if [ $BACKEND == "custom" ]; then
         REPO_DIR=./custom_models 
     elif [ $BACKEND == "python" ]; then
@@ -107,7 +118,7 @@ for BACKEND in $BACKENDS; do
     fi
 
     SHAPE=${TENSOR_SIZE}
-    KIND="KIND_GPU" && [ $BACKEND == "custom" ] || [ $BACKEND == "python" ] && KIND="KIND_CPU"
+    KIND="KIND_GPU" && [ $BACKEND == "custom" ] || [ $BACKEND == "python" ] || [ $BACKEND == "openvino" ] && KIND="KIND_CPU"
 
     rm -fr models && mkdir -p models && \
         cp -r $REPO_DIR/$MODEL_NAME models/. && \
@@ -118,7 +129,7 @@ for BACKEND in $BACKENDS; do
         (cd models/$MODEL_NAME && \
             sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt)
     fi
-    if [ $DYNAMIC_BATCH > 1 ]; then
+    if [ $DYNAMIC_BATCH > 1 ] && [ $BACKEND != "openvino" ]; then
         (cd models/$MODEL_NAME && \
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
