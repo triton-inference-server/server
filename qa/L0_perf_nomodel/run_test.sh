@@ -113,7 +113,7 @@ for BACKEND in $BACKENDS; do
     fi
 
     SHAPE=${TENSOR_SIZE}
-    KIND="KIND_GPU" && [ $BACKEND == "custom" ] || [ $BACKEND == "python" ] && KIND="KIND_CPU"
+    KIND="KIND_GPU" && [ $BACKEND == "custom" ] || [ $BACKEND == "python" ] || [ $BACKEND == "openvino" ] && KIND="KIND_CPU"
 
     rm -fr models && mkdir -p models && \
         cp -r $REPO_DIR/$MODEL_NAME models/. && \
