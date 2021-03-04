@@ -79,8 +79,8 @@ for BACKEND in $BACKENDS; do
         continue
     fi
 
-    # plan model does not support 16MB I/O tests
-    if [ $BACKEND == "plan" ] && [ $TENSOR_SIZE != 1 ]; then
+    # plan and openvino models do not support 16MB I/O tests
+    if ([ $BACKEND == "plan" ] || [ $BACKEND == "openvino" ]) && [ $TENSOR_SIZE != 1 ]; then
         continue
     fi
 
@@ -90,9 +90,13 @@ for BACKEND in $BACKENDS; do
     MAX_LATENCY=300
     MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
 
-    # openvino model does not support batching
-    if [ $BACKEND == "openvino" ] && [ $MAX_BATCH != 1 ]; then
-        continue
+    # openvino model does also not support batching/dynamic shapes
+    if [ $BACKEND == "openvino" ]; then
+        if [ $MAX_BATCH != 1 ]; then
+            continue
+        else
+            MAX_BATCH=0
+        fi
     fi
 
     if [ $DYNAMIC_BATCH > 1 ]; then
@@ -124,7 +128,7 @@ for BACKEND in $BACKENDS; do
         (cd models/$MODEL_NAME && \
             sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt)
     fi
-    if [ $DYNAMIC_BATCH > 1 ]; then
+    if [ $DYNAMIC_BATCH > 1 ] && [ $BACKEND != "openvino" ]; then
         (cd models/$MODEL_NAME && \
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
