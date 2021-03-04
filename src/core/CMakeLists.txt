@@ -161,8 +161,8 @@ if(${TRITON_ENABLE_GPU})
   cuda_add_library(
     kernel-library 
     kernel.cu kernel.h
-    OPTIONS -arch compute_60
-    OPTIONS -code compute_60,sm_60,sm_61,sm_62,sm_70,sm_72,sm_75
+    OPTIONS -arch compute_53
+    OPTIONS -code compute_53,sm_53,sm_60,sm_61,sm_62,sm_70,sm_72,sm_75
     OPTIONS -Xcompiler ${HOST_COMPILER_FLAGS}
   )
 endif() # TRITON_ENABLE_GPU
