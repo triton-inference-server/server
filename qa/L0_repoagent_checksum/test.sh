@@ -43,11 +43,14 @@ RET=0
 # load all models
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    grep "failed to load model 'identity_int32': Mismatched MD5 hash for file 1/libtriton_identity.so" $SERVER_LOG
+    set +e
+    grep "'identity_int32': Mismatched MD5 hash for file 1/libtriton_identity.so" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected error on mismatched MD5 hash\n***"
+        cat $SERVER_LOG
         RET=1
     fi
+    set -e
 else
     echo -e "\n***\n*** Expect fail to start $SERVER\n***"
     cat $SERVER_LOG
