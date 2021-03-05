@@ -58,14 +58,14 @@ from distutils.dir_util import copy_tree
 #      OpenVINO version
 #     )
 TRITON_VERSION_MAP = {
-    '2.8.0dev': ('21.03dev', '21.02', '1.6.0', '2021.1', '2021.2.200')
+    '2.8.0dev': ('21.03dev', '20.12', '1.6.0', '2021.1', '2021.2.200')
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino'
+    'openvino', 'armnn'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -124,7 +124,7 @@ def untar(targetdir, tarfile):
             'untar {} into {} failed'.format(tarfile, targetdir))
 
 
-def gitclone(cwd, repo, tag, subdir):
+def gitclone(cwd, repo, tag, subdir, org):
     # If 'tag' starts with "pull/" then it must be of form
     # "pull/<pr>/head". We just clone at "main" and then fetch the
     # reference onto a new branch we name "tritonbuildref".
@@ -132,7 +132,7 @@ def gitclone(cwd, repo, tag, subdir):
         log_verbose('git clone of repo "{}" at ref "{}"'.format(repo, tag))
         p = subprocess.Popen([
             'git', 'clone', '--recursive', '--depth=1', '{}/{}.git'.format(
-                FLAGS.github_organization, repo), subdir
+                org, repo), subdir
         ],
                              cwd=cwd)
         p.wait()
@@ -157,7 +157,7 @@ def gitclone(cwd, repo, tag, subdir):
         log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
         p = subprocess.Popen([
             'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
-            tag, '{}/{}.git'.format(FLAGS.github_organization, repo), subdir
+            tag, '{}/{}.git'.format(org, repo), subdir
         ],
                              cwd=cwd)
         p.wait()
@@ -294,6 +294,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = dali_cmake_args()
     elif be == 'pytorch':
         args = pytorch_cmake_args(images)
+    elif be == 'armnn':
+        args = armnn_cmake_args()
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
@@ -411,11 +413,16 @@ def tensorflow_cmake_args(ver, images, library_paths):
             ]
     else:
         # If a specific TF image is specified use it, otherwise pull from NGC.
+        backend_name = "tensorflow{}".format(ver)
         if backend_name in images:
             image = images[backend_name]
         else:
-            image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
-                FLAGS.upstream_container_version, ver)
+            if ver == 2:
+                image = 'nvcr.io/nvidia/tensorflow:{}-py3'.format(
+                    FLAGS.upstream_container_version)
+            else:
+                image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
+                    FLAGS.upstream_container_version, ver)
         extra_args = ['-DTRITON_TENSORFLOW_DOCKER_IMAGE={}'.format(image)]
     return ['-DTRITON_TENSORFLOW_VERSION={}'.format(ver)] + extra_args
 
@@ -423,6 +430,12 @@ def tensorflow_cmake_args(ver, images, library_paths):
 def dali_cmake_args():
     return [
         '-DTRITON_DALI_SKIP_DOWNLOAD=OFF',
+    ]
+
+def armnn_cmake_args():
+    return [
+        '-DTRITON_ENABLE_GPU=OFF',
+        '-DJOBS=$(nproc)'
     ]
 
 
@@ -484,7 +497,22 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker && \
     pip3 install grpcio-tools grpcio-channelz
-
+'''
+    if target_platform() == 'ubuntu/arm64':
+        df += '''
+# Install cmake 3.19 from source for ubuntu
+RUN build=1 && \
+    mkdir /temp && \
+    cd /temp && \
+    wget https://cmake.org/files/v3.19/cmake-3.19.$build.tar.gz && \
+    tar -xzvf cmake-3.19.$build.tar.gz && \
+    cd cmake-3.19.$build/ && \
+    ./bootstrap --parallel=$(nproc) && \
+    make -j$(nproc) && \
+    make install
+'''
+    else:
+        df += '''
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
       gpg --dearmor - |  \
@@ -676,6 +704,8 @@ def container_build(images, backends, repoagents):
         base_image = images['base']
     elif target_platform() == 'windows':
         base_image = 'mcr.microsoft.com/dotnet/framework/sdk:4.8'
+    elif target_platform() == 'ubuntu/arm64':
+        base_image = 'arm64v8/ubuntu:20.04'
     else:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
@@ -879,7 +909,7 @@ if __name__ == '__main__':
         required=False,
         default=None,
         help=
-        'Target for build, can be "ubuntu", "windows" or "jetpack". If not specified, build targets the current platform.'
+        'Target for build, can be "ubuntu", "windows", "ubuntu/arm64", or "jetpack". If not specified, build targets the current platform.'
     )
 
     parser.add_argument('--build-id',
@@ -1193,7 +1223,11 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, be, 'install')
 
         mkdir(FLAGS.build_dir)
-        gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be)
+        # If armnn backend, source from external repo for git clone
+        if (be == 'armnn'):
+            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be, 'git@gitlab.com:arm-research/smarter/')
+        else:
+            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be, FLAGS.github_organization)
         mkdir(repo_build_dir)
         cmake(
             repo_build_dir,
@@ -1213,7 +1247,7 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, ra, 'install')
 
         mkdir(FLAGS.build_dir)
-        gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra)
+        gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra, FLAGS.github_organization)
         mkdir(repo_build_dir)
         cmake(repo_build_dir,
               repoagent_cmake_args(images, components, ra, repo_install_dir))
