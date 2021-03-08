@@ -26,13 +26,11 @@
 
 import sys
 import numpy as np
+from functools import partial
 import test_util as tu
-import shm_util as su
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
-import tritonclient.utils.shared_memory as shm
-import tritonclient.utils.cuda_shared_memory as cudashm
-from functools import partial
+import shm_util as su
 from tritonclient.utils import *
 
 if sys.version_info >= (3, 0):
@@ -44,6 +42,10 @@ else:
 # corresponding function is bytes()
 if sys.version_info.major == 3:
     unicode = bytes
+
+# Shared memory imports are not available on all platforms so they are
+# imported lazily only when explicitly needed
+_shm_imports_complete = False
 
 _seen_request_ids = set()
 
@@ -111,6 +113,14 @@ def infer_exact(tester,
                 use_cuda_shared_memory=False,
                 priority=0,
                 timeout_us=0):
+    # Lazy shm imports...
+    if use_system_shared_memory or use_cuda_shared_memory:
+        global _shm_imports_complete
+        if not _shm_imports_complete:
+            import tritonclient.utils.shared_memory as shm
+            import tritonclient.utils.cuda_shared_memory as cudashm
+            _shm_imports_complete = True
+
     tester.assertTrue(use_http or use_grpc or use_streaming)
     # configs [ url, protocol, async stream, binary data ]
     configs = []
@@ -595,6 +605,15 @@ def infer_shape_tensor(tester,
                        priority=0,
                        timeout_us=0,
                        batch_size=1):
+    # Lazy shm imports...
+    if use_system_shared_memory:
+        global _shm_imports_complete
+        if not _shm_imports_complete:
+            import shm_util as su
+            import tritonclient.utils.shared_memory as shm
+            import tritonclient.utils.cuda_shared_memory as cudashm
+            _shm_imports_complete = True
+
     tester.assertTrue(use_http or use_grpc or use_streaming)
     tester.assertTrue(pf == "plan" or pf == "plan_nobatch")
     tester.assertEqual(len(input_shape_values), len(dummy_input_shapes))
@@ -810,6 +829,15 @@ def infer_zero(tester,
                use_cuda_shared_memory=False,
                priority=0,
                timeout_us=0):
+    # Lazy shm imports...
+    if use_system_shared_memory or use_cuda_shared_memory:
+        global _shm_imports_complete
+        if not _shm_imports_complete:
+            import shm_util as su
+            import tritonclient.utils.shared_memory as shm
+            import tritonclient.utils.cuda_shared_memory as cudashm
+            _shm_imports_complete = True
+
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
