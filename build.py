@@ -273,6 +273,36 @@ def core_cmake_args(components, backends, install_dir):
     return cargs
 
 
+def repoagent_repo(ra):
+    return '{}_repository_agent'.format(ra)
+
+
+def repoagent_cmake_args(images, components, ra, install_dir):
+    if ra in EXAMPLE_REPOAGENTS:
+        args = []
+    else:
+        fail('unknown agent {}'.format(ra))
+
+    cargs = args + [
+        '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
+        '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
+        '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
+        '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core'])
+    ]
+
+    cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
+        cmake_enable(FLAGS.enable_gpu)))
+
+    # If TRITONBUILD_* is defined in the env then we use it to set
+    # corresponding cmake value.
+    for evar, eval in os.environ.items():
+        if evar.startswith('TRITONBUILD_'):
+            cargs.append('-D{}={}'.format(evar[len('TRITONBUILD_'):], eval))
+
+    cargs.append('..')
+    return cargs
+
+
 def backend_repo(be):
     if (be == 'tensorflow1') or (be == 'tensorflow2'):
         return 'tensorflow_backend'
@@ -320,36 +350,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     return cargs
 
 
-def repoagent_repo(ra):
-    return '{}_repository_agent'.format(ra)
-
-
-def repoagent_cmake_args(images, components, ra, install_dir):
-    if ra in EXAMPLE_REPOAGENTS:
-        args = []
-    else:
-        fail('unknown agent {}'.format(ra))
-
-    cargs = args + [
-        '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
-        '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
-        '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
-        '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core'])
-    ]
-
-    cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
-        cmake_enable(FLAGS.enable_gpu)))
-
-    # If TRITONBUILD_* is defined in the env then we use it to set
-    # corresponding cmake value.
-    for evar, eval in os.environ.items():
-        if evar.startswith('TRITONBUILD_'):
-            cargs.append('-D{}={}'.format(evar[len('TRITONBUILD_'):], eval))
-
-    cargs.append('..')
-    return cargs
-
-
 def pytorch_cmake_args(images):
     if "pytorch" in images:
         image = images["pytorch"]
@@ -372,8 +372,11 @@ def onnxruntime_cmake_args(images):
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
     else:
-        cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][1]))
+        if 'base' in images:
+            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+        else:
+            cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][1]))
 
         if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
             cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
@@ -387,9 +390,17 @@ def openvino_cmake_args():
     cargs = [
         '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][4]),
-        '-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][1])
     ]
+
+    if target_platform() == 'windows':
+        if 'base' in images:
+            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    else:
+        if 'base' in images:
+            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+        else:
+            cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][1]))
 
     return cargs
 
