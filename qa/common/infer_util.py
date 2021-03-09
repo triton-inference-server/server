@@ -609,7 +609,6 @@ def infer_shape_tensor(tester,
     if use_system_shared_memory:
         global _shm_imports_complete
         if not _shm_imports_complete:
-            import shm_util as su
             import tritonclient.utils.shared_memory as shm
             import tritonclient.utils.cuda_shared_memory as cudashm
             _shm_imports_complete = True
@@ -833,7 +832,6 @@ def infer_zero(tester,
     if use_system_shared_memory or use_cuda_shared_memory:
         global _shm_imports_complete
         if not _shm_imports_complete:
-            import shm_util as su
             import tritonclient.utils.shared_memory as shm
             import tritonclient.utils.cuda_shared_memory as cudashm
             _shm_imports_complete = True
