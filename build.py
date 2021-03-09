@@ -58,7 +58,7 @@ from distutils.dir_util import copy_tree
 #      OpenVINO version
 #     )
 TRITON_VERSION_MAP = {
-    '2.8.0dev': ('21.03dev', '20.12', '1.6.0', '2021.1', '2021.2.200')
+    '2.8.0dev': ('21.03dev', '21.02', '1.6.0', '2021.1.110', '2021.2.200')
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -273,55 +273,6 @@ def core_cmake_args(components, backends, install_dir):
     return cargs
 
 
-def backend_repo(be):
-    if (be == 'tensorflow1') or (be == 'tensorflow2'):
-        return 'tensorflow_backend'
-    return '{}_backend'.format(be)
-
-
-def backend_cmake_args(images, components, be, install_dir, library_paths):
-    if be == 'onnxruntime':
-        args = onnxruntime_cmake_args()
-    elif be == 'openvino':
-        args = openvino_cmake_args()
-    elif be == 'tensorflow1':
-        args = tensorflow_cmake_args(1, images, library_paths)
-    elif be == 'tensorflow2':
-        args = tensorflow_cmake_args(2, images, library_paths)
-    elif be == 'python':
-        args = []
-    elif be == 'dali':
-        args = dali_cmake_args()
-    elif be == 'pytorch':
-        args = pytorch_cmake_args(images)
-    elif be == 'armnn':
-        args = armnn_cmake_args()
-    elif be in EXAMPLE_BACKENDS:
-        args = []
-    else:
-        fail('unknown backend {}'.format(be))
-
-    cargs = args + [
-        '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
-        '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
-        '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
-        '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core']),
-        '-DTRITON_BACKEND_REPO_TAG:STRING={}'.format(components['backend'])
-    ]
-
-    cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
-        cmake_enable(FLAGS.enable_gpu)))
-
-    # If TRITONBUILD_* is defined in the env then we use it to set
-    # corresponding cmake value.
-    for evar, eval in os.environ.items():
-        if evar.startswith('TRITONBUILD_'):
-            cargs.append('-D{}={}'.format(evar[len('TRITONBUILD_'):], eval))
-
-    cargs.append('..')
-    return cargs
-
-
 def repoagent_repo(ra):
     return '{}_repository_agent'.format(ra)
 
@@ -352,6 +303,55 @@ def repoagent_cmake_args(images, components, ra, install_dir):
     return cargs
 
 
+def backend_repo(be):
+    if (be == 'tensorflow1') or (be == 'tensorflow2'):
+        return 'tensorflow_backend'
+    return '{}_backend'.format(be)
+
+
+def backend_cmake_args(images, components, be, install_dir, library_paths):
+    if be == 'onnxruntime':
+        args = onnxruntime_cmake_args(images)
+    elif be == 'openvino':
+        args = openvino_cmake_args()
+    elif be == 'tensorflow1':
+        args = tensorflow_cmake_args(1, images, library_paths)
+    elif be == 'tensorflow2':
+        args = tensorflow_cmake_args(2, images, library_paths)
+    elif be == 'python':
+        args = []
+    elif be == 'dali':
+        args = dali_cmake_args()
+    elif be == 'pytorch':
+        args = pytorch_cmake_args(images)
+    elif be == 'armnn':
+        args = armnn_cmake_args(images)
+    elif be in EXAMPLE_BACKENDS:
+        args = []
+    else:
+        fail('unknown backend {}'.format(be))
+
+    cargs = args + [
+        '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
+        '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
+        '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
+        '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core']),
+        '-DTRITON_BACKEND_REPO_TAG:STRING={}'.format(components['backend'])
+    ]
+
+    cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
+        cmake_enable(FLAGS.enable_gpu)))
+
+    # If TRITONBUILD_* is defined in the env then we use it to set
+    # corresponding cmake value.
+    for evar, eval in os.environ.items():
+        if evar.startswith('TRITONBUILD_'):
+            cargs.append('-D{}={}'.format(evar[len('TRITONBUILD_'):], eval))
+
+    cargs.append('..')
+    return cargs
+
+
 def pytorch_cmake_args(images):
     if "pytorch" in images:
         image = images["pytorch"]
@@ -363,19 +363,27 @@ def pytorch_cmake_args(images):
     ]
 
 
-def onnxruntime_cmake_args():
+def onnxruntime_cmake_args(images):
     cargs = [
         '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][2]),
-        '-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][1])
+            TRITON_VERSION_MAP[FLAGS.version][2])
     ]
 
-    if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
-        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
-        cargs.append('-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][3]))
+    if target_platform() == 'windows':
+        if 'base' in images:
+            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    else:
+        if 'base' in images:
+            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+        else:
+            cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][1]))
+
+        if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
+            cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
+            cargs.append('-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][3]))
 
     return cargs
 
@@ -384,9 +392,17 @@ def openvino_cmake_args():
     cargs = [
         '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][4]),
-        '-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][1])
     ]
+
+    if target_platform() == 'windows':
+        if 'base' in images:
+            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    else:
+        if 'base' in images:
+            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+        else:
+            cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][1]))
 
     return cargs
 
@@ -556,7 +572,8 @@ COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
 '''
 
     if 'onnxruntime' in backends:
-        df += '''
+        if target_platform() != 'windows':
+            df += '''
 # Copy ONNX custom op library and model (needed for testing)
 RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
       cp /tmp/tritonbuild/onnxruntime/install/test/libcustom_op_library.so /workspace/qa/L0_custom_ops/.; \
@@ -665,13 +682,16 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backen
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
 '''
 
-    df += '''
-# Extra defensive wiring for CUDA Compat lib
-RUN ln -sf ${{_CUDA_COMPAT_PATH}}/lib.real ${{_CUDA_COMPAT_PATH}}/lib \
- && echo ${{_CUDA_COMPAT_PATH}}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
- && ldconfig \
- && rm -f ${{_CUDA_COMPAT_PATH}}/lib
+    if target_platform() != 'ubuntu/arm64':
+        df += '''
+    # Extra defensive wiring for CUDA Compat lib
+    RUN ln -sf ${{_CUDA_COMPAT_PATH}}/lib.real ${{_CUDA_COMPAT_PATH}}/lib \
+    && echo ${{_CUDA_COMPAT_PATH}}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
+    && ldconfig \
+    && rm -f ${{_CUDA_COMPAT_PATH}}/lib
+'''
 
+    df += '''
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf /opt/tritonserver
 COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tritonserver
 ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
