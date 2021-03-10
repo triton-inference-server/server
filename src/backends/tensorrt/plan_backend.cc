@@ -594,8 +594,10 @@ PlanBackend::CreateExecutionContext(
   const int cuda_stream_priority =
       GetCudaStreamPriority(Config().optimization().priority());
   RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
+#ifdef TRITON_ENABLE_STATS
   RETURN_IF_ERROR(context->CreateCudaStream(
       cuda_stream_priority, &context->signal_stream_));
+#endif  // TRITON_ENABLE_STATS
   RETURN_IF_ERROR(context->CreateCudaStream(
       cuda_stream_priority, &context->input_copy_stream_));
   if (separate_output_stream) {
@@ -3233,9 +3235,11 @@ PlanBackend::Context::InitEventSet(bool busy_wait_events)
     RETURN_IF_ERROR(CreateCudaEvent(
         "Set " + std::to_string(idx) + " output ready", event_flags,
         &events_[idx].output_ready_));
+#ifdef TRITON_ENABLE_STATS
     RETURN_IF_ERROR(CreateCudaEvent(
         "Set " + std::to_string(idx) + " timestamp signal", event_flags,
         &events_[idx].timestamp_signal_));
+#endif  // TRITON_ENABLE_STATS
   }
   return Status::Success;
 }
