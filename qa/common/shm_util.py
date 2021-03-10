@@ -33,11 +33,6 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
-# Shared memory imports are not available on all platforms so they are
-# imported lazily only when explicitly needed
-_shm_imports_complete = False
-
-
 def _range_repr_dtype(dtype):
     if dtype == np.float64:
         return np.int32
@@ -55,12 +50,10 @@ def create_set_shm_regions(input0_list, input1_list, output0_byte_size,
                            precreated_shm_regions, use_system_shared_memory,
                            use_cuda_shared_memory):
     # Lazy shm imports...
-    if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+    if use_system_shared_memory:
+        import tritonclient.utils.shared_memory as shm
+    if use_cuda_shared_memory:
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     if use_system_shared_memory and use_cuda_shared_memory:
         raise ValueError(
@@ -148,12 +141,10 @@ def register_add_shm_regions(inputs, outputs, shm_region_names,
                              use_system_shared_memory, use_cuda_shared_memory,
                              triton_client):
     # Lazy shm imports...
-    if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+    if use_system_shared_memory:
+        import tritonclient.utils.shared_memory as shm
+    if use_cuda_shared_memory:
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     if use_system_shared_memory or use_cuda_shared_memory:
         # Unregister then register required shared memory regions
@@ -227,12 +218,10 @@ def unregister_cleanup_shm_regions(shm_regions, shm_handles,
                                    use_system_shared_memory,
                                    use_cuda_shared_memory):
     # Lazy shm imports...
-    if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+    if use_system_shared_memory:
+        import tritonclient.utils.shared_memory as shm
+    if use_cuda_shared_memory:
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     if not (use_system_shared_memory or use_cuda_shared_memory):
         return None
@@ -278,12 +267,10 @@ def create_set_either_shm_region(shm_region_names, input_list, input_byte_size,
                                  output_byte_size, use_system_shared_memory,
                                  use_cuda_shared_memory):
     # Lazy shm imports...
-    if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+    if use_system_shared_memory:
+        import tritonclient.utils.shared_memory as shm
+    if use_cuda_shared_memory:
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     if use_cuda_shared_memory and use_system_shared_memory:
         raise ValueError(
@@ -315,12 +302,10 @@ def register_add_either_shm_regions(inputs, outputs, shm_region_prefix,
                                     output_byte_size, use_system_shared_memory,
                                     use_cuda_shared_memory, triton_client):
     # Lazy shm imports...
-    if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+    if use_system_shared_memory:
+        import tritonclient.utils.shared_memory as shm
+    if use_cuda_shared_memory:
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     if use_system_shared_memory or use_cuda_shared_memory:
         # Unregister then register required shared memory regions

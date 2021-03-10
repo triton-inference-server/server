@@ -43,10 +43,6 @@ else:
 if sys.version_info.major == 3:
     unicode = bytes
 
-# Shared memory imports are not available on all platforms so they are
-# imported lazily only when explicitly needed
-_shm_imports_complete = False
-
 _seen_request_ids = set()
 
 
@@ -115,11 +111,8 @@ def infer_exact(tester,
                 timeout_us=0):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+        import tritonclient.utils.shared_memory as shm
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
     # configs [ url, protocol, async stream, binary data ]
@@ -607,11 +600,7 @@ def infer_shape_tensor(tester,
                        batch_size=1):
     # Lazy shm imports...
     if use_system_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
             import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
     tester.assertTrue(pf == "plan" or pf == "plan_nobatch")
@@ -830,11 +819,8 @@ def infer_zero(tester,
                timeout_us=0):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+        import tritonclient.utils.shared_memory as shm
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
