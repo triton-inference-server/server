@@ -248,6 +248,9 @@ class PlanBackend : public InferenceBackend {
       // CUDA event for capturing correct timestamp.
       cudaEvent_t ready_for_output_;
       cudaEvent_t output_ready_;
+
+      // CUDA event for synchronizing the order of timestamp capture.
+      cudaEvent_t timestamp_signal_;
     };
 
     // Number of CUDA event set for each instance.
@@ -294,6 +297,9 @@ class PlanBackend : public InferenceBackend {
     nvinfer1::ICudaEngine* engine_;
     bool is_shared_engine_;
 
+    // CUDA stream use to track execution status
+    cudaStream_t signal_stream_;
+
     // Additional CUDA streams to overlap copy and execution.
     cudaStream_t input_copy_stream_;
     cudaStream_t output_copy_stream_;
@@ -316,7 +322,8 @@ class PlanBackend : public InferenceBackend {
           std::vector<std::unique_ptr<InferenceRequest>>&& requests)
           : inference_backend_(inference_backend),
             event_set_idx_(event_set_idx), total_batch_size_(0),
-            compute_start_ns_(0), requests_(std::move(requests))
+            compute_start_ns_(0), compute_input_end_ns_(0),
+            compute_output_start_ns_(0), requests_(std::move(requests))
       {
       }
 
@@ -331,6 +338,8 @@ class PlanBackend : public InferenceBackend {
 
       // The timestamps for reporting stats
       uint64_t compute_start_ns_;
+      uint64_t compute_input_end_ns_;
+      uint64_t compute_output_start_ns_;
 
       // All the composing InferenceRequest objects
       std::vector<std::unique_ptr<InferenceRequest>> requests_;
