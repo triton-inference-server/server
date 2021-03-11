@@ -148,7 +148,7 @@ for MODEL in $(ls models); do
 
     set +e
 
-    ms_print ${MASSIF_LOG} | head -n35 >> $CLIENT_LOG 2>&1
+    ms_print ${MASSIF_LOG} | head -n35
     # Check the massif output
     python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -205,7 +205,7 @@ wait $SERVER_PID
 
 set +e
 
-ms_print ${MASSIF_LOG} | head -n35 >> $CLIENT_LOG 2>&1
+ms_print ${MASSIF_LOG} | head -n35
 # Check the massif output
 python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
 if [ $? -ne 1 ]; then

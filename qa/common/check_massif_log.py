@@ -77,8 +77,9 @@ def is_unbounded_growth(summary, max_allowed_alloc, start_from_middle):
     # Remove 5% of the max value which will be treated as outlier
     num_max_min_dropout = math.ceil(0.05 * len(processed_snapshot))
     start = num_max_min_dropout
-    mem_heap_avg = sum(processed_snapshot[start:]) / len(processed_snapshot[start:])
-    mem_heap_max = max(processed_snapshot[start:])
+    end = len(processed_snapshot) - num_max_min_dropout
+    mem_heap_avg = sum(processed_snapshot[start:end]) / len(processed_snapshot[start:end])
+    mem_heap_max = max(processed_snapshot[start:end])
 
     # Compute change in allocation rate
     memory_allocation_delta_mb = (mem_heap_max - mem_heap_avg) / 1e6
