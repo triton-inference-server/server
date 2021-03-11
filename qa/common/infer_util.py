@@ -184,7 +184,7 @@ def infer_exact(tester,
                                  dtype=object).reshape(output0_array.shape)
     else:
         output0_array = output0_array.astype(output0_dtype)
-    if output1_dtype == np.object:
+    if output1_dtype == np.object_:
         output1_array = np.array([
             unicode(str(x), encoding='utf-8') for x in (output1_array.flatten())
         ],
