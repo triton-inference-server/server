@@ -71,7 +71,7 @@ CONCURRENCY=32
 CLIENT_BS=8
 
 # Threshold memory growth in MB
-MAX_ALLOWED_ALLOC="50"
+MAX_ALLOWED_ALLOC="150"
 export MAX_ALLOWED_ALLOC
 
 # Create local model repository
@@ -148,8 +148,9 @@ for MODEL in $(ls models); do
 
     set +e
 
+    ms_print ${MASSIF_LOG} | head -n35
     # Check the massif output
-    python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC >> $CLIENT_LOG 2>&1
+    python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test for $MODEL Failed\n***"
@@ -204,8 +205,9 @@ wait $SERVER_PID
 
 set +e
 
+ms_print ${MASSIF_LOG} | head -n35
 # Check the massif output
-python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC >> $CLIENT_LOG 2>&1
+python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
 if [ $? -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
