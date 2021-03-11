@@ -125,7 +125,7 @@ class InferenceServerException(Exception):
 
 
 def np_to_triton_dtype(np_dtype):
-    if np_dtype == np.bool:
+    if np_dtype == bool:
         return "BOOL"
     elif np_dtype == np.int8:
         return "INT8"
@@ -156,7 +156,7 @@ def np_to_triton_dtype(np_dtype):
 
 def triton_to_np_dtype(dtype):
     if dtype == "BOOL":
-        return np.bool
+        return bool
     elif dtype == "INT8":
         return np.int8
     elif dtype == "INT16":
