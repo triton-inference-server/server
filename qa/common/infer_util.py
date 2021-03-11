@@ -643,7 +643,7 @@ def infer_shape_tensor(tester,
 
         # Prepare the dummy tensor
         rtensor_dtype = _range_repr_dtype(tensor_dtype)
-        if (rtensor_dtype != np.bool):
+        if (rtensor_dtype != bool):
             dummy_in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
                                           high=np.iinfo(rtensor_dtype).max,
                                           size=dummy_input_shapes[io_num],
@@ -882,7 +882,7 @@ def infer_zero(tester,
         output_shape = output_shapes[io_num]
 
         rtensor_dtype = _range_repr_dtype(tensor_dtype)
-        if (rtensor_dtype != np.bool):
+        if (rtensor_dtype != bool):
             input_array = np.random.randint(low=np.iinfo(rtensor_dtype).min,
                                             high=np.iinfo(rtensor_dtype).max,
                                             size=input_shape,
