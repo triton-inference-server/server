@@ -41,7 +41,7 @@ namespace nvidia { namespace inferenceserver {
 Status
 OpenLibraryHandle(const std::string& path, void** handle)
 {
- LOG_VERBOSE(1) << "OpenLibraryHandle: " << path;
+  LOG_VERBOSE(1) << "OpenLibraryHandle: " << path;
 
 #ifdef _WIN32
   // Need to put backend directory on the DLL path so that any
@@ -59,7 +59,8 @@ OpenLibraryHandle(const std::string& path, void** handle)
     LocalFree(err_buffer);
 
     return Status(
-        Status::Code::NOT_FOUND, "unable to set dll path for custom library: " + errstr);
+        Status::Code::NOT_FOUND,
+        "unable to set dll path for backend library: " + errstr);
   }
 
   // HMODULE is typedef of void*
@@ -81,14 +82,14 @@ OpenLibraryHandle(const std::string& path, void** handle)
     LocalFree(err_buffer);
 
     return Status(
-        Status::Code::NOT_FOUND, "unable to load custom library: " + errstr);
+        Status::Code::NOT_FOUND, "unable to load backend library: " + errstr);
   }
 #else
   *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
   if (*handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
-        "unable to load custom library: " + std::string(dlerror()));
+        "unable to load backend library: " + std::string(dlerror()));
   }
 #endif
   return Status::Success;

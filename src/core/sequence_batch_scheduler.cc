@@ -925,7 +925,7 @@ DirectSequenceBatch::SchedulerThread(
   }
 #else
   LOG_VERBOSE(1) << "Starting Direct sequence-batch scheduler thread "
-                   << batcher_idx_ << " at default nice...";
+                 << batcher_idx_ << " at default nice...";
 #endif
 
   // Initialize using the thread. If error then just exit this thread
