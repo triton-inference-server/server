@@ -57,6 +57,12 @@ from distutils.dir_util import copy_tree
 #      ORT openvino version (use None to disable openvino in ORT),
 #      OpenVINO version
 #     )
+#
+# Currently the OpenVINO versions used in ORT and standalone must
+# match because of the way dlopen works with loading the backends. If
+# different versions are used then one backend or the other will
+# incorrectly load the other version of the openvino libraries.
+#
 TRITON_VERSION_MAP = {
     '2.8.0dev': ('21.03dev', '21.02', '1.6.0', '2021.1.110', '2021.1.110')
 }
