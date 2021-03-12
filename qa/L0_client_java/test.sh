@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-rm -f *.log
+rm -f *.log.*
 
 # Copy protobuf files from server core
 cp src/core/*.proto src/clients/java/library/src/main/proto/
@@ -50,7 +50,8 @@ cp src/core/*.proto src/clients/java/library/src/main/proto/
     cp -R target/generated-sources/protobuf/java/inference ../examples/src/main/java/inference && \
     cp -r target/generated-sources/protobuf/grpc-java/inference/*.java ../examples/src/main/java/inference/)
 
-set -e
+# Build simple java and scala client example 
+(cd src/clients/java/examples && mvn clean install)
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -65,19 +66,25 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+pushd src/clients/java/examples
 set +e
 
-# Build simple java client example 
-cd src/clients/java/examples && mvn clean install
-
 # Test simple java client example
-mvn exec:java -Dexec.mainClass=clients.SimpleJavaClient -Dexec.args="localhost 8001" >> $CLIENT_LOG 2>&1
+mvn exec:java -Dexec.mainClass=clients.SimpleJavaClient -Dexec.args="localhost 8001" >> ${CLIENT_LOG}.java 2>&1
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
+    cat ${CLIENT_LOG}.java
+    RET=1
+fi
+
+# Test simple scala client example
+mvn exec:java -Dexec.mainClass=clients.SimpleClient -Dexec.args="localhost 8001" >> ${CLIENT_LOG}.scala 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.scala
     RET=1
 fi
 
 set -e
+popd
 
 kill $SERVER_PID
 wait $SERVER_PID

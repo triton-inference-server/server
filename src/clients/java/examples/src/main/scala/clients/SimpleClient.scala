@@ -139,7 +139,7 @@ object SimpleClient {
   def testInference(grpc_stub: GRPCStub,model: String, version: String = "") = {
 
 
-    val batch_size = 2
+    val batch_size = 1
     val dimension = 16
 
     /**
@@ -151,7 +151,7 @@ object SimpleClient {
 
     /**
      * Input Data
-     * use input dimension [batch_size,dimension]
+     * use input dimension [batch_size, dimension]
      */
     val lst_0 = (1 to batch_size * dimension).toList.map(x => new Integer(x)).asJava;
     val lst_1 = (1 to batch_size * dimension).toList.map(x => new Integer(x)).asJava;
@@ -209,20 +209,28 @@ object SimpleClient {
      * check the two output tensors
      */
 
-    for (i <- 0 until response.getOutputsCount) {
+    println(response.getOutputs(0))
+    println(response.getOutputs(1))
 
-      println(response.getOutputs(i))
+    val op0 = toArray(response.getRawOutputContents(0).asReadOnlyByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asIntBuffer())
+    val op1 = toArray(response.getRawOutputContents(1).asReadOnlyByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asIntBuffer())
 
-      /**
-       * print raw output
-       */
-      val outputArr = toArray(response.getRawOutputContents(i).asReadOnlyByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asIntBuffer())
-      outputArr.grouped(dimension).foreach { rec =>
-        println(rec.mkString(","))
-      }
+    /**
+     * Validate the output tensors
+     */
+    for (i <- 0 until dimension) {
+      println(lst_0.get(i) + " + " + lst_1.get(i) + " = " + op0(i))
+      println(lst_0.get(i) + " - " + lst_1.get(i) + " = " + op1(i))
 
-      println
-
+			if (op0(i) != (lst_0.get(i) + lst_1.get(i))) {
+				println("OUTPUT0 contains incorrect sum")
+        System.exit(1)
+			}
+			
+			if (op1(i) != (lst_0.get(i) - lst_1.get(i))) {
+				println("OUTPUT1 contains incorrect difference")
+        System.exit(1)
+			}
     }
 
   }
