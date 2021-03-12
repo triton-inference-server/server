@@ -236,7 +236,7 @@ DynamicBatchScheduler::SchedulerThread(
   }
 #else
   LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
-                   << " at default nice...";
+                 << " at default nice...";
 #endif
 
   // Initialize using the thread. If error then just exit this thread
@@ -539,8 +539,8 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
   // Obatin the age of the oldest pending request to compare with the maximum
   // batch queuing delay
   uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-             std::chrono::steady_clock::now().time_since_epoch())
-             .count();
+                        std::chrono::steady_clock::now().time_since_epoch())
+                        .count();
   uint64_t delay_ns = now_ns - queue_.OldestEnqueueTime();
   bool delay_is_exceeded = (delay_ns >= pending_batch_delay_ns_);
 
