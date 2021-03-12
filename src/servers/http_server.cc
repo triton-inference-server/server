@@ -2080,7 +2080,7 @@ HTTPAPIServer::EVBufferToInput(
             std::string(
                 "unexpected size for input '" + std::string(input_name) +
                 "', expecting " + std::to_string(byte_size) +
-                " bytes for model '" + model_name + "'")
+                " additional bytes for model '" + model_name + "'")
                 .c_str());
       }
     } else {
