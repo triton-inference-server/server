@@ -418,8 +418,8 @@ class InferenceRequest {
   uint64_t CaptureQueueStartNs()
   {
     queue_start_ns_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
-             std::chrono::steady_clock::now().time_since_epoch())
-             .count();
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
     return queue_start_ns_;
   }
 
@@ -428,8 +428,8 @@ class InferenceRequest {
   uint64_t CaptureRequestStartNs()
   {
     request_start_ns_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
-             std::chrono::steady_clock::now().time_since_epoch())
-             .count();
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count();
     return request_start_ns_;
   }
 

@@ -61,8 +61,7 @@ __launch_bounds__(THREADBLOCK_SIZE) __global__ void TritonGatherKernel(
 }
 
 #ifdef __cplusplus
-extern "C" 
-{
+extern "C" {
 #endif
 
 cudaError_t

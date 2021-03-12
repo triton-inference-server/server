@@ -134,10 +134,11 @@ class TritonRepoAgentModelList {
   std::vector<std::unique_ptr<TritonRepoAgentModel>> agent_models_;
 };
 
-Status CreateAgentModelListWithLoadAction(
-  const inference::ModelConfig& original_model_config,
-  const std::string& original_model_path,
-  std::shared_ptr<TritonRepoAgentModelList>* agent_model_list)
+Status
+CreateAgentModelListWithLoadAction(
+    const inference::ModelConfig& original_model_config,
+    const std::string& original_model_path,
+    std::shared_ptr<TritonRepoAgentModelList>* agent_model_list)
 {
   std::shared_ptr<TritonRepoAgentModelList> lagent_model_list;
   if (original_model_config.has_model_repository_agents()) {
@@ -152,10 +153,10 @@ Status CreateAgentModelListWithLoadAction(
     inference::ModelConfig model_config = original_model_config;
     lagent_model_list.reset(new TritonRepoAgentModelList());
     for (const auto& agent_config :
-        original_model_config.model_repository_agents().agents()) {
+         original_model_config.model_repository_agents().agents()) {
       std::shared_ptr<TritonRepoAgent> agent;
-      RETURN_IF_ERROR(TritonRepoAgentManager::CreateAgent(
-          agent_config.name(), &agent));
+      RETURN_IF_ERROR(
+          TritonRepoAgentManager::CreateAgent(agent_config.name(), &agent));
       TritonRepoAgent::Parameters agent_params;
       for (const auto& parameter : agent_config.parameters()) {
         agent_params.emplace_back(parameter.first, parameter.second);
@@ -164,7 +165,7 @@ Status CreateAgentModelListWithLoadAction(
       if (lagent_model_list->Size() != 0) {
         lagent_model_list->Back()->Location(&artifact_type, &location);
         const auto config_path = JoinPath({location, kModelConfigPbTxt});
-        if(!ReadTextProto(config_path, &model_config).IsOk()) {
+        if (!ReadTextProto(config_path, &model_config).IsOk()) {
           model_config.Clear();
         }
       }
@@ -773,8 +774,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   }
 
   std::set<int64_t> versions;
-  RETURN_IF_ERROR(VersionsToLoad(
-      repository_path, model_name, model_config, &versions));
+  RETURN_IF_ERROR(
+      VersionsToLoad(repository_path, model_name, model_config, &versions));
   if (versions.empty()) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -1843,17 +1844,19 @@ ModelRepositoryManager::Poll(
       {
         const auto config_path = JoinPath({full_path, kModelConfigPbTxt});
         if (ReadTextProto(config_path, &model_config).IsOk()) {
-          status = CreateAgentModelListWithLoadAction(model_config, full_path, &model_info->agent_model_list_);
+          status = CreateAgentModelListWithLoadAction(
+              model_config, full_path, &model_info->agent_model_list_);
           if (status.IsOk() && model_info->agent_model_list_ != nullptr) {
             // Get the latest repository path
             const char* location;
             TRITONREPOAGENT_ArtifactType artifact_type;
-            RETURN_IF_ERROR(
-                model_info->agent_model_list_->Back()->Location(&artifact_type, &location));
+            RETURN_IF_ERROR(model_info->agent_model_list_->Back()->Location(
+                &artifact_type, &location));
             // RepoAgentModel uses model path while backend creation needs
             // repository path, so need to go up one level.
-            // [FIXME] Should just passing model path directly as we don't really
-            // look at the repository path but just create model path from it
+            // [FIXME] Should just passing model path directly as we don't
+            // really look at the repository path but just create model path
+            // from it
             auto location_string = std::string(location);
             size_t pos = location_string.length() - 1;
             for (; (int64_t)pos >= 0; pos--) {
@@ -1934,7 +1937,8 @@ ModelRepositoryManager::Poll(
     }
 
     if (!status.IsOk()) {
-      LOG_ERROR << "Poll failed for model directory '" << child << "': " << status.Message();
+      LOG_ERROR << "Poll failed for model directory '" << child
+                << "': " << status.Message();
       *all_models_polled = false;
     }
   }
