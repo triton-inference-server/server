@@ -78,6 +78,15 @@ if __name__ == '__main__':
         required=False,
         default=None,
         help='File holding PEM-encoded certicate chain. Default is None.')
+    parser.add_argument(
+        '-C',
+        '--compression_algorithm',
+        type=str,
+        required=False,
+        default=None,
+        help=
+        'The compression algorithm to be used when sending request to server. Default is None.'
+    )
 
     FLAGS = parser.parse_args()
     try:
@@ -114,11 +123,13 @@ if __name__ == '__main__':
     outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
 
     # Test with outputs
-    results = triton_client.infer(model_name=model_name,
-                                  inputs=inputs,
-                                  outputs=outputs,
-                                  client_timeout=FLAGS.client_timeout,
-                                  headers={'test': '1'})
+    results = triton_client.infer(
+        model_name=model_name,
+        inputs=inputs,
+        outputs=outputs,
+        client_timeout=FLAGS.client_timeout,
+        headers={'test': '1'},
+        compression_algorithm=FLAGS.compression_algorithm)
 
     statistics = triton_client.get_inference_statistics(model_name=model_name)
     print(statistics)
@@ -145,9 +156,11 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Test with no outputs
-    results = triton_client.infer(model_name=model_name,
-                                  inputs=inputs,
-                                  outputs=None)
+    results = triton_client.infer(
+        model_name=model_name,
+        inputs=inputs,
+        outputs=None,
+        compression_algorithm=FLAGS.compression_algorithm)
 
     # Get the output arrays from the results
     output0_data = results.as_numpy('OUTPUT0')

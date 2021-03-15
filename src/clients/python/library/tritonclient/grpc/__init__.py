@@ -87,6 +87,20 @@ def _get_inference_request(model_name, inputs, model_version, request_id,
     return request
 
 
+def _grpc_compression_type(algorithm_str):
+    if (algorithm_str == None):
+        return grpc.Compression.NoCompression
+    elif (algorithm_str.lower() == "deflate"):
+        return grpc.Compression.Deflate
+    elif (algorithm_str.lower() == "gzip"):
+        return grpc.Compression.Gzip
+
+    print(
+        "The provided client-side compression algorithm is not supported... using no compression"
+    )
+    return grpc.Compression.NoCompression
+
+
 class InferenceServerClient:
     """An InferenceServerClient object is used to perform any kind of
     communication with the InferenceServer using gRPC protocol. Most
@@ -958,7 +972,8 @@ class InferenceServerClient:
               priority=0,
               timeout=None,
               client_timeout=None,
-              headers=None):
+              headers=None,
+              compression_algorithm=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -1016,6 +1031,10 @@ class InferenceServerClient:
         headers : dict
             Optional dictionary specifying additional HTTP headers to include
             in the request.
+        compression_algorithm : str
+            Optional grpc compression algorithm to be used on client side.
+            Currently supports "deflate", "gzip" and None. By default, no
+            compression is used.
 
         Returns
         -------
@@ -1050,9 +1069,11 @@ class InferenceServerClient:
             print("infer, metadata {}\n{}".format(metadata, request))
 
         try:
-            response = self._client_stub.ModelInfer(request=request,
-                                                    metadata=metadata,
-                                                    timeout=client_timeout)
+            response = self._client_stub.ModelInfer(
+                request=request,
+                metadata=metadata,
+                timeout=client_timeout,
+                compression=_grpc_compression_type(compression_algorithm))
             if self._verbose:
                 print(response)
             result = InferResult(response)
@@ -1073,7 +1094,8 @@ class InferenceServerClient:
                     priority=0,
                     timeout=None,
                     client_timeout=None,
-                    headers=None):
+                    headers=None,
+                    compression_algorithm=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -1138,6 +1160,10 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
+        compression_algorithm : str
+            Optional grpc compression algorithm to be used on client side.
+            Currently supports "deflate", "gzip" and None. By default, no
+            compression is used.
 
         Raises
         ------
@@ -1179,7 +1205,10 @@ class InferenceServerClient:
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
-                request=request, metadata=metadata, timeout=client_timeout)
+                request=request,
+                metadata=metadata,
+                timeout=client_timeout,
+                compression=_grpc_compression_type(compression_algorithm))
             self._call_future.add_done_callback(wrapped_callback)
             if self._verbose:
                 verbose_message = "Sent request"
@@ -1190,7 +1219,11 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def start_stream(self, callback, stream_timeout=None, headers=None):
+    def start_stream(self,
+                     callback,
+                     stream_timeout=None,
+                     headers=None,
+                     compression_algorithm=None):
         """Starts a grpc bi-directional stream to send streaming inferences.
         Note: When using stream, user must ensure the InferenceServerClient.close()
         gets called at exit.
@@ -1211,6 +1244,10 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
+        compression_algorithm : str
+            Optional grpc compression algorithm to be used on client side.
+            Currently supports "deflate", "gzip" and None. By default, no
+            compression is used.
 
         Raises
         ------
@@ -1235,7 +1272,8 @@ class InferenceServerClient:
             response_iterator = self._client_stub.ModelStreamInfer(
                 _RequestIterator(self._stream),
                 metadata=metadata,
-                timeout=stream_timeout)
+                timeout=stream_timeout,
+                compression=_grpc_compression_type(compression_algorithm))
             self._stream._init_handler(response_iterator)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)

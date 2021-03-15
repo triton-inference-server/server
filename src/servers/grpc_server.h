@@ -52,7 +52,8 @@ class GRPCServer {
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
       bool use_ssl, const SslOptions& ssl_options,
-      int infer_allocation_pool_size, std::unique_ptr<GRPCServer>* grpc_server);
+      int infer_allocation_pool_size, grpc_compression_level compression_level,
+      std::unique_ptr<GRPCServer>* grpc_server);
 
   ~GRPCServer();
 
@@ -79,7 +80,8 @@ class GRPCServer {
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const std::string& server_addr, bool use_ssl,
-      const SslOptions& ssl_options, const int infer_allocation_pool_size);
+      const SslOptions& ssl_options, const int infer_allocation_pool_size,
+      grpc_compression_level compression_level);
 
   std::shared_ptr<TRITONSERVER_Server> server_;
   TraceManager* trace_manager_;
@@ -89,6 +91,7 @@ class GRPCServer {
   const SslOptions ssl_options_;
 
   const int infer_allocation_pool_size_;
+  grpc_compression_level compression_level_;
 
   std::unique_ptr<grpc::ServerCompletionQueue> common_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_infer_cq_;

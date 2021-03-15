@@ -853,7 +853,7 @@ InferenceServerGrpcClient::Infer(
     InferResult** result, const InferOptions& options,
     const std::vector<InferInput*>& inputs,
     const std::vector<const InferRequestedOutput*>& outputs,
-    const Headers& headers)
+    const Headers& headers, grpc_compression_algorithm compression_algorithm)
 {
   Error err;
 
@@ -874,6 +874,7 @@ InferenceServerGrpcClient::Infer(
                     std::chrono::microseconds(options.client_timeout_);
     context.set_deadline(deadline);
   }
+  context.set_compression_algorithm(compression_algorithm);
 
   err = PreRunProcessing(options, inputs, outputs);
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
@@ -913,7 +914,7 @@ InferenceServerGrpcClient::AsyncInfer(
     OnCompleteFn callback, const InferOptions& options,
     const std::vector<InferInput*>& inputs,
     const std::vector<const InferRequestedOutput*>& outputs,
-    const Headers& headers)
+    const Headers& headers, grpc_compression_algorithm compression_algorithm)
 {
   if (callback == nullptr) {
     return Error(
@@ -937,6 +938,7 @@ InferenceServerGrpcClient::AsyncInfer(
                     std::chrono::microseconds(options.client_timeout_);
     async_request->grpc_context_.set_deadline(deadline);
   }
+  async_request->grpc_context_.set_compression_algorithm(compression_algorithm);
 
   Error err = PreRunProcessing(options, inputs, outputs);
   if (!err.IsOk()) {
@@ -972,7 +974,7 @@ InferenceServerGrpcClient::AsyncInfer(
 Error
 InferenceServerGrpcClient::StartStream(
     OnCompleteFn callback, bool enable_stats, uint32_t stream_timeout,
-    const Headers& headers)
+    const Headers& headers, grpc_compression_algorithm compression_algorithm)
 {
   if (stream_worker_.joinable()) {
     return Error(
@@ -998,6 +1000,7 @@ InferenceServerGrpcClient::StartStream(
                     std::chrono::microseconds(stream_timeout);
     grpc_context_.set_deadline(deadline);
   }
+  grpc_context_.set_compression_algorithm(compression_algorithm);
 
   grpc_stream_ = stub_->ModelStreamInfer(&grpc_context_);
   stream_worker_ =

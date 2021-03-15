@@ -73,6 +73,7 @@ class TritonClientBackend : public ClientBackend {
   /// \return Error object indicating success or failure.
   static Error Create(
       const std::string& url, const ProtocolType protocol,
+      const grpc_compression_algorithm compression_algorithm,
       std::shared_ptr<nic::Headers> http_headers, const bool verbose,
       std::unique_ptr<ClientBackend>* client_backend);
 
@@ -150,8 +151,11 @@ class TritonClientBackend : public ClientBackend {
 
  private:
   TritonClientBackend(
-      const ProtocolType protocol, std::shared_ptr<nic::Headers> http_headers)
+      const ProtocolType protocol,
+      const grpc_compression_algorithm compression_algorithm,
+      std::shared_ptr<nic::Headers> http_headers)
       : ClientBackend(BackendKind::TRITON), protocol_(protocol),
+        compression_algorithm_(compression_algorithm),
         http_headers_(http_headers)
   {
   }
@@ -187,6 +191,7 @@ class TritonClientBackend : public ClientBackend {
   } client_;
 
   const ProtocolType protocol_;
+  const grpc_compression_algorithm compression_algorithm_;
   std::shared_ptr<nic::Headers> http_headers_;
 };
 

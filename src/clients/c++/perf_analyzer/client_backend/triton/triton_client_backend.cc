@@ -35,11 +35,12 @@ namespace perfanalyzer { namespace clientbackend {
 Error
 TritonClientBackend::Create(
     const std::string& url, const ProtocolType protocol,
+    const grpc_compression_algorithm compression_algorithm,
     std::shared_ptr<Headers> http_headers, const bool verbose,
     std::unique_ptr<ClientBackend>* client_backend)
 {
   std::unique_ptr<TritonClientBackend> triton_client_backend(
-      new TritonClientBackend(protocol, http_headers));
+      new TritonClientBackend(protocol, compression_algorithm, http_headers));
   if (protocol == ProtocolType::HTTP) {
     RETURN_IF_TRITON_ERROR(nic::InferenceServerHttpClient::Create(
         &(triton_client_backend->client_.http_client_), url, verbose));
@@ -162,7 +163,7 @@ TritonClientBackend::Infer(
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_TRITON_ERROR(client_.grpc_client_->Infer(
         &triton_result, triton_options, triton_inputs, triton_outputs,
-        *http_headers_));
+        *http_headers_, compression_algorithm_));
   } else {
     RETURN_IF_TRITON_ERROR(client_.http_client_->Infer(
         &triton_result, triton_options, triton_inputs, triton_outputs,
@@ -197,7 +198,7 @@ TritonClientBackend::AsyncInfer(
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_TRITON_ERROR(client_.grpc_client_->AsyncInfer(
         wrapped_callback, triton_options, triton_inputs, triton_outputs,
-        *http_headers_));
+        *http_headers_, compression_algorithm_));
   } else {
     RETURN_IF_TRITON_ERROR(client_.http_client_->AsyncInfer(
         wrapped_callback, triton_options, triton_inputs, triton_outputs,
@@ -217,8 +218,8 @@ TritonClientBackend::StartStream(OnCompleteFn callback, bool enable_stats)
 
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_TRITON_ERROR(client_.grpc_client_->StartStream(
-        wrapped_callback, enable_stats, 0 /* stream_timeout */,
-        *http_headers_));
+        wrapped_callback, enable_stats, 0 /* stream_timeout */, *http_headers_,
+        compression_algorithm_));
   } else {
     return Error("HTTP does not support starting streams");
   }
