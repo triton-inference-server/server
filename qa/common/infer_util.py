@@ -177,7 +177,7 @@ def infer_exact(tester,
                                  dtype=object).reshape(output0_array.shape)
     else:
         output0_array = output0_array.astype(output0_dtype)
-    if output1_dtype == np.object:
+    if output1_dtype == np.object_:
         output1_array = np.array([
             unicode(str(x), encoding='utf-8') for x in (output1_array.flatten())
         ],
@@ -632,7 +632,7 @@ def infer_shape_tensor(tester,
 
         # Prepare the dummy tensor
         rtensor_dtype = _range_repr_dtype(tensor_dtype)
-        if (rtensor_dtype != np.bool):
+        if (rtensor_dtype != bool):
             dummy_in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
                                           high=np.iinfo(rtensor_dtype).max,
                                           size=dummy_input_shapes[io_num],
@@ -868,7 +868,7 @@ def infer_zero(tester,
         output_shape = output_shapes[io_num]
 
         rtensor_dtype = _range_repr_dtype(tensor_dtype)
-        if (rtensor_dtype != np.bool):
+        if (rtensor_dtype != bool):
             input_array = np.random.randint(low=np.iinfo(rtensor_dtype).min,
                                             high=np.iinfo(rtensor_dtype).max,
                                             size=input_shape,

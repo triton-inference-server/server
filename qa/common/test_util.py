@@ -89,7 +89,7 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
 def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                            input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a TRT model."""
-    supported_datatypes = [np.bool, np.int8, np.int32, np.float16, np.float32]
+    supported_datatypes = [bool, np.int8, np.int32, np.float16, np.float32]
     if not input_dtype in supported_datatypes:
         return False
     if not output0_dtype in supported_datatypes:

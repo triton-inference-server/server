@@ -269,12 +269,12 @@ class InferZeroTest(tu.TestResultCollector):
         self._full_zero(np_dtype_string, ([1, 1], [0, 6], [2, 2]))
 
     def test_bb1_sanity(self):
-        self._full_zero(np.bool, ([
+        self._full_zero(bool, ([
             10,
         ],))
 
     def test_bb1_0(self):
-        self._full_zero(np.bool, ([
+        self._full_zero(bool, ([
             0,
         ],))
 
