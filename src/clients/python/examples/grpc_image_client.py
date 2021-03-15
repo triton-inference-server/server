@@ -42,7 +42,7 @@ FLAGS = None
 
 def model_dtype_to_np(model_dtype):
     if model_dtype == "BOOL":
-        return np.bool
+        return bool
     elif model_dtype == "INT8":
         return np.int8
     elif model_dtype == "INT16":

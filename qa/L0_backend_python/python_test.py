@@ -123,7 +123,7 @@ class PythonTest(tu.TestResultCollector):
     def test_bool(self):
         model_name = 'identity_bool'
         with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_data = np.array([[True, False, True]], dtype=np.bool)
+            input_data = np.array([[True, False, True]], dtype=bool)
             inputs = [
                 httpclient.InferInput("INPUT0", input_data.shape,
                                       np_to_triton_dtype(input_data.dtype))
