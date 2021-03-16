@@ -43,6 +43,14 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
+#ifdef TRITON_ENABLE_STATS
+void CUDART_CB
+TimestampCaptureCallback(void* data)
+{
+  INFER_STATS_SET_TIMESTAMP(*(reinterpret_cast<uint64_t*>(data)));
+}
+#endif  // TRITON_ENABLE_STATS
+
 Status
 CreateCudaEvent(
     const std::string& event_name, unsigned int event_flags, cudaEvent_t* event)
@@ -127,7 +135,8 @@ WarmupRequestComplete(
 PlanBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size,
     const bool enable_pinned_input, const bool enable_pinned_output,
-    const size_t gather_kernel_buffer_threshold, const bool separate_output_stream,
+    const size_t gather_kernel_buffer_threshold,
+    const bool separate_output_stream,
     std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
@@ -137,6 +146,7 @@ PlanBackend::Context::Context(
       num_expected_bindings_(0), use_output_copy_stream_(separate_output_stream)
 {
   stream_ = nullptr;
+  signal_stream_ = nullptr;
   input_copy_stream_ = nullptr;
   output_copy_stream_ = nullptr;
   num_copy_streams_ = 1;
@@ -152,6 +162,7 @@ PlanBackend::Context::Context(
     events_[idx].ready_for_input_ = nullptr;
     events_[idx].output_ready_ = nullptr;
     events_[idx].ready_for_output_ = nullptr;
+    events_[idx].timestamp_signal_ = nullptr;
   }
   support_batching_ = (max_batch_size != NO_BATCHING);
 }
@@ -211,6 +222,14 @@ PlanBackend::Context::~Context()
       LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
     }
     stream_ = nullptr;
+  }
+
+  if (signal_stream_ != nullptr) {
+    cudaError_t err = cudaStreamDestroy(signal_stream_);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
+    }
+    signal_stream_ = nullptr;
   }
 
   if (input_copy_stream_ != nullptr) {
@@ -575,6 +594,10 @@ PlanBackend::CreateExecutionContext(
   const int cuda_stream_priority =
       GetCudaStreamPriority(Config().optimization().priority());
   RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
+#ifdef TRITON_ENABLE_STATS
+  RETURN_IF_ERROR(context->CreateCudaStream(
+      cuda_stream_priority, &context->signal_stream_));
+#endif  // TRITON_ENABLE_STATS
   RETURN_IF_ERROR(context->CreateCudaStream(
       cuda_stream_priority, &context->input_copy_stream_));
   if (separate_output_stream) {
@@ -2745,6 +2768,13 @@ PlanBackend::Context::Run(
   }
   payload_->collector_->Finalize();
 
+#ifdef TRITON_ENABLE_STATS
+  cudaStreamWaitEvent(signal_stream_, events_[next_set_].input_ready_, 0);
+  cudaLaunchHostFunc(
+      signal_stream_, TimestampCaptureCallback,
+      reinterpret_cast<void*>(&payload_->compute_input_end_ns_));
+#endif  // TRITON_ENABLE_STATS
+
   const TensorRTContext::CudaGraph* cuda_graph = nullptr;
   bool found_exact = false;
   // FIXME closest_cuda_graph
@@ -2883,6 +2913,14 @@ PlanBackend::Context::Run(
   }
 
   cudaEventRecord(events_[next_set_].ready_for_output_, stream_);
+
+#ifdef TRITON_ENABLE_STATS
+  cudaStreamWaitEvent(signal_stream_, events_[next_set_].ready_for_output_, 0);
+  cudaLaunchHostFunc(
+      signal_stream_, TimestampCaptureCallback,
+      reinterpret_cast<void*>(&payload_->compute_output_start_ns_));
+  cudaEventRecord(events_[next_set_].timestamp_signal_, signal_stream_);
+#endif  // TRITON_ENABLE_STATS
 
   // Collect the names of requested outputs. Do not include outputs
   // for requests that have already responded with an error.
@@ -3106,11 +3144,6 @@ PlanBackend::Context::ProcessResponse(
     }
     auto& event_set = events_[payload->event_set_idx_];
 
-#ifdef TRITON_ENABLE_STATS
-    cudaEventSynchronize(event_set.input_ready_);
-    INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
-#endif  // TRITON_ENABLE_STATS
-
     // The model execution associated with the current context
     // has consumed the inputs. Put the context back into the available queue
     // so that it can begin enqueuing new memcpys into the input buffers
@@ -3118,18 +3151,16 @@ PlanBackend::Context::ProcessResponse(
     context_queue->Put(context_idx);
     NVTX_MARKER("plan_input_available");
 
-
-#ifdef TRITON_ENABLE_STATS
-    cudaEventSynchronize(event_set.ready_for_output_);
-    INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
-#endif  // TRITON_ENABLE_STATS
-
     // Call Finalize() here to defer CUDA synchronization as much as possible
     payload->responder_->Finalize();
     cudaEventSynchronize(event_set.output_ready_);
     NVTX_MARKER("plan_output_ready");
     // Compute ends when the output data copy is completed
+
+#ifdef TRITON_ENABLE_STATS
+    cudaEventSynchronize(event_set.timestamp_signal_);
     INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
+#endif  // TRITON_ENABLE_STATS
 
 #ifdef TRITON_ENABLE_STATS
 
@@ -3138,8 +3169,8 @@ PlanBackend::Context::ProcessResponse(
       auto& request = payload->requests_[i];
       request->ReportStatistics(
           metric_reporter_.get(), (payload->responses_[i] != nullptr),
-          payload->compute_start_ns_, compute_input_end_ns,
-          compute_output_start_ns, compute_end_ns);
+          payload->compute_start_ns_, payload->compute_input_end_ns_,
+          payload->compute_output_start_ns_, compute_end_ns);
 
 #ifdef TRITON_ENABLE_TRACING
       if (request->Trace() != nullptr) {
@@ -3147,9 +3178,11 @@ PlanBackend::Context::ProcessResponse(
         trace->Report(
             TRITONSERVER_TRACE_COMPUTE_START, payload->compute_start_ns_);
         trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
+            TRITONSERVER_TRACE_COMPUTE_INPUT_END,
+            payload->compute_input_end_ns_);
         trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
+            TRITONSERVER_TRACE_COMPUTE_OUTPUT_START,
+            payload->compute_output_start_ns_);
         trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
       }
 #endif  // TRITON_ENABLE_TRACING
@@ -3159,8 +3192,8 @@ PlanBackend::Context::ProcessResponse(
     payload->inference_backend_->MutableStatsAggregator()
         ->UpdateInferBatchStats(
             metric_reporter_.get(), payload->total_batch_size_,
-            payload->compute_start_ns_, compute_input_end_ns,
-            compute_output_start_ns, compute_end_ns);
+            payload->compute_start_ns_, payload->compute_input_end_ns_,
+            payload->compute_output_start_ns_, compute_end_ns);
 #endif  // TRITON_ENABLE_STATS
 
     // Send all the responses that haven't already been sent because of
@@ -3202,6 +3235,11 @@ PlanBackend::Context::InitEventSet(bool busy_wait_events)
     RETURN_IF_ERROR(CreateCudaEvent(
         "Set " + std::to_string(idx) + " output ready", event_flags,
         &events_[idx].output_ready_));
+#ifdef TRITON_ENABLE_STATS
+    RETURN_IF_ERROR(CreateCudaEvent(
+        "Set " + std::to_string(idx) + " timestamp signal", event_flags,
+        &events_[idx].timestamp_signal_));
+#endif  // TRITON_ENABLE_STATS
   }
   return Status::Success;
 }
@@ -3221,6 +3259,9 @@ PlanBackend::Context::DestroyEventSet()
     }
     if (events_[idx].output_ready_ != nullptr) {
       cudaEventDestroy(events_[idx].output_ready_);
+    }
+    if (events_[idx].timestamp_signal_ != nullptr) {
+      cudaEventDestroy(events_[idx].timestamp_signal_);
     }
   }
   return Status::Success;

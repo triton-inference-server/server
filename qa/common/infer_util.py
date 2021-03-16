@@ -43,10 +43,6 @@ else:
 if sys.version_info.major == 3:
     unicode = bytes
 
-# Shared memory imports are not available on all platforms so they are
-# imported lazily only when explicitly needed
-_shm_imports_complete = False
-
 _seen_request_ids = set()
 
 
@@ -115,11 +111,8 @@ def infer_exact(tester,
                 timeout_us=0):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+        import tritonclient.utils.shared_memory as shm
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
     # configs [ url, protocol, async stream, binary data ]
@@ -184,7 +177,7 @@ def infer_exact(tester,
                                  dtype=object).reshape(output0_array.shape)
     else:
         output0_array = output0_array.astype(output0_dtype)
-    if output1_dtype == np.object:
+    if output1_dtype == np.object_:
         output1_array = np.array([
             unicode(str(x), encoding='utf-8') for x in (output1_array.flatten())
         ],
@@ -607,11 +600,7 @@ def infer_shape_tensor(tester,
                        batch_size=1):
     # Lazy shm imports...
     if use_system_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
             import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
     tester.assertTrue(pf == "plan" or pf == "plan_nobatch")
@@ -643,7 +632,7 @@ def infer_shape_tensor(tester,
 
         # Prepare the dummy tensor
         rtensor_dtype = _range_repr_dtype(tensor_dtype)
-        if (rtensor_dtype != np.bool):
+        if (rtensor_dtype != bool):
             dummy_in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
                                           high=np.iinfo(rtensor_dtype).max,
                                           size=dummy_input_shapes[io_num],
@@ -830,11 +819,8 @@ def infer_zero(tester,
                timeout_us=0):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
-        global _shm_imports_complete
-        if not _shm_imports_complete:
-            import tritonclient.utils.shared_memory as shm
-            import tritonclient.utils.cuda_shared_memory as cudashm
-            _shm_imports_complete = True
+        import tritonclient.utils.shared_memory as shm
+        import tritonclient.utils.cuda_shared_memory as cudashm
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
@@ -882,7 +868,7 @@ def infer_zero(tester,
         output_shape = output_shapes[io_num]
 
         rtensor_dtype = _range_repr_dtype(tensor_dtype)
-        if (rtensor_dtype != np.bool):
+        if (rtensor_dtype != bool):
             input_array = np.random.randint(low=np.iinfo(rtensor_dtype).min,
                                             high=np.iinfo(rtensor_dtype).max,
                                             size=input_shape,

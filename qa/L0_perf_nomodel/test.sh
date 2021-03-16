@@ -139,7 +139,7 @@ TEST_CONCURRENCY+=(
     1
     16
     16)
-TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch python openvino"
+TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch python"
 
 
 mkdir -p ${REPO_VERSION}

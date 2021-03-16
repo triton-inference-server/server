@@ -117,22 +117,32 @@ public class SimpleJavaClient {
 		ModelInferResponse response = grpc_stub.modelInfer(request.build());
 		System.out.println(response);
 
-		// print the response outputs
-		response.getRawOutputContentsList().forEach(x -> {
+		// Get the response outputs
+		int[] op0 = toArray(response.getRawOutputContentsList().get(0).asReadOnlyByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asIntBuffer());
+		int[] op1 = toArray(response.getRawOutputContentsList().get(1).asReadOnlyByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asIntBuffer());
 
-			int[] dst = toArray(x.asReadOnlyByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asIntBuffer());
-			Integer[] boxedArray = Arrays.stream(dst) // IntStream
-					.boxed() // Stream<Integer>
-					.toArray(Integer[]::new);
+		// Validate response outputs
+		for (int i = 0; i < op0.length; i++) {
+			System.out.println(
+				Integer.toString(lst_0.get(i)) + " + " + Integer.toString(lst_1.get(i)) + " = " +
+				Integer.toString(op0[i]));
+			System.out.println(
+				Integer.toString(lst_0.get(i)) + " - " + Integer.toString(lst_1.get(i)) + " = " +
+				Integer.toString(op1[i]));
 
-			System.out.println(Arrays.toString(boxedArray));
-
-		});
+			if (op0[i] != (lst_0.get(i) + lst_1.get(i))) {
+				System.out.println("OUTPUT0 contains incorrect sum");
+                System.exit(1); 
+			}
+			
+			if (op1[i] != (lst_0.get(i) - lst_1.get(i))) {
+				System.out.println("OUTPUT1 contains incorrect difference");
+                System.exit(1); 
+			}
+		}
 		
 		channel.shutdownNow();
 		
-		
-
 	}
 
 	public static int[] toArray(IntBuffer b) {

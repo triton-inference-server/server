@@ -33,7 +33,7 @@ architecture. The [model repository](model_repository.md) is a
 file-system based repository of the models that Triton will make
 available for inferencing. Inference requests arrive at the server via
 either [HTTP/REST or GRPC](inference_protocols.md) or by the [C
-API](c_api.md) and are then routed to the appropriate per-model
+API](inference_protocols.md) and are then routed to the appropriate per-model
 scheduler. Triton implements [multiple scheduling and batching
 algorithms](#models-and-schedulers) that can be configured on a
 model-by-model basis. Each model's scheduler optionally performs

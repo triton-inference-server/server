@@ -33,7 +33,7 @@ import numpy as np
 
 
 def np_to_model_dtype(np_dtype):
-    if np_dtype == np.bool:
+    if np_dtype == bool:
         return "TYPE_BOOL"
     elif np_dtype == np.int8:
         return "TYPE_INT8"
@@ -59,7 +59,7 @@ def np_to_model_dtype(np_dtype):
 
 
 def np_to_trt_dtype(np_dtype):
-    if np_dtype == np.bool:
+    if np_dtype == bool:
         return trt.bool
     elif np_dtype == np.int8:
         return trt.int8
