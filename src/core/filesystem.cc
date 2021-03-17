@@ -523,8 +523,9 @@ GCSFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 
   if (!bucket_metadata) {
     return Status(
-        Status::Code::INTERNAL,
-        "Could not get MetaData for bucket with name " + bucket);
+        Status::Code::INTERNAL, "Could not get MetaData for bucket with name " +
+                                    bucket + " : " +
+                                    bucket_metadata.status().message());
   }
 
   // Root case - bucket exists and object path is empty
@@ -591,8 +592,9 @@ GCSFileSystem::GetDirectoryContents(
        client_->ListObjects(bucket, gcs::Prefix(full_dir))) {
     if (!object_metadata) {
       return Status(
-          Status::Code::INTERNAL,
-          "Could not list contents of directory at " + path);
+          Status::Code::INTERNAL, "Could not list contents of directory at " +
+                                      path + " : " +
+                                      object_metadata.status().message());
     }
 
     // In the case of empty directories, the directory itself will appear here
@@ -670,8 +672,8 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
   if (!stream) {
     return Status(
-        Status::Code::INTERNAL,
-        "Failed to open object read stream for " + path);
+        Status::Code::INTERNAL, "Failed to open object read stream for " +
+                                    path + " : " + stream.status().message());
   }
 
   std::string data = "";
@@ -757,7 +759,9 @@ GCSFileSystem::LocalizeDirectory(
             client_->ReadObject(file_bucket, file_object);
         if (!filestream) {
           return Status(
-              Status::Code::INTERNAL, "Failed to get object at " + *iter);
+              Status::Code::INTERNAL, "Failed to get object at " + *iter +
+                                          " : " +
+                                          filestream.status().message());
         }
 
         std::string gcs_removed_path = (*iter).substr(path.size());
