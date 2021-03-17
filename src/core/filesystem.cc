@@ -1161,6 +1161,7 @@ class S3FileSystem : public FileSystem {
  public:
   S3FileSystem(const Aws::SDKOptions& options, const std::string& s3_path);
   ~S3FileSystem();
+  Status IntializeAndCheckClient();
   Status FileExists(const std::string& path, bool* exists) override;
   Status IsDirectory(const std::string& path, bool* is_dir) override;
   Status FileModificationTime(
@@ -1275,6 +1276,11 @@ S3FileSystem::S3FileSystem(
                              "s3://([0-9a-zA-Z\\-.]+):([0-9]+)/"
                              "([0-9a-z.\\-]+)(((/[0-9a-zA-Z.\\-_]+)*)?)")
 {
+}
+
+Status
+S3FileSystem::IntializeAndCheckClient()
+{
   Aws::Client::ClientConfiguration config;
   Aws::Auth::AWSCredentials credentials;
 
@@ -1299,9 +1305,9 @@ S3FileSystem::S3FileSystem(
     config = Aws::Client::ClientConfiguration("default");
   }
 
-  // Cleanup extra slashes
+  // Cleanup extra slashes, return error if path is invalid
   std::string clean_path;
-  LOG_STATUS_ERROR(CleanPath(s3_path, &clean_path), "failed to parse S3 path");
+  RETURN_IF_ERROR(CleanPath(s3_path, &clean_path));
 
   std::string host_name, host_port, bucket, object;
   if (RE2::FullMatch(
@@ -1321,6 +1327,23 @@ S3FileSystem::S3FileSystem(
         config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
         /*useVirtualAdressing*/ false);
   }
+
+  if (!client_) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Unable to create S3 client. Check account credentials.");
+  }
+
+  // Verify that teh bucket is a directory
+  bool is_dir;
+  RETURN_IF_ERROR(IsDirectory(clean_path, &is_dir));
+
+  if (!is_dir) {
+    return Status(
+        Status::Code::INVALID_ARG, "No bucket/folder found at " + clean_path);
+  }
+
+  return Status::Success;
 }
 
 S3FileSystem::~S3FileSystem()
@@ -1731,6 +1754,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
     Aws::SDKOptions options;
     Aws::InitAPI(options);
     static S3FileSystem s3_fs(options, path);
+    RETURN_IF_ERROR(s3_fs.IntializeAndCheckClient());
     *file_system = &s3_fs;
     return Status::Success;
 #endif  // TRITON_ENABLE_S3
