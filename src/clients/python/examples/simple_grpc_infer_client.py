@@ -80,7 +80,7 @@ if __name__ == '__main__':
         help='File holding PEM-encoded certicate chain. Default is None.')
     parser.add_argument(
         '-C',
-        '--compression_algorithm',
+        '--grpc-compression-algorithm',
         type=str,
         required=False,
         default=None,
@@ -129,7 +129,7 @@ if __name__ == '__main__':
         outputs=outputs,
         client_timeout=FLAGS.client_timeout,
         headers={'test': '1'},
-        compression_algorithm=FLAGS.compression_algorithm)
+        compression_algorithm=FLAGS.grpc_compression_algorithm)
 
     statistics = triton_client.get_inference_statistics(model_name=model_name)
     print(statistics)
@@ -160,7 +160,7 @@ if __name__ == '__main__':
         model_name=model_name,
         inputs=inputs,
         outputs=None,
-        compression_algorithm=FLAGS.compression_algorithm)
+        compression_algorithm=FLAGS.grpc_compression_algorithm)
 
     # Get the output arrays from the results
     output0_data = results.as_numpy('OUTPUT0')
