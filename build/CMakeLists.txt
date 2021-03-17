@@ -503,13 +503,13 @@ ExternalProject_Add(cnmem
 #
 ExternalProject_Add(aws-sdk-cpp
   PREFIX aws-sdk-cpp
-  GIT_REPOSITORY "https://github.com/aws/aws-sdk-cpp.git"
-  GIT_TAG "1.7.129"
+  GIT_REPOSITORY "https://github.com/outtoin/aws-sdk-cpp.git"
+  GIT_TAG "origin/feature/log-stsprofile"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/src/aws-sdk-cpp"
   CMAKE_CACHE_ARGS
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
-    -DBUILD_ONLY:STRING=s3
+    -DBUILD_ONLY:STRING=s3;identity-management
     -DBUILD_SHARED_LIBS:BOOL=OFF
     -DMINIMIZE_SIZE:BOOL=ON
     -DENABLE_TESTING:BOOL=OFF
@@ -647,6 +647,9 @@ ExternalProject_Add(server
     -DAWSSDK_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/AWSSDK
     -Daws-cpp-sdk-core_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-core
     -Daws-cpp-sdk-s3_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-s3
+    -Daws-cpp-sdk-identity-management_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-identity-management
+    -Daws-cpp-sdk-cognito-identity_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-cognito-identity
+    -Daws-cpp-sdk-sts_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-sts
     -Daws-c-event-stream_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-c-event-stream/cmake
     -Daws-c-common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-checksums/cmake

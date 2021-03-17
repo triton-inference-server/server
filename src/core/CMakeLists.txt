@@ -147,7 +147,7 @@ endif() # NOT WIN32
 endif() # TRITON_ENABLE_GCS
 
 if(${TRITON_ENABLE_S3})
-  find_package(AWSSDK REQUIRED COMPONENTS s3)
+  find_package(AWSSDK REQUIRED COMPONENTS s3 identity-management)
   message(STATUS "Using aws-sdk-cpp ${AWSSDK_VERSION}")
 endif()
 
@@ -284,6 +284,7 @@ if(${TRITON_ENABLE_S3})
   target_include_directories(
     server-library
     PRIVATE $<TARGET_PROPERTY:aws-cpp-sdk-s3,INTERFACE_INCLUDE_DIRECTORIES>
+    PRIVATE $<TARGET_PROPERTY:aws-cpp-sdk-identity-management,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif() # TRITON_ENABLE_S3
 

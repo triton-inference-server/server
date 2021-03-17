@@ -53,6 +53,17 @@
 #include <aws/s3/model/HeadBucketRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/ListObjectsRequest.h>
+#include <aws/core/utils/memory/stl/AWSString.h>
+#include <aws/core/utils/logging/DefaultLogSystem.h>
+#include <aws/core/utils/logging/AWSLogging.h>
+#include <aws/core/utils/logging/DefaultLogSystem.h>
+#include <aws/core/utils/logging/LogMacros.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
+#include <aws/core/auth/AWSCredentialsProviderChain.h>
+#include <aws/core/auth/STSCredentialsProvider.h>
+#include <aws/core/platform/Environment.h>
+#include <aws/identity-management/auth/STSProfileCredentialsProvider.h>
+
 #endif  // TRITON_ENABLE_S3
 
 #ifdef TRITON_ENABLE_AZURE_STORAGE
@@ -83,6 +94,7 @@
 #endif
 #define F_OK 0
 #endif
+
 
 namespace nvidia { namespace inferenceserver {
 
@@ -1155,6 +1167,60 @@ ASFileSystem::DeleteDirectory(const std::string& path)
 
 #ifdef TRITON_ENABLE_S3
 
+class CredentialsProviderChain : public Aws::Auth::AWSCredentialsProviderChain
+{
+public:
+    CredentialsProviderChain();
+};
+
+static const char AWS_ECS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
+static const char AWS_ECS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
+static const char AWS_ECS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
+static const char AWS_EC2_METADATA_DISABLED[] = "AWS_EC2_METADATA_DISABLED";
+static const char DefaultCredentialsProviderChainTag[] = "DefaultAWSCredentialsProviderChain";
+
+CredentialsProviderChain::CredentialsProviderChain() : Aws::Auth::AWSCredentialsProviderChain() {
+  AddProvider(Aws::MakeShared<Aws::Auth::EnvironmentAWSCredentialsProvider>(DefaultCredentialsProviderChainTag));
+  AddProvider(Aws::MakeShared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(DefaultCredentialsProviderChainTag));
+  AddProvider(Aws::MakeShared<Aws::Auth::STSProfileCredentialsProvider>(DefaultCredentialsProviderChainTag));
+  AddProvider(Aws::MakeShared<Aws::Auth::STSAssumeRoleWebIdentityCredentialsProvider>(DefaultCredentialsProviderChainTag));
+
+  //ECS TaskRole Credentials only available when ENVIRONMENT VARIABLE is set
+  const auto relativeUri = Aws::Environment::GetEnv(AWS_ECS_CONTAINER_CREDENTIALS_RELATIVE_URI);
+  AWS_LOGSTREAM_DEBUG(DefaultCredentialsProviderChainTag, "The environment variable value " << AWS_ECS_CONTAINER_CREDENTIALS_RELATIVE_URI
+                                                                                          << " is " << relativeUri);
+
+  const auto absoluteUri = Aws::Environment::GetEnv(AWS_ECS_CONTAINER_CREDENTIALS_FULL_URI);
+  AWS_LOGSTREAM_DEBUG(DefaultCredentialsProviderChainTag, "The environment variable value " << AWS_ECS_CONTAINER_CREDENTIALS_FULL_URI
+                                                                                            << " is " << absoluteUri);
+
+  const auto ec2MetadataDisabled = Aws::Environment::GetEnv(AWS_EC2_METADATA_DISABLED);
+  AWS_LOGSTREAM_DEBUG(DefaultCredentialsProviderChainTag, "The environment variable value " << AWS_EC2_METADATA_DISABLED
+                                                                                            << " is " << ec2MetadataDisabled);
+
+  if (!relativeUri.empty())
+  {
+    AddProvider(Aws::MakeShared<Aws::Auth::TaskRoleCredentialsProvider>(DefaultCredentialsProviderChainTag, relativeUri.c_str()));
+    AWS_LOGSTREAM_INFO(DefaultCredentialsProviderChainTag, "Added ECS metadata service credentials provider with relative path: ["
+              << relativeUri << "] to the provider chain.");
+  }
+  else if (!absoluteUri.empty())
+  {
+    const auto token = Aws::Environment::GetEnv(AWS_ECS_CONTAINER_AUTHORIZATION_TOKEN);
+    AddProvider(Aws::MakeShared<Aws::Auth::TaskRoleCredentialsProvider>(DefaultCredentialsProviderChainTag,
+                                                                        absoluteUri.c_str(), token.c_str()));
+
+    //DO NOT log the value of the authorization token for security purposes.
+    AWS_LOGSTREAM_INFO(DefaultCredentialsProviderChainTag, "Added ECS credentials provider with URI: ["
+              << absoluteUri << "] to the provider chain with a" << (token.empty() ? "n empty " : " non-empty ")
+              << "authorization token.");
+  }
+  else if (Aws::Utils::StringUtils::ToLower(ec2MetadataDisabled.c_str()) != "true")
+  {
+    AddProvider(Aws::MakeShared<Aws::Auth::InstanceProfileCredentialsProvider>(DefaultCredentialsProviderChainTag));
+    AWS_LOGSTREAM_INFO(DefaultCredentialsProviderChainTag, "Added EC2 metadata service credentials provider to the provider chain.");
+  }
+}
 namespace s3 = Aws::S3;
 
 class S3FileSystem : public FileSystem {
@@ -1283,6 +1349,7 @@ S3FileSystem::S3FileSystem(
   const char* key_id = std::getenv("AWS_ACCESS_KEY_ID");
   const char* region = std::getenv("AWS_DEFAULT_REGION");
   const char* session_token = std::getenv("AWS_SESSION_TOKEN");
+  const char* profile_name = std::getenv("AWS_PROFILE");
   if ((secret_key != NULL) && (key_id != NULL)) {
     credentials.SetAWSAccessKeyId(key_id);
     credentials.SetAWSSecretKey(secret_key);
@@ -1290,14 +1357,18 @@ S3FileSystem::S3FileSystem(
       credentials.SetSessionToken(session_token);
     }
     config = Aws::Client::ClientConfiguration();
-    if (region != NULL) {
-      config.region = region;
-    }
-  } else if (const char* profile_name = std::getenv("AWS_PROFILE")) {
+  } else if (profile_name != NULL) {
     config = Aws::Client::ClientConfiguration(profile_name);
   } else {
     config = Aws::Client::ClientConfiguration("default");
   }
+
+  if (region != NULL) {
+    config.region = region;
+  }
+
+  config.connectTimeoutMs = 3000000;
+  config.requestTimeoutMs = 6000000;
 
   // Cleanup extra slashes
   std::string clean_path;
@@ -1315,10 +1386,11 @@ S3FileSystem::S3FileSystem(
         credentials, config,
         Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
         /*useVirtualAdressing*/ false);
-
   } else {
+    const char DefaultCredentialsProviderChainTag[] = "DefaultAWSCredentialsProviderChain";
+    auto credsChain = Aws::MakeShared<CredentialsProviderChain>(DefaultCredentialsProviderChainTag);
     client_ = s3::S3Client(
-        config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+        credsChain, config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
         /*useVirtualAdressing*/ false);
   }
 }
@@ -2062,3 +2134,4 @@ FileSystemTypeString(const FileSystemType type)
 }
 
 }}  // namespace nvidia::inferenceserver
+

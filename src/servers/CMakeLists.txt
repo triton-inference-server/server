@@ -494,11 +494,13 @@ if(${TRITON_ENABLE_GCS})
 endif() # TRITON_ENABLE_GCS
 
 if(${TRITON_ENABLE_S3})
-  find_package(AWSSDK REQUIRED COMPONENTS s3)
+  find_package(AWSSDK REQUIRED COMPONENTS s3 identity-management)
   message(STATUS "Using aws-cpp-sdk-s3 ${AWSSDK_VERSION}")
+  message(STATUS "Using aws-cpp-sdk-identity-management ${AWSSDK_VERSION}")
   target_link_libraries(
     tritonserver
     PRIVATE aws-cpp-sdk-s3
+    PRIVATE aws-cpp-sdk-identity-management
     PRIVATE ${RE2_LIBRARY}
   )
 endif() # TRITON_ENABLE_S3
