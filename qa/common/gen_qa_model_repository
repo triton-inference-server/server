@@ -54,7 +54,11 @@ TRITON_VERSION=21.07
 ONNX_VERSION=1.7.0
 ONNX_OPSET=0
 
+# OPENVINO version
+OPENVINO_VERSION=2021.1.110
+
 ONNX_IMAGE=${ONNX_IMAGE:=ubuntu:20.04}
+OPENVINO_IMAGE=${OPENVINO_IMAGE:=ubuntu:18.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf1-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
@@ -147,6 +151,44 @@ NOSHAPEDESTDIR=/tmp/noshapemodels
 PLGDESTDIR=/tmp/pluginmodels
 RAGGEDDESTDIR=/tmp/raggedmodels
 FORMATDESTDIR=/tmp/formatmodels
+
+# OPENVINO
+cat >$HOST_SRCDIR/$OPENVINOSCRIPT <<EOF
+#!/bin/bash
+set -e
+export DEBIAN_FRONTEND=noninteractive
+apt-get update && \
+    apt-get install -y --no-install-recommends build-essential cmake libprotobuf-dev \
+            protobuf-compiler python3.6 python3.6-dev python3-pip wget gnupg2 \
+            software-properties-common
+ln -s /usr/bin/python3 /usr/bin/python
+
+OPENVINO_VERSION=2021.1.110
+(wget https://apt.repos.intel.com/openvino/2021/GPG-PUB-KEY-INTEL-OPENVINO-2021 && \
+    apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2021 && rm GPG-PUB-KEY-INTEL-OPENVINO-2021 && \
+    cd /etc/apt/sources.list.d && \
+    echo "deb https://apt.repos.intel.com/openvino/2021 all main">intel-openvino-2021.list && \
+    apt update && \
+    apt install -y intel-openvino-dev-ubuntu18-${OPENVINO_VERSION})
+
+pip3 install numpy setuptools
+
+INSTALL_DIR=/opt/intel/openvino_${OPENVINO_VERSION}
+PYTHONPATH=${INSTALL_DIR}/python/python3.6
+source ${INSTALL_DIR}/bin/setupvars.sh .
+
+# PS: Since variable shape tensors are not allowed, identity models may fail to generate
+python3 $SRCDIR/gen_qa_models.py --openvino --models_dir=$DESTDIR
+chmod -R 777 $DESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --openvino --models_dir=$IDENTITYDESTDIR
+chmod -R 777 $IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --openvino --models_dir=$RESHAPEDESTDIR
+chmod -R 777 $RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --openvino --models_dir=$SEQDESTDIR
+chmod -R 777 $SEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$DYNASEQDESTDIR
+chmod -R 777 $DYNASEQDESTDIR
+EOF
 
 # ONNX
 cat >$HOST_SRCDIR/$ONNXSCRIPT <<EOF
