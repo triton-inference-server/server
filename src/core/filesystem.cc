@@ -1367,8 +1367,8 @@ S3FileSystem::S3FileSystem(
     config.region = region;
   }
 
-  config.connectTimeoutMs = 3000000;
-  config.requestTimeoutMs = 6000000;
+  config.connectTimeoutMs = 30000;
+  config.requestTimeoutMs = 600000;
 
   // Cleanup extra slashes
   std::string clean_path;
