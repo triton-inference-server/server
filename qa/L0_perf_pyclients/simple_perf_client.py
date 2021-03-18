@@ -214,6 +214,13 @@ if __name__ == '__main__':
                         default=1000,
                         help='The number of iterations. Default is 1000.')
     parser.add_argument(
+        '-w',
+        '--warmup_count',
+        type=int,
+        required=False,
+        default=500,
+        help='The number of warm-up iterations. Default is 500.')
+    parser.add_argument(
         '--csv',
         type=str,
         required=False,
@@ -268,6 +275,15 @@ if __name__ == '__main__':
     input_data = np.zeros([FLAGS.batch_size, FLAGS.shape],
                           dtype=triton_to_np_dtype(dtype))
 
+    # --------------------------- Warm-Up --------------------------------------------------------
+    for i in range(FLAGS.warmup_count):
+        inputs, outputs = requestGenerator(input_name, input_data, output_name,
+                                           dtype, FLAGS.protocol.lower())
+        triton_client.infer(FLAGS.model_name,
+                            inputs,
+                            model_version=FLAGS.model_version,
+                            outputs=outputs)
+
     latencies = []
 
     # --------------------------- Start Load --------------------------------------------------------
@@ -308,7 +324,8 @@ if __name__ == '__main__':
         file.write(
             "Concurrency,Inferences/Second,p50 latency,p90 latency,p95 latency,p99 latency\n"
         )
-        file.write("1,{},{},{},{},{}".format(throughput, p50_latency,
-                                             p90_latency, p95_latency,
-                                             p99_latency))
+        file.write("1,{},{},{},{},{}".format(throughput, p50_latency * 1000,
+                                             p90_latency * 1000,
+                                             p95_latency * 1000,
+                                             p99_latency * 1000))
         file.close()

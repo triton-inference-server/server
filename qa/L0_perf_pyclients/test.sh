@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -38,6 +39,14 @@ fi
 REPORTER=../common/reporter.py
 CLIENT_LOG="./simple_perf_client.log"
 SIMPLE_PERF_CLIENT=simple_perf_client.py
+
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/custom_models"
+source ../common/util.sh
+
+# Select the single GPU that will be available to the inference
+# server.
+export CUDA_VISIBLE_DEVICES=0
 
 rm -f *.log *.csv *.tjson *.json
 
@@ -52,12 +61,9 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Collect HTTP logs
-# To warmup the model
-python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000 
-# Collect data
+# Collect HTTP data
 NAME=${MODEL_NAME}_http
-python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000  -csv ${NAME}.csv >> ${NAME}.log 2>&1
+python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000 --csv ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
     RET=1
 fi
@@ -99,12 +105,9 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Collect grpc logs
-# To warmup the model
-python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000 -i grpc -u localhost:8001
-# Collect data
+# Collect grpc data
 NAME=${MODEL_NAME}_grpc
-python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000 -i grpc -u localhost:8001 -csv ${NAME}.csv >> ${NAME}.log 2>&1
+python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000 -i grpc -u localhost:8001 --csv ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
     RET=1
 fi
