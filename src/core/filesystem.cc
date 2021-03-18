@@ -918,7 +918,7 @@ ASFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   if (!blobProperty.valid()) {
     return Status(
         Status::Code::INTERNAL,
-        "Unable to get file modification time for " + path);
+        "Unable to get blob property for file at " + path);
   }
 
   auto time =
