@@ -1345,7 +1345,6 @@ S3FileSystem::IntializeAndCheckClient(const std::string& s3_path)
   // Verify that bucket exists and 'client_' is initialized correctly.
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(clean_path, &is_dir));
-
   if (!is_dir) {
     return Status(
         Status::Code::INVALID_ARG, "No bucket/folder found at " + clean_path +
