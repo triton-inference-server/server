@@ -87,7 +87,11 @@ class PythonTest(tu.TestResultCollector):
             ), "error: expected execution_count == 1 and inference_count == 8, got {} and {}"
                              .format(stat['execution_count'],
                                      stat['inference_count']))
-
+            batch_stat = stat['batch_stats'][0]
+            self.assertFalse(
+                batch_stat['batch_size'] != 8,
+                f"error: expected batch_size == 8, got {batch_stat['batch_size']}"
+            )
             # Check metrics to make sure they are reported correctly
             metrics = httpreq.get('http://localhost:8002/metrics')
             print(metrics.text)
