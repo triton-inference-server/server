@@ -392,30 +392,3 @@ function check_test_results () {
 
     return 0
 }
-
-# Check the valgrind logs for memory leaks, ignoring known memory leaks
-#   * cnmem https://github.com/NVIDIA/cnmem/issues/12
-#   * Tensorflow::NewSession
-#   * dl-open leak could be due to https://bugs.kde.org/show_bug.cgi?id=358980
-#   * dlerror leak in tensorflow::HadoopFileSystem::HadoopFileSystem()
-#     -> tensorflow::LibHDFS::LoadAndBind()::{lambda(char const*, void**)#1}::operator()(char const*, void**)
-#     -> tensorflow::internal::LoadLibrary
-#     -> dlerror
-function check_valgrind_log () {
-    local valgrind_log=$1
-
-    leak_records=$(grep "are definitely lost" -A 12 $valgrind_log | awk \
-    'BEGIN{RS="--";acc=0} !(/cnmem/||/tensorflow::NewSession/||/dl-init/|| \
-    /dl-open/||/dlerror/||/libtorch/) \
-    {print;acc+=1} END{print acc}')
-
-    num_leaks=$(echo -e "$leak_records" | tail -n1)
-
-    if [ "$num_leaks" != "0" ]; then
-        echo -e "$leak_records" | sed '$d'
-        echo -e "\n***\n*** Test Failed: $num_leaks memory leaks detected.\n***"
-        return 1
-    fi
-
-    return 0
-}

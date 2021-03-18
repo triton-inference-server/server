@@ -219,7 +219,7 @@ for model_type in FIXED VARIABLE; do
 
         set +e
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            check_valgrind_log $LEAKCHECK_LOG
+            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 RET=1
             fi
@@ -278,7 +278,7 @@ for model_type in FIXED VARIABLE; do
 
         set +e
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            check_valgrind_log $LEAKCHECK_LOG
+            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 RET=1
             fi
@@ -332,7 +332,7 @@ for i in $DIFFERENT_SHAPE_TESTS ; do
 
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi
@@ -391,7 +391,7 @@ for i in \
 
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi
@@ -475,7 +475,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
 
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi
@@ -535,7 +535,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
 
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi
