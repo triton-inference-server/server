@@ -47,6 +47,7 @@ source ../common/util.sh
 # Select the single GPU that will be available to the inference
 # server.
 export CUDA_VISIBLE_DEVICES=0
+PROTOCOLS="grpc http"
 
 rm -f *.log *.csv *.tjson *.json
 
@@ -54,95 +55,52 @@ RET=0
 
 MODEL_NAME="custom_zero_1_int32"
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-# Collect HTTP data
-NAME=${MODEL_NAME}_http
-python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000 --csv ${NAME}.csv >> ${NAME}.log 2>&1
-if (( $? != 0 )); then
-    RET=1
-fi
-
-echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
-echo -e "\"s_benchmark_name\":\"python_client\"," >> ${NAME}.tjson
-echo -e "\"s_server\":\"triton\"," >> ${NAME}.tjson
-echo -e "\"s_protocol\":\"http\"," >> ${NAME}.tjson
-echo -e "\"s_framework\":\"custom\"," >> ${NAME}.tjson
-echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
-echo -e "\"l_concurrency\":1," >> ${NAME}.tjson
-echo -e "\"l_batch_size\":1," >> ${NAME}.tjson
-echo -e "\"l_instance_count\":1}]" >> ${NAME}.tjson
-
-
-if [ -f $REPORTER ]; then
-    set +e
-
-    URL_FLAG=
-    if [ ! -z ${BENCHMARK_REPORTER_URL} ]; then
-        URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
+for PROTOCOL in $PROTOCOLS; do
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
     fi
 
-    python $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
+
+    NAME=${MODEL_NAME}_${PROTOCOL}
+    EXTRA_ARGS="" && [[ "${PROTOCOL}" == "grpc" ]] && EXTRA_ARGS="-i grpc -u localhost:8001"
+    python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000 --csv ${NAME}.csv ${EXTRA_ARGS}>> ${NAME}.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
 
-    set -e
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-# Collect grpc data
-NAME=${MODEL_NAME}_grpc
-python $SIMPLE_PERF_CLIENT -m $MODEL_NAME --shape 100000 -i grpc -u localhost:8001 --csv ${NAME}.csv >> ${NAME}.log 2>&1
-if (( $? != 0 )); then
-    RET=1
-fi
-
-echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
-echo -e "\"s_benchmark_name\":\"python_client\"," >> ${NAME}.tjson
-echo -e "\"s_server\":\"triton\"," >> ${NAME}.tjson
-echo -e "\"s_protocol\":\"grpc\"," >> ${NAME}.tjson
-echo -e "\"s_framework\":\"custom\"," >> ${NAME}.tjson
-echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
-echo -e "\"l_concurrency\":1," >> ${NAME}.tjson
-echo -e "\"l_batch_size\":1," >> ${NAME}.tjson
-echo -e "\"l_instance_count\":1}]" >> ${NAME}.tjson
+    echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
+    echo -e "\"s_benchmark_name\":\"python_client\"," >> ${NAME}.tjson
+    echo -e "\"s_server\":\"triton\"," >> ${NAME}.tjson
+    echo -e "\"s_protocol\":\"${PROTOCOL}\"," >> ${NAME}.tjson
+    echo -e "\"s_framework\":\"custom\"," >> ${NAME}.tjson
+    echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
+    echo -e "\"l_concurrency\":1," >> ${NAME}.tjson
+    echo -e "\"l_batch_size\":1," >> ${NAME}.tjson
+    echo -e "\"l_instance_count\":1}]" >> ${NAME}.tjson
 
 
-if [ -f $REPORTER ]; then
-    set +e
+    if [ -f $REPORTER ]; then
+        set +e
 
-    URL_FLAG=
-    if [ ! -z ${BENCHMARK_REPORTER_URL} ]; then
-        URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
+        URL_FLAG=
+        if [ ! -z ${BENCHMARK_REPORTER_URL} ]; then
+            URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
+        fi
+
+        python $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
+        if (( $? != 0 )); then
+            RET=1
+        fi
+
+        set -e
     fi
 
-    python $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
-    if (( $? != 0 )); then
-        RET=1
-    fi
-
-    set -e
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if (( $RET == 0 )); then
     echo -e "\n***\n*** Test Passed\n***"
