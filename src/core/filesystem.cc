@@ -899,7 +899,9 @@ Status
 ASFileSystem::CheckClient()
 {
   if (client_ == nullptr) {
-    return Status(Status::Code::INTERNAL, "blob client initialize failed.");
+    return Status(
+        Status::Code::INTERNAL,
+        "Unable to create Azure filesystem client. Check account credentials.");
   }
   return Status::Success;
 }
@@ -913,6 +915,12 @@ ASFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
 
   auto blobProperty = bc.get_blob_property(container, object_path);
+  if (!blobProperty.valid()) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Unable to get file modification time for " + path);
+  }
+
   auto time =
       std::chrono::system_clock::from_time_t(blobProperty.last_modified);
   auto update_time =
@@ -1020,8 +1028,8 @@ ASFileSystem::ReadTextFile(const std::string& path, std::string* contents)
   std::ostringstream out_stream;
   bc.download_blob_to_stream(container, object_path, 0, 0, out_stream);
   if (errno != 0) {
-    auto error = "Failed to download blob " + path;
-    return Status(Status::Code::INTERNAL, error);
+    return Status(
+        Status::Code::INTERNAL, "Failed to fetch file stream at " + path);
   }
   *contents = out_stream.str();
 
@@ -1038,7 +1046,8 @@ ASFileSystem::FileExists(const std::string& path, bool* exists)
   as::blob_client_wrapper bc(client_);
   auto blobs = bc.list_blobs_segmented(container, "/", "", object, 1);
   if (errno != 0) {
-    return Status(Status::Code::INTERNAL, "Failed check file: " + path);
+    return Status(
+        Status::Code::INTERNAL, "Failed to check if file exists at " + path);
   }
   if (blobs.blobs.size() > 0) {
     *exists = true;
@@ -1074,7 +1083,8 @@ ASFileSystem::DownloadFolder(
       bc.download_blob_to_file(container, blob_path, local_path, last_modified);
       if (errno != 0) {
         return Status(
-            Status::Code::INTERNAL, "download file " + blob_path + " failed.");
+            Status::Code::INTERNAL, "Failed to download file at " + blob_path +
+                                        ", errno:" + strerror(errno));
       }
     }
     return Status::Success;
@@ -1163,9 +1173,10 @@ namespace s3 = Aws::S3;
 
 class S3FileSystem : public FileSystem {
  public:
-  S3FileSystem(const Aws::SDKOptions& options, const std::string& s3_path);
+  S3FileSystem(const Aws::SDKOptions& options);
   ~S3FileSystem();
-  Status IntializeAndCheckClient();
+
+  Status IntializeAndCheckClient(const std::string& s3_path);
   Status FileExists(const std::string& path, bool* exists) override;
   Status IsDirectory(const std::string& path, bool* is_dir) override;
   Status FileModificationTime(
@@ -1274,8 +1285,7 @@ S3FileSystem::CleanPath(const std::string& s3_path, std::string* clean_path)
   return Status::Success;
 }
 
-S3FileSystem::S3FileSystem(
-    const Aws::SDKOptions& options, const std::string& s3_path)
+S3FileSystem::S3FileSystem(const Aws::SDKOptions& options)
     : options_(options), s3_regex_(
                              "s3://([0-9a-zA-Z\\-.]+):([0-9]+)/"
                              "([0-9a-z.\\-]+)(((/[0-9a-zA-Z.\\-_]+)*)?)")
@@ -1283,7 +1293,7 @@ S3FileSystem::S3FileSystem(
 }
 
 Status
-S3FileSystem::IntializeAndCheckClient()
+S3FileSystem::IntializeAndCheckClient(const std::string& s3_path)
 {
   Aws::Client::ClientConfiguration config;
   Aws::Auth::AWSCredentials credentials;
@@ -1332,19 +1342,14 @@ S3FileSystem::IntializeAndCheckClient()
         /*useVirtualAdressing*/ false);
   }
 
-  if (!client_) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Unable to create S3 client. Check account credentials.");
-  }
-
-  // Verify that teh bucket is a directory
+  // Verify that bucket exists and 'client_' is initialized correctly.
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(clean_path, &is_dir));
 
   if (!is_dir) {
     return Status(
-        Status::Code::INVALID_ARG, "No bucket/folder found at " + clean_path);
+        Status::Code::INVALID_ARG, "No bucket/folder found at " + clean_path +
+                                       ". Check account credentials.");
   }
 
   return Status::Success;
@@ -1757,8 +1762,8 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #else
     Aws::SDKOptions options;
     Aws::InitAPI(options);
-    static S3FileSystem s3_fs(options, path);
-    RETURN_IF_ERROR(s3_fs.IntializeAndCheckClient());
+    static S3FileSystem s3_fs(options);
+    RETURN_IF_ERROR(s3_fs.IntializeAndCheckClient(path));
     *file_system = &s3_fs;
     return Status::Success;
 #endif  // TRITON_ENABLE_S3
