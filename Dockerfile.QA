@@ -179,6 +179,9 @@ RUN cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so 
     mkdir -p qa/L0_perf_nomodel/custom_models/custom_zero_1_float32/1 && \
     cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
         qa/L0_perf_nomodel/custom_models/custom_zero_1_float32/1/. && \
+    mkdir -p qa/L0_perf_pyclients/custom_models/custom_zero_1_int32/1 && \
+    cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
+        qa/L0_perf_pyclients/custom_models/custom_zero_1_int32/1/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
         qa/L0_perf_analyzer/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
