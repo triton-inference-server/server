@@ -1342,14 +1342,9 @@ S3FileSystem::IntializeAndCheckClient(const std::string& s3_path)
         /*useVirtualAdressing*/ false);
   }
 
-  // Verify that bucket exists and 'client_' is initialized correctly.
-  bool is_dir;
-  RETURN_IF_ERROR(IsDirectory(clean_path, &is_dir));
-  if (!is_dir) {
-    return Status(
-        Status::Code::INVALID_ARG, "No bucket/folder found at " + clean_path +
-                                       ". Check account credentials.");
-  }
+  // Verify that the path exists and 'client_' is initialized correctly.
+  bool exists;
+  RETURN_IF_ERROR(FileExists(clean_path, &exists));
 
   return Status::Success;
 }
@@ -1372,16 +1367,21 @@ S3FileSystem::FileExists(const std::string& path, bool* exists)
   head_request.SetBucket(bucket.c_str());
   head_request.SetKey(object.c_str());
 
-  auto head_object_outcome = client_.HeadObject(head_request);
-  if (head_object_outcome.IsSuccess()) {
-    *exists = true;
-    return Status::Success;
-  }
-
   // S3 doesn't make objects for directories, so it could still be a directory
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   *exists = is_dir;
+
+  auto head_object_outcome = client_.HeadObject(head_request);
+  if (!head_object_outcome.IsSuccess()) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Could not get MetaData for object at " + path + " due to exception: " +
+            head_object_outcome.GetError().GetExceptionName() +
+            ", error message: " + head_object_outcome.GetError().GetMessage());
+  } else {
+    *exists = true;
+  }
 
   return Status::Success;
 }
