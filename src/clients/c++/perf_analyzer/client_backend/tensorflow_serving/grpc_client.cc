@@ -205,7 +205,8 @@ GrpcClient::Infer(
     InferResult** result, const InferOptions& options,
     const std::vector<InferInput*>& inputs,
     const std::vector<const InferRequestedOutput*>& outputs,
-    const Headers& headers)
+    const Headers& headers,
+    const grpc_compression_algorithm compression_algorithm)
 {
   Error err;
 
@@ -221,6 +222,7 @@ GrpcClient::Infer(
   for (const auto& it : headers) {
     context.AddMetadata(it.first, it.second);
   }
+  context.set_compression_algorithm(compression_algorithm);
 
   err = PreRunProcessing(options, inputs, outputs);
   sync_request->Timer().CaptureTimestamp(nic::RequestTimers::Kind::SEND_END);
@@ -260,7 +262,8 @@ GrpcClient::AsyncInfer(
     TFServeOnCompleteFn callback, const InferOptions& options,
     const std::vector<InferInput*>& inputs,
     const std::vector<const InferRequestedOutput*>& outputs,
-    const Headers& headers)
+    const Headers& headers,
+    const grpc_compression_algorithm compression_algorithm)
 {
   if (callback == nullptr) {
     return Error(
@@ -279,6 +282,7 @@ GrpcClient::AsyncInfer(
   for (const auto& it : headers) {
     async_request->grpc_context_.AddMetadata(it.first, it.second);
   }
+  async_request->grpc_context_.set_compression_algorithm(compression_algorithm);
 
   Error err = PreRunProcessing(options, inputs, outputs);
   if (!err.IsOk()) {

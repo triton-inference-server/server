@@ -35,6 +35,7 @@ namespace perfanalyzer { namespace clientbackend {
 Error
 TFServeClientBackend::Create(
     const std::string& url, const ProtocolType protocol,
+    const grpc_compression_algorithm compression_algorithm,
     std::shared_ptr<Headers> http_headers, const bool verbose,
     std::unique_ptr<ClientBackend>* client_backend)
 {
@@ -43,7 +44,7 @@ TFServeClientBackend::Create(
         "perf_analyzer does not support http protocol with TF serving");
   }
   std::unique_ptr<TFServeClientBackend> tfserve_client_backend(
-      new TFServeClientBackend(http_headers));
+      new TFServeClientBackend(compression_algorithm, http_headers));
 
   RETURN_IF_CB_ERROR(tfs::GrpcClient::Create(
       &(tfserve_client_backend->grpc_client_), url, verbose));
@@ -82,7 +83,8 @@ TFServeClientBackend::Infer(
 {
   tfs::InferResult* tfserve_result;
   RETURN_IF_CB_ERROR(grpc_client_->Infer(
-      &tfserve_result, options, inputs, outputs, *http_headers_));
+      &tfserve_result, options, inputs, outputs, *http_headers_,
+      compression_algorithm_));
 
   *result = new TFServeInferResult(tfserve_result);
 
@@ -101,7 +103,8 @@ TFServeClientBackend::AsyncInfer(
   };
 
   RETURN_IF_CB_ERROR(grpc_client_->AsyncInfer(
-      wrapped_callback, options, inputs, outputs, *http_headers_));
+      wrapped_callback, options, inputs, outputs, *http_headers_,
+      compression_algorithm_));
 
   return Error::Success;
 }

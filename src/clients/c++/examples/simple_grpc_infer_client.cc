@@ -103,6 +103,8 @@ main(int argc, char** argv)
   std::string root_certificates;
   std::string private_key;
   std::string certificate_chain;
+  grpc_compression_algorithm compression_algorithm =
+      grpc_compression_algorithm::GRPC_COMPRESS_NONE;
 
   // {name, has_arg, *flag, val}
   static struct option long_options[] = {{"ssl", 0, 0, 0},
@@ -112,7 +114,8 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt_long(argc, argv, "vu:t:H:", long_options, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "vu:t:H:C:", long_options, NULL)) !=
+         -1) {
     switch (opt) {
       case 0:
         use_ssl = true;
@@ -139,6 +142,26 @@ main(int argc, char** argv)
         std::string arg = optarg;
         std::string header = arg.substr(0, arg.find(":"));
         http_headers[header] = arg.substr(header.size() + 1);
+        break;
+      }
+      case 'C': {
+        std::string algorithm_str{optarg};
+        if (algorithm_str.compare("deflate") == 0) {
+          compression_algorithm =
+              grpc_compression_algorithm::GRPC_COMPRESS_DEFLATE;
+        } else if (algorithm_str.compare("gzip") == 0) {
+          compression_algorithm =
+              grpc_compression_algorithm::GRPC_COMPRESS_GZIP;
+        } else if (algorithm_str.compare("none") == 0) {
+          compression_algorithm =
+              grpc_compression_algorithm::GRPC_COMPRESS_NONE;
+        } else {
+          Usage(
+              argv,
+              "unsupported compression algorithm specified... only "
+              "\'deflate\', "
+              "\'gzip\' and \'none\' are supported.");
+        }
         break;
       }
       case '?':
@@ -236,7 +259,9 @@ main(int argc, char** argv)
 
   nic::InferResult* results;
   FAIL_IF_ERR(
-      client->Infer(&results, options, inputs, outputs, http_headers),
+      client->Infer(
+          &results, options, inputs, outputs, http_headers,
+          compression_algorithm),
       "unable to run model");
   std::shared_ptr<nic::InferResult> results_ptr;
   results_ptr.reset(results);

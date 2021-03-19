@@ -303,6 +303,8 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// config will be returned as default settings.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param compression_algorithm The compression algorithm to be used
+  /// by gRPC when sending requests. By default compression is not used.
   /// \return Error object indicating success or failure of the
   /// request.
   Error Infer(
@@ -310,7 +312,8 @@ class InferenceServerGrpcClient : public InferenceServerClient {
       const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs =
           std::vector<const InferRequestedOutput*>(),
-      const Headers& headers = Headers());
+      const Headers& headers = Headers(), 
+      grpc_compression_algorithm compression_algorithm=GRPC_COMPRESS_NONE);
 
   /// Run asynchronous inference on server.
   /// Once the request is completed, the InferResult pointer will be passed to
@@ -328,13 +331,16 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// config will be returned as default settings.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param compression_algorithm The compression algorithm to be used
+  /// by gRPC when sending requests. By default compression is not used.
   /// \return Error object indicating success or failure of the request.
   Error AsyncInfer(
       OnCompleteFn callback, const InferOptions& options,
       const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs =
           std::vector<const InferRequestedOutput*>(),
-      const Headers& headers = Headers());
+      const Headers& headers = Headers(),
+      grpc_compression_algorithm compression_algorithm=GRPC_COMPRESS_NONE);
 
   /// Starts a grpc bi-directional stream to send streaming inferences.
   /// \param callback The callback function to be invoked on receiving a
@@ -350,10 +356,13 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// the specified time elapses.
   /// \param headers Optional map specifying additional HTTP headers to
   /// include in the metadata of gRPC request.
+  /// \param compression_algorithm The compression algorithm to be used
+  /// by gRPC when sending requests. By default compression is not used.
   /// \return Error object indicating success or failure of the request.
   Error StartStream(
       OnCompleteFn callback, bool enable_stats = true,
-      uint32_t stream_timeout = 0, const Headers& headers = Headers());
+      uint32_t stream_timeout = 0, const Headers& headers = Headers(),
+      grpc_compression_algorithm compression_algorithm=GRPC_COMPRESS_NONE);
 
   /// Stops an active grpc bi-directional stream, if one available.
   /// \return Error object indicating success or failure of the request.
