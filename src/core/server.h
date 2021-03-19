@@ -47,7 +47,7 @@ class InferenceRequest;
 enum class ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
 
 // The configured mode for rate limiting
-enum class RateLimitMode { RL_OFF, RL_EXEC_COUNT };
+enum class RateLimitMode { RL_EXEC_COUNT, RL_OFF };
 
 // Readiness status for the inference server.
 enum class ServerReadyState {

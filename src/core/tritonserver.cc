@@ -58,37 +58,11 @@ namespace ni = nvidia::inferenceserver;
 namespace {
 
 std::string
-DeviceString(const int device_key)
-{
-  switch (device_key) {
-    case ni::RateLimiter::CPU_RESOURCE_KEY: {
-      static std::string d("cpu");
-      return d;
-    }
-    case ni::RateLimiter::GLOBAL_RESOURCE_KEY: {
-      static std::string d("global");
-      return d;
-    }
-    case ni::RateLimiter::PER_DEVICE_RESOURCE_KEY: {
-      static std::string d("per_device");
-      return d;
-    }
-    default: {
-      static std::string d(std::to_string(device_key));
-      return d;
-    }
-  }
-
-  static std::string d("<unknown>");
-  return d;
-}
-
-std::string
-ResourceString(const int device_key, const std::string& name, const int count)
+ResourceString(const std::string& name, const int count, const int device_id)
 {
   return std::string(
-      "{\"device\":\"" + DeviceString(device_key) + "\", \"name\":\"" + name +
-      "\", \"count\":" + std::to_string(count) + "}");
+      "{\"name\":\"" + name + "\", \"count\":" + std::to_string(count) +
+      " \"device\":" + std::to_string(device_id) + "}");
 }
 
 //
@@ -337,14 +311,10 @@ TritonServerOptions::TritonServerOptions()
     : server_id_("triton"),
       model_control_mode_(ni::ModelControlMode::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
-<<<<<<< HEAD
-      metrics_(true), gpu_metrics_(true), exit_timeout_(30),
-      pinned_memory_pool_size_(1 << 28), buffer_manager_thread_count_(0),
-=======
-      rate_limit_mode_(ni::RateLimitMode::RL_OFF), metrics_(true),
+      rate_limit_mode_(ni::RateLimitMode::RL_EXEC_COUNT), metrics_(true),
       gpu_metrics_(true), exit_timeout_(30), pinned_memory_pool_size_(1 << 28),
->>>>>>> Add CLI options and RateLimiter to the server
-      #ifdef TRITON_ENABLE_GPU
+      buffer_manager_thread_count_(0),
+#ifdef TRITON_ENABLE_GPU
       min_compute_capability_(TRITON_MIN_COMPUTE_CAPABILITY),
 #else
       min_compute_capability_(0),
@@ -1757,12 +1727,12 @@ TRITONSERVER_ServerNew(
   std::string rate_limit;
   auto rate_limit_mode = lserver->GetRateLimitMode();
   switch (rate_limit_mode) {
-    case ni::RateLimitMode::RL_OFF: {
-      rate_limit = "OFF";
-      break;
-    }
     case ni::RateLimitMode::RL_EXEC_COUNT: {
       rate_limit = "EXEC_COUNT";
+      break;
+    }
+    case ni::RateLimitMode::RL_OFF: {
+      rate_limit = "OFF";
       break;
     }
     default: {
@@ -1777,7 +1747,7 @@ TRITONSERVER_ServerNew(
       options_table.InsertRow(std::vector<std::string>{
           "rate_limit_resource[" + std::to_string(i) + "]",
           ResourceString(
-              device_resources.first, resource.first, resource.second)});
+              resource.first, resource.second, device_resources.first)});
       ++i;
     }
   }
