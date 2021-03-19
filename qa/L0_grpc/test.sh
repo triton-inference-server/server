@@ -233,6 +233,45 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+export GRPC_TRACE=compression, channel
+export GRPC_VERBOSITY=DEBUG
+SERVER_ARGS="--model-repository=$DATADIR --grpc-infer-response-compression-level=high"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+$SIMPLE_INFER_CLIENT -v -C deflate>> ${CLIENT_LOG}.c++.compress 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.compress
+    RET=1
+fi
+if [ $(cat ${CLIENT_LOG}.c++.compress | grep "Compressed\[deflate\]" | wc -l) -eq 0 ]; then
+    cat ${CLIENT_LOG}.c++.compress
+    RET=1
+fi
+
+python $SIMPLE_INFER_CLIENT_PY -v -C deflate>> ${CLIENT_LOG}.compress 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.compress
+    RET=1
+fi
+if [ $(cat ${CLIENT_LOG}.compress | grep "Compressed\[deflate\]" | wc -l) -eq 0 ]; then
+    cat ${CLIENT_LOG}.compress
+    RET=1
+fi
+
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+unset GRPC_TRACE
+unset GRPC_VERBOSITY
+
 SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then

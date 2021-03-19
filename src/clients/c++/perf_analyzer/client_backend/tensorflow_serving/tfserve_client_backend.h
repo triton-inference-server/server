@@ -54,6 +54,8 @@ class TFServeClientBackend : public ClientBackend {
   /// server.
   /// \param url The inference server url and port.
   /// \param protocol The protocol type used.
+  /// \param compression_algorithm The compression algorithm to be used
+  /// on the grpc requests.
   /// \param http_headers Map of HTTP headers. The map key/value indicates
   /// the header name/value.
   /// \param verbose Enables the verbose mode.
@@ -62,6 +64,7 @@ class TFServeClientBackend : public ClientBackend {
   /// \return Error object indicating success or failure.
   static Error Create(
       const std::string& url, const ProtocolType protocol,
+      const grpc_compression_algorithm compression_algorithm,
       std::shared_ptr<Headers> http_headers, const bool verbose,
       std::unique_ptr<ClientBackend>* client_backend);
 
@@ -86,8 +89,11 @@ class TFServeClientBackend : public ClientBackend {
   Error ClientInferStat(InferStat* infer_stat) override;
 
  private:
-  TFServeClientBackend(std::shared_ptr<Headers> http_headers)
+  TFServeClientBackend(
+      const grpc_compression_algorithm compression_algorithm,
+      std::shared_ptr<Headers> http_headers)
       : ClientBackend(BackendKind::TENSORFLOW_SERVING),
+        compression_algorithm_(compression_algorithm),
         http_headers_(http_headers)
   {
   }
@@ -97,6 +103,7 @@ class TFServeClientBackend : public ClientBackend {
 
   std::unique_ptr<tfs::GrpcClient> grpc_client_;
 
+  grpc_compression_algorithm compression_algorithm_;
   std::shared_ptr<Headers> http_headers_;
 };
 

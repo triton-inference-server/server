@@ -271,6 +271,8 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-f <filename for storing report in csv format>" << std::endl;
   std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << "\t--streaming" << std::endl;
+  std::cerr << "\t--grpc-compression-algorithm <compression_algorithm>"
+            << std::endl;
   std::cerr << std::endl;
   std::cerr << "==== OPTIONS ==== \n \n";
 
@@ -589,6 +591,16 @@ Usage(char** argv, const std::string& msg = std::string())
              18)
       << std::endl;
 
+  std::cerr
+      << FormatMessage(
+             " --grpc-compression-algorithm: The compression algorithm "
+             "to be used by gRPC when sending request. Only supported "
+             "when grpc protocol is being used. The supported values are "
+             "none, gzip, deflate and stream_gzip. Default value is none.",
+             18)
+      << std::endl;
+
+
   exit(1);
 }
 
@@ -620,6 +632,8 @@ main(int argc, char** argv)
   std::string filename("");
   cb::ProtocolType protocol = cb::ProtocolType::HTTP;
   std::shared_ptr<cb::Headers> http_headers(new cb::Headers());
+  cb::GrpcCompressionAlgorithm compression_algorithm =
+      cb::GrpcCompressionAlgorithm::COMPRESS_NONE;
   pa::SharedMemoryType shared_memory_type = pa::NO_SHARED_MEMORY;
   size_t output_shm_size = 100 * 1024;
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
@@ -637,6 +651,7 @@ main(int argc, char** argv)
   bool using_concurrency_range = false;
   bool using_request_rate_range = false;
   bool using_custom_intervals = false;
+  bool using_grpc_compression = false;
   pa::SearchMode search_mode = pa::SearchMode::LINEAR;
   pa::Distribution request_distribution = pa::Distribution::CONSTANT;
   std::string request_intervals_file("");
@@ -673,6 +688,7 @@ main(int argc, char** argv)
       {"output-shared-memory-size", 1, 0, 22},
       {"service-kind", 1, 0, 23},
       {"model-signature-name", 1, 0, 24},
+      {"grpc-compression-algorithm", 1, 0, 25},
       {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -896,6 +912,22 @@ main(int argc, char** argv)
       case 24:
         model_signature_name = optarg;
         break;
+      case 25: {
+        using_grpc_compression = true;
+        std::string arg = optarg;
+        if (arg.compare("none") == 0) {
+          compression_algorithm = cb::COMPRESS_NONE;
+        } else if (arg.compare("deflate") == 0) {
+          compression_algorithm = cb::COMPRESS_DEFLATE;
+        } else if (arg.compare("gzip") == 0) {
+          compression_algorithm = cb::COMPRESS_GZIP;
+        } else if (arg.compare("stream_gzip") == 0) {
+          compression_algorithm = cb::COMPRESS_STREAM_GZIP;
+        } else {
+          Usage(argv, "unsupported --grpc-compression-algorithm specified");
+        }
+        break;
+      }
       case 'v':
         extra_verbose = verbose;
         verbose = true;
@@ -983,6 +1015,9 @@ main(int argc, char** argv)
   }
   if (streaming && (protocol != cb::ProtocolType::GRPC)) {
     Usage(argv, "streaming is only allowed with gRPC protocol");
+  }
+  if (using_grpc_compression && (protocol != cb::ProtocolType::GRPC)) {
+    Usage(argv, "compression is only allowed with gRPC protocol");
   }
   if (max_threads == 0) {
     Usage(argv, "maximum number of threads must be > 0");
@@ -1121,7 +1156,8 @@ main(int argc, char** argv)
   std::shared_ptr<cb::ClientBackendFactory> factory;
   FAIL_IF_ERR(
       cb::ClientBackendFactory::Create(
-          kind, url, protocol, http_headers, extra_verbose, &factory),
+          kind, url, protocol, compression_algorithm, http_headers,
+          extra_verbose, &factory),
       "failed to create client factory");
 
   std::unique_ptr<cb::ClientBackend> backend;

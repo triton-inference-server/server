@@ -114,6 +114,8 @@ class GrpcClient : public nic::InferenceServerClient {
   /// config will be returned as default settings.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param compression_algorithm The compression algorithm to be used
+  /// on the grpc requests.
   /// \return Error object indicating success or failure of the
   /// request.
   Error Infer(
@@ -121,7 +123,9 @@ class GrpcClient : public nic::InferenceServerClient {
       const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs =
           std::vector<const InferRequestedOutput*>(),
-      const Headers& headers = Headers());
+      const Headers& headers = Headers(),
+      const grpc_compression_algorithm compression_algorithm =
+          GRPC_COMPRESS_NONE);
 
   /// Run asynchronous inference on server.
   /// Once the request is completed, the InferResult pointer will be passed to
@@ -139,13 +143,17 @@ class GrpcClient : public nic::InferenceServerClient {
   /// config will be returned as default settings.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param compression_algorithm The compression algorithm to be used
+  /// on the grpc requests.
   /// \return Error object indicating success or failure of the request.
   Error AsyncInfer(
       TFServeOnCompleteFn callback, const InferOptions& options,
       const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs =
           std::vector<const InferRequestedOutput*>(),
-      const Headers& headers = Headers());
+      const Headers& headers = Headers(),
+      const grpc_compression_algorithm compression_algorithm =
+          GRPC_COMPRESS_NONE);
 
  private:
   GrpcClient(

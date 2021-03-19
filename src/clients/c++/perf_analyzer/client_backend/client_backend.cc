@@ -67,6 +67,20 @@ BackendKindToString(const BackendKind kind)
   }
 }
 
+grpc_compression_algorithm
+BackendToGrpcType(const GrpcCompressionAlgorithm compression_algorithm)
+{
+  if (compression_algorithm == COMPRESS_STREAM_GZIP) {
+    return grpc_compression_algorithm::GRPC_COMPRESS_STREAM_GZIP;
+  } else if (compression_algorithm == COMPRESS_DEFLATE) {
+    return grpc_compression_algorithm::GRPC_COMPRESS_DEFLATE;
+  } else if (compression_algorithm == COMPRESS_GZIP) {
+    return grpc_compression_algorithm::GRPC_COMPRESS_GZIP;
+  } else {
+    return grpc_compression_algorithm::GRPC_COMPRESS_NONE;
+  }
+}
+
 //================================================
 
 //
@@ -75,11 +89,12 @@ BackendKindToString(const BackendKind kind)
 Error
 ClientBackendFactory::Create(
     const BackendKind kind, const std::string& url, const ProtocolType protocol,
+    const GrpcCompressionAlgorithm compression_algorithm,
     std::shared_ptr<Headers> http_headers, const bool verbose,
     std::shared_ptr<ClientBackendFactory>* factory)
 {
-  factory->reset(
-      new ClientBackendFactory(kind, url, protocol, http_headers, verbose));
+  factory->reset(new ClientBackendFactory(
+      kind, url, protocol, compression_algorithm, http_headers, verbose));
   return Error::Success;
 }
 
@@ -88,7 +103,8 @@ ClientBackendFactory::CreateClientBackend(
     std::unique_ptr<ClientBackend>* client_backend)
 {
   RETURN_IF_CB_ERROR(ClientBackend::Create(
-      kind_, url_, protocol_, http_headers_, verbose_, client_backend));
+      kind_, url_, protocol_, compression_algorithm_, http_headers_, verbose_,
+      client_backend));
   return Error::Success;
 }
 
@@ -98,16 +114,19 @@ ClientBackendFactory::CreateClientBackend(
 Error
 ClientBackend::Create(
     const BackendKind kind, const std::string& url, const ProtocolType protocol,
+    const GrpcCompressionAlgorithm compression_algorithm,
     std::shared_ptr<Headers> http_headers, const bool verbose,
     std::unique_ptr<ClientBackend>* client_backend)
 {
   std::unique_ptr<ClientBackend> local_backend;
   if (kind == TRITON) {
     RETURN_IF_CB_ERROR(TritonClientBackend::Create(
-        url, protocol, http_headers, verbose, &local_backend));
+        url, protocol, BackendToGrpcType(compression_algorithm), http_headers,
+        verbose, &local_backend));
   } else if (kind == TENSORFLOW_SERVING) {
     RETURN_IF_CB_ERROR(TFServeClientBackend::Create(
-        url, protocol, http_headers, verbose, &local_backend));
+        url, protocol, BackendToGrpcType(compression_algorithm), http_headers,
+        verbose, &local_backend));
   } else if (kind == TORCHSERVE) {
     RETURN_IF_CB_ERROR(TorchServeClientBackend::Create(
         url, protocol, http_headers, verbose, &local_backend));

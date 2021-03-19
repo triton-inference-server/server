@@ -83,6 +83,12 @@ class InferResult;
 
 enum BackendKind { TRITON = 0, TENSORFLOW_SERVING = 1, TORCHSERVE = 2 };
 enum ProtocolType { HTTP = 0, GRPC = 1, UNKNOWN = 2 };
+enum GrpcCompressionAlgorithm {
+  COMPRESS_NONE = 0,
+  COMPRESS_DEFLATE = 1,
+  COMPRESS_GZIP = 2,
+  COMPRESS_STREAM_GZIP = 3
+};
 typedef std::map<std::string, std::string> Headers;
 
 using OnCompleteFn = std::function<void(InferResult*)>;
@@ -165,6 +171,8 @@ class ClientBackendFactory {
   /// \param kind The kind of client backend to create.
   /// \param url The inference server url and port.
   /// \param protocol The protocol type used.
+  /// \param compression_algorithm The compression algorithm to be used
+  /// on the grpc requests.
   /// \param http_headers Map of HTTP headers. The map key/value
   /// indicates the header name/value. The headers will be included
   /// with all the requests made to server using this client.
@@ -173,8 +181,10 @@ class ClientBackendFactory {
   /// \return Error object indicating success or failure.
   static Error Create(
       const BackendKind kind, const std::string& url,
-      const ProtocolType protocol, std::shared_ptr<Headers> http_headers,
-      const bool verbose, std::shared_ptr<ClientBackendFactory>* factory);
+      const ProtocolType protocol,
+      const GrpcCompressionAlgorithm compression_algorithm,
+      std::shared_ptr<Headers> http_headers, const bool verbose,
+      std::shared_ptr<ClientBackendFactory>* factory);
 
   /// Create a ClientBackend.
   /// \param backend Returns a new Client backend object.
@@ -183,9 +193,11 @@ class ClientBackendFactory {
  private:
   ClientBackendFactory(
       const BackendKind kind, const std::string& url,
-      const ProtocolType protocol, const std::shared_ptr<Headers> http_headers,
-      const bool verbose)
+      const ProtocolType protocol,
+      const GrpcCompressionAlgorithm compression_algorithm,
+      const std::shared_ptr<Headers> http_headers, const bool verbose)
       : kind_(kind), url_(url), protocol_(protocol),
+        compression_algorithm_(compression_algorithm),
         http_headers_(http_headers), verbose_(verbose)
   {
   }
@@ -193,6 +205,7 @@ class ClientBackendFactory {
   const BackendKind kind_;
   const std::string url_;
   const ProtocolType protocol_;
+  const GrpcCompressionAlgorithm compression_algorithm_;
   std::shared_ptr<Headers> http_headers_;
   const bool verbose_;
 };
@@ -204,8 +217,10 @@ class ClientBackend {
  public:
   static Error Create(
       const BackendKind kind, const std::string& url,
-      const ProtocolType protocol, std::shared_ptr<Headers> http_headers,
-      const bool verbose, std::unique_ptr<ClientBackend>* client_backend);
+      const ProtocolType protocol,
+      const GrpcCompressionAlgorithm compression_algorithm,
+      std::shared_ptr<Headers> http_headers, const bool verbose,
+      std::unique_ptr<ClientBackend>* client_backend);
 
   /// Destructor for the client backend object
   virtual ~ClientBackend() = default;

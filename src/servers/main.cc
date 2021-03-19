@@ -83,6 +83,8 @@ bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
 bool grpc_use_ssl_ = false;
 nvidia::inferenceserver::SslOptions grpc_ssl_options_;
+grpc_compression_level grpc_response_compression_level_ =
+    GRPC_COMPRESS_LEVEL_NONE;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -203,6 +205,7 @@ enum OptionId {
   OPTION_GRPC_SERVER_CERT,
   OPTION_GRPC_SERVER_KEY,
   OPTION_GRPC_ROOT_CERT,
+  OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL,
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
@@ -320,6 +323,11 @@ std::vector<Option> options_
       {OPTION_GRPC_ROOT_CERT, "grpc-root-cert", Option::ArgStr,
        "File holding PEM-encoded root certificate. Ignore unless "
        "--grpc-use-ssl is false."},
+      {OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL,
+       "grpc-infer-response-compression-level", Option::ArgStr,
+       "The compression level to be used while returning the infer response to "
+       "the peer. Allowed values are none, low, medium and high. By default, "
+       "compression level is selected as none."},
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
       {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
@@ -449,7 +457,8 @@ StartGrpcService(
 {
   TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
       server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
-      grpc_ssl_options_, grpc_infer_allocation_pool_size_, service);
+      grpc_ssl_options_, grpc_infer_allocation_pool_size_,
+      grpc_response_compression_level_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -847,6 +856,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t grpc_port = grpc_port_;
   int32_t grpc_use_ssl = grpc_use_ssl_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
+  grpc_compression_level grpc_response_comression_level =
+      grpc_response_compression_level_;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -953,6 +964,27 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_GRPC_ROOT_CERT:
         grpc_ssl_options_.root_cert = optarg;
         break;
+      case OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL: {
+        std::string mode_str(optarg);
+        std::transform(
+            mode_str.begin(), mode_str.end(), mode_str.begin(), ::tolower);
+        if (mode_str == "none") {
+          grpc_response_comression_level = GRPC_COMPRESS_LEVEL_NONE;
+        } else if (mode_str == "low") {
+          grpc_response_comression_level = GRPC_COMPRESS_LEVEL_LOW;
+        } else if (mode_str == "medium") {
+          grpc_response_comression_level = GRPC_COMPRESS_LEVEL_MED;
+        } else if (mode_str == "high") {
+          grpc_response_comression_level = GRPC_COMPRESS_LEVEL_HIGH;
+        } else {
+          std::cerr
+              << "invalid argument for --grpc_infer_response_compression_level"
+              << std::endl;
+          std::cerr << Usage() << std::endl;
+          return false;
+        }
+        break;
+      }
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -1059,6 +1091,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   grpc_port_ = grpc_port;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
   grpc_use_ssl_ = grpc_use_ssl;
+  grpc_response_compression_level_ = grpc_response_comression_level;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
