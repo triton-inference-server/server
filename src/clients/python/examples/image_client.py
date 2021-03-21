@@ -26,17 +26,18 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import numpy as np
-from PIL import Image
-import sys
 from functools import partial
 import os
+import sys
+
+from PIL import Image
+import numpy as np
 
 import tritonclient.grpc as grpcclient
 import tritonclient.grpc.model_config_pb2 as mc
 import tritonclient.http as httpclient
-from tritonclient.utils import triton_to_np_dtype
 from tritonclient.utils import InferenceServerException
+from tritonclient.utils import triton_to_np_dtype
 
 if sys.version_info >= (3, 0):
     import queue
@@ -107,11 +108,11 @@ def parse_model_grpc(model_metadata, model_config):
     if len(input_metadata.shape) != expected_input_dims:
         raise Exception(
             "expecting input to have {} dimensions, model '{}' input has {}".
-            format(expected_input_dims, model_metadata.name,
-                   len(input_metadata.shape)))
+                format(expected_input_dims, model_metadata.name,
+                       len(input_metadata.shape)))
 
     if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
-        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
+            (input_config.format != mc.ModelInput.FORMAT_NHWC)):
         raise Exception("unexpected input format " +
                         mc.ModelInput.Format.Name(input_config.format) +
                         ", expecting " +
@@ -185,11 +186,11 @@ def parse_model_http(model_metadata, model_config):
     if len(input_metadata['shape']) != expected_input_dims:
         raise Exception(
             "expecting input to have {} dimensions, model '{}' input has {}".
-            format(expected_input_dims, model_metadata['name'],
-                   len(input_metadata['shape'])))
+                format(expected_input_dims, model_metadata['name'],
+                       len(input_metadata['shape'])))
 
     if ((input_config['format'] != "FORMAT_NCHW") and
-        (input_config['format'] != "FORMAT_NHWC")):
+            (input_config['format'] != "FORMAT_NHWC")):
         raise Exception("unexpected input format " + input_config['format'] +
                         ", expecting FORMAT_NCHW or FORMAT_NHWC")
 
@@ -277,7 +278,6 @@ def postprocess(results, output_name, batch_size, batching):
 
 
 def requestGenerator(batched_image_data, input_name, output_name, dtype, FLAGS):
-
     # Set the input data
     inputs = []
     if FLAGS.protocol.lower() == "grpc":
@@ -323,7 +323,7 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Use streaming inference API. ' +
-                        'The flag is only available with gRPC protocol.')
+                             'The flag is only available with gRPC protocol.')
     parser.add_argument('-m',
                         '--model-name',
                         type=str,
@@ -368,7 +368,7 @@ if __name__ == '__main__':
                         required=False,
                         default='HTTP',
                         help='Protocol (HTTP/gRPC) used to communicate with ' +
-                        'the inference service. Default is HTTP.')
+                             'the inference service. Default is HTTP.')
     parser.add_argument('image_filename',
                         type=str,
                         nargs='?',
