@@ -121,7 +121,7 @@ COPY qa/images/mug.jpg images/mug.jpg
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
-RUN pip3 install --upgrade numpy pillow && \
+RUN pip3 install --upgrade numpy pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
     "tritonclient-*-manylinux1_x86_64.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
