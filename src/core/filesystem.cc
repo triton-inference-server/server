@@ -1370,7 +1370,10 @@ S3FileSystem::FileExists(const std::string& path, bool* exists)
   // S3 doesn't make objects for directories, so it could still be a directory
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
-  *exists = is_dir;
+  if (is_dir) {
+    *exists = is_dir;
+    return Status::Success;
+  }
 
   auto head_object_outcome = client_.HeadObject(head_request);
   if (!head_object_outcome.IsSuccess()) {
