@@ -59,7 +59,8 @@ RUN apt-get update && \
             python3-dev \
             rapidjson-dev \
             vim \
-            wget && \
+            wget \
+            python3-pdfkit && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
