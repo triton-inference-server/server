@@ -59,18 +59,7 @@ install is only available on Linux**.
 
 ```
 $ pip install nvidia-pyindex
-$ pip install tritonclient[all]
-```
-
-Using *all* installs both the HTTP/REST and GRPC client
-libraries. There are two optional packages available, *grpc* and
-*http* that can be used to install support specifically for the
-protocol. For example, to install only the HTTP/REST client library
-use,
-
-```
-$ pip install nvidia-pyindex
-$ pip install tritonclient[http]
+$ pip install tritonclient
 ```
 
 The components of the install packages are:
