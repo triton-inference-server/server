@@ -33,6 +33,7 @@ import base64
 import glob
 import os
 import sys
+import tarfile
 
 
 def send(subject: str, attachments=[], files_to_tar=None):
@@ -49,7 +50,7 @@ def send(subject: str, attachments=[], files_to_tar=None):
 
     if files_to_tar is not None:
         with tarfile.open(subject + ".tgz", "w:gz") as csv_tar:
-            for filename in glob.glob("client_memory_growth*.log"):
+            for filename in glob.glob(files_to_tar):
                 csv_tar.add(filename)
         attachments.append(subject + ".tgz")
 
