@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -107,6 +107,7 @@ for MODEL in $(ls models); do
     SERVER_ARGS="--model-repository=`pwd`/test_repo"
     LEAKCHECK_LOG="test_${MODEL}.valgrind.log"
     MASSIF_LOG="test_${MODEL}.massif"
+    GRAPH_LOG="memory_growth_${MODEL}.log"
     LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
     SERVER_LOG="test_$MODEL.server.log"
     CLIENT_LOG="test_$MODEL.client.log"
@@ -148,7 +149,8 @@ for MODEL in $(ls models); do
 
     set +e
 
-    ms_print ${MASSIF_LOG} | head -n35
+    ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
+    cat ${GRAPH_LOG}
     # Check the massif output
     python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -176,6 +178,7 @@ SERVER_LD_PRELOAD="${DATADIR}/qa_custom_ops/tf_custom_ops/libbusyop.so"
 
 LEAKCHECK_LOG="test_busyop.valgrind.log"
 MASSIF_LOG="test_busyop.massif"
+GRAPH_LOG="memory_growth_busyop.log"
 LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
 SERVER_LOG="test_busyop.server.log"
 CLIENT_LOG="test_busyop.client.log"
@@ -205,7 +208,8 @@ wait $SERVER_PID
 
 set +e
 
-ms_print ${MASSIF_LOG} | head -n35
+ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
+cat ${GRAPH_LOG}
 # Check the massif output
 python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
 if [ $? -ne 1 ]; then
@@ -219,6 +223,11 @@ if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+# Run only if both TRITON_FROM and TRITON_TO_DL are set
+if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
+    python server_memory_mail.py
 fi
 
 exit $RET
