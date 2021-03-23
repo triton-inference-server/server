@@ -1173,7 +1173,7 @@ namespace s3 = Aws::S3;
 
 class S3FileSystem : public FileSystem {
  public:
-  S3FileSystem(const Aws::SDKOptions& options);
+  S3FileSystem(const Aws::SDKOptions& options, const std::string& s3_path);
   ~S3FileSystem();
 
   Status IntializeAndCheckClient(const std::string& s3_path);
@@ -1285,15 +1285,11 @@ S3FileSystem::CleanPath(const std::string& s3_path, std::string* clean_path)
   return Status::Success;
 }
 
-S3FileSystem::S3FileSystem(const Aws::SDKOptions& options)
+S3FileSystem::S3FileSystem(
+    const Aws::SDKOptions& options, const std::string& s3_path)
     : options_(options), s3_regex_(
                              "s3://([0-9a-zA-Z\\-.]+):([0-9]+)/"
                              "([0-9a-z.\\-]+)(((/[0-9a-zA-Z.\\-_]+)*)?)")
-{
-}
-
-Status
-S3FileSystem::IntializeAndCheckClient(const std::string& s3_path)
 {
   Aws::Client::ClientConfiguration config;
   Aws::Auth::AWSCredentials credentials;
@@ -1319,9 +1315,9 @@ S3FileSystem::IntializeAndCheckClient(const std::string& s3_path)
     config = Aws::Client::ClientConfiguration("default");
   }
 
-  // Cleanup extra slashes, return error if path is invalid
+  // Cleanup extra slashes
   std::string clean_path;
-  RETURN_IF_ERROR(CleanPath(s3_path, &clean_path));
+  LOG_STATUS_ERROR(CleanPath(s3_path, &clean_path), "failed to parse S3 path");
 
   std::string host_name, host_port, bucket, object;
   if (RE2::FullMatch(
@@ -1341,12 +1337,6 @@ S3FileSystem::IntializeAndCheckClient(const std::string& s3_path)
         config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
         /*useVirtualAdressing*/ false);
   }
-
-  // Verify that the path exists and 'client_' is initialized correctly.
-  bool exists;
-  RETURN_IF_ERROR(FileExists(clean_path, &exists));
-
-  return Status::Success;
 }
 
 S3FileSystem::~S3FileSystem()
@@ -1359,14 +1349,6 @@ S3FileSystem::FileExists(const std::string& path, bool* exists)
 {
   *exists = false;
 
-  std::string bucket, object;
-  RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
-
-  // Construct request for object metadata
-  s3::Model::HeadObjectRequest head_request;
-  head_request.SetBucket(bucket.c_str());
-  head_request.SetKey(object.c_str());
-
   // S3 doesn't make objects for directories, so it could still be a directory
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
@@ -1374,6 +1356,14 @@ S3FileSystem::FileExists(const std::string& path, bool* exists)
     *exists = is_dir;
     return Status::Success;
   }
+
+  std::string bucket, object;
+  RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
+
+  // Construct request for object metadata
+  s3::Model::HeadObjectRequest head_request;
+  head_request.SetBucket(bucket.c_str());
+  head_request.SetKey(object.c_str());
 
   auto head_object_outcome = client_.HeadObject(head_request);
   if (!head_object_outcome.IsSuccess()) {
@@ -1764,8 +1754,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #else
     Aws::SDKOptions options;
     Aws::InitAPI(options);
-    static S3FileSystem s3_fs(options);
-    RETURN_IF_ERROR(s3_fs.IntializeAndCheckClient(path));
+    static S3FileSystem s3_fs(options, path);
     *file_system = &s3_fs;
     return Status::Success;
 #endif  // TRITON_ENABLE_S3
