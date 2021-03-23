@@ -29,6 +29,7 @@ from email import encoders
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
 import base64
 import glob
 import os
@@ -36,7 +37,7 @@ import sys
 import tarfile
 
 
-def send(subject: str, attachments=[], files_to_tar=None):
+def send(subject: str, content: str, attachments=[], files_to_tar=None):
     FROM = os.environ.get('TRITON_FROM', '')
     TO = os.environ.get('TRITON_TO_DL', '')
     if FROM == '' or TO == '':
@@ -47,6 +48,7 @@ def send(subject: str, attachments=[], files_to_tar=None):
     msg['Subject'] = subject
     msg['From'] = FROM
     msg['To'] = TO
+    msg.attach(MIMEText(content))
 
     if files_to_tar is not None:
         with tarfile.open(subject + ".tgz", "w:gz") as csv_tar:
@@ -64,5 +66,5 @@ def send(subject: str, attachments=[], files_to_tar=None):
         msg.attach(p)
 
     mailServer = smtplib.SMTP("mailgw.nvidia.com")
-    mailServer.sendmail(FROM, TO, msg.as_string())
+    mailServer.send_message(msg)
     mailServer.quit()

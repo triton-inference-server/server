@@ -37,4 +37,9 @@ if __name__ == '__main__':
     today = date.today().strftime("%Y-%m-%d")
     subject = "Triton Client Memory Growth Summary: " + today
     memory_graphs = glob.glob("client_memory_growth*.log")
-    nightly_email_helper.send(subject, memory_graphs)
+    mail_content = ""
+    for mem_graph in sorted(memory_graphs):
+        mail_content += "\n" + mem_graph + "\n"
+        with open(mem_graph, "r") as f:
+            mail_content += f.read() + "\n"
+    nightly_email_helper.send(subject, mail_content)
