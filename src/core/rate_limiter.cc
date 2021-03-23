@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #include "src/backends/backend/triton_model.h"
 #include "src/backends/backend/triton_model_instance.h"
+#include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -66,11 +67,12 @@ RateLimiter::RegisterModelInstance(
         [this](ModelInstance* instance) { OnStage(instance); },
         [this](ModelInstance* instance) { OnRelease(instance); })));
     model_context.AddAvailableInstance(model_instances.back().get());
-    resource_manager_->AddModelInstance(model_instances.back().get());
     model_context.AddSpecificRequestQueue();
 
-
-    resource_manager_->UpdateResourceLimits();
+    if (!ignore_resources_and_priority_) {
+      resource_manager_->AddModelInstance(model_instances.back().get());
+      RETURN_IF_ERROR(resource_manager_->UpdateResourceLimits());
+    }
   }
 
   return Status::Success;
@@ -89,14 +91,18 @@ RateLimiter::UnregisterModel(const TritonModel* model)
     model_context.RequestRemoval();
     for (const auto& instance : model_instances_[model]) {
       instance->WaitForRemoval();
-      resource_manager_->RemoveModelInstance(instance.get());
+      if (!ignore_resources_and_priority_) {
+        resource_manager_->RemoveModelInstance(instance.get());
+      }
     }
 
     model_instances_.erase(model);
     model_contexts_.erase(model);
   }
 
-  resource_manager_->UpdateResourceLimits();
+  if (!ignore_resources_and_priority_) {
+    RETURN_IF_ERROR(resource_manager_->UpdateResourceLimits());
+  }
 
   return Status::Success;
 }
@@ -155,7 +161,9 @@ RateLimiter::OnRelease(ModelInstance* instance)
 {
   auto& model_context = model_contexts_[instance->RawInstance()->Model()];
   model_context.AddAvailableInstance(instance);
-  resource_manager_->ReleaseResources(instance);
+  if (!ignore_resources_and_priority_) {
+    resource_manager_->ReleaseResources(instance);
+  }
   if (model_context.ContainsPendingRequests(instance->RawInstance()->Index())) {
     if (ignore_resources_and_priority_) {
       // Directly allocate an available model instance if not using rate
@@ -174,7 +182,8 @@ RateLimiter::AttemptAllocation()
   std::lock_guard<std::recursive_mutex> lk(staged_instances_mtx_);
   if (!staged_instances_.empty()) {
     ModelInstance* instance = staged_instances_.top();
-    if (resource_manager_->AllocateResources(instance)) {
+    if (ignore_resources_and_priority_ ||
+        resource_manager_->AllocateResources(instance)) {
       staged_instances_.pop();
       instance->Allocate();
     }
@@ -501,7 +510,7 @@ RateLimiter::ResourceManager::RemoveModelInstance(
   return Status::Success;
 }
 
-void
+Status
 RateLimiter::ResourceManager::UpdateResourceLimits()
 {
   std::lock_guard<std::mutex> lk1(max_resources_mtx_);
@@ -509,8 +518,6 @@ RateLimiter::ResourceManager::UpdateResourceLimits()
   max_resources_.clear();
   // Obtain the maximum resource across all the instances
   // and use it as the default available.
-  // TODO: Add the enhancement to provide resources via CLI
-  // Will save some cycles in obtaineing the resource limits.
   for (const auto& instance_resources : model_resources_) {
     for (const auto& resource_device_map : instance_resources.second) {
       auto ditr = max_resources_.find(resource_device_map.first);
@@ -533,6 +540,109 @@ RateLimiter::ResourceManager::UpdateResourceLimits()
       }
     }
   }
+
+  if (!explicit_max_resources_.empty()) {
+    RETURN_IF_ERROR(ParseAndValidateExplicitResources());
+  }
+  RETURN_IF_ERROR(ValidateMaxResources());
+
+  if (LOG_VERBOSE_IS_ON(1)) {
+    std::string resource_map_str{"\nMax Resource Map===>\n"};
+    for (const auto& ditr : max_resources_) {
+      if (!ditr.second.empty()) {
+        std::string device_str{(ditr.first == GLOBAL_RESOURCE_KEY)
+                                   ? "GLOBAL"
+                                   : std::to_string(ditr.first)};
+        resource_map_str += "\tDevice: " + device_str + "\n";
+        for (const auto& ritr : ditr.second) {
+          resource_map_str += "\t\tResource: " + ritr.first +
+                              "\t Count: " + std::to_string(ritr.second) + "\n";
+        }
+      }
+    }
+    LOG_VERBOSE(1) << resource_map_str;
+  }
+
+  return Status::Success;
+}
+
+Status
+RateLimiter::ResourceManager::ValidateMaxResources()
+{
+  for (const auto& global_resource : max_resources_[GLOBAL_RESOURCE_KEY]) {
+    for (const auto& ditr : max_resources_) {
+      if (ditr.first != GLOBAL_RESOURCE_KEY) {
+        for (const auto& ritr : ditr.second) {
+          if (global_resource.first.compare(ritr.first) == 0) {
+            return Status(
+                Status::Code::INVALID_ARG,
+                (std::string("Resource \"") + ritr.first +
+                 "\" is present as both global and device-specific resource in "
+                 "the model configuration.")
+                    .c_str());
+          }
+        }
+      }
+    }
+  }
+  return Status::Success;
+}
+
+Status
+RateLimiter::ResourceManager::ParseAndValidateExplicitResources()
+{
+  for (auto& ditr : max_resources_) {
+    for (auto& ritr : ditr.second) {
+      // If not specified explicitly, consider the resource to be unavailable.
+      size_t resource_count = 0;
+      if (ditr.first == GLOBAL_RESOURCE_KEY) {
+        // Ignore the device specification... will search for all resources in
+        // the map...
+        for (const auto& exp_ditr : explicit_max_resources_) {
+          for (const auto& exp_ritr : exp_ditr.second) {
+            if (ritr.first.compare(exp_ritr.first) == 0) {
+              if (resource_count < exp_ritr.second) {
+                resource_count = exp_ritr.second;
+              }
+            }
+          }
+        }
+      } else {
+        // Search only for the device specific or per-device resources...
+        // device-specific
+        for (const auto& exp_ritr : explicit_max_resources_[ditr.first]) {
+          if (ritr.first.compare(exp_ritr.first) == 0) {
+            if (resource_count < exp_ritr.second) {
+              resource_count = exp_ritr.second;
+            }
+          }
+        }
+        // per-device
+        for (const auto& exp_ritr :
+             explicit_max_resources_[PER_DEVICE_RESOURCE_KEY]) {
+          if (ritr.first.compare(exp_ritr.first) == 0) {
+            if (resource_count < exp_ritr.second) {
+              resource_count = exp_ritr.second;
+            }
+          }
+        }
+      }
+      if (resource_count < ritr.second) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            (std::string("Resource \"") + ritr.first + "\" is limited to " +
+             std::to_string(resource_count) +
+             " which will prevent scheduling of one or more model "
+             "instances... the minimum expected count is " +
+             std::to_string(ritr.second))
+                .c_str());
+      } else {
+        ritr.second = resource_count;
+      }
+    }
+  }
+
+  return Status::Success;
 }
 
 bool

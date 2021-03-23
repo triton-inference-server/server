@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -52,12 +52,10 @@ class RateLimiter {
 
   using ResourceMap = std::map<int, std::map<std::string, size_t>>;
   enum RESOURCE_KIND_KEY {
-    // Key for holding cpu resources
-    CPU_RESOURCE_KEY = INT_MIN,
     // Key for holding global resources
-    GLOBAL_RESOURCE_KEY,
+    GLOBAL_RESOURCE_KEY = -2,
     // Key for holding resources per each device
-    PER_DEVICE_RESOURCE_KEY
+    PER_DEVICE_RESOURCE_KEY = -1
   };
 
   /// Creates a rate limiter object which will funnel the requests to
@@ -227,12 +225,14 @@ class RateLimiter {
         std::unique_ptr<ResourceManager>* resource_manager);
     void AddModelInstance(const RateLimiter::ModelInstance* instance);
     Status RemoveModelInstance(const RateLimiter::ModelInstance* instance);
-    void UpdateResourceLimits();
+    Status UpdateResourceLimits();
     bool AllocateResources(const RateLimiter::ModelInstance* instance);
     Status ReleaseResources(const RateLimiter::ModelInstance* instance);
 
    private:
     ResourceManager(const ResourceMap& resource_map);
+    Status ValidateMaxResources();
+    Status ParseAndValidateExplicitResources();
 
     ResourceMap explicit_max_resources_;
 
