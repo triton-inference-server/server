@@ -55,7 +55,7 @@ fi
 if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_LOG_BASE="./valgrind_test"
     LEAKCHECK=/usr/bin/valgrind
-    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
+    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000 --num-callers=20"
     SERVER_TIMEOUT=3600
     rm -f $LEAKCHECK_LOG_BASE*
 fi
@@ -279,7 +279,7 @@ for TARGET in cpu gpu; do
 
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi
