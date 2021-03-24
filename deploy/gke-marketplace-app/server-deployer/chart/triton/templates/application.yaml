@@ -1,0 +1,40 @@
+{{ if and .Values.gcpMarketplace (eq .Values.gcpMarketplace true) }}
+---
+apiVersion: app.k8s.io/v1beta1
+kind: Application
+metadata:
+  name: "{{ .Release.Name }}"
+  annotations:
+    kubernetes-engine.cloud.google.com/icon: >-
+      data:image/png;base64,{{ .Files.Get "logo.png" | b64enc }}
+    marketplace.cloud.google.com/deploy-info: '{"partner_id": "nvidia", "product_id": "triton", "partner_name": "NVIDIA"}'
+  labels:
+    app.kubernetes.io/name: "{{ .Release.Name }}"
+spec:
+  descriptor:
+    type: Triton
+    version: "{{ .Values.publishedVersion }}"
+    description: |-
+      Triton Inference Server provides a cloud and edge inferencing solution 
+      optimized for both CPUs and GPUs. Triton supports an HTTP/REST and GRPC 
+      protocol that allows remote clients to request inferencing for any model 
+      being managed by the server.
+
+    notes: |-
+
+      Send request to Triton server by using IP address of istio-ingressgateway, 
+      send to IP:80/v2/models/{}/infer
+
+      Links:
+      - [NVIDIA Triton page](https://developer.nvidia.com/nvidia-triton-inference-server)
+      - [Documentation](https://github.com/triton-inference-server/server)
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ .Release.Name }}"
+  componentKinds:
+  - group: apps/v1beta2
+    kind: Deployment
+  - group: v1
+    kind: Service
+{{  end }}

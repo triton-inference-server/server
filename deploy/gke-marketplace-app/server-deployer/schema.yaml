@@ -1,0 +1,94 @@
+# Copyright (c) 2020 NVIDIA CORPORATION. All rights reserved.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+x-google-marketplace:
+  schemaVersion: v2
+  applicationApiVersion: v1beta1
+  publishedVersion: '2.7.1'
+  publishedVersionMetadata:
+    releaseNote: >-
+      Initial release.
+    releaseTypes:
+    - Feature
+    recommended: true
+
+  clusterConstraints:
+    k8sVersion: >=1.18.7
+    assistedClusterCreation:
+      type: DISABLED
+      creationGuidance: "GKE currently doesn't support autocreate GPU clusters, please refer to https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app to manually  create the GKE cluster >= 1.18.7 and add GPU node pools"
+    resources:
+    - requests:
+        gpu:
+          nvidia.com/gpu: {}
+    istio:
+      type: REQUIRED
+
+  images:
+    '':
+      properties:
+        triton.image.registry:
+          type: REGISTRY
+        triton.image.repository:
+            type: REPO_WITHOUT_REGISTRY
+        triton.image.tag:
+            type: TAG
+
+properties:
+  name:
+    type: string
+    x-google-marketplace:
+      type: NAME
+  namespace:
+    type: string
+    x-google-marketplace:
+      type: NAMESPACE
+  initReplicaCount: 
+    title: Initial number of Triton pod instances to deploy
+    type: integer
+    default: 1
+  minReplicaCount: 
+    title: Minimum number of Triton pod instances in the deployment for autoscaling.
+    type: integer
+    default: 1
+  maxReplicaCount: 
+    title: Maximum number of Triton pod instances in the deployment for autoscaling.
+    type: integer
+    default: 3
+  tritonProtocol: 
+    title: Request protocol to send data to Triton, choose from gRPC and HTTP
+    type: string
+    default: HTTP
+  HPATargetAverageValue: 
+    title: HPA GPU utilization autoscaling target, when target is reached, Triton Server service will create another pod instance.
+    type: integer
+    default: 85      
+  modelRepositoryPath:
+    type: string
+    title: Bucket where models are stored. Read Triton documentation on configs and formatting details.
+    default: gs://triton_sample_models
+  istioEnabled:
+    type: boolean
+    x-google-marketplace:
+      type: ISTIO_ENABLED
+    default: True
+
+  
+required:
+- name
+- namespace
+- modelRepositoryPath
+
+form:
+- widget: help
+  description: Please refer to the <a href="https://github.com/triton-inference-server/server">Triton GITHUB page</a> for product information.

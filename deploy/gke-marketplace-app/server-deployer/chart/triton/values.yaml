@@ -1,0 +1,52 @@
+# Copyright (c) 2020 NVIDIA CORPORATION. All rights reserved.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+initReplicaCount: 1
+minReplicaCount: 1
+maxReplicaCount: 3
+# choice from gRPC and HTTP
+tritonProtocol: HTTP
+# HPA GPU utilization autoscaling target
+HPATargetAverageValue: 85
+modelRepositoryPath: gs://triton_sample_models
+publishedVersion: '2.7.1'
+gcpMarketplace: true
+
+image:
+  registry: gcr.io
+  repository: nvidia-ngc-public/tritonserver
+  tag: 21.02-py3
+  pyullPolicy: IfNotPresent
+  # modify the model repository here to match your GCP storage bucket
+  numGpus: 1
+  strictModelConfig: false
+  # add in custom library which could include custom ops in the model
+  ldPreloadPath: ''
+  logVerboseLevel: 1
+
+service:
+  type: NodePort 
+
+deployment:
+  livenessProbe:
+    failureThreshold: 60
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    successThreshold: 1
+    timeoutSeconds: 1
+  readinessProbe:
+    failureThreshold: 60
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    successThreshold: 1
+    timeoutSeconds: 1
