@@ -325,7 +325,7 @@ for model_trial in $MODEL_TRIALS; do
 
         set +e
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            check_valgrind_log $LEAKCHECK_LOG
+            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 RET=1
             fi
@@ -392,7 +392,7 @@ for model_trial in $MODEL_TRIALS; do
 
         set +e
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            check_valgrind_log $LEAKCHECK_LOG
+            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 RET=1
             fi
@@ -467,7 +467,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
 
       set +e
       if [ "$TEST_VALGRIND" -eq 1 ]; then
-          check_valgrind_log $LEAKCHECK_LOG
+          python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
           if [ $? -ne 0 ]; then
               RET=1
           fi
@@ -530,7 +530,7 @@ for i in $QUEUE_DELAY_TESTS ; do
 
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi
