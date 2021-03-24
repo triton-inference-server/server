@@ -646,6 +646,7 @@ COPY --chown=1000:1000 LICENSE .
 COPY --chown=1000:1000 TRITON_VERSION .
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
 '''
 
     for noncore in NONCORE_BACKENDS:
