@@ -523,8 +523,9 @@ GCSFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 
   if (!bucket_metadata) {
     return Status(
-        Status::Code::INTERNAL,
-        "Could not get MetaData for bucket with name " + bucket);
+        Status::Code::INTERNAL, "Could not get MetaData for bucket with name " +
+                                    bucket + " : " +
+                                    bucket_metadata.status().message());
   }
 
   // Root case - bucket exists and object path is empty
@@ -591,8 +592,9 @@ GCSFileSystem::GetDirectoryContents(
        client_->ListObjects(bucket, gcs::Prefix(full_dir))) {
     if (!object_metadata) {
       return Status(
-          Status::Code::INTERNAL,
-          "Could not list contents of directory at " + path);
+          Status::Code::INTERNAL, "Could not list contents of directory at " +
+                                      path + " : " +
+                                      object_metadata.status().message());
     }
 
     // In the case of empty directories, the directory itself will appear here
@@ -670,8 +672,8 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
   if (!stream) {
     return Status(
-        Status::Code::INTERNAL,
-        "Failed to open object read stream for " + path);
+        Status::Code::INTERNAL, "Failed to open object read stream for " +
+                                    path + " : " + stream.status().message());
   }
 
   std::string data = "";
@@ -757,7 +759,9 @@ GCSFileSystem::LocalizeDirectory(
             client_->ReadObject(file_bucket, file_object);
         if (!filestream) {
           return Status(
-              Status::Code::INTERNAL, "Failed to get object at " + *iter);
+              Status::Code::INTERNAL, "Failed to get object at " + *iter +
+                                          " : " +
+                                          filestream.status().message());
         }
 
         std::string gcs_removed_path = (*iter).substr(path.size());
@@ -895,7 +899,9 @@ Status
 ASFileSystem::CheckClient()
 {
   if (client_ == nullptr) {
-    return Status(Status::Code::INTERNAL, "blob client initialize failed.");
+    return Status(
+        Status::Code::INTERNAL,
+        "Unable to create Azure filesystem client. Check account credentials.");
   }
   return Status::Success;
 }
@@ -909,6 +915,12 @@ ASFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
 
   auto blobProperty = bc.get_blob_property(container, object_path);
+  if (!blobProperty.valid()) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Unable to get blob property for file at " + path);
+  }
+
   auto time =
       std::chrono::system_clock::from_time_t(blobProperty.last_modified);
   auto update_time =
@@ -1016,8 +1028,8 @@ ASFileSystem::ReadTextFile(const std::string& path, std::string* contents)
   std::ostringstream out_stream;
   bc.download_blob_to_stream(container, object_path, 0, 0, out_stream);
   if (errno != 0) {
-    auto error = "Failed to download blob " + path;
-    return Status(Status::Code::INTERNAL, error);
+    return Status(
+        Status::Code::INTERNAL, "Failed to fetch file stream at " + path);
   }
   *contents = out_stream.str();
 
@@ -1034,7 +1046,8 @@ ASFileSystem::FileExists(const std::string& path, bool* exists)
   as::blob_client_wrapper bc(client_);
   auto blobs = bc.list_blobs_segmented(container, "/", "", object, 1);
   if (errno != 0) {
-    return Status(Status::Code::INTERNAL, "Failed check file: " + path);
+    return Status(
+        Status::Code::INTERNAL, "Failed to check if file exists at " + path);
   }
   if (blobs.blobs.size() > 0) {
     *exists = true;
@@ -1070,7 +1083,8 @@ ASFileSystem::DownloadFolder(
       bc.download_blob_to_file(container, blob_path, local_path, last_modified);
       if (errno != 0) {
         return Status(
-            Status::Code::INTERNAL, "download file " + blob_path + " failed.");
+            Status::Code::INTERNAL, "Failed to download file at " + blob_path +
+                                        ", errno:" + strerror(errno));
       }
     }
     return Status::Success;
@@ -1161,6 +1175,8 @@ class S3FileSystem : public FileSystem {
  public:
   S3FileSystem(const Aws::SDKOptions& options, const std::string& s3_path);
   ~S3FileSystem();
+
+  Status IntializeAndCheckClient(const std::string& s3_path);
   Status FileExists(const std::string& path, bool* exists) override;
   Status IsDirectory(const std::string& path, bool* is_dir) override;
   Status FileModificationTime(
@@ -1333,6 +1349,14 @@ S3FileSystem::FileExists(const std::string& path, bool* exists)
 {
   *exists = false;
 
+  // S3 doesn't make objects for directories, so it could still be a directory
+  bool is_dir;
+  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  if (is_dir) {
+    *exists = is_dir;
+    return Status::Success;
+  }
+
   std::string bucket, object;
   RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
 
@@ -1342,15 +1366,15 @@ S3FileSystem::FileExists(const std::string& path, bool* exists)
   head_request.SetKey(object.c_str());
 
   auto head_object_outcome = client_.HeadObject(head_request);
-  if (head_object_outcome.IsSuccess()) {
+  if (!head_object_outcome.IsSuccess()) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Could not get MetaData for object at " + path + " due to exception: " +
+            head_object_outcome.GetError().GetExceptionName() +
+            ", error message: " + head_object_outcome.GetError().GetMessage());
+  } else {
     *exists = true;
-    return Status::Success;
   }
-
-  // S3 doesn't make objects for directories, so it could still be a directory
-  bool is_dir;
-  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
-  *exists = is_dir;
 
   return Status::Success;
 }
