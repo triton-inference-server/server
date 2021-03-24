@@ -63,6 +63,7 @@ for PROTOCOL in http grpc; do
     for LANG in c++ python; do
         LEAKCHECK_LOG="./valgrind.${PROTOCOL}.${LANG}.log"
         CLIENT_LOG="./client.${PROTOCOL}.${LANG}.log"
+        GRAPH_LOG="./client_memory_growth.${PROTOCOL}.${LANG}.log"
         MASSIF_LOG="./${PROTOCOL}.${LANG}.massif"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG --massif-out-file=$MASSIF_LOG"
 
@@ -106,7 +107,8 @@ for PROTOCOL in http grpc; do
 
             # Log the graph for memory growth and the change between Average and Max memory usage
             cat ${CLIENT_LOG}.massif
-            ms_print ${MASSIF_LOG} | head -n35
+            ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
+            cat ${GRAPH_LOG}
             set -e
         fi
 
@@ -120,6 +122,11 @@ if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+# Run only if both TRITON_FROM and TRITON_TO_DL are set
+if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
+    python client_memory_mail.py
 fi
 
 exit $RET
