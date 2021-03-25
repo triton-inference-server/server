@@ -507,7 +507,19 @@ InferenceServer::PrintBackendAndModelSummary()
 
   triton::common::TablePrinter backends_table(backend_headers);
 
-  std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
+  // TensorRT is built-in to core Triton (for now), so explicitly add
+  // a row for it.
+#ifdef TRITON_ENABLE_TENSORRT
+  {
+    std::vector<std::string> backend_record;
+    backend_record.emplace_back("tensorrt");
+    backend_record.emplace_back("<built-in>");
+    backend_record.emplace_back("{}");
+    backends_table.InsertRow(backend_record);
+  }
+#endif // TRITON_ENABLE_TENSORRT
+
+std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
       backend_state;
   RETURN_IF_ERROR(TritonBackendManager::BackendState(&backend_state));
 
