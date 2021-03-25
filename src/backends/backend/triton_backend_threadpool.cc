@@ -44,28 +44,28 @@ TritonBackendThreadPool::CreateThreadPool(
     const StandardRunFuncV2 OnRun,
     std::unique_ptr<TritonBackendThreadPool>* threadpool)
 {
-  // int nice = GetCpuNiceLevel(triton_model->Backend()->BackendConfig());
-  int nice = 0;
   std::unique_ptr<TritonBackendThreadPool> local_threadpool(
-      new TritonBackendThreadPool(nice, OnInit, OnRun));
+      new TritonBackendThreadPool(OnInit, OnRun));
 
   bool initialization_failed = false;
-  for (const auto& instance : triton_model->Instances()) {
-    std::promise<bool> init_state;
-    TritonModelInstance* raw_instance = instance.get();
-    auto& this_context =
-        local_threadpool->backend_thread_contexts_[raw_instance];
-    this_context.reset(new BackendThreadContext());
-    this_context->thread_.reset(new std::thread([&] {
-      local_threadpool->BackendThread(
-          raw_instance, this_context.get(), &init_state);
-    }));
-    if (!init_state.get_future().get()) {
-      initialization_failed = true;
-      if (this_context->thread_->joinable()) {
-        this_context->thread_->join();
+  if (triton_model->Instances().size() != 1) {
+    for (const auto& instance : triton_model->Instances()) {
+      std::promise<bool> init_state;
+      TritonModelInstance* raw_instance = instance.get();
+      auto& this_context =
+          local_threadpool->backend_thread_contexts_[raw_instance];
+      this_context.reset(new BackendThreadContext());
+      this_context->thread_.reset(new std::thread([&] {
+        local_threadpool->BackendThread(
+            raw_instance, this_context.get(), &init_state);
+      }));
+      if (!init_state.get_future().get()) {
+        initialization_failed = true;
+        if (this_context->thread_->joinable()) {
+          this_context->thread_->join();
+        }
+        local_threadpool->backend_thread_contexts_.erase(raw_instance);
       }
-      local_threadpool->backend_thread_contexts_.erase(raw_instance);
     }
   }
 
@@ -80,9 +80,8 @@ TritonBackendThreadPool::CreateThreadPool(
 }
 
 TritonBackendThreadPool::TritonBackendThreadPool(
-    const int nice, const StandardInitFuncV2& OnInit,
-    const StandardRunFuncV2& OnRun)
-    : nice_(nice), OnInit_(OnInit), OnRun_(OnRun), signal_exit_(false)
+    const StandardInitFuncV2& OnInit, const StandardRunFuncV2& OnRun)
+    : OnInit_(OnInit), OnRun_(OnRun), signal_exit_(false)
 {
 }
 
@@ -90,6 +89,8 @@ TritonBackendThreadPool::~TritonBackendThreadPool()
 {
   signal_exit_ = true;
   for (const auto& thread_context_ : backend_thread_contexts_) {
+    thread_context_.second->ready_.store(true);
+    thread_context_.second->cv_.notify_one();
     if (thread_context_.second->thread_->joinable()) {
       thread_context_.second->thread_->join();
     }
@@ -102,16 +103,21 @@ TritonBackendThreadPool::SubmitRequest(
     std::vector<std::unique_ptr<InferenceRequest>>&& requests,
     std::function<void()> callback_fn)
 {
-  // Pass this to appropriate backend thread
-  LOG_INFO << "Inside Submit Request";
-
-  // Single instance case... Execute on this thread itself...
-  OnRun_(instance, std::move(requests));
-
-  // TODO: For multiple instance push the requests to the backend thread
-  // associated with the instance
-
-  callback_fn();
+  if (backend_thread_contexts_.empty()) {
+    // Single instance case... Execute on this thread itself...
+    LOG_VERBOSE(1) << "Executing on scheduler thread for instance \""
+                   << instance->Name() << "\"...";
+    OnRun_(instance, std::move(requests));
+    callback_fn();
+  } else {
+    {
+      std::lock_guard<std::mutex> lk(backend_thread_contexts_[instance]->mtx_);
+      backend_thread_contexts_[instance]->requests_ = std::move(requests);
+      backend_thread_contexts_[instance]->completion_cb_ = callback_fn;
+      backend_thread_contexts_[instance]->ready_.store(true);
+    }
+    backend_thread_contexts_[instance]->cv_.notify_one();
+  }
 
   return Status::Success;
 }
@@ -121,19 +127,9 @@ TritonBackendThreadPool::BackendThread(
     TritonModelInstance* instance, BackendThreadContext* rthread_context,
     std::promise<bool>* is_initialized)
 {
-#ifndef _WIN32
-  if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice_) == 0) {
-    LOG_VERBOSE(1) << "Starting backend thread for instance \""
-                   << instance->Name() << "\" at nice " << nice_ << "...";
-  } else {
-    LOG_VERBOSE(1) << "Starting backend thread for instance \""
-                   << instance->Name() << "\" at default nice (requested nice "
-                   << nice_ << " failed)...";
-  }
-#else
   LOG_VERBOSE(1) << "Starting backend thread for instance \""
-                 << instance->Name() << "\" at default nice...";
-#endif
+                 << instance->Name() << "\"...";
+
 
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
@@ -155,13 +151,24 @@ TritonBackendThreadPool::BackendThread(
   }
 
   while (!signal_exit_) {
-    LOG_ERROR << "Inside backend thread for instance \"" << instance->Name()
-              << "\": " << startup_status.Message();
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::unique_lock<std::mutex> lk(rthread_context->mtx_);
+    rthread_context->cv_.wait(
+        lk, [rthread_context] { return rthread_context->ready_.load(); });
+    if (!rthread_context->requests_.empty()) {
+      LOG_VERBOSE(1) << "Executing backend thread for instance \""
+                     << instance->Name() << "\"...";
+      OnRun_(instance, std::move(rthread_context->requests_));
+      rthread_context->requests_.clear();
+      rthread_context->completion_cb_();
+      rthread_context->count_++;
+    } else {
+      rthread_context->ready_.store(false);
+    }
   }
 
   LOG_VERBOSE(1) << "Stopping backend thread for instance \""
-                 << instance->Name() << "\"...";
+                 << instance->Name() << "\"..."
+                 << " with count " << rthread_context->count_;
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -85,23 +85,24 @@ class TritonBackendThreadPool {
 
  private:
   TritonBackendThreadPool(
-      const int nice, const StandardInitFuncV2& OnInit,
-      const StandardRunFuncV2& OnRun);
+      const StandardInitFuncV2& OnInit, const StandardRunFuncV2& OnRun);
 
   struct BackendThreadContext {
-    BackendThreadContext() {}
+    BackendThreadContext() : ready_(false), count_(0) {}
 
     std::mutex mtx_;
     std::condition_variable cv_;
-    std::unique_ptr<std::vector<std::unique_ptr<InferenceRequest>>> requests_;
+    std::vector<std::unique_ptr<InferenceRequest>> requests_;
     std::unique_ptr<std::thread> thread_;
+    std::atomic<bool> ready_;
+    std::function<void()> completion_cb_;
+    size_t count_;
   };
 
   void BackendThread(
       TritonModelInstance* instance, BackendThreadContext* rthread_context,
       std::promise<bool>* is_initialized);
 
-  int nice_;
   StandardInitFuncV2 OnInit_;
   StandardWarmupFuncV2 OnWarmup_;
   StandardRunFuncV2 OnRun_;

@@ -258,7 +258,7 @@ DynamicBatchSchedulerV2::SchedulerThread(
       // that we don't requests for too many model_instances from the
       // rate_limiter. Intelligently mixing the two queues looks like the
       // way ahead.
-  
+
       /*
       // Use dynamic batching to get request(s) to execute.
       wait_microseconds = GetDynamicBatch();
@@ -438,19 +438,19 @@ DynamicBatchSchedulerV2::SchedulerThread(
       rate_limiter_->RequestModelInstance(sched_cb, triton_model_);
     }
 
-/*
-    // Finish rejected requests if any
-    if (rejected_requests != nullptr) {
-      static Status rejected_status =
-          Status(Status::Code::UNAVAILABLE, "Request timeout expired");
-      for (auto& rejected_queue : *rejected_requests) {
-        for (auto& rejected_request : rejected_queue) {
-          InferenceRequest::RespondIfError(
-              rejected_request, rejected_status, true);
+    /*
+        // Finish rejected requests if any
+        if (rejected_requests != nullptr) {
+          static Status rejected_status =
+              Status(Status::Code::UNAVAILABLE, "Request timeout expired");
+          for (auto& rejected_queue : *rejected_requests) {
+            for (auto& rejected_request : rejected_queue) {
+              InferenceRequest::RespondIfError(
+                  rejected_request, rejected_status, true);
+            }
+          }
         }
-      }
-    }
-*/    
+    */
   }
 
   LOG_VERBOSE(1) << "Stopping dynamic-batch scheduler thread for model"

@@ -167,7 +167,6 @@ TritonModel::Create(
   auto OnRun = [backend](
                    void* instance,
                    std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
-    LOG_INFO << "Inside OnRun";
     // Use a thread local vector to avoid needing to malloc each
     // time an inference is run.
     thread_local std::vector<TRITONBACKEND_Request*> triton_requests(1024);
@@ -211,7 +210,6 @@ TritonModel::Create(
           TritonModelInstance* instance,
           std::vector<std::unique_ptr<InferenceRequest>>&& requests,
           std::function<void()> callback_fn) {
-        LOG_INFO << "Request Scheduled";
         raw_local_model->backend_threadpool_->SubmitRequest(
             instance, std::move(requests), callback_fn);
       };
