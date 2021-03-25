@@ -54,6 +54,7 @@ TritonModelInstance::TritonModelInstance(
 
 TritonModelInstance::~TritonModelInstance()
 {
+  LOG_INFO << "Deleting model instance";
   // Model finalization is optional...
   if (model_->Backend()->ModelInstanceFiniFn() != nullptr) {
     LOG_TRITONSERVER_ERROR(

@@ -28,6 +28,7 @@
 #include <memory>
 #include <string>
 #include "src/backends/backend/triton_backend_manager.h"
+#include "src/backends/backend/triton_backend_threadpool.h"
 #include "src/core/backend.h"
 #include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
@@ -38,6 +39,7 @@ namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
 class TritonModelInstance;
+class TritonBackendThreadPool;
 
 //
 // Represents a model.
@@ -65,6 +67,10 @@ class TritonModel : public InferenceBackend {
       const uint32_t config_version,
       TRITONSERVER_Message* updated_config_message);
   const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
+  const std::vector<std::unique_ptr<TritonModelInstance>>& Instances() const
+  {
+    return instances_;
+  }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
@@ -91,6 +97,8 @@ class TritonModel : public InferenceBackend {
   // required creation of a temporary local copy then that copy will
   // persist as along as this object is retained by this model.
   std::shared_ptr<LocalizedDirectory> localized_model_dir_;
+
+  std::unique_ptr<TritonBackendThreadPool> backend_threadpool_;
 
   // Backend used by this model.
   std::shared_ptr<TritonBackend> backend_;

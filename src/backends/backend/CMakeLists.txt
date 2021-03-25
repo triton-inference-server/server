@@ -33,6 +33,7 @@ set(
   BACKEND_SRCS
   triton_backend_config.cc
   triton_backend_manager.cc
+  triton_backend_threadpool.cc
   triton_memory_manager.cc
   triton_model.cc
   triton_model_instance.cc
@@ -43,6 +44,7 @@ set(
   backend_factory.h
   triton_backend_config.h
   triton_backend_manager.h
+  triton_backend_threadpool.h
   triton_memory_manager.h
   triton_model.h
   triton_model_instance.h

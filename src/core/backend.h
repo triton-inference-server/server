@@ -185,10 +185,8 @@ class InferenceBackend {
 
   // Set the scheduler based on the model configuration. The scheduler
   // can only be set once for a backend.
-  Status SetConfiguredScheduler(
-      const void* raw_triton_model, const uint32_t runner_cnt,
-      const Scheduler::StandardInitFunc& OnInit,
-      const Scheduler::StandardRunFunc& OnRun);
+  Status SetConfiguredSchedulerV2(
+      const void* triton_model, const Scheduler::StandardSchedFuncV2 OnSched);
 
   // Get the raw pointer to the scheduler of this backend.
   Scheduler* BackendScheduler() { return scheduler_.get(); }

@@ -1399,20 +1399,25 @@ class InferInput:
                 self._data = []
                 try:
                     if input_tensor.size > 0:
-                        for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
+                        for obj in np.nditer(input_tensor,
+                                             flags=["refs_ok"],
+                                             order='C'):
                             # We need to convert the object to string using utf-8,
                             # if we want to use the binary_data=False. JSON requires
                             # the input to be a UTF-8 string.
                             if input_tensor.dtype == np.object_:
                                 if type(obj.item()) == bytes:
-                                    self._data.append(str(obj.item(), encoding='utf-8'))
+                                    self._data.append(
+                                        str(obj.item(), encoding='utf-8'))
                                 else:
                                     self._data.append(str(obj.item()))
                             else:
-                                self._data.append(str(obj.item(), encoding='utf-8'))
+                                self._data.append(
+                                    str(obj.item(), encoding='utf-8'))
                 except UnicodeDecodeError:
-                    raise_error(f'Failed to encode "{obj.item()}" using UTF-8. Please use binary_data=True, if'
-                                ' you want to pass a byte array.')
+                    raise_error(
+                        f'Failed to encode "{obj.item()}" using UTF-8. Please use binary_data=True, if'
+                        ' you want to pass a byte array.')
             else:
                 self._data = [val.item() for val in input_tensor.flatten()]
         else:
@@ -1594,8 +1599,9 @@ class InferResult:
             try:
                 self._result = json.loads(content)
             except UnicodeDecodeError as e:
-                raise_error(f'Failed to encode using UTF-8. Please use binary_data=True, if'
-                            f' you want to pass a byte array. UnicodeError: {e}')
+                raise_error(
+                    f'Failed to encode using UTF-8. Please use binary_data=True, if'
+                    f' you want to pass a byte array. UnicodeError: {e}')
         else:
             header_length = int(header_length)
             content = response.read(length=header_length)

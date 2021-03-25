@@ -40,9 +40,7 @@
 namespace nvidia { namespace inferenceserver {
 
 DynamicBatchSchedulerV2::DynamicBatchSchedulerV2(
-    const void* triton_model, const uint32_t runner_id_start,
-    const uint32_t runner_cnt, const StandardInitFunc& OnInit,
-    const StandardWarmupFunc& OnWarmup, const StandardRunFunc& OnSchedule,
+    const void* triton_model, const StandardSchedFuncV2& OnSchedule,
     const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
@@ -50,19 +48,17 @@ DynamicBatchSchedulerV2::DynamicBatchSchedulerV2(
     const uint64_t max_queue_delay_microseconds,
     const inference::ModelQueuePolicy& default_queue_policy,
     const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map)
-    : triton_model_((const TritonModel*)triton_model),
-      runner_id_start_(runner_id_start), runner_cnt_(runner_cnt),
-      OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
+    : triton_model_((const TritonModel*)triton_model), OnSchedule_(OnSchedule),
       dynamic_batching_enabled_(dynamic_batching_enabled),
-      scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
       queue_(default_queue_policy, priority_levels, queue_policy_map),
+      staged_queue_(default_queue_policy, 0, queue_policy_map), delay_cnt_(0),
       max_batch_size_((size_t)std::max(1, max_batch_size)),
       preferred_batch_sizes_(preferred_batch_sizes),
       pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
-      pending_batch_size_(0), queued_batch_size_(0),
+      pending_batch_size_(0), staged_batch_size_(0), queued_batch_size_(0),
       next_preferred_batch_size_(0),
       enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
-      preserve_ordering_(preserve_ordering)
+      preserve_ordering_(preserve_ordering), signal_exit_(false)
 {
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
@@ -75,10 +71,9 @@ DynamicBatchSchedulerV2::DynamicBatchSchedulerV2(
 
 Status
 DynamicBatchSchedulerV2::Create(
-    const void* triton_model, const uint32_t runner_id_start,
-    const uint32_t runner_cnt, const int nice, const StandardInitFunc& OnInit,
-    const StandardWarmupFunc& OnWarmup, const StandardRunFunc& OnSchedule,
-    const bool dynamic_batching_enabled, const int32_t max_batch_size,
+    const void* triton_model, const int nice,
+    const StandardSchedFuncV2& OnSchedule, const bool dynamic_batching_enabled,
+    const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
@@ -93,17 +88,15 @@ DynamicBatchSchedulerV2::Create(
   batcher_config.set_max_queue_delay_microseconds(max_queue_delay_microseconds);
 
   return Create(
-      triton_model, runner_id_start, runner_cnt, nice, OnInit, OnWarmup,
-      OnSchedule, dynamic_batching_enabled, max_batch_size,
+      triton_model, nice, OnSchedule, dynamic_batching_enabled, max_batch_size,
       enforce_equal_shape_tensors, batcher_config, scheduler);
 }
 
 Status
 DynamicBatchSchedulerV2::Create(
-    const void* triton_model, const uint32_t runner_id_start,
-    const uint32_t runner_cnt, const int nice, const StandardInitFunc& OnInit,
-    const StandardWarmupFunc& OnWarmup, const StandardRunFunc& OnSchedule,
-    const bool dynamic_batching_enabled, const int32_t max_batch_size,
+    const void* triton_model, const int nice,
+    const StandardSchedFuncV2& OnSchedule, const bool dynamic_batching_enabled,
+    const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const inference::ModelDynamicBatching& batcher_config,
     std::unique_ptr<Scheduler>* scheduler)
@@ -114,40 +107,24 @@ DynamicBatchSchedulerV2::Create(
   }
 
   DynamicBatchSchedulerV2* dyna_sched = new DynamicBatchSchedulerV2(
-      triton_model, runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, max_batch_size, enforce_equal_shape_tensors,
-      batcher_config.preserve_ordering(), preferred_batch_sizes,
-      batcher_config.max_queue_delay_microseconds(),
+      triton_model, OnSchedule, dynamic_batching_enabled, max_batch_size,
+      enforce_equal_shape_tensors, batcher_config.preserve_ordering(),
+      preferred_batch_sizes, batcher_config.max_queue_delay_microseconds(),
       batcher_config.default_queue_policy(), batcher_config.priority_levels(),
       batcher_config.priority_queue_policy());
   std::unique_ptr<DynamicBatchSchedulerV2> sched(dyna_sched);
 
-  // Create one scheduler thread for each requested runner. Associate
-  // each scheduler thread with a runner.
-  for (uint32_t c = 0; c < sched->scheduler_thread_cnt_; ++c) {
-    const uint32_t runner_id = runner_id_start + c;
-    std::promise<bool> init_state;
-    auto thread_exit = std::make_shared<std::atomic<bool>>(false);
-    auto thread_context = std::make_shared<SchedulerThreadContext>(thread_exit);
-    thread_context->thread_.reset(new std::thread(
-        [dyna_sched, runner_id, nice, thread_context, &init_state]() {
-          dyna_sched->SchedulerThread(
-              runner_id, nice, thread_context, &init_state);
-        }));
-    sched->sched_thread_contexts_.push_back(thread_context);
-    if (!init_state.get_future().get()) {
-      if (sched->sched_thread_contexts_.back()->thread_->joinable()) {
-        sched->sched_thread_contexts_.back()->thread_->join();
-      }
-      sched->sched_thread_contexts_.pop_back();
+  std::promise<bool> init_state;
+  sched->sched_thread_.reset(new std::thread([dyna_sched, nice, &init_state]() {
+    dyna_sched->SchedulerThread(nice, &init_state);
+  }));
+  if (!init_state.get_future().get()) {
+    if (sched->sched_thread_->joinable()) {
+      sched->sched_thread_->join();
     }
   }
 
-  if (sched->sched_thread_contexts_.empty()) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Initialization failed for all dynamic-batch scheduler threads");
-  }
+  // Check if the Scheduler thread is initialized properly
 
   // For debugging/testing, delay start of threads until the queue
   // contains the specified number of entries.
@@ -156,10 +133,9 @@ DynamicBatchSchedulerV2::Create(
     const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER");
     if (dstr != nullptr) {
       sched->delay_cnt_ = atoi(dstr);
-      LOG_VERBOSE(1) << "Delaying scheduler thread [ " << runner_id_start
-                     << " - " << (runner_id_start + runner_cnt - 1)
-                     << " ] until " << sched->delay_cnt_
-                     << " queued requests...";
+      LOG_VERBOSE(1) << "Delaying scheduler thread for model "
+                     << sched->triton_model_->Name() << "  until "
+                     << sched->delay_cnt_ << " queued requests...";
     }
   }
 
@@ -170,29 +146,14 @@ DynamicBatchSchedulerV2::Create(
 
 DynamicBatchSchedulerV2::~DynamicBatchSchedulerV2()
 {
+  signal_exit_ = true;
   // Signal the scheduler threads to exit and then wait for them...
   {
-    // std::unique_lock<std::mutex> lock(queue_mtx_);
-    uint32_t count = 0;
-    for (auto& context : sched_thread_contexts_) {
-      context->exit_->store(true);
-      context->ready_cv_.notify_all();
-
-      // It is possible for (one of) the scheduler threads to be the last
-      // holder of a backend object, and when that scheduler thread
-      // releases the object the scheduler thread itself will destroy the
-      // DynamicBatchSchedulerV2 object. So we need to check for a scheduler
-      // thread and not join it against itself. Instead we detach it so
-      // there is not a problem when its thread object is destroyed.
-      if (context->thread_->get_id() != std::this_thread::get_id()) {
-        if (context->thread_->joinable()) {
-          context->thread_->join();
-        }
-      } else {
-        context->thread_->detach();
-      }
-      count++;
-    }
+    std::unique_lock<std::mutex> lock(mu_);
+    cv_.notify_all();
+  }
+  if (sched_thread_->joinable()) {
+    sched_thread_->join();
   }
 }
 
@@ -206,8 +167,10 @@ DynamicBatchSchedulerV2::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
 
+  Status enqueue_status;
+  bool wake_runner = false;
   {
-    std::lock_guard<std::mutex> lock(queue_mtx_);
+    std::lock_guard<std::mutex> lock(mu_);
 
     queued_batch_size_ += std::max(1U, request->BatchSize());
 
@@ -215,67 +178,35 @@ DynamicBatchSchedulerV2::Enqueue(std::unique_ptr<InferenceRequest>& request)
     // 'request' and so we can't use it after this point.
     RETURN_IF_ERROR(queue_.Enqueue(request->Priority(), request));
 
-    if (delay_cnt_ > 0) {
-      if (queue_.Size() >= delay_cnt_) {
-        delay_cnt_ = 0;
-      } else {
-        LOG_VERBOSE(1) << "Delaying scheduler threads [ " << runner_id_start_
-                       << " - " << (runner_id_start_ + runner_cnt_ - 1)
-                       << " ] until " << delay_cnt_
-                       << " queued requests, current total = " << queue_.Size();
-        return Status::Success;
-      }
+    // We may wake up runner less often if we don't enforce equal shape within
+    // a batch, otherwise must always wake up runner to check it
+    if (enforce_equal_shape_tensors_.empty()) {
+      wake_runner &=
+          ((staged_batch_size_ + queued_batch_size_) >=
+           next_preferred_batch_size_);
     }
   }
 
-  auto callback_fn = [this](RateLimiter::ModelInstance* instance) {
-    NotificationFunction(instance);
-  };
-
-  rate_limiter_->RequestModelInstance(callback_fn, triton_model_);
+  if (wake_runner) {
+    cv_.notify_one();
+  }
 
   return Status::Success;
 }
 
 void
-DynamicBatchSchedulerV2::NotificationFunction(
-    RateLimiter::ModelInstance* instance)
-{
-  if (dynamic_batching_enabled_ &&
-      (!rate_limiter_->IgnoreResourcesAndPriority())) {
-    PushInstanceToQueue(instance);
-  }
-
-  // Signal the scheduler thread to make progress
-  if (instance->RawInstance()->Index() >= sched_thread_contexts_.size()) {
-    LOG_ERROR << "Instance Index " << instance->RawInstance()->Index()
-              << " should be less than " << sched_thread_contexts_.size();
-  }
-
-  // Note that we are notifying a specific scheduler thread for
-  // a given instance index. This is done to benefit from the
-  // locality of the thread with instance.
-  // This requires a distinct runner thread for each instance.
-  // TODO: When TensorRT gets migrated to new backend API, this
-  // condition might not be true.
-  auto& sched_thread_context =
-      sched_thread_contexts_[instance->RawInstance()->Index()];
-  sched_thread_context->allocated_instance_ = instance;
-  sched_thread_context->ready_.store(true);
-  sched_thread_context->ready_cv_.notify_all();
-}
-
-void
 DynamicBatchSchedulerV2::SchedulerThread(
-    const uint32_t runner_id, const int nice,
-    const std::shared_ptr<SchedulerThreadContext>& rthread_context,
-    std::promise<bool>* is_initialized)
+    const int nice, std::promise<bool>* is_initialized)
 {
+  // I need to take the requests off the queue, communicate with the rate
+  // limiter and in the end ask backend thread pool to execute the inference.
+
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
-    LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
-                   << " at nice " << nice << "...";
+    LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread for model "
+                   << triton_model_->Name() << " at nice " << nice << "...";
   } else {
-    LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
+    LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread for model "
+                   << triton_model_->Name()
                    << " at default nice (requested nice " << nice
                    << " failed)...";
   }
@@ -283,194 +214,231 @@ DynamicBatchSchedulerV2::SchedulerThread(
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
   // any runner and so will not get used for execution.
-  Status startup_status = OnInit_(runner_id);
+  // Status startup_status = OnInit_();
 
   // Run warmup function if initialization succeed.
-  if (startup_status.IsOk()) {
-    startup_status = OnWarmup_(runner_id);
-  }
+  // if (startup_status.IsOk()) {
+  //  startup_status = OnWarmup_();
+  //}
 
-  if (!startup_status.IsOk()) {
-    LOG_ERROR << "Initialization failed for dynamic-batch scheduler thread "
-              << runner_id << ": " << startup_status.Message();
+  // if (!startup_status.IsOk()) {
+  if (false) {
+    // LOG_ERROR << "Initialization failed for dynamic-batch scheduler thread
+    // for model "
+    //          << triton_model_->Name() << ": " << startup_status.Message();
     is_initialized->set_value(false);
     return;
   } else {
     is_initialized->set_value(true);
   }
 
-  // For testing this scheduler thread to be the last to release the
-  // backend object.
-  uint64_t backend_release_wait_milliseconds = 0;
-  {
-    const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
-    if (dstr != nullptr) {
-      backend_release_wait_milliseconds = atoi(dstr);
-      LOG_VERBOSE(1) << "Delaying scheduler backend release for " << runner_id
-                     << ": " << backend_release_wait_milliseconds << "ms";
-    }
-  }
+  const uint64_t default_wait_microseconds = 500 * 1000;
 
-  // Make a local copy of the atomic used to signal the thread to
-  // exit. See comment at end of function for explanation.
-  std::shared_ptr<SchedulerThreadContext> thread_context = rthread_context;
-
-  while (!thread_context->exit_->load()) {
+  while (!signal_exit_) {
     NVTX_RANGE(nvtx_, "DynamicBatchSchedulerV2 " + runner_id);
 
-    // The thread will wait till rate limiter marks the thread
-    // ready and allocates a model instance to run.
-    if (!thread_context->ready_) {
-      std::unique_lock<std::mutex> lock(thread_context->ready_mu_);
-      thread_context->ready_cv_.wait(lock, [&thread_context]() {
-        return (thread_context->ready_.load() || thread_context->exit_->load());
-      });
-    }
-
-    // With dynamic batching enable the priority order across
-    // the instances must be preserved. This serialization step
-    // can be ignored if rate_limiter is configured to ignore the
-    // resource and priority.
-    if (dynamic_batching_enabled_ &&
-        (!rate_limiter_->IgnoreResourcesAndPriority())) {
-      std::unique_lock<std::mutex> lock(sync_mu_);
-      sync_cv_.wait(lock, [this, &thread_context]() {
-        return (ProceedOk(thread_context->allocated_instance_));
-      });
-    }
-
-    std::vector<std::unique_ptr<InferenceRequest>> requests;
-    std::shared_ptr<std::vector<std::deque<std::unique_ptr<InferenceRequest>>>>
-        rejected_requests;
+    bool request_model_instance = false;
     uint64_t wait_microseconds = 0;
 
-    // Hold the lock for as short a time as possible.
-    {
-      std::unique_lock<std::mutex> lock(queue_mtx_);
-      if (queue_.Empty()) {
-        // Release the allocated instance
-        thread_context->ready_ = false;
-        if (thread_context->allocated_instance_ != nullptr) {
-          thread_context->allocated_instance_->Release(false /*executed*/);
-          thread_context->allocated_instance_ = nullptr;
-        }
-        continue;
-      } else if (dynamic_batching_enabled_) {
-        // Use dynamic batching to get request(s) to execute.
-        wait_microseconds = GetDynamicBatch(runner_id);
+    if (delay_cnt_ > 0) {
+      // Debugging/testing... wait until queue contains 'delay_cnt'
+      // items...
+      wait_microseconds = 10 * 1000;
+      if (queue_.Size() >= delay_cnt_) {
+        delay_cnt_ = 0;
+      }
+      LOG_VERBOSE(1) << "Delaying scheduler thread for model "
+                     << triton_model_->Name() << " until " << delay_cnt_
+                     << " queued requests, current total = " << queue_.Size();
+    } else if (queue_.Empty()) {
+      wait_microseconds = default_wait_microseconds;
+    } else if (dynamic_batching_enabled_) {
+      // TODO: Enable Dynamic Batching!!! The requests are deferred and not
+      // necessarily executed right away. We need to optimize below so
+      // that we don't requests for too many model_instances from the
+      // rate_limiter. Intelligently mixing the two queues looks like the
+      // way ahead.
+  
+      /*
+      // Use dynamic batching to get request(s) to execute.
+      wait_microseconds = GetDynamicBatch();
+      // Get requests that are rejected from searching dynamic batch.
+      queue_.ReleaseRejectedRequests(&rejected_requests);
 
-        // Get requests that are rejected from searching dynamic batch.
-        queue_.ReleaseRejectedRequests(&rejected_requests);
-
-        // Extract batch only if there is pending batch
-        auto pending_batch_queue_cnt = queue_.PendingBatchCount();
-        if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
-          requests.reserve(pending_batch_queue_cnt);
-          for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
-            std::unique_ptr<InferenceRequest> request;
-            auto status = queue_.Dequeue(&request);
-            if (status.IsOk()) {
-              requests.emplace_back(std::move(request));
-            } else {
-              // The queue is empty which conflicts with pending batch count.
-              // Send the current batch if any and reset related variables.
-              LOG_ERROR << "Failed to retrieve request from scheduler queue: "
-                        << status.Message();
-              queue_.ResetCursor();
-              queued_batch_size_ = 0;
-              pending_batch_size_ = 0;
-              break;
-            }
+      // Extract batch only if there is pending batch
+      auto pending_batch_queue_cnt = queue_.PendingBatchCount();
+      if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
+        for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
+          std::unique_ptr<InferenceRequest> request;
+          auto status = queue_.Dequeue(&request);
+          if (status.IsOk()) {
+            std::lock_guard<std::mutex> lock(staged_queue_mtx_);
+            staged_batch_size_ += std::max(1U, request->BatchSize());
+            staged_queue_.Enqueue(0, std::move(request));
+          } else {
+            // The queue is empty which conflicts with pending batch count.
+            // Send the current batch if any and reset related variables.
+            LOG_ERROR << "Failed to retrieve request from scheduler queue: "
+                      << status.Message();
+            queue_.ResetCursor();
+            queued_batch_size_ = 0;
+            pending_batch_size_ = 0;
+            break;
           }
-          if (preserve_ordering_ && !requests.empty()) {
-            std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-            for (auto& request : requests) {
-              completion_queue_.emplace_back();
-              auto queue_slot = &completion_queue_.back();
-              request->SetResponseDelegator(
-                  [this, queue_slot](
-                      std::unique_ptr<InferenceResponse>&& response,
-                      const uint32_t flags) {
-                    {
-                      std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      queue_slot->emplace_back(std::move(response), flags);
-                    }
-                    FinalizeResponses();
-                  });
-            }
-          }
-
-          queued_batch_size_ -= pending_batch_size_;
-          // Set next preferred to be 0 so that enqueue thread will wake up
-          // runners when new request arrives. In the case where the queue
-          // becomes empty, this helps the runners to set up proper wait time
-          // instead of waiting for the default timer or actual next preferred
-          // batch size is reached.
-          next_preferred_batch_size_ = 0;
-
-          pending_batch_size_ = 0;
-          required_equal_inputs_.clear();
         }
+
+        queued_batch_size_ -= pending_batch_size_;
+        // Set next preferred to be 0 so that enqueue thread will wake up
+        // runners when new request arrives. In the case where the queue
+        // becomes empty, this helps the runners to set up proper wait time
+        // instead of waiting for the default timer or actual next preferred
+        // batch size is reached.
+        next_preferred_batch_size_ = 0;
+
+        pending_batch_size_ = 0;
+        required_equal_inputs_.clear();
+      }
+      */
+    } else {
+      // No batching... stage next request
+      std::unique_ptr<InferenceRequest> request;
+      auto status = queue_.Dequeue(&request);
+      if (status.IsOk()) {
+        request_model_instance = true;
+        std::lock_guard<std::mutex> lock(staged_queue_mtx_);
+        staged_queue_.Enqueue(0, request);
       } else {
-        // No batching... execute next request
-        std::unique_ptr<InferenceRequest> request;
-        auto status = queue_.Dequeue(&request);
-        if (status.IsOk()) {
-          requests.emplace_back(std::move(request));
-          if (preserve_ordering_) {
-            std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-            for (auto& request : requests) {
-              completion_queue_.emplace_back();
-              auto queue_slot = &completion_queue_.back();
-              request->SetResponseDelegator(
-                  [this, queue_slot](
-                      std::unique_ptr<InferenceResponse>&& response,
-                      const uint32_t flags) {
-                    {
-                      std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      queue_slot->emplace_back(std::move(response), flags);
-                    }
-                    FinalizeResponses();
-                  });
-            }
-          }
-        } else {
-          LOG_ERROR << "Failed to retrieve request from scheduler queue: "
-                    << status.Message();
-        }
+        LOG_ERROR << "Failed to retrieve request from scheduler queue: "
+                  << status.Message();
       }
     }
 
-    // If wait for notification or for the specified timeout before checking
-    // the queue again.
+    // If no requests are to be handled, wait for notification or
+    // for the specified timeout before checking the queue again.
     if (wait_microseconds > 0) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(wait_microseconds));
-      continue;
-    }
-    // If finally going to run then pop the instance from the queue
-    // queue and give chance to other
-    if (!rate_limiter_->IgnoreResourcesAndPriority()) {
-      PopInstanceFromQueue();
-      sync_cv_.notify_all();
+      std::chrono::microseconds wait_timeout(wait_microseconds);
+      std::unique_lock<std::mutex> lock(mu_);
+      cv_.wait_for(lock, wait_timeout);
     }
 
-    if (!requests.empty()) {
-      OnSchedule_(runner_id, std::move(requests));
+    if (request_model_instance) {
+      auto sched_cb = [this](RateLimiter::ModelInstance* instance) {
+        std::vector<std::unique_ptr<InferenceRequest>> requests;
+        std::shared_ptr<
+            std::vector<std::deque<std::unique_ptr<InferenceRequest>>>>
+            rejected_requests;
 
-      // For testing we introduce a delay here to make the
-      // "DynamicBatchSchedulerV2 destroyed by this thread" case
-      // described in the comment below reproducible.
-      if (backend_release_wait_milliseconds > 0) {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(backend_release_wait_milliseconds));
-      }
+        if (dynamic_batching_enabled_) {
+          // TODO: See above comment regarding the dynamic batching. Need
+          // to recheck for any new requests in queue/staged_queue that
+          // will allow to form better batches..
+          /*
+                    // Use dynamic batching to get request(s) to execute.
+                    wait_microseconds = GetDynamicBatch();
 
-      // Release the allocated instance
-      thread_context->ready_ = false;
-      thread_context->allocated_instance_->Release(true /* executed */);
-      thread_context->allocated_instance_ = nullptr;
+                    // Get requests that are rejected from searching dynamic
+             batch. queue_.ReleaseRejectedRequests(&rejected_requests);
+
+                    // Extract batch only if there is pending batch
+                    auto pending_batch_queue_cnt = queue_.PendingBatchCount();
+                    if ((wait_microseconds == 0) && (pending_batch_queue_cnt !=
+             0)) { requests.reserve(pending_batch_queue_cnt); for (size_t idx =
+             0; idx < pending_batch_queue_cnt; ++idx) {
+                        std::unique_ptr<InferenceRequest> request;
+                        auto status = queue_.Dequeue(&request);
+                        if (status.IsOk()) {
+                          requests.emplace_back(std::move(request));
+                        } else {
+                          // The queue is empty which conflicts with pending
+             batch count.
+                          // Send the current batch if any and reset related
+             variables. LOG_ERROR << "Failed to retrieve request from scheduler
+             queue: "
+                                    << status.Message();
+                          queue_.ResetCursor();
+                          queued_batch_size_ = 0;
+                          pending_batch_size_ = 0;
+                          break;
+                        }
+                      }
+                      if (preserve_ordering_ && !requests.empty()) {
+                        std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+                        for (auto& request : requests) {
+                          completion_queue_.emplace_back();
+                          auto queue_slot = &completion_queue_.back();
+                          request->SetResponseDelegator(
+                              [this, queue_slot](
+                                  std::unique_ptr<InferenceResponse>&& response,
+                                  const uint32_t flags) {
+                                {
+                                  std::lock_guard<std::mutex>
+             lock(completion_queue_mtx_);
+                                  queue_slot->emplace_back(std::move(response),
+             flags);
+                                }
+                                FinalizeResponses();
+                              });
+                        }
+                      }
+
+                      queued_batch_size_ -= pending_batch_size_;
+                      // Set next preferred to be 0 so that enqueue thread will
+             wake up
+                      // runners when new request arrives. In the case where the
+             queue
+                      // becomes empty, this helps the runners to set up proper
+             wait time
+                      // instead of waiting for the default timer or actual next
+             preferred
+                      // batch size is reached.
+                      next_preferred_batch_size_ = 0;
+
+                      pending_batch_size_ = 0;
+                      required_equal_inputs_.clear();
+                    }
+          */
+        } else {
+          std::unique_ptr<InferenceRequest> request;
+          auto status = staged_queue_.Dequeue(&request);
+          if (status.IsOk()) {
+            requests.emplace_back(std::move(request));
+            if (preserve_ordering_) {
+              std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+              for (auto& request : requests) {
+                completion_queue_.emplace_back();
+                auto queue_slot = &completion_queue_.back();
+                request->SetResponseDelegator(
+                    [this, queue_slot](
+                        std::unique_ptr<InferenceResponse>&& response,
+                        const uint32_t flags) {
+                      {
+                        std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+                        queue_slot->emplace_back(std::move(response), flags);
+                      }
+                      FinalizeResponses();
+                    });
+              }
+            }
+          } else {
+            LOG_ERROR << "Failed to retrieve request from scheduler queue: "
+                      << status.Message();
+          }
+        }
+        auto completion_cb = [instance]() {
+          instance->Release(true /* executed */);
+        };
+        if (!requests.empty()) {
+          OnSchedule_(
+              const_cast<TritonModelInstance*>(instance->RawInstance()),
+              std::move(requests), completion_cb);
+        } else {
+          instance->Release(false /* executed */);
+        }
+      };
+      rate_limiter_->RequestModelInstance(sched_cb, triton_model_);
     }
 
+/*
     // Finish rejected requests if any
     if (rejected_requests != nullptr) {
       static Status rejected_status =
@@ -482,29 +450,15 @@ DynamicBatchSchedulerV2::SchedulerThread(
         }
       }
     }
+*/    
+  }
 
-    // FIXME, this isn't really true anymore so needs to be revisited.
-    //
-    // At the end of this scope 'requests' will be destroyed.  A
-    // handle to the backend is held by the request. If the server is
-    // exiting or the backend is unloaded, it could be that this
-    // handle is the last one for the backend and so destroying
-    // 'requests' will cause the backend to be deleted which in turn
-    // will call this thread's DynamicBatchSchedulerV2 to be destroyed
-    // by this thread itself. In that case it is important that this
-    // thread not reference the object after this point since the
-    // object will be invalid. The while statement above uses a local
-    // atomic which is set to false by the destructor (and so the
-    // while loop will exit) and the logging below uses only local
-    // variables... so this code is ok.
-  }  // end runner loop
-
-  LOG_VERBOSE(1) << "Stopping dynamic-batch scheduler thread " << runner_id
-                 << "...";
+  LOG_VERBOSE(1) << "Stopping dynamic-batch scheduler thread for model"
+                 << triton_model_->Name() << "...";
 }
 
 uint64_t
-DynamicBatchSchedulerV2::GetDynamicBatch(const int64_t runner_id)
+DynamicBatchSchedulerV2::GetDynamicBatch(PriorityQueue& queue)
 {
   // 'queue_mtx_' mutex must be held when this function is called. queue_
   // must not be empty.
@@ -515,8 +469,8 @@ DynamicBatchSchedulerV2::GetDynamicBatch(const int64_t runner_id)
   // batch size would be exceeded or if the shape of the next request
   // does not match the shape of the pending batch.
   bool send_now = false;
-  if (!queue_.IsCursorValid()) {
-    queue_.ResetCursor();
+  if (!queue.IsCursorValid()) {
+    queue.ResetCursor();
     pending_batch_size_ = 0;
   }
   size_t best_preferred_batch_size = 0;
@@ -526,7 +480,7 @@ DynamicBatchSchedulerV2::GetDynamicBatch(const int64_t runner_id)
 
     // If there is no pending batch, then this request is starting a
     // new batch.
-    if (queue_.PendingBatchCount() == 0) {
+    if ((staged_batch_size_ + queue_.PendingBatchCount()) == 0) {
       // Get the shape of the new batch that is being started...
       if (!enforce_equal_shape_tensors_.empty()) {
         if (!InitRequiredEqualInputs(
@@ -635,29 +589,6 @@ DynamicBatchSchedulerV2::GetDynamicBatch(const int64_t runner_id)
   // (and at that time will then see the delay has been exceeded and will send
   // the batch).
   return wait_ns / 1000;
-}
-
-bool
-DynamicBatchSchedulerV2::ProceedOk(
-    const RateLimiter::ModelInstance* model_instance)
-{
-  std::unique_lock<std::mutex> lock(alloc_instances_queue_mtx_);
-  return (alloc_instances_queue_.front() == model_instance);
-}
-
-void
-DynamicBatchSchedulerV2::PushInstanceToQueue(
-    const RateLimiter::ModelInstance* model_instance)
-{
-  std::unique_lock<std::mutex> lock(alloc_instances_queue_mtx_);
-  alloc_instances_queue_.push(model_instance);
-}
-
-void
-DynamicBatchSchedulerV2::PopInstanceFromQueue()
-{
-  std::unique_lock<std::mutex> lock(alloc_instances_queue_mtx_);
-  alloc_instances_queue_.pop();
 }
 
 void

@@ -50,9 +50,8 @@ class DynamicBatchSchedulerV2 : public Scheduler {
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
   static Status Create(
-      const void* triton_model, const uint32_t runner_id_start,
-      const uint32_t runner_cnt, const int nice, const StandardInitFunc& OnInit,
-      const StandardWarmupFunc& OnWarmup, const StandardRunFunc& OnSchedule,
+      const void* triton_model, const int nice,
+      const StandardSchedFuncV2& OnSchedule,
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
@@ -64,9 +63,8 @@ class DynamicBatchSchedulerV2 : public Scheduler {
   // function to call when a request is scheduled. And the scheduler also
   // supports different queue policies for different priority levels.
   static Status Create(
-      const void* triton_model, const uint32_t runner_id_start,
-      const uint32_t runner_cnt, const int nice, const StandardInitFunc& OnInit,
-      const StandardWarmupFunc& OnWarmup, const StandardRunFunc& OnSchedule,
+      const void* triton_model, const int nice,
+      const StandardSchedFuncV2& OnSchedule,
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const inference::ModelDynamicBatching& batcher_config,
@@ -79,9 +77,7 @@ class DynamicBatchSchedulerV2 : public Scheduler {
 
  private:
   DynamicBatchSchedulerV2(
-      const void* triton_model, const uint32_t runner_id_start,
-      const uint32_t runner_cnt, const StandardInitFunc& OnInit,
-      const StandardWarmupFunc& OnWarmup, const StandardRunFunc& OnSchedule,
+      const void* triton_model, const StandardSchedFuncV2& OnSchedule,
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
@@ -91,64 +87,21 @@ class DynamicBatchSchedulerV2 : public Scheduler {
       const uint32_t priority_levels,
       const ModelQueuePolicyMap& queue_policy_map);
 
-  // Stores the running context of the scheduler threads
-  struct SchedulerThreadContext {
-    SchedulerThreadContext(std::shared_ptr<std::atomic<bool>> exit)
-        : exit_(exit), allocated_instance_(nullptr)
-    {
-      ready_.store(false);
-    }
-    // The pointer to the scheduler thread.
-    std::unique_ptr<std::thread> thread_;
-    // Whether or not the thread is exitting...
-    std::shared_ptr<std::atomic<bool>> exit_;
 
-    // Mutex and condvar to notify scheduler thread to proceed with execution.
-    std::condition_variable ready_cv_;
-    std::mutex ready_mu_;
-    std::atomic<bool> ready_;
-
-    // The pointer to the model instance allocated to the scheduler thread.
-    RateLimiter::ModelInstance* allocated_instance_;
-  };
-
-  void NotificationFunction(RateLimiter::ModelInstance* instance);
-  void SchedulerThread(
-      const uint32_t runner_id, const int nice,
-      const std::shared_ptr<SchedulerThreadContext>& rthread_exit,
-      std::promise<bool>* is_initialized);
-  uint64_t GetDynamicBatch(const int64_t runner_id);
+  void SchedulerThread(const int nice, std::promise<bool>* is_initialized);
+  uint64_t GetDynamicBatch(PriorityQueue& queue);
   void FinalizeResponses();
-  bool ProceedOk(const RateLimiter::ModelInstance* model_instance);
-  void PushInstanceToQueue(const RateLimiter::ModelInstance* model_instance);
-  void PopInstanceFromQueue();
 
   // The pointer to the triton model being managed by the scheduler
   const TritonModel* triton_model_;
 
-  // The start id of the runners
-  const uint32_t runner_id_start_;
-
-  // The number of runners in the scheduler
-  const uint32_t runner_cnt_;
-
-  // Function the scheduler will call to initialize a runner.
-  const StandardInitFunc OnInit_;
-
-  // Function the scheduler will call to warmup a runner.
-  const StandardWarmupFunc OnWarmup_;
-
   // Function the scheduler will call to schedule a batch of requests.
-  const StandardRunFunc OnSchedule_;
+  const StandardSchedFuncV2 OnSchedule_;
 
   // True if dynamic batching is enabled.
   const bool dynamic_batching_enabled_;
 
-  // The number of scheduler threads.
-  const uint32_t scheduler_thread_cnt_;
-
-  // The number of scheduler threads currently idle.
-  uint32_t idle_scheduler_thread_cnt_;
+  std::unique_ptr<std::thread> sched_thread_;
 
   // Map from priority level to queue holding inference requests for the model
   // represented by this scheduler. If priority queues are not supported by the
@@ -157,29 +110,23 @@ class DynamicBatchSchedulerV2 : public Scheduler {
   // Mutex for protecting the scheduling queue.
   std::mutex queue_mtx_;
 
+  // Map from priority level to queue holding inference requests for the model
+  // represented by this scheduler. If priority queues are not supported by the
+  // scheduler, then priority zero entry is used as the single queue.
+  PriorityQueue staged_queue_;
+  // Mutex for protecting the scheduling queue.
+  std::mutex staged_queue_mtx_;
+
   // The number of requests in the queue before dispatching execution. Must be
   // used for testing/debugging purpose.
   size_t delay_cnt_;
-
-  std::vector<std::shared_ptr<SchedulerThreadContext>> sched_thread_contexts_;
-
-  // Used to synchronize execution across instances when using prioritization
-  // in the rate limiter with dynamic batching.
-  //
-  // Queue to hold the model instances returned by the rate limiter.
-  std::queue<const RateLimiter::ModelInstance*> alloc_instances_queue_;
-  // Mutex to protect the above queue
-  std::mutex alloc_instances_queue_mtx_;
-  // CV to synchronize runner for accessing the queue
-  std::condition_variable sync_cv_;
-  // Mutex associated with the above CV
-  std::mutex sync_mu_;
 
   size_t max_batch_size_;
   size_t max_preferred_batch_size_;
   std::set<int32_t> preferred_batch_sizes_;
   uint64_t pending_batch_delay_ns_;
   size_t pending_batch_size_;
+  size_t staged_batch_size_;
   RequiredEqualInputs required_equal_inputs_;
 
   size_t queued_batch_size_;
@@ -197,6 +144,11 @@ class DynamicBatchSchedulerV2 : public Scheduler {
   // If true the ordering of responses matches the order of requests
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
+
+  std::condition_variable cv_;
+  std::mutex mu_;
+
+  bool signal_exit_;
 
   // Per completion-id queues to store the ready responses
   std::deque<

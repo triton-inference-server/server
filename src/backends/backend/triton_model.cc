@@ -161,53 +161,63 @@ TritonModel::Create(
   RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
       raw_local_model, model_config, &local_model->instances_));
 
-  // Create a scheduler with 1 thread per instance. The backend is
-  // already initialized so there is no need to have the scheduler
-  // thread call any initialization.
-  RETURN_IF_ERROR(local_model->SetConfiguredScheduler(
-      (const void*)raw_local_model,
-      local_model->instances_.size() /* runner_cnt */,
-      /* Initialization callback */
-      [](uint32_t runner_idx) -> Status { return Status::Success; },
-      /* Run callback */
-      [raw_local_model, backend](
-          uint32_t runner_idx,
-          std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
-        // Use a thread local vector to avoid needing to malloc each
-        // time an inference is run.
-        thread_local std::vector<TRITONBACKEND_Request*> triton_requests(1024);
-        triton_requests.clear();
-        for (auto& r : requests) {
-          triton_requests.push_back(
-              reinterpret_cast<TRITONBACKEND_Request*>(r.release()));
-        }
+  /* Initialization callback */
+  auto OnInit = [&](void* instance) -> Status { return Status::Success; };
+  /* Run callback */
+  auto OnRun = [backend](
+                   void* instance,
+                   std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
+    LOG_INFO << "Inside OnRun";
+    // Use a thread local vector to avoid needing to malloc each
+    // time an inference is run.
+    thread_local std::vector<TRITONBACKEND_Request*> triton_requests(1024);
+    triton_requests.clear();
+    for (auto& r : requests) {
+      triton_requests.push_back(
+          reinterpret_cast<TRITONBACKEND_Request*>(r.release()));
+    }
 
-        TRITONBACKEND_ModelInstance* triton_model_instance =
-            reinterpret_cast<TRITONBACKEND_ModelInstance*>(
-                raw_local_model->instances_[runner_idx].get());
-        TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
-            backend->ModelInstanceExecFn();
+    TRITONBACKEND_ModelInstance* triton_model_instance =
+        reinterpret_cast<TRITONBACKEND_ModelInstance*>(instance);
+    TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
+        backend->ModelInstanceExecFn();
 
-        // If there is an error then we retain ownership of 'requests'
-        // and must send error responses.
-        TRITONSERVER_Error* err = inst_exec_fn(
-            triton_model_instance, &triton_requests[0], triton_requests.size());
-        if (err != nullptr) {
-          Status status = Status(
-              TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
-              TRITONSERVER_ErrorMessage(err));
-          for (TRITONBACKEND_Request* tr : triton_requests) {
-            std::unique_ptr<InferenceRequest> ur(
-                reinterpret_cast<InferenceRequest*>(tr));
-            InferenceRequest::RespondIfError(
-                ur, status, true /* release_requests */);
-          }
+    // If there is an error then we retain ownership of 'requests'
+    // and must send error responses.
+    TRITONSERVER_Error* err = inst_exec_fn(
+        triton_model_instance, &triton_requests[0], triton_requests.size());
+    if (err != nullptr) {
+      Status status = Status(
+          TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
+          TRITONSERVER_ErrorMessage(err));
+      for (TRITONBACKEND_Request* tr : triton_requests) {
+        std::unique_ptr<InferenceRequest> ur(
+            reinterpret_cast<InferenceRequest*>(tr));
+        InferenceRequest::RespondIfError(
+            ur, status, true /* release_requests */);
+      }
+      TRITONSERVER_ErrorDelete(err);
+    }
 
-          TRITONSERVER_ErrorDelete(err);
-        }
+    return Status::Success;
+  };
 
-        return Status::Success;
-      }));
+  // Create backend thread pool
+  RETURN_IF_ERROR(TritonBackendThreadPool::CreateThreadPool(
+      raw_local_model, OnInit, OnRun, &local_model->backend_threadpool_));
+
+  auto OnSchedule =
+      [raw_local_model](
+          TritonModelInstance* instance,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests,
+          std::function<void()> callback_fn) {
+        LOG_INFO << "Request Scheduled";
+        raw_local_model->backend_threadpool_->SubmitRequest(
+            instance, std::move(requests), callback_fn);
+      };
+
+  RETURN_IF_ERROR(local_model->SetConfiguredSchedulerV2(
+      (const void*)raw_local_model, OnSchedule));
 
   *model = std::move(local_model);
   return Status::Success;
@@ -302,6 +312,8 @@ TritonModel::~TritonModel()
   // cleaned up once legacy InferenceBackend is completed replaced by
   // TritonModel.
   scheduler_.reset();
+
+  backend_threadpool_.reset();
 
   // Unregister itself from the rate limiter
   RateLimiter* rate_limiter = server_->GetRateLimiter();

@@ -185,12 +185,12 @@ InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 
 
 Status
-InferenceBackend::SetConfiguredScheduler(
-    const void* triton_model, const uint32_t runner_cnt,
-    const Scheduler::StandardInitFunc& OnInit,
-    const Scheduler::StandardRunFunc& OnRun)
+InferenceBackend::SetConfiguredSchedulerV2(
+    const void* triton_model, const Scheduler::StandardSchedFuncV2 OnSchedule)
 {
   std::unique_ptr<Scheduler> scheduler;
+
+  /*
 
   // Create a warmup function for the scheduler thread to run the contexts
   // in corresponding threads. Currently the warmup function can't be run
@@ -207,6 +207,9 @@ InferenceBackend::SetConfiguredScheduler(
       RETURN_IF_ERROR(GenerateWarmupData(&runner_samples));
     }
   }
+  */
+
+  /*
 
   auto OnWarmup = [this, &samples](uint32_t runner_idx) -> Status {
     auto& runner_samples = samples[runner_idx];
@@ -232,6 +235,8 @@ InferenceBackend::SetConfiguredScheduler(
     return Status::Success;
   };
 
+  */
+
   // Need to enforce equal shape batches (i.e. non-ragged batches) if
   // the model 1) allows one or more variable-size input tensors that
   // are not marked as 'allow_ragged_batch' or 2) has one or more
@@ -250,23 +255,23 @@ InferenceBackend::SetConfiguredScheduler(
   // If 'sequence_batching' is configured use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
+    /*
     // Sequence batcher
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
         config_, runner_cnt, OnInit, OnWarmup, OnRun,
         enforce_equal_shape_tensors, &scheduler));
+    */
   } else if (config_.has_dynamic_batching()) {
     // Dynamic batcher
     RETURN_IF_ERROR(DynamicBatchSchedulerV2::Create(
-        triton_model, 0 /* runner_id_start */, runner_cnt,
-        GetCpuNiceLevel(config_), OnInit, OnWarmup, OnRun,
+        triton_model, GetCpuNiceLevel(config_), OnSchedule,
         true /* dynamic_batching_enabled */, config_.max_batch_size(),
         enforce_equal_shape_tensors, config_.dynamic_batching(), &scheduler));
   } else {
     // Default scheduler. Use dynamic batch scheduler (with batching
     // disabled) as the default scheduler.
     RETURN_IF_ERROR(DynamicBatchSchedulerV2::Create(
-        triton_model, 0 /* runner_id_start */, runner_cnt,
-        GetCpuNiceLevel(config_), OnInit, OnWarmup, OnRun,
+        triton_model, GetCpuNiceLevel(config_), OnSchedule,
         false /* dynamic_batching_enabled */, 1 /* max_batch_size */,
         std::unordered_map<
             std::string, bool>() /* enforce_equal_shape_tensors */,

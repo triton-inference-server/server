@@ -126,7 +126,7 @@ class RateLimiter {
     /// pool so that it can serve other requests.
     void Release(bool executed);
 
-    /// Returns the index of the instance
+    /// Returns the raw triton instance
     const TritonModelInstance* RawInstance() const
     {
       return triton_model_instance_;
