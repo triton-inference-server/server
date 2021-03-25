@@ -37,7 +37,7 @@ import sys
 import tarfile
 
 
-def send(subject: str, content: str, attachments=[], files_to_tar=None):
+def send(subject: str, content: str, attachments=[], files_to_tar=None, is_html=False):
     FROM = os.environ.get('TRITON_FROM', '')
     TO = os.environ.get('TRITON_TO_DL', '')
     if FROM == '' or TO == '':
@@ -48,7 +48,11 @@ def send(subject: str, content: str, attachments=[], files_to_tar=None):
     msg['Subject'] = subject
     msg['From'] = FROM
     msg['To'] = TO
-    msg.attach(MIMEText(content))
+    if is_html:
+        mime_text = MIMEText(content, 'html')
+    else:
+        mime_text = MIMEText(content)
+    msg.attach(mime_text)
 
     if files_to_tar is not None:
         with tarfile.open(subject + ".tgz", "w:gz") as csv_tar:

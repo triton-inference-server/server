@@ -37,9 +37,10 @@ if __name__ == '__main__':
     today = date.today().strftime("%Y-%m-%d")
     subject = "Triton Client Memory Growth Summary: " + today
     memory_graphs = glob.glob("client_memory_growth*.log")
-    mail_content = ""
+    html_content = "<html><head></head><body><pre style=\"font-size:11pt;font-family:Consolas;\">"
     for mem_graph in sorted(memory_graphs):
-        mail_content += "\n" + mem_graph + "\n"
+        html_content += "\n" + mem_graph + "\n"
         with open(mem_graph, "r") as f:
-            mail_content += f.read() + "\n"
-    nightly_email_helper.send(subject, mail_content)
+            html_content += f.read() + "\n"
+    html_content += "</pre></body></html>"
+    nightly_email_helper.send(subject, html_content, is_html=True)
