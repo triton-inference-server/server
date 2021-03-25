@@ -799,11 +799,9 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
       // If the version backend is being served, the re-load of the version
       // should be performed in background to avoid version down-time
       if (serving_backend->state_ == ModelReadyState::READY) {
-        if (res.first->second.second != nullptr) {
-          res.first->second.second.reset(new BackendInfo(
-              repository_path, ModelReadyState::UNKNOWN, ActionType::NO_ACTION,
-              model_config));
-        }
+        res.first->second.second.reset(new BackendInfo(
+            repository_path, ModelReadyState::UNKNOWN, ActionType::NO_ACTION,
+            model_config));
       }
     }
   }
