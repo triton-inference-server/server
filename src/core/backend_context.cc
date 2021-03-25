@@ -65,7 +65,7 @@ BackendContext::BackendContext(
     const std::string& name, const int gpu_device, const int max_batch_size,
     const bool enable_pinned_input, const bool enable_pinned_output,
     const size_t gather_kernel_buffer_threshold,
-    std::unique_ptr<MetricModelReporter>&& metric_reporter)
+    std::shared_ptr<MetricModelReporter>&& metric_reporter)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
       enable_pinned_input_(enable_pinned_input),
       enable_pinned_output_(enable_pinned_output),

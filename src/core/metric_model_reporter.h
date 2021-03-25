@@ -40,9 +40,11 @@ namespace nvidia { namespace inferenceserver {
 class MetricModelReporter {
  public:
 #ifdef TRITON_ENABLE_METRICS
-  MetricModelReporter(
+  static Status Create(
       const std::string& model_name, const int64_t model_version,
-      const int device, const MetricTagsMap& model_tags);
+      const int device, const MetricTagsMap& model_tags,
+      std::shared_ptr<MetricModelReporter>* metric_model_reporter);
+
   ~MetricModelReporter();
 
   // Get a metric for the backend specialized for the given model,
@@ -85,10 +87,14 @@ class MetricModelReporter {
   }
 
  private:
-  void GetMetricLabels(
+  MetricModelReporter(
+      const std::string& model_name, const int64_t model_version,
+      const int device, const MetricTagsMap& model_tags);
+
+  static void GetMetricLabels(
       std::map<std::string, std::string>* labels, const std::string& model_name,
       const int64_t model_version, const int device,
-      const MetricTagsMap& model_tags) const;
+      const MetricTagsMap& model_tags);
   prometheus::Counter* CreateCounterMetric(
       prometheus::Family<prometheus::Counter>& family,
       const std::map<std::string, std::string>& labels);

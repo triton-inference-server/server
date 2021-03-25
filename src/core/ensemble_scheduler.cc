@@ -1207,8 +1207,8 @@ EnsembleScheduler::EnsembleScheduler(
 
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
-    metric_reporter_.reset(
-        new MetricModelReporter(config.name(), 1, -1, config.metric_tags()));
+    MetricModelReporter::Create(
+        config.name(), 1, -1, config.metric_tags(), &metric_reporter_);
   }
 #endif  // TRITON_ENABLE_METRICS
 

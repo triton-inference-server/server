@@ -43,6 +43,9 @@ namespace nvidia { namespace inferenceserver {
 
 class Metrics {
  public:
+  // Return the hash value of the labels
+  static size_t HashLabels(const std::map<std::string, std::string>& labels);
+
   // Are metrics enabled?
   static bool Enabled();
 
