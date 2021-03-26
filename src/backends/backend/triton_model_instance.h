@@ -83,7 +83,7 @@ class TritonModelInstance {
   int32_t device_id_;
 
   // Reporter for metrics, or nullptr if no metrics should be reported
-  std::unique_ptr<MetricModelReporter> reporter_;
+  std::shared_ptr<MetricModelReporter> reporter_;
 
   // Opaque state associated with this model instance.
   void* state_;

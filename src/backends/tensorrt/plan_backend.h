@@ -95,7 +95,7 @@ class PlanBackend : public InferenceBackend {
         const bool enable_pinned_input, const bool enable_pinned_output,
         const size_t gather_kernel_buffer_threshold,
         const bool separate_output_copy_stream,
-        std::unique_ptr<MetricModelReporter>&& metric_reporter);
+        std::shared_ptr<MetricModelReporter>&& metric_reporter);
     ~Context();
 
     DISALLOW_MOVE(Context);

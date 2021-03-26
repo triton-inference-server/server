@@ -137,7 +137,7 @@ PlanBackend::Context::Context(
     const bool enable_pinned_input, const bool enable_pinned_output,
     const size_t gather_kernel_buffer_threshold,
     const bool separate_output_stream,
-    std::unique_ptr<MetricModelReporter>&& metric_reporter)
+    std::shared_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
           enable_pinned_output, gather_kernel_buffer_threshold,
@@ -563,11 +563,12 @@ PlanBackend::CreateExecutionContext(
   const size_t gather_kernel_buffer_threshold =
       Config().optimization().gather_kernel_buffer_threshold();
 
-  std::unique_ptr<MetricModelReporter> metric_reporter;
+  std::shared_ptr<MetricModelReporter> metric_reporter;
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
-    metric_reporter.reset(new MetricModelReporter(
-        Name(), Version(), gpu_device, Config().metric_tags()));
+    MetricModelReporter::Create(
+        Name(), Version(), gpu_device, Config().metric_tags(),
+        &metric_reporter);
   }
 #endif  // TRITON_ENABLE_METRICS
 

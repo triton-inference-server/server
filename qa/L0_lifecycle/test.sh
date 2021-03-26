@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1021,6 +1021,54 @@ for protocol in grpc http; do
 
     set +e
     python $LC_TEST LifeCycleTest.test_model_availability_on_reload_2 >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $CLIENT_LOG 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    unset TRITONSERVER_USE_GRPC
+
+    LOG_IDX=$((LOG_IDX+1))
+done
+
+# LifeCycleTest.test_model_availability_on_reload_3
+for protocol in grpc http; do
+    if [[ $protocol == "grpc" ]]; then
+       export TRITONSERVER_USE_GRPC=1
+    fi
+    rm -fr models config.pbtxt.*
+    mkdir models
+    cp -r identity_zero_1_int32 models/. \
+        && mkdir -p models/identity_zero_1_int32/1 \
+        && mkdir -p models/identity_zero_1_int32/2
+    echo "version_policy: { specific { versions: [1] }}" >> models/identity_zero_1_int32/config.pbtxt
+    cp models/identity_zero_1_int32/config.pbtxt config.pbtxt.new
+
+    SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
+                 --exit-timeout-secs=5 --strict-model-config=false \
+                 --load-model=identity_zero_1_int32 \
+                 --strict-readiness=false"
+    SERVER_LOG="./inference_server_$LOG_IDX.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    python $LC_TEST LifeCycleTest.test_model_availability_on_reload_3 >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
