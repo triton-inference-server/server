@@ -519,7 +519,7 @@ InferenceServer::PrintBackendAndModelSummary()
   }
 #endif // TRITON_ENABLE_TENSORRT
 
-std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
+  std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
       backend_state;
   RETURN_IF_ERROR(TritonBackendManager::BackendState(&backend_state));
 
