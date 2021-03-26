@@ -32,9 +32,9 @@
 
 **LATEST RELEASE: You are currently on the master branch which tracks
 under-development progress towards the next release. The latest
-release of the Triton Inference Server is 2.7.0 and is available on
+release of the Triton Inference Server is 2.8.0 and is available on
 branch
-[r21.02](https://github.com/triton-inference-server/server/tree/r21.02).**
+[r21.03](https://github.com/triton-inference-server/server/tree/r21.03).**
 
 Triton Inference Server provides a cloud and edge inferencing solution
 optimized for both CPUs and GPUs. Triton supports an HTTP/REST and
@@ -44,11 +44,11 @@ available as a shared library with a C API that allows the full
 functionality of Triton to be included directly in an
 application.
 
-The current release of the Triton Inference Server is 2.7.0 and
-corresponds to the 21.02 release of the tritonserver container on
+The current release of the Triton Inference Server is 2.8.0 and
+corresponds to the 21.03 release of the tritonserver container on
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com). The branch for this
 release is
-[r21.02](https://github.com/triton-inference-server/server/tree/r20.12).
+[r21.03](https://github.com/triton-inference-server/server/tree/r21.03).
 
 ## Features
 
@@ -107,8 +107,8 @@ release is
 
 **The master branch documentation tracks the upcoming,
 under-development release and so may not be accurate for the current
-release of Triton. See the [r20.12
-documentation](https://github.com/triton-inference-server/server/tree/r20.12#documentation)
+release of Triton. See the [r21.03
+documentation](https://github.com/triton-inference-server/server/tree/r21.03#documentation)
 for the current release.**
 
 [Triton Architecture](docs/architecture.md) gives a high-level
@@ -216,9 +216,8 @@ Docker](docs/build.md#building-triton-with-docker) or [built without
 Docker](docs/build.md#building-triton-without-docker). After building
 you should [test Triton](docs/test.md).
 
-Starting with the r20.10 release, it is also possible to [create a
-Docker image containing a customized Triton](docs/compose.md) that
-contains only a subset of the backends.
+It is also possible to [create a Docker image containing a customized
+Triton](docs/compose.md) that contains only a subset of the backends.
 
 The Triton project also provides [client libraries for Python and
 C++](docs/client_libraries.md) that make it easy to communicate with
