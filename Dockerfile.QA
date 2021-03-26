@@ -96,6 +96,7 @@ RUN mkdir -p qa/common && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/simple_dyna_sequence qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/simple_int8 qa/L0_grpc/models && \
+    cp -r /workspace/docs/examples/model_repository/simple_identity qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/simple_sequence qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc/models && \
     cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc/models && \
