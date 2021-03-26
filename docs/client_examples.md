@@ -83,13 +83,24 @@ Docker](client_libraries.md#build-using-docker) or
 This section describes several of the simple example applications and
 the features that they illustrate.
 
-### String Datatype
+### Bytes/String Datatype
 
-Some frameworks support tensors where each element in the tensor is a
-string (see [Datatypes](model_configuration.md#datatypes) for
-information on supported datatypes).
+Some frameworks support tensors where each element in the tensor is
+variable-length binary data. Each element can hold a string or an
+arbitrary sequence of bytes. On the client this datatype is BYTES (see
+[Datatypes](model_configuration.md#datatypes) for information on
+supported datatypes).
 
-String tensors are demonstrated in the C++ example applications
+The Python client library uses numpy to represent input and output
+tensors. For BYTES tensors the dtype of the numpy array should be
+'np.object_' as shown in the examples. For backwards compatibility
+with previous versions of the client library, 'np.bytes_' can also be
+used for BYTES tensors. However, using 'np.bytes_' is not recommended
+because using this dtype will cause numpy to remove all trailing zeros
+from each array element. As a result, binary sequences ending in
+zero(s) will not be represented correctly.
+
+BYTES tensors are demonstrated in the C++ example applications
 simple_http_string_infer_client.cc and
 simple_grpc_string_infer_client.cc.  String tensors are demonstrated
 in the Python example application simple_http_string_infer_client.py

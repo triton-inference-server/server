@@ -27,32 +27,17 @@
 
 import argparse
 import numpy as np
+import sys
 
 import tritonclient.grpc as grpcclient
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-v',
-                        '--verbose',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8001',
-                        help='Inference server URL. Default is localhost:8001.')
+# unicode() doesn't exist on python3, for how we use it the
+# corresponding function is bytes()
+if sys.version_info.major == 3:
+    unicode = bytes
 
-    FLAGS = parser.parse_args()
-    try:
-        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
-                                                         verbose=FLAGS.verbose)
-    except Exception as e:
-        print("context creation failed: " + str(e))
-        sys.exit()
 
+def simple_string_inference(triton_client):
     model_name = 'simple_string'
 
     inputs = []
@@ -68,11 +53,15 @@ if __name__ == '__main__':
     expected_sum = np.add(in0, in1)
     expected_diff = np.subtract(in0, in1)
 
+    # The 'simple_string' model expects 2 BYTES tensors where each
+    # element in those tensors is the utf-8 string representation of
+    # an integer. The BYTES tensors must be represented by a numpy
+    # array with dtype=np.object_.
     in0n = np.array([str(x).encode('utf-8') for x in in0.reshape(in0.size)],
-                    dtype=object)
+                    dtype=np.object_)
     input0_data = in0n.reshape(in0.shape)
     in1n = np.array([str(x).encode('utf-8') for x in in1.reshape(in1.size)],
-                    dtype=object)
+                    dtype=np.object_)
     input1_data = in1n.reshape(in1.shape)
 
     # Initialize the data
@@ -107,5 +96,77 @@ if __name__ == '__main__':
         if expected_diff[0][i] != r1:
             print("error: incorrect difference")
             sys.exit(1)
+
+
+def identity_inference(triton_client, np_array):
+    model_name = "simple_identity"
+    inputs = []
+    outputs = []
+
+    inputs.append(grpcclient.InferInput('INPUT0', np_array.shape, "BYTES"))
+    inputs[0].set_data_from_numpy(np_array)
+
+    outputs.append(
+        grpcclient.InferRequestedOutput('OUTPUT0'))
+
+    results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=outputs)
+    if (np_array.dtype == np.object_):
+        print(results.as_numpy('OUTPUT0'))
+        if not np.array_equal(np_array, results.as_numpy('OUTPUT0')):
+            print(results.as_numpy('OUTPUT0'))
+            print("error: incorrect output")
+            sys.exit(1)
+    else:
+        encoded_results = np.char.encode(
+            results.as_numpy('OUTPUT0').astype(str))
+        if not np.array_equal(np_array, encoded_results):
+            print(encoded_results)
+            print("error: incorrect output")
+            sys.exit(1)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-v',
+                        '--verbose',
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Enable verbose output')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8001',
+                        help='Inference server URL. Default is localhost:8001.')
+
+    FLAGS = parser.parse_args()
+    try:
+        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
+    except Exception as e:
+        print("context creation failed: " + str(e))
+        sys.exit()
+
+    # Example using BYTES input tensors with utf-8 encoded string
+    # elements
+    simple_string_inference(triton_client)
+
+    # Example using BYTES input tensor with utf-8 encoded string that
+    # has an embedded null character.
+    null_chars_array = np.array(
+        ["he\x00llo".encode('utf-8') for i in range(16)], dtype=np.object_)
+    null_char_data = null_chars_array.reshape([1, 16])
+    identity_inference(triton_client, null_char_data)
+
+    # Example using BYTES input tensor with 16 elements, where each
+    # element is a 4-byte binary blob with value 0x00010203. Can use
+    # dtype=np.bytes_ in this case.
+    bytes_data = [b'\x00\x01\x02\x03' for i in range(16)]
+    np_bytes_data = np.array(bytes_data, dtype=np.bytes_)
+    np_bytes_data = np_bytes_data.reshape([1, 16])
+    identity_inference(triton_client, np_bytes_data)
 
     print('PASS: string')
