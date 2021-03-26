@@ -95,7 +95,7 @@ class EnsembleScheduler : public Scheduler {
       InferenceStatsAggregator* const stats_aggregator,
       InferenceServer* const server, const inference::ModelConfig& config);
 
-  std::unique_ptr<MetricModelReporter> metric_reporter_;
+  std::shared_ptr<MetricModelReporter> metric_reporter_;
   InferenceStatsAggregator* const stats_aggregator_;
   InferenceServer* const is_;
 

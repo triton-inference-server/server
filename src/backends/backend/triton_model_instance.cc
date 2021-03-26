@@ -45,8 +45,9 @@ TritonModelInstance::TritonModelInstance(
     // -1 to indicate no device should be reported in the metric.
     const int id =
         (kind_ == TRITONSERVER_INSTANCEGROUPKIND_GPU) ? device_id_ : -1;
-    reporter_.reset(new MetricModelReporter(
-        model_->Name(), model_->Version(), id, model_->Config().metric_tags()));
+    MetricModelReporter::Create(
+        model_->Name(), model_->Version(), id, model_->Config().metric_tags(),
+        &reporter_);
   }
 #endif  // TRITON_ENABLE_METRICS
 }
