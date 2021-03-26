@@ -14,7 +14,7 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '2.7.1'
+  publishedVersion: '2.7.2'
   publishedVersionMetadata:
     releaseNote: >-
       Initial release.
@@ -23,7 +23,7 @@ x-google-marketplace:
     recommended: true
 
   clusterConstraints:
-    k8sVersion: >=1.18.7
+    k8sVersion: ">=1.18.7"
     assistedClusterCreation:
       type: DISABLED
       creationGuidance: "GKE currently doesn't support autocreate GPU clusters, please refer to https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app to manually  create the GKE cluster >= 1.18.7 and add GPU node pools"

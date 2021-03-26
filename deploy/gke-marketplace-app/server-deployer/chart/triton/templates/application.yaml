@@ -33,8 +33,14 @@ spec:
     matchLabels:
       app.kubernetes.io/name: "{{ .Release.Name }}"
   componentKinds:
-  - group: apps/v1beta2
+  - group: apps/v1
     kind: Deployment
   - group: v1
     kind: Service
+  - group: autoscaling/v2beta1
+    kind: HorizontalPodAutoscaler
+  - group: networking.istio.io/v1alpha3
+    kind: VirtualService
+  - group: networking.istio.io/v1alpha3
+    kind: Gateway
 {{  end }}

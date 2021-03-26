@@ -27,10 +27,6 @@ spec:
         port:
           {{ if eq .Values.tritonProtocol "gRPC" }}
           number: 8001
-          name: grpc-inference-server
-          protocol: GRPC
           {{ else }}
           number: 8000
-          name: http-inference-server
-          protocol: HTTP
           {{ end }}

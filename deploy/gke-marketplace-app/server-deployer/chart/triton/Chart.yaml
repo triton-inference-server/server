@@ -15,4 +15,4 @@ apiVersion: v1
 appVersion: "2.7"
 description: Triton Inference Server
 name: triton-inference-server
-version: 2.7.1
+version: 2.7.2
