@@ -62,7 +62,7 @@ build will be a Docker image called *tritonserver* that will contain
 the tritonserver executable in /opt/tritonserver/bin and the required
 shared libraries in /opt/tritonserver/lib. The backends built for
 Triton will be in /opt/tritonserver/backends (note that as of the
-21.02 release the TensorRT backend is still included in the core of
+21.03 release the TensorRT backend is still included in the core of
 Triton and so does not appear in /opt/tritonserver/backends).
 
 The first step for any build is to checkout the
@@ -100,8 +100,8 @@ $ ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --e
 If you are building on master/main branch then \<container tag\>
 should be set to "main". If you are building on a release branch you
 should set \<container tag\> to match the branch name. For example, if
-you are building on the r21.02 branch you should set \<container tag\>
-to be "r21.02". You can use a different \<container tag\> for a
+you are building on the r21.03 branch you should set \<container tag\>
+to be "r21.03". You can use a different \<container tag\> for a
 component to instead use the corresponding branch/tag in the
 build. For example, if you have a branch called "mybranch" in the
 [identity_backend](https://github.com/triton-inference-server/identity_backend)
