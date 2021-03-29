@@ -32,7 +32,7 @@ tritonProtocol: HTTP
 # HPA GPU utilization autoscaling target
 HPATargetAverageValue: 85
 modelRepositoryPath: gs://triton_sample_models
-publishedVersion: '2.7.2'
+publishedVersion: '2.8.0'
 gcpMarketplace: true
 
 image:

@@ -67,7 +67,7 @@ kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stack
 
 After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
  
-Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. We provide a BERT large model in public GCS bucket that is compatible with 21.02 release of Triton Server, in `gs://triton_sample_models`. As the application deployed successfully, get Istio Ingress host and port
+Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. We provide a BERT large model in public GCS bucket that is compatible with 21.03 release of Triton Server, in `gs://triton_sample_models`. As the application deployed successfully, get Istio Ingress host and port
 ```
 export INGRESS_HOST=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].port}')
