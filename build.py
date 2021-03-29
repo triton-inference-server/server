@@ -386,8 +386,9 @@ def onnxruntime_cmake_args(images):
 
         if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
             cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
-            cargs.append('-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][3]))
+            cargs.append(
+                '-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
+                    TRITON_VERSION_MAP[FLAGS.version][3]))
 
     return cargs
 
@@ -1111,6 +1112,11 @@ if __name__ == '__main__':
             fail('upstream container version not known for {}'.format(
                 FLAGS.version))
         FLAGS.upstream_container_version = TRITON_VERSION_MAP[FLAGS.version][1]
+
+    log('version {}'.format(FLAGS.version))
+    log('container version {}'.format(FLAGS.container_version))
+    log('upstream container version {}'.format(
+        FLAGS.upstream_container_version))
 
     # Determine the default <repo-tag> based on container version.
     if FLAGS.container_version.endswith('dev'):
