@@ -16,6 +16,8 @@ This repository contains Google Kubernetes Engine(GKE) Marketplace Application f
  - Triton GKE deployer includes a horizontal pod autoscaler(HPA) which relies [stack driver custom metrics adaptor](https://github.com/GoogleCloudPlatform/k8s-stackdriver/tree/master/custom-metrics-stackdriver-adapter) to monitor GPU duty cycle, and auto scale GPU nodes.
  - This repo also contains a sample to generate BERT model with TensorRT and use Locust to experiment with GPU node autoscaling and monitor client latency/throughput. 
 
+![Cloud Architecture Diagram](diagram.png)
+
 ## Prerequisites
 
  - [Install Google Cloud SDK on your laptop/client workstation](https://cloud.google.com/sdk/docs/install), so that `gcloud` SDK cli interface could be run on the client and sign in with your GCP credentials. 
