@@ -32,7 +32,7 @@ tritonProtocol: HTTP
 # HPA GPU utilization autoscaling target
 HPATargetAverageValue: 85
 modelRepositoryPath: gs://triton_sample_models
-publishedVersion: '2.8.0'
+publishedVersion: '2.8.1'
 gcpMarketplace: true
 
 image:
@@ -42,10 +42,10 @@ image:
   pyullPolicy: IfNotPresent
   # modify the model repository here to match your GCP storage bucket
   numGpus: 1
-  strictModelConfig: false
+  strictModelConfig: False
   # add in custom library which could include custom ops in the model
   ldPreloadPath: ''
-  logVerboseLevel: 1
+  logVerboseLevel: 0
 
 service:
   type: NodePort 

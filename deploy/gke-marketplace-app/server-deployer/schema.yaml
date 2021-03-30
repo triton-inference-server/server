@@ -27,7 +27,7 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '2.8.0'
+  publishedVersion: '2.8.1'
   publishedVersionMetadata:
     releaseNote: >-
       Initial release.
@@ -67,7 +67,7 @@ properties:
     x-google-marketplace:
       type: NAMESPACE
   initReplicaCount: 
-    title: Initial number of Triton pod instances to deploy
+    title: Initial number of Triton pod instances to deploy.
     type: integer
     default: 1
   minReplicaCount: 
@@ -79,7 +79,7 @@ properties:
     type: integer
     default: 3
   tritonProtocol: 
-    title: Request protocol to send data to Triton, choose from gRPC and HTTP
+    title: Request protocol to send data to Triton, choose from gRPC and HTTP.
     type: string
     default: HTTP
   HPATargetAverageValue: 
@@ -90,6 +90,18 @@ properties:
     type: string
     title: Bucket where models are stored. Read Triton documentation on configs and formatting details.
     default: gs://triton_sample_models
+  image.strictModelConfig:
+    type: boolean
+    title: When strictModelConfig is False, Triton will try to infer the config file from model file, when True, user need to provide config.pbtxt in model repository.
+    default: False
+  image.ldPreloadPath:
+    type: string
+    title: Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.
+    default: ''
+  image.logVerboseLevel:
+    type: integer
+    title: Set verbose logging level. Zero (0) disables verbose logging and values >= 1 enable verbose logging, this is helpful when user unsure if the model is compatible with Triton or for general debug.
+    default: 0 
   istioEnabled:
     type: boolean
     x-google-marketplace:
