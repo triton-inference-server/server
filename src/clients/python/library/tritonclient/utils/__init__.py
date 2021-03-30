@@ -216,7 +216,7 @@ def serialize_byte_tensor(input_tensor):
     # order.
     if (input_tensor.dtype == np.object_) or (input_tensor.dtype.type
                                               == np.bytes_):
-        flattened = bytes()
+        flattened_ls = []
         for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
             # If directly passing bytes to BYTES type,
             # don't convert it to str as Python will encode the
@@ -228,8 +228,9 @@ def serialize_byte_tensor(input_tensor):
                     s = str(obj.item()).encode('utf-8')
             else:
                 s = obj.item()
-            flattened += struct.pack("<I", len(s))
-            flattened += s
+            flattened.append(struct.pack("<I", len(s)))
+            flattened.append(s)
+        flattened = b''.join(flattened_ls)
         flattened_array = np.asarray(flattened, dtype=np.object_)
         if not flattened_array.flags['C_CONTIGUOUS']:
             flattened_array = np.ascontiguousarray(flattened_array,
