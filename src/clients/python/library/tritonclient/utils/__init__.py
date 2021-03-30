@@ -228,8 +228,8 @@ def serialize_byte_tensor(input_tensor):
                     s = str(obj.item()).encode('utf-8')
             else:
                 s = obj.item()
-            flattened.append(struct.pack("<I", len(s)))
-            flattened.append(s)
+            flattened_ls.append(struct.pack("<I", len(s)))
+            flattened_ls.append(s)
         flattened = b''.join(flattened_ls)
         flattened_array = np.asarray(flattened, dtype=np.object_)
         if not flattened_array.flags['C_CONTIGUOUS']:
