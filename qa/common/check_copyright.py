@@ -35,6 +35,8 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
              'jmx', 'gz', 'caffemodel', 'json', 'pdf', 'so', 'onnx')
 SKIP_PATHS = (
     'builddir', 'build/libevhtp', 'build/onnxruntime',
+    'deploy/gke-marketplace-app/.gitignore',
+    'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
     'deploy/single_server/.helmignore', 'docs/examples/model_repository',
     'qa/common/cuda_op_kernel.cu.cc.patch',
     'qa/custom_models/custom_float32_float32_float32/output0_labels.txt',
