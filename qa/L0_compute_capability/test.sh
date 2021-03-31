@@ -52,12 +52,8 @@ BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom"}
 for BACKEND in $BACKENDS; do
     # Need just one model for the backend...
     rm -fr models && mkdir models
-    if [ "$BACKEND" != "custom" ]; then
-        cp -r ${DATADIR}/qa_model_repository/${BACKEND}_float32_float32_float32 \
-           models/.
-    else
-        cp -r ../custom_models/custom_float32_float32_float32 models/.
-    fi
+    cp -r ${DATADIR}/qa_model_repository/${BACKEND}_float32_float32_float32 \
+        models/.
 
     if [ "$BACKEND" != "plan" ]; then
         for MC in `ls models/*/config.pbtxt`; do

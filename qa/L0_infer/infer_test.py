@@ -46,7 +46,7 @@ USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get(
-    'BACKENDS', "graphdef savedmodel onnx libtorch plan custom python")
+    'BACKENDS', "graphdef savedmodel onnx libtorch plan python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 np_dtype_string = np.dtype(object)
@@ -829,7 +829,7 @@ class InferTest(tu.TestResultCollector):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if all(x in BACKENDS for x in ['graphdef', 'custom']):
+        if all(x in BACKENDS for x in ['graphdef',]):
 
             def test_ensemble_mix_batch_nobatch(self):
                 base_names = ["batch_to_nobatch", "nobatch_to_batch"]

@@ -223,12 +223,6 @@ GetPlatform(const std::string& platform_str)
   }
 #endif  // TRITON_ENABLE_TENSORRT
 
-#ifdef TRITON_ENABLE_CUSTOM
-  if (platform_str == kCustomPlatform) {
-    return Platform::PLATFORM_CUSTOM;
-  }
-#endif  // TRITON_ENABLE_CUSTOM
-
 #ifdef TRITON_ENABLE_ONNXRUNTIME
   if (platform_str == kOnnxRuntimeOnnxPlatform) {
     return Platform::PLATFORM_ONNXRUNTIME_ONNX;
@@ -278,12 +272,6 @@ GetBackendTypeFromPlatform(const std::string& platform_name)
   }
 #endif  // TRITON_ENABLE_PYTORCH
 
-#ifdef TRITON_ENABLE_CUSTOM
-  if (platform_name == kCustomPlatform) {
-    return BackendType::BACKEND_TYPE_CUSTOM;
-  }
-#endif  // TRITON_ENABLE_CUSTOM
-
   return BackendType::BACKEND_TYPE_UNKNOWN;
 }
 
@@ -317,12 +305,6 @@ GetBackendType(const std::string& backend_name)
     return BackendType::BACKEND_TYPE_PYTORCH;
   }
 #endif  // TRITON_ENABLE_PYTORCH
-
-#ifdef TRITON_ENABLE_CUSTOM
-  if (backend_name == kCustomBackend) {
-    return BackendType::BACKEND_TYPE_CUSTOM;
-  }
-#endif  // TRITON_ENABLE_CUSTOM
 
   return BackendType::BACKEND_TYPE_UNKNOWN;
 }

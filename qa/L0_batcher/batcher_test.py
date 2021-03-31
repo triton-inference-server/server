@@ -57,13 +57,10 @@ if USE_GRPC and USE_HTTP:
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get('BACKENDS',
-                          "graphdef savedmodel onnx libtorch plan custom")
+                          "graphdef savedmodel onnx libtorch plan")
 
 _trials = BACKENDS.split(" ")
-if "custom" in BACKENDS:
-    _ragged_batch_supported_trials = ("custom",)
-else:
-    _ragged_batch_supported_trials = ()
+_ragged_batch_supported_trials = ()
 
 _max_queue_delay_ms = 10000
 
@@ -138,8 +135,8 @@ class BatcherTest(tu.TestResultCollector):
         try:
             start_ms = int(round(time.time() * 1000))
 
-            if trial == "savedmodel" or trial == "graphdef" or trial == "custom" \
-                    or trial == "libtorch" or trial == "onnx" or trial == "plan":
+            if trial == "savedmodel" or trial == "graphdef" or trial == "libtorch" \
+                    or trial == "onnx" or trial == "plan":
                 tensor_shape = (bs, input_size)
                 iu.infer_exact(
                     self,

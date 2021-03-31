@@ -1214,7 +1214,7 @@ if __name__ == '__main__':
             '--repo-tag must specific <component-name>:<repo-tag>')
         fail_if(
             parts[0] not in components,
-            '--repo-tag <component-name> must be "common", "core", "server", "backend", or "thirdparty"'
+            '--repo-tag <component-name> must be "common", "core", "backend", or "thirdparty"'
         )
         components[parts[0]] = parts[1]
     for c in components:

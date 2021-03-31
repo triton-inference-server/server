@@ -152,19 +152,15 @@ function get_datatype () {
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  if [[ $BACKEND == "custom" ]]; then
-    MODELS="$MODELS ../custom_models/custom_sequence_int32"
-  else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+  DTYPE=$(get_datatype $BACKEND)
+  MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
 
-    if [[ $BACKEND == "graphdef" ]]; then
-      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
-    fi
+  if [[ $BACKEND == "graphdef" ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
+  fi
 
-    if [ "$ENSEMBLES" == "1" ]; then
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
-    fi
+  if [ "$ENSEMBLES" == "1" ]; then
+    MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
   fi
 done
 
@@ -205,22 +201,18 @@ done
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  if [[ $BACKEND == "custom" ]]; then
-    MODELS="$MODELS ../custom_models/custom_sequence_int32"
-  else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
+  DTYPE=$(get_datatype $BACKEND)
+  MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
+
+  if [[ $BACKEND == "graphdef" ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
+  fi
+
+  if [ "$ENSEMBLES" == "1" ]; then
+    MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_nobatch_sequence_${DTYPE}"
 
     if [[ $BACKEND == "graphdef" ]]; then
-      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
-    fi
-
-    if [ "$ENSEMBLES" == "1" ]; then
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_nobatch_sequence_${DTYPE}"
-
-      if [[ $BACKEND == "graphdef" ]]; then
-        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
-      fi
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
     fi
   fi
 done
@@ -237,15 +229,11 @@ rm -fr modelsv && mkdir modelsv
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  if [[ $BACKEND == "custom" ]]; then
-    MODELS="$MODELS ../custom_models/custom_sequence_int32"
-  else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+  DTYPE=$(get_datatype $BACKEND)
+  MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
 
-    if [ "$ENSEMBLES" == "1" ]; then
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
-    fi
+  if [ "$ENSEMBLES" == "1" ]; then
+    MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
   fi
 done
 

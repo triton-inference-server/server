@@ -43,7 +43,6 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 class ModelQueueTest(tu.TestResultCollector):
-
     def setUp(self):
         self.trials_ = []
         for base in ["custom", "ensemble"]:
@@ -115,7 +114,7 @@ class ModelQueueTest(tu.TestResultCollector):
         # model execution. Then sends 10 requests to overload the model queue,
         # expecting 2 of the requests are returned with error code immediately.
         dtype = np.float32
-        shapes = ([16],)
+        shapes = ([16], )
 
         for trial in self.trials_:
             preceding_thread = threading.Thread(

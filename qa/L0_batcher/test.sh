@@ -92,7 +92,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 export BACKENDS
 
 # Basic batcher tests
@@ -123,11 +123,7 @@ DIFFERENT_SHAPE_TESTS=${DIFFERENT_SHAPE_TESTS:="test_multi_batch_not_preferred_d
 # Setup non-variable-size model repository
 rm -fr *.log *.serverlog models && mkdir models
 for BACKEND in $BACKENDS; do
-    if [ "$BACKEND" != "custom" ]; then
-      TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
-    else
-      TMP_MODEL_DIR="../custom_models/custom_float32_float32_float32"
-    fi
+    TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
 
     cp -r $TMP_MODEL_DIR models/. &&
     (cd models/$(basename $TMP_MODEL_DIR) && \
@@ -139,11 +135,7 @@ done
 # Setup variable-size model repository
 rm -fr var_models && mkdir var_models
 for BACKEND in $BACKENDS; do
-    if [ "$BACKEND" != "custom" ]; then
-      TMP_MODEL_DIR="$DATADIR/qa_variable_model_repository/${BACKEND}_float32_float32_float32"
-    else
-      TMP_MODEL_DIR="../custom_models/custom_float32_float32_float32 ../custom_models/custom_zero_1_float32"
-    fi
+    TMP_MODEL_DIR="$DATADIR/qa_variable_model_repository/${BACKEND}_float32_float32_float32"
 
     for TMP_DIR in $TMP_MODEL_DIR; do
       cp -r $TMP_DIR var_models/. &&

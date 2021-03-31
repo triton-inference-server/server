@@ -227,12 +227,6 @@ AutoFill::Create(
                     << " (verify contents of model directory or use "
                        "--log-verbose=1 for more details)";
       } else {
-#ifdef TRITON_ENABLE_CUSTOM
-        if ((platform == Platform::PLATFORM_CUSTOM) ||
-            (backend_type == BackendType::BACKEND_TYPE_CUSTOM)) {
-          print_warning = false;
-        }
-#endif
 #ifdef TRITON_ENABLE_ENSEMBLE
         if (platform == Platform::PLATFORM_ENSEMBLE) {
           print_warning = false;

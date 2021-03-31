@@ -60,12 +60,6 @@ constexpr char kPyTorchLibTorchFilename[] = "model.pt";
 constexpr char kPyTorchBackend[] = "pytorch";
 #endif  // TRITON_ENABLE_PYTORCH
 
-#ifdef TRITON_ENABLE_CUSTOM
-constexpr char kCustomPlatform[] = "custom";
-constexpr char kCustomFilename[] = "libcustom.so";
-constexpr char kCustomBackend[] = "custom";
-#endif  // TRITON_ENABLE_CUSTOM
-
 #ifdef TRITON_ENABLE_ENSEMBLE
 constexpr char kEnsemblePlatform[] = "ensemble";
 #endif  // TRITON_ENABLE_ENSEMBLE

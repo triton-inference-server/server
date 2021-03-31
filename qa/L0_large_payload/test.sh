@@ -73,7 +73,6 @@ cp ../python_models/identity_fp32/model.py models/python_$MODEL_SUFFIX/1/model.p
 
 # Restart server before every test to make sure server state
 # is invariant to previous test
-# TODO add back custom backend after fixing bug
 for TARGET in graphdef savedmodel onnx libtorch plan python; do
     SERVER_LOG=$SERVER_LOG_BASE.$TARGET
     CLIENT_LOG=$CLIENT_LOG_BASE.$TARGET

@@ -106,7 +106,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom python"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
@@ -130,13 +130,9 @@ for TARGET in cpu gpu; do
 
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
-      if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
+      if [ "$BACKEND" != "python" ]; then
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
-      elif [ "$BACKEND" == "custom" ]; then
-        cp -r ../custom_models/custom_float32_* models/. && \
-        cp -r ../custom_models/custom_int32_* models/. && \
-        cp -r ../custom_models/custom_nobatch_* models/.
       elif [ "$BACKEND" == "python" ]; then
         # We will be using ONNX models config.pbtxt and tweak them to make them
         # appropriate for Python backend
@@ -175,12 +171,9 @@ for TARGET in cpu gpu; do
     if [ "$ENSEMBLES" == "1" ]; then
       if [[ $BACKENDS == *"custom"* ]]; then
         for BACKEND in $BACKENDS; do
-          if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
+          if [ "$BACKEND" != "python" ]; then
               cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
                 models/.
-          elif [ "$BACKEND" == "custom" ]; then
-            cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
-              models/.
           fi
         done
 

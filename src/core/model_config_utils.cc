@@ -655,11 +655,6 @@ GetNormalizedModelConfig(
       config->set_backend(kPyTorchBackend);
     }
 #endif  // TRITON_ENABLE_PYTORCH
-#ifdef TRITON_ENABLE_CUSTOM
-    if (config->platform() == kCustomPlatform) {
-      config->set_backend(kCustomBackend);
-    }
-#endif  // TRITON_ENABLE_CUSTOM
     // FIXME: "else if ()" other supported frameworks once they are ported
     // to use backend API.
   }
@@ -681,11 +676,6 @@ GetNormalizedModelConfig(
       config->set_platform(kPyTorchLibTorchPlatform);
     }
 #endif  // TRITON_ENABLE_PYTORCH
-#ifdef TRITON_ENABLE_CUSTOM
-    if (config->backend() == kCustomBackend) {
-      config->set_platform(kCustomPlatform);
-    }
-#endif  // TRITON_ENABLE_CUSTOM
   }
 
   // If 'default_model_filename' is not specified set it appropriately
@@ -713,11 +703,6 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kPyTorchLibTorchFilename);
     } else
 #endif  // TRITON_ENABLE_PYTORCH
-#ifdef TRITON_ENABLE_CUSTOM
-        if (config->platform() == kCustomPlatform) {
-      config->set_default_model_filename(kCustomFilename);
-    } else
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
         if (config->platform() == kEnsemblePlatform) {
       // No actual model file is needed to be loaded for ensemble.
@@ -883,6 +868,17 @@ ValidateModelIOConfig(const inference::ModelConfig& config)
 Status
 ValidateBatchIO(const inference::ModelConfig& config)
 {
+  if (
+#ifdef TRITON_ENABLE_TENSORRT
+      (config.platform() != kTensorRTPlanPlatform) &&
+#endif  // TRITON_ENABLE_TENSORRT
+      ((config.batch_input_size() != 0) || (config.batch_output_size() != 0))) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "batch inputs and batch outputs are only supported for custom "
+        "platform and TensorRT platform");
+  }
+
   std::set<std::string> input_names;
   std::set<std::string> output_names;
   for (const auto& io : config.input()) {
@@ -1353,6 +1349,17 @@ ValidateModelInput(
     return Status(
         Status::Code::INVALID_ARG,
         "shape tensors are only supported for TensorRT platform");
+  }
+
+  if (
+#ifdef TRITON_ENABLE_TENSORRT
+      (platform != kTensorRTPlanPlatform) &&
+#endif  // TRITON_ENABLE_TENSORRT
+      io.allow_ragged_batch()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "ragged-batch input tensors are only supported for custom platform"
+        " and TensorRT platform");
   }
 
   return Status::Success;
