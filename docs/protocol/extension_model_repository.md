@@ -48,7 +48,7 @@ POST v2/repository/index
 
 POST v2/repository/models/${MODEL_NAME}/load
 
-POST v2/repository/models/${MODEL_NAME}/unload
+POST v2/repository/models/${MODEL_NAME}/unload[/cascading]
 ```
 
 ### Index
@@ -130,8 +130,10 @@ $repository_load_error_response =
 
 The unload API requests that a model be unloaded from Triton. An
 unload request is made with an HTTP POST to an unload endpoint. The
-HTTP body must be empty. A successful unload request is indicated by a
-200 HTTP status.
+HTTP body must be empty. If cascading unload is specified and the model
+to be unloaded is an ensemble model, the server will also unload the models
+within the ensemble if they are only used by the ensemble.
+A successful unload request is indicated by a 200 HTTP status.
 
 A failed unload request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
