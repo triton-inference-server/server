@@ -43,7 +43,7 @@ class OutputValidationTest(tu.TestResultCollector):
         msg = response.json()["error"]
         self.assertTrue(
             msg.startswith(
-                "unexpected datatype TYPE_FP32 for inference output 'OUTPUT__0', expecting TYPE_INT32"
+                "configuration expects datatype TYPE_INT32 for output 'OUTPUT__0', model provides TYPE_FP32"
             ))
 
     # for output mismatch
