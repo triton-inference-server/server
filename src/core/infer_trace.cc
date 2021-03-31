@@ -34,6 +34,14 @@ namespace nvidia { namespace inferenceserver {
 // parent.
 std::atomic<uint64_t> InferenceTrace::next_id_(1);
 
+std::unique_ptr<InferenceTrace>
+InferenceTrace::SpawnChildTrace()
+{
+  std::unique_ptr<InferenceTrace> ltrace(
+      new InferenceTrace(level_, id_, activity_fn_, release_fn_, userp_));
+  return ltrace;
+}
+
 void
 InferenceTrace::Release(std::unique_ptr<InferenceTrace>&& trace)
 {

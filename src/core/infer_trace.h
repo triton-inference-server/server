@@ -52,6 +52,8 @@ class InferenceTrace {
   {
   }
 
+  std::unique_ptr<InferenceTrace> SpawnChildTrace();
+
   int64_t Id() const { return id_; }
   int64_t ParentId() const { return parent_id_; }
 

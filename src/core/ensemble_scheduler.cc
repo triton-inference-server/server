@@ -534,13 +534,13 @@ EnsembleContext::RequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(request),
+        "deleting ensemble inference request");
     auto request_tracker = reinterpret_cast<RequestTracker*>(userp);
     if (request_tracker->DecrementCounter()) {
       delete request_tracker;
     }
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(request),
-        "deleting ensemble inference request");
   }
 }
 
@@ -894,6 +894,15 @@ EnsembleContext::InitStep(
   irequest->SetReleaseCallback(RequestComplete, request_tracker_);
 
   RETURN_IF_ERROR(irequest->PrepareForInference());
+
+#ifdef TRITON_ENABLE_TRACING
+  auto& parent_trace = request_tracker_->Request()->Trace();
+  if (parent_trace != nullptr) {
+    irequest->SetTrace(std::move(parent_trace->SpawnChildTrace()));
+    irequest->Trace()->SetModelName(irequest->ModelName());
+    irequest->Trace()->SetModelVersion(irequest->ActualModelVersion());
+  }
+#endif
 
   // Record the batch size of output in advance as
   // there is no other way to access it later on.

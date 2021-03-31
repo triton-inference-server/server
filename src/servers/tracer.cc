@@ -26,10 +26,20 @@
 
 #include "src/servers/tracer.h"
 
+#include <unordered_map>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
+
+namespace {
+struct TraceStreams {
+  TraceStreams(TraceManager* manager) : manager_(manager) {}
+  TraceManager* manager_;
+  std::mutex mtx_;
+  std::unordered_map<uint64_t, std::unique_ptr<std::stringstream>> streams_;
+};
+}  // namespace
 
 TRITONSERVER_Error*
 TraceManager::Create(
@@ -91,9 +101,7 @@ TraceManager::SampleTrace()
 
   // userp is a pair of the trace manager and a string buffer where
   // the trace collects its trace activity output.
-  std::unique_ptr<std::pair<TraceManager*, std::stringstream>> userp(
-      new std::pair<TraceManager*, std::stringstream>(
-          this, std::stringstream()));
+  std::unique_ptr<TraceStreams> userp(new TraceStreams(this));
 
   TRITONSERVER_InferenceTrace* trace;
   TRITONSERVER_Error* err = TRITONSERVER_InferenceTraceNew(
@@ -148,10 +156,26 @@ TraceManager::CaptureTimestamp(
 void
 TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
 {
-  auto pr =
-      reinterpret_cast<std::pair<TraceManager*, std::stringstream>*>(userp);
-  pr->first->WriteTrace(pr->second);
-  delete pr;
+  auto ts = reinterpret_cast<TraceStreams*>(userp);
+  std::stringstream* ss = nullptr;
+  {
+    uint64_t id;
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceTraceId(trace, &id), "getting trace id");
+    std::lock_guard<std::mutex> lk(ts->mtx_);
+    ss = ts->streams_[id].get();
+  }
+  ts->manager_->WriteTrace(*ss);
+
+  uint64_t parent_id;
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceTraceParentId(trace, &parent_id),
+      "getting trace parent id");
+  // The userp will be shared with the trace children, so only delete it
+  // if the root trace is being released
+  if (parent_id == 0) {
+    delete ts;
+  }
 
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
@@ -163,13 +187,25 @@ TraceManager::TraceActivity(
     TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
     void* userp)
 {
-  auto pr =
-      reinterpret_cast<std::pair<TraceManager*, std::stringstream>*>(userp);
-  std::stringstream& ss = pr->second;
-
   uint64_t id;
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceTraceId(trace, &id), "getting trace id");
+
+  // The function may be called with different traces but the same 'userp',
+  // group the activity of the same trace together for more readable output.
+  auto ts = reinterpret_cast<TraceStreams*>(userp);
+  std::stringstream* ss = nullptr;
+  {
+    if (activity == TRITONSERVER_TRACE_REQUEST_START) {
+      std::unique_ptr<std::stringstream> stream(new std::stringstream());
+      ss = stream.get();
+      std::lock_guard<std::mutex> lk(ts->mtx_);
+      ts->streams_.emplace(id, std::move(stream));
+    } else {
+      std::lock_guard<std::mutex> lk(ts->mtx_);
+      ss = ts->streams_[id].get();
+    }
+  }
 
   // If 'activity' is TRITONSERVER_TRACE_REQUEST_START then collect
   // and serialize trace details.
@@ -188,17 +224,17 @@ TraceManager::TraceActivity(
         TRITONSERVER_InferenceTraceParentId(trace, &parent_id),
         "getting trace parent id");
 
-    ss << "{\"id\":" << id << ",\"model_name\":\"" << model_name
-       << "\",\"model_version\":" << model_version;
+    *ss << "{\"id\":" << id << ",\"model_name\":\"" << model_name
+        << "\",\"model_version\":" << model_version;
     if (parent_id != 0) {
-      ss << ",\"parent_id\":" << parent_id;
+      *ss << ",\"parent_id\":" << parent_id;
     }
-    ss << "}";
+    *ss << "}";
   }
 
-  ss << ",{\"id\":" << id << ",\"timestamps\":["
-     << "{\"name\":\"" << TRITONSERVER_InferenceTraceActivityString(activity)
-     << "\",\"ns\":" << timestamp_ns << "}]}";
+  *ss << ",{\"id\":" << id << ",\"timestamps\":["
+      << "{\"name\":\"" << TRITONSERVER_InferenceTraceActivityString(activity)
+      << "\",\"ns\":" << timestamp_ns << "}]}";
 }
 
 }}  // namespace nvidia::inferenceserver

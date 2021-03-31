@@ -295,6 +295,12 @@ set +e
 
 $TRACE_SUMMARY -t trace_ensemble.log > summary_ensemble.log
 
+if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble.log` != "7" ]; then
+    cat summary_ensemble.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 if [ `grep -c ^simple summary_ensemble.log` != "1" ]; then
     cat summary_ensemble.log
     echo -e "\n***\n*** Test Failed\n***"
