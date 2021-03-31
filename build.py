@@ -386,8 +386,9 @@ def onnxruntime_cmake_args(images):
 
         if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
             cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
-            cargs.append('-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][3]))
+            cargs.append(
+                '-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
+                    TRITON_VERSION_MAP[FLAGS.version][3]))
 
     return cargs
 
@@ -1053,21 +1054,21 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build, default is "main".'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.03 -> branch r21.03); otherwise the default <repo-tag> is "main" (e.g. version 21.03dev -> branch main).'
     )
     parser.add_argument(
         '--repo-tag',
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", or "backend". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. Default is "main".'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.03 -> branch r21.03); otherwise the default <repo-tag> is "main" (e.g. version 21.03dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build, default is "main".'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.03 -> branch r21.03); otherwise the default <repo-tag> is "main" (e.g. version 21.03dev -> branch main).'
     )
 
     FLAGS = parser.parse_args()
@@ -1099,6 +1100,7 @@ if __name__ == '__main__':
     if FLAGS.version is None:
         with open('TRITON_VERSION', "r") as vfile:
             FLAGS.version = vfile.readline().strip()
+
     # For other versions use the TRITON_VERSION_MAP unless explicitly
     # given.
     if FLAGS.container_version is None:
@@ -1111,12 +1113,23 @@ if __name__ == '__main__':
                 FLAGS.version))
         FLAGS.upstream_container_version = TRITON_VERSION_MAP[FLAGS.version][1]
 
+    log('version {}'.format(FLAGS.version))
+    log('container version {}'.format(FLAGS.container_version))
+    log('upstream container version {}'.format(
+        FLAGS.upstream_container_version))
+
+    # Determine the default <repo-tag> based on container version.
+    if FLAGS.container_version.endswith('dev'):
+        default_repo_tag = 'main'
+    else:
+        default_repo_tag = 'r' + FLAGS.container_version
+
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
     for be in FLAGS.backend:
         parts = be.split(':')
         if len(parts) == 1:
-            parts.append('main')
+            parts.append(default_repo_tag)
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
 
@@ -1125,7 +1138,7 @@ if __name__ == '__main__':
     for be in FLAGS.repoagent:
         parts = be.split(':')
         if len(parts) == 1:
-            parts.append('main')
+            parts.append(default_repo_tag)
         log('repoagent "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         repoagents[parts[0]] = parts[1]
 
@@ -1173,10 +1186,10 @@ if __name__ == '__main__':
 
     # Initialize map of common components and repo-tag for each.
     components = {
-        'common': 'main',
-        'core': 'main',
-        'backend': 'main',
-        'thirdparty': 'main'
+        'common': default_repo_tag,
+        'core': default_repo_tag,
+        'backend': default_repo_tag,
+        'thirdparty': default_repo_tag
     }
     for be in FLAGS.repo_tag:
         parts = be.split(':')
