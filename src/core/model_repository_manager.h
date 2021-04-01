@@ -107,6 +107,8 @@ class ModelRepositoryManager {
     std::string model_name_;
     Status status_;
     bool checked_;
+    // FIXME
+    bool explicitly_load_;
     inference::ModelConfig model_config_;
     std::set<int64_t> loaded_versions_;
     std::set<DependencyNode*> missing_upstreams_;
@@ -163,7 +165,9 @@ class ModelRepositoryManager {
   /// \return error status. Return "NOT_FOUND" if it tries to load
   /// a non-existing model or if it tries to unload a model that hasn't been
   /// loaded.
-  Status LoadUnloadModel(const std::string& model_name, ActionType type);
+  Status LoadUnloadModel(
+      const std::string& model_name, const ActionType type,
+      const bool cascading_delete);
 
   /// Unload all models. This function should be called before shutting down
   /// the model repository manager.
@@ -225,8 +229,8 @@ class ModelRepositoryManager {
 
   /// The internal function that load or unload a set of models.
   Status LoadUnloadModels(
-      const std::set<std::string>& models, ActionType type,
-      bool* all_models_polled);
+      const std::set<std::string>& models, const ActionType type,
+      const bool cascading_delete, bool* all_models_polled);
 
   /// Poll the requested models in the model repository and
   /// compare with the current set. Return the additions, deletions,
@@ -265,7 +269,8 @@ class ModelRepositoryManager {
   /// \return The error status.
   Status UpdateDependencyGraph(
       const std::set<std::string>& added, const std::set<std::string>& deleted,
-      const std::set<std::string>& modified);
+      const std::set<std::string>& modified,
+      const bool cascading_delete = false);
 
   /// Helper function to uncheck the nodes because the model that they depends
   /// on has changed. The unchecked nodes will be validated again.
@@ -279,12 +284,11 @@ class ModelRepositoryManager {
   /// \return True if the node represents an ensemble model. False otherwise.
   bool ConnectDependencyGraph(DependencyNode* updated_node);
 
-  /// Get the configuration for a named model.
+  /// Get the model info for a named model.
   /// \param name The model name.
-  /// \param model_config Returns the model configuration.
+  /// \param model_info Returns the model information.
   /// \return OK if found, NOT_FOUND otherwise.
-  Status GetModelConfig(
-      const std::string& name, inference::ModelConfig* model_config);
+  Status GetModelInfo(const std::string& name, ModelInfo** model_info);
 
   /// Get the models to be loaded / unloaded based on the model loaded in
   /// previous iteration.

@@ -909,7 +909,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         model_regex_(
             R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats))?)"),
         modelcontrol_regex_(
-            R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
+            R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload(?:/(cascading))?)))"),
         systemsharedmemory_regex_(
             R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
         cudasharedmemory_regex_(
@@ -1075,7 +1075,8 @@ class HTTPAPIServer : public HTTPServerImpl {
       evhtp_request_t* req, const std::string& repository_name);
   void HandleRepositoryControl(
       evhtp_request_t* req, const std::string& repository_name,
-      const std::string& model_name, const std::string& action);
+      const std::string& model_name, const std::string& action,
+      const std::string& cascading);
   void HandleSystemSharedMemory(
       evhtp_request_t* req, const std::string& region_name,
       const std::string& action);
@@ -1262,7 +1263,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     }
   }
 
-  std::string region, action, rest, repo_name;
+  std::string region, action, rest, repo_name, cascading;
   if (std::string(req->uri->path->full) == "/v2") {
     // server metadata
     HandleServerMetadata(req);
@@ -1286,13 +1287,13 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     return;
   } else if (RE2::FullMatch(
                  std::string(req->uri->path->full), modelcontrol_regex_,
-                 &repo_name, &kind, &model_name, &action)) {
+                 &repo_name, &kind, &model_name, &action, &cascading)) {
     // model repository
     if (kind == "index") {
       HandleRepositoryIndex(req, repo_name);
       return;
     } else if (kind.find("models", 0) == 0) {
-      HandleRepositoryControl(req, repo_name, model_name, action);
+      HandleRepositoryControl(req, repo_name, model_name, action, cascading);
       return;
     }
   }
@@ -1402,7 +1403,8 @@ HTTPAPIServer::HandleRepositoryIndex(
 void
 HTTPAPIServer::HandleRepositoryControl(
     evhtp_request_t* req, const std::string& repository_name,
-    const std::string& model_name, const std::string& action)
+    const std::string& model_name, const std::string& action,
+    const std::string& cascading)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -1422,7 +1424,12 @@ HTTPAPIServer::HandleRepositoryControl(
     if (action == "load") {
       err = TRITONSERVER_ServerLoadModel(server_.get(), model_name.c_str());
     } else if (action == "unload") {
-      err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
+      if (cascading.empty()) {
+        err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
+      } else {
+        err = TRITONSERVER_ServerCascadingUnloadModel(
+            server_.get(), model_name.c_str());
+      }
     }
   }
 

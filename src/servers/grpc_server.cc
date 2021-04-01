@@ -1555,8 +1555,14 @@ CommonHandler::SetUpAllRequests()
           grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
-          err = TRITONSERVER_ServerUnloadModel(
-              tritonserver_.get(), request.model_name().c_str());
+          // [FIXME] grpc client needs to reflect this
+          if (request.cascading_unload()) {
+            err = TRITONSERVER_ServerCascadingUnloadModel(
+                tritonserver_.get(), request.model_name().c_str());
+          } else {
+            err = TRITONSERVER_ServerUnloadModel(
+                tritonserver_.get(), request.model_name().c_str());
+          }
         } else {
           err = TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_UNSUPPORTED,

@@ -461,11 +461,13 @@ InferenceServer::LoadModel(const std::string& model_name)
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
   auto action_type = ModelRepositoryManager::ActionType::LOAD;
-  return model_repository_manager_->LoadUnloadModel(model_name, action_type);
+  return model_repository_manager_->LoadUnloadModel(
+      model_name, action_type, false /* cascading_delete */);
 }
 
 Status
-InferenceServer::UnloadModel(const std::string& model_name)
+InferenceServer::UnloadModel(
+    const std::string& model_name, const bool cascading_delete)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     return Status(Status::Code::UNAVAILABLE, "Server not ready");
@@ -474,7 +476,8 @@ InferenceServer::UnloadModel(const std::string& model_name)
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
   auto action_type = ModelRepositoryManager::ActionType::UNLOAD;
-  return model_repository_manager_->LoadUnloadModel(model_name, action_type);
+  return model_repository_manager_->LoadUnloadModel(
+      model_name, action_type, cascading_delete);
 }
 
 Status
@@ -517,7 +520,7 @@ InferenceServer::PrintBackendAndModelSummary()
     backend_record.emplace_back("{}");
     backends_table.InsertRow(backend_record);
   }
-#endif // TRITON_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
 
   std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
       backend_state;
