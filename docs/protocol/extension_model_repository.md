@@ -254,6 +254,10 @@ message RepositoryModelUnloadRequest
 
   // The name of the model to unload.
   string model_name = 2;
+
+  // Whether to unload other models if they are only be used by
+  // the model to unload.
+  bool cascading_unload = 3;
 }
 
 message RepositoryModelUnloadResponse
