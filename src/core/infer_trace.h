@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -51,6 +51,8 @@ class InferenceTrace {
         activity_fn_(activity_fn), release_fn_(release_fn), userp_(userp)
   {
   }
+
+  std::unique_ptr<InferenceTrace> SpawnChildTrace();
 
   int64_t Id() const { return id_; }
   int64_t ParentId() const { return parent_id_; }
