@@ -568,7 +568,7 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def unload_model(self, model_name, headers=None):
+    def unload_model(self, model_name, headers=None, cascading=False):
         """Request the inference server to unload specified model.
 
         Parameters
@@ -578,6 +578,8 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
+        cascading : bool
+            Whether the models should be cascading unloaded.
 
         Raises
         ------
@@ -591,7 +593,7 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = service_pb2.RepositoryModelUnloadRequest(
-                model_name=model_name)
+                model_name=model_name, cascading_unload=cascading)
             if self._verbose:
                 print("unload_model, metadata {}\n{}".format(metadata, request))
             self._client_stub.RepositoryModelUnload(request=request,

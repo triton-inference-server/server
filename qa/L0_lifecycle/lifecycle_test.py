@@ -1500,6 +1500,104 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+
+    def test_model_control_ensemble(self):
+        model_shape = (1, 16)
+        onnx_name = tu.get_model_name('onnx', np.float32, np.float32,
+                                      np.float32)
+
+        ensemble_prefix = "simple_"
+        ensemble_name = ensemble_prefix + onnx_name
+
+        # Make sure no models are loaded
+        for model_name in (onnx_name, ensemble_name):
+            try:
+                for triton_client in (httpclient.InferenceServerClient(
+                        "localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient(
+                                          "localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Load ensemble model, the dependent model should be polled and loaded
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.load_model(ensemble_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        self._infer_success_models([
+            "onnx",
+        ], (1, 3), model_shape)
+        self._infer_success_models([
+            "simple_onnx",
+        ], (1, 3),
+                                   model_shape,
+                                   swap=True)
+
+
+        # Unload the ensemble with cascading flag. all models should be unloaded
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.unload_model(ensemble_name, cascading=True)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        for model_name in (onnx_name, ensemble_name):
+            try:
+                for triton_client in (httpclient.InferenceServerClient(
+                        "localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient(
+                                          "localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Load ensemble model, and unload it without cascading flag (default).
+        # The dependent model should still be available
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.load_model(ensemble_name)
+            triton_client.unload_model(ensemble_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        self._infer_success_models([
+            "onnx",
+        ], (1, 3), model_shape)
+
+        try:
+            for triton_client in (httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient(
+                                      "localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(
+                    triton_client.is_model_ready(ensemble_name, "1"))
+                self.assertFalse(
+                    triton_client.is_model_ready(ensemble_name, "3"))
+                self.assertTrue(
+                    triton_client.is_model_ready(onnx_name, "1"))
+                self.assertTrue(
+                    triton_client.is_model_ready(onnx_name, "3"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+
     def test_load_same_model_different_platform(self):
         model_shape = (1, 16)
         model_name = tu.get_model_name('simple', np.float32, np.float32,

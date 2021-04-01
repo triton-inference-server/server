@@ -615,7 +615,11 @@ class InferenceServerClient:
         if self._verbose:
             print("Loaded model '{}'".format(model_name))
 
-    def unload_model(self, model_name, headers=None, query_params=None):
+    def unload_model(self,
+                     model_name,
+                     headers=None,
+                     query_params=None,
+                     cascading=False):
         """Request the inference server to unload specified model.
 
         Parameters
@@ -628,6 +632,8 @@ class InferenceServerClient:
         query_params: dict
             Optional url query parameters to use in network
             transaction
+        cascading : bool
+            Whether the models should be cascading unloaded.
 
         Raises
         ------
@@ -635,7 +641,8 @@ class InferenceServerClient:
             If unable to unload the model.
 
         """
-        request_uri = "v2/repository/models/{}/unload".format(quote(model_name))
+        request_uri = "v2/repository/models/{}/unload{}".format(
+            quote(model_name), "/cascading" if cascading else "")
         response = self._post(request_uri=request_uri,
                               request_body="",
                               headers=headers,
@@ -1399,20 +1406,25 @@ class InferInput:
                 self._data = []
                 try:
                     if input_tensor.size > 0:
-                        for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
+                        for obj in np.nditer(input_tensor,
+                                             flags=["refs_ok"],
+                                             order='C'):
                             # We need to convert the object to string using utf-8,
                             # if we want to use the binary_data=False. JSON requires
                             # the input to be a UTF-8 string.
                             if input_tensor.dtype == np.object_:
                                 if type(obj.item()) == bytes:
-                                    self._data.append(str(obj.item(), encoding='utf-8'))
+                                    self._data.append(
+                                        str(obj.item(), encoding='utf-8'))
                                 else:
                                     self._data.append(str(obj.item()))
                             else:
-                                self._data.append(str(obj.item(), encoding='utf-8'))
+                                self._data.append(
+                                    str(obj.item(), encoding='utf-8'))
                 except UnicodeDecodeError:
-                    raise_error(f'Failed to encode "{obj.item()}" using UTF-8. Please use binary_data=True, if'
-                                ' you want to pass a byte array.')
+                    raise_error(
+                        f'Failed to encode "{obj.item()}" using UTF-8. Please use binary_data=True, if'
+                        ' you want to pass a byte array.')
             else:
                 self._data = [val.item() for val in input_tensor.flatten()]
         else:
@@ -1594,8 +1606,9 @@ class InferResult:
             try:
                 self._result = json.loads(content)
             except UnicodeDecodeError as e:
-                raise_error(f'Failed to encode using UTF-8. Please use binary_data=True, if'
-                            f' you want to pass a byte array. UnicodeError: {e}')
+                raise_error(
+                    f'Failed to encode using UTF-8. Please use binary_data=True, if'
+                    f' you want to pass a byte array. UnicodeError: {e}')
         else:
             header_length = int(header_length)
             content = response.read(length=header_length)
