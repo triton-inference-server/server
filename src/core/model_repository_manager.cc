@@ -1321,7 +1321,7 @@ ModelRepositoryManager::Create(
     RETURN_IF_ERROR(local_manager->PollAndUpdateInternal(&all_models_polled));
   } else {
     RETURN_IF_ERROR(local_manager->LoadUnloadModels(
-        startup_models, ActionType::LOAD, &all_models_polled));
+        startup_models, ActionType::LOAD, false, &all_models_polled));
   }
 
   *model_repository_manager = std::move(local_manager);
