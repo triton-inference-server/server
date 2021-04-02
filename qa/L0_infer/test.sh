@@ -169,23 +169,23 @@ for TARGET in cpu; do
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
-      if [[ $BACKENDS == *"custom"* ]]; then
-        for BACKEND in $BACKENDS; do
-          if [ "$BACKEND" != "python" ]; then
-              cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
-                models/.
-          fi
-        done
+      for BACKEND in $BACKENDS; do
+        if [ "$BACKEND" != "python" ]; then
+            cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
+              models/.
+        fi
+      done
 
-        create_nop_version_dir `pwd`/models
-      fi
+      # Copy identity backend models 
+      cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
+        models/.
+
+      create_nop_version_dir `pwd`/models
 
       if [[ $BACKENDS == *"graphdef"* ]]; then
         ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
 
-        if [[ $BACKENDS == *"custom"* ]]; then
-          ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
-        fi
+        ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
 
         if [[ $BACKENDS == *"savedmodel"* ]] ; then
           ENSEMBLE_MODELS="${ENSEMBLE_MODELS} mix_platform_float32_float32_float32 mix_ensemble_int32_float32_float32"
@@ -213,20 +213,18 @@ for TARGET in cpu; do
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
     # This is done after the instance group change above so that identity backend models
     # are run on CPU
-    if [[ $BACKENDS == *"custom"* ]]; then
-      cp -r ../custom_models/custom_zero_1_float32 models/. &&\
-          mkdir -p models/custom_zero_1_float32/1 && \
-          (cd models/custom_zero_1_float32 && \
-              echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
-      cp -r models/custom_zero_1_float32 models/custom_nobatch_zero_1_float32 && \
-          (cd models/custom_zero_1_float32 && \
-              sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
-              sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt) && \
-          (cd models/custom_nobatch_zero_1_float32 && \
-              sed -i "s/custom_zero_1_float32/custom_nobatch_zero_1_float32/" config.pbtxt && \
-              sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
-              sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
-    fi
+    cp -r ../custom_models/custom_zero_1_float32 models/. &&\
+        mkdir -p models/custom_zero_1_float32/1 && \
+        (cd models/custom_zero_1_float32 && \
+            echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
+    cp -r models/custom_zero_1_float32 models/custom_nobatch_zero_1_float32 && \
+        (cd models/custom_zero_1_float32 && \
+            sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt) && \
+        (cd models/custom_nobatch_zero_1_float32 && \
+            sed -i "s/custom_zero_1_float32/custom_nobatch_zero_1_float32/" config.pbtxt && \
+            sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
+            sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
 
     # Check if running a memory leak check
     if [ "$TEST_VALGRIND" -eq 1 ]; then
