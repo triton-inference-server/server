@@ -41,7 +41,7 @@ This repository contains Google Kubernetes Engine(GKE) Marketplace Application f
 
  - Triton GKE deployer is a helm chart deployer recommended by GKE Marketplace
  - Triton GKE deployer leverage [Istio on GCP](https://cloud.google.com/istio/docs/istio-on-gke/overview) for traffic ingress and load balancing, user can further config Istio for advanced use cases in service mesh and Anthos
- - Triton GKE deployer includes a horizontal pod autoscaler(HPA) which relies [stack driver custom metrics adaptor](https://github.com/GoogleCloudPlatform/k8s-stackdriver/tree/master/custom-metrics-stackdriver-adapter) to monitor GPU duty cycle, and auto scale GPU nodes.
+ - Triton GKE deployer includes a horizontal pod autoscaler(HPA) which relies on [stack driver custom metrics adaptor](https://github.com/GoogleCloudPlatform/k8s-stackdriver/tree/master/custom-metrics-stackdriver-adapter) to monitor GPU duty cycle, and auto scale GPU nodes.
  - This repo also contains a sample to generate BERT model with TensorRT and use Locust to experiment with GPU node autoscaling and monitor client latency/throughput. 
 
 ![Cloud Architecture Diagram](diagram.png)
@@ -61,7 +61,7 @@ export PROJECT_ID=<your GCP project ID>
 export ZONE=<GCP zone of your choice>
 export REGION=<GCP region of your choice>
 export DEPLOYMENT_NAME=<GKE cluster name, triton_gke for example>
-export GKE_VERSION=1.19.8-gke.1000
+export GKE_VERSION=1.19.8-gke.1600
 
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing,Istio \
@@ -73,45 +73,58 @@ gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --scopes cloud-platform \
 --num-nodes 1
 
+# add GPU node pools, user can modify number of node based on workloads
 gcloud container node-pools create accel \
   --project ${PROJECT_ID} \
   --zone ${ZONE} \
   --cluster ${DEPLOYMENT_NAME} \
   --num-nodes 2 \
   --accelerator type=nvidia-tesla-t4,count=1 \
-  --enable-autoscaling --min-nodes 1 --max-nodes 3 \
+  --enable-autoscaling --min-nodes 2 --max-nodes 3 \
   --enable-autorepair \
   --machine-type n1-standard-4 \
   --disk-size=100 \
   --scopes cloud-platform \
   --verbosity error
 
+# so that you can run kubectl locally to the cluster
 gcloud container clusters get-credentials ${DEPLOYMENT_NAME} --project ${PROJECT_ID} --zone ${ZONE}  
 
+# deploy NVIDIA device plugin for GKE to prepare GPU nodes for driver install
 kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml
 
+# make sure you can run kubectl locally to access the cluster
 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user "$(gcloud config get-value account)"
 
+# enable stackdriver custom metrics adaptor
 kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/production/adapter.yaml
 ```
 
 After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
  
-Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. We provide a BERT large model in public GCS bucket that is compatible with 21.03 release of Triton Server, in `gs://triton_sample_models`. As the application deployed successfully, get Istio Ingress host and port
+Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. User could leave everything as default, if user has model that has been validated with Triton, they can provide GCS path point to that model in Triton format. By default, we provide a BERT large model in public GCS bucket that is compatible with 21.03 release of Triton Server, in `gs://triton_sample_models/21_03`. 
+
+![GKE Marketplace Application UI](ui.png)
+
+As the application deployed successfully, get Istio Ingress host and port
 ```
 export INGRESS_HOST=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].port}')
 ```
 
-Third, with provide client example, launch [Locust](https://docs.locust.io/en/stable/installation.html) with Ingress host and port to query Triton Inference Server. In this example, we load a BERT large TensorRT Engine with Sequence length of 128 into GCP bucket.
+Third, we will try sending request to server with provide client example.
+
+If User selected deploy Triton to accept HTTP request, please launch [Locust](https://docs.locust.io/en/stable/installation.html) with Ingress host and port to query Triton Inference Server. In this [example script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/locustfile_bert_large.py), we send request to Triton server which has loaded a BERT large TensorRT Engine with Sequence length of 128 into GCP bucket.
 ```
 locust -f locustfile-bert-large.py -H http://${INGRESS_HOST}:${INGRESS_PORT}
 ```
 
-Alternatively, user can opt to use [Perf Analyzer](https://github.com/triton-inference-server/server/blob/master/docs/perf_analyzer.md) to profile and study the performance of Triton Inference Server.
-
 The client example push about ~200 QPS(Query per second) to Trition Server, and will trigger a auto scale of T4 GPU nodes (We recommend to use T4 and A100[MIG] for inference). From locust UI, we will observer a drop of latency mean and variance for the requests.
 
+Alternatively, user can opt to use [Perf Analyzer](https://github.com/triton-inference-server/server/blob/master/docs/perf_analyzer.md) to profile and study the performance of Triton Inference Server. Here we also provide a [client script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/perf_analyzer_grpc.sh) to use Perf Analyzer to send gRPC to Triton Server GKE deployment. 
+```
+bash perf_analyzer_grpc.sh ${INGRESS_HOST}:${INGRESS_PORT}
+```
 
 ## Additional Resources
 

@@ -27,7 +27,7 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '2.8.0'
+  publishedVersion: '2.8.2'
   publishedVersionMetadata:
     releaseNote: >-
       Initial release.
@@ -39,7 +39,7 @@ x-google-marketplace:
     k8sVersion: ">=1.18.7"
     assistedClusterCreation:
       type: DISABLED
-      creationGuidance: "GKE currently doesn't support autocreate GPU clusters, please refer to https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app to manually  create the GKE cluster >= 1.18.7 and add GPU node pools"
+      creationGuidance: "GKE currently doesn't support autocreate GPU clusters, please refer to (GITHUB Link)[https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app] to manually create the GKE cluster >= 1.18.7 and add GPU node pools"
     resources:
     - requests:
         gpu:
@@ -89,19 +89,19 @@ properties:
   modelRepositoryPath:
     type: string
     title: Bucket where models are stored. Read Triton documentation on configs and formatting details.
-    default: gs://triton_sample_models
-  image.strictModelConfig:
-    type: boolean
-    title: When strictModelConfig is False, Triton will try to infer the config file from model file, when True, user need to provide config.pbtxt in model repository.
-    default: False
+    default: gs://triton_sample_models/21_03
   image.ldPreloadPath:
     type: string
-    title: Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.
+    title: Leave this empty by default. Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.
     default: ''
   image.logVerboseLevel:
     type: integer
     title: Set verbose logging level. Zero (0) disables verbose logging and values >= 1 enable verbose logging, this is helpful when user unsure if the model is compatible with Triton or for general debug.
     default: 0 
+  image.strictModelConfig:
+    type: boolean
+    title: Leave this unchecked by default. When strictModelConfig is not checked(False), Triton will try to infer the config file from model file, when checked(True), user need to provide config.pbtxt in model repository.
+    default: False
   istioEnabled:
     type: boolean
     x-google-marketplace:
