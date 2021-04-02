@@ -802,7 +802,7 @@ class InferenceServerClient:
             self._client_stub.SystemSharedMemoryUnregister(request=request,
                                                            metadata=metadata)
             if self._verbose:
-                if name is not "":
+                if name != "":
                     print("Unregistered system shared memory with name '{}'".
                           format(name))
                 else:
@@ -951,7 +951,7 @@ class InferenceServerClient:
             self._client_stub.CudaSharedMemoryUnregister(request=request,
                                                          metadata=metadata)
             if self._verbose:
-                if name is not "":
+                if name != "":
                     print(
                         "Unregistered cuda shared memory with name '{}'".format(
                             name))
@@ -1212,7 +1212,7 @@ class InferenceServerClient:
             self._call_future.add_done_callback(wrapped_callback)
             if self._verbose:
                 verbose_message = "Sent request"
-                if request_id is not "":
+                if request_id != "":
                     verbose_message = verbose_message + " '{}'".format(
                         request_id)
                 print(verbose_message)

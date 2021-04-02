@@ -842,7 +842,7 @@ class InferenceServerClient:
                               query_params=query_params)
         _raise_if_error(response)
         if self._verbose:
-            if name is not "":
+            if name != "":
                 print("Unregistered system shared memory with name '{}'".format(
                     name))
             else:
@@ -986,7 +986,7 @@ class InferenceServerClient:
                               query_params=query_params)
         _raise_if_error(response)
         if self._verbose:
-            if name is not "":
+            if name != "":
                 print("Unregistered cuda shared memory with name '{}'".format(
                     name))
             else:
@@ -1226,7 +1226,7 @@ class InferenceServerClient:
 
         if self._verbose:
             verbose_message = "Sent request"
-            if request_id is not "":
+            if request_id != "":
                 verbose_message = verbose_message + " '{}'".format(request_id)
             print(verbose_message)
 
