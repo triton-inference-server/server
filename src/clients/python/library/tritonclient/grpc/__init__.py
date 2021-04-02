@@ -593,8 +593,9 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = service_pb2.RepositoryModelUnloadRequest(
-                model_name=model_name,
-                parameters={"unload_dependents": unload_dependents})
+                model_name=model_name)
+            request.parameters[
+                'unload_dependents'].bool_param = unload_dependents
             if self._verbose:
                 print("unload_model, metadata {}\n{}".format(metadata, request))
             self._client_stub.RepositoryModelUnload(request=request,
