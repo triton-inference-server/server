@@ -270,7 +270,7 @@ class ModelRepositoryManager {
   Status UpdateDependencyGraph(
       const std::set<std::string>& added, const std::set<std::string>& deleted,
       const std::set<std::string>& modified,
-      const bool cascading_delete = false);
+      std::set<std::string>* cascading_deleted = nullptr);
 
   /// Helper function to uncheck the nodes because the model that they depends
   /// on has changed. The unchecked nodes will be validated again.

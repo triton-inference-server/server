@@ -1592,16 +1592,20 @@ ModelRepositoryManager::LoadUnloadModels(
       }
     }
   }
+  std::set<std::string> cascading_deleted;
+
+  // Update dependency graph and load
+  UpdateDependencyGraph(
+      added, deleted, modified,
+      cascading_delete ? &cascading_deleted : nullptr);
+
   // The models are in 'deleted' either when they are asked to be unloaded or
   // they are not found / are duplicated across all model repositories.
   // In all cases, should unload them and remove from 'infos_' explicitly.
-  for (const auto& name : deleted) {
+  for (const auto& name : (cascading_delete ? cascading_deleted : deleted)) {
     infos_.erase(name);
     backend_life_cycle_->AsyncUnload(name);
   }
-
-  // Update dependency graph and load
-  UpdateDependencyGraph(added, deleted, modified, cascading_delete);
 
   // load / unload the models affected, and check the load status of
   // the requested models
@@ -1950,7 +1954,8 @@ ModelRepositoryManager::Poll(
 Status
 ModelRepositoryManager::UpdateDependencyGraph(
     const std::set<std::string>& added, const std::set<std::string>& deleted,
-    const std::set<std::string>& modified, const bool cascading_delete)
+    const std::set<std::string>& modified,
+    std::set<std::string>* cascading_deleted)
 {
   // update dependency graph, if the state of a node is changed, all its
   // downstreams will be affected
@@ -1970,7 +1975,8 @@ ModelRepositoryManager::UpdateDependencyGraph(
         for (auto& upstream : it->second->upstreams_) {
           upstream.first->downstreams_.erase(it->second.get());
           // Check if the upstream should be removed aas well
-          if (cascading_delete && (upstream.first->downstreams_.empty()) &&
+          if ((cascading_deleted != nullptr) &&
+              (upstream.first->downstreams_.empty()) &&
               (!upstream.first->explicitly_load_)) {
             next_deleted.emplace(upstream.first->model_name_);
           }
@@ -1990,6 +1996,9 @@ ModelRepositoryManager::UpdateDependencyGraph(
         // Make sure deleted node will not be in affected nodes
         affected_nodes.erase(it->second.get());
         dependency_graph_.erase(it);
+      }
+      if (cascading_deleted != nullptr) {
+        cascading_deleted->emplace(model_name);
       }
     }
     current_deleted.swap(next_deleted);

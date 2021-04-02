@@ -1421,9 +1421,9 @@ HTTPAPIServer::HandleRepositoryControl(
         TRITONSERVER_ERROR_UNSUPPORTED,
         "'repository_name' specification is not supported");
   } else {
-    if (action == "load") {
+    if (action.find("load", 0) == 0) {
       err = TRITONSERVER_ServerLoadModel(server_.get(), model_name.c_str());
-    } else if (action == "unload") {
+    } else if (action.find("unload", 0) == 0) {
       if (cascading.empty()) {
         err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
       } else {
