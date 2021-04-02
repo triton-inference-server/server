@@ -119,7 +119,7 @@ If User selected deploy Triton to accept HTTP request, please launch [Locust](ht
 locust -f locustfile_bert_large.py -H http://${INGRESS_HOST}:${INGRESS_PORT}
 ```
 
-The client example push about ~300 QPS(Query per second) to Trition Server, and will trigger a auto scale of T4 GPU nodes (We recommend to use T4 and A100[MIG] for inference). From locust UI, we will observer a drop of latency mean and variance for the requests. At the end, after autoscaling, we see the latency stablized at ~60 ms, which is excellent for a model that has 345 million parameters
+The client example push about ~300 QPS(Query per second) to Trition Server, and will trigger a auto scale of T4 GPU nodes (We recommend to use T4 and A100[MIG] for inference). From locust UI, we will observer a drop of latency mean and variance for the requests. At the end, after autoscaling, we see the latency stablized at ~60 ms, which is excellent for a model that has 345 million parameters. Since for each node, we use 1T4 + n1-standard-4 instance, and it can handle ~200 QPS, with on-demand price, it is ($0.35+$0.19)=$0.54/hr, that translate to 1.3 million inference per dollar for BERT large model at batch size 1. Further more, with 3 year commitment price, hr rate is ($0.16+$0.08)=$0.24/hr, that translate to 3 million inference per dollar.
 
 ![Locust Client Chart](client.png)
 
