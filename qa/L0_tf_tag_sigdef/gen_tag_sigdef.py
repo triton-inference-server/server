@@ -25,12 +25,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
+sys.path.append("../common")
+
 import os
 from builtins import range
 from future.utils import iteritems
 import unittest
 import numpy as np
-import test_util as tu
 
 from tensorflow.python.framework import ops
 from tensorflow.python.saved_model import builder
@@ -38,15 +40,15 @@ from tensorflow.python.saved_model import signature_constants
 from tensorflow.python.saved_model import signature_def_utils
 from tensorflow.python.saved_model import tag_constants
 import tensorflow.compat.v1 as tf
-
-sys.path.append("../common")
-
 """Savedmodel that contains multiple tags and multiple signature defs"""
-def create_savedmodel_modelfile_negate(models_dir, model_version, value,
-                                       signature_def_name, tag_name):
-    model_name = "savedmodel"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(
-        model_version)
+
+
+def create_savedmodel(models_dir,
+                      model_version=1,
+                      signature_def_name="testSigDef",
+                      tag_name="testTag"):
+    model_name = "sig_tag"
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -54,15 +56,17 @@ def create_savedmodel_modelfile_negate(models_dir, model_version, value,
         pass  # ignore existing dir
 
     with tf.Session() as sess:
+        input_tensor = tf.placeholder(tf.float32, [16], "TENSOR_INPUT")
+
         # tag:"serve", signature_def:signature_def_name
         multiplier_0 = tf.constant(-1.0, name="multiplier_0")
         # tag:"serve", signature_def:signature_def_name
         multiplier_1 = tf.constant(1.0, name="multiplier_1")
         # tag:tag_name, signature_def:"serving_default"
-        multiplier_2 = tf.constant(-2.0, name="multiplier_2")
+        multiplier_2 = tf.constant(2.0, name="multiplier_2")
         # tag:tag_name, signature_def:"serving_default"
         multiplier_3 = tf.constant(3.0, name="multiplier_3")
-        input_tensor = tf.constant(value, tf.float32, name="TENSOR_INPUT")
+
         output_tensor_0 = tf.multiply(multiplier_0,
                                       input_tensor,
                                       name="TENSOR_OUTPUT")
@@ -77,8 +81,7 @@ def create_savedmodel_modelfile_negate(models_dir, model_version, value,
                                       name="TENSOR_OUTPUT")
 
         # build_tensor_info_op could be used if build_tensor_info is deprecated
-        input_tensor_info = tf.saved_model.utils.build_tensor_info(
-            input_tensor)
+        input_tensor_info = tf.saved_model.utils.build_tensor_info(input_tensor)
         output_tensor_info_0 = tf.saved_model.utils.build_tensor_info(
             output_tensor_0)
         output_tensor_info_1 = tf.saved_model.utils.build_tensor_info(
@@ -87,22 +90,23 @@ def create_savedmodel_modelfile_negate(models_dir, model_version, value,
             output_tensor_2)
         output_tensor_info_3 = tf.saved_model.utils.build_tensor_info(
             output_tensor_3)
+
         # Using predict method name because simple save uses it
         signature_0 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
-            outputs={"OUTPUT_0": output_tensor_info_0},
+            outputs={"OUTPUT": output_tensor_info_0},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
         signature_1 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
-            outputs={"OUTPUT_1": output_tensor_info_1},
+            outputs={"OUTPUT": output_tensor_info_1},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
         signature_2 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
-            outputs={"OUTPUT_2": output_tensor_info_2},
+            outputs={"OUTPUT": output_tensor_info_2},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
         signature_3 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
-            outputs={"OUTPUT_3": output_tensor_info_3},
+            outputs={"OUTPUT": output_tensor_info_3},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
 
         signature_def_map_0 = {
@@ -127,3 +131,11 @@ def create_savedmodel_modelfile_negate(models_dir, model_version, value,
                              ops.GraphKeys.ASSET_FILEPATHS),
                          clear_devices=True)
         b.save()
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='getting model output dir')
+    parser.add_argument('--dir', help='directory to run model in')
+    args = parser.parse_args()
+    create_savedmodel(args.dir)
