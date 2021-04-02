@@ -100,9 +100,9 @@ kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-ad
 kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/production/adapter.yaml
 ```
 
-After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
+GPU resources in GCP could be fully utilized, so please try a different zone in case compute resource cannot be allocated. After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
  
-Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. User could leave everything as default, if user has model that has been validated with Triton, they can provide GCS path point to that model in Triton format. By default, we provide a BERT large model in public GCS bucket that is compatible with 21.03 release of Triton Server, in `gs://triton_sample_models/21_03`, please note that this bucket locates in us-central1 hence loading model into Triton in other region might be effected. 
+Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. User could leave everything as default, if user has model that has been validated with Triton, they can provide GCS path point to that model in Triton format. By default, we provide a BERT large model in public GCS bucket that is compatible with 21.03 release of Triton Server, in `gs://triton_sample_models/21_03`, please note that this bucket locates in us-central1 hence loading model into Triton in other region might be effected. Also the first deployment of Triton Application will be slower than consecutive runs as image needs to be pulled into the GKE cluster. 
 
 ![GKE Marketplace Application UI](ui.png)
 
