@@ -121,7 +121,7 @@ locust -f locustfile_bert_large.py -H http://${INGRESS_HOST}:${INGRESS_PORT}
 
 The client example push about ~200 QPS(Query per second) to Trition Server, and will trigger a auto scale of T4 GPU nodes (We recommend to use T4 and A100[MIG] for inference). From locust UI, we will observer a drop of latency mean and variance for the requests.
 
-Alternatively, user can opt to use [Perf Analyzer](https://github.com/triton-inference-server/server/blob/master/docs/perf_analyzer.md) to profile and study the performance of Triton Inference Server. Here we also provide a [client script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/perf_analyzer_grpc.sh) to use Perf Analyzer to send gRPC to Triton Server GKE deployment. 
+Alternatively, user can opt to use [Perf Analyzer](https://github.com/triton-inference-server/server/blob/master/docs/perf_analyzer.md) to profile and study the performance of Triton Inference Server. Here we also provide a [client script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/perf_analyzer_grpc.sh) to use Perf Analyzer to send gRPC to Triton Server GKE deployment. Perf Analyzer client requires user to use NGC Triton Client Container(docker pull nvcr.io/nvidia/tritonserver:21.03-py3-sdk).  
 ```
 bash perf_analyzer_grpc.sh ${INGRESS_HOST}:${INGRESS_PORT}
 ```
