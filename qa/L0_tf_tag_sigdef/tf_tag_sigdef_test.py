@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
 from builtins import range
@@ -33,56 +34,48 @@ import unittest
 import numpy as np
 import os
 import test_util as tu
-
 import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
 
-class PluginModelTest(tu.TestResultCollector):
+class TagSigdefTest(tu.TestResultCollector):
+    def _test_helper(self, model_name, tag, sig_def):
 
-    def _full_exact(self, model_name, plugin_name, shape):
+        # {
+        #     tag/sig_def: multiplier
+        # }
+
+        shape = [16]
+        output_name = "OUTPUT"
         triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                          verbose=True)
-
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT0', list(shape), "FP32"))
+        inputs.append(httpclient.InferInput('INPUT', shape, "FP32"))
 
         input0_data = np.ones(shape=shape).astype(np.float32)
         inputs[0].set_data_from_numpy(input0_data, binary_data=True)
 
         outputs.append(
-            httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+            httpclient.InferRequestedOutput(output_name, binary_data=True))
 
-        results = triton_client.infer(model_name + '_' + plugin_name,
+        results = triton_client.infer(model_name,
                                       inputs,
                                       outputs=outputs)
 
-        output0_data = results.as_numpy('OUTPUT0')
+        output0_data = results.as_numpy(output_name)
 
-        # Verify values of Normalize and GELU
-        if plugin_name == 'CustomGeluPluginDynamic':
-            # Add bias
-            input0_data += 1
-            # Calculate Gelu activation
-            test_output = (input0_data *
-                           0.5) * (1 + np.tanh((0.797885 * input0_data) +
-                                               (0.035677 * (input0_data**3))))
-            self.assertTrue(np.isclose(output0_data, test_output).all())
-        else:
-            # L2 norm is sqrt(sum([1]*16)))
-            test_output = input0_data / np.sqrt(sum([1] * 16))
-            self.assertTrue(np.isclose(output0_data, test_output).all())
+        # if
+        multiplier = 2
+        test_output = input0_data * multiplier
+        print(test_output)
+        print(output0_data)
+        self.assertTrue(np.isclose(output0_data, test_output).all())
 
-    def test_raw_fff_gelu(self):
-        self._full_exact('plan_nobatch_float32_float32_float32',
-                         'CustomGeluPluginDynamic', (16, 1, 1))
-
-    def test_raw_fff_norm(self):
-        # model that supports batching
-        for bs in (1, 8):
-            self._full_exact('plan_float32_float32_float32', 'Normalize_TRT',
-                             (bs, 16, 16, 16))
+    def test_default_tag(self):
+        signature_def_name="testSigDef"
+        tag_name="testTag"
+        self._test_helper('sig_tag', tag_name, signature_def_name)
 
 
 if __name__ == '__main__':

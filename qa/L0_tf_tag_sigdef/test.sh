@@ -38,10 +38,11 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-PLUGIN_TEST=trt_plugin_test.py
-EXPECTED_NUM_TESTS="2"
+TEST=tf_tag_sigdef_test.py
+MAKE_MODEL=gen_tag_sigdef.py
+TEST_VAL=2
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_tf_tag_sigdef
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
@@ -52,6 +53,8 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
+# save model
+python $MAKE_MODEL --dir $DATA_DIR --value $TEST_VAL
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -60,7 +63,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $PLUGIN_TEST >$CLIENT_LOG 2>&1
+python $TEST --value $TEST_VAL>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
