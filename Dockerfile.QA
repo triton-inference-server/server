@@ -45,11 +45,6 @@ FROM ${BUILD_IMAGE} AS build
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
-# image_preprocess custom backend requires opencv
-RUN apt-get update && apt-get install -y --no-install-recommends \
-            libopencv-dev \
-            libopencv-core-dev
-
 WORKDIR /tmp/tritonbuild/tritonserver/build
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
@@ -59,18 +54,6 @@ RUN cmake -DTRITON_ENABLE_GPU=ON \
           -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
           -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} /workspace/build && \
     make -j16 test-util
-
-# Add models and custom backend for imageprocess ensemble example repo
-WORKDIR /workspace/qa/ensemble_models/image_preprocess_ensemble_example
-RUN mkdir -p inception_graphdef/1 && \
-    wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
-         https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz && \
-    (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz) && \
-    mv /tmp/inception_v3_2016_08_28_frozen.pb inception_graphdef/1/model.graphdef && \
-    mkdir -p image_preprocess_nhwc_299x299x3_inception/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libimagepreprocess.so \
-        image_preprocess_nhwc_299x299x3_inception/1/. && \
-    mkdir -p preprocess_inception_ensemble/1
 
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace

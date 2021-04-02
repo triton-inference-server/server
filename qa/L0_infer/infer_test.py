@@ -125,7 +125,7 @@ class InferTest(tu.TestResultCollector):
 
         all_ensemble_prefix = ["simple_", "sequence_", "fan_"]
         ensemble_prefix = [""]
-        if ENSEMBLES and ("custom" in BACKENDS):
+        if ENSEMBLES:
             for prefix in all_ensemble_prefix:
                 if tu.validate_for_ensemble_model(prefix, input_dtype,
                                                   output0_dtype, output1_dtype,
@@ -174,23 +174,6 @@ class InferTest(tu.TestResultCollector):
                                             output0_raw=output0_raw,
                                             output1_raw=output1_raw,
                                             swap=swap)
-
-        # the custom model is src/custom/addsub... it does not swap
-        # the inputs so always set to False
-        if tu.validate_for_custom_model(input_dtype, output0_dtype,
-                                        output1_dtype, (input_size,),
-                                        (input_size,), (input_size,)):
-            # No basic ensemble models are created against custom models
-            if 'custom' in BACKENDS:
-                _infer_exact_helper(self,
-                                    'custom', (input_size,),
-                                    8,
-                                    input_dtype,
-                                    output0_dtype,
-                                    output1_dtype,
-                                    output0_raw=output0_raw,
-                                    output1_raw=output1_raw,
-                                    swap=False)
 
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                       (input_size,), (input_size,),

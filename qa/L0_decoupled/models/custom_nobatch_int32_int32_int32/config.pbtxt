@@ -24,10 +24,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "custom_nobatch_int32_int32_int32"
-platform: "custom"
+name: "savedmodel_nobatch_int32_int32_int32"
+platform: "tensorflow_savedmodel"
 max_batch_size: 0
-default_model_filename: "libaddsub.so"
 input [
   {
     name: "INPUT0"

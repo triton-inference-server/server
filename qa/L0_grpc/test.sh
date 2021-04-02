@@ -46,7 +46,6 @@ SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_grpc_string_infer_client.py
 SIMPLE_STREAM_INFER_CLIENT_PY=../clients/simple_grpc_sequence_stream_infer_client.py
 SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_grpc_sequence_sync_infer_client.py
 SIMPLE_IMAGE_CLIENT_PY=../clients/image_client.py
-SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY=../clients/ensemble_image_client.py
 SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_grpc_shm_string_client.py
 SIMPLE_SHM_CLIENT_PY=../clients/simple_grpc_shm_client.py
 SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_grpc_cudashm_client.py
@@ -68,15 +67,12 @@ SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_grpc_sequence_sync_infer_client
 SIMPLE_SHM_CLIENT=../clients/simple_grpc_shm_client
 SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_cudashm_client
 SIMPLE_IMAGE_CLIENT=../clients/image_client
-SIMPLE_ENSEMBLE_IMAGE_CLIENT=../clients/ensemble_image_client
 SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
 
 rm -f *.log
 rm -f *.log.*
 
 set -e
-
-cp -r ../ensemble_models/image_preprocess_ensemble_example/* models/.
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -120,7 +116,7 @@ for i in \
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
     EXTRA_ARGS=""
-    if [[ ($SUFFIX == "image_client") || ($SUFFIX == "ensemble_image_client") ]]; then
+    if [ $SUFFIX == "image_client" ]; then
         EXTRA_ARGS="-i grpc -u localhost:8001"
     fi
     if [[ ($SUFFIX == "image_client") || ($SUFFIX == "grpc_image_client") ]]; then
@@ -142,14 +138,6 @@ for i in \
             cat $CLIENT_LOG.${SUFFIX}
             RET=1
         fi
-    elif [ $SUFFIX == "ensemble_image_client" ]; then
-        python $i -c 1 $EXTRA_ARGS ../images >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
-        for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
-            if [ `grep -c "$result" ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
-                echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
-                RET=1
-            fi
-        done
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi
@@ -205,14 +193,6 @@ for i in \
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
-    elif [ $SUFFIX == "ensemble_image_client" ]; then
-        $i -c 1 -i grpc -u localhost:8001 ../images >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
-        for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
-            if [ `grep -c "$result" ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
-                echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
-                RET=1
-            fi
-        done
     else
         $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
         if [ $? -ne 0 ]; then

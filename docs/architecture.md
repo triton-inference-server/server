@@ -429,7 +429,7 @@ configuration:
 
 ```
 name: "oldest_stateful_model"
-platform: "custom"
+platform: "tensorflow_savedmodel"
 max_batch_size: 2
 sequence_batching {
   max_sequence_idle_microseconds: 5000000
