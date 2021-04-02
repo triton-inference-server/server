@@ -1543,11 +1543,11 @@ class LifeCycleTest(tu.TestResultCollector):
                                    swap=True)
 
 
-        # Unload the ensemble with cascading flag. all models should be unloaded
+        # Unload the ensemble with unload_dependents flag. all models should be unloaded
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
-            triton_client.unload_model(ensemble_name, cascading=True)
+            triton_client.unload_model(ensemble_name, unload_dependents=True)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         for model_name in (onnx_name, ensemble_name):
@@ -1565,7 +1565,7 @@ class LifeCycleTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Load ensemble model, and unload it without cascading flag (default).
+        # Load ensemble model, and unload it without unload_dependents flag (default).
         # The dependent model should still be available
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",

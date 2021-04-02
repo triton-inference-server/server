@@ -2138,13 +2138,13 @@ TRITONSERVER_ServerUnloadModel(
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   RETURN_IF_STATUS_ERROR(lserver->UnloadModel(
-      std::string(model_name), false /* cascading_delete */));
+      std::string(model_name), false /* unload_dependents */));
 
   return nullptr;  // success
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_ServerCascadingUnloadModel(
+TRITONSERVER_ServerUnloadModelAndDependents(
     TRITONSERVER_Server* server, const char* model_name)
 {
   {
@@ -2152,7 +2152,7 @@ TRITONSERVER_ServerCascadingUnloadModel(
         reinterpret_cast<ni::InferenceServer*>(server);
 
     RETURN_IF_STATUS_ERROR(lserver->UnloadModel(
-        std::string(model_name), true /* cascading_delete */));
+        std::string(model_name), true /* unload_dependents */));
 
     return nullptr;  // success
   }

@@ -1555,13 +1555,32 @@ CommonHandler::SetUpAllRequests()
           grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
-          // [FIXME] grpc client needs to reflect this
-          if (request.cascading_unload()) {
-            err = TRITONSERVER_ServerCascadingUnloadModel(
-                tritonserver_.get(), request.model_name().c_str());
-          } else {
-            err = TRITONSERVER_ServerUnloadModel(
-                tritonserver_.get(), request.model_name().c_str());
+          // Check if the dependent models should be removed
+          bool unload_dependents = false;
+          for (auto param : request.parameters()) {
+            if (param.first.compare("unload_dependents") == 0) {
+              const auto& unload_param = param.second;
+              if (unload_param.parameter_choice_case() !=
+                  inference::ModelRepositoryParameter::ParameterChoiceCase::
+                      kBoolParam) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "invalid value type for 'unload_dependents' parameter, "
+                    "expected "
+                    "bool_param.");
+              }
+              unload_dependents = unload_param.bool_param();
+              break;
+            }
+          }
+          if (err == nullptr) {
+            if (unload_dependents) {
+              err = TRITONSERVER_ServerUnloadModelAndDependents(
+                  tritonserver_.get(), request.model_name().c_str());
+            } else {
+              err = TRITONSERVER_ServerUnloadModel(
+                  tritonserver_.get(), request.model_name().c_str());
+            }
           }
         } else {
           err = TRITONSERVER_ErrorNew(

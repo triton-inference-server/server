@@ -462,12 +462,12 @@ InferenceServer::LoadModel(const std::string& model_name)
 
   auto action_type = ModelRepositoryManager::ActionType::LOAD;
   return model_repository_manager_->LoadUnloadModel(
-      model_name, action_type, false /* cascading_delete */);
+      model_name, action_type, false /* unload_dependents */);
 }
 
 Status
 InferenceServer::UnloadModel(
-    const std::string& model_name, const bool cascading_delete)
+    const std::string& model_name, const bool unload_dependents)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     return Status(Status::Code::UNAVAILABLE, "Server not ready");
@@ -477,7 +477,7 @@ InferenceServer::UnloadModel(
 
   auto action_type = ModelRepositoryManager::ActionType::UNLOAD;
   return model_repository_manager_->LoadUnloadModel(
-      model_name, action_type, cascading_delete);
+      model_name, action_type, unload_dependents);
 }
 
 Status

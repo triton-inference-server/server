@@ -909,7 +909,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         model_regex_(
             R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats))?)"),
         modelcontrol_regex_(
-            R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload(?:/(cascading))?)))"),
+            R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
         systemsharedmemory_regex_(
             R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
         cudasharedmemory_regex_(
@@ -1075,8 +1075,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       evhtp_request_t* req, const std::string& repository_name);
   void HandleRepositoryControl(
       evhtp_request_t* req, const std::string& repository_name,
-      const std::string& model_name, const std::string& action,
-      const std::string& cascading);
+      const std::string& model_name, const std::string& action);
   void HandleSystemSharedMemory(
       evhtp_request_t* req, const std::string& region_name,
       const std::string& action);
@@ -1263,7 +1262,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     }
   }
 
-  std::string region, action, rest, repo_name, cascading;
+  std::string region, action, rest, repo_name;
   if (std::string(req->uri->path->full) == "/v2") {
     // server metadata
     HandleServerMetadata(req);
@@ -1287,13 +1286,13 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     return;
   } else if (RE2::FullMatch(
                  std::string(req->uri->path->full), modelcontrol_regex_,
-                 &repo_name, &kind, &model_name, &action, &cascading)) {
+                 &repo_name, &kind, &model_name, &action)) {
     // model repository
     if (kind == "index") {
       HandleRepositoryIndex(req, repo_name);
       return;
     } else if (kind.find("models", 0) == 0) {
-      HandleRepositoryControl(req, repo_name, model_name, action, cascading);
+      HandleRepositoryControl(req, repo_name, model_name, action);
       return;
     }
   }
@@ -1403,8 +1402,7 @@ HTTPAPIServer::HandleRepositoryIndex(
 void
 HTTPAPIServer::HandleRepositoryControl(
     evhtp_request_t* req, const std::string& repository_name,
-    const std::string& model_name, const std::string& action,
-    const std::string& cascading)
+    const std::string& model_name, const std::string& action)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -1421,14 +1419,53 @@ HTTPAPIServer::HandleRepositoryControl(
         TRITONSERVER_ERROR_UNSUPPORTED,
         "'repository_name' specification is not supported");
   } else {
-    if (action.find("load", 0) == 0) {
+    if (action == "load") {
       err = TRITONSERVER_ServerLoadModel(server_.get(), model_name.c_str());
-    } else if (action.find("unload", 0) == 0) {
-      if (cascading.empty()) {
-        err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
-      } else {
-        err = TRITONSERVER_ServerCascadingUnloadModel(
+    } else if (action == "unload") {
+      // Check if the dependent models should be removed
+      bool unload_dependents = false;
+      {
+        struct evbuffer_iovec* v = nullptr;
+        int v_idx = 0;
+        int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+        if (n > 0) {
+          v = static_cast<struct evbuffer_iovec*>(
+              alloca(sizeof(struct evbuffer_iovec) * n));
+          if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "unexpected error getting model control request body");
+          }
+        }
+
+        size_t buffer_len = evbuffer_get_length(req->buffer_in);
+        if (buffer_len > 0) {
+          triton::common::TritonJson::Value control_request;
+          err = EVBufferToJson(&control_request, v, &v_idx, buffer_len, n);
+          if (err == nullptr) {
+            triton::common::TritonJson::Value params_json;
+            if (control_request.Find("parameters", &params_json)) {
+              triton::common::TritonJson::Value ud_json;
+              if (params_json.Find("unload_dependents", &ud_json)) {
+                auto parse_err = ud_json.AsBool(&unload_dependents);
+                if (parse_err != nullptr) {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ErrorCode(parse_err),
+                      (std::string("Unable to parse 'unload_dependents': ") +
+                       TRITONSERVER_ErrorMessage(parse_err))
+                          .c_str());
+                  TRITONSERVER_ErrorDelete(parse_err);
+                }
+              }
+            }
+          }
+        }
+      }
+      if (unload_dependents) {
+        err = TRITONSERVER_ServerUnloadModelAndDependents(
             server_.get(), model_name.c_str());
+      } else {
+        err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
       }
     }
   }

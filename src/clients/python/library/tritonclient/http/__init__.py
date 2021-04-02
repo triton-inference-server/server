@@ -619,7 +619,7 @@ class InferenceServerClient:
                      model_name,
                      headers=None,
                      query_params=None,
-                     cascading=False):
+                     unload_dependents=False):
         """Request the inference server to unload specified model.
 
         Parameters
@@ -632,8 +632,8 @@ class InferenceServerClient:
         query_params: dict
             Optional url query parameters to use in network
             transaction
-        cascading : bool
-            Whether the models should be cascading unloaded.
+        unload_dependents : bool
+            Whether the dependents of the model should also be unloaded.
 
         Raises
         ------
@@ -641,10 +641,14 @@ class InferenceServerClient:
             If unable to unload the model.
 
         """
-        request_uri = "v2/repository/models/{}/unload{}".format(
-            quote(model_name), "/cascading" if cascading else "")
+        request_uri = "v2/repository/models/{}/unload".format(quote(model_name))
+        unload_request = {
+            "parameters": {
+                "unload_dependents": unload_dependents
+            }
+        }
         response = self._post(request_uri=request_uri,
-                              request_body="",
+                              request_body=json.dumps(unload_request),
                               headers=headers,
                               query_params=query_params)
         _raise_if_error(response)

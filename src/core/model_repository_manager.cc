@@ -1477,7 +1477,7 @@ ModelRepositoryManager::LoadModelByDependency()
 Status
 ModelRepositoryManager::LoadUnloadModel(
     const std::string& model_name, const ActionType type,
-    const bool cascading_delete)
+    const bool unload_dependents)
 {
   if (!model_control_enabled_) {
     return Status(
@@ -1490,7 +1490,7 @@ ModelRepositoryManager::LoadUnloadModel(
 
   bool polled = true;
   RETURN_IF_ERROR(
-      LoadUnloadModels({model_name}, type, cascading_delete, &polled));
+      LoadUnloadModels({model_name}, type, unload_dependents, &polled));
 
   // Check if model is loaded / unloaded properly
   const auto version_states = backend_life_cycle_->VersionStates(model_name);
@@ -1530,7 +1530,7 @@ ModelRepositoryManager::LoadUnloadModel(
 Status
 ModelRepositoryManager::LoadUnloadModels(
     const std::set<std::string>& model_names, const ActionType type,
-    const bool cascading_delete, bool* all_models_polled)
+    const bool unload_dependents, bool* all_models_polled)
 {
   auto status = Status::Success;
   *all_models_polled = true;
@@ -1592,17 +1592,17 @@ ModelRepositoryManager::LoadUnloadModels(
       }
     }
   }
-  std::set<std::string> cascading_deleted;
+  std::set<std::string> deleted_dependents;
 
   // Update dependency graph and load
   UpdateDependencyGraph(
       added, deleted, modified,
-      cascading_delete ? &cascading_deleted : nullptr);
+      unload_dependents ? &deleted_dependents : nullptr);
 
   // The models are in 'deleted' either when they are asked to be unloaded or
   // they are not found / are duplicated across all model repositories.
   // In all cases, should unload them and remove from 'infos_' explicitly.
-  for (const auto& name : (cascading_delete ? cascading_deleted : deleted)) {
+  for (const auto& name : (unload_dependents ? deleted_dependents : deleted)) {
     infos_.erase(name);
     backend_life_cycle_->AsyncUnload(name);
   }
@@ -1955,7 +1955,7 @@ Status
 ModelRepositoryManager::UpdateDependencyGraph(
     const std::set<std::string>& added, const std::set<std::string>& deleted,
     const std::set<std::string>& modified,
-    std::set<std::string>* cascading_deleted)
+    std::set<std::string>* deleted_dependents)
 {
   // update dependency graph, if the state of a node is changed, all its
   // downstreams will be affected
@@ -1975,7 +1975,7 @@ ModelRepositoryManager::UpdateDependencyGraph(
         for (auto& upstream : it->second->upstreams_) {
           upstream.first->downstreams_.erase(it->second.get());
           // Check if the upstream should be removed aas well
-          if ((cascading_deleted != nullptr) &&
+          if ((deleted_dependents != nullptr) &&
               (upstream.first->downstreams_.empty()) &&
               (!upstream.first->explicitly_load_)) {
             next_deleted.emplace(upstream.first->model_name_);
@@ -1997,8 +1997,8 @@ ModelRepositoryManager::UpdateDependencyGraph(
         affected_nodes.erase(it->second.get());
         dependency_graph_.erase(it);
       }
-      if (cascading_deleted != nullptr) {
-        cascading_deleted->emplace(model_name);
+      if (deleted_dependents != nullptr) {
+        deleted_dependents->emplace(model_name);
       }
     }
     current_deleted.swap(next_deleted);

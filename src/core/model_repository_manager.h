@@ -167,7 +167,7 @@ class ModelRepositoryManager {
   /// loaded.
   Status LoadUnloadModel(
       const std::string& model_name, const ActionType type,
-      const bool cascading_delete);
+      const bool unload_dependents);
 
   /// Unload all models. This function should be called before shutting down
   /// the model repository manager.
@@ -230,7 +230,7 @@ class ModelRepositoryManager {
   /// The internal function that load or unload a set of models.
   Status LoadUnloadModels(
       const std::set<std::string>& models, const ActionType type,
-      const bool cascading_delete, bool* all_models_polled);
+      const bool unload_dependents, bool* all_models_polled);
 
   /// Poll the requested models in the model repository and
   /// compare with the current set. Return the additions, deletions,
@@ -270,7 +270,7 @@ class ModelRepositoryManager {
   Status UpdateDependencyGraph(
       const std::set<std::string>& added, const std::set<std::string>& deleted,
       const std::set<std::string>& modified,
-      std::set<std::string>* cascading_deleted = nullptr);
+      std::set<std::string>* deleted_dependents = nullptr);
 
   /// Helper function to uncheck the nodes because the model that they depends
   /// on has changed. The unchecked nodes will be validated again.
