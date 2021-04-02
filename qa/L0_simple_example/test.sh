@@ -90,7 +90,7 @@ if [ `grep -c my_host_ client_py_host.log` != "3" ]; then
     RET=1
 fi
 
-Run with multiple headers...
+# Run with multiple headers...
 $SIMPLE_CLIENT -v -H"abc:xyz" -H"123:456" >>client_c++_multi.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
