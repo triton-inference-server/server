@@ -28,7 +28,7 @@
 SERVER_HOST=${1:-"${INGRESS_HOST}:${INGRESS_PORT}"} # need update public IP
 MODEL_VERSION=${2:-1}
 precision=${3:-"int8"}
-BATCH_SIZE=${4:-16}
+BATCH_SIZE=${4:-1}
 MAX_LATENCY=${5:-500}
 MAX_CLIENT_THREADS=${6:-6}
 MAX_CONCURRENCY=${7:-6}

@@ -38,8 +38,8 @@ class ProfileLoad(LoadTestShape):
     until time_limit is reached.
     '''
 
-    target_users   = 250
-    step_users     = 5      # ramp users each step
+    target_users   = 300
+    step_users     = 10      # ramp users each step
     time_limit     = 3600   # seconds
 
     def tick(self):
