@@ -116,7 +116,7 @@ Third, we will try sending request to server with provide client example.
 
 If User selected deploy Triton to accept HTTP request, please launch [Locust](https://docs.locust.io/en/stable/installation.html) with Ingress host and port to query Triton Inference Server. In this [example script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/locustfile_bert_large.py), we send request to Triton server which has loaded a BERT large TensorRT Engine with Sequence length of 128 into GCP bucket.
 ```
-locust -f locustfile-bert-large.py -H http://${INGRESS_HOST}:${INGRESS_PORT}
+locust -f locustfile_bert_large.py -H http://${INGRESS_HOST}:${INGRESS_PORT}
 ```
 
 The client example push about ~200 QPS(Query per second) to Trition Server, and will trigger a auto scale of T4 GPU nodes (We recommend to use T4 and A100[MIG] for inference). From locust UI, we will observer a drop of latency mean and variance for the requests.
