@@ -27,7 +27,7 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '2.8.4'
+  publishedVersion: '2.8.5'
   publishedVersionMetadata:
     releaseNote: >-
       Initial release.
@@ -83,7 +83,7 @@ properties:
     type: string
     default: HTTP
   HPATargetAverageValue: 
-    title: HPA GPU utilization autoscaling target, when target is reached, Triton Server service will create another pod instance.
+    title: HPA GPU utilization autoscaling target, when target is reached, Triton Server service will create another pod instance. We ask user to profile their model to understand what is appropriate target based on latency requirement and profiling. We also recommend leave some cushion room for request traffic spike. 
     type: integer
     default: 85      
   modelRepositoryPath:
