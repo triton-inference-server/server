@@ -53,7 +53,7 @@ rm -f $SERVER_LOG $CLIENT_LOG
 RET=0
 
 # save model
-python $MAKE_MODEL --dir $DATA_DIR --value $TEST_VAL
+python $MAKE_MODEL --dir $DATA_DIR
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
