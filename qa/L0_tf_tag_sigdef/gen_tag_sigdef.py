@@ -40,14 +40,16 @@ from tensorflow.python.saved_model import signature_constants
 from tensorflow.python.saved_model import signature_def_utils
 from tensorflow.python.saved_model import tag_constants
 import tensorflow.compat.v1 as tf
+import gen_ensemble_model_utils as gu
 """Savedmodel that contains multiple tags and multiple signature defs"""
 
 
 def create_savedmodel(models_dir,
                       model_version=1,
-                      signature_def_name="testSigDef",
-                      tag_name="testTag"):
-    model_name = "sig_tag"
+                      dims=16,
+                      model_name="sig_tag",
+                      tag_name="testTag",
+                      signature_def_name="testSigDef"):
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -56,16 +58,16 @@ def create_savedmodel(models_dir,
         pass  # ignore existing dir
 
     with tf.Session() as sess:
-        input_tensor = tf.placeholder(tf.float32, [16], "TENSOR_INPUT")
+        input_tensor = tf.placeholder(tf.float32, [dims], "TENSOR_INPUT")
 
+        # tag:"serve", signature_def:"serving_default"
+        multiplier_0 = tf.constant(1.0, name="multiplier_0")
         # tag:"serve", signature_def:signature_def_name
-        multiplier_0 = tf.constant(-1.0, name="multiplier_0")
-        # tag:"serve", signature_def:signature_def_name
-        multiplier_1 = tf.constant(1.0, name="multiplier_1")
+        multiplier_1 = tf.constant(2.0, name="multiplier_1")
         # tag:tag_name, signature_def:"serving_default"
-        multiplier_2 = tf.constant(2.0, name="multiplier_2")
-        # tag:tag_name, signature_def:"serving_default"
-        multiplier_3 = tf.constant(3.0, name="multiplier_3")
+        multiplier_2 = tf.constant(3.0, name="multiplier_2")
+        # tag:tag_name, signature_def:signature_def_name
+        multiplier_3 = tf.constant(4.0, name="multiplier_3")
 
         output_tensor_0 = tf.multiply(multiplier_0,
                                       input_tensor,
@@ -92,30 +94,34 @@ def create_savedmodel(models_dir,
             output_tensor_3)
 
         # Using predict method name because simple save uses it
+        # tag:"serve", signature_def:"serving_default"
         signature_0 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_0},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
+        # tag:"serve", signature_def:signature_def_name
         signature_1 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_1},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
+        # tag:tag_name, signature_def:"serving_default"
         signature_2 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_2},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
+        # tag:tag_name, signature_def:signature_def_name
         signature_3 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_3},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
 
         signature_def_map_0 = {
-            signature_def_name: signature_0,
-            signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_1
+            signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_0,
+            signature_def_name: signature_1
         }
         signature_def_map_1 = {
-            signature_def_name: signature_2,
-            signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_3
+            signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_2,
+            signature_def_name: signature_3
         }
 
         b = builder.SavedModelBuilder(model_version_dir + "/model.savedmodel")
@@ -133,9 +139,90 @@ def create_savedmodel(models_dir,
         b.save()
 
 
+def create_savedmodel_modelconfig(models_dir,
+                                  model_version=1,
+                                  dims=16,
+                                  model_name="sig_tag",
+                                  tag_name="testTag",
+                                  signature_def_name="testSigDef"):
+    version_policy_str = "{ latest { num_versions: 1 }}"
+
+    # Use a different model name for the non-batching variant
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "tensorflow_savedmodel"
+version_policy: {}
+input [
+  {{
+    name: "INPUT"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+parameters: {{
+key: "TF_GRAPH_TAG"
+value: {{
+string_value: "{}"
+}}
+}}
+parameters: {{
+key: "TF_SIGNATURE_DEF"
+value: {{
+string_value: "{}"
+}}
+}}
+'''.format(model_name, version_policy_str, gu.np_to_model_dtype(tf.float32),
+           str(dims), gu.np_to_model_dtype(tf.float32), str(dims), tag_name,
+           signature_def_name)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='getting model output dir')
     parser.add_argument('--dir', help='directory to run model in')
     args = parser.parse_args()
-    create_savedmodel(args.dir)
+    base_dir = args.dir
+    base_model_name = "sig_tag"
+    base_tag = "serve"
+    test_tag = "testTag"
+    base_sig_def = "serving_default"
+    test_sig_def = "testSigDef"
+
+    for i in range(4):
+        model_name = base_model_name + str(i)
+        create_savedmodel(args.dir,
+                          model_name=model_name,
+                          tag_name=test_tag,
+                          signature_def_name=test_sig_def)
+    create_savedmodel_modelconfig(args.dir,
+                                  model_name="sig_tag0",
+                                  tag_name=base_tag,
+                                  signature_def_name=base_sig_def)
+    create_savedmodel_modelconfig(args.dir,
+                                  model_name="sig_tag1",
+                                  tag_name=base_tag,
+                                  signature_def_name=test_sig_def)
+    create_savedmodel_modelconfig(args.dir,
+                                  model_name="sig_tag2",
+                                  tag_name=test_tag,
+                                  signature_def_name=base_sig_def)
+    create_savedmodel_modelconfig(args.dir,
+                                  model_name="sig_tag3",
+                                  tag_name=test_tag,
+                                  signature_def_name=test_sig_def)

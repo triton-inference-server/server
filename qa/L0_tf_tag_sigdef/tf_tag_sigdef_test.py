@@ -39,43 +39,47 @@ from tritonclientutils import InferenceServerException
 
 
 class TagSigdefTest(tu.TestResultCollector):
-    def _test_helper(self, model_name, tag, sig_def):
-
-        # {
-        #     tag/sig_def: multiplier
-        # }
-
-        shape = [16]
+    base_model_name = "sig_tag"
+    base_tag = "serve"
+    test_tag = "testTag"
+    base_sig_def = "serving_default"
+    test_sig_def = "testSigDef"
+    dims = 16
+    def _test_helper(self, model_name, multiplier, tag, sig_def):
+        shape = [self.dims]
         output_name = "OUTPUT"
         triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                          verbose=True)
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT', shape, "FP32"))
-
-        input0_data = np.ones(shape=shape).astype(np.float32)
-        inputs[0].set_data_from_numpy(input0_data, binary_data=True)
+        inputs.append(httpclient.InferInput('INPUT', shape, "FP32")
+        input_data = np.ones(shape=shape).astype(np.float32)
+        inputs[0].set_data_from_numpy(input_data, binary_data=True)
 
         outputs.append(
             httpclient.InferRequestedOutput(output_name, binary_data=True))
-
         results = triton_client.infer(model_name,
                                       inputs,
                                       outputs=outputs)
+        output_data = results.as_numpy(output_name)
+        test_output = input_data * multiplier
+        self.assertTrue(np.isclose(output_data, test_output).all())
 
-        output0_data = results.as_numpy(output_name)
+    def test_default(self):
+        model_name = self.base_model_name + str(0)
+        self._test_helper(model_name, 1, self.base_tag, self.base_sig_def)
 
-        # if
-        multiplier = 2
-        test_output = input0_data * multiplier
-        print(test_output)
-        print(output0_data)
-        self.assertTrue(np.isclose(output0_data, test_output).all())
+    def test_sig_def(self):
+        model_name = self.base_model_name + str(1)
+        self._test_helper(model_name, 2, self.base_tag, self.test_sig_def)
 
-    def test_default_tag(self):
-        signature_def_name="testSigDef"
-        tag_name="testTag"
-        self._test_helper('sig_tag', tag_name, signature_def_name)
+    def test_tag(self):
+        model_name = self.base_model_name + str(2)
+        self._test_helper(model_name, 3, self.test_tag, self.base_sig_def)
+
+    def test_tag_sig_def(self):
+        model_name = self.base_model_name + str(3)
+        self._test_helper(model_name, 4, self.test_tag, self.test_sig_def)
 
 
 if __name__ == '__main__':
