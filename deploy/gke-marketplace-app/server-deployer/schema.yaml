@@ -88,7 +88,7 @@ properties:
     default: 85      
   modelRepositoryPath:
     type: string
-    title: Bucket where models are stored. Read Triton documentation on configs and formatting details, supporting TensorRT, TensorFlow, Pytorch, Onnx ... etc.
+    title: Bucket where models are stored. Please make sure the user/service account to create the GKE app has permission to this GCS bucket. Read Triton documentation on configs and formatting details, supporting TensorRT, TensorFlow, Pytorch, Onnx ... etc.
     default: gs://triton_sample_models/21_03
   image.ldPreloadPath:
     type: string
