@@ -65,6 +65,7 @@ HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/$TRITON_VERSION/qa_model_repository
 HOST_VARDESTDIR=/tmp/$TRITON_VERSION/qa_variable_model_repository
 HOST_IDENTITYDESTDIR=/tmp/$TRITON_VERSION/qa_identity_model_repository
+HOST_SIGDEFDESTDIR=/tmp/$TRITON_VERSION/qa_tf_tag_sigdef_repository 
 HOST_IDENTITYBIGDESTDIR=/tmp/$TRITON_VERSION/qa_identity_big_model_repository
 HOST_SHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_shapetensor_model_repository
 HOST_RESHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_reshape_model_repository
@@ -78,14 +79,15 @@ HOST_RAGGEDDESTDIR=/tmp/$TRITON_VERSION/qa_ragged_model_repository
 HOST_FORMATDESTDIR=/tmp/$TRITON_VERSION/qa_trt_format_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
-rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR
+rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
-rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR
+rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR 
 mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_IDENTITYDESTDIR
+mkdir -p $HOST_SIGDEFDESTDIR
 mkdir -p $HOST_IDENTITYBIGDESTDIR
 mkdir -p $HOST_SHAPEDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
@@ -132,6 +134,7 @@ SRCDIR=/tmp/src
 DESTDIR=/tmp/models
 VARDESTDIR=/tmp/varmodels
 IDENTITYDESTDIR=/tmp/zeromodels
+SIGDEFDESTDIR=/tmp/sigdefmodels
 IDENTITYBIGDESTDIR=/tmp/zerobigmodels
 SHAPEDESTDIR=/tmp/shapetensormodels
 RESHAPEDESTDIR=/tmp/reshapemodels
@@ -263,6 +266,7 @@ python3 $SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$ENSEMBLEDESTDI
 python3 $SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_identity_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_sequence_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
+python3 $SRCDIR/gen_tag_sigdef.py --dir $SIGDEFDESTDIR
 chmod -R 777 $ENSEMBLEDESTDIR
 EOF
 
@@ -278,6 +282,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
+       --mount type=bind,source=$HOST_SIGDEFDESTDIR,target=$SIGDEFDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \

@@ -41,7 +41,7 @@ CLIENT_LOG="./client.log"
 TEST=tf_tag_sigdef_test.py
 MAKE_MODEL=gen_tag_sigdef.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_tf_tag_sigdef
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_tf_tag_sigdef_repository
 EXPECTED_NUM_TESTS="4"
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
