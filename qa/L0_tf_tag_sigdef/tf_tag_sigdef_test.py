@@ -52,7 +52,7 @@ class TagSigdefTest(tu.TestResultCollector):
                                                          verbose=True)
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT', shape, "FP32")
+        inputs.append(httpclient.InferInput('INPUT', shape, "FP32"))
         input_data = np.ones(shape=shape).astype(np.float32)
         inputs[0].set_data_from_numpy(input_data, binary_data=True)
 

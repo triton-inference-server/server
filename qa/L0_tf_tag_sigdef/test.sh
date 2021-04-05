@@ -42,7 +42,7 @@ TEST=tf_tag_sigdef_test.py
 MAKE_MODEL=gen_tag_sigdef.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_tf_tag_sigdef
-
+EXPECTED_NUM_TESTS="4"
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
@@ -53,7 +53,7 @@ rm -f $SERVER_LOG $CLIENT_LOG
 RET=0
 
 # save model
-python $MAKE_MODEL --dir $DATA_DIR
+# python $MAKE_MODEL --dir $DATA_DIR
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
