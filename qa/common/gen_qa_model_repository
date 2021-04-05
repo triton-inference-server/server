@@ -124,6 +124,7 @@ cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_format_models.py $HOST_SRCDIR/.
 cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
+cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
 TORCHSCRIPT=torch_gen.cmds
