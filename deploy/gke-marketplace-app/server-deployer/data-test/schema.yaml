@@ -27,7 +27,7 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '2.8.0'
+  publishedVersion: '2.8.5'
   publishedVersionMetadata:
     releaseNote: >-
       Initial release.
@@ -39,7 +39,7 @@ x-google-marketplace:
     k8sVersion: ">=1.18.7"
     assistedClusterCreation:
       type: DISABLED
-      creationGuidance: "GKE currently doesn't support autocreate GPU clusters, please refer to https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app to manually  create the GKE cluster >= 1.18.7 and add GPU node pools"
+      creationGuidance: GKE currently doesn't support autocreate GPU clusters, please refer to <a href="https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app">Triton GKE Marketplace Deployer</a> to manually create the GKE cluster >= 1.18.7 and add GPU node pools
     resources:
     - requests:
         gpu:
@@ -83,25 +83,25 @@ properties:
     type: string
     default: HTTP
   HPATargetAverageValue: 
-    title: HPA GPU utilization autoscaling target, when target is reached, Triton Server service will create another pod instance.
+    title: HPA GPU utilization autoscaling target, when target is reached, Triton Server service will create another pod instance. We ask user to profile their model to understand what is appropriate target based on latency requirement and profiling. We also recommend leave some cushion room for request traffic spike. 
     type: integer
     default: 85      
   modelRepositoryPath:
     type: string
-    title: Bucket where models are stored. Read Triton documentation on configs and formatting details.
-    default: gs://triton_sample_models
-  image.strictModelConfig:
-    type: boolean
-    title: When strictModelConfig is False, Triton will try to infer the config file from model file, when True, user need to provide config.pbtxt in model repository.
-    default: False
+    title: Bucket where models are stored. Read Triton documentation on configs and formatting details, supporting TensorRT, TensorFlow, Pytorch, Onnx ... etc.
+    default: gs://triton_sample_models/21_03
   image.ldPreloadPath:
     type: string
-    title: Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.
+    title: Leave this empty by default. Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.
     default: ''
   image.logVerboseLevel:
     type: integer
     title: Set verbose logging level. Zero (0) disables verbose logging and values >= 1 enable verbose logging, this is helpful when user unsure if the model is compatible with Triton or for general debug.
     default: 0 
+  image.strictModelConfig:
+    type: boolean
+    title: Leave this unchecked by default. When strictModelConfig is not checked(False), Triton will try to infer the config file from model file, when checked(True), user need to provide config.pbtxt in model repository.
+    default: False
   istioEnabled:
     type: boolean
     x-google-marketplace:
@@ -116,4 +116,4 @@ required:
 
 form:
 - widget: help
-  description: Please refer to the <a href="https://github.com/triton-inference-server/server">Triton GITHUB page</a> for product information.
+  description: GKE currently doesn't support autocreate GPU clusters, please refer to <a href="https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app">Triton GKE Marketplace Deployer</a> to manually create the GKE cluster >= 1.18.7 and add GPU node pools. Also, please refer to the <a href="https://github.com/triton-inference-server/server">Triton GITHUB page</a> for product information.
