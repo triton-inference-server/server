@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,8 +45,13 @@ class TagSigdefTest(tu.TestResultCollector):
     base_sig_def = "serving_default"
     test_sig_def = "testSigDef"
     dims = 16
-    def _test_helper(self, model_name, multiplier, tag, sig_def):
+
+    def _test_helper(self, modelVersion, tag, sig_def):
         shape = [self.dims]
+        model_name = self.base_model_name + str(modelVersion)
+        # The multiplier is defined during model creation. See server/qa/common/gen_tag_sigdef.py
+        # for details
+        multiplier = modelVersion + 1
         output_name = "OUTPUT"
         triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                          verbose=True)
@@ -58,28 +63,22 @@ class TagSigdefTest(tu.TestResultCollector):
 
         outputs.append(
             httpclient.InferRequestedOutput(output_name, binary_data=True))
-        results = triton_client.infer(model_name,
-                                      inputs,
-                                      outputs=outputs)
+        results = triton_client.infer(model_name, inputs, outputs=outputs)
         output_data = results.as_numpy(output_name)
         test_output = input_data * multiplier
         self.assertTrue(np.isclose(output_data, test_output).all())
 
     def test_default(self):
-        model_name = self.base_model_name + str(0)
-        self._test_helper(model_name, 1, self.base_tag, self.base_sig_def)
+        self._test_helper(0, self.base_tag, self.base_sig_def)
 
     def test_sig_def(self):
-        model_name = self.base_model_name + str(1)
-        self._test_helper(model_name, 2, self.base_tag, self.test_sig_def)
+        self._test_helper(1, self.base_tag, self.test_sig_def)
 
     def test_tag(self):
-        model_name = self.base_model_name + str(2)
-        self._test_helper(model_name, 3, self.test_tag, self.base_sig_def)
+        self._test_helper(2, self.test_tag, self.base_sig_def)
 
     def test_tag_sig_def(self):
-        model_name = self.base_model_name + str(3)
-        self._test_helper(model_name, 4, self.test_tag, self.test_sig_def)
+        self._test_helper(3, self.test_tag, self.test_sig_def)
 
 
 if __name__ == '__main__':
