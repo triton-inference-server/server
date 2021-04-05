@@ -33,7 +33,7 @@ namespace nvidia { namespace inferenceserver {
 TensorRTLogger tensorrt_logger;
 
 void
-TensorRTLogger::log(Severity severity, const char* msg)
+TensorRTLogger::log(Severity severity, const char* msg) noexcept
 {
   switch (severity) {
     case Severity::kINTERNAL_ERROR:
