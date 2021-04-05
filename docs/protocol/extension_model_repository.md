@@ -32,7 +32,12 @@ This document describes Triton's model repository extension.  The
 model-repository extension allows a client to query and control the
 one or more model repositories being served by Triton.  Because this
 extension is supported, Triton reports “model_repository” in the
-extensions field of its Server Metadata.
+extensions field of the Server Metadata. This extension has an
+optional component, described below, that allows the unload API to
+specify the "unload_dependents" parameter. Versions of Triton that
+support this optional component will also report
+"model_repository(unload_dependents)" in the extensions field of the
+Server Metadata.
 
 ## HTTP/REST
 
@@ -48,7 +53,7 @@ POST v2/repository/index
 
 POST v2/repository/models/${MODEL_NAME}/load
 
-POST v2/repository/models/${MODEL_NAME}/unload[/cascading]
+POST v2/repository/models/${MODEL_NAME}/unload
 ```
 
 ### Index
