@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
-=======
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
->>>>>>> adding test script to gen_qa_model_repository
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,11 +41,7 @@ from tensorflow.python.saved_model import signature_def_utils
 from tensorflow.python.saved_model import tag_constants
 import tensorflow.compat.v1 as tf
 import gen_ensemble_model_utils as gu
-<<<<<<< HEAD
 """Create SaveModels that contains multiple tags and multiple signature defs"""
-=======
-"""Savedmodel that contains multiple tags and multiple signature defs"""
->>>>>>> adding test script to gen_qa_model_repository
 
 
 def create_savedmodel(models_dir,
@@ -58,7 +50,6 @@ def create_savedmodel(models_dir,
                       model_name="sig_tag",
                       tag_name="testTag",
                       signature_def_name="testSigDef"):
-<<<<<<< HEAD
     """
     Creates 4 SavedModels that have different combinations of model_name and tag_name.
     The models multiplies the input tensor by a multiplier and the multiplier value is different for each model.
@@ -68,8 +59,6 @@ def create_savedmodel(models_dir,
     <model_name>2: tag: <tag_name>, signature_def: "serving_default",    multiplier 3
     <model_name>3: tag: <tag_name>, signature_def: <signature_def_name>, multiplier 4
     """
-=======
->>>>>>> adding test script to gen_qa_model_repository
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
