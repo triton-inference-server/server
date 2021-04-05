@@ -917,6 +917,12 @@ ValidateBatchIO(const inference::ModelConfig& config)
             "unknown batch input kind '" +
                 inference::BatchInput::Kind_Name(batch_io.kind()) + "'");
     }
+    if ((batch_io.data_type() != inference::DataType::TYPE_INT32) &&
+        (batch_io.data_type() != inference::DataType::TYPE_FP32)) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "batch input data type must be TYPE_INT32 or TYPE_FP32");
+    }
     for (const auto& source_name : batch_io.source_input()) {
       if (input_names.find(source_name) == input_names.end()) {
         return Status(
