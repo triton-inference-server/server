@@ -1422,7 +1422,51 @@ HTTPAPIServer::HandleRepositoryControl(
     if (action == "load") {
       err = TRITONSERVER_ServerLoadModel(server_.get(), model_name.c_str());
     } else if (action == "unload") {
-      err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
+      // Check if the dependent models should be removed
+      bool unload_dependents = false;
+      {
+        struct evbuffer_iovec* v = nullptr;
+        int v_idx = 0;
+        int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+        if (n > 0) {
+          v = static_cast<struct evbuffer_iovec*>(
+              alloca(sizeof(struct evbuffer_iovec) * n));
+          if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "unexpected error getting model control request body");
+          }
+        }
+
+        size_t buffer_len = evbuffer_get_length(req->buffer_in);
+        if (buffer_len > 0) {
+          triton::common::TritonJson::Value control_request;
+          err = EVBufferToJson(&control_request, v, &v_idx, buffer_len, n);
+          if (err == nullptr) {
+            triton::common::TritonJson::Value params_json;
+            if (control_request.Find("parameters", &params_json)) {
+              triton::common::TritonJson::Value ud_json;
+              if (params_json.Find("unload_dependents", &ud_json)) {
+                auto parse_err = ud_json.AsBool(&unload_dependents);
+                if (parse_err != nullptr) {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ErrorCode(parse_err),
+                      (std::string("Unable to parse 'unload_dependents': ") +
+                       TRITONSERVER_ErrorMessage(parse_err))
+                          .c_str());
+                  TRITONSERVER_ErrorDelete(parse_err);
+                }
+              }
+            }
+          }
+        }
+      }
+      if (unload_dependents) {
+        err = TRITONSERVER_ServerUnloadModelAndDependents(
+            server_.get(), model_name.c_str());
+      } else {
+        err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
+      }
     }
   }
 

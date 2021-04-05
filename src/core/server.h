@@ -116,7 +116,8 @@ class InferenceServer {
   Status LoadModel(const std::string& model_name);
 
   // Unload the corresponding model.
-  Status UnloadModel(const std::string& model_name);
+  Status UnloadModel(
+      const std::string& model_name, const bool unload_dependents);
 
   // Print backends and models summary
   Status PrintBackendAndModelSummary();

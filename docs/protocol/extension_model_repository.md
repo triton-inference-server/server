@@ -32,7 +32,12 @@ This document describes Triton's model repository extension.  The
 model-repository extension allows a client to query and control the
 one or more model repositories being served by Triton.  Because this
 extension is supported, Triton reports “model_repository” in the
-extensions field of its Server Metadata.
+extensions field of the Server Metadata. This extension has an
+optional component, described below, that allows the unload API to
+specify the "unload_dependents" parameter. Versions of Triton that
+support this optional component will also report
+"model_repository(unload_dependents)" in the extensions field of the
+Server Metadata.
 
 ## HTTP/REST
 
@@ -70,7 +75,7 @@ $repository_index_request =
 }
 ```
 
-    "ready" : Optional, default is false. If true return only models ready for inferencing.
+- "ready" : Optional, default is false. If true return only models ready for inferencing.
 
 A successful index request is indicated by a 200 HTTP status code. The
 response object, identified as $repository_index_response, is returned
@@ -130,8 +135,28 @@ $repository_load_error_response =
 
 The unload API requests that a model be unloaded from Triton. An
 unload request is made with an HTTP POST to an unload endpoint. The
-HTTP body must be empty. A successful unload request is indicated by a
-200 HTTP status.
+HTTP body may be empty or may contain the unload request object,
+identified as $repository_unload_request. A successful unload request
+is indicated by a 200 HTTP status.
+
+```
+$repository_unload_request =
+{
+  "parameters" : $parameters #optional
+}
+```
+
+- "parameters" : An object containing zero or more parameters for this
+  request expressed as key/value pairs. See
+  [Parameters](https://github.com/kubeflow/kfserving/blob/master/docs/predict-api/v2/required_api.md#parameters)
+  for more information.
+
+The unload API accepts the following parameters:
+
+- "unload_dependents" : boolean parameter indicating that in addition
+  to unloading the requested model, also unload any dependent model
+  that was loaded along with the requested model (for example, the
+  models composing an ensemble).
 
 A failed unload request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
@@ -166,6 +191,23 @@ service GRPCInferenceService
   // Unload a model.
   rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
           returns (RepositoryModelUnloadResponse) {}
+}
+
+message ModelRepositoryParameter
+{
+  // The parameter value can be a string, an int64, a boolean
+  // or a message specific to a predefined parameter.
+  oneof parameter_choice
+  {
+    // A boolean parameter value.
+    bool bool_param = 1;
+
+    // An int64 parameter value.
+    int64 int64_param = 2;
+
+    // A string parameter value.
+    string string_param = 3;
+  }
 }
 ```
 
@@ -252,6 +294,9 @@ message RepositoryModelUnloadRequest
 
   // The name of the model to unload.
   string model_name = 2;
+
+  // Optional parameters.
+  map<string, ModelRepositoryParameter> parameters = 3;
 }
 
 message RepositoryModelUnloadResponse

@@ -1058,6 +1058,40 @@ message ModelStatisticsResponse
 }
 
 //@@
+//@@.. cpp:var:: message ModelRepositoryParameter
+//@@
+//@@   An model repository parameter value.
+//@@
+message ModelRepositoryParameter
+{
+  //@@  .. cpp:var:: oneof parameter_choice
+  //@@
+  //@@     The parameter value can be a string, an int64 or
+  //@@     a boolean
+  //@@
+  oneof parameter_choice
+  {
+    //@@    .. cpp:var:: bool bool_param
+    //@@
+    //@@       A boolean parameter value.
+    //@@
+    bool bool_param = 1;
+
+    //@@    .. cpp:var:: int64 int64_param
+    //@@
+    //@@       An int64 parameter value.
+    //@@
+    int64 int64_param = 2;
+
+    //@@    .. cpp:var:: string string_param
+    //@@
+    //@@       A string parameter value.
+    //@@
+    string string_param = 3;
+  }
+}
+
+//@@
 //@@.. cpp:var:: message RepositoryIndexRequest
 //@@
 //@@   Request message for RepositoryIndex.
@@ -1175,6 +1209,12 @@ message RepositoryModelUnloadRequest
   //@@     The name of the model to unload.
   //@@
   string model_name = 2;
+
+  //@@  .. cpp:var:: map<string,ModelRepositoryParameter> parameters
+  //@@
+  //@@     Optional model repository request parameters.
+  //@@
+  map<string, ModelRepositoryParameter> parameters = 3;
 }
 
 //@@
