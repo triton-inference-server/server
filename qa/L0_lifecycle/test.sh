@@ -847,6 +847,47 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_model_control_ensemble
+rm -fr models config.pbtxt.*
+mkdir models
+for i in onnx ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/simple_${i}_float32_float32_float32/config.pbtxt
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
+             --exit-timeout-secs=5 --strict-model-config=false
+             --strict-readiness=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_model_control_ensemble >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_multiple_model_repository_control_startup_models
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0
