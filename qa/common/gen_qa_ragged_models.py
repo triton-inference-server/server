@@ -72,14 +72,119 @@ def np_to_trt_dtype(np_dtype):
     return None
 
 
+def np_to_tf_dtype(np_dtype):
+    if np_dtype == bool:
+        return tf.bool
+    elif np_dtype == np.int8:
+        return tf.int8
+    elif np_dtype == np.int16:
+        return tf.int16
+    elif np_dtype == np.int32:
+        return tf.int32
+    elif np_dtype == np.int64:
+        return tf.int64
+    elif np_dtype == np.uint8:
+        return tf.uint8
+    elif np_dtype == np.uint16:
+        return tf.uint16
+    elif np_dtype == np.float16:
+        return tf.float16
+    elif np_dtype == np.float32:
+        return tf.float32
+    elif np_dtype == np.float64:
+        return tf.float64
+    elif np_dtype == np_dtype_string:
+        return tf.string
+    return None
+
+
+def create_savedmodel_modelfile(models_dir, model_version, dtype):
+    # Create special identity model for batch input testing.
+    # Because the ragged input and batch input are one dimensional vector
+    # when passing to the model, the model must generate output with batch
+    # dimension so that Triton can scatter it to different responses along
+    # the batch dimension.
+    # 'BATCH_AND_SIZE_INPUT' is also used as a hint to generate output with
+    # batch dimension, 'BATCH_AND_SIZE_INPUT' must have shape [batch_size].
+    # Each output corresponds to the input with the same name, so if there
+    # are two requests, one has "RAGGED_INPUT" [2, 4] and the other has [1],
+    # since the input is ragged, the model sees the input as [2, 4, 1], and
+    # "BATCH_AND_SIZE_INPUT" will have shape [3]. Then the model output will
+    # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
+    # value [[2, 4, 1]].
+    tf_dtype = np_to_tf_dtype(dtype)
+
+    tf.reset_default_graph()
+    in_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
+                             "TENSOR_RAGGED_INPUT")
+    bs_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
+                             "TENSOR_BATCH_AND_SIZE_INPUT")
+    batch_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
+                                "TENSOR_BATCH_INPUT")
+
+    in_mat = tf.reshape(in_node, [1, -1])
+    bs_mat = tf.reshape(bs_node, [1, -1])
+    batch_mat = tf.reshape(batch_node, [1, -1])
+
+    output_expander = tf.reshape(tf.divide(bs_node, bs_node), [-1, 1])
+
+    out_node = tf.matmul(output_expander, in_mat, name="TENSOR_RAGGED_OUTPUT")
+    bs_out_node = tf.matmul(output_expander,
+                            bs_mat,
+                            name="TENSOR_BATCH_AND_SIZE_OUTPUT")
+    batch_out_node = tf.matmul(output_expander,
+                               batch_mat,
+                               name="TENSOR_BATCH_OUTPUT")
+
+    model_name = "savedmodel_batch_input"
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with tf.Session() as sess:
+        in_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_RAGGED_INPUT:0")
+        bs_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_BATCH_AND_SIZE_INPUT:0")
+        batch_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_BATCH_INPUT:0")
+        out_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_RAGGED_OUTPUT:0")
+        bs_out_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_BATCH_AND_SIZE_OUTPUT:0")
+        batch_out_tensor = tf.get_default_graph().get_tensor_by_name(
+            "TENSOR_BATCH_OUTPUT:0")
+        tf.saved_model.simple_save(sess,
+                                   model_version_dir + "/model.savedmodel",
+                                   inputs={
+                                       "RAGGED_INPUT": in_tensor,
+                                       "BATCH_AND_SIZE_INPUT": bs_tensor,
+                                       "BATCH_INPUT": batch_tensor,
+                                   },
+                                   outputs={
+                                       "RAGGED_OUTPUT": out_tensor,
+                                       "BATCH_AND_SIZE_OUTPUT": bs_out_tensor,
+                                       "BATCH_OUTPUT": batch_out_tensor,
+                                   })
+
+
 def create_plan_modelfile(models_dir, model_version, dtype):
-    # Create specific model for L0_trt_batch_input. Because the ragged input
-    # nature and the server is not supporting output scattering,
-    # 'BATCH_AND_SIZE_INPUT' is used as hint to generate output with batch
-    # dimension, 'BATCH_AND_SIZE_INPUT' must have shape [batch_size]. In the
-    # context of BATCH_INPUT, that implies the test must ensure the requests and
-    # kind of 'BATCH_AND_SIZE_INPUT' are configured to form end-tensor with the
-    # right shape, i.e. send batch-1 request with kind 'BATCH_ELEMENT_COUNT'.
+    # Create special identity model for batch input testing.
+    # Because the ragged input and batch input are one dimensional vector
+    # when passing to the model, the model must generate output with batch
+    # dimension so that Triton can scatter it to different responses along
+    # the batch dimension.
+    # 'BATCH_AND_SIZE_INPUT' is also used as a hint to generate output with
+    # batch dimension, 'BATCH_AND_SIZE_INPUT' must have shape [batch_size].
+    # Each output corresponds to the input with the same name, so if there
+    # are two requests, one has "RAGGED_INPUT" [2, 4] and the other has [1],
+    # since the input is ragged, the model sees the input as [2, 4, 1], and
+    # "BATCH_AND_SIZE_INPUT" will have shape [3]. Then the model output will
+    # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
+    # value [[2, 4, 1]].
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network(
@@ -149,15 +254,30 @@ def create_plan_modelfile(models_dir, model_version, dtype):
     del builder
 
 
-def create_plan_modelconfig(models_dir, max_batch, model_version, dtype):
+def create_modelconfig(models_dir, max_batch, model_version, dtype, backend,
+                       platform):
     version_policy_str = "{ latest { num_versions: 1 }}"
 
+    # FIXME platform should be renamed and not required after all backends are ported
+    if backend != "tensorrt":
+        backend_spec = '''
+backend: "{}"
+'''.format(backend)
+        if backend == "tensorflow":
+            backend_spec += '''
+platform: "{}_{}"
+'''.format(backend, platform)
+    else:
+        backend_spec = '''
+platform: "{}_{}"
+'''.format(backend, platform)
+
     # Use a different model name for the non-batching variant
-    model_name = "plan_batch_input"
+    model_name = "{}_batch_input".format(platform)
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
-platform: "tensorrt_plan"
+{}
 max_batch_size: {}
 version_policy: {}
 input [
@@ -197,7 +317,7 @@ batch_input [
     source_input: "RAGGED_INPUT"
   }},
   {{
-    kind: BATCH_ACCUMULATED_ELEMENT_COUNT
+    kind: BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO
     target_name: "BATCH_INPUT"
     data_type: {data_type}
     source_input: "RAGGED_INPUT"
@@ -207,6 +327,7 @@ dynamic_batching {{
   max_queue_delay_microseconds: 1000000
 }}
 '''.format(model_name,
+           backend_spec,
            max_batch,
            version_policy_str,
            data_type=np_to_model_dtype(dtype))
@@ -223,8 +344,13 @@ dynamic_batching {{
 def create_batch_input_models(models_dir):
     model_version = 1
     if FLAGS.tensorrt:
-        create_plan_modelconfig(models_dir, 8, model_version, np.float32)
+        create_modelconfig(models_dir, 4, model_version, np.float32, "tensorrt",
+                           "plan")
         create_plan_modelfile(models_dir, model_version, np.float32)
+    if FLAGS.savedmodel:
+        create_modelconfig(models_dir, 4, model_version, np.float32,
+                           "tensorflow", "savedmodel")
+        create_savedmodel_modelfile(models_dir, model_version, np.float32)
 
 
 if __name__ == '__main__':
@@ -237,10 +363,21 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate TensorRT PLAN models')
+    parser.add_argument('--savedmodel',
+                        required=False,
+                        action='store_true',
+                        help='Generate SavedModel models')
+    parser.add_argument('--graphdef',
+                        required=False,
+                        action='store_true',
+                        help='Generate GraphDef models')
     FLAGS, unparsed = parser.parse_known_args()
 
     import test_util as tu
     if FLAGS.tensorrt:
         import tensorrt as trt
+    if FLAGS.graphdef or FLAGS.savedmodel:
+        import tensorflow as tf
+        from tensorflow.python.framework import graph_io, graph_util
 
     create_batch_input_models(FLAGS.models_dir)
