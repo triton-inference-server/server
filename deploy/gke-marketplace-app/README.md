@@ -106,6 +106,8 @@ Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplac
 
 ![GKE Marketplace Application UI](ui.png)
 
+We want to discuss HPA autoscaling metrics users can leverage. GPU Power(Percentage of Power) tends to be a reliable metric, especially for larger GPU like V100 and A100. GKE currently natively support GPU duty cycle which is GPU utilization in `nvidia-smi`. We ask users always profile their model to determine the autoscaling target and metrics. The goal of autoscaling should be: 1, meet SLA rrequirement. 2, give consideration to transient request load, 3, keep GPU as fully utilized as possible
+
 As the application deployed successfully, get Istio Ingress host and port
 ```
 export INGRESS_HOST=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
