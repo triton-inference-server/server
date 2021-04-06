@@ -1206,19 +1206,18 @@ if __name__ == '__main__':
 
     # Build the core server. For now the core is contained in this
     # repo so we just build in place
-    if True:
-        repo_build_dir = os.path.join(FLAGS.build_dir, 'tritonserver', 'build')
-        repo_install_dir = os.path.join(FLAGS.build_dir, 'tritonserver',
-                                        'install')
+    repo_build_dir = os.path.join(FLAGS.build_dir, 'tritonserver', 'build')
+    repo_install_dir = os.path.join(FLAGS.build_dir, 'tritonserver',
+                                    'install')
 
-        mkdir(repo_build_dir)
-        cmake(repo_build_dir,
-              core_cmake_args(components, backends, repo_install_dir))
-        makeinstall(repo_build_dir, target='server')
+    mkdir(repo_build_dir)
+    cmake(repo_build_dir,
+          core_cmake_args(components, backends, repo_install_dir))
+    makeinstall(repo_build_dir, target='server')
 
-        core_install_dir = FLAGS.install_dir
-        mkdir(core_install_dir)
-        cpdir(repo_install_dir, core_install_dir)
+    core_install_dir = FLAGS.install_dir
+    mkdir(core_install_dir)
+    cpdir(repo_install_dir, core_install_dir)
 
     # Build each backend...
     for be in backends:
