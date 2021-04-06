@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=./python_test.py
+CLIENT_PY=python_test
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="8"
 
@@ -67,13 +67,6 @@ cp ../python_models/wrong_model/config.pbtxt ./models/wrong_model/
 (cd models/wrong_model && \
           sed -i "s/^name:.*/name: \"wrong_model\"/" config.pbtxt && \
           sed -i "s/TYPE_FP32/TYPE_UINT32/g" config.pbtxt)
-
-# TODO: Fix symbol issues with pytorch
-# mkdir -p models/pytorch_fp32_fp32/1/
-# cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
-# cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
-# (cd models/pytorch_fp32_fp32 && \
-#           sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
 mkdir -p models/execute_error/1/
 cp ../python_models/execute_error/model.py ./models/execute_error/1/
@@ -122,8 +115,6 @@ mkdir -p models/string_fixed/1/
 cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
 cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
-pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -134,7 +125,7 @@ fi
 RET=0
 
 set +e
-python3 $CLIENT_PY >>$CLIENT_LOG 2>&1
+python3 -m unittest $CLIENT_PY.PythonTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 else
@@ -150,8 +141,44 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Triton non-graceful exit
+# TODO: Fix the shared library issue with the pytorch_backend.
+rm -rf /opt/tritonserver/backends/pytorch
+rm -rf models/libtorch_float32_float32_float32/
+rm -rf models/ensemble/
+rm -rf models/ensemble_gpu
 
+mkdir -p models/pytorch_fp32_fp32/1/
+cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
+cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
+(cd models/pytorch_fp32_fp32 && \
+          sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
+
+pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 -m unittest $CLIENT_PY.PytorchTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+else
+    check_test_results $CLIENT_LOG 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Triton non-graceful exit
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -249,29 +276,28 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Test Multi file models (Fix multi-file Test)
-# rm -rf models/
-# mkdir -p models/multi_file/1/
-# cp ../python_models/multi_file/*.py ./models/multi_file/1/
-# cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
-# (cd models/multi_file && \
-#           sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
-# 
-# run_server
-# if [ "$SERVER_PID" == "0" ]; then
-#     echo -e "\n***\n*** Failed to start $SERVER\n***"
-#     cat $SERVER_LOG
-#     exit 1
-# fi
-# 
-# if [ $? -ne 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** multi-file model test failed \n***"
-#     RET=1
-# fi
+rm -rf models/
+mkdir -p models/multi_file/1/
+cp ../python_models/multi_file/*.py ./models/multi_file/1/
+cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
+(cd models/multi_file && \
+          sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
 
-# kill $SERVER_PID
-# wait $SERVER_PID
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** multi-file model test failed \n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 # Test environment variable propagation
 rm -rf models/
