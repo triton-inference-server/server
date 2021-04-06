@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -154,9 +154,6 @@ def create_savedmodel_modelconfig(models_dir,
                                   model_name="sig_tag",
                                   tag_name="testTag",
                                   signature_def_name="testSigDef"):
-    version_policy_str = "{ latest { num_versions: 1 }}"
-
-    # Use a different model name for the non-batching variant
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -188,7 +185,7 @@ value: {{
 string_value: "{}"
 }}
 }}
-'''.format(model_name, version_policy_str, gu.np_to_model_dtype(tf.float32),
+'''.format(model_name, gu.np_to_model_dtype(tf.float32),
            str(dims), gu.np_to_model_dtype(tf.float32), str(dims), tag_name,
            signature_def_name)
 
