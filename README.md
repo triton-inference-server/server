@@ -195,9 +195,9 @@ Triton.
 As part of your deployment strategy you may want to [explicitly manage
 what models are available by loading and unloading
 models](docs/model_management.md) from a running Triton server. If you
-are using Kubernetes for deployment a simple example of how to [deploy
-Triton using Kubernetes and Helm](deploy/single_server/README.md) may
-be helpful.
+are using Kubernetes for deployment there are simple examples of how
+to deploy Triton using Kubernetes and Helm, one for
+[GCP](deploy/gcp/README.md) and one for [AWS](deploy/aws/README.md).
 
 The [version 1 to version 2 migration
 information](docs/v1_to_v2.md) is helpful if you are moving to
