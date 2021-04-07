@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,7 +37,8 @@ SKIP_PATHS = (
     'builddir', 'build/libevhtp', 'build/onnxruntime',
     'deploy/gke-marketplace-app/.gitignore',
     'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
-    'deploy/single_server/.helmignore', 'docs/examples/model_repository',
+    'deploy/gcp/.helmignore', 'deploy/aws/.helmignore',
+    'docs/examples/model_repository',
     'qa/common/cuda_op_kernel.cu.cc.patch',
     'qa/custom_models/custom_float32_float32_float32/output0_labels.txt',
     'qa/custom_models/custom_nobatch_float32_float32_float32/output0_labels.txt',
