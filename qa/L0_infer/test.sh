@@ -61,7 +61,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
-  EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="28"}
+  EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="29"}
 else
   EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="42"}
 fi
@@ -114,7 +114,7 @@ ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
 
 
-for TARGET in cpu; do
+for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
         if [ "$TARGET" == "gpu" ]; then
             echo -e "Skip GPU testing on CPU-only device"
