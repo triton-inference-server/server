@@ -85,14 +85,7 @@ OpenLibraryHandle(const std::string& path, void** handle)
         Status::Code::NOT_FOUND, "unable to load backend library: " + errstr);
   }
 #else
-  // Need to open the Python backend shared library using RTLD_GLOBAL flag so
-  // that subsequent dlopens in the user's Python model work properly
-  if (path.find("libtriton_python") != std::string::npos) {
-    LOG_VERBOSE(1) << "Python backend shared library opened with RTLD_GLOBAL";
-    *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  }
-  else
-    *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+  *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
   if (*handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
