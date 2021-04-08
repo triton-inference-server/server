@@ -297,7 +297,8 @@ PlanBackend::CreateExecutionContexts(
           // For sequence batcher, there must be one runner per instance
           // instead of one runner per device
           runner_idx = available_context_queue_.size();
-          available_context_queue_.emplace_back(new SyncQueue<size_t>());
+          available_context_queue_.emplace_back(
+              new triton::common::SyncQueue<size_t>());
           next_context_.emplace_back(-1);
         } else {
           auto it = device_to_runner_map.find(gpu_device);
@@ -305,7 +306,8 @@ PlanBackend::CreateExecutionContexts(
             it = device_to_runner_map
                      .emplace(gpu_device, available_context_queue_.size())
                      .first;
-            available_context_queue_.emplace_back(new SyncQueue<size_t>());
+            available_context_queue_.emplace_back(
+                new triton::common::SyncQueue<size_t>());
             next_context_.emplace_back(-1);
           }
           runner_idx = it->second;
@@ -551,7 +553,7 @@ PlanBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::vector<char>& model,
     const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
-    const std::shared_ptr<SyncQueue<size_t>>& context_queue)
+    const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue)
 {
   // Max batch size. A value of 0 in the config becomes NO_BATCHING.
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
@@ -3135,7 +3137,8 @@ PlanBackend::Context::SetBindingDimensions(
 
 void
 PlanBackend::Context::ProcessResponse(
-    size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue)
+    size_t context_idx,
+    std::shared_ptr<triton::common::SyncQueue<size_t>> context_queue)
 {
   while (true) {
     NVTX_RANGE(nvtx_, "ProcessResponse " + context_idx);

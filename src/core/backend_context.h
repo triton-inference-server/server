@@ -358,7 +358,7 @@ class BackendInputCollector {
 
   std::list<DeferredPinned> deferred_pinned_;
   // FIXME use future to maintain an issue-order queue to drop task count
-  SyncQueue<bool> completion_queue_;
+  triton::common::SyncQueue<bool> completion_queue_;
   size_t async_task_count_;
 };
 

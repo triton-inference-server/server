@@ -48,4 +48,5 @@ add_dependencies(onnxruntime-backend-library proto-library)
 target_link_libraries(
   onnxruntime-backend-library
   PUBLIC triton-core-serverapi   # from repo-core
+  triton-common-sync-queue       # from repo-common
 )

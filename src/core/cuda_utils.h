@@ -27,7 +27,7 @@
 
 #include <set>
 #include "src/core/status.h"
-#include "src/core/sync_queue.h"
+#include "triton/common/sync_queue.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -117,6 +117,7 @@ void CopyBufferHandler(
     const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, void* response_ptr,
-    SyncQueue<std::tuple<Status, bool, void*>>* completion_queue);
+    triton::common::SyncQueue<std::tuple<Status, bool, void*>>*
+        completion_queue);
 
 }}  // namespace nvidia::inferenceserver

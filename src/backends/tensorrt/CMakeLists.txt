@@ -68,4 +68,5 @@ endif() # TRITON_ENABLE_METRICS
 target_link_libraries(
   tensorrt-backend-library
   PUBLIC triton-core-serverapi   # from repo-core
+  triton-common-sync-queue       # from repo-common
 )

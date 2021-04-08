@@ -52,4 +52,5 @@ add_dependencies(tensorflow-backend-library proto-library)
 target_link_libraries(
   tensorflow-backend-library
   PUBLIC triton-core-serverapi   # from repo-core
+  triton-common-sync-queue       # from repo-common
 )

@@ -30,7 +30,7 @@
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/nvtx.h"
-#include "src/core/sync_queue.h"
+#include "triton/common/sync_queue.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include "src/core/kernel.h"
