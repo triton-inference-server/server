@@ -1546,7 +1546,9 @@ ModelRepositoryManager::LoadUnloadModels(
       std::set<std::string> models = model_names;
 
       ModelInfoMap new_infos;
+#ifdef TRITON_ENABLE_ENSEMBLE
       bool first_iteration = true;
+#endif  // TRITON_ENABLE_ENSEMBLE
       while (!models.empty()) {
         bool polled = true;
         RETURN_IF_ERROR(Poll(
@@ -1574,10 +1576,9 @@ ModelRepositoryManager::LoadUnloadModels(
             }
           }
         }
-#endif  // TRITON_ENABLE_ENSEMBLE
-
-        models.swap(next_models);
         first_iteration = false;
+#endif  // TRITON_ENABLE_ENSEMBLE
+        models.swap(next_models);
       }
 
       // Only update the infos when all validation is completed
