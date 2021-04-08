@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,8 +27,9 @@
 # Default setting is building on nvidia/cuda:11.1-devel-ubuntu20.04
 ARG BASE_IMAGE=nvidia/cuda:11.1-devel-ubuntu20.04
 
+ARG TRITON_CLIENT_REPO_TAG=main
 ARG TRITON_COMMON_REPO_TAG=main
-ARG TRITON_CORE_REPO_TAG=main
+ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG CMAKE_UBUNTU_VERSION=20.04
 
@@ -90,22 +91,29 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 # Build the client library and examples
+ARG TRITON_CLIENT_REPO_TAG
+ARG TRITON_COMMON_REPO_TAG
+ARG TRITON_THIRD_PARTY_REPO_TAG
+
 WORKDIR /workspace
 COPY TRITON_VERSION .
-COPY build build
-COPY src/clients src/clients
-COPY src/core src/core
+RUN echo ${TRITON_CLIENT_REPO_TAG}
+RUN git clone --single-branch --depth=1 -b ${TRITON_CLIENT_REPO_TAG} \
+        https://github.com/triton-inference-server/client.git
 
-ARG TRITON_COMMON_REPO_TAG
-ARG TRITON_CORE_REPO_TAG
-RUN mkdir builddir && cd builddir && \
-    cmake -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
-          -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
-          -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
-          -DTRITON_ENABLE_GRPC=ON \
-          -DTRITON_ENABLE_HTTP=ON ../build && \
-    make -j16 client
+WORKDIR /workspace/build
+RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
+          -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
+          -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
+          -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
+          -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER=ON \
+          -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
+          -DTRITON_ENABLE_GPU=ON /workspace/client
+RUN make -j16 cc-clients python-clients
+
+WORKDIR /workspace
 RUN cd install && \
     export VERSION=`cat /workspace/TRITON_VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
