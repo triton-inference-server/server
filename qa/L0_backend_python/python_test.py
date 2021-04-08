@@ -152,7 +152,7 @@ class PythonTest(tu.TestResultCollector):
                 client.infer(model_name, inputs)
             except InferenceServerException as e:
                 self.assertTrue(
-                    e.message().startswith("GRPC Execute Failed, message:"),
+                    e.message().startswith("Failed to process the request(s),"),
                     "Exception message is not correct")
             else:
                 self.assertTrue(
