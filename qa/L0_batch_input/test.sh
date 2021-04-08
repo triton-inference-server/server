@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-BATCH_INPUT_TEST=trt_batch_input_test.py
+BATCH_INPUT_TEST=batch_input_test.py
 EXPECTED_NUM_TESTS="6"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_ragged_model_repository
@@ -49,44 +49,61 @@ SERVER_ARGS="--model-repository=models --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
+# If BACKENDS not specified, set to all
+BACKENDS=${BACKENDS:="savedmodel plan"}
+
 rm -f $SERVER_LOG $CLIENT_LOG
 
-mkdir -p models/ragged_acc_shape/1 &&
-    cp $DATADIR/plan_batch_input/1/model.plan models/ragged_acc_shape/1/.
-mkdir -p models/ragged_element_count_acc_zero/1 &&
-    cp $DATADIR/plan_batch_input/1/model.plan models/ragged_element_count_acc_zero/1/.
-# Use nobatch model to showcase ragged input, identity model to verify
-# batch input is generated properly
-mkdir -p models/ragged_io/1 &&
-    cp $IDENTITY_DATADIR/plan_nobatch_zero_1_float32/1/model.plan models/ragged_io/1/.
-
 RET=0
+for BACKEND in $BACKENDS; do
+    rm -rf models && mkdir models
+    cp -r $DATADIR/${BACKEND}_batch_input models/ragged_element_count_acc_zero
+    (cd models/ragged_element_count_acc_zero && \
+          sed -i "s/${BACKEND}_batch_input/ragged_element_count_acc_zero/" config.pbtxt)
+    cp -r $DATADIR/${BACKEND}_batch_input models/ragged_acc_shape
+    (cd models/ragged_acc_shape && \
+          sed -i "s/${BACKEND}_batch_input/ragged_acc_shape/" config.pbtxt && \
+          sed -i "s/BATCH_ELEMENT_COUNT/BATCH_ACCUMULATED_ELEMENT_COUNT/" config.pbtxt && \
+          sed -i "s/BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO/BATCH_MAX_ELEMENT_COUNT_AS_SHAPE/" config.pbtxt)
+    # Use nobatch model to showcase ragged input, identity model to verify
+    # batch input is generated properly
+    cp -r $IDENTITY_DATADIR/${BACKEND}_nobatch_zero_1_float32 models/ragged_io
+    (cd models/ragged_io && \
+          sed -i "s/${BACKEND}_nobatch_zero_1_float32/ragged_io/" config.pbtxt && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+          sed -i "s/name: \"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
+          echo "batch_output [{target_name: \"OUTPUT0\" \
+                                 kind: BATCH_SCATTER_WITH_INPUT_SHAPE \
+                                 source_input: \"INPUT0\" }] \
+                dynamic_batching { max_queue_delay_microseconds: 1000000 }" >> config.pbtxt)
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
 
-set +e
-python $BATCH_INPUT_TEST >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    python $BATCH_INPUT_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** Test Failed\n***"
         RET=1
+    else
+        check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
-fi
-set -e
+    set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

@@ -873,20 +873,6 @@ ValidateModelIOConfig(const inference::ModelConfig& config)
 Status
 ValidateBatchIO(const inference::ModelConfig& config)
 {
-  if (
-#ifdef TRITON_ENABLE_CUSTOM
-      (config.platform() != kCustomPlatform) &&
-#endif  // TRITON_ENABLE_CUSTOM
-#ifdef TRITON_ENABLE_TENSORRT
-      (config.platform() != kTensorRTPlanPlatform) &&
-#endif  // TRITON_ENABLE_TENSORRT
-      ((config.batch_input_size() != 0) || (config.batch_output_size() != 0))) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "batch inputs and batch outputs are only supported for custom "
-        "platform and TensorRT platform");
-  }
-
   std::set<std::string> input_names;
   std::set<std::string> output_names;
   for (const auto& io : config.input()) {
@@ -916,6 +902,12 @@ ValidateBatchIO(const inference::ModelConfig& config)
             Status::Code::INVALID_ARG,
             "unknown batch input kind '" +
                 inference::BatchInput::Kind_Name(batch_io.kind()) + "'");
+    }
+    if ((batch_io.data_type() != inference::DataType::TYPE_INT32) &&
+        (batch_io.data_type() != inference::DataType::TYPE_FP32)) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "batch input data type must be TYPE_INT32 or TYPE_FP32");
     }
     for (const auto& source_name : batch_io.source_input()) {
       if (input_names.find(source_name) == input_names.end()) {
@@ -1370,20 +1362,6 @@ ValidateModelInput(
     return Status(
         Status::Code::INVALID_ARG,
         "shape tensors are only supported for TensorRT platform");
-  }
-
-  if (
-#ifdef TRITON_ENABLE_CUSTOM
-      (platform != kCustomPlatform) &&
-#endif  // TRITON_ENABLE_CUSTOM
-#ifdef TRITON_ENABLE_TENSORRT
-      (platform != kTensorRTPlanPlatform) &&
-#endif  // TRITON_ENABLE_TENSORRT
-      io.allow_ragged_batch()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "ragged-batch input tensors are only supported for custom platform"
-        " and TensorRT platform");
   }
 
   return Status::Success;
