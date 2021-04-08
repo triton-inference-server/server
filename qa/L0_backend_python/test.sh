@@ -166,7 +166,7 @@ set +e
 # Trigger non-graceful termination of Triton
 kill -9 $SERVER_PID
 
-# Wait 10 seconds so that Python gRPC server can detect non-graceful exit
+# Wait 10 seconds so that Python stub can detect non-graceful exit
 sleep 10
 
 for triton_proc in $triton_procs; do
