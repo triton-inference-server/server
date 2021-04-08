@@ -116,13 +116,13 @@ RUN if [ -f /tmp/tritonbuild/tritonserver/build/test-util/install/bin/caffe2plan
     fi
 
 RUN mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libaddsub.so \
+    cp /workspace/docs/examples/model_repository/simple/1/model.graphdef \
         qa/L0_simple_ensemble/models/simple/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/2 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libaddsub.so \
+    cp /workspace/docs/examples/model_repository/simple/1/model.graphdef \
         qa/L0_simple_ensemble/models/simple/2/. && \
     mkdir -p qa/L0_multiple_ports/models/simple/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libaddsub.so \
+    cp /workspace/docs/examples/model_repository/simple/1/model.graphdef \
         qa/L0_multiple_ports/models/simple/1/.
 
 RUN mkdir -p qa/L0_backend_identity/models && \
