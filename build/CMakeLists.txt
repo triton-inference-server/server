@@ -64,17 +64,12 @@ set(TRITON_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
 set(TRITON_TENSORRT_INCLUDE_PATHS "" CACHE PATH "Paths to TensorRT includes")
 set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
 
-# Client
-set(TRITON_CLIENT_CMAKE_DIR "" CACHE PATH "Path to Triton client library cmake configuration")
-option(TRITON_CLIENT_SKIP_EXAMPLES "Skip building client examples" OFF)
-option(TRITON_CURL_WITHOUT_CONFIG "Find curl package without using cmake config" OFF)
-
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
 option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
 option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
 option(TRITON_ENABLE_ASAN "Build with address sanitizer" OFF)
-option(TRITON_ENABLE_GPU "Enable GPU support in server/client" ON)
+option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
 set(TRITON_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
     "The minimum CUDA compute capability supported by Triton" )
 
@@ -545,50 +540,6 @@ ExternalProject_Add(test-util
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_TEST_UTILS_INSTALL_PREFIX}
   DEPENDS protobuf googletest cnmem
-)
-
-#
-# Build Triton client libraries and examples
-#
-if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(TRITON_CLIENTS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/client/install)
-else()
-  set(TRITON_CLIENTS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
-endif()
-
-# If TRITON_CLIENT_CMAKE_DIR is set then use it to find Triton client cmake
-# config
-set(_CMAKE_TRITON_DIR "")
-if (TRITON_CLIENT_CMAKE_DIR)
-  set(_CMAKE_TRITON_DIR "-DTRITON_DIR:PATH=${TRITON_CLIENT_CMAKE_DIR}")
-endif()
-
-ExternalProject_Add(client
-  PREFIX client
-  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/client"
-  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/client"
-  BUILD_ALWAYS 1
-  CMAKE_CACHE_ARGS
-    -DCURL_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/curl/install/${CMAKE_INSTALL_LIBDIR}/cmake/CURL
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
-    ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
-    ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
-    ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
-    -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
-    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
-    ${_CMAKE_TRITON_DIR}
-    -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
-    -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
-    -DTRITON_ENABLE_METRICS:BOOL=OFF
-    -DTRITON_CLIENT_SKIP_EXAMPLES:BOOL=${TRITON_CLIENT_SKIP_EXAMPLES}
-    -DTRITON_CURL_WITHOUT_CONFIG:BOOL=${TRITON_CURL_WITHOUT_CONFIG}
-    -DTRITON_ENABLE_HTTP:BOOL=${TRITON_ENABLE_HTTP}
-    -DTRITON_ENABLE_GRPC:BOOL=${TRITON_ENABLE_GRPC}
-    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-    -DTRITON_ENABLE_GPU:BOOL=${TRITON_ENABLE_GPU}
-    -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_CLIENTS_INSTALL_PREFIX}
-    -DTRITON_VERSION:STRING=${TRITON_VERSION}
-  DEPENDS curl protobuf grpc
 )
 
 #
