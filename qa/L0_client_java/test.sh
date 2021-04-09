@@ -42,16 +42,16 @@ RET=0
 rm -f *.log.*
 
 # Copy protobuf files from server core
-cp src/core/*.proto src/clients/java/library/src/main/proto/
+cp core/*.proto java/library/src/main/proto/.
 
 # Compile library
-(cd src/clients/java/library && \
+(cd java/library && \
     mvn compile && \
     cp -R target/generated-sources/protobuf/java/inference ../examples/src/main/java/inference && \
     cp -r target/generated-sources/protobuf/grpc-java/inference/*.java ../examples/src/main/java/inference/)
 
-# Build simple java and scala client example 
-(cd src/clients/java/examples && mvn clean install)
+# Build simple java and scala client example
+(cd java/examples && mvn clean install)
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -66,7 +66,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-pushd src/clients/java/examples
+pushd java/examples
 set +e
 
 # Test simple java client example
