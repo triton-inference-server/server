@@ -185,8 +185,8 @@ value: {{
 string_value: "{}"
 }}
 }}
-'''.format(model_name, gu.np_to_model_dtype(tf.float32),
-           str(dims), gu.np_to_model_dtype(tf.float32), str(dims), tag_name,
+'''.format(model_name, gu.np_to_model_dtype(tf.float32), str(dims),
+           gu.np_to_model_dtype(tf.float32), str(dims), tag_name,
            signature_def_name)
 
     try:
