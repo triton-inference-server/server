@@ -55,6 +55,14 @@ RUN cmake -DTRITON_ENABLE_GPU=ON \
           -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} /workspace/build && \
     make -j16 test-util
 
+# Add inception_graphdef model to example repo
+WORKDIR /workspace/docs/examples/model_repository
+RUN mkdir -p inception_graphdef/1 && \
+    wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
+    https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz && \
+    (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz) && \
+    mv /tmp/inception_v3_2016_08_28_frozen.pb inception_graphdef/1/model.graphdef
+
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
