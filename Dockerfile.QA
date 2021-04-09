@@ -80,7 +80,6 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_go_client/models/. && \
     mkdir -p qa/L0_simple_go_client/core && \
     cp /workspace/src/core/*.proto qa/L0_simple_go_client/core/. && \
-    cp /workspace/src/clients/go/*.go qa/L0_simple_go_client/. && \
     mkdir qa/L0_backend_release/simple_models && \
     cp -r docs/examples/model_repository/simple qa/L0_backend_release/simple_models/. && \
     mkdir qa/L0_backend_release/simple_seq_models && \
@@ -89,7 +88,8 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_shared_memory/models/. && \
     mkdir qa/L0_cuda_shared_memory/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
-    cp -r /workspace/src qa/L0_client_java/ && \
+    mkdir -p qa/L0_client_java/core && \
+    cp /workspace/src/core/*.proto qa/L0_client_java/core/. && \
     mkdir qa/L0_client_java/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_client_java/models && \
     mkdir qa/L0_grpc/models && \
@@ -285,6 +285,8 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/lib/libhttpclient.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \
     cp install/python/triton*.whl qa/pkgs/.
+RUN cp client/src/go/*.go qa/L0_simple_go_client/. && \
+    cp -r client/src/java qa/L0_client_java/.
 
 ############################################################################
 ## Create CI enabled image
