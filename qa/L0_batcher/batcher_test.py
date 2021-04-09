@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -56,8 +56,7 @@ if USE_GRPC and USE_HTTP:
     USE_GRPC = False
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
-BACKENDS = os.environ.get('BACKENDS',
-                          "graphdef savedmodel onnx libtorch plan")
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx libtorch plan")
 
 _trials = BACKENDS.split(" ")
 _ragged_batch_supported_trials = ()
@@ -1304,8 +1303,10 @@ class BatcherTest(tu.TestResultCollector):
                                      args=(self, model_base, 1, dtype, shapes,
                                            shapes),
                                      kwargs={
-                                         'use_grpc': USE_GRPC,
-                                         'use_http': USE_HTTP,
+                                         'use_grpc':
+                                             USE_GRPC,
+                                         'use_http':
+                                             USE_HTTP,
                                          'use_http_json_tensors':
                                              False,
                                          'use_streaming':

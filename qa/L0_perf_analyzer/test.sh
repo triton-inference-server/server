@@ -41,7 +41,6 @@ CLIENT_LOG="./perf_analyzer.log"
 PERF_ANALYZER=../clients/perf_analyzer
 
 DATADIR=`pwd`/models
-ENSEMBLE_DATADIR=`pwd`/ensemble_model_repository
 TESTDATADIR=`pwd`/test_data
 
 INT_JSONDATAFILE=`pwd`/json_input_data_files/int_data.json
@@ -54,7 +53,7 @@ SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
 IMAGE_JSONDATAFILE=`pwd`/json_input_data_files/image_data.json
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR} --model-repository=${ENSEMBLE_DATADIR}"
+SERVER_ARGS="--model-repository=${DATADIR}"
 SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"

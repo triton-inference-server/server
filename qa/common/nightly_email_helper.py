@@ -37,7 +37,11 @@ import sys
 import tarfile
 
 
-def send(subject: str, content: str, attachments=[], files_to_tar=None, is_html=False):
+def send(subject: str,
+         content: str,
+         attachments=[],
+         files_to_tar=None,
+         is_html=False):
     FROM = os.environ.get('TRITON_FROM', '')
     TO = os.environ.get('TRITON_TO_DL', '')
     if FROM == '' or TO == '':

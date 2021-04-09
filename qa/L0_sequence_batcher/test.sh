@@ -389,6 +389,7 @@ for model_trial in $MODEL_TRIALS; do
     done
 done
 
+# TODO create new backend to replace custom_sequence_int32 (libsequence.so)
 # ragged models
 if [[ $BACKENDS == *"custom"* ]]; then
   rm -fr ragged_models && mkdir ragged_models

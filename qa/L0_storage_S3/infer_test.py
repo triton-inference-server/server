@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -61,8 +61,12 @@ class InferTest(tu.TestResultCollector):
                                 use_streaming=True,
                                 correlation_id=0):
             for bs in (1, batch_size):
-                iu.infer_exact(tester, pf, (bs,) + tensor_shape, bs,
-                               input_dtype, output0_dtype, output1_dtype,
+                iu.infer_exact(tester,
+                               pf, (bs,) + tensor_shape,
+                               bs,
+                               input_dtype,
+                               output0_dtype,
+                               output1_dtype,
                                output0_raw=output0_raw,
                                output1_raw=output1_raw,
                                model_version=model_version,
