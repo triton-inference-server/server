@@ -233,7 +233,8 @@ target_include_directories(
 )
 target_link_libraries(
   async_work_queue_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-core-serverapi      # from repo-core
+  PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE -lpthread
