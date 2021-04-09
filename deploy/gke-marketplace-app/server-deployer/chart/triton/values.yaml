@@ -38,7 +38,7 @@ gcpMarketplace: true
 image:
   registry: gcr.io
   repository: nvidia-ngc-public/tritonserver
-  tag: 21.02-py3
+  tag: 21.03-py3
   pullPolicy: IfNotPresent
   # modify the model repository here to match your GCP storage bucket
   numGpus: 1
@@ -46,6 +46,7 @@ image:
   # add in custom library which could include custom ops in the model
   ldPreloadPath: ''
   logVerboseLevel: 0
+  allowGPUMetrics: True
 
 service:
   type: NodePort 

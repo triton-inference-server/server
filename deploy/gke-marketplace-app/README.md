@@ -61,13 +61,10 @@ export PROJECT_ID=<your GCP project ID>
 export ZONE=<GCP zone of your choice>
 export REGION=<GCP region of your choice>
 export DEPLOYMENT_NAME=<GKE cluster name, triton_gke for example>
-export GKE_VERSION=1.19.8-gke.1600
 
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing,Istio \
 --machine-type=n1-standard-8 \
---cluster-version=${GKE_VERSION} --zone=${ZONE} \
---release-channel rapid \
 --node-locations=${ZONE} \
 --subnetwork=default \
 --scopes cloud-platform \
@@ -81,7 +78,6 @@ gcloud container node-pools create accel \
   --num-nodes 2 \
   --accelerator type=nvidia-tesla-t4,count=1 \
   --enable-autoscaling --min-nodes 2 --max-nodes 3 \
-  --enable-autorepair \
   --machine-type n1-standard-4 \
   --disk-size=100 \
   --scopes cloud-platform \
@@ -101,7 +97,24 @@ kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stack
 ```
 
 GPU resources in GCP could be fully utilized, so please try a different zone in case compute resource cannot be allocated. After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
- 
+
+If user would like to experiment with A100 MIG partitioned GPU in GKE, please create node pool with following command:
+```
+gcloud beta container node-pools create accel \
+  --project ${PROJECT_ID} \
+  --zone ${ZONE} \
+  --cluster ${DEPLOYMENT_NAME} \
+  --num-nodes 2 \
+  --accelerator type=nvidia-tesla-a100,count=1,gpu-partition-size=1g.5gb  \
+  --enable-autoscaling --min-nodes 2 --max-nodes 3 \
+  --machine-type=a2-highgpu-1g  \
+  --disk-size=100 \
+  --scopes cloud-platform \
+  --verbosity error
+```
+
+Please note that A100 MIG in GKE does not support GPU metrics yet, also Triton GPU Metrics is not compatiable with A100 MIG. Hence, please disable GPU metrics by unselect allowGPUMetrics while deploy Triton GKE app. Also for the same reason, this deployer doesn't support inference workfload auto-scaling on A100 MIG as well.  
+
 Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. User could leave everything as default, if user has model that has been validated with Triton, they can provide GCS path point to that model in Triton format. By default, we provide a BERT large model optimized by TensorRT with batch size of 1 in public GCS bucket that is compatible with 21.03 release of Triton Server, in `gs://triton_sample_models/21_03`, please note that this bucket locates in us-central1 hence loading model into Triton in other region might be effected. Also the first deployment of Triton Application will be slower than consecutive runs as image needs to be pulled into the GKE cluster. 
 
 ![GKE Marketplace Application UI](ui.png)

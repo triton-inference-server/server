@@ -102,6 +102,10 @@ properties:
     type: boolean
     title: Leave this unchecked by default. When strictModelConfig is not checked(False), Triton will try to infer the config file from model file, when checked(True), user need to provide config.pbtxt in model repository.
     default: False
+  image.allowGPUMetrics:
+    type: boolean
+    title: Select by default. When use A100 MIG, unselect to disable GPU Memory metrics reported by Triton, as current GPU metrics not support on A100 MIG.
+    default: True  
   istioEnabled:
     type: boolean
     x-google-marketplace:
