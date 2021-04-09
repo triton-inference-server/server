@@ -158,7 +158,6 @@ def create_savedmodel_modelconfig(models_dir,
     config = '''
 name: "{}"
 platform: "tensorflow_savedmodel"
-version_policy: {}
 input [
   {{
     name: "INPUT"
