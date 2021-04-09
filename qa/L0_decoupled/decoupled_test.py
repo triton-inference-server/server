@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -59,7 +59,6 @@ class DecoupledTest(tu.TestResultCollector):
     def setUp(self):
         self.trials_ = [("repeat_int32", None), ("simple_repeat", None),
                         ("sequence_repeat", None),
-                        ("fan_repeat", self._fan_validate),
                         ("repeat_square", self._nested_validate),
                         ("nested_square", self._nested_validate)]
         self.model_name_ = "repeat_int32"

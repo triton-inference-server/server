@@ -58,20 +58,11 @@ for TARGET in cpu gpu; do
 
     rm -fr models && \
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository models && \
-        cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_variable_model_repository/* models/. && \
-        cp -r ../custom_models/custom_float32_* models/. && \
-        cp -r ../custom_models/custom_int32_* models/. && \
-        cp -r ../custom_models/custom_nobatch_* models/.
-
-    create_nop_version_dir `pwd`/models
-
-    for MC in `ls models/custom*_int32_int32_int32/config.pbtxt`; do
-        sed -i "s/16/-1,-1/g" $MC
-    done
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_variable_model_repository/* models/.
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     # Onnx models are handled separately, see below
-    for FW in graphdef savedmodel onnx libtorch custom; do
+    for FW in graphdef savedmodel onnx libtorch; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done

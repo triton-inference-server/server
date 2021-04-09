@@ -310,11 +310,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_init_error_modelfail
 rm -fr models models_0
 mkdir models models_0
-cp -r ../custom_models/custom_sequence_int32 models/.
-cp -r ../custom_models/custom_int32_int32_int32 models_0/.
-sed -i "s/OUTPUT/_OUTPUT/" models/custom_sequence_int32/config.pbtxt
-sed -i "s/OUTPUT/_OUTPUT/" models_0/custom_int32_int32_int32/config.pbtxt
-for i in graphdef savedmodel ; do
+for i in graphdef savedmodel; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 for i in onnx ; do

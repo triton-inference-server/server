@@ -47,7 +47,7 @@ rm -f *.log
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
 for BACKEND in $BACKENDS; do
     # Need just one model for the backend...
