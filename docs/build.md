@@ -51,7 +51,7 @@ non-Docker build.
 
 * [Build using Docker](#ubuntu-docker) and the TensorFlow and PyTorch
   Docker images from [NVIDIA GPU Cloud
-  (NGC)](https://ngc.nvidia.com>).
+  (NGC)](https://ngc.nvidia.com).
 
 * [Build without Docker](#ubuntu-without-docker).
 
