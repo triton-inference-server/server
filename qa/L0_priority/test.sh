@@ -83,7 +83,7 @@ fi
 
 grep "plan_float32_float32_float32_max" $SERVER_LOG | grep "stream priority -5"
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected MAX priority -2\n***"
+    echo -e "\n***\n*** Failed. Expected MAX priority -5\n***"
     RET=1
 fi
 
