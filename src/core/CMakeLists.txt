@@ -226,7 +226,6 @@ set(
   persistent_backend_manager.h
   pinned_memory_manager.h
   response_allocator.h
-  sync_queue.h
   scheduler.h
   scheduler_utils.h
   sequence_batch_scheduler.h
@@ -299,6 +298,7 @@ target_link_libraries(
   PUBLIC
     triton-core-backendapi           # from repo-core
     triton-core-serverapi            # from repo-core
+    triton-common-sync-queue         # from repo-common
     triton-common-json               # from repo-common
     triton-common-table-printer      # from repo-common
 )

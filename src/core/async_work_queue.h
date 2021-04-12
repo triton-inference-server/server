@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,7 +33,7 @@
 #include <vector>
 
 #include "src/core/status.h"
-#include "src/core/sync_queue.h"
+#include "triton/common/sync_queue.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -64,7 +64,7 @@ class AsyncWorkQueue {
   static void WorkThread();
 
   std::vector<std::unique_ptr<std::thread>> worker_threads_;
-  SyncQueue<std::function<void(void)>> task_queue_;
+  triton::common::SyncQueue<std::function<void(void)>> task_queue_;
 };
 
 }}  // namespace nvidia::inferenceserver
