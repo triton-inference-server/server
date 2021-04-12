@@ -60,7 +60,8 @@ spec:
               value: {{ .Values.image.ldPreloadPath }}
           args: ["tritonserver", "--model-store={{ .Values.modelRepositoryPath }}",
                  "--strict-model-config={{ .Values.image.strictModelConfig }}",
-                 "--log-verbose={{ .Values.image.logVerboseLevel }}"]
+                 "--log-verbose={{ .Values.image.logVerboseLevel }}",
+                 "--allow-gpu-metrics={{ .Values.image.allowGPUMetrics }}"]
 
           ports:
             - containerPort: 8000
