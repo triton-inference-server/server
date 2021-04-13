@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,7 +53,7 @@ RET=0
 rm -fr ./custom_models && mkdir ./custom_models && \
     cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
     mkdir -p ./custom_models/custom_zero_1_float32/1 && \
-    cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
+    cp ./libtriton_identity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
 
 #
 # Use "identity" model for all model types.

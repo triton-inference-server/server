@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -270,7 +270,7 @@ for model_trial in $MODEL_TRIALS; do
 
     if [ "$ENSEMBLES" == "1" ]; then
       cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_PATH/.
-      create_nop_modelfile `pwd`/libidentity.so `pwd`/$MODEL_PATH
+      create_nop_modelfile `pwd`/libtriton_identity.so `pwd`/$MODEL_PATH
     fi
 
     # Need to launch the server for each test so that the model status

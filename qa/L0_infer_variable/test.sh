@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ for TARGET in cpu gpu; do
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.
 
-    create_nop_modelfile `pwd`/libidentity.so `pwd`/models
+    create_nop_modelfile `pwd`/libtriton_identity.so `pwd`/models
 
     for MC in `ls models/custom*_int32_int32_int32/config.pbtxt`; do
         sed -i "s/16/-1,-1/g" $MC

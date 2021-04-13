@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@ SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
 mkdir -p $DATADIR/custom_identity_int32/1
-cp libidentity.so $DATADIR/custom_identity_int32/1/.
+cp libtriton_identity.so $DATADIR/custom_identity_int32/1/.
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

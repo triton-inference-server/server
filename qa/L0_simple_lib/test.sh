@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -128,7 +128,7 @@ for SIMPLE_CLIENT in simple ; do
 
     cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
         mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
-        cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
+        cp libtriton_identity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
 
     cp -r $DATADIR/plan_float32_float32_float32 $MODELSDIR/. && \
         # make sure version 1 is used (no swap)

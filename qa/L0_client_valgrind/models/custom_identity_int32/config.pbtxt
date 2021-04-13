@@ -25,10 +25,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 name: "custom_identity_int32"
-platform: "custom"
+backend: "identity"
 max_batch_size: 1024
 version_policy: { latest { num_versions: 1 }}
-default_model_filename: "libidentity.so"
+default_model_filename: "libtriton_identity.so"
 instance_group [ { kind: KIND_CPU } ]
 
 input [

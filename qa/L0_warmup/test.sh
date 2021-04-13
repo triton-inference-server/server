@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -169,9 +169,9 @@ for BACKEND in ${BACKENDS}; do
         if [ "$BACKEND" = "custom" ]; then
             cp -r ../custom_models/custom_zero_1_float32 models/custom_zero_1_object && \
                 mkdir -p models/custom_zero_1_object/1 && \
-                cp `pwd`/libidentity.so models/custom_zero_1_object/1/. && \
+                cp `pwd`/libtriton_identity.so models/custom_zero_1_object/1/. && \
                 (cd models/custom_zero_1_object && \
-                        echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
+                        echo "default_model_filename: \"libtriton_identity.so\"" >> config.pbtxt && \
                         echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
                         sed -i "s/custom_zero_1_float32/custom_zero_1_object/" config.pbtxt && \
                         sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -113,7 +113,7 @@ cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && 
 # custom float32 component of ensemble
 cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
     mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
-    cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
+    cp libtriton_identity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
 
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do

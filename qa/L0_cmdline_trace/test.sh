@@ -265,7 +265,7 @@ mkdir -p $MODELSDIR/simple/1 && \
 
 cp -r $ENSEMBLEDIR/nop_TYPE_INT32_-1 $MODELSDIR/. && \
     mkdir -p $MODELSDIR/nop_TYPE_INT32_-1/1 && \
-    cp libidentity.so $MODELSDIR/nop_TYPE_INT32_-1/1/.
+    cp libtriton_identity.so $MODELSDIR/nop_TYPE_INT32_-1/1/.
 
 # trace-rate == 1, trace-level=MAX
 SERVER_ARGS="--http-thread-count=1 --trace-file=trace_ensemble.log \

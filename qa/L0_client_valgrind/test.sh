@@ -52,7 +52,7 @@ SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
 mkdir -p $DATADIR/custom_identity_int32/1
-cp libidentity.so $DATADIR/custom_identity_int32/1/.
+cp libtriton_identity.so $DATADIR/custom_identity_int32/1/.
 
 RET=0
 

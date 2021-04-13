@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,7 +57,7 @@ export CUDA_VISIBLE_DEVICES=0
 rm -fr *.log *.serverlog models custom_zero_1_float32
 cp -r ../custom_models/custom_zero_1_float32 . && \
     mkdir -p ./custom_zero_1_float32/1 && \
-    cp ./libidentity.so ./custom_zero_1_float32/1/libcustom.so
+    cp ./libtriton_identity.so ./custom_zero_1_float32/1/libcustom.so
 
 (cd custom_zero_1_float32 && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \

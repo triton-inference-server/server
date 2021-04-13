@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -161,7 +161,7 @@ done
 # Create allow-ragged model to variable-size model repository
 if [[ $BACKENDS == *"custom"* ]]; then
     (cd var_models/custom_zero_1_float32 && \
-        mkdir -p 1 && cp ../../libidentity.so 1/libcustom.so && \
+        mkdir -p 1 && cp ../../libtriton_identity.so 1/libcustom.so && \
         echo "instance_group [ { kind: KIND_CPU count: 1 }]" >> config.pbtxt && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
         sed -i "s/name:.*\"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt)
@@ -408,7 +408,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
     rm -fr ./custom_models && mkdir ./custom_models && \
         cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
         mkdir -p ./custom_models/custom_zero_1_float32/1 && \
-        cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
+        cp ./libtriton_identity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
 
     # Two instances will be created for the custom model, one delays 100 ms while
     # the other delays 400 ms
