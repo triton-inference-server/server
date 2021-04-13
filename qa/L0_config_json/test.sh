@@ -48,7 +48,6 @@ source ../common/util.sh
 RET=0
 rm -fr *.log
 
-# TODO Create addsub models to replace custom_(nobatch_)float32_float32_float32 (libaddsub.so)
 rm -fr models && mkdir models
 cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
 
@@ -121,7 +120,7 @@ TRIAL=specific
 rm -fr models && mkdir models
 cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
 (cd models/savedmodel_nobatch_float32_float32_float32 && \
-     echo "version_policy: { specific: { versions: [ 1 ] } }" >> config.pbtxt)
+    sed -i "s/^version_policy:.*/version_policy: { specific: { versions: [1] }}/" config.pbtxt)
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

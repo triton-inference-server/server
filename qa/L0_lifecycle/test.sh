@@ -310,6 +310,10 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_init_error_modelfail
 rm -fr models models_0
 mkdir models models_0
+cp -r $DATADIR/qa_sequence_model_repository/onnx_sequence_int32 models_0/.
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models/.
+sed -i "s/OUTPUT/_OUTPUT/" models/onnx_sequence_int32/config.pbtxt
+sed -i "s/OUTPUT/_OUTPUT/" models_0/onnx_int32_int32_int32/config.pbtxt
 for i in graphdef savedmodel; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
@@ -522,7 +526,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_model_load_unload_disabled
 rm -fr models savedmodel_float32_float32_float32
 mkdir models
-for i in graphdef onnx plan ; do
+for i in graphdef onnx plan; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
@@ -679,7 +683,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_file_delete
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel plan ; do
+for i in savedmodel plan; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 
