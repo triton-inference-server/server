@@ -1169,11 +1169,11 @@ BackendInputCollector::FlushPendingPinned(
       deferred_pinned_.back().finalized_ = true;
       auto incomplete_count = new std::atomic<size_t>(std::min(
           deferred_pinned_.back().requests_.size(),
-          AsyncWorkQueue::WorkerCount()));
+          triton::common::AsyncWorkQueue::WorkerCount()));
       auto pending_pinned_byte_size = pending_pinned_byte_size_;
       size_t stride = (deferred_pinned_.back().requests_.size() +
-                       AsyncWorkQueue::WorkerCount() - 1) /
-                      AsyncWorkQueue::WorkerCount();
+                       triton::common::AsyncWorkQueue::WorkerCount() - 1) /
+                      triton::common::AsyncWorkQueue::WorkerCount();
       auto pending_it = deferred_pinned_.back().requests_.begin();
       while (pending_it != deferred_pinned_.back().requests_.end()) {
         auto end_it = pending_it;
@@ -1186,34 +1186,41 @@ BackendInputCollector::FlushPendingPinned(
           }
         }
 
-        auto status = AsyncWorkQueue::AddTask([this, offset, pinned_buffer,
-                                               pinned_memory_type,
-                                               pending_pinned_byte_size,
-                                               pinned_memory_id, pending_it,
-                                               end_it, incomplete_count,
-                                               &deferred_pinned]() mutable {
-          for (; pending_it != end_it; pending_it++) {
-            std::unique_ptr<InferenceResponse>* response = (*pending_it).first;
-            const InferenceRequest::Input* request_input = (*pending_it).second;
-            SetFixedSizeInputTensor(
-                request_input, offset, pinned_buffer, pending_pinned_byte_size,
-                pinned_memory_type, pinned_memory_id,
-                TRITONSERVER_MEMORY_CPU_PINNED, false, false, response);
-            offset += request_input->Data()->TotalByteSize();
-          }
-          // The last segmented task will start the next phase of
-          // the internal pinned buffer copy
-          if (incomplete_count->fetch_sub(1) == 1) {
+        Status status;
+        try {
+          triton::common::AsyncWorkQueue::AddTask(
+              [this, offset, pinned_buffer, pinned_memory_type,
+               pending_pinned_byte_size, pinned_memory_id, pending_it, end_it,
+               incomplete_count, &deferred_pinned]() mutable {
+                for (; pending_it != end_it; pending_it++) {
+                  std::unique_ptr<InferenceResponse>* response =
+                      (*pending_it).first;
+                  const InferenceRequest::Input* request_input =
+                      (*pending_it).second;
+                  SetFixedSizeInputTensor(
+                      request_input, offset, pinned_buffer,
+                      pending_pinned_byte_size, pinned_memory_type,
+                      pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED, false,
+                      false, response);
+                  offset += request_input->Data()->TotalByteSize();
+                }
+                // The last segmented task will start the next phase of
+                // the internal pinned buffer copy
+                if (incomplete_count->fetch_sub(1) == 1) {
 #ifdef TRITON_ENABLE_GPU
-            if (buffer_ready_event_ != nullptr) {
-              cudaEventSynchronize(buffer_ready_event_);
-              buffer_ready_event_ = nullptr;
-            }
+                  if (buffer_ready_event_ != nullptr) {
+                    cudaEventSynchronize(buffer_ready_event_);
+                    buffer_ready_event_ = nullptr;
+                  }
 #endif  // TRITON_ENABLE_GPU
-            completion_queue_.Put(deferred_pinned.Finalize(stream_));
-            delete incomplete_count;
-          }
-        });
+                  completion_queue_.Put(deferred_pinned.Finalize(stream_));
+                  delete incomplete_count;
+                }
+              });
+        }
+        catch (const triton::common::Exception& ex) {
+          status = Status(ex);
+        }
         if (!status.IsOk()) {
           for (; pending_it != end_it; pending_it++) {
             std::unique_ptr<InferenceResponse>* response = (*pending_it).first;

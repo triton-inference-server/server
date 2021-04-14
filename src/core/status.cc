@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,6 +27,11 @@
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
+
+Status::Status(const triton::common::Exception& ex)
+    : code_(ExceptionCodeToStatusCode(ex.code_)), msg_(ex.error_message_)
+{
+}
 
 const Status Status::Success(Status::Code::SUCCESS);
 
@@ -115,6 +120,32 @@ StatusCodeToTritonCode(Status::Code status_code)
   }
 
   return TRITONSERVER_ERROR_UNKNOWN;
+}
+
+Status::Code
+ExceptionCodeToStatusCode(triton::common::Exception::Code code)
+{
+  switch (code) {
+    case triton::common::Exception::Code::UNKNOWN:
+      return Status::Code::UNKNOWN;
+    case triton::common::Exception::Code::INTERNAL:
+      return Status::Code::INTERNAL;
+    case triton::common::Exception::Code::NOT_FOUND:
+      return Status::Code::NOT_FOUND;
+    case triton::common::Exception::Code::INVALID_ARG:
+      return Status::Code::INVALID_ARG;
+    case triton::common::Exception::Code::UNAVAILABLE:
+      return Status::Code::UNAVAILABLE;
+    case triton::common::Exception::Code::UNSUPPORTED:
+      return Status::Code::UNSUPPORTED;
+    case triton::common::Exception::Code::ALREADY_EXISTS:
+      return Status::Code::ALREADY_EXISTS;
+
+    default:
+      break;
+  }
+
+  return Status::Code::UNKNOWN;
 }
 
 }}  // namespace nvidia::inferenceserver

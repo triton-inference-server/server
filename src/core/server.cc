@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "src/backends/backend/triton_backend_manager.h"
-#include "src/core/async_work_queue.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
@@ -147,7 +146,12 @@ InferenceServer::Init()
   status = PersistentBackendManager::Create(
       backend_cmdline_config_map_, &persist_backend_manager_);
   if (status.IsOk() && (buffer_manager_thread_count_ > 0)) {
-    status = AsyncWorkQueue::Initialize(buffer_manager_thread_count_);
+    try {
+      triton::common::AsyncWorkQueue::Initialize(buffer_manager_thread_count_);
+    }
+    catch (const triton::common::Exception& ex) {
+      status = Status(ex);
+    }
   }
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
