@@ -30,7 +30,7 @@
 
 # Kubernetes Deploy: Triton Inference Server Cluster
 
-**NOTE: The prometheuos operator used in these instructions is not yet
+**NOTE: The prometheus operator used in these instructions is not yet
 updated to work with 1.16.x versions of Google Kubernetes Engine
 (GKE). You must use a GKE 1.15.x version to avoid this issue.**
 
@@ -43,7 +43,7 @@ This guide assumes you already have a functional Kubernetes cluster
 and helm installed (see below for instructions on installing
 helm). Note the following requirements:
 
-* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. Your cluster must contain sufficient CPU resourses to support these services. At a minimum you will likely require 2 CPU nodes with machine type of n1-standard-2 or greater.
+* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. Your cluster must contain sufficient CPU resources to support these services. At a minimum you will likely require 2 CPU nodes with machine type of n1-standard-2 or greater.
 
 * If you want Triton Server to use GPUs for inferencing, your cluster
 must be configured to contain the desired number of GPU nodes with
