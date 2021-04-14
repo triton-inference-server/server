@@ -68,7 +68,7 @@ for i in \
     rm -fr models/custom_${i}/1/*
     cp libtriton_identity.so models/custom_${i}/1/.
     (cd models/custom_${i} && \
-                sed -i "s/^platform:.*/platform: \"custom\"/" config.pbtxt && \
+                sed -i "s/^platform:.*/backend: \"identity\"/" config.pbtxt && \
                 sed -i "s/^name:.*/name: \"custom_${i}\"/" config.pbtxt && \
                 echo "default_model_filename: \"libtriton_identity.so\"" >> config.pbtxt && \
                 echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
