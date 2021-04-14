@@ -53,7 +53,6 @@ add_library(
   tensorrt-backend-library EXCLUDE_FROM_ALL OBJECT
   ${PLAN_SRCS} ${PLAN_HDRS}
 )
-add_dependencies(tensorrt-backend-library proto-library)
 
 if(${TRITON_ENABLE_GPU})
   target_include_directories(tensorrt-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -67,7 +66,9 @@ endif() # TRITON_ENABLE_METRICS
 
 target_link_libraries(
   tensorrt-backend-library
-  PUBLIC 
+  PRIVATE
+    proto-library
+  PUBLIC
     triton-core-serverapi     # from repo-core
     triton-common-sync-queue  # from repo-common
 )

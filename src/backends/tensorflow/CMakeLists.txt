@@ -47,11 +47,12 @@ add_library(
   tensorflow-backend-library EXCLUDE_FROM_ALL OBJECT
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
 )
-add_dependencies(tensorflow-backend-library proto-library)
 
 target_link_libraries(
   tensorflow-backend-library
-  PUBLIC 
+  PRIVATE
+    proto-library
+  PUBLIC
     triton-core-serverapi     # from repo-core
     triton-common-sync-queue  # from repo-common
 )

@@ -57,6 +57,8 @@ FetchContent_Declare(
   GIT_TAG ${TRITON_CORE_REPO_TAG}
   GIT_SHALLOW ON
 )
+
+set(TRITON_COMMON_ENABLE_PROTOBUF ON)
 FetchContent_MakeAvailable(repo-common repo-core)
 
 if(${TRITON_ENABLE_GPU})

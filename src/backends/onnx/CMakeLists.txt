@@ -43,11 +43,12 @@ add_library(
   onnxruntime-backend-library EXCLUDE_FROM_ALL OBJECT
   ${ONNXRUNTIME_SRCS} ${ONNXRUNTIME_HDRS}
 )
-add_dependencies(onnxruntime-backend-library proto-library)
 
 target_link_libraries(
   onnxruntime-backend-library
-  PUBLIC 
+  PRIVATE
+    proto-library
+  PUBLIC
     triton-core-serverapi     # from repo-core
     triton-common-sync-queue  # from repo-common
 )

@@ -133,6 +133,7 @@ target_link_libraries(
   PRIVATE triton-common-error        # from repo-common
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
+  PRIVATE proto-library
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
@@ -162,6 +163,7 @@ add_executable(
   pinned_memory_manager_test
   ${PINNED_MEMORY_MANAGER_TEST_SRCS}
   ${PINNED_MEMORY_MANAGER_TEST_HDRS}
+  $<TARGET_OBJECTS:proto-library>
 )
 set_target_properties(
   pinned_memory_manager_test
@@ -181,9 +183,11 @@ target_link_libraries(
   PRIVATE triton-common-error        # from repo-common
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
+  PRIVATE proto-library
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
+  PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
 )
 install(
@@ -290,6 +294,7 @@ target_include_directories(
 target_link_libraries(
   data_compressor_test
   PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE proto-library
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE -lpthread
@@ -300,9 +305,6 @@ install(
   TARGETS data_compressor_test
   RUNTIME DESTINATION bin
 )
-
-# Generate C++ protobuf files for the following tests
-protobuf_generate_cpp(MODEL_CONFIG_PROTO_SRC MODEL_CONFIG_PROTO_HDR ../core/model_config.proto)
 
 #
 # Unit test for TritonRepoAgent ... (TODO specify the other classes)
@@ -365,6 +367,7 @@ target_link_libraries(
   PRIVATE triton-core-repoagentapi  # from repo-core
   PRIVATE triton-common-error       # from repo-common
   PRIVATE triton-common-json        # from repo-common
+  PRIVATE proto-library
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf
@@ -450,6 +453,7 @@ target_link_libraries(
   rate_limiter_test
   PRIVATE triton-common-error     # from repo-common
   PRIVATE triton-core-serverapi   # from repo-core
+  PRIVATE proto-library
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf
