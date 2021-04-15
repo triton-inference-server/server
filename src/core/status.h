@@ -27,7 +27,7 @@
 
 #include <string>
 #include "src/core/tritonserver_apis.h"
-#include "triton/common/exception.h"
+#include "triton/common/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -52,8 +52,8 @@ class Status {
   // Construct a status from a code and message.
   explicit Status(Code code, const std::string& msg) : code_(code), msg_(msg) {}
 
-  // Construct a status from Exception from triton::common
-  explicit Status(const triton::common::Exception& ex);
+  // Construct a status from Status from common repo
+  explicit Status(const triton::common::Status& ex);
 
   // Convenience "success" value. Can be used as Status::Success to
   // indicate no error.
@@ -81,10 +81,6 @@ class Status {
 };
 
 // Return the Status::Code corresponding to a
-// triton::common::Exception::Code.
-Status::Code TritonCodeToStatusCode(triton::common::Exception::Code code);
-
-// Return the Status::Code corresponding to a
 // TRITONSERVER_Error_Code.
 Status::Code TritonCodeToStatusCode(TRITONSERVER_Error_Code code);
 
@@ -93,9 +89,9 @@ Status::Code TritonCodeToStatusCode(TRITONSERVER_Error_Code code);
 TRITONSERVER_Error_Code StatusCodeToTritonCode(Status::Code status_code);
 
 // Return the Status::Code corresponding to a
-// triton::common::Exception::Code.
-Status::Code ExceptionCodeToStatusCode(
-    const triton::common::Exception::Code code);
+// Status code from common repo
+Status::Code CommonStatusCodeToStatusCode(
+    const triton::common::Status::Code code);
 
 // If status is non-OK, return the Status.
 #define RETURN_IF_ERROR(S)        \

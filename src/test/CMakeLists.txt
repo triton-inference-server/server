@@ -392,7 +392,7 @@ if(${TRITON_ENABLE_GPU})
 endif() # TRITON_ENABLE_GPU
 target_link_libraries(
   rate_limiter_test
-  PRIVATE triton-common-exception  # from repo-common
+  PRIVATE triton-common-status     # from repo-common
   PRIVATE triton-core-serverapi    # from repo-core
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}

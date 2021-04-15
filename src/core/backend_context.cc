@@ -1186,41 +1186,35 @@ BackendInputCollector::FlushPendingPinned(
           }
         }
 
-        Status status;
-        try {
-          triton::common::AsyncWorkQueue::AddTask(
-              [this, offset, pinned_buffer, pinned_memory_type,
-               pending_pinned_byte_size, pinned_memory_id, pending_it, end_it,
-               incomplete_count, &deferred_pinned]() mutable {
-                for (; pending_it != end_it; pending_it++) {
-                  std::unique_ptr<InferenceResponse>* response =
-                      (*pending_it).first;
-                  const InferenceRequest::Input* request_input =
-                      (*pending_it).second;
-                  SetFixedSizeInputTensor(
-                      request_input, offset, pinned_buffer,
-                      pending_pinned_byte_size, pinned_memory_type,
-                      pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED, false,
-                      false, response);
-                  offset += request_input->Data()->TotalByteSize();
-                }
-                // The last segmented task will start the next phase of
-                // the internal pinned buffer copy
-                if (incomplete_count->fetch_sub(1) == 1) {
+        Status status = Status(triton::common::AsyncWorkQueue::AddTask(
+            [this, offset, pinned_buffer, pinned_memory_type,
+             pending_pinned_byte_size, pinned_memory_id, pending_it, end_it,
+             incomplete_count, &deferred_pinned]() mutable {
+              for (; pending_it != end_it; pending_it++) {
+                std::unique_ptr<InferenceResponse>* response =
+                    (*pending_it).first;
+                const InferenceRequest::Input* request_input =
+                    (*pending_it).second;
+                SetFixedSizeInputTensor(
+                    request_input, offset, pinned_buffer,
+                    pending_pinned_byte_size, pinned_memory_type,
+                    pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED, false,
+                    false, response);
+                offset += request_input->Data()->TotalByteSize();
+              }
+              // The last segmented task will start the next phase of
+              // the internal pinned buffer copy
+              if (incomplete_count->fetch_sub(1) == 1) {
 #ifdef TRITON_ENABLE_GPU
-                  if (buffer_ready_event_ != nullptr) {
-                    cudaEventSynchronize(buffer_ready_event_);
-                    buffer_ready_event_ = nullptr;
-                  }
-#endif  // TRITON_ENABLE_GPU
-                  completion_queue_.Put(deferred_pinned.Finalize(stream_));
-                  delete incomplete_count;
+                if (buffer_ready_event_ != nullptr) {
+                  cudaEventSynchronize(buffer_ready_event_);
+                  buffer_ready_event_ = nullptr;
                 }
-              });
-        }
-        catch (const triton::common::Exception& ex) {
-          status = Status(ex);
-        }
+#endif  // TRITON_ENABLE_GPU
+                completion_queue_.Put(deferred_pinned.Finalize(stream_));
+                delete incomplete_count;
+              }
+            }));
         if (!status.IsOk()) {
           for (; pending_it != end_it; pending_it++) {
             std::unique_ptr<InferenceResponse>* response = (*pending_it).first;

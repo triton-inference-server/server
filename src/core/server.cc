@@ -146,12 +146,8 @@ InferenceServer::Init()
   status = PersistentBackendManager::Create(
       backend_cmdline_config_map_, &persist_backend_manager_);
   if (status.IsOk() && (buffer_manager_thread_count_ > 0)) {
-    try {
-      triton::common::AsyncWorkQueue::Initialize(buffer_manager_thread_count_);
-    }
-    catch (const triton::common::Exception& ex) {
-      status = Status(ex);
-    }
+    status = Status(triton::common::AsyncWorkQueue::Initialize(
+        buffer_manager_thread_count_));
   }
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
