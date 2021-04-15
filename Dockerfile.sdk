@@ -27,7 +27,7 @@
 # Default setting is building on nvidia/cuda:11.1-devel-ubuntu20.04
 ARG BASE_IMAGE=nvidia/cuda:11.1-devel-ubuntu20.04
 
-ARG TRITON_CLIENT_REPO_TAG=main
+ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
@@ -91,15 +91,13 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 # Build the client library and examples
-ARG TRITON_CLIENT_REPO_TAG
+ARG TRITON_CLIENT_REPO_SUBDIR
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
-RUN echo ${TRITON_CLIENT_REPO_TAG}
-RUN git clone --single-branch --depth=1 -b ${TRITON_CLIENT_REPO_TAG} \
-        https://github.com/triton-inference-server/client.git
+COPY ${TRITON_CLIENT_REPO_SUBDIR} client
 
 WORKDIR /workspace/build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
