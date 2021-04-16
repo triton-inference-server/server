@@ -31,7 +31,6 @@ namespace nvidia { namespace inferenceserver {
 
 constexpr char kInferHeaderContentLengthHTTPHeader[] =
     "Inference-Header-Content-Length";
-// FIXME accept encoding can be a list
 constexpr char kAcceptEncodingHTTPHeader[] = "Accept-Encoding";
 constexpr char kContentEncodingHTTPHeader[] = "Content-Encoding";
 
