@@ -52,28 +52,28 @@ class AsyncWorkQueueTest : public ::testing::Test {
 
 TEST_F(AsyncWorkQueueTest, InitZeroWorker)
 {
-  auto status = tc::AsyncWorkQueue::Initialize(0);
-  EXPECT_FALSE(status.IsOk()) << "Expect error when initialized with 0 worker";
+  auto error = tc::AsyncWorkQueue::Initialize(0);
+  EXPECT_FALSE(error.IsOk()) << "Expect error when initialized with 0 worker";
 }
 
 TEST_F(AsyncWorkQueueTest, InitOneWorker)
 {
-  auto status = tc::AsyncWorkQueue::Initialize(1);
-  EXPECT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(1);
+  EXPECT_TRUE(error.IsOk()) << error.Message();
 }
 
 TEST_F(AsyncWorkQueueTest, InitFourWorker)
 {
-  auto status = tc::AsyncWorkQueue::Initialize(1);
-  EXPECT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(1);
+  EXPECT_TRUE(error.IsOk()) << error.Message();
 }
 
 TEST_F(AsyncWorkQueueTest, InitTwice)
 {
-  auto status = tc::AsyncWorkQueue::Initialize(4);
-  EXPECT_TRUE(status.IsOk()) << status.Message();
-  status = tc::AsyncWorkQueue::Initialize(2);
-  EXPECT_FALSE(status.IsOk()) << "Expect error from initializing twice";
+  auto error = tc::AsyncWorkQueue::Initialize(4);
+  EXPECT_TRUE(error.IsOk()) << error.Message();
+  error = tc::AsyncWorkQueue::Initialize(2);
+  EXPECT_FALSE(error.IsOk()) << "Expect error from initializing twice";
 }
 
 TEST_F(AsyncWorkQueueTest, WorkerCountUninitialized)
@@ -84,8 +84,8 @@ TEST_F(AsyncWorkQueueTest, WorkerCountUninitialized)
 
 TEST_F(AsyncWorkQueueTest, WorkerCountInitialized)
 {
-  auto status = tc::AsyncWorkQueue::Initialize(4);
-  EXPECT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(4);
+  EXPECT_TRUE(error.IsOk()) << error.Message();
   EXPECT_EQ(tc::AsyncWorkQueue::WorkerCount(), (size_t)4)
       << "Expect 4 worker count for initialized queue";
 }
@@ -148,8 +148,8 @@ TEST_F(AsyncWorkQueueTest, RunTasksInParallel)
     serialized_duration = end_ts - start_ts;
   }
 
-  auto status = tc::AsyncWorkQueue::Initialize(4);
-  ASSERT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(4);
+  ASSERT_TRUE(error.IsOk()) << error.Message();
 
   uint64_t parallelized_duration = 0;
   {
@@ -205,8 +205,8 @@ TEST_F(AsyncWorkQueueTest, RunTasksFIFO)
   size_t task_count = 8;
   std::vector<std::promise<uint64_t>> ps(task_count);
 
-  auto status = tc::AsyncWorkQueue::Initialize(2);
-  ASSERT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(2);
+  ASSERT_TRUE(error.IsOk()) << error.Message();
 
   std::vector<std::promise<void>> barrier(2);
   tc::AsyncWorkQueue::AddTask([&barrier]() mutable {

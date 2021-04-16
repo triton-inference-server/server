@@ -28,48 +28,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-Status::Status(const triton::common::Status& status)
-    : code_(CommonStatusCodeToStatusCode(status.StatusCode())),
-      msg_(status.Message())
-{
-}
-
 const Status Status::Success(Status::Code::SUCCESS);
-
-std::string
-Status::AsString() const
-{
-  std::string str(CodeString(code_));
-  str += ": " + msg_;
-  return str;
-}
-
-const char*
-Status::CodeString(const Code code)
-{
-  switch (code) {
-    case Status::Code::SUCCESS:
-      return "OK";
-    case Status::Code::UNKNOWN:
-      return "Unknown";
-    case Status::Code::INTERNAL:
-      return "Internal";
-    case Status::Code::NOT_FOUND:
-      return "Not found";
-    case Status::Code::INVALID_ARG:
-      return "Invalid argument";
-    case Status::Code::UNAVAILABLE:
-      return "Unavailable";
-    case Status::Code::UNSUPPORTED:
-      return "Unsupported";
-    case Status::Code::ALREADY_EXISTS:
-      return "Already exists";
-    default:
-      break;
-  }
-
-  return "<invalid code>";
-}
 
 Status::Code
 TritonCodeToStatusCode(TRITONSERVER_Error_Code code)
@@ -121,32 +80,6 @@ StatusCodeToTritonCode(Status::Code status_code)
   }
 
   return TRITONSERVER_ERROR_UNKNOWN;
-}
-
-Status::Code
-CommonStatusCodeToStatusCode(triton::common::Status::Code code)
-{
-  switch (code) {
-    case triton::common::Status::Code::UNKNOWN:
-      return Status::Code::UNKNOWN;
-    case triton::common::Status::Code::INTERNAL:
-      return Status::Code::INTERNAL;
-    case triton::common::Status::Code::NOT_FOUND:
-      return Status::Code::NOT_FOUND;
-    case triton::common::Status::Code::INVALID_ARG:
-      return Status::Code::INVALID_ARG;
-    case triton::common::Status::Code::UNAVAILABLE:
-      return Status::Code::UNAVAILABLE;
-    case triton::common::Status::Code::UNSUPPORTED:
-      return Status::Code::UNSUPPORTED;
-    case triton::common::Status::Code::ALREADY_EXISTS:
-      return Status::Code::ALREADY_EXISTS;
-
-    default:
-      break;
-  }
-
-  return Status::Code::UNKNOWN;
 }
 
 }}  // namespace nvidia::inferenceserver

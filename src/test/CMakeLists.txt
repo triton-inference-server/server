@@ -130,6 +130,7 @@ target_include_directories(
 )
 target_link_libraries(
   memory_test
+  PRIVATE triton-common-error        # from repo-common
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE ${GTEST_LIBRARY}
@@ -177,6 +178,7 @@ target_include_directories(
 )
 target_link_libraries(
   pinned_memory_manager_test
+  PRIVATE triton-common-error        # from repo-common
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE ${GTEST_LIBRARY}
@@ -236,6 +238,7 @@ target_link_libraries(
   PRIVATE triton-core-serverapi            # from repo-core
   PRIVATE triton-common-sync-queue         # from repo-common
   PRIVATE triton-common-async-work-queue   # from repo-common
+  PRIVATE triton-common-error              # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE -lpthread
@@ -305,8 +308,9 @@ target_include_directories(
 )
 target_link_libraries(
   triton_repo_agent_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-core-serverapi     # from repo-core
   PRIVATE triton-core-repoagentapi  # from repo-core
+  PRIVATE triton-common-error       # from repo-common
   PRIVATE triton-common-json        # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
@@ -392,8 +396,8 @@ if(${TRITON_ENABLE_GPU})
 endif() # TRITON_ENABLE_GPU
 target_link_libraries(
   rate_limiter_test
-  PRIVATE triton-common-status     # from repo-common
-  PRIVATE triton-core-serverapi    # from repo-core
+  PRIVATE triton-common-error     # from repo-common
+  PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf
