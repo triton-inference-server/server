@@ -64,6 +64,7 @@ for (( I=1; I<${THREAD_COUNT}+2; I++ )); do
         cp $DATADIR/${full}/config.pbtxt ${MODELSDIR}${I}/simple${I}/. && \
         (cd ${MODELSDIR}${I}/simple${I} && \
                 sed -i "s/^name:.*/name: \"simple${I}\"/" config.pbtxt && \
+                sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
                 sed -i "s/label_filename:.*//" config.pbtxt)
     EXTRA_ARGS="${EXTRA_ARGS} -r ${MODELSDIR}${I}"
 done
