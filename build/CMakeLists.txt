@@ -540,7 +540,7 @@ ExternalProject_Add(test-util
     -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_TEST_UTILS_INSTALL_PREFIX}
-  DEPENDS protobuf googletest cnmem
+  DEPENDS protobuf googletest cnmem libevent
 )
 
 #
