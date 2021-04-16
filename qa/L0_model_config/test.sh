@@ -45,7 +45,8 @@ source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0
 
-TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan onnxruntime_onnx pytorch_libtorch custom"
+# Removing custom backend since legacy custom backend is deprecated
+TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan onnxruntime_onnx pytorch_libtorch"
 
 # Copy fixed TensorRT plans into the test model repositories.
 for modelpath in \
