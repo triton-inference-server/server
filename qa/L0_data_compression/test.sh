@@ -68,6 +68,7 @@ set -e
 
 # End-to-end testing with simple model
 SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
+SIMPLE_INFER_CLIENT=../clients/simple_http_infer_client
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -109,6 +110,36 @@ if [ $? -ne 0 ]; then
 fi
 
 python $SIMPLE_INFER_CLIENT_PY -v --input-compression-algorithm gzip --output-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_INFER_CLIENT -v -i deflate >> "${CLIENT_LOG}" 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_INFER_CLIENT -v -i gzip >> "${CLIENT_LOG}" 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_INFER_CLIENT -v -o deflate >> "${CLIENT_LOG}" 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_INFER_CLIENT -v -o gzip >> "${CLIENT_LOG}" 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_INFER_CLIENT -v -i deflate -o gzip >> "${CLIENT_LOG}" 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_INFER_CLIENT -v -i gzip -o deflate >> "${CLIENT_LOG}" 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
