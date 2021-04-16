@@ -59,7 +59,7 @@ Status::Code TritonCodeToStatusCode(TRITONSERVER_Error_Code code);
 TRITONSERVER_Error_Code StatusCodeToTritonCode(Status::Code status_code);
 
 // Converts the common Error to Status object
-#define COMMON_ERROR_TO_STATUS(S) Status((S));
+#define COMMON_ERROR_TO_STATUS(S) Status((S))
 
 // If status is non-OK, return the Status.
 #define RETURN_IF_ERROR(S)        \
