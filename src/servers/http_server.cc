@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -39,6 +39,7 @@
 #include "src/core/model_config.h"
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
+#include "src/servers/data_compressor.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
@@ -2344,13 +2345,39 @@ HTTPAPIServer::HandleInfer(
       header_length = std::atoi(header_length_c_str);
     }
 
-    err = EVBufferToInput(
-        model_name, irequest, req->buffer_in, infer_request.get(),
-        header_length);
+    evbuffer* decompressed_buffer = nullptr;
+    LOG_ERROR << "Received " << evbuffer_get_length(req->buffer_in) << " bytes";
+    // Find Content-Encoding in header. Decompress if not empty
+    const char* content_encoding_c_str =
+        evhtp_kv_find(req->headers_in, kContentEncodingHTTPHeader);
+    if (content_encoding_c_str != NULL) {
+      std::string content_encoding(content_encoding_c_str);
+      if (content_encoding == "deflate") {
+        decompressed_buffer = evbuffer_new();
+        err = DataCompressor::DecompressData(
+            DataCompressor::Type::DEFLATE, req->buffer_in, decompressed_buffer);
+      } else if (content_encoding == "gzip") {
+        decompressed_buffer = evbuffer_new();
+        err = DataCompressor::DecompressData(
+            DataCompressor::Type::GZIP, req->buffer_in, decompressed_buffer);
+      } else if (!content_encoding.empty()) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("unsupported Content-Encoding: ") + content_encoding)
+                .c_str());
+      }
+    }
+    if (err == nullptr) {
+      err = EVBufferToInput(
+          model_name, irequest,
+          (decompressed_buffer == nullptr) ? req->buffer_in
+                                           : decompressed_buffer,
+          infer_request.get(), header_length);
+    }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
-          nullptr /* request_release_userp */);
+          decompressed_buffer);
       if (err == nullptr) {
         err = TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator_,
@@ -2470,6 +2497,11 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
 
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
+
+  // Always specify supported compression as Accept-Encoding
+  evhtp_headers_add_header(
+            infer_request->req_->headers_out,
+            evhtp_header_new(kAcceptEncodingHTTPHeader, "gzip, deflate", 1, 1));
 
   auto response_count = infer_request->IncrementResponseCount();
 
@@ -2720,16 +2752,17 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 
   RETURN_IF_ERR(response_json.Add("outputs", std::move(response_outputs)));
 
+  evbuffer* response_placeholder = evbuffer_new();
   // Write json metadata into response evbuffer
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERR(response_json.Write(&buffer));
-  evbuffer_add(req_->buffer_out, buffer.Base(), buffer.Size());
+  evbuffer_add(response_placeholder, buffer.Base(), buffer.Size());
 
   // If there is binary data write it next in the appropriate
   // order... also need the HTTP header when returning binary data.
   if (!ordered_buffers.empty()) {
     for (evbuffer* b : ordered_buffers) {
-      evbuffer_add_buffer(req_->buffer_out, b);
+      evbuffer_add_buffer(response_placeholder, b);
     }
 
     evhtp_headers_add_header(
@@ -2737,6 +2770,53 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
                                kInferHeaderContentLengthHTTPHeader,
                                std::to_string(buffer.Size()).c_str(), 1, 1));
   }
+
+  evbuffer* response_body = response_placeholder;
+  // Find Accept-Encoding in header. Try to compress if found
+  const char* accept_encoding_c_str =
+      evhtp_kv_find(req_->headers_in, kAcceptEncodingHTTPHeader);
+  if (accept_encoding_c_str != NULL) {
+    // FIXME compress only work for the simplest case for now
+    // (one accept encoding specified)
+    std::string accept_encoding(accept_encoding_c_str);
+    if (accept_encoding == "deflate") {
+      auto compressed_buffer = evbuffer_new();
+      auto err = DataCompressor::CompressData(
+          DataCompressor::Type::DEFLATE, response_placeholder,
+          compressed_buffer);
+      if (err == nullptr) {
+        evhtp_headers_add_header(
+            req_->headers_out,
+            evhtp_header_new(kContentEncodingHTTPHeader, "deflate", 1, 1));
+        response_body = compressed_buffer;
+        evbuffer_free(response_placeholder);
+      } else {
+        // just log the compression error and return the uncompressed data
+        LOG_VERBOSE(1) << "unable to compress response: "
+                       << TRITONSERVER_ErrorMessage(err);
+        TRITONSERVER_ErrorDelete(err);
+        evbuffer_free(compressed_buffer);
+      }
+    } else if (accept_encoding == "gzip") {
+      auto compressed_buffer = evbuffer_new();
+      auto err = DataCompressor::CompressData(
+          DataCompressor::Type::GZIP, response_placeholder, compressed_buffer);
+      if (err == nullptr) {
+        evhtp_headers_add_header(
+            req_->headers_out,
+            evhtp_header_new(kContentEncodingHTTPHeader, "gzip", 1, 1));
+        response_body = compressed_buffer;
+        evbuffer_free(response_placeholder);
+      } else {
+        // just log the compression error and return the uncompressed data
+        LOG_VERBOSE(1) << "unable to compress response: "
+                       << TRITONSERVER_ErrorMessage(err);
+        TRITONSERVER_ErrorDelete(err);
+        evbuffer_free(compressed_buffer);
+      }
+    }
+  }
+  evbuffer_add_buffer(req_->buffer_out, response_body);
 
   return nullptr;  // success
 }
