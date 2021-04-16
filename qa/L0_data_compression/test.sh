@@ -84,32 +84,32 @@ fi
 
 set +e
 # Test various combinations
-python $SIMPLE_INFER_CLIENT_PY -v --input-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
+python $SIMPLE_INFER_CLIENT_PY -v --request-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python $SIMPLE_INFER_CLIENT_PY -v --input-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
+python $SIMPLE_INFER_CLIENT_PY -v --request-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python $SIMPLE_INFER_CLIENT_PY -v --output-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
+python $SIMPLE_INFER_CLIENT_PY -v --response-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python $SIMPLE_INFER_CLIENT_PY -v --output-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
+python $SIMPLE_INFER_CLIENT_PY -v --response-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python $SIMPLE_INFER_CLIENT_PY -v --input-compression-algorithm deflate --output-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
+python $SIMPLE_INFER_CLIENT_PY -v --request-compression-algorithm deflate --response-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python $SIMPLE_INFER_CLIENT_PY -v --input-compression-algorithm gzip --output-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
+python $SIMPLE_INFER_CLIENT_PY -v --request-compression-algorithm gzip --response-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi

@@ -894,6 +894,51 @@ EVBufferToJson(
   return nullptr;  // success
 }
 
+std::string
+CompressionTypeUsed(const std::string accept_encoding)
+{
+  std::vector<std::string> encodings;
+  size_t offset = 0;
+  size_t delimeter_pos = accept_encoding.find(',');
+  while (delimeter_pos != std::string::npos) {
+    encodings.emplace_back(
+        accept_encoding.substr(offset, delimeter_pos - offset));
+    offset = delimeter_pos;
+    delimeter_pos = accept_encoding.find(',', offset);
+  }
+  std::string res = "identity";
+  double weight = 0;
+  encodings.emplace_back(accept_encoding.substr(offset));
+  for (const auto& encoding : encodings) {
+    auto start_pos = encoding.find_first_not_of(' ');
+    auto weight_pos = encoding.find(";q=");
+    // Skip if the encoding is malformed
+    if ((start_pos == std::string::npos) ||
+        ((weight_pos != std::string::npos) && (start_pos >= weight_pos))) {
+      continue;
+    }
+    const std::string type =
+        (weight_pos == std::string::npos)
+            ? encoding.substr(start_pos)
+            : encoding.substr(start_pos, weight_pos - start_pos);
+    double type_weight = 1;
+    if (weight_pos != std::string::npos) {
+      try {
+        type_weight = std::stod(encoding.substr(weight_pos + 3));
+      }
+      catch (const std::invalid_argument& ia) {
+        continue;
+      }
+    }
+    if (((type == "identity") || (type == "deflate") || (type == "gzip")) &&
+        (type_weight > weight)) {
+      res = type;
+      weight = type_weight;
+    }
+  }
+  return res;
+}
+
 }  // namespace
 
 // Handle HTTP requests to inference server APIs
@@ -2360,10 +2405,13 @@ HTTPAPIServer::HandleInfer(
         err = DataCompressor::DecompressData(
             DataCompressor::Type::GZIP, req->buffer_in, decompressed_buffer);
       } else if (!content_encoding.empty()) {
-        err = TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("unsupported Content-Encoding: ") + content_encoding)
-                .c_str());
+        // Encounter unsupported compressed type,
+        // send 415 error with supported types in Accept-Encoding
+        evhtp_headers_add_header(
+            req->headers_out,
+            evhtp_header_new(kAcceptEncodingHTTPHeader, "gzip, deflate", 1, 1));
+        evhtp_send_reply(req, EVHTP_RES_UNSUPPORTED);
+        return;
       }
     }
     if (err == nullptr) {
@@ -2496,11 +2544,6 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
 
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
-
-  // Always specify supported compression as Accept-Encoding
-  evhtp_headers_add_header(
-            infer_request->req_->headers_out,
-            evhtp_header_new(kAcceptEncodingHTTPHeader, "gzip, deflate", 1, 1));
 
   auto response_count = infer_request->IncrementResponseCount();
 
@@ -2775,9 +2818,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   const char* accept_encoding_c_str =
       evhtp_kv_find(req_->headers_in, kAcceptEncodingHTTPHeader);
   if (accept_encoding_c_str != NULL) {
-    // FIXME compress only work for the simplest case for now
-    // (one accept encoding specified)
-    std::string accept_encoding(accept_encoding_c_str);
+    std::string accept_encoding = CompressionTypeUsed(accept_encoding_c_str);
     if (accept_encoding == "deflate") {
       auto compressed_buffer = evbuffer_new();
       auto err = DataCompressor::CompressData(
