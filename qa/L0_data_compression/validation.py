@@ -37,7 +37,7 @@ def generate_compressed_data():
             of.write(gzip.compress(raw_data))
 
 def validate_compressed_data():
-    with open("raw_input", "rb") as f:
+    with open("raw_data", "rb") as f:
         import zlib
         import gzip
         raw_data = f.read()
