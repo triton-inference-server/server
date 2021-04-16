@@ -291,4 +291,5 @@ class DataCompressor {
     return nullptr;  // success
   }
 };
+
 }}  // namespace nvidia::inferenceserver

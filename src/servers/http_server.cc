@@ -2345,9 +2345,8 @@ HTTPAPIServer::HandleInfer(
       header_length = std::atoi(header_length_c_str);
     }
 
-    evbuffer* decompressed_buffer = nullptr;
-    LOG_ERROR << "Received " << evbuffer_get_length(req->buffer_in) << " bytes";
     // Find Content-Encoding in header. Decompress if not empty
+    evbuffer* decompressed_buffer = nullptr;
     const char* content_encoding_c_str =
         evhtp_kv_find(req->headers_in, kContentEncodingHTTPHeader);
     if (content_encoding_c_str != NULL) {
