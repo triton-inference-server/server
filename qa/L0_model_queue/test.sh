@@ -37,7 +37,6 @@ fi
 
 CLIENT_LOG="./client.log"
 MODEL_QUEUE_TEST=model_queue_test.py
-VERIFY_TIMESTAMPS=verify_timestamps.py
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
