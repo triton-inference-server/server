@@ -1,6 +1,6 @@
 name: "fp32_dim2_nobatch"
 max_batch_size: 0
-platform: "custom"
+backend: "identity"
 input [
   {
     name: "INPUT0"

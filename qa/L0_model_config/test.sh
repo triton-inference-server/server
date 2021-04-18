@@ -161,7 +161,7 @@ for modelpath in \
        autofill_noplatform_success/ensemble/unmapped_output/unmapped_output/1 \
        autofill_noplatform_success/ensemble/unmapped_output/fp32_dim1_batch4_output3/1 ; do
    mkdir -p $modelpath
-   cp ./libtriton_identity.so $modelpath/libcustom.so
+   cp ./libtriton_identity.so $modelpath/.
 done
 
 for modelpath in \
