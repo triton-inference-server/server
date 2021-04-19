@@ -167,7 +167,7 @@ RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/sequence/libtriton_sequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \
     mkdir -p qa/custom_models/custom_dyna_sequence_int32/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libdyna_sequence.so \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libtriton_dyna_sequence.so \
         qa/custom_models/custom_dyna_sequence_int32/1/.
 
 RUN cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libidentity.so \
