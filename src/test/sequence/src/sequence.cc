@@ -29,21 +29,21 @@
 
 #include "triton/backend/backend_common.h"
 
-namespace triton { namespace backend { namespace identity {
+namespace triton { namespace backend { namespace sequence {
 
 
 // Simple sequence backend that demonstrates the TRITONBACKEND API for a
-// blocking backend. A blocking backend completes execution of the
-// inference before returning from TRITONBACKEND_ModelInstanceExecute.
+// blocking backend. A blocking backend completes execution of the inference
+// before returning from TRITONBACKEND_ModelInstanceExecute.
 //
 // The backend supports models that take three input tensors, two INT32 [ 1 ]
-// control values and one variable-size INT32 [ -1 ] value input; and
-// produces an output tensor with the same shape as the input
-// tensor. The input tensors must be named "START", "READY" and
-// "INPUT". The output tensor must be named "OUTPUT".
+// control values and one variable-size INT32 [ -1 ] value input; and produces
+// an output tensor with the same shape as the input tensor. The input tensors
+// must be named "START", "READY" and "INPUT". The output tensor must be named
+// "OUTPUT".
 //
-// The model maintains an INT32 accumulator which is updated based
-// on the control values in "START" and "READY":
+// The model maintains an INT32 accumulator which is updated based on the
+// control values in "START" and "READY":
 //
 //   READY=0, START=x: Ignore value input, do not change accumulator value.
 //
@@ -52,8 +52,7 @@ namespace triton { namespace backend { namespace identity {
 //
 //   READY=1, START=0: Add input tensor values to accumulator.
 //
-// When READY=1, the accumulator is returned in every element of the
-// output.
+// When READY=1, the accumulator is returned in every element of the output.
 //
 
 #define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
@@ -103,10 +102,6 @@ class ModelState {
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
 
-  // Block the thread for seconds specified in 'creation_delay_sec' parameter.
-  // This function is used for testing.
-  TRITONSERVER_Error* CreationDelay();
-
  private:
   ModelState(
       TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
@@ -136,13 +131,12 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
   RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
       triton_model, 1 /* config_version */, &config_message));
 
-  // We can get the model configuration as a json string from
-  // config_message, parse it with our favorite json parser to create
-  // DOM that we can access when we need to example the
-  // configuration. We use TritonJson, which is a wrapper that returns
-  // nice errors (currently the underlying implementation is
-  // rapidjson... but others could be added). You can use any json
-  // parser you prefer.
+  // We can get the model configuration as a json string from config_message,
+  // parse it with our favorite json parser to create DOM that we can access
+  // when we need to example the configuration. We use TritonJson, which is a
+  // wrapper that returns nice errors (currently the underlying implementation
+  // is rapidjson... but others could be added). You can use any json parser you
+  // prefer.
   const char* buffer;
   size_t byte_size;
   RETURN_IF_ERROR(
@@ -183,8 +177,8 @@ TRITONSERVER_Error*
 ModelState::SupportsFirstDimBatching(bool* supports)
 {
   // We can't determine this during model initialization because
-  // TRITONSERVER_ServerModelBatchProperties can't be called until the
-  // model is loaded. So we just cache it here.
+  // TRITONSERVER_ServerModelBatchProperties can't be called until the model is
+  // loaded. So we just cache it here.
   if (!supports_batching_initialized_) {
     uint32_t flags = 0;
     RETURN_IF_ERROR(TRITONSERVER_ServerModelBatchProperties(
@@ -194,30 +188,6 @@ ModelState::SupportsFirstDimBatching(bool* supports)
   }
 
   *supports = supports_batching_;
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-ModelState::CreationDelay()
-{
-  // Feature for testing purpose...
-  // look for parameter 'creation_delay_sec' in model config
-  // and sleep for the value specified
-  common::TritonJson::Value parameters;
-  if (model_config_.Find("parameters", &parameters)) {
-    common::TritonJson::Value creation_delay_sec;
-    if (parameters.Find("creation_delay_sec", &creation_delay_sec)) {
-      std::string creation_delay_sec_str;
-      RETURN_IF_ERROR(creation_delay_sec.MemberAsString(
-          "string_value", &creation_delay_sec_str));
-      LOG_MESSAGE(
-          TRITONSERVER_LOG_INFO,
-          (std::string("Creation delay is set to : ") + creation_delay_sec_str)
-              .c_str());
-      std::this_thread::sleep_for(
-          std::chrono::seconds(std::stoi(creation_delay_sec_str)));
-    }
-  }
   return nullptr;  // success
 }
 
@@ -246,8 +216,8 @@ ModelState::ValidateModelConfig()
   RETURN_IF_ERROR(model_config_.MemberAsInt("max_batch_size", &max_batch_size));
   accumulator_size_ = (size_t)(std::max((int64_t)1, max_batch_size));
 
-  // The model configuration must specify the sequence batcher and
-  // must use the START and READY input to indicate control values.
+  // The model configuration must specify the sequence batcher and must use the
+  // START and READY input to indicate control values.
   triton::common::TritonJson::Value sequence_batching;
   RETURN_IF_ERROR(
       model_config_.MemberAsObject("sequence_batching", &sequence_batching));
@@ -316,8 +286,8 @@ ModelState::ValidateModelConfig()
       strcmp(input_name, "INPUT") == 0, TRITONSERVER_ERROR_INVALID_ARG,
       std::string("model input must be named 'INPUT'"));
 
-  // There must be one INT32 output with shape that matches the
-  // input. The output must be named OUTPUT.
+  // There must be one INT32 output with shape that matches the input. The
+  // output must be named OUTPUT.
   RETURN_ERROR_IF_FALSE(
       outputs.ArraySize() == 1, TRITONSERVER_ERROR_INVALID_ARG,
       std::string(
@@ -600,9 +570,6 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
   // function will prevent the model from loading.
   RETURN_IF_ERROR(model_state->ValidateModelConfig());
 
-  // For testing.. Block the thread for certain time period before returning.
-  RETURN_IF_ERROR(model_state->CreationDelay());
-
   return nullptr;  // success
 }
 
@@ -713,10 +680,10 @@ TRITONBACKEND_ModelInstanceExecute(
   ModelState* model_state = instance_state->StateForModel();
 
   // This backend specifies BLOCKING execution policy. That means that
-  // we should not return from this function until execution is
-  // complete. Triton will automatically release 'instance' on return
-  // from this function so that it is again available to be used for
-  // another call to TRITONBACKEND_ModelInstanceExecute.
+  // we should not return from this function until execution is complete. Triton
+  // will automatically release 'instance' on return from this function so that
+  // it is again available to be used for another call to
+  // TRITONBACKEND_ModelInstanceExecute.
 
   LOG_MESSAGE(
       TRITONSERVER_LOG_INFO,
@@ -730,9 +697,9 @@ TRITONBACKEND_ModelInstanceExecute(
 
   // Each request represents a different sequence, which corresponds
   // to the accumulator at the same index. Each request must have
-  // batch-size 1 inputs which is the next timestep for that
-  // sequence. The total number of requests will not exceed the
-  // max-batch-size specified in the model configuration.
+  // batch-size 1 inputs which is the next timestep for that sequence. The total
+  // number of requests will not exceed the max-batch-size specified in the
+  // model configuration.
   if (request_count > model_state->AccumulatorSize()) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
@@ -763,21 +730,20 @@ TRITONBACKEND_ModelInstanceExecute(
     responses.push_back(response);
   }
 
-  // The way we collect these batch timestamps is not entirely
-  // accurate. Normally, in a performant backend you would execute all
-  // the requests at the same time, and so there would be a single
-  // compute-start / compute-end time-range. But here we execute each
-  // request separately so there is no single range. As a result we
-  // just show the entire execute time as being the compute time as
-  // well.
+  // After this point we take ownership of 'requests', which means that a
+  // response must be sent for every request. If something does go wrong in
+  // processing a particular request then we send an error response just for the
+  // specific request.
+
+  // The way we collect these batch timestamps is not entirely accurate.
+  // Normally, in a performant backend you would execute all the requests at the
+  // same time, and so there would be a single compute-start / compute-end
+  // time-range. But here we execute each request separately so there is no
+  // single range. As a result we just show the entire execute time as being the
+  // compute time as well.
   uint64_t min_exec_start_ns = std::numeric_limits<uint64_t>::max();
   uint64_t max_exec_end_ns = 0;
   uint64_t total_batch_size = 0;
-
-  // After this point we take ownership of 'requests', which means
-  // that a response must be sent for every request. If something does
-  // go wrong in processing a particular request then we send an error
-  // response just for the specific request.
 
   // For simplicity we just process each request separately... in
   // general a backend should try to operate on the entire batch of
@@ -1018,8 +984,8 @@ TRITONBACKEND_ModelInstanceExecute(
     int32_t* ready = reinterpret_cast<int32_t*>(&ready_buffer[0]);
     int32_t* ipbuffer_int = reinterpret_cast<int32_t*>(&input_buffer[0]);
 
-    // Update the accumulator value based on START/READY and calculate
-    // the output value.
+    // Update the accumulator value based on START/READY and calculate the
+    // output value.
     if (ready[0] != 0) {
       if (start[0] == 0) {
         // Update accumulator.
@@ -1034,26 +1000,14 @@ TRITONBACKEND_ModelInstanceExecute(
         }
       }
 
-      // This backend simply copies the output tensors from the corresponding
-      // input tensors. The input tensors contents are available in one or
-      // more contiguous buffers. To do the copy we:
-      //
-      //   1. Create an output tensor in the response.
-      //
-      //   2. Allocate appropriately sized buffer in the output
-      //      tensor.
-      //
-      //   3. Iterate over the input tensor buffers and copy the contents into
-      //      the output buffer.
       TRITONBACKEND_Response* response = responses[r];
 
       // If the output is requested, copy the calculated output value
       // into the output buffer.
       if (requested_output_count > 0) {
-        // The output shape is [1, input_element_cnt] if the model
-        // configuration supports batching, or just
-        // [input_element_cnt] if the model configuration does not
-        // support batching.
+        // The output shape is [1, input_element_cnt] if the model configuration
+        // supports batching, or just [input_element_cnt] if the model
+        // configuration does not support batching.
         std::vector<int64_t> shape;
         if (supports_batching) {
           shape.push_back(1);
@@ -1075,9 +1029,9 @@ TRITONBACKEND_ModelInstanceExecute(
           continue;
         }
 
-        // Step 2. Get the output buffer. We request a buffer in CPU
-        // memory but we have to handle any returned type. If we get
-        // back a buffer in GPU memory we just fail the request.
+        // Get the output buffer. We request a buffer in CPU memory but we have
+        // to handle any returned type. If we get back a buffer in GPU memory we
+        // just fail the request.
         void* output_buffer;
         TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
         int64_t output_memory_type_id = 0;
@@ -1109,26 +1063,12 @@ TRITONBACKEND_ModelInstanceExecute(
       }
     }
 
-    // To demonstrate response parameters we attach some here. Most responses
-    // do not use parameters but they provide a way for backends to
-    // communicate arbitrary information along with the response.
-    LOG_IF_ERROR(
-        TRITONBACKEND_ResponseSetStringParameter(
-            responses[r], "param0", "an example string parameter"),
-        "failed setting string parameter");
-    LOG_IF_ERROR(
-        TRITONBACKEND_ResponseSetIntParameter(responses[r], "param1", 42),
-        "failed setting integer parameter");
-    LOG_IF_ERROR(
-        TRITONBACKEND_ResponseSetBoolParameter(responses[r], "param2", false),
-        "failed setting boolean parameter");
-
     uint64_t exec_end_ns = 0;
     SET_TIMESTAMP(exec_end_ns);
     max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
 
-    // Send all the responses that haven't already been sent because of
-    // an earlier error.
+    // Send all the responses that haven't already been sent because of an
+    // earlier error.
     if (responses[r] != nullptr) {
       LOG_IF_ERROR(
           TRITONBACKEND_ResponseSend(
@@ -1163,4 +1103,4 @@ TRITONBACKEND_ModelInstanceExecute(
 
 }  // extern "C"
 
-}}}  // namespace triton::backend::identity
+}}}  // namespace triton::backend::sequence
