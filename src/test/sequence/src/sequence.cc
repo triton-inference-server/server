@@ -34,7 +34,7 @@ namespace triton { namespace backend { namespace identity {
 
 // Simple sequence backend that demonstrates the TRITONBACKEND API for a
 // blocking backend. A blocking backend completes execution of the
-// inference before returning from TRITONBACKED_ModelInstanceExecute.
+// inference before returning from TRITONBACKEND_ModelInstanceExecute.
 //
 // The backend supports models that take three input tensors, two INT32 [ 1 ]
 // control values and one variable-size INT32 [ -1 ] value input; and
@@ -784,6 +784,9 @@ TRITONBACKEND_ModelInstanceExecute(
   // requests at the same time for improved performance.
   std::vector<uint8_t> start_buffer, ready_buffer, input_buffer;
   for (uint32_t r = 0; r < request_count; ++r) {
+    start_buffer.clear();
+    ready_buffer.clear();
+    input_buffer.clear();
     uint64_t exec_start_ns = 0;
     SET_TIMESTAMP(exec_start_ns);
     min_exec_start_ns = std::min(min_exec_start_ns, exec_start_ns);
@@ -898,7 +901,7 @@ TRITONBACKEND_ModelInstanceExecute(
       LOG_MESSAGE(
           TRITONSERVER_LOG_ERROR,
           (std::string("request ") + std::to_string(r) +
-           ": failed to read input, error response sent")
+           ": failed to read input 'START', error response sent")
               .c_str());
       continue;
     }
@@ -911,7 +914,7 @@ TRITONBACKEND_ModelInstanceExecute(
       LOG_MESSAGE(
           TRITONSERVER_LOG_ERROR,
           (std::string("request ") + std::to_string(r) +
-           ": failed to read input, error response sent")
+           ": failed to read input 'READY', error response sent")
               .c_str());
       continue;
     }
@@ -1124,57 +1127,30 @@ TRITONBACKEND_ModelInstanceExecute(
     SET_TIMESTAMP(exec_end_ns);
     max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
 
-    // If we get to this point then there hasn't been any error and the
-    // response is complete and we can send it. This is the last (and only)
-    // response that we are sending for the request so we must mark it FINAL.
-    // If there is an error when sending all we can do is log it.
-    LOG_IF_ERROR(
-        TRITONBACKEND_ResponseSend(
-            responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-            nullptr /* success */),
-        "failed sending response");
+    // Send all the responses that haven't already been sent because of
+    // an earlier error.
+    if (responses[r] != nullptr) {
+      LOG_IF_ERROR(
+          TRITONBACKEND_ResponseSend(
+              responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+              nullptr /* success */),
+          "failed sending response");
+    }
 
-    // Report statistics for the successful request. For an instance using the
-    // CPU we don't associate any device with the statistics, otherwise we
-    // associate the instance's device.
+    // Report statistics for each request.
     LOG_IF_ERROR(
         TRITONBACKEND_ModelInstanceReportStatistics(
             instance_state->TritonModelInstance(), request,
             (responses[r] != nullptr) /* success */, exec_start_ns,
             exec_start_ns, exec_end_ns, exec_end_ns),
         "failed reporting request statistics");
-  }
-
-  // Done with requests...
-
-  // We could have released each request as soon as we sent the corresponding
-  // response. But for clarity we just release them all here. Note that is
-  // something goes wrong when releasing a request all we can do is log it...
-  // there is no response left to use to report an error.
-  for (uint32_t r = 0; r < request_count; ++r) {
-    TRITONBACKEND_Request* request = requests[r];
-
-    // Before releasing, record failed requests as those where responses[r] is
-    // nullptr. The timestamps are ignored in this case.
-    if (responses[r] == nullptr) {
-      LOG_IF_ERROR(
-          TRITONBACKEND_ModelInstanceReportStatistics(
-              instance_state->TritonModelInstance(), request,
-              false /* success */, 0, 0, 0, 0),
-          "failed reporting request statistics");
-    }
 
     LOG_IF_ERROR(
         TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
         "failed releasing request");
   }
 
-  // There are two types of statistics that we can report... the statistics
-  // for the entire batch of requests that we just executed and statistics for
-  // each individual request. Statistics for each individual request were
-  // reported above inside the loop as each request was processed (or for
-  // failed requests we report that failure below). Here we report statistics
-  // for the entire batch of requests.
+  // Report the entire batch statistics.
   LOG_IF_ERROR(
       TRITONBACKEND_ModelInstanceReportBatchStatistics(
           instance_state->TritonModelInstance(), total_batch_size,
