@@ -246,6 +246,59 @@ install(
   RUNTIME DESTINATION bin
 )
 
+#
+# Unit test for DataCompressor
+#
+set(
+  DATA_COMPRESSOR_HDRS
+  ../servers/data_compressor.h
+  ../servers/common.h
+)
+
+set(
+  DATA_COMPRESSOR_TEST_SRCS
+  data_compressor_test.cc
+)
+
+set(
+  DATA_COMPRESSOR_TEST_HDRS
+  ${DATA_COMPRESSOR_HDRS}
+)
+
+find_package(GTest REQUIRED)
+find_package(Libevent CONFIG REQUIRED)
+include_directories(${LIBEVENT_INCLUDE_DIRS})
+add_executable(
+  data_compressor_test
+  ${DATA_COMPRESSOR_TEST_SRCS}
+  ${DATA_COMPRESSOR_TEST_HDRS}
+)
+set_target_properties(
+  data_compressor_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(
+  data_compressor_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+)
+target_link_libraries(
+  data_compressor_test
+  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE -lpthread
+  PRIVATE -lz
+  PRIVATE ${LIBEVENT_LIBRARIES}
+)
+install(
+  TARGETS data_compressor_test
+  RUNTIME DESTINATION bin
+)
+
 # Generate C++ protobuf files for the following tests
 protobuf_generate_cpp(MODEL_CONFIG_PROTO_SRC MODEL_CONFIG_PROTO_HDR ../core/model_config.proto)
 
