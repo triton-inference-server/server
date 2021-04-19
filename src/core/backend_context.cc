@@ -1187,7 +1187,7 @@ BackendInputCollector::FlushPendingPinned(
         }
 
         Status status =
-            COMMON_ERROR_TO_STATUS(triton::common::AsyncWorkQueue::AddTask(
+            CommonErrorToStatus(triton::common::AsyncWorkQueue::AddTask(
                 [this, offset, pinned_buffer, pinned_memory_type,
                  pending_pinned_byte_size, pinned_memory_id, pending_it, end_it,
                  incomplete_count, &deferred_pinned]() mutable {

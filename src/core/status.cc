@@ -82,4 +82,10 @@ StatusCodeToTritonCode(Status::Code status_code)
   return TRITONSERVER_ERROR_UNKNOWN;
 }
 
+Status
+CommonErrorToStatus(const triton::common::Error& error)
+{
+  return Status(error);
+}
+
 }}  // namespace nvidia::inferenceserver
