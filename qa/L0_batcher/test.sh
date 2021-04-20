@@ -407,7 +407,6 @@ if [[ $BACKENDS == *"custom"* ]]; then
     rm -fr ./custom_models && mkdir ./custom_models && \
         cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
         mkdir -p ./custom_models/custom_zero_1_float32/1 && \
-        cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
 
     # Two instances will be created for the custom model, one delays 100 ms while
     # the other delays 400 ms
