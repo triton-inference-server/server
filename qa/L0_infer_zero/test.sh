@@ -51,7 +51,7 @@ rm -fr models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/* models/. && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_identity_model_repository/* models/.
 
-create_nop_modelfile `pwd`/libtriton_identity.so `pwd`/models
+create_nop_version_dir `pwd`/models
 
 RET=0
 

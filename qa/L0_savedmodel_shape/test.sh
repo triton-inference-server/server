@@ -59,7 +59,7 @@ CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
 rm -fr models && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_noshape_model_repository models
 
-create_nop_modelfile `pwd`/libtriton_identity.so `pwd`/models
+create_nop_version_dir `pwd`/models
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

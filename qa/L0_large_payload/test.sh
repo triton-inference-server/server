@@ -58,9 +58,7 @@ for TARGET in graphdef savedmodel onnx libtorch plan; do
 done
 cp -r ../custom_models/custom_zero_1_float32 models/. && \
     mkdir -p models/custom_zero_1_float32/1 && \
-    cp `pwd`/libtriton_identity.so models/custom_zero_1_float32/1/. && \
     (cd models/custom_zero_1_float32 && \
-            echo "default_model_filename: \"libtriton_identity.so\"" >> config.pbtxt && \
             echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)

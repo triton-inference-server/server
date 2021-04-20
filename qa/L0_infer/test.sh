@@ -223,9 +223,7 @@ for TARGET in cpu gpu; do
     if [[ $BACKENDS == *"custom"* ]]; then
       cp -r ../custom_models/custom_zero_1_float32 models/. &&\
           mkdir -p models/custom_zero_1_float32/1 && \
-          cp `pwd`/libtriton_identity.so models/custom_zero_1_float32/1/. && \
           (cd models/custom_zero_1_float32 && \
-              echo "default_model_filename: \"libtriton_identity.so\"" >> config.pbtxt && \
               echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
       cp -r models/custom_zero_1_float32 models/custom_nobatch_zero_1_float32 && \
           (cd models/custom_zero_1_float32 && \

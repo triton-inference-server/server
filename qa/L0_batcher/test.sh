@@ -160,8 +160,7 @@ done
 
 # Create allow-ragged model to variable-size model repository
 if [[ $BACKENDS == *"custom"* ]]; then
-    (cd var_models/custom_zero_1_float32 && \
-        mkdir -p 1 && cp ../../libtriton_identity.so 1/libcustom.so && \
+    (cd var_models/custom_zero_1_float32 && mkdir 1 && \
         echo "instance_group [ { kind: KIND_CPU count: 1 }]" >> config.pbtxt && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
         sed -i "s/name:.*\"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt)

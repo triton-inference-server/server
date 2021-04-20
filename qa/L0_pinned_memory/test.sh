@@ -52,8 +52,7 @@ RET=0
 
 rm -fr ./custom_models && mkdir ./custom_models && \
     cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
-    mkdir -p ./custom_models/custom_zero_1_float32/1 && \
-    cp ./libtriton_identity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
+    mkdir -p ./custom_models/custom_zero_1_float32/1
 
 #
 # Use "identity" model for all model types.

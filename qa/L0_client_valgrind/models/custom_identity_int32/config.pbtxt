@@ -28,7 +28,6 @@ name: "custom_identity_int32"
 backend: "identity"
 max_batch_size: 1024
 version_policy: { latest { num_versions: 1 }}
-default_model_filename: "libtriton_identity.so"
 instance_group [ { kind: KIND_CPU } ]
 
 input [

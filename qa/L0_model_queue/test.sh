@@ -55,8 +55,7 @@ export CUDA_VISIBLE_DEVICES=0
 # Prepare base model. Only test with custom backend as it is sufficient
 rm -fr *.log *.serverlog models custom_zero_1_float32
 cp -r ../custom_models/custom_zero_1_float32 . && \
-    mkdir -p ./custom_zero_1_float32/1 && \
-    cp ./libtriton_identity.so ./custom_zero_1_float32/1/.
+    mkdir -p ./custom_zero_1_float32/1
 
 (cd custom_zero_1_float32 && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \

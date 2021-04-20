@@ -270,7 +270,7 @@ for model_trial in $MODEL_TRIALS; do
 
     if [ "$ENSEMBLES" == "1" ]; then
       cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_PATH/.
-      create_nop_modelfile `pwd`/libtriton_identity.so `pwd`/$MODEL_PATH
+        create_nop_version_dir `pwd`/$MODEL_PATH
     fi
 
     # Need to launch the server for each test so that the model status

@@ -882,7 +882,6 @@ def create_nop_modelconfig(models_dir,
         repeat(tensor_shape, 2),
         repeat(tensor_model_shape, 2),
         repeat(None, 2),
-        default_model_filename="libtriton_identity.so",
         instance_group_str="instance_group [ { kind: KIND_CPU } ]")
 
     try:
@@ -924,7 +923,6 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
         repeat([internal_shape], 2),
         repeat(None, 2),
         repeat(None, 2),
-        default_model_filename="libtriton_identity.so",
         instance_group_str="instance_group [ { kind: KIND_CPU } ]")
 
     try:
@@ -948,7 +946,6 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
         repeat(tensor_shape, 2),
         repeat(None, 2),
         repeat(None, 2),
-        default_model_filename="libtriton_identity.so",
         instance_group_str="instance_group [ { kind: KIND_CPU } ]")
 
     try:

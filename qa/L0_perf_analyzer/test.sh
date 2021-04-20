@@ -87,7 +87,6 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequ
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_sequence_model_repository/graphdef_sequence_float32 $DATADIR
 
 mkdir $DATADIR/nop_TYPE_FP32_-1/1
-cp libtriton_identity.so $DATADIR/nop_TYPE_FP32_-1/1/
 
 # Copy inception model to the model repository
 cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v1_graphdef $DATADIR
