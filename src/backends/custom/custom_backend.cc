@@ -556,17 +556,6 @@ CustomBackend::Context::Run(
         metric_reporter_.get(), (custom_payloads[i].error_code == 0),
         compute_start_ns, compute_input_end_ns, compute_output_start_ns,
         compute_end_ns);
-
-#ifdef TRITON_ENABLE_TRACING
-    if (request->Trace() != nullptr) {
-      auto& trace = request->Trace();
-      trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
-      trace->Report(TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
-      trace->Report(
-          TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
-      trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
-    }
-#endif  // TRITON_ENABLE_TRACING
   }
 
   // Also reporting batch stats

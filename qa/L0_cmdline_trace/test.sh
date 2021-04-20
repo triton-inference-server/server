@@ -43,7 +43,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
-MODELBASE=plan_int32_int32_int32
+MODELBASE=onnx_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
 
@@ -301,15 +301,15 @@ if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble.log` != "7" ]; then
     RET=1
 fi
 for trace_str in \
-        '{"id":3,"model_name":"simple","model_version":1}' \
-        '{"id":4,"model_name":"nop_TYPE_INT32_-1","model_version":1,"parent_id":3}' \
-        '{"id":5,"model_name":"fan_plan_int32_int32_int32","model_version":1,"parent_id":3}' \
-        '{"id":6,"model_name":"nop_TYPE_INT32_-1","model_version":1,"parent_id":5}' \
-        '{"id":7,"model_name":"plan_int32_int32_int32","model_version":1,"parent_id":5}' \
-        '{"id":8,"model_name":"nop_TYPE_INT32_-1","model_version":1,"parent_id":5}' \
-        '{"id":9,"model_name":"nop_TYPE_INT32_-1","model_version":1,"parent_id":5}' \
-        '{"id":10,"model_name":"nop_TYPE_INT32_-1","model_version":1,"parent_id":3}' \
-        '{"id":11,"model_name":"nop_TYPE_INT32_-1","model_version":1,"parent_id":3}' ; do
+        "{\"id\":3,\"model_name\":\"simple\",\"model_version\":1}" \
+        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":5,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":5}" \
+        "{\"id\":7,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":5}" \
+        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":5}" \
+        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":5}" \
+        "{\"id\":10,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":11,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" ; do
     if [ `grep -c ${trace_str} trace_ensemble.log` != "1" ]; then
         echo -e "Ensemble trace log expects trace: ${trace_str}"
         RET=1

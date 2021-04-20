@@ -676,6 +676,16 @@ InferenceRequest::ReportStatistics(
     return;
   }
 
+#ifdef TRITON_ENABLE_TRACING
+  if (trace_ != nullptr) {
+    trace_->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
+    trace_->Report(TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_start_ns);
+    trace_->Report(
+        TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
+    trace_->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
+  }
+#endif  // TRITON_ENABLE_TRACING
+
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
