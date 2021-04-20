@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -62,7 +62,13 @@ needed to run the QA tests. First do a [Docker image
 build](build.md#building-triton-with-docker) to produce the
 *tritonserver_build* and *tritonserver* images. Then build the
 *tritonserver_sdk* image that contains the client libraries,
-model analyzer, and examples. Then build the actual QA image.
+model analyzer, and examples.
+
+```
+$ docker build -t tritonserver_sdk -f Dockerfile.sdk .
+```
+
+Lastly, build the actual QA image.
 
 ```
 $ docker build -t tritonserver_qa -f Dockerfile.QA .
