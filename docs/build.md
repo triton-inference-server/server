@@ -30,7 +30,8 @@
 
 This section gives an overview of how to build the Triton server. For
 information on building the Triton client libraries and examples see
-[Client Libraries](client_libraries.md).
+[Client Libraries and
+Examples](https://github.com/triton-inference-server/client).
 
 Triton server is built using the [build.py](../build.py) script. The
 build.py script currently supports building for the following

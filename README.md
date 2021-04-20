@@ -138,8 +138,7 @@ describe supported GPUs.
 - [Model Configuration](docs/model_configuration.md)
 - [Model Management](docs/model_management.md)
 - [Custom Operations](docs/custom_operations.md)
-- [Client Libraries](docs/client_libraries.md)
-- [Client Examples](docs/client_examples.md)
+- [Client Libraries and Examples](https://github.com/triton-inference-server/client)
 - [Optimization](docs/optimization.md)
   - [Model Analyzer](docs/model_analyzer.md)
   - [Performance Analyzer](docs/perf_analyzer.md)
@@ -164,15 +163,14 @@ to make sure they are loaded correctly by Triton.
 After you have your model(s) available in Triton, you will want to
 send inference and other requests to Triton from your *client*
 application. The [Python and C++ client
-libraries](docs/client_libraries.md) provide
-[APIs](docs/client_libraries.md#client-library-apis) to simplify this
-communication. There are also a large number of [client
-examples](docs/client_examples.md) that demonstrate how to use the
-libraries.  You can also send HTTP/REST requests directly to Triton
-using the [HTTP/REST JSON-based
+libraries](https://github.com/triton-inference-server/client) provide
+APIs to simplify this communication. There are also a large number of
+[client examples](https://github.com/triton-inference-server/client)
+that demonstrate how to use the libraries.  You can also send
+HTTP/REST requests directly to Triton using the [HTTP/REST JSON-based
 protocol](docs/inference_protocols.md#httprest-and-grpc-protocols) or
 [generate a GRPC client for many other
-languages](docs/client_libraries.md).
+languages](https://github.com/triton-inference-server/client).
 
 Understanding and [optimizing performance](docs/optimization.md) is an
 important part of deploying your models. The Triton project provides
@@ -220,12 +218,12 @@ It is also possible to [create a Docker image containing a customized
 Triton](docs/compose.md) that contains only a subset of the backends.
 
 The Triton project also provides [client libraries for Python and
-C++](docs/client_libraries.md) that make it easy to communicate with
-the server. There are also a large number of [example
-clients](docs/client_examples.md) that demonstrate how to use the
-libraries. You can also develop your own clients that directly
-communicate with Triton using [HTTP/REST or GRPC
-protocols](docs/inference_protocols.md). There is also a [C
+C++](https://github.com/triton-inference-server/client) that make it
+easy to communicate with the server. There are also a large number of
+[example clients](https://github.com/triton-inference-server/client)
+that demonstrate how to use the libraries. You can also develop your
+own clients that directly communicate with Triton using [HTTP/REST or
+GRPC protocols](docs/inference_protocols.md). There is also a [C
 API](docs/inference_protocols.md) that allows Triton to be linked
 directly into your application.
 

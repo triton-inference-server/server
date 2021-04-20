@@ -56,8 +56,9 @@ version 2.
 * Python and C++ client libraries are re-implemented to match the new
   HTTP/REST and GRPC protocols. The Python client no longer depends on
   a C++ shared library and so should be usable on any platform that
-  supports Python. See [client libraries](docs/client_libraries.md)
-  for more information.
+  supports Python. See [client
+  libraries](https://github.com/triton-inference-server/client) for
+  more information.
 
 * Building Triton has changed significantly in version 2. See
   [build](docs/build.md) for more information.
