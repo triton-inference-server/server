@@ -184,7 +184,7 @@ for TARGET in cpu gpu; do
           fi
         done
 
-        create_nop_modelfile `pwd`/libtriton_identity.so `pwd`/models
+        create_nop_version_dir `pwd`/models
       fi
 
       if [[ $BACKENDS == *"graphdef"* ]]; then
