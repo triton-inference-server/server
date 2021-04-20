@@ -170,7 +170,16 @@ RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/dyna_sequence/libtriton_dyna_sequence.so \
         qa/custom_models/custom_dyna_sequence_int32/1/.
 
-RUN mkdir -p qa/L0_perf_nomodel/custom_models/custom_zero_1_float32/1 && \
+# L0_lifecycle needs No-GPU version of identity backend
+RUN (cd /tmp/tritonbuild/tritonserver/build && \
+        cmake -DTRITON_ENABLE_GPU=OFF \
+            -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+            -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} /workspace/build && \
+        make -j16 test-util)
+    
+RUN cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
+        qa/L0_lifecycle/. && \
+    mkdir -p qa/L0_perf_nomodel/custom_models/custom_zero_1_float32/1 && \
     mkdir -p qa/L0_perf_pyclients/custom_models/custom_zero_1_int32/1 && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
