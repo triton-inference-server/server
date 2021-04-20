@@ -29,12 +29,12 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "src/core/async_work_queue.h"
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
+#include "triton/common/async_work_queue.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -141,8 +141,8 @@ class BackendResponder {
       cudaEvent_t event = nullptr)
       : need_sync_(false), requests_(requests), responses_(responses),
         max_batch_size_(max_batch_size), pinned_enabled_(pinned_enabled),
-        use_async_cpu_copy_(AsyncWorkQueue::WorkerCount() > 1), stream_(stream),
-        event_(event), pending_pinned_byte_size_(0)
+        use_async_cpu_copy_(triton::common::AsyncWorkQueue::WorkerCount() > 1),
+        stream_(stream), event_(event), pending_pinned_byte_size_(0)
   {
   }
 
@@ -234,8 +234,8 @@ class BackendInputCollector {
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
         kernel_buffer_threshold_(kernel_buffer_threshold),
-        use_async_cpu_copy_(AsyncWorkQueue::WorkerCount() > 1), stream_(stream),
-        event_(event), buffer_ready_event_(buffer_ready_event),
+        use_async_cpu_copy_(triton::common::AsyncWorkQueue::WorkerCount() > 1),
+        stream_(stream), event_(event), buffer_ready_event_(buffer_ready_event),
         pending_pinned_byte_size_(0), pending_pinned_offset_(0),
         pending_copy_kernel_buffer_byte_size_(0),
         pending_copy_kernel_buffer_offset_(0),
