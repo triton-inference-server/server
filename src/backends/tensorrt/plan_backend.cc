@@ -3175,21 +3175,6 @@ PlanBackend::Context::ProcessResponse(
           metric_reporter_.get(), (payload->responses_[i] != nullptr),
           payload->compute_start_ns_, payload->compute_input_end_ns_,
           payload->compute_output_start_ns_, compute_end_ns);
-
-#ifdef TRITON_ENABLE_TRACING
-      if (request->Trace() != nullptr) {
-        auto& trace = request->Trace();
-        trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_START, payload->compute_start_ns_);
-        trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_INPUT_END,
-            payload->compute_input_end_ns_);
-        trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_OUTPUT_START,
-            payload->compute_output_start_ns_);
-        trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
-      }
-#endif  // TRITON_ENABLE_TRACING
     }
 
     // Also reporting batch stats
