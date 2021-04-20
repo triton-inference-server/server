@@ -109,7 +109,8 @@ TritonServerError::Create(const ni::Status& status)
     return nullptr;
   }
 
-  return Create(StatusCodeToTritonCode(status.StatusCode()), status.Message());
+  return Create(
+      ni::StatusCodeToTritonCode(status.StatusCode()), status.Message());
 }
 
 #define RETURN_IF_STATUS_ERROR(S)                 \

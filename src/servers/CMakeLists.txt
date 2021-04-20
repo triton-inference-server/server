@@ -232,7 +232,8 @@ target_link_libraries(
   ${GRPC_ENDPOINT_LIBRARIES}
   ${TRACING_LIBRARIES}
   PRIVATE protobuf::libprotobuf
-  PRIVATE triton-common-json
+  PRIVATE triton-common-async-work-queue
+  PRIVATE triton-common-error
   PRIVATE triton-core-serverapi
   PRIVATE tritonserver
 )
@@ -283,7 +284,9 @@ set_target_properties(
 )
 target_link_libraries(
   simple
-  PRIVATE triton-core-serverapi   # from repo-core
+  PRIVATE triton-common-async-work-queue  # from repo-common
+  PRIVATE triton-common-error             # from repo-common
+  PRIVATE triton-core-serverapi           # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
   )
@@ -325,7 +328,9 @@ set_target_properties(
 )
 target_link_libraries(
   multi_server
-  PRIVATE triton-core-serverapi   # from repo-core
+  PRIVATE triton-common-async-work-queue # from repo-common
+  PRIVATE triton-common-error             # from repo-common
+  PRIVATE triton-core-serverapi          # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
   )
@@ -459,6 +464,8 @@ target_link_libraries(
   PRIVATE triton-core-backendapi
   PRIVATE triton-core-repoagentapi
   PRIVATE triton-core-serverapi
+  PRIVATE triton-common-async-work-queue
+  PRIVATE triton-common-error
   PRIVATE triton-common-json
   PRIVATE triton-common-table-printer
   PRIVATE ${TRITON_EXTRA_LDFLAGS}

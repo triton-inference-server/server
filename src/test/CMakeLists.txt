@@ -130,6 +130,7 @@ target_include_directories(
 )
 target_link_libraries(
   memory_test
+  PRIVATE triton-common-error        # from repo-common
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE ${GTEST_LIBRARY}
@@ -177,6 +178,7 @@ target_include_directories(
 )
 target_link_libraries(
   pinned_memory_manager_test
+  PRIVATE triton-common-error        # from repo-common
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE ${GTEST_LIBRARY}
@@ -194,13 +196,11 @@ install(
 #
 set(
   ASYNC_WORK_QUEUE_SRCS
-  ../core/async_work_queue.cc
   ../core/status.cc
 )
 
 set(
   ASYNC_WORK_QUEUE_HDRS
-  ../core/async_work_queue.h
   ../core/status.h
 )
 
@@ -235,8 +235,10 @@ target_include_directories(
 )
 target_link_libraries(
   async_work_queue_test
-  PRIVATE triton-core-serverapi      # from repo-core
-  PRIVATE triton-common-sync-queue   # from repo-common
+  PRIVATE triton-core-serverapi            # from repo-core
+  PRIVATE triton-common-sync-queue         # from repo-common
+  PRIVATE triton-common-async-work-queue   # from repo-common
+  PRIVATE triton-common-error              # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE -lpthread
@@ -359,8 +361,9 @@ target_include_directories(
 )
 target_link_libraries(
   triton_repo_agent_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-core-serverapi     # from repo-core
   PRIVATE triton-core-repoagentapi  # from repo-core
+  PRIVATE triton-common-error       # from repo-common
   PRIVATE triton-common-json        # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
@@ -446,7 +449,8 @@ if(${TRITON_ENABLE_GPU})
 endif() # TRITON_ENABLE_GPU
 target_link_libraries(
   rate_limiter_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-common-error     # from repo-common
+  PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf

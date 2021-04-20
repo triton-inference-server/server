@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -29,41 +29,6 @@
 namespace nvidia { namespace inferenceserver {
 
 const Status Status::Success(Status::Code::SUCCESS);
-
-std::string
-Status::AsString() const
-{
-  std::string str(CodeString(code_));
-  str += ": " + msg_;
-  return str;
-}
-
-const char*
-Status::CodeString(const Code code)
-{
-  switch (code) {
-    case Status::Code::SUCCESS:
-      return "OK";
-    case Status::Code::UNKNOWN:
-      return "Unknown";
-    case Status::Code::INTERNAL:
-      return "Internal";
-    case Status::Code::NOT_FOUND:
-      return "Not found";
-    case Status::Code::INVALID_ARG:
-      return "Invalid argument";
-    case Status::Code::UNAVAILABLE:
-      return "Unavailable";
-    case Status::Code::UNSUPPORTED:
-      return "Unsupported";
-    case Status::Code::ALREADY_EXISTS:
-      return "Already exists";
-    default:
-      break;
-  }
-
-  return "<invalid code>";
-}
 
 Status::Code
 TritonCodeToStatusCode(TRITONSERVER_Error_Code code)
@@ -115,6 +80,12 @@ StatusCodeToTritonCode(Status::Code status_code)
   }
 
   return TRITONSERVER_ERROR_UNKNOWN;
+}
+
+Status
+CommonErrorToStatus(const triton::common::Error& error)
+{
+  return Status(error);
 }
 
 }}  // namespace nvidia::inferenceserver
