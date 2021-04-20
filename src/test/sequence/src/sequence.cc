@@ -26,8 +26,9 @@
 
 #include <memory>
 #include <thread>
-
 #include "triton/backend/backend_common.h"
+#include "triton/backend/backend_model.h"
+#include "triton/backend/backend_model_instance.h"
 
 namespace triton { namespace backend { namespace sequence {
 
@@ -78,44 +79,21 @@ namespace triton { namespace backend { namespace sequence {
 // of this class is created and associated with each
 // TRITONBACKEND_Model.
 //
-class ModelState {
+class ModelState : public BackendModel {
  public:
   static TRITONSERVER_Error* Create(
       TRITONBACKEND_Model* triton_model, ModelState** state);
-
-  // Get the handle to the TRITONBACKEND model.
-  TRITONBACKEND_Model* TritonModel() { return triton_model_; }
-
-  // Get the name and version of the model.
-  const std::string& Name() const { return name_; }
-  uint64_t Version() const { return version_; }
+  virtual ~ModelState() = default;
 
   // Get accumulator size and execution delay
   size_t AccumulatorSize() const { return accumulator_size_; }
   int ExecDelay() const { return execute_delay_ms_; }
 
-  // Does this model support batching in the first dimension. This
-  // function should not be called until after the model is completely
-  // loaded.
-  TRITONSERVER_Error* SupportsFirstDimBatching(bool* supports);
-
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
 
  private:
-  ModelState(
-      TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
-      const char* name, const uint64_t version,
-      common::TritonJson::Value&& model_config);
-
-  TRITONSERVER_Server* triton_server_;
-  TRITONBACKEND_Model* triton_model_;
-  const std::string name_;
-  const uint64_t version_;
-  common::TritonJson::Value model_config_;
-
-  bool supports_batching_initialized_;
-  bool supports_batching_;
+  ModelState(TRITONBACKEND_Model* triton_model);
 
   // Delay to introduce into execution, in milliseconds.
   int execute_delay_ms_;
@@ -127,68 +105,22 @@ class ModelState {
 TRITONSERVER_Error*
 ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 {
-  TRITONSERVER_Message* config_message;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
-      triton_model, 1 /* config_version */, &config_message));
-
-  // We can get the model configuration as a json string from config_message,
-  // parse it with our favorite json parser to create DOM that we can access
-  // when we need to example the configuration. We use TritonJson, which is a
-  // wrapper that returns nice errors (currently the underlying implementation
-  // is rapidjson... but others could be added). You can use any json parser you
-  // prefer.
-  const char* buffer;
-  size_t byte_size;
-  RETURN_IF_ERROR(
-      TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
-
-  common::TritonJson::Value model_config;
-  TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
-  RETURN_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
-  RETURN_IF_ERROR(err);
-
-  const char* model_name;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelName(triton_model, &model_name));
-
-  uint64_t model_version;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model, &model_version));
-
-  TRITONSERVER_Server* triton_server;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelServer(triton_model, &triton_server));
-
-  *state = new ModelState(
-      triton_server, triton_model, model_name, model_version,
-      std::move(model_config));
-  return nullptr;  // success
-}
-
-ModelState::ModelState(
-    TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
-    const char* name, const uint64_t version,
-    common::TritonJson::Value&& model_config)
-    : triton_server_(triton_server), triton_model_(triton_model), name_(name),
-      version_(version), model_config_(std::move(model_config)),
-      supports_batching_initialized_(false), supports_batching_(false),
-      execute_delay_ms_(0)
-{
-}
-
-TRITONSERVER_Error*
-ModelState::SupportsFirstDimBatching(bool* supports)
-{
-  // We can't determine this during model initialization because
-  // TRITONSERVER_ServerModelBatchProperties can't be called until the model is
-  // loaded. So we just cache it here.
-  if (!supports_batching_initialized_) {
-    uint32_t flags = 0;
-    RETURN_IF_ERROR(TRITONSERVER_ServerModelBatchProperties(
-        triton_server_, name_.c_str(), version_, &flags, nullptr /* voidp */));
-    supports_batching_ = ((flags & TRITONSERVER_BATCH_FIRST_DIM) != 0);
-    supports_batching_initialized_ = true;
+  try {
+    *state = new ModelState(triton_model);
+  }
+  catch (const BackendModelException& ex) {
+    RETURN_ERROR_IF_TRUE(
+        ex.err_ == nullptr, TRITONSERVER_ERROR_INTERNAL,
+        std::string("unexpected nullptr in BackendModelException"));
+    RETURN_IF_ERROR(ex.err_);
   }
 
-  *supports = supports_batching_;
   return nullptr;  // success
+}
+
+ModelState::ModelState(TRITONBACKEND_Model* triton_model)
+    : BackendModel(triton_model), execute_delay_ms_(0)
+{
 }
 
 TRITONSERVER_Error*
@@ -330,23 +262,13 @@ ModelState::ValidateModelConfig()
 // State associated with a model instance. An object of this class is
 // created and associated with each TRITONBACKEND_ModelInstance.
 //
-class ModelInstanceState {
+class ModelInstanceState : public BackendModelInstance {
  public:
   static TRITONSERVER_Error* Create(
       ModelState* model_state,
       TRITONBACKEND_ModelInstance* triton_model_instance,
       ModelInstanceState** state);
-
-  // Get the handle to the TRITONBACKEND model instance.
-  TRITONBACKEND_ModelInstance* TritonModelInstance()
-  {
-    return triton_model_instance_;
-  }
-
-  // Get the name, kind and device ID of the instance.
-  const std::string& Name() const { return name_; }
-  TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
-  int32_t DeviceId() const { return device_id_; }
+  virtual ~ModelInstanceState();
 
   // Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
@@ -359,14 +281,9 @@ class ModelInstanceState {
  private:
   ModelInstanceState(
       ModelState* model_state,
-      TRITONBACKEND_ModelInstance* triton_model_instance, const char* name,
-      const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id);
+      TRITONBACKEND_ModelInstance* triton_model_instance);
 
   ModelState* model_state_;
-  TRITONBACKEND_ModelInstance* triton_model_instance_;
-  const std::string name_;
-  const TRITONSERVER_InstanceGroupKind kind_;
-  const int32_t device_id_;
 
   // Accumulators maintained by this instance, one for each batch slot.
   std::vector<int32_t> accumulator_;
@@ -377,30 +294,23 @@ ModelInstanceState::Create(
     ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
     ModelInstanceState** state)
 {
-  const char* instance_name;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceName(triton_model_instance, &instance_name));
+  try {
+    *state = new ModelInstanceState(model_state, triton_model_instance);
+  }
+  catch (const BackendModelInstanceException& ex) {
+    RETURN_ERROR_IF_TRUE(
+        ex.err_ == nullptr, TRITONSERVER_ERROR_INTERNAL,
+        std::string("unexpected nullptr in BackendModelInstanceException"));
+    RETURN_IF_ERROR(ex.err_);
+  }
 
-  TRITONSERVER_InstanceGroupKind instance_kind;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceKind(triton_model_instance, &instance_kind));
-
-  int32_t instance_id;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &instance_id));
-
-  *state = new ModelInstanceState(
-      model_state, triton_model_instance, instance_name, instance_kind,
-      instance_id);
   return nullptr;  // success
 }
 
 ModelInstanceState::ModelInstanceState(
-    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
-    const char* name, const TRITONSERVER_InstanceGroupKind kind,
-    const int32_t device_id)
-    : model_state_(model_state), triton_model_instance_(triton_model_instance),
-      name_(name), kind_(kind), device_id_(device_id)
+    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance)
+    : BackendModelInstance(model_state, triton_model_instance),
+      model_state_(model_state)
 {
   accumulator_.resize(model_state->AccumulatorSize());
 }
@@ -421,6 +331,11 @@ void
 ModelInstanceState::AddAccumulatorAt(size_t idx, int32_t value)
 {
   accumulator_[idx] += value;
+}
+
+ModelInstanceState::~ModelInstanceState()
+{
+  accumulator_.clear();
 }
 
 /////////////
@@ -482,33 +397,6 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
       TRITONSERVER_LOG_INFO,
       (std::string("backend configuration:\n") + buffer).c_str());
 
-  // If we have any global backend state we create and set it here. We
-  // don't need anything for this backend but for demonstration
-  // purposes we just create something...
-  std::string* state = new std::string("backend state");
-  RETURN_IF_ERROR(
-      TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(state)));
-
-  return nullptr;  // success
-}
-
-// Implementing TRITONBACKEND_Finalize is optional unless state is set
-// using TRITONBACKEND_BackendSetState. The backend must free this
-// state and perform any other global cleanup.
-TRITONSERVER_Error*
-TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
-{
-  void* vstate;
-  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
-  std::string* state = reinterpret_cast<std::string*>(vstate);
-
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_Finalize: state is '") + *state + "'")
-          .c_str());
-
-  delete state;
-
   return nullptr;  // success
 }
 
@@ -530,32 +418,6 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
       (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
        std::to_string(version) + ")")
           .c_str());
-
-  // Can get location of the model artifacts. Normally we would need
-  // to check the artifact type to make sure it was something we can
-  // handle... but we are just going to log the location so we don't
-  // need the check. We would use the location if we wanted to load
-  // something from the model's repo.
-  TRITONBACKEND_ArtifactType artifact_type;
-  const char* clocation;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelRepository(model, &artifact_type, &clocation));
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("Repository location: ") + clocation).c_str());
-
-  // The model can access the backend as well... here we can access
-  // the backend global state.
-  TRITONBACKEND_Backend* backend;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(model, &backend));
-
-  void* vbackendstate;
-  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vbackendstate));
-  std::string* backend_state = reinterpret_cast<std::string*>(vbackendstate);
-
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("backend state is '") + *backend_state + "'").c_str());
 
   // With each model we create a ModelState object and associate it
   // with the TRITONBACKEND_Model.
