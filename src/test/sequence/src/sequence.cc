@@ -612,9 +612,6 @@ TRITONBACKEND_ModelInstanceExecute(
   // requests at the same time for improved performance.
   std::vector<uint8_t> start_buffer, ready_buffer, input_buffer;
   for (uint32_t r = 0; r < request_count; ++r) {
-    start_buffer.clear();
-    ready_buffer.clear();
-    input_buffer.clear();
     uint64_t exec_start_ns = 0;
     SET_TIMESTAMP(exec_start_ns);
     min_exec_start_ns = std::min(min_exec_start_ns, exec_start_ns);
@@ -747,15 +744,15 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
+    const void* start_buffer = nullptr;
     uint64_t buffer_byte_size = 0;
     TRITONSERVER_MemoryType input_memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t input_memory_type_id = 0;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
         TRITONBACKEND_InputBuffer(
-            start_input, 0 /* input_buffer_count */,
-            reinterpret_cast<const void**>(&start_buffer), &buffer_byte_size,
-            &input_memory_type, &input_memory_type_id));
+            start_input, 0 /* input_buffer_count */, &start_buffer,
+            &buffer_byte_size, &input_memory_type, &input_memory_type_id));
     if (responses[r] == nullptr) {
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
@@ -769,12 +766,12 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
+    const void* ready_buffer = nullptr;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
         TRITONBACKEND_InputBuffer(
-            ready_input, 0 /* input_buffer_count */,
-            reinterpret_cast<const void**>(&ready_buffer), &buffer_byte_size,
-            &input_memory_type, &input_memory_type_id));
+            ready_input, 0 /* input_buffer_count */, &ready_buffer,
+            &buffer_byte_size, &input_memory_type, &input_memory_type_id));
     if (responses[r] == nullptr) {
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
@@ -800,11 +797,11 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
+    const void* input_buffer = nullptr;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
         TRITONBACKEND_InputBuffer(
-            input, 0 /* input_buffer_count */,
-            reinterpret_cast<const void**>(&input_buffer), &buffer_byte_size,
+            input, 0 /* input_buffer_count */, &input_buffer, &buffer_byte_size,
             &input_memory_type, &input_memory_type_id));
     if ((responses[r] == nullptr) ||
         (input_memory_type == TRITONSERVER_MEMORY_GPU)) {
@@ -842,9 +839,9 @@ TRITONBACKEND_ModelInstanceExecute(
     }
 
     int64_t input_element_cnt = input_byte_size / sizeof(int32_t);
-    int32_t* start = reinterpret_cast<int32_t*>(&start_buffer[0]);
-    int32_t* ready = reinterpret_cast<int32_t*>(&ready_buffer[0]);
-    int32_t* ipbuffer_int = reinterpret_cast<int32_t*>(&input_buffer[0]);
+    const int32_t* start = reinterpret_cast<const int32_t*>(start_buffer);
+    const int32_t* ready = reinterpret_cast<const int32_t*>(ready_buffer);
+    const int32_t* ipbuffer_int = reinterpret_cast<const int32_t*>(input_buffer);
 
     // Update the accumulator value based on START/READY and calculate the
     // output value.
