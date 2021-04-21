@@ -34,7 +34,7 @@ different optimization strategies. The perf_analyzer application
 (previously known as perf_client) performs this task for the Triton
 Inference Server. The perf_analyzer is included with the client
 examples which are [available from several
-sources](client_examples.md#getting-the-client-examples).
+sources](https://github.com/triton-inference-server/client#getting-the-client-libraries-and-examples).
 
 The perf_analyzer application generates inference requests to your
 model and measures the throughput and latency of those requests. To
