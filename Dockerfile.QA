@@ -33,6 +33,7 @@ ARG BUILD_IMAGE=tritonserver_build
 ARG SDK_IMAGE=tritonserver_sdk
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
+ARG TRITON_BACKEND_REPO_TAG=main
 
 ############################################################################
 ## Build tests in the BUILD_IMAGE since it has already been configured
@@ -170,13 +171,15 @@ RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/dyna_sequence/libtriton_dyna_sequence.so \
         qa/custom_models/custom_dyna_sequence_int32/1/.
 
-# L0_lifecycle needs No-GPU version of identity backend
-RUN (cd /tmp/tritonbuild/tritonserver/build && \
+# L0_lifecycle needs No-GPU build of identity backend
+RUN cd /tmp/tritonbuild/identity/build && \
         cmake -DTRITON_ENABLE_GPU=OFF \
+            -DCMAKE_INSTALL_PREFIX:PATH=/tmp/tritonbuild/identity/install \
             -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
-            -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} /workspace/build && \
-        make -j16 test-util)
-    
+            -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+            -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
+        make -j16 install
+
 RUN cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
         qa/L0_lifecycle/. && \
     mkdir -p qa/L0_perf_nomodel/custom_models/custom_zero_1_float32/1 && \
