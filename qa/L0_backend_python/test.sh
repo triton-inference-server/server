@@ -27,7 +27,7 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="9"
+EXPECTED_NUM_TESTS="10"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
@@ -55,6 +55,12 @@ cp -r ./models/identity_fp32 ./models/identity_uint8
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 12000000 }" >> config.pbtxt)
 
+cp -r ./models/identity_fp32 ./models/identity_uint8_nobatch
+(cd models/identity_uint8_nobatch && \
+          sed -i "s/^name:.*/name: \"identity_uint8_nobatch\"/" config.pbtxt && \
+          sed -i "s/TYPE_FP32/TYPE_UINT8/g" config.pbtxt && \
+          sed -i "s/^max_batch_size:.*//" config.pbtxt >> config.pbtxt)
+
 cp -r ./models/identity_fp32 ./models/identity_uint32
 (cd models/identity_uint32 && \
           sed -i "s/^name:.*/name: \"identity_uint32\"/" config.pbtxt && \
@@ -81,6 +87,10 @@ cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
 mkdir -p models/execute_error/1/
 cp ../python_models/execute_error/model.py ./models/execute_error/1/
 cp ../python_models/execute_error/config.pbtxt ./models/execute_error/
+(cd models/execute_error && \
+          sed -i "s/^name:.*/name: \"execute_error\"/" config.pbtxt && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+          echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 12000000 }" >> config.pbtxt)
 
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
