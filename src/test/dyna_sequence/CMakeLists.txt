@@ -114,7 +114,7 @@ target_link_libraries(
 set_target_properties(
   triton-dyna-sequence-backend PROPERTIES
   POSITION_INDEPENDENT_CODE ON
-  OUTPUT_NAME triton_dynasequence
+  OUTPUT_NAME triton_dyna_sequence
   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_dyna_sequence.ldscript
   LINK_FLAGS "-Wl,--version-script libtriton_dyna_sequence.ldscript"
 )
@@ -130,8 +130,8 @@ install(
     triton-dyna-sequence-backend
   EXPORT
     triton-dyna-sequence-backend-targets
-  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/dynasequence
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/dynasequence
+  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/dyna_sequence
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/dyna_sequence
 )
 
 install(

@@ -24,12 +24,14 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <algorithm>
 #include <memory>
 #include <thread>
-
 #include "triton/backend/backend_common.h"
+#include "triton/backend/backend_model.h"
+#include "triton/backend/backend_model_instance.h"
 
-namespace triton { namespace backend { namespace dynasequence {
+namespace triton { namespace backend { namespace dyna_sequence {
 
 
 // Simple dynamic sequence backend that demonstrates the TRITONBACKEND API for a
@@ -85,44 +87,21 @@ namespace triton { namespace backend { namespace dynasequence {
 // of this class is created and associated with each
 // TRITONBACKEND_Model.
 //
-class ModelState {
+class ModelState : public BackendModel {
  public:
   static TRITONSERVER_Error* Create(
       TRITONBACKEND_Model* triton_model, ModelState** state);
-
-  // Get the handle to the TRITONBACKEND model.
-  TRITONBACKEND_Model* TritonModel() { return triton_model_; }
-
-  // Get the name and version of the model.
-  const std::string& Name() const { return name_; }
-  uint64_t Version() const { return version_; }
+  virtual ~ModelState() = default;
 
   // Get accumulator size and execution delay
   size_t AccumulatorSize() const { return accumulator_size_; }
   int ExecDelay() const { return execute_delay_ms_; }
 
-  // Does this model support batching in the first dimension. This
-  // function should not be called until after the model is completely
-  // loaded.
-  TRITONSERVER_Error* SupportsFirstDimBatching(bool* supports);
-
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
 
  private:
-  ModelState(
-      TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
-      const char* name, const uint64_t version,
-      common::TritonJson::Value&& model_config);
-
-  TRITONSERVER_Server* triton_server_;
-  TRITONBACKEND_Model* triton_model_;
-  const std::string name_;
-  const uint64_t version_;
-  common::TritonJson::Value model_config_;
-
-  bool supports_batching_initialized_;
-  bool supports_batching_;
+  ModelState(TRITONBACKEND_Model* triton_model);
 
   // Delay to introduce into execution, in milliseconds.
   int execute_delay_ms_;
@@ -134,69 +113,22 @@ class ModelState {
 TRITONSERVER_Error*
 ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 {
-  TRITONSERVER_Message* config_message;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelConfig(
-      triton_model, 1 /* config_version */, &config_message));
-
-  // We can get the model configuration as a json string from
-  // config_message, parse it with our favorite json parser to create
-  // DOM that we can access when we need to example the
-  // configuration. We use TritonJson, which is a wrapper that returns
-  // nice errors (currently the underlying implementation is
-  // rapidjson... but others could be added). You can use any json
-  // parser you prefer.
-  const char* buffer;
-  size_t byte_size;
-  RETURN_IF_ERROR(
-      TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
-
-  common::TritonJson::Value model_config;
-  TRITONSERVER_Error* err = model_config.Parse(buffer, byte_size);
-  RETURN_IF_ERROR(TRITONSERVER_MessageDelete(config_message));
-  RETURN_IF_ERROR(err);
-
-  const char* model_name;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelName(triton_model, &model_name));
-
-  uint64_t model_version;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(triton_model, &model_version));
-
-  TRITONSERVER_Server* triton_server;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelServer(triton_model, &triton_server));
-
-  *state = new ModelState(
-      triton_server, triton_model, model_name, model_version,
-      std::move(model_config));
-  return nullptr;  // success
-}
-
-ModelState::ModelState(
-    TRITONSERVER_Server* triton_server, TRITONBACKEND_Model* triton_model,
-    const char* name, const uint64_t version,
-    common::TritonJson::Value&& model_config)
-    : triton_server_(triton_server), triton_model_(triton_model), name_(name),
-      version_(version), model_config_(std::move(model_config)),
-      supports_batching_initialized_(false), supports_batching_(false),
-      execute_delay_ms_(0)
-{
-}
-
-TRITONSERVER_Error*
-ModelState::SupportsFirstDimBatching(bool* supports)
-{
-  // We can't determine this during model initialization because
-  // TRITONSERVER_ServerModelBatchProperties can't be called until the
-  // model is loaded. So we just cache it here.
-  if (!supports_batching_initialized_) {
-    uint32_t flags = 0;
-    RETURN_IF_ERROR(TRITONSERVER_ServerModelBatchProperties(
-        triton_server_, name_.c_str(), version_, &flags, nullptr /* voidp */));
-    supports_batching_ = ((flags & TRITONSERVER_BATCH_FIRST_DIM) != 0);
-    supports_batching_initialized_ = true;
+  try {
+    *state = new ModelState(triton_model);
+  }
+  catch (const BackendModelException& ex) {
+    RETURN_ERROR_IF_TRUE(
+        ex.err_ == nullptr, TRITONSERVER_ERROR_INTERNAL,
+        std::string("unexpected nullptr in BackendModelException"));
+    RETURN_IF_ERROR(ex.err_);
   }
 
-  *supports = supports_batching_;
   return nullptr;  // success
+}
+
+ModelState::ModelState(TRITONBACKEND_Model* triton_model)
+    : BackendModel(triton_model), execute_delay_ms_(0), accumulator_size_(0)
+{
 }
 
 TRITONSERVER_Error*
@@ -225,7 +157,8 @@ ModelState::ValidateModelConfig()
   accumulator_size_ = (size_t)(std::max((int64_t)1, max_batch_size));
 
   // The model configuration must specify the sequence batcher and
-  // must use the START and READY input to indicate control values.
+  // must use the START, END, READY and CORRID input to indicate
+  // control values.
   triton::common::TritonJson::Value sequence_batching;
   RETURN_IF_ERROR(
       model_config_.MemberAsObject("sequence_batching", &sequence_batching));
@@ -249,21 +182,34 @@ ModelState::ValidateModelConfig()
   }
 
   RETURN_ERROR_IF_FALSE(
-      (control_input_names.find("START") != control_input_names.end()) ||
-          (control_input_names.find("END") != control_input_names.end()) ||
-          (control_input_names.find("READY") != control_input_names.end()) ||
-          (control_input_names.find("CORRID") != control_input_names.end()),
+      (std::find(
+           control_input_names.begin(), control_input_names.end(), "START") !=
+       control_input_names.end()) ||
+          (std::find(
+               control_input_names.begin(), control_input_names.end(), "END") !=
+           control_input_names.end()) ||
+          (std::find(
+               control_input_names.begin(), control_input_names.end(),
+               "READY") != control_input_names.end()) ||
+          (std::find(
+               control_input_names.begin(), control_input_names.end(),
+               "CORRID") != control_input_names.end()),
       TRITONSERVER_ERROR_INVALID_ARG,
       std::string("'START', 'END, 'READY' and 'CORRID' must be configured as "
                   "the control inputs"));
 
   // The CORRID input must be UINT64 type.
+  auto itr = std::find(
+      control_input_names.begin(), control_input_names.end(), "CORRID");
+  size_t corrid_pos = std::distance(control_input_names.begin(), itr);
   triton::common::TritonJson::Value corrid_input;
-  RETURN_IF_ERROR(control_inputs.MemberAsObject("CORRID", &corrid_input));
+  RETURN_IF_ERROR(control_inputs.IndexAsObject(corrid_pos, &corrid_input));
   triton::common::TritonJson::Value corrid_control;
-  RETURN_IF_ERROR(corrid_input.MemberAsObject("control", &corrid_control));
+  RETURN_IF_ERROR(corrid_input.MemberAsArray("control", &corrid_control));
+  common::TritonJson::Value control_item;
+  RETURN_IF_ERROR(corrid_control.IndexAsObject(0 /* index */, &control_item));
   std::string corrid_dtype;
-  RETURN_IF_ERROR(corrid_control.MemberAsString("data_type", &corrid_dtype));
+  RETURN_IF_ERROR(control_item.MemberAsString("data_type", &corrid_dtype));
 
   RETURN_ERROR_IF_FALSE(
       corrid_dtype == "TYPE_UINT64", TRITONSERVER_ERROR_INVALID_ARG,
@@ -351,23 +297,13 @@ ModelState::ValidateModelConfig()
 // State associated with a model instance. An object of this class is
 // created and associated with each TRITONBACKEND_ModelInstance.
 //
-class ModelInstanceState {
+class ModelInstanceState : public BackendModelInstance {
  public:
   static TRITONSERVER_Error* Create(
       ModelState* model_state,
       TRITONBACKEND_ModelInstance* triton_model_instance,
       ModelInstanceState** state);
-
-  // Get the handle to the TRITONBACKEND model instance.
-  TRITONBACKEND_ModelInstance* TritonModelInstance()
-  {
-    return triton_model_instance_;
-  }
-
-  // Get the name, kind and device ID of the instance.
-  const std::string& Name() const { return name_; }
-  TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
-  int32_t DeviceId() const { return device_id_; }
+  virtual ~ModelInstanceState();
 
   // Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
@@ -381,14 +317,9 @@ class ModelInstanceState {
  private:
   ModelInstanceState(
       ModelState* model_state,
-      TRITONBACKEND_ModelInstance* triton_model_instance, const char* name,
-      const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id);
+      TRITONBACKEND_ModelInstance* triton_model_instance);
 
   ModelState* model_state_;
-  TRITONBACKEND_ModelInstance* triton_model_instance_;
-  const std::string name_;
-  const TRITONSERVER_InstanceGroupKind kind_;
-  const int32_t device_id_;
 
   // Accumulators maintained by this context, as a map from
   // correlation ID to the accumulator.
@@ -400,30 +331,23 @@ ModelInstanceState::Create(
     ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
     ModelInstanceState** state)
 {
-  const char* instance_name;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceName(triton_model_instance, &instance_name));
+  try {
+    *state = new ModelInstanceState(model_state, triton_model_instance);
+  }
+  catch (const BackendModelInstanceException& ex) {
+    RETURN_ERROR_IF_TRUE(
+        ex.err_ == nullptr, TRITONSERVER_ERROR_INTERNAL,
+        std::string("unexpected nullptr in BackendModelInstanceException"));
+    RETURN_IF_ERROR(ex.err_);
+  }
 
-  TRITONSERVER_InstanceGroupKind instance_kind;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceKind(triton_model_instance, &instance_kind));
-
-  int32_t instance_id;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &instance_id));
-
-  *state = new ModelInstanceState(
-      model_state, triton_model_instance, instance_name, instance_kind,
-      instance_id);
   return nullptr;  // success
 }
 
 ModelInstanceState::ModelInstanceState(
-    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance,
-    const char* name, const TRITONSERVER_InstanceGroupKind kind,
-    const int32_t device_id)
-    : model_state_(model_state), triton_model_instance_(triton_model_instance),
-      name_(name), kind_(kind), device_id_(device_id)
+    ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance)
+    : BackendModelInstance(model_state, triton_model_instance),
+      model_state_(model_state)
 {
 }
 
@@ -450,6 +374,12 @@ ModelInstanceState::EraseAccumulatorKey(uint64_t corrid)
 {
   accumulator_.erase(corrid);
 }
+
+ModelInstanceState::~ModelInstanceState()
+{
+  accumulator_.clear();
+}
+
 
 /////////////
 
@@ -510,33 +440,6 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
       TRITONSERVER_LOG_INFO,
       (std::string("backend configuration:\n") + buffer).c_str());
 
-  // If we have any global backend state we create and set it here. We
-  // don't need anything for this backend but for demonstration
-  // purposes we just create something...
-  std::string* state = new std::string("backend state");
-  RETURN_IF_ERROR(
-      TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(state)));
-
-  return nullptr;  // success
-}
-
-// Implementing TRITONBACKEND_Finalize is optional unless state is set
-// using TRITONBACKEND_BackendSetState. The backend must free this
-// state and perform any other global cleanup.
-TRITONSERVER_Error*
-TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
-{
-  void* vstate;
-  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
-  std::string* state = reinterpret_cast<std::string*>(vstate);
-
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_Finalize: state is '") + *state + "'")
-          .c_str());
-
-  delete state;
-
   return nullptr;  // success
 }
 
@@ -558,32 +461,6 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
       (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
        std::to_string(version) + ")")
           .c_str());
-
-  // Can get location of the model artifacts. Normally we would need
-  // to check the artifact type to make sure it was something we can
-  // handle... but we are just going to log the location so we don't
-  // need the check. We would use the location if we wanted to load
-  // something from the model's repo.
-  TRITONBACKEND_ArtifactType artifact_type;
-  const char* clocation;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelRepository(model, &artifact_type, &clocation));
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("Repository location: ") + clocation).c_str());
-
-  // The model can access the backend as well... here we can access
-  // the backend global state.
-  TRITONBACKEND_Backend* backend;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(model, &backend));
-
-  void* vbackendstate;
-  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vbackendstate));
-  std::string* backend_state = reinterpret_cast<std::string*>(vbackendstate);
-
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("backend state is '") + *backend_state + "'").c_str());
 
   // With each model we create a ModelState object and associate it
   // with the TRITONBACKEND_Model.
@@ -664,7 +541,7 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
   RETURN_ERROR_IF_FALSE(
       instance_state->Kind() == TRITONSERVER_INSTANCEGROUPKIND_CPU,
       TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("'sequence' backend only supports CPU instances"));
+      std::string("'dyna_sequence' backend only supports CPU instances"));
 
   return nullptr;  // success
 }
@@ -780,11 +657,6 @@ TRITONBACKEND_ModelInstanceExecute(
   std::vector<uint8_t> start_buffer, end_buffer, ready_buffer, corrid_buffer,
       input_buffer;
   for (uint32_t r = 0; r < request_count; ++r) {
-    start_buffer.clear();
-    end_buffer.clear();
-    ready_buffer.clear();
-    corrid_buffer.clear();
-    input_buffer.clear();
     uint64_t exec_start_ns = 0;
     SET_TIMESTAMP(exec_start_ns);
     min_exec_start_ns = std::min(min_exec_start_ns, exec_start_ns);
@@ -944,15 +816,15 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
+    const void* start_buffer = nullptr;
     uint64_t buffer_byte_size = 0;
     TRITONSERVER_MemoryType input_memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t input_memory_type_id = 0;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
         TRITONBACKEND_InputBuffer(
-            start_input, 0 /* input_buffer_count */,
-            reinterpret_cast<const void**>(&start_buffer), &buffer_byte_size,
-            &input_memory_type, &input_memory_type_id));
+            start_input, 0 /* input_buffer_count */, &start_buffer,
+            &buffer_byte_size, &input_memory_type, &input_memory_type_id));
     if (responses[r] == nullptr) {
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
@@ -966,15 +838,12 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
-    uint64_t buffer_byte_size = 0;
-    TRITONSERVER_MemoryType input_memory_type = TRITONSERVER_MEMORY_CPU;
-    int64_t input_memory_type_id = 0;
+    const void* end_buffer = nullptr;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
         TRITONBACKEND_InputBuffer(
-            end_input, 0 /* input_buffer_count */,
-            reinterpret_cast<const void**>(&end_buffer), &buffer_byte_size,
-            &input_memory_type, &input_memory_type_id));
+            end_input, 0 /* input_buffer_count */, &end_buffer,
+            &buffer_byte_size, &input_memory_type, &input_memory_type_id));
     if (responses[r] == nullptr) {
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
@@ -988,12 +857,12 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
+    const void* ready_buffer = nullptr;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
         TRITONBACKEND_InputBuffer(
-            ready_input, 0 /* input_buffer_count */,
-            reinterpret_cast<const void**>(&ready_buffer), &buffer_byte_size,
-            &input_memory_type, &input_memory_type_id));
+            ready_input, 0 /* input_buffer_count */, &ready_buffer,
+            &buffer_byte_size, &input_memory_type, &input_memory_type_id));
     if (responses[r] == nullptr) {
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
@@ -1007,12 +876,12 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
+    const void* corrid_buffer = nullptr;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
         TRITONBACKEND_InputBuffer(
-            corrid_input, 0 /* input_buffer_count */,
-            reinterpret_cast<const void**>(&corrid_buffer), &buffer_byte_size,
-            &input_memory_type, &input_memory_type_id));
+            corrid_input, 0 /* input_buffer_count */, &corrid_buffer,
+            &buffer_byte_size, &input_memory_type, &input_memory_type_id));
     if (responses[r] == nullptr) {
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
@@ -1038,11 +907,11 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
+    const void* input_buffer = nullptr;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
         TRITONBACKEND_InputBuffer(
-            input, 0 /* input_buffer_count */,
-            reinterpret_cast<const void**>(&input_buffer), &buffer_byte_size,
+            input, 0 /* input_buffer_count */, &input_buffer, &buffer_byte_size,
             &input_memory_type, &input_memory_type_id));
     if ((responses[r] == nullptr) ||
         (input_memory_type == TRITONSERVER_MEMORY_GPU)) {
@@ -1080,11 +949,12 @@ TRITONBACKEND_ModelInstanceExecute(
     }
 
     int64_t input_element_cnt = input_byte_size / sizeof(int32_t);
-    const int32_t start = *reinterpret_cast<int32_t*>(&start_buffer[0]);
-    const int32_t end = *reinterpret_cast<int32_t*>(&end_buffer[0]);
-    const int32_t ready = *reinterpret_cast<int32_t*>(&ready_buffer[0]);
-    const uint64_t corrid = *reinterpret_cast<uint64_t*>(&corrid_buffer[0]);
-    const int32_t* ipbuffer_int = reinterpret_cast<int32_t*>(&input_buffer[0]);
+    const int32_t start = *reinterpret_cast<const int32_t*>(start_buffer);
+    const int32_t end = *reinterpret_cast<const int32_t*>(end_buffer);
+    const int32_t ready = *reinterpret_cast<const int32_t*>(ready_buffer);
+    const uint64_t corrid = *reinterpret_cast<const uint64_t*>(corrid_buffer);
+    const int32_t* ipbuffer_int =
+        reinterpret_cast<const int32_t*>(input_buffer);
 
     // Sequence batcher should never send us a batch of payloads where
     // a given correlation ID occurs more that once. Check that here
@@ -1104,9 +974,6 @@ TRITONBACKEND_ModelInstanceExecute(
            "response sent")
               .c_str());
       continue;
-      std::string(
-          "Execute() called with batch containing multiple inferences requests "
-          "for the same Correlation ID"));
     }
     seen_corrids.insert(corrid);
 
@@ -1131,7 +998,7 @@ TRITONBACKEND_ModelInstanceExecute(
         instance_state->AddAccumulatorVal(corrid, (int32_t)corrid);
       }
 
-      const int32_t output = instance_state->GetAccumulatorVal(corrid);
+      const int32_t output_val = instance_state->GetAccumulatorVal(corrid);
 
       // If sequence has ended remove CORRID from the accumulator map.
       if (end != 0) {
@@ -1197,7 +1064,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
         int32_t* obuffer_int = reinterpret_cast<int32_t*>(output_buffer);
         for (int64_t i = 0; i < input_element_cnt; ++i) {
-          obuffer_int[i] = output;
+          obuffer_int[i] = output_val;
         }
       }
     }
@@ -1242,4 +1109,4 @@ TRITONBACKEND_ModelInstanceExecute(
 
 }  // extern "C"
 
-}}}  // namespace triton::backend::dynasequence
+}}}  // namespace triton::backend::dyna_sequence
