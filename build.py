@@ -317,7 +317,7 @@ def backend_repo(be):
 
 def backend_cmake_args(images, components, be, install_dir, library_paths):
     if be == 'onnxruntime':
-        args = onnxruntime_cmake_args(images)
+        args = onnxruntime_cmake_args(images, library_paths)
     elif be == 'openvino':
         args = openvino_cmake_args()
     elif be == 'tensorflow1':
@@ -368,27 +368,37 @@ def pytorch_cmake_args(images):
 
 
 def onnxruntime_cmake_args(images):
-    cargs = [
-        '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
-        '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][2])
-    ]
-
-    if target_platform() == 'windows':
-        if 'base' in images:
-            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    # If platform is jetpack do not use docker based build
+    cargs = ['-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][2])]
+    if target_platform() == 'jetpack':
+        if backend_name in library_paths:
+            ort_lib_path = library_paths[backend_name] + "/lib"
+            ort_include_path = library_paths[backend_name] + "/include"
+            cargs += [
+                '-DTRITON_ONNXRUNTIME_INCLUDE_PATHS={}'.format(ort_lib_path),
+                '-DTRITON_ONNXRUNTIME_LIB_PATHS={}'.format(ort_include_path),
+                '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF',
+                '-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=OFF'
+            ]
     else:
-        if 'base' in images:
-            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
-        else:
-            cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][1]))
+        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON')
 
-        if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
-            cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
-            cargs.append(
-                '-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
-                    TRITON_VERSION_MAP[FLAGS.version][3]))
+        if target_platform() == 'windows':
+            if 'base' in images:
+                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+        else:
+            if 'base' in images:
+                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+            else:
+                cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+                    TRITON_VERSION_MAP[FLAGS.version][1]))
+
+            if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
+                cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
+                cargs.append(
+                    '-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
+                        TRITON_VERSION_MAP[FLAGS.version][3]))
 
     return cargs
 
