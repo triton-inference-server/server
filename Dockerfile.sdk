@@ -117,9 +117,9 @@ RUN cd install && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
 
 # For CI testing need to install a test script.
-COPY qa/L0_client/test.sh /tmp/test.sh
-COPY qa/L0_client/grpc_test.cc /tmp/grpc_test.cc
-COPY qa/L0_client/http_test.cc /tmp/http_test.cc
+COPY qa/L0_sdk/test.sh /tmp/test.sh
+COPY qa/L0_sdk/grpc_test.cc /tmp/grpc_test.cc
+COPY qa/L0_sdk/http_test.cc /tmp/http_test.cc
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
