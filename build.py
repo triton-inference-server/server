@@ -369,8 +369,11 @@ def pytorch_cmake_args(images):
 
 def onnxruntime_cmake_args(images):
     # If platform is jetpack do not use docker based build
-    cargs = ['-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][2])]
+    cargs = [
+        '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
+        '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][2])
+    ]
     if target_platform() == 'jetpack':
         if backend_name in library_paths:
             ort_lib_path = library_paths[backend_name] + "/lib"
@@ -378,12 +381,9 @@ def onnxruntime_cmake_args(images):
             cargs += [
                 '-DTRITON_ONNXRUNTIME_INCLUDE_PATHS={}'.format(ort_lib_path),
                 '-DTRITON_ONNXRUNTIME_LIB_PATHS={}'.format(ort_include_path),
-                '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF',
                 '-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=OFF'
             ]
     else:
-        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON')
-
         if target_platform() == 'windows':
             if 'base' in images:
                 cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
