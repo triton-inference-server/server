@@ -32,6 +32,7 @@ ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG CMAKE_UBUNTU_VERSION=20.04
+ARG TRITON_ENABLE_GPU=ON
 
 FROM ${BASE_IMAGE}
 
@@ -94,6 +95,7 @@ RUN rm -f /usr/bin/python && \
 ARG TRITON_CLIENT_REPO_SUBDIR
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
+ARG TRITON_ENABLE_GPU
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
@@ -108,7 +110,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
           -DTRITON_ENABLE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
-          -DTRITON_ENABLE_GPU=ON /workspace/client
+          -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN make -j16 cc-clients python-clients
 
 WORKDIR /workspace
@@ -133,8 +135,10 @@ RUN pip3 install --upgrade numpy pillow attrdict && \
     xargs pip3 install --upgrade
 
 # Install DCGM
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
-    dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb
+RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
+      wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
+      dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb; \
+    fi
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
