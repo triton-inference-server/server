@@ -50,7 +50,7 @@ rm -fr *.log
 
 LOG_IDX=0
 
-LifeCycleTest.test_parse_error_noexit_strict
+# LifeCycleTest.test_parse_error_noexit_strict
 SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=true \
              --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
