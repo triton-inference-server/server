@@ -52,9 +52,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /tmp/tritonbuild/tritonserver/build
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
+ARG TRITON_BACKEND_REPO_TAG
 RUN cmake -DTRITON_ENABLE_GPU=ON \
           -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
-          -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} /workspace/build && \
+          -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+          -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} /workspace/build && \
     make -j16 test-util
 
 # Add models and custom backend for imageprocess ensemble example repo
@@ -162,7 +164,7 @@ RUN mkdir -p qa/L0_backend_identity/models && \
         qa/L0_backend_identity/models/identity_fp32/1/.
 
 RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
-    cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libsequence.so \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/sequence/libtriton_sequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \
     mkdir -p qa/custom_models/custom_dyna_sequence_int32/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libdyna_sequence.so \

@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,9 +25,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 name: "custom_sequence_int32"
-platform: "custom"
+backend: "sequence"
 max_batch_size: 8
-default_model_filename: "libsequence.so"
+default_model_filename: "libtriton_sequence.so"
 sequence_batching {
   max_sequence_idle_microseconds: 5000000
   control_input [
