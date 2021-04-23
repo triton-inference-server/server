@@ -309,19 +309,22 @@ def create_onnx_modelfile(models_dir, model_version, dtype):
     batch_in = onnx.helper.make_tensor_value_info("BATCH_INPUT", onnx_dtype,
                                              tu.shape_to_onnx_shape([-1]))
 
-    out = onnx.helper.make_tensor_value_info("RAGGED_OUTPUT", onnx_dtype, [-1])
-    bs_out = onnx.helper.make_tensor_value_info("BATCH_AND_SIZE_OUTPUT", onnx_dtype, [-1])
-    batch_out = onnx.helper.make_tensor_value_info("BATCH_OUTPUT", onnx_dtype, [-1])
+    out = onnx.helper.make_tensor_value_info("RAGGED_OUTPUT", onnx_dtype, tu.shape_to_onnx_shape([-1, -1]))
+    bs_out = onnx.helper.make_tensor_value_info("BATCH_AND_SIZE_OUTPUT", onnx_dtype, tu.shape_to_onnx_shape([-1, -1]))
+    batch_out = onnx.helper.make_tensor_value_info("BATCH_OUTPUT", onnx_dtype, tu.shape_to_onnx_shape([-1, -1]))
 
     const_node = onnx.helper.make_node('Constant', [], ["shape"],
                     value=helper.make_tensor("", onnx.TensorProto.INT64, [2], [1, -1]))
+
+    const_node = onnx.helper.make_node('Constant', [], ["expander_shape"],
+                    value=helper.make_tensor("", onnx.TensorProto.INT64, [2], [-1, 1]))
 
     in0_mat_node = onnx.helper.make_node("Reshape", ["RAGGED_INPUT", "shape"], ["in_mat"])
     bs_mat_node = onnx.helper.make_node("Reshape", ["BATCH_AND_SIZE_INPUT", "shape"], ["bs_mat"])
     batch_mat_node = onnx.helper.make_node("Reshape", ["BATCH_INPUT", "shape"], ["batch_mat"])
 
     internal_node_div = onnx.helper.make_node("Div", ["BATCH_AND_SIZE_INPUT", "BATCH_AND_SIZE_INPUT"], ["output_expander_int"])
-    internal_node_reshape = onnx.helper.make_node("Reshape", ["output_expander_int", "shape"], ["output_expander"])
+    internal_node_reshape = onnx.helper.make_node("Reshape", ["output_expander_int", "expander_shape"], ["output_expander"])
 
     out_node = onnx.helper.make_node("MatMul", ["output_expander", "in_mat"], ["RAGGED_OUTPUT"])
     bs_out_node = onnx.helper.make_node("MatMul", ["output_expander", "bs_mat"], ["BATCH_AND_SIZE_OUTPUT"])
