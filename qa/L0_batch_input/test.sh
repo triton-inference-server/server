@@ -50,7 +50,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="savedmodel plan"}
+BACKENDS=${BACKENDS:="onnx savedmodel plan"}
 
 rm -f $SERVER_LOG $CLIENT_LOG
 

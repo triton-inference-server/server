@@ -97,6 +97,31 @@ def np_to_tf_dtype(np_dtype):
         return tf.string
     return None
 
+def np_to_onnx_dtype(np_dtype):
+    if np_dtype == bool:
+        return onnx.TensorProto.BOOL
+    elif np_dtype == np.int8:
+        return onnx.TensorProto.INT8
+    elif np_dtype == np.int16:
+        return onnx.TensorProto.INT16
+    elif np_dtype == np.int32:
+        return onnx.TensorProto.INT32
+    elif np_dtype == np.int64:
+        return onnx.TensorProto.INT64
+    elif np_dtype == np.uint8:
+        return onnx.TensorProto.UINT8
+    elif np_dtype == np.uint16:
+        return onnx.TensorProto.UINT16
+    elif np_dtype == np.float16:
+        return onnx.TensorProto.FLOAT16
+    elif np_dtype == np.float32:
+        return onnx.TensorProto.FLOAT
+    elif np_dtype == np.float64:
+        return onnx.TensorProto.DOUBLE
+    elif np_dtype == np_dtype_string:
+        return onnx.TensorProto.STRING
+    return None
+
 
 def create_savedmodel_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input testing.
@@ -254,6 +279,76 @@ def create_plan_modelfile(models_dir, model_version, dtype):
     del builder
 
 
+def create_onnx_modelfile(models_dir, model_version, dtype):
+    # Create special identity model for batch input testing.
+    # Because the ragged input and batch input are one dimensional vector
+    # when passing to the model, the model must generate output with batch
+    # dimension so that Triton can scatter it to different responses along
+    # the batch dimension.
+    # 'BATCH_AND_SIZE_INPUT' is also used as a hint to generate output with
+    # batch dimension, 'BATCH_AND_SIZE_INPUT' must have shape [batch_size].
+    # Each output corresponds to the input with the same name, so if there
+    # are two requests, one has "RAGGED_INPUT" [2, 4] and the other has [1],
+    # since the input is ragged, the model sees the input as [2, 4, 1], and
+    # "BATCH_AND_SIZE_INPUT" will have shape [3]. Then the model output will
+    # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
+    # value [[2, 4, 1]].
+
+    onnx_dtype = np_to_onnx_dtype(dtype)
+
+    # Create the model
+    model_name = "onnx_batch_input"
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    in0 = onnx.helper.make_tensor_value_info("RAGGED_INPUT", onnx_dtype,
+                                             tu.shape_to_onnx_shape([-1]))
+
+    bs_in = onnx.helper.make_tensor_value_info("BATCH_AND_SIZE_INPUT", onnx_dtype,
+                                             tu.shape_to_onnx_shape([-1]))
+
+    batch_in = onnx.helper.make_tensor_value_info("BATCH_INPUT", onnx_dtype,
+                                             tu.shape_to_onnx_shape([-1]))
+
+    out = onnx.helper.make_tensor_value_info("RAGGED_OUTPUT", onnx_dtype, [-1])
+    bs_out = onnx.helper.make_tensor_value_info("BATCH_AND_SIZE_OUTPUT", onnx_dtype, [-1])
+    batch_out = onnx.helper.make_tensor_value_info("BATCH_OUTPUT", onnx_dtype, [-1])
+
+    const_node = onnx.helper.make_node('Constant', [], ["shape"],
+                    value=helper.make_tensor("", onnx.TensorProto.INT64, [2], [1, -1]))
+
+    in0_mat_node = onnx.helper.make_node("Reshape", ["RAGGED_INPUT", "shape"], ["in_mat"])
+    bs_mat_node = onnx.helper.make_node("Reshape", ["BATCH_AND_SIZE_INPUT", "shape"], ["bs_mat"])
+    batch_mat_node = onnx.helper.make_node("Reshape", ["BATCH_INPUT", "shape"], ["batch_mat"])
+
+    internal_node_div = onnx.helper.make_node("Div", ["BATCH_AND_SIZE_INPUT", "BATCH_AND_SIZE_INPUT"], ["output_expander_int"])
+    internal_node_reshape = onnx.helper.make_node("Reshape", ["output_expander_int", "shape"], ["output_expander"])
+
+    out_node = onnx.helper.make_node("MatMul", ["output_expander", "in_mat"], ["RAGGED_OUTPUT"])
+    bs_out_node = onnx.helper.make_node("MatMul", ["output_expander", "bs_mat"], ["BATCH_AND_SIZE_OUTPUT"])
+    batch_out_node = onnx.helper.make_node("MatMul", ["output_expander", "batch_mat"], ["BATCH_OUTPUT"])
+
+    onnx_nodes = [const_node, in0_mat_node, bs_mat_node, batch_mat_node, internal_node_div, internal_node_reshape, out_node, bs_out_node, batch_out_node]
+    onnx_inputs = [in0, bs_in, batch_in]
+    onnx_outputs = [out, bs_out, batch_out]
+
+    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
+                                         onnx_outputs)
+    if FLAGS.onnx_opset > 0:
+        model_opset = onnx.helper.make_operatorsetid("", FLAGS.onnx_opset)
+        model_def = onnx.helper.make_model(graph_proto,
+                                           producer_name="triton",
+                                           opset_imports=[model_opset])
+    else:
+        model_def = onnx.helper.make_model(graph_proto, producer_name="triton")
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    onnx.save(model_def, model_version_dir + "/model.onnx")
+
+
 def create_modelconfig(models_dir, max_batch, model_version, dtype, backend,
                        platform):
     version_policy_str = "{ latest { num_versions: 1 }}"
@@ -351,6 +446,10 @@ def create_batch_input_models(models_dir):
         create_modelconfig(models_dir, 4, model_version, np.float32,
                            "tensorflow", "savedmodel")
         create_savedmodel_modelfile(models_dir, model_version, np.float32)
+    if FLAGS.onnx:
+        create_modelconfig(models_dir, 4, model_version, np.float32,
+                           "onnx", "onnx")
+        create_onnx_modelfile(models_dir, model_version, np.float32)
 
 
 if __name__ == '__main__':
@@ -371,6 +470,16 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate GraphDef models')
+    parser.add_argument('--onnx',
+                        required=False,
+                        action='store_true',
+                        help='Generate Onnx Runtime Onnx models')
+    parser.add_argument('--onnx_opset',
+                        type=int,
+                        required=False,
+                        default=0,
+                        help='Opset used for Onnx models. Default is to use ONNXRT default')
+
     FLAGS, unparsed = parser.parse_known_args()
 
     import test_util as tu
@@ -379,5 +488,7 @@ if __name__ == '__main__':
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io, graph_util
+    if FLAGS.onnx:
+        import onnx
 
     create_batch_input_models(FLAGS.models_dir)
