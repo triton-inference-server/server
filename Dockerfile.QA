@@ -172,15 +172,16 @@ RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
         qa/custom_models/custom_dyna_sequence_int32/1/.
 
 # L0_lifecycle needs No-GPU build of identity backend
-RUN cd /tmp/tritonbuild/identity/build && \
-        cmake -DTRITON_ENABLE_GPU=OFF \
-            -DCMAKE_INSTALL_PREFIX:PATH=/tmp/tritonbuild/identity/install \
-            -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
-            -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
-            -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
-        make -j16 install
+RUN cd /tmp/tritonbuild/identity && \
+    rm -rf install build && mkdir build && cd build && \
+    cmake -DTRITON_ENABLE_GPU=OFF \
+        -DCMAKE_INSTALL_PREFIX:PATH=/tmp/tritonbuild/identity/install \
+        -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+        -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+        -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
+    make -j16 install
 
-RUN cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
+RUN cp /tmp/tritonbuild/identity/install/backends/identity/libtriton_identity.so \
         qa/L0_lifecycle/. && \
     mkdir -p qa/L0_perf_nomodel/custom_models/custom_zero_1_float32/1 && \
     mkdir -p qa/L0_perf_pyclients/custom_models/custom_zero_1_int32/1 && \
