@@ -42,6 +42,45 @@ import tritonclient.http as httpclient
 
 class PythonTest(tu.TestResultCollector):
 
+    def _infer_help(self, model_name, shape, data_type):
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            input_data_0 = np.array(np.random.randn(*shape), dtype=data_type)
+            inputs = [
+                httpclient.InferInput("INPUT0", shape,
+                                      np_to_triton_dtype(input_data_0.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data_0)
+            result = client.infer(model_name, inputs)
+            output0 = result.as_numpy('OUTPUT0')
+            self.assertTrue(np.all(input_data_0 == output0))
+
+    def test_growth_error(self):
+        # 2 MiBs
+        total_byte_size = 2 * 1024 * 1024
+        shape = [total_byte_size]
+        model_name = 'identity_uint8_nobatch'
+        dtype = np.uint8
+        self._infer_help(model_name, shape, dtype)
+
+        # 1 GiB payload leads to error in the main Python backned process.
+        # Total shared memory available is 1GiB.
+        total_byte_size = 1024 * 1024 * 1024
+        shape = [total_byte_size]
+        with self.assertRaises(InferenceServerException):
+            self._infer_help(model_name, shape, dtype)
+
+        # 512 MiBs payload leads to error in the Python stub process.
+        total_byte_size = 512 * 1024 * 1024
+        shape = [total_byte_size]
+        with self.assertRaises(InferenceServerException):
+            self._infer_help(model_name, shape, dtype)
+
+        # 2 MiBs
+        # Send a small paylaod to make sure it is still working properly
+        total_byte_size = 2 * 1024 * 1024
+        shape = [total_byte_size]
+        self._infer_help(model_name, shape, dtype)
+
     def test_async_infer(self):
         model_name = "identity_uint8"
         request_parallelism = 4
@@ -184,24 +223,41 @@ class PythonTest(tu.TestResultCollector):
     def test_infer_output_error(self):
         model_name = "execute_error"
         shape = [2, 2]
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_data = np.zeros(shape, dtype=np.float32)
-            inputs = [
-                httpclient.InferInput("IN", input_data.shape,
-                                      np_to_triton_dtype(input_data.dtype))
-            ]
-            inputs[0].set_data_from_numpy(input_data)
-            try:
-                client.infer(model_name, inputs)
-            except InferenceServerException as e:
-                print(e)
+        request_parallelism = 4
+
+        with httpclient.InferenceServerClient(
+                "localhost:8000", concurrency=request_parallelism) as client:
+            input_datas = []
+            requests = []
+            for i in range(request_parallelism):
+                input_data = np.random.randn(*shape).astype(np.float32)
+                input_datas.append(input_data)
+                inputs = [
+                    httpclient.InferInput("IN", input_data.shape,
+                                          np_to_triton_dtype(input_data.dtype))
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                requests.append(client.async_infer(model_name, inputs))
+
+            for i in range(request_parallelism):
+                # Get the result from the initiated asynchronous inference request.
+                # Note the call will block till the server responds.
+
+                results = None
+                if i == 0:
+                    with self.assertRaises(InferenceServerException):
+                        results = requests[i].get_result()
+                    continue
+                else:
+                    results = requests[i].get_result()
+
+                print(results)
+                output_data = results.as_numpy("OUT")
+                self.assertIsNotNone(output_data, "error: expected 'OUT'")
                 self.assertTrue(
-                    e.message().startswith("An error occured during execution"),
-                    "Exception message is not correct")
-            else:
-                self.assertTrue(
-                    False,
-                    "Wrong exception raised or did not raise an exception")
+                    np.array_equal(output_data, input_datas[i]),
+                    "error: expected output {} to match input {}".format(
+                        output_data, input_datas[i]))
 
     def test_init_args(self):
         model_name = "init_args"
