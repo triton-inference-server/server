@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Default setting is building on nvidia/cuda:11.1-devel-ubuntu20.04
+# Base image on the minimum Triton container
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:21.03-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
