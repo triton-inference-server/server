@@ -97,6 +97,7 @@ def np_to_tf_dtype(np_dtype):
         return tf.string
     return None
 
+
 def np_to_onnx_dtype(np_dtype):
     if np_dtype == bool:
         return onnx.TensorProto.BOOL
@@ -300,37 +301,66 @@ def create_onnx_modelfile(models_dir, model_version, dtype):
     model_name = "onnx_batch_input"
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
+    in0_shape, idx = tu.shape_to_onnx_shape([-1], 0)
+    bs_shape, idx = tu.shape_to_onnx_shape([-1], idx)
+    batch_shape, idx = tu.shape_to_onnx_shape([-1], idx)
+
     in0 = onnx.helper.make_tensor_value_info("RAGGED_INPUT", onnx_dtype,
-                                             tu.shape_to_onnx_shape([-1]))
-
-    bs_in = onnx.helper.make_tensor_value_info("BATCH_AND_SIZE_INPUT", onnx_dtype,
-                                             tu.shape_to_onnx_shape([-1]))
-
+                                             in0_shape)
+    bs_in = onnx.helper.make_tensor_value_info("BATCH_AND_SIZE_INPUT",
+                                               onnx_dtype, bs_shape)
     batch_in = onnx.helper.make_tensor_value_info("BATCH_INPUT", onnx_dtype,
-                                             tu.shape_to_onnx_shape([-1]))
+                                                  batch_shape)
 
-    out = onnx.helper.make_tensor_value_info("RAGGED_OUTPUT", onnx_dtype, tu.shape_to_onnx_shape([-1, -1]))
-    bs_out = onnx.helper.make_tensor_value_info("BATCH_AND_SIZE_OUTPUT", onnx_dtype, tu.shape_to_onnx_shape([-1, -1]))
-    batch_out = onnx.helper.make_tensor_value_info("BATCH_OUTPUT", onnx_dtype, tu.shape_to_onnx_shape([-1, -1]))
+    out_shape, idx = tu.shape_to_onnx_shape([-1, -1], idx)
+    bs_out_shape, idx = tu.shape_to_onnx_shape([-1, -1], idx)
+    batch_out_shape, idx = tu.shape_to_onnx_shape([-1, -1], idx)
 
-    const_node = onnx.helper.make_node('Constant', [], ["shape"],
-                    value=helper.make_tensor("", onnx.TensorProto.INT64, [2], [1, -1]))
+    out = onnx.helper.make_tensor_value_info("RAGGED_OUTPUT", onnx_dtype,
+                                             out_shape)
+    bs_out = onnx.helper.make_tensor_value_info("BATCH_AND_SIZE_OUTPUT",
+                                                onnx_dtype, bs_out_shape)
+    batch_out = onnx.helper.make_tensor_value_info("BATCH_OUTPUT", onnx_dtype,
+                                                   batch_out_shape)
 
-    const_node = onnx.helper.make_node('Constant', [], ["expander_shape"],
-                    value=helper.make_tensor("", onnx.TensorProto.INT64, [2], [-1, 1]))
+    const_node_shape = onnx.helper.make_node(
+        'Constant', [], ["shape"],
+        value=onnx.helper.make_tensor("const_shape", onnx.TensorProto.INT64,
+                                      [2], [1, -1]))
 
-    in0_mat_node = onnx.helper.make_node("Reshape", ["RAGGED_INPUT", "shape"], ["in_mat"])
-    bs_mat_node = onnx.helper.make_node("Reshape", ["BATCH_AND_SIZE_INPUT", "shape"], ["bs_mat"])
-    batch_mat_node = onnx.helper.make_node("Reshape", ["BATCH_INPUT", "shape"], ["batch_mat"])
+    const_node_expander_shape = onnx.helper.make_node(
+        'Constant', [], ["expander_shape"],
+        value=onnx.helper.make_tensor("const_expander_shape",
+                                      onnx.TensorProto.INT64, [2], [-1, 1]))
 
-    internal_node_div = onnx.helper.make_node("Div", ["BATCH_AND_SIZE_INPUT", "BATCH_AND_SIZE_INPUT"], ["output_expander_int"])
-    internal_node_reshape = onnx.helper.make_node("Reshape", ["output_expander_int", "expander_shape"], ["output_expander"])
+    in0_mat_node = onnx.helper.make_node("Reshape", ["RAGGED_INPUT", "shape"],
+                                         ["in_mat"])
+    bs_mat_node = onnx.helper.make_node("Reshape",
+                                        ["BATCH_AND_SIZE_INPUT", "shape"],
+                                        ["bs_mat"])
+    batch_mat_node = onnx.helper.make_node("Reshape", ["BATCH_INPUT", "shape"],
+                                           ["batch_mat"])
 
-    out_node = onnx.helper.make_node("MatMul", ["output_expander", "in_mat"], ["RAGGED_OUTPUT"])
-    bs_out_node = onnx.helper.make_node("MatMul", ["output_expander", "bs_mat"], ["BATCH_AND_SIZE_OUTPUT"])
-    batch_out_node = onnx.helper.make_node("MatMul", ["output_expander", "batch_mat"], ["BATCH_OUTPUT"])
+    internal_node_div = onnx.helper.make_node(
+        "Div", ["BATCH_AND_SIZE_INPUT", "BATCH_AND_SIZE_INPUT"],
+        ["output_expander_int"])
+    internal_node_reshape = onnx.helper.make_node(
+        "Reshape", ["output_expander_int", "expander_shape"],
+        ["output_expander"])
 
-    onnx_nodes = [const_node, in0_mat_node, bs_mat_node, batch_mat_node, internal_node_div, internal_node_reshape, out_node, bs_out_node, batch_out_node]
+    out_node = onnx.helper.make_node("MatMul", ["output_expander", "in_mat"],
+                                     ["RAGGED_OUTPUT"])
+    bs_out_node = onnx.helper.make_node("MatMul", ["output_expander", "bs_mat"],
+                                        ["BATCH_AND_SIZE_OUTPUT"])
+    batch_out_node = onnx.helper.make_node("MatMul",
+                                           ["output_expander", "batch_mat"],
+                                           ["BATCH_OUTPUT"])
+
+    onnx_nodes = [
+        const_node_shape, const_node_expander_shape, in0_mat_node, bs_mat_node,
+        batch_mat_node, internal_node_div, internal_node_reshape, out_node,
+        bs_out_node, batch_out_node
+    ]
     onnx_inputs = [in0, bs_in, batch_in]
     onnx_outputs = [out, bs_out, batch_out]
 
@@ -450,8 +480,8 @@ def create_batch_input_models(models_dir):
                            "tensorflow", "savedmodel")
         create_savedmodel_modelfile(models_dir, model_version, np.float32)
     if FLAGS.onnx:
-        create_modelconfig(models_dir, 4, model_version, np.float32,
-                           "onnx", "onnx")
+        create_modelconfig(models_dir, 4, model_version, np.float32, "onnx",
+                           "onnx")
         create_onnx_modelfile(models_dir, model_version, np.float32)
 
 
@@ -477,11 +507,12 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate Onnx Runtime Onnx models')
-    parser.add_argument('--onnx_opset',
-                        type=int,
-                        required=False,
-                        default=0,
-                        help='Opset used for Onnx models. Default is to use ONNXRT default')
+    parser.add_argument(
+        '--onnx_opset',
+        type=int,
+        required=False,
+        default=0,
+        help='Opset used for Onnx models. Default is to use ONNXRT default')
 
     FLAGS, unparsed = parser.parse_known_args()
 
