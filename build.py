@@ -368,12 +368,13 @@ def pytorch_cmake_args(images):
 
 
 def onnxruntime_cmake_args(images, library_paths):
-    # If platform is jetpack do not use docker based build
     cargs = [
         '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
+
+    # If platform is jetpack do not use docker based build
     if target_platform() == 'jetpack':
         ort_lib_path = library_paths['onnxruntime'] + "/lib"
         ort_include_path = library_paths['onnxruntime'] + "/include"
