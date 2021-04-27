@@ -1,6 +1,6 @@
 name: "fp32_dim1_batch4_input4"
 max_batch_size: 4
-platform: "custom"
+backend: "identity"
 input [
   {
     name: "INPUT0"

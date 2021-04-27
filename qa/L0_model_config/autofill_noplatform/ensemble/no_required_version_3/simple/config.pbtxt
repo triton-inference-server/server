@@ -1,5 +1,5 @@
 name: "simple"
-platform: "custom"
+backend: "identity"
 max_batch_size: 8
 version_policy : { all {} }
 input [

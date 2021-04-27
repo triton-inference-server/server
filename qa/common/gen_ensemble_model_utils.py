@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -873,7 +873,7 @@ def create_nop_modelconfig(models_dir,
     config_dir = models_dir + "/" + model_name
     config = create_general_modelconfig(
         model_name,
-        "custom",
+        "",
         1024,
         repeat(tensor_dtype, 2),
         repeat(tensor_shape, 2),
@@ -882,7 +882,7 @@ def create_nop_modelconfig(models_dir,
         repeat(tensor_shape, 2),
         repeat(tensor_model_shape, 2),
         repeat(None, 2),
-        default_model_filename="libidentity.so",
+        backend="identity",
         instance_group_str="instance_group [ { kind: KIND_CPU } ]")
 
     try:
@@ -915,7 +915,7 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
     config_dir = models_dir + "/" + in_model_name
     config = create_general_modelconfig(
         in_model_name,
-        "custom",
+        "",
         1024,
         repeat(tensor_dtype, 2),
         repeat(tensor_shape, 2),
@@ -924,7 +924,7 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
         repeat([internal_shape], 2),
         repeat(None, 2),
         repeat(None, 2),
-        default_model_filename="libidentity.so",
+        backend="identity",
         instance_group_str="instance_group [ { kind: KIND_CPU } ]")
 
     try:
@@ -939,7 +939,7 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
     config_dir = models_dir + "/" + out_model_name
     config = create_general_modelconfig(
         out_model_name,
-        "custom",
+        "",
         1024,
         repeat(tensor_dtype, 2),
         repeat([internal_shape], 2),
@@ -948,7 +948,7 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
         repeat(tensor_shape, 2),
         repeat(None, 2),
         repeat(None, 2),
-        default_model_filename="libidentity.so",
+        backend="identity",
         instance_group_str="instance_group [ { kind: KIND_CPU } ]")
 
     try:
@@ -970,6 +970,7 @@ def create_general_modelconfig(model_name,
                                output_shapes,
                                output_model_shapes,
                                label_filenames,
+                               backend=None,
                                version_policy=None,
                                default_model_filename=None,
                                instance_group_str="",
@@ -997,14 +998,22 @@ def create_general_modelconfig(model_name,
         default_model_filename_str = 'default_model_filename: "{}"'.format(
             default_model_filename)
 
+    # If backend is specified use backend instead of platform
+    if backend is not None:
+        key = "backend"
+        val = backend
+    else:
+        key = "platform"
+        val = platform
+
     config = '''
 name: "{}"
-platform: "{}"
+{}: "{}"
 max_batch_size: {}
 version_policy: {}
 {}
 {}
-'''.format(model_name, platform, max_batch, version_policy_str,
+'''.format(model_name, key, val, max_batch, version_policy_str,
            default_model_filename_str, instance_group_str)
 
     for idx in range(len(input_dtypes)):

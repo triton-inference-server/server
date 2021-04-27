@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -350,14 +350,12 @@ function run_gpu_monitor () {
     fi
 }
 
-# Put libidentity.so model file into nop models in the model repository
-function create_nop_modelfile () {
-    local model_file=$1
-    local dest_dir=$2
+# Create a model version directory for nop models in the model repository
+function create_nop_version_dir () {
+    local dest_dir=$1
     for nop_model in `ls $dest_dir | grep "nop_"`; do
         local path=$dest_dir/$nop_model
         mkdir -p $path/1
-        cp $model_file $path/1/.
     done
 }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,7 +37,6 @@ fi
 
 CLIENT_LOG="./client.log"
 MODEL_QUEUE_TEST=model_queue_test.py
-VERIFY_TIMESTAMPS=verify_timestamps.py
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
@@ -56,8 +55,7 @@ export CUDA_VISIBLE_DEVICES=0
 # Prepare base model. Only test with custom backend as it is sufficient
 rm -fr *.log *.serverlog models custom_zero_1_float32
 cp -r ../custom_models/custom_zero_1_float32 . && \
-    mkdir -p ./custom_zero_1_float32/1 && \
-    cp ./libidentity.so ./custom_zero_1_float32/1/libcustom.so
+    mkdir -p ./custom_zero_1_float32/1
 
 (cd custom_zero_1_float32 && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
