@@ -903,7 +903,7 @@ CompressionTypeUsed(const std::string accept_encoding)
   while (delimeter_pos != std::string::npos) {
     encodings.emplace_back(
         accept_encoding.substr(offset, delimeter_pos - offset));
-    offset = delimeter_pos;
+    offset = delimeter_pos + 1;
     delimeter_pos = accept_encoding.find(',', offset);
   }
   std::string res = "identity";
