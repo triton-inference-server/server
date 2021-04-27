@@ -1,6 +1,6 @@
 name: "int32_dim1_nobatch_output2"
 max_batch_size: 0
-platform: "custom"
+backend: "identity"
 input [
   {
     name: "INPUT0"

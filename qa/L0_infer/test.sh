@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -184,7 +184,7 @@ for TARGET in cpu gpu; do
           fi
         done
 
-        create_nop_modelfile `pwd`/libidentity.so `pwd`/models
+        create_nop_version_dir `pwd`/models
       fi
 
       if [[ $BACKENDS == *"graphdef"* ]]; then
@@ -223,9 +223,7 @@ for TARGET in cpu gpu; do
     if [[ $BACKENDS == *"custom"* ]]; then
       cp -r ../custom_models/custom_zero_1_float32 models/. &&\
           mkdir -p models/custom_zero_1_float32/1 && \
-          cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
           (cd models/custom_zero_1_float32 && \
-              echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
               echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
       cp -r models/custom_zero_1_float32 models/custom_nobatch_zero_1_float32 && \
           (cd models/custom_zero_1_float32 && \

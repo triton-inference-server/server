@@ -386,10 +386,12 @@ def onnxruntime_cmake_args(images, library_paths):
     else:
         if target_platform() == 'windows':
             if 'base' in images:
-                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(
+                    images['base']))
         else:
             if 'base' in images:
-                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(
+                    images['base']))
             else:
                 cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
                     TRITON_VERSION_MAP[FLAGS.version][1]))
@@ -1115,28 +1117,30 @@ if __name__ == '__main__':
         with open('TRITON_VERSION', "r") as vfile:
             FLAGS.version = vfile.readline().strip()
 
+    log('version {}'.format(FLAGS.version))
+    default_repo_tag = 'main'
+
     # For other versions use the TRITON_VERSION_MAP unless explicitly
     # given.
-    if FLAGS.container_version is None:
-        if FLAGS.version not in TRITON_VERSION_MAP:
-            fail('container version not known for {}'.format(FLAGS.version))
+    if not FLAGS.no_container_build:
+        if FLAGS.container_version is None:
+            if FLAGS.version not in TRITON_VERSION_MAP:
+                fail('container version not known for {}'.format(FLAGS.version))
         FLAGS.container_version = TRITON_VERSION_MAP[FLAGS.version][0]
-    if FLAGS.upstream_container_version is None:
-        if FLAGS.version not in TRITON_VERSION_MAP:
-            fail('upstream container version not known for {}'.format(
-                FLAGS.version))
-        FLAGS.upstream_container_version = TRITON_VERSION_MAP[FLAGS.version][1]
+        if FLAGS.upstream_container_version is None:
+            if FLAGS.version not in TRITON_VERSION_MAP:
+                fail('upstream container version not known for {}'.format(
+                    FLAGS.version))
+            FLAGS.upstream_container_version = TRITON_VERSION_MAP[
+                FLAGS.version][1]
 
-    log('version {}'.format(FLAGS.version))
-    log('container version {}'.format(FLAGS.container_version))
-    log('upstream container version {}'.format(
-        FLAGS.upstream_container_version))
+        log('container version {}'.format(FLAGS.container_version))
+        log('upstream container version {}'.format(
+            FLAGS.upstream_container_version))
 
-    # Determine the default <repo-tag> based on container version.
-    if FLAGS.container_version.endswith('dev'):
-        default_repo_tag = 'main'
-    else:
-        default_repo_tag = 'r' + FLAGS.container_version
+        # Determine the default <repo-tag> based on container version.
+        if not FLAGS.container_version.endswith('dev'):
+            default_repo_tag = 'r' + FLAGS.container_version
 
     # Initialize map of backends to build and repo-tag for each.
     backends = {}

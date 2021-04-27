@@ -62,7 +62,6 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 sleep 10
 
-rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -1134,9 +1133,11 @@ done
 # LifeCycleTest.test_model_reload_fail
 rm -fr models config.pbtxt.*
 mkdir models
-cp -r identity_zero_1_int32 models/. \
-    && mkdir -p models/identity_zero_1_int32/1 \
-    && mkdir -p models/identity_zero_1_int32/2
+cp -r identity_zero_1_int32 models/. && \
+    mkdir -p models/identity_zero_1_int32/1 && \
+    cp libtriton_identity.so models/identity_zero_1_int32/1/. && \
+    mkdir -p models/identity_zero_1_int32/2 && \
+    cp libtriton_identity.so models/identity_zero_1_int32/2/.
 echo "version_policy: { specific { versions: [1] }}" >> models/identity_zero_1_int32/config.pbtxt
 cp identity_zero_1_int32/config.pbtxt config.pbtxt.v2.gpu && \
     echo "version_policy: { specific { versions: [2] }}" >> config.pbtxt.v2.gpu && \
@@ -1329,8 +1330,6 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
-
-LOG_IDX=$((LOG_IDX+1))
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

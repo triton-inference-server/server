@@ -462,7 +462,6 @@ install(
 
 add_subdirectory(custom/sdk custom/sdk)
 add_subdirectory(custom/addsub custom/addsub)
-add_subdirectory(custom/identity custom/identity)
 add_subdirectory(custom/image_preprocess custom/image_preprocess)
 add_subdirectory(custom/param custom/param)
 add_subdirectory(sequence sequence)

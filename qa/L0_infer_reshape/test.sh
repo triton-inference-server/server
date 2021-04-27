@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,15 +66,13 @@ for i in \
         zero_3_int32 ; do
     cp -r models/graphdef_${i} models/custom_${i}
     rm -fr models/custom_${i}/1/*
-    cp libidentity.so models/custom_${i}/1/.
     (cd models/custom_${i} && \
-                sed -i "s/^platform:.*/platform: \"custom\"/" config.pbtxt && \
+                sed -i "s/^platform:.*/backend: \"identity\"/" config.pbtxt && \
                 sed -i "s/^name:.*/name: \"custom_${i}\"/" config.pbtxt && \
-                echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
                 echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
 done
 
-create_nop_modelfile `pwd`/libidentity.so `pwd`/models
+create_nop_version_dir `pwd`/models
 
 RET=0
 
