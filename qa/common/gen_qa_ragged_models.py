@@ -135,7 +135,7 @@ def create_savedmodel_modelfile(models_dir, model_version, dtype):
     # Each output corresponds to the input with the same name, so if there
     # are two requests, one has "RAGGED_INPUT" [2, 4] and the other has [1],
     # since the input is ragged, the model sees the input as [2, 4, 1], and
-    # "BATCH_AND_SIZE_INPUT" will have shape [3]. Then the model output will
+    # "BATCH_AND_SIZE_INPUT" will have shape [2]. Then the model output will
     # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
     # value [[2, 4, 1]].
     tf_dtype = np_to_tf_dtype(dtype)
@@ -208,7 +208,7 @@ def create_plan_modelfile(models_dir, model_version, dtype):
     # Each output corresponds to the input with the same name, so if there
     # are two requests, one has "RAGGED_INPUT" [2, 4] and the other has [1],
     # since the input is ragged, the model sees the input as [2, 4, 1], and
-    # "BATCH_AND_SIZE_INPUT" will have shape [3]. Then the model output will
+    # "BATCH_AND_SIZE_INPUT" will have shape [2]. Then the model output will
     # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
     # value [[2, 4, 1]].
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
@@ -291,7 +291,7 @@ def create_onnx_modelfile(models_dir, model_version, dtype):
     # Each output corresponds to the input with the same name, so if there
     # are two requests, one has "RAGGED_INPUT" [2, 4] and the other has [1],
     # since the input is ragged, the model sees the input as [2, 4, 1], and
-    # "BATCH_AND_SIZE_INPUT" will have shape [3]. Then the model output will
+    # "BATCH_AND_SIZE_INPUT" will have shape [2]. Then the model output will
     # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
     # value [[2, 4, 1]].
 
@@ -480,8 +480,8 @@ def create_batch_input_models(models_dir):
                            "tensorflow", "savedmodel")
         create_savedmodel_modelfile(models_dir, model_version, np.float32)
     if FLAGS.onnx:
-        create_modelconfig(models_dir, 4, model_version, np.float32, "onnx",
-                           "onnx")
+        create_modelconfig(models_dir, 4, model_version, np.float32, "onnxruntime",
+                           "")
         create_onnx_modelfile(models_dir, model_version, np.float32)
 
 
