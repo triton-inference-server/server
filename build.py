@@ -64,7 +64,7 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.10.0dev': ('21.05dev_hemantj', '21.03', '1.7.1', '2021.2.200', '2021.2.200')
+    '2.10.0dev': ('21.05dev', '21.03', '1.7.1', '2021.2.200', '2021.2.200')
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -386,10 +386,12 @@ def onnxruntime_cmake_args(images, library_paths):
     else:
         if target_platform() == 'windows':
             if 'base' in images:
-                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(
+                    images['base']))
         else:
             if 'base' in images:
-                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(
+                    images['base']))
             else:
                 cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
                     TRITON_VERSION_MAP[FLAGS.version][1]))
