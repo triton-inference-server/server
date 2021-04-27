@@ -903,7 +903,7 @@ CompressionTypeUsed(const std::string accept_encoding)
   while (delimeter_pos != std::string::npos) {
     encodings.emplace_back(
         accept_encoding.substr(offset, delimeter_pos - offset));
-    offset = delimeter_pos;
+    offset = delimeter_pos + 1;
     delimeter_pos = accept_encoding.find(',', offset);
   }
   std::string res = "identity";
@@ -2523,6 +2523,9 @@ HTTPAPIServer::InferRequestClass::InferRequestComplete(
   // delete it here.
 
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    if (userp != nullptr) {
+      evbuffer_free(reinterpret_cast<evbuffer*>(userp));
+    }
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(request),
         "deleting HTTP/REST inference request");
@@ -2857,6 +2860,9 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
     }
   }
   evbuffer_add_buffer(req_->buffer_out, response_body);
+  // Destroy the evbuffer object as the data has been moved
+  // to HTTP response buffer
+  evbuffer_free(response_body);
 
   return nullptr;  // success
 }
