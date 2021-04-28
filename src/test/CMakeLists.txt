@@ -459,10 +459,6 @@ install(
   RUNTIME DESTINATION bin
 )
 
-add_subdirectory(custom/sdk custom/sdk)
-add_subdirectory(custom/addsub custom/addsub)
-add_subdirectory(custom/image_preprocess custom/image_preprocess)
-add_subdirectory(custom/param custom/param)
 add_subdirectory(sequence sequence)
 add_subdirectory(dyna_sequence dyna_sequence)
 add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)
