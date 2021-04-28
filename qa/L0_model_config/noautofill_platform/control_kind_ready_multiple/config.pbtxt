@@ -1,5 +1,5 @@
 name: "control_kind_ready_multiple"
-platform: "custom"
+backend: "identity"
 max_batch_size: 8
 sequence_batching {
   control_input [

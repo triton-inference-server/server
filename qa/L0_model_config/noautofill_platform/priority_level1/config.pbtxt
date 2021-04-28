@@ -1,5 +1,5 @@
 name: "priority_level1"
-platform: "custom"
+backend: "identity"
 max_batch_size: 8
 dynamic_batching {
   priority_levels: 3

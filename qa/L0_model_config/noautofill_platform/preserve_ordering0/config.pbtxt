@@ -1,5 +1,5 @@
 name: "preserve_ordering0"
-platform: "custom"
+backend: "identity"
 max_batch_size: 8
 dynamic_batching {
   preserve_ordering: true

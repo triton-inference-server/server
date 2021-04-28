@@ -59,7 +59,7 @@ RUN cmake -DTRITON_ENABLE_GPU=ON \
 WORKDIR /workspace/docs/examples/model_repository
 RUN mkdir -p inception_graphdef/1 && \
     wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
-    https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz && \
+        https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz && \
     (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz) && \
     mv /tmp/inception_v3_2016_08_28_frozen.pb inception_graphdef/1/model.graphdef
 
@@ -135,9 +135,7 @@ RUN mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
 
 RUN mkdir -p qa/L0_backend_identity/models && \
     cp -r src/backends/backend/examples/models/identity_fp32 qa/L0_backend_identity/models/. && \
-    mkdir -p qa/L0_backend_identity/models/identity_fp32/1 && \
-    cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
-        qa/L0_backend_identity/models/identity_fp32/1/.
+    mkdir -p qa/L0_backend_identity/models/identity_fp32/1
 
 RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/sequence/libtriton_sequence.so \
@@ -206,17 +204,13 @@ RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
 RUN mkdir -p qa/L0_decoupled/models/square_int32/1 && \
     cp /tmp/tritonbuild/install/backends/square/libtriton_square.so \
         qa/L0_decoupled/models/square_int32/1/.
-RUN mkdir -p qa/L0_decoupled/models/identity_int32/1 && \
-    cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
-        qa/L0_decoupled/models/identity_int32/1/.
+RUN mkdir -p qa/L0_decoupled/models/identity_int32/1
 RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/fan_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
     mkdir -p qa/L0_decoupled/models/nested_square/1
-RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
-    cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
-        qa/L0_repoagent_checksum/models/identity_int32/1/.
+RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1
 
 ############################################################################
 ## Copy artifacts from sdk container

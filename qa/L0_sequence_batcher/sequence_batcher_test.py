@@ -80,7 +80,7 @@ if ENSEMBLES:
     res = []
     for trial in _trials:
         res.append(trial)
-        if ("custom" in trial):
+        if "custom" in trial:
             continue
         for ensemble_prefix in ENSEMBLE_PREFIXES:
             res.append(ensemble_prefix + trial)
