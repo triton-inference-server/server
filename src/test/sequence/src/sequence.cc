@@ -803,8 +803,7 @@ TRITONBACKEND_ModelInstanceExecute(
         TRITONBACKEND_InputBuffer(
             input, 0 /* input_buffer_count */, &input_buffer, &buffer_byte_size,
             &input_memory_type, &input_memory_type_id));
-    if ((responses[r] == nullptr) ||
-        (input_memory_type == TRITONSERVER_MEMORY_GPU)) {
+    if (responses[r] == nullptr) {
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONSERVER_ErrorNew(
@@ -841,7 +840,14 @@ TRITONBACKEND_ModelInstanceExecute(
     int64_t input_element_cnt = input_byte_size / sizeof(int32_t);
     const int32_t* start = reinterpret_cast<const int32_t*>(start_buffer);
     const int32_t* ready = reinterpret_cast<const int32_t*>(ready_buffer);
-    const int32_t* ipbuffer_int = reinterpret_cast<const int32_t*>(input_buffer);
+    const int32_t* ipbuffer_int = nullptr;
+
+    if (input_memory_type == TRITONSERVER_MEMORY_GPU) {
+      cudaMemcpy(
+          const_cast<int32_t*>(ipbuffer_int), input_buffer, input_byte_size, cudaMemcpyDeviceToHost);
+    } else {
+      ipbuffer_int = reinterpret_cast<const int32_t*>(input_buffer);
+    }
 
     // Update the accumulator value based on START/READY and calculate the
     // output value.
@@ -899,8 +905,7 @@ TRITONBACKEND_ModelInstanceExecute(
             TRITONBACKEND_OutputBuffer(
                 output, &output_buffer, buffer_byte_size, &output_memory_type,
                 &output_memory_type_id));
-        if ((responses[r] == nullptr) ||
-            (output_memory_type == TRITONSERVER_MEMORY_GPU)) {
+        if (responses[r] == nullptr) {
           GUARDED_RESPOND_IF_ERROR(
               responses, r,
               TRITONSERVER_ErrorNew(
@@ -915,9 +920,22 @@ TRITONBACKEND_ModelInstanceExecute(
           continue;
         }
 
-        int32_t* obuffer_int = reinterpret_cast<int32_t*>(output_buffer);
+        int32_t* obuffer_int = nullptr;
+        std::vector<int32_t> obuffer_vec(buffer_byte_size/4);
+        if (output_memory_type == TRITONSERVER_MEMORY_GPU) {
+          obuffer_int = obuffer_vec.data();
+        } else {
+          obuffer_int = reinterpret_cast<int32_t*>(output_buffer);
+        }
+
         for (int64_t i = 0; i < input_element_cnt; ++i) {
           obuffer_int[i] = instance_state->GetAccumulatorAt(r);
+        }
+
+        if (output_memory_type == TRITONSERVER_MEMORY_GPU) {
+          cudaMemcpy(
+              output_buffer, const_cast<int32_t*>(obuffer_int),
+              buffer_byte_size, cudaMemcpyHostToDevice);
         }
       }
     }
