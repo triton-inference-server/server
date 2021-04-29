@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -144,7 +144,7 @@ class ModelQueueTest(tu.TestResultCollector):
                     self.check_deferred_exception()
                 except InferenceServerException as ex:
                     self.assertTrue(
-                        ex.message().startswith("Exceeds maximum queue size"),
+                        "Exceeds maximum queue size" in ex.message(),
                         "Expected error message \"Exceeds maximum queue size\", got: {}"
                         .format(ex))
             try:
@@ -222,7 +222,7 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(
-                    ex.message().startswith("Request timeout expired"),
+                    "Request timeout expired" in ex.message(),
                     "Expected error message \"Request timeout expired\", got: {}"
                     .format(ex))
 
@@ -270,7 +270,7 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(
-                    ex.message().startswith("Request timeout expired"),
+                    "Request timeout expired" in ex.message(),
                     "Expected error message \"Request timeout expired\", got: {}"
                     .format(ex))
 
@@ -309,7 +309,7 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(
-                    ex.message().startswith("Request timeout expired"),
+                    "Request timeout expired" in ex.message(),
                     "Expected error message \"Request timeout expired\", got: {}"
                     .format(ex))
 
@@ -346,7 +346,7 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(
-                    ex.message().startswith("Request timeout expired"),
+                    "Request timeout expired" in ex.message(),
                     "Expected error message \"Request timeout expired\", got: {}"
                     .format(ex))
 
@@ -458,7 +458,7 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(
-                    ex.message().startswith("Request timeout expired"),
+                    "Request timeout expired"  in ex.message(),
                     "Expected error message \"Request timeout expired\", got: {}"
                     .format(ex))
 
