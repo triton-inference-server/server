@@ -42,10 +42,13 @@ _max_queue_delay_ms = 10000
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
-
 class ModelQueueTest(tu.TestResultCollector):
 
     def setUp(self):
+        self.trials_ = []
+        for base in ["custom", "ensemble"]:
+            for is_http_trial in [True, False]:
+                self.trials_.append({"base": base, "is_http_trial": is_http_trial})
         global _deferred_exceptions
         _deferred_exceptions = []
 
@@ -69,6 +72,7 @@ class ModelQueueTest(tu.TestResultCollector):
                        priority,
                        timeout_us,
                        thresholds,
+                       base="custom",
                        is_http_trial=True):
         full_shapes = [[
             bs,
@@ -76,7 +80,7 @@ class ModelQueueTest(tu.TestResultCollector):
         try:
             start_ms = int(round(time.time() * 1000))
             iu.infer_zero(self,
-                          "custom",
+                          base,
                           bs,
                           dtype,
                           full_shapes,
@@ -113,7 +117,7 @@ class ModelQueueTest(tu.TestResultCollector):
         dtype = np.float32
         shapes = ([16],)
 
-        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+        for trial in self.trials_:
             preceding_thread = threading.Thread(
                 target=self.check_response,
                 args=(8, dtype, shapes, 0, 0, (1999, 1000)),
@@ -157,7 +161,7 @@ class ModelQueueTest(tu.TestResultCollector):
         # can be executed.
         dtype = np.float32
         shapes = ([16],)
-        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+        for trial in self.trials_:
             try:
                 threads = []
                 threads.append(
@@ -191,7 +195,7 @@ class ModelQueueTest(tu.TestResultCollector):
         # second and third request be batched together and executed.
         dtype = np.float32
         shapes = ([16],)
-        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+        for trial in self.trials_:
             threads = []
             threads.append(
                 threading.Thread(target=self.check_response,
@@ -238,7 +242,7 @@ class ModelQueueTest(tu.TestResultCollector):
 
         dtype = np.float32
         shapes = ([16],)
-        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+        for trial in self.trials_:
             threads = []
             threads.append(
                 threading.Thread(target=self.check_response,
@@ -358,7 +362,7 @@ class ModelQueueTest(tu.TestResultCollector):
         # first request.
         dtype = np.float32
         shapes = ([16],)
-        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+        for trial in self.trials_:
             threads = []
             threads.append(
                 threading.Thread(target=self.check_response,
@@ -412,7 +416,7 @@ class ModelQueueTest(tu.TestResultCollector):
 
         dtype = np.float32
         shapes = ([16],)
-        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+        for trial in self.trials_:
             threads = []
             # The expected ranges may not be rounded to accommodate
             # the sleep between sending requests
