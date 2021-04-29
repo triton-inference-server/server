@@ -323,6 +323,7 @@ class EnsembleContext {
   std::string request_id_;
   uint64_t correlation_id_;
   uint32_t priority_;
+  uint64_t timeout_;
 
   // Objects related to the ensemble infer request
   Status ensemble_status_;
@@ -433,6 +434,7 @@ EnsembleContext::EnsembleContext(
     correlation_id_ = lrequest->CorrelationId();
     flags_ = lrequest->Flags();
     priority_ = lrequest->Priority();
+    timeout_ = lrequest->TimeoutMicroseconds();
 
     for (const auto& pr : lrequest->ImmutableInputs()) {
       const InferenceRequest::Input* input = pr.second;
@@ -818,11 +820,6 @@ EnsembleContext::InitStep(
   auto irequest = std::unique_ptr<InferenceRequest>(
       new InferenceRequest(backend, istep.model_version_));
 
-  // Request for ensemble model cannot override the timeout values for the
-  // composing models. Thus currently the timeout field in request has no
-  // effect until we support an overall ensemble timeout.
-  irequest->SetTimeoutMicroseconds(0);
-
   // Store the pointers to tensors used so that we can prune them afterward.
   // Can't prune the tensor in the input loop below as it may be used by
   // multiple inputs in the same step.
@@ -884,6 +881,7 @@ EnsembleContext::InitStep(
   irequest->SetCorrelationId(correlation_id);
   irequest->SetFlags(flags);
   irequest->SetPriority(priority_);
+  irequest->SetTimeoutMicroseconds(timeout_);
 #ifdef TRITON_ENABLE_STATS
   irequest->SetSecondaryStatsAggregator(
       &request_tracker_->ContextStatsAggregator());
