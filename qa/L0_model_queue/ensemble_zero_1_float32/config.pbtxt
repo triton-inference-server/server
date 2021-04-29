@@ -45,6 +45,7 @@ ensemble_scheduling {
   step [
     {
       model_name: "custom_zero_1_float32"
+      model_version: -1
       input_map {
         key: "INPUT0"
         value: "INPUT0"
