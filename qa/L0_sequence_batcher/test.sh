@@ -196,6 +196,15 @@ for MODEL in $MODELS; do
       (cd queue_delay_models/$(basename $MODEL)_full && \
         sed -i "s/$(basename $MODEL)/$(basename $MODEL)_full/" config.pbtxt && \
         sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 1/" config.pbtxt)
+  else
+    cp -r $MODEL queue_delay_models/$(basename $MODEL)_full && \
+      (cd queue_delay_models/$(basename $MODEL)_full && \
+        sed -i "s/$(basename $MODEL)/$(basename $MODEL)_full/" config.pbtxt && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/sequence_batching {/sequence_batching {\\ndirect {\\nmax_queue_delay_microseconds: 3000000\\nminimum_slot_utilization: 0\\n}/" config.pbtxt && \
+        sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 1/" config.pbtxt)
   fi
 done
 
