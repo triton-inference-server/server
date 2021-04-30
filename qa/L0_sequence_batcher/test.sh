@@ -63,6 +63,10 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     QUEUE_DELAY_TESTS="test_queue_delay_full_min_util"
 fi
 
+if [ -z "$TEST_JETSON" ]; then
+    TEST_CUDA_SHARED_MEMORY="0"
+fi
+
 # Shortened tests due to jetson slowdown
 if [ "$TEST_JETSON" -eq 1 ]; then
     MODEL_TRIALS="0 v"
