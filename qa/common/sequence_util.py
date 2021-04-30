@@ -416,8 +416,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
         """
         if (("savedmodel" not in trial) and ("graphdef" not in trial) and
-            ("onnx" not in trial) and ("libtorch" not in trial) and
-            ("plan" not in trial)):
+            ("custom" not in trial) and ("onnx" not in trial) and
+            ("libtorch" not in trial) and ("plan" not in trial)):
             self.assertFalse(True, "unknown trial type: " + trial)
 
         # Can only send the request exactly once since it is a
@@ -661,8 +661,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
         """
         if (("savedmodel" not in trial) and ("graphdef" not in trial) and
-            ("onnx" not in trial) and ("libtorch" not in trial) and
-            ("plan" not in trial)):
+            ("custom" not in trial) and ("onnx" not in trial) and
+            ("libtorch" not in trial) and ("plan" not in trial)):
             self.assertFalse(True, "unknown trial type: " + trial)
 
         self.assertFalse(

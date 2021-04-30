@@ -156,20 +156,19 @@ function get_datatype () {
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  DTYPE=$(get_datatype $BACKEND)
-  if [ "$BACKEND" == "custom" ]; then
+  if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
-    continue
-  fi
+  else
+    DTYPE=$(get_datatype $BACKEND)
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
 
-  MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    if [[ $BACKEND == "graphdef" ]]; then
+      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
+    fi
 
-  if [[ $BACKEND == "graphdef" ]]; then
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
-  fi
-
-  if [ "$ENSEMBLES" == "1" ]; then
-    MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+    if [ "$ENSEMBLES" == "1" ]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+    fi
   fi
 done
 
@@ -219,22 +218,22 @@ done
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  DTYPE=$(get_datatype $BACKEND)
-  if [ "$BACKEND" == "custom" ]; then
-    continue
-  fi
-
-  MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
-
-  if [[ $BACKEND == "graphdef" ]]; then
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
-  fi
-
-  if [ "$ENSEMBLES" == "1" ]; then
-    MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+  if [[ $BACKEND == "custom" ]]; then
+    MODELS="$MODELS ../custom_models/custom_sequence_int32"
+  else
+    DTYPE=$(get_datatype $BACKEND)
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
 
     if [[ $BACKEND == "graphdef" ]]; then
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
+      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
+    fi
+
+    if [ "$ENSEMBLES" == "1" ]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+
+      if [[ $BACKEND == "graphdef" ]]; then
+        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
+      fi
     fi
   fi
 done
@@ -251,16 +250,15 @@ rm -fr modelsv && mkdir modelsv
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  DTYPE=$(get_datatype $BACKEND)
-  if [ "$BACKEND" == "custom" ]; then
+  if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
-    continue
-  fi
+  else
+    DTYPE=$(get_datatype $BACKEND)
+    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
 
-  MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
-
-  if [ "$ENSEMBLES" == "1" ]; then
-    MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+    if [ "$ENSEMBLES" == "1" ]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+    fi
   fi
 done
 
@@ -418,77 +416,77 @@ done
 
 # ragged models
 if [[ $BACKENDS == *"custom"* ]]; then
-    rm -fr ragged_models && mkdir ragged_models
-    cp -r ../custom_models/custom_sequence_int32 ragged_models/.
-    (cd ragged_models/custom_sequence_int32 && \
-            sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
+  rm -fr ragged_models && mkdir ragged_models
+  cp -r ../custom_models/custom_sequence_int32 ragged_models/.
+  (cd ragged_models/custom_sequence_int32 && \
+          sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 
-    export NO_BATCHING=0
-    export MODEL_INSTANCES=1
-    export BATCHER_TYPE="FIXED"
-    MODEL_PATH=ragged_models
+  export NO_BATCHING=0
+  export MODEL_INSTANCES=1
+  export BATCHER_TYPE="FIXED"
+  MODEL_PATH=ragged_models
 
-    # Need to launch the server for each test so that the model status
-    # is reset (which is used to make sure the correct batch size was
-    # used for execution). Test everything with fixed-tensor-size
-    # models and variable-tensor-size models.
-    for i in test_ragged_batch_allowed ; do
-        export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
-        export TRITONSERVER_DELAY_SCHEDULER=12
+  # Need to launch the server for each test so that the model status
+  # is reset (which is used to make sure the correct batch size was
+  # used for execution). Test everything with fixed-tensor-size
+  # models and variable-tensor-size models.
+  for i in test_ragged_batch_allowed ; do
+    export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+    export TRITONSERVER_DELAY_SCHEDULER=12
 
-        SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$i.$MODEL_PATH.serverlog"
 
-        if [ "$TEST_VALGRIND" -eq 1 ]; then
-            LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-            LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-            run_server_leakcheck
-        elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-            # We rely on HTTP endpoint in run_server so until HTTP is
-            # implemented for win we do this hack...
-            run_server_nowait
-            sleep 15
-        else
-            run_server
-        fi
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+      LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+      LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+      run_server_leakcheck
+    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+      # We rely on HTTP endpoint in run_server so until HTTP is
+      # implemented for win we do this hack...
+      run_server_nowait
+      sleep 15
+    else
+        run_server
+    fi
 
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            exit 1
-        fi
+    if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+    fi
 
-        echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
+    echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
-        set +e
-        python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-            echo -e "\n***\n*** Test $i Failed\n***"
-            RET=1
-        else
-            check_test_results $CLIENT_LOG 1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                echo -e "\n***\n*** Test Result Verification Failed\n***"
-                RET=1
-            fi
-        fi
-        set -e
+    set +e
+    python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+      echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+      echo -e "\n***\n*** Test $i Failed\n***"
+      RET=1
+    else
+      check_test_results $CLIENT_LOG 1
+      if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+      fi
+    fi
+    set -e
 
-        unset TRITONSERVER_DELAY_SCHEDULER
-        unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-        kill_server
+    unset TRITONSERVER_DELAY_SCHEDULER
+    unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+    kill_server
 
-        set +e
-        if [ "$TEST_VALGRIND" -eq 1 ]; then
-            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
-            if [ $? -ne 0 ]; then
-                RET=1
-            fi
-        fi
-        set -e
-    done
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+      python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+      if [ $? -ne 0 ]; then
+          RET=1
+      fi
+    fi
+    set -e
+  done
 fi
 
 # max queue delay
