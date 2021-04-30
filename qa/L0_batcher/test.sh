@@ -76,6 +76,7 @@ TF_VERSION=${TF_VERSION:=1}
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    OS_WINDOWS="1"
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
@@ -83,6 +84,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
     export USE_HTTP=0
     export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER
 else
+    OS_WINDOWS="0"
     MODELDIR=${MODELDIR:=`pwd`}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     OPTDIR=${OPTDIR:="/opt"}
@@ -400,8 +402,8 @@ done
 TEST_CASE=test_multi_batch_preserve_ordering
 
 # FIXME sleep_for does not delay for expected time when passing 400ms 
-# when using I/O is in GPU memory.
-if [ "$TEST_CUDA_SHARED_MEMORY" -eq 0 ]; then
+# when using I/O is in GPU memory. Skip for Windows test.
+if [ "$OS_WINDOWS" -eq "1" ] && [ "$TEST_CUDA_SHARED_MEMORY" -eq 0 ]; then
     rm -fr ./custom_models && mkdir ./custom_models && \
         cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
         mkdir -p ./custom_models/custom_zero_1_float32/1

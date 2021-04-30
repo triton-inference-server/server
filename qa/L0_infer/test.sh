@@ -72,12 +72,14 @@ TF_VERSION=${TF_VERSION:=1}
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    export OS_WINDOWS="1"
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     export USE_HTTP=0
 else
+    export OS_WINDOWS="0"
     MODELDIR=${MODELDIR:=`pwd`/models}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     OPTDIR=${OPTDIR:="/opt"}
@@ -169,18 +171,21 @@ for TARGET in cpu gpu; do
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
-      for BACKEND in $BACKENDS; do
-        if [ "$BACKEND" != "python" ]; then
-            cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
-              models/.
-        fi
-      done
 
-      # Copy identity backend models 
-      cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
-        models/.
+      # Copy identity backend models and ensembled for non-Windows test
+      if [ "$OS_WINDOWS" -eq "1" ]; then
+        for BACKEND in $BACKENDS; do
+          if [ "$BACKEND" != "python" ]; then
+              cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
+                models/.
+          fi
+        done
 
-      create_nop_version_dir `pwd`/models
+        cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
+          models/.
+
+        create_nop_version_dir `pwd`/models
+      fi
 
       if [[ $BACKENDS == *"graphdef"* ]]; then
         ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
@@ -212,19 +217,21 @@ for TARGET in cpu gpu; do
 
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
     # This is done after the instance group change above so that identity backend models
-    # are run on CPU
-    cp -r ../custom_models/custom_zero_1_float32 models/. &&\
-        mkdir -p models/custom_zero_1_float32/1 && \
-        (cd models/custom_zero_1_float32 && \
-            echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
-    cp -r models/custom_zero_1_float32 models/custom_nobatch_zero_1_float32 && \
-        (cd models/custom_zero_1_float32 && \
-            sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
-            sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt) && \
-        (cd models/custom_nobatch_zero_1_float32 && \
-            sed -i "s/custom_zero_1_float32/custom_nobatch_zero_1_float32/" config.pbtxt && \
-            sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
-            sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
+    # are run on CPU. Skip for Windows test.
+    if [ "$OS_WINDOWS" -eq "1" ]; then
+      cp -r ../custom_models/custom_zero_1_float32 models/. &&\
+          mkdir -p models/custom_zero_1_float32/1 && \
+          (cd models/custom_zero_1_float32 && \
+              echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
+      cp -r models/custom_zero_1_float32 models/custom_nobatch_zero_1_float32 && \
+          (cd models/custom_zero_1_float32 && \
+              sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
+              sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt) && \
+          (cd models/custom_nobatch_zero_1_float32 && \
+              sed -i "s/custom_zero_1_float32/custom_nobatch_zero_1_float32/" config.pbtxt && \
+              sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
+              sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
+    fi
 
     # Check if running a memory leak check
     if [ "$TEST_VALGRIND" -eq 1 ]; then

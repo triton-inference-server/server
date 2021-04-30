@@ -48,6 +48,7 @@ assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 BACKENDS = os.environ.get('BACKENDS',
                           "graphdef savedmodel onnx libtorch plan python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
+OS_WINDOWS = bool(int(os.environ.get('OS_WINDOWS', 1)))
 
 np_dtype_string = np.dtype(object)
 
@@ -125,7 +126,7 @@ class InferTest(tu.TestResultCollector):
 
         all_ensemble_prefix = ["simple_", "sequence_", "fan_"]
         ensemble_prefix = [""]
-        if ENSEMBLES:
+        if ENSEMBLES and OS_WINDOWS:
             for prefix in all_ensemble_prefix:
                 if tu.validate_for_ensemble_model(prefix, input_dtype,
                                                   output0_dtype, output1_dtype,
@@ -812,7 +813,7 @@ class InferTest(tu.TestResultCollector):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if all(x in BACKENDS for x in ['graphdef',]):
+        if all(x in BACKENDS for x in ['graphdef',]) and not OS_WINDOWS:
 
             def test_ensemble_mix_batch_nobatch(self):
                 base_names = ["batch_to_nobatch", "nobatch_to_batch"]
