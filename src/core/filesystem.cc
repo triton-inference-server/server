@@ -1753,7 +1753,8 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
         "-DTRITON_ENABLE_S3=ON.");
 #else
     Aws::SDKOptions options;
-    Aws::InitAPI(options);
+    std::once_flag onceFlag;
+    std::call_once(onceFlag, [&options] { Aws::InitAPI(options); });
     static S3FileSystem s3_fs(options, path);
     *file_system = &s3_fs;
     return Status::Success;
