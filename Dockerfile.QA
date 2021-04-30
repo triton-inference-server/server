@@ -206,7 +206,6 @@ RUN mkdir -p qa/L0_decoupled/models/square_int32/1 && \
         qa/L0_decoupled/models/square_int32/1/.
 RUN mkdir -p qa/L0_decoupled/models/identity_int32/1
 RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
-    mkdir -p qa/L0_decoupled/models/fan_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
     mkdir -p qa/L0_decoupled/models/nested_square/1
