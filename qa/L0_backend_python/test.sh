@@ -406,6 +406,9 @@ $page_size."
     fi
 done
 
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
