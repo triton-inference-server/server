@@ -66,14 +66,16 @@ class PythonTest(tu.TestResultCollector):
         # Total shared memory available is 1GiB.
         total_byte_size = 1024 * 1024 * 1024
         shape = [total_byte_size]
-        with self.assertRaises(InferenceServerException):
+        with self.assertRaises(InferenceServerException) as ex:
             self._infer_help(model_name, shape, dtype)
+        self.assertIn("Failed to increase the shared memory pool size", str(ex.exception))
 
         # 512 MiBs payload leads to error in the Python stub process.
         total_byte_size = 512 * 1024 * 1024
         shape = [total_byte_size]
-        with self.assertRaises(InferenceServerException):
+        with self.assertRaises(InferenceServerException) as ex:
             self._infer_help(model_name, shape, dtype)
+        self.assertIn("Failed to increase the shared memory pool size", str(ex.exception))
 
         # 2 MiBs
         # Send a small paylaod to make sure it is still working properly
@@ -220,10 +222,13 @@ class PythonTest(tu.TestResultCollector):
             self.assertTrue(np.allclose(output_data[0], expected_result),
                             'Inference result is not correct')
 
-    def test_infer_output_error(self):
+    def test_batch_error(self):
+        # The execute_error model returns an error for the first request and
+        # sucessfully processes the second request.  This is making sure that
+        # an error in a single request does not completely fail the batch.
         model_name = "execute_error"
         shape = [2, 2]
-        request_parallelism = 4
+        request_parallelism = 2
 
         with httpclient.InferenceServerClient(
                 "localhost:8000", concurrency=request_parallelism) as client:
@@ -240,9 +245,6 @@ class PythonTest(tu.TestResultCollector):
                 requests.append(client.async_infer(model_name, inputs))
 
             for i in range(request_parallelism):
-                # Get the result from the initiated asynchronous inference request.
-                # Note the call will block till the server responds.
-
                 results = None
                 if i == 0:
                     with self.assertRaises(InferenceServerException):
