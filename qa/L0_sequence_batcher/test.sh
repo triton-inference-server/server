@@ -153,6 +153,11 @@ function get_datatype () {
 MODELS=""
 for BACKEND in $BACKENDS; do
   DTYPE=$(get_datatype $BACKEND)
+  if [ "$BACKEND" == "custom" ]; then
+    MODELS="$MODELS ../custom_models/custom_sequence_int32"
+    continue
+  fi
+
   MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
 
   if [[ $BACKEND == "graphdef" ]]; then
@@ -211,6 +216,10 @@ done
 MODELS=""
 for BACKEND in $BACKENDS; do
   DTYPE=$(get_datatype $BACKEND)
+  if [ "$BACKEND" == "custom" ]; then
+    continue
+  fi
+
   MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
 
   if [[ $BACKEND == "graphdef" ]]; then
@@ -239,6 +248,11 @@ rm -fr modelsv && mkdir modelsv
 MODELS=""
 for BACKEND in $BACKENDS; do
   DTYPE=$(get_datatype $BACKEND)
+  if [ "$BACKEND" == "custom" ]; then
+    MODELS="$MODELS ../custom_models/custom_sequence_int32"
+    continue
+  fi
+
   MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
 
   if [ "$ENSEMBLES" == "1" ]; then
