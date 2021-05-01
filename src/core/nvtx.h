@@ -34,9 +34,14 @@ namespace nvidia { namespace inferenceserver {
 // Updates a server stat with duration measured by a C++ scope.
 class NvtxRange {
  public:
-  explicit NvtxRange(const std::string& label)
+  explicit NvtxRange(const char* label)
   {
-    nvtxRangePushA(label.c_str());
+    nvtxRangePushA(label);
+  }
+
+  explicit NvtxRange(const std::string& label)
+    : NvtxRange(label.c_str())
+  {
   }
 
   ~NvtxRange()
