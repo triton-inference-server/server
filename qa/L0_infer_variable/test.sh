@@ -60,6 +60,8 @@ for TARGET in cpu gpu; do
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository models && \
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_variable_model_repository/* models/.
 
+    create_nop_version_dir `pwd`/models
+
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     # Onnx models are handled separately, see below
     for FW in graphdef savedmodel onnx libtorch; do

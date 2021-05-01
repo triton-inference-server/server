@@ -173,7 +173,7 @@ for TARGET in cpu gpu; do
     if [ "$ENSEMBLES" == "1" ]; then
 
       # Copy identity backend models and ensembled for non-Windows test
-      if [ "$OS_WINDOWS" -eq "1" ]; then
+      if [ "$OS_WINDOWS" -eq "0" ]; then
         for BACKEND in $BACKENDS; do
           if [ "$BACKEND" != "python" ]; then
               cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
@@ -190,7 +190,7 @@ for TARGET in cpu gpu; do
       if [[ $BACKENDS == *"graphdef"* ]]; then
         ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
 
-        if [ "$OS_WINDOWS" -eq "1" ]; then
+        if [ "$OS_WINDOWS" -eq "0" ]; then
           ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
         fi
 
@@ -220,7 +220,7 @@ for TARGET in cpu gpu; do
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
     # This is done after the instance group change above so that identity backend models
     # are run on CPU. Skip for Windows test.
-    if [ "$OS_WINDOWS" -eq "1" ]; then
+    if [ "$OS_WINDOWS" -eq "0" ]; then
       cp -r ../custom_models/custom_zero_1_float32 models/. &&\
           mkdir -p models/custom_zero_1_float32/1 && \
           (cd models/custom_zero_1_float32 && \

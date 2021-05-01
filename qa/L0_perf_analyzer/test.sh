@@ -187,21 +187,7 @@ for PROTOCOL in grpc http; do
         set -e
     done
 
-    set +e
-    # Testing with preprocess_inception_ensemble model
-    $PERF_ANALYZER -v -i $PROTOCOL -m preprocess_inception_ensemble --input-data=$IMAGE_JSONDATAFILE \
-    -p2000 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
+    # TODO Add back testing with preprocess_inception_ensemble model
 
     # Testing with inception model
     for SHARED_MEMORY_TYPE in none system cuda; do

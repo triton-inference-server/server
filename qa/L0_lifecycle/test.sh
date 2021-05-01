@@ -310,8 +310,8 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_init_error_modelfail
 rm -fr models models_0
 mkdir models models_0
-cp -r $DATADIR/qa_sequence_model_repository/onnx_sequence_int32 models_0/.
-cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models/.
+cp -r $DATADIR/qa_sequence_model_repository/onnx_sequence_int32 models/.
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models_0/.
 sed -i "s/OUTPUT/_OUTPUT/" models/onnx_sequence_int32/config.pbtxt
 sed -i "s/OUTPUT/_OUTPUT/" models_0/onnx_int32_int32_int32/config.pbtxt
 for i in graphdef savedmodel; do
