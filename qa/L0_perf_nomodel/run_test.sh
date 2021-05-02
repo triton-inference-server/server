@@ -86,7 +86,7 @@ for BACKEND in $BACKENDS; do
 
     # set input name (special case for libtorch model)
     INPUT_NAME="INPUT0" && [ $BACKEND == "libtorch" ] && INPUT_NAME="INPUT__0"
-    
+
     MAX_LATENCY=300
     MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
 
@@ -109,20 +109,26 @@ for BACKEND in $BACKENDS; do
     # set model name (special case for openvino i.e. nobatch)
     MODEL_NAME=${BACKEND}_zero_1_float32 && [ $BACKEND == "openvino" ] && MODEL_NAME=${BACKEND}_nobatch_zero_1_float32
 
-    if [ $BACKEND == "python" ]; then
-        REPO_DIR=./python_models 
+    if [ $BACKEND == "custom" ]; then
+        REPO_DIR=./custom_models
+    elif [ $BACKEND == "python" ]; then
+        REPO_DIR=./python_models
     else
         REPO_DIR=$DATADIR/qa_identity_model_repository
     fi
 
     SHAPE=${TENSOR_SIZE}
-    KIND="KIND_GPU" && [ $BACKEND == "python" ] || [ $BACKEND == "openvino" ] && KIND="KIND_CPU"
+    KIND="KIND_GPU" && [ $BACKEND == "custom" ] || [ $BACKEND == "python" ] || [ $BACKEND == "openvino" ] && KIND="KIND_CPU"
 
     rm -fr models && mkdir -p models && \
         cp -r $REPO_DIR/$MODEL_NAME models/. && \
         (cd models/$MODEL_NAME && \
                 sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
                 echo "instance_group [ { kind: ${KIND}, count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+    if [ $BACKEND == "custom" ]; then
+        (cd models/$MODEL_NAME && \
+            sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt)
+    fi
     if [ $DYNAMIC_BATCH > 1 ] && [ $BACKEND != "openvino" ]; then
         (cd models/$MODEL_NAME && \
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
