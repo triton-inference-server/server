@@ -42,7 +42,9 @@ _max_queue_delay_ms = 10000
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
+
 class ModelQueueTest(tu.TestResultCollector):
+
     def setUp(self):
         self.trials_ = []
         for base in ["custom", "ensemble"]:
@@ -114,12 +116,12 @@ class ModelQueueTest(tu.TestResultCollector):
         # model execution. Then sends 10 requests to overload the model queue,
         # expecting 2 of the requests are returned with error code immediately.
         dtype = np.float32
-        shapes = ([16], )
+        shapes = ([16],)
 
         for trial in self.trials_:
             preceding_thread = threading.Thread(
                 target=self.check_response,
-                args=(8, dtype, shapes, 0, 0, (5000, 1000)),
+                args=(8, dtype, shapes, 0, 0, (1999, 1000)),
             )
             threads = []
             for i in range(10):
@@ -170,11 +172,11 @@ class ModelQueueTest(tu.TestResultCollector):
                                      kwargs=trial))
                 threads.append(
                     threading.Thread(target=self.check_response,
-                                     args=(2, dtype, shapes, 0, 0, (4000, 0)),
+                                     args=(2, dtype, shapes, 0, 0, (100, 0)),
                                      kwargs=trial))
                 threads.append(
                     threading.Thread(target=self.check_response,
-                                     args=(2, dtype, shapes, 0, 0, (4000, 0)),
+                                     args=(2, dtype, shapes, 0, 0, (100, 0)),
                                      kwargs=trial))
                 threads[0].start()
                 time.sleep(0.2)
@@ -202,11 +204,11 @@ class ModelQueueTest(tu.TestResultCollector):
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (4000, 0)),
+                                 args=(2, dtype, shapes, 0, 0, (100, 0)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (4000, 0)),
+                                 args=(2, dtype, shapes, 0, 0, (100, 0)),
                                  kwargs=trial))
             threads[0].start()
             time.sleep(0.2)
@@ -250,11 +252,11 @@ class ModelQueueTest(tu.TestResultCollector):
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (4000, 0)),
+                                 args=(2, dtype, shapes, 0, 0, (100, 0)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (4000, 0)),
+                                 args=(2, dtype, shapes, 0, 0, (100, 0)),
                                  kwargs=trial))
             threads[0].start()
             time.sleep(0.2)
@@ -289,11 +291,11 @@ class ModelQueueTest(tu.TestResultCollector):
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (1500, 700)),
+                                 args=(2, dtype, shapes, 0, 0, (1100, 700)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (1500, 700)),
+                                 args=(2, dtype, shapes, 0, 0, (1100, 700)),
                                  kwargs=trial))
             threads[0].start()
             time.sleep(0.2)
@@ -326,11 +328,11 @@ class ModelQueueTest(tu.TestResultCollector):
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (1500, 700)),
+                                 args=(2, dtype, shapes, 0, 0, (1100, 700)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (1500, 700)),
+                                 args=(2, dtype, shapes, 0, 0, (1100, 700)),
                                  kwargs=trial))
             threads[0].start()
             time.sleep(0.2)
@@ -365,7 +367,7 @@ class ModelQueueTest(tu.TestResultCollector):
             threads = []
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 0, 0, (4000, 200)),
+                                 args=(2, dtype, shapes, 0, 0, (500, 200)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
@@ -373,7 +375,7 @@ class ModelQueueTest(tu.TestResultCollector):
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 1, 0, (4000, 0)),
+                                 args=(2, dtype, shapes, 1, 0, (100, 0)),
                                  kwargs=trial))
             threads[0].start()
             # wait to make sure the order is correct
@@ -421,16 +423,16 @@ class ModelQueueTest(tu.TestResultCollector):
             # the sleep between sending requests
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 1, 0, (5000, 1000)),
+                                 args=(2, dtype, shapes, 1, 0, (2000, 1000)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(1, dtype, shapes, 1, 1000000, (5000,
+                                 args=(1, dtype, shapes, 1, 1000000, (3400,
                                                                       2400)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(2, dtype, shapes, 1, 0, (5000, 700)),
+                                 args=(2, dtype, shapes, 1, 0, (1700, 700)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
@@ -439,7 +441,7 @@ class ModelQueueTest(tu.TestResultCollector):
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(3, dtype, shapes, 2, 0, (5000, 1700)),
+                                 args=(3, dtype, shapes, 2, 0, (2700, 1700)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
@@ -457,7 +459,7 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(
-                    "Request timeout expired"  in ex.message(),
+                    "Request timeout expired" in ex.message(),
                     "Expected error message \"Request timeout expired\", got: {}"
                     .format(ex))
 
