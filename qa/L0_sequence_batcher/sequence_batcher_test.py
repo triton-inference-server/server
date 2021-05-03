@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -2229,7 +2229,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # request while the second sequence has two, so expecting the second
         # execution to be a batch of 'null, seq 2'. Both executions should be
         # waited until the max queue delay is exceeded.
-
         for trial in _trials:
             is_ensemble = False
             for prefix in ENSEMBLE_PREFIXES:
@@ -2267,7 +2266,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             model_name,
                             dtype,
                             1001,
-                            (4000, 3000),
+                            (6000, 3000),
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start", 1, None),),

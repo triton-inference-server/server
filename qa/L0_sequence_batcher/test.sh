@@ -64,7 +64,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 fi
 
 if [ -z "$TEST_JETSON" ]; then
-    TEST_CUDA_SHARED_MEMORY="0"
+    TEST_JETSON="0"
 fi
 
 # Shortened tests due to jetson slowdown
