@@ -1230,25 +1230,12 @@ ValidateModelConfig(
 #endif  // TRITON_ENABLE_GPU
 
     for (const auto& group : config.instance_group()) {
-      // KIND_MODEL is supported only on TensorFlow.
       if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         if (group.gpus().size() > 0) {
           return Status(
               Status::Code::INVALID_ARG,
               "instance group " + group.name() + " of model " + config.name() +
                   " has kind KIND_MODEL but specifies one or more GPUs");
-        }
-#ifdef TRITON_ENABLE_TENSORFLOW
-        if (!(config.platform() == kTensorFlowGraphDefPlatform ||
-              config.platform() == kTensorFlowSavedModelPlatform))
-#endif  // TRITON_ENABLE_TENSORFLOW
-        {
-          return Status(
-              Status::Code::INVALID_ARG,
-              "instance group " + group.name() + " of model " + config.name() +
-                  "on platform " + config.platform() +
-                  " has kind KIND_MODEL which is supported only on TensorFlow "
-                  "models");
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
 #ifndef TRITON_ENABLE_GPU
