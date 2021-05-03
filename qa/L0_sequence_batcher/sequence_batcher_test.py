@@ -2266,6 +2266,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             model_name,
                             dtype,
                             1001,
+                            # (4000, 3000), TODO: Investigate why earlier threshold requirements were lower
                             (6000, 3000),
                             # (flag_str, value, pre_delay_ms)
                             (
