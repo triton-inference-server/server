@@ -47,7 +47,7 @@ add_library(
 target_link_libraries(
   onnxruntime-backend-library
   PRIVATE
-    proto-library
+    proto-library             # from repo-common
   PUBLIC
     triton-core-serverapi     # from repo-core
     triton-common-sync-queue  # from repo-common

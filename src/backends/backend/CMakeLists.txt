@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,7 +66,7 @@ endif() # TRITON_ENABLE_METRICS
 target_link_libraries(
   triton-backend-library
   PRIVATE
-    proto-library
+    proto-library           # from repo-common
   PUBLIC
     triton-core-backendapi  # from repo-core
     triton-core-serverapi   # from repo-core

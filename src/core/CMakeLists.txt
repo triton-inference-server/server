@@ -36,7 +36,7 @@ add_library(
 target_link_libraries(
   model-config-library
   PUBLIC
-    proto-library
+    proto-library           # from repo-common
     triton-core-serverapi   # from repo-core
 )
 
@@ -49,7 +49,7 @@ if(${TRITON_ENABLE_GPU})
   target_link_libraries(
     model-config-cuda-library
     PUBLIC
-      proto-library
+      proto-library     # from repo-common
   )
 endif() # TRITON_ENABLE_GPU
 
@@ -73,11 +73,11 @@ add_library(
 target_link_libraries(
   triton-repoagent-library
   PRIVATE
-    proto-library
+    proto-library             # from repo-common
   PUBLIC
     triton-core-repoagentapi  # from repo-core
-    triton-core-serverapi   # from repo-core
-    triton-common-json      # from repo-common
+    triton-core-serverapi     # from repo-core
+    triton-common-json        # from repo-common
 )
 
 #
@@ -240,7 +240,7 @@ endif() # TRITON_ENABLE_AZURE_STORAGE
 target_link_libraries(
   server-library
   PRIVATE
-    proto-library
+    proto-library                    # from repo-common
   PUBLIC
     triton-core-backendapi           # from repo-core
     triton-core-serverapi            # from repo-core

@@ -133,7 +133,7 @@ target_link_libraries(
   PRIVATE triton-common-error        # from repo-common
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
-  PRIVATE proto-library
+  PRIVATE proto-library              # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
@@ -183,7 +183,7 @@ target_link_libraries(
   PRIVATE triton-common-error        # from repo-common
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
-  PRIVATE proto-library
+  PRIVATE proto-library              # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
@@ -294,7 +294,7 @@ target_include_directories(
 target_link_libraries(
   data_compressor_test
   PRIVATE triton-core-serverapi  # from repo-core
-  PRIVATE proto-library
+  PRIVATE proto-library          # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE -lpthread
@@ -367,7 +367,7 @@ target_link_libraries(
   PRIVATE triton-core-repoagentapi  # from repo-core
   PRIVATE triton-common-error       # from repo-common
   PRIVATE triton-common-json        # from repo-common
-  PRIVATE proto-library
+  PRIVATE proto-library             # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf
@@ -453,7 +453,7 @@ target_link_libraries(
   rate_limiter_test
   PRIVATE triton-common-error     # from repo-common
   PRIVATE triton-core-serverapi   # from repo-core
-  PRIVATE proto-library
+  PRIVATE proto-library           # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf

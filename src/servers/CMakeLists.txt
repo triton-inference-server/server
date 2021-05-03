@@ -58,7 +58,7 @@ if(${TRITON_ENABLE_GRPC})
     grpc-endpoint-library
     PUBLIC
       grpc-service-library
-      proto-library
+      proto-library           # from repo-common
       triton-core-serverapi   # from repo-core
       triton-common-json      # from repo-common
   )
@@ -117,7 +117,7 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
   target_link_libraries(
     http-endpoint-library
     PRIVATE
-      proto-library
+      proto-library           # from repo-common
     PUBLIC
       triton-core-serverapi   # from repo-core
       triton-common-json      # from repo-common
