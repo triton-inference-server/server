@@ -173,7 +173,6 @@ message ModelInstanceGroup
     //@@       CPU and/or GPU(s) as specified by the model or backend itself.
     //@@       The inference server will not override the model/backend
     //@@       settings.
-    //@@       Currently, this option is supported only for Tensorflow models.
     //@@
     KIND_MODEL = 3;
   }
