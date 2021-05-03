@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,9 +45,10 @@ USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
 USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
-BACKENDS = os.environ.get(
-    'BACKENDS', "graphdef savedmodel onnx libtorch plan custom python")
+BACKENDS = os.environ.get('BACKENDS',
+                          "graphdef savedmodel onnx libtorch plan python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
+OS_WINDOWS = bool(int(os.environ.get('OS_WINDOWS', 1)))
 
 np_dtype_string = np.dtype(object)
 
@@ -107,17 +108,17 @@ class InferTest(tu.TestResultCollector):
                     input_dtype,
                     output0_dtype,
                     output1_dtype,
-                        output0_raw=output0_raw,
-                        output1_raw=output1_raw,
-                        model_version=model_version,
-                        swap=swap,
-                        outputs=outputs,
-                        use_http=use_http,
-                        use_grpc=use_grpc,
-                        use_http_json_tensors=use_http_json_tensors,
-                        skip_request_id_check=skip_request_id_check,
-                        use_streaming=use_streaming,
-                        correlation_id=correlation_id,
+                    output0_raw=output0_raw,
+                    output1_raw=output1_raw,
+                    model_version=model_version,
+                    swap=swap,
+                    outputs=outputs,
+                    use_http=use_http,
+                    use_grpc=use_grpc,
+                    use_http_json_tensors=use_http_json_tensors,
+                    skip_request_id_check=skip_request_id_check,
+                    use_streaming=use_streaming,
+                    correlation_id=correlation_id,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
@@ -125,7 +126,7 @@ class InferTest(tu.TestResultCollector):
 
         all_ensemble_prefix = ["simple_", "sequence_", "fan_"]
         ensemble_prefix = [""]
-        if ENSEMBLES and ("custom" in BACKENDS):
+        if ENSEMBLES and OS_WINDOWS:
             for prefix in all_ensemble_prefix:
                 if tu.validate_for_ensemble_model(prefix, input_dtype,
                                                   output0_dtype, output1_dtype,
@@ -174,23 +175,6 @@ class InferTest(tu.TestResultCollector):
                                             output0_raw=output0_raw,
                                             output1_raw=output1_raw,
                                             swap=swap)
-
-        # the custom model is src/custom/addsub... it does not swap
-        # the inputs so always set to False
-        if tu.validate_for_custom_model(input_dtype, output0_dtype,
-                                        output1_dtype, (input_size,),
-                                        (input_size,), (input_size,)):
-            # No basic ensemble models are created against custom models
-            if 'custom' in BACKENDS:
-                _infer_exact_helper(self,
-                                    'custom', (input_size,),
-                                    8,
-                                    input_dtype,
-                                    output0_dtype,
-                                    output1_dtype,
-                                    output0_raw=output0_raw,
-                                    output1_raw=output1_raw,
-                                    swap=False)
 
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                       (input_size,), (input_size,),
@@ -829,7 +813,7 @@ class InferTest(tu.TestResultCollector):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if all(x in BACKENDS for x in ['graphdef', 'custom']):
+        if all(x in BACKENDS for x in ['graphdef',]) and not OS_WINDOWS:
 
             def test_ensemble_mix_batch_nobatch(self):
                 base_names = ["batch_to_nobatch", "nobatch_to_batch"]

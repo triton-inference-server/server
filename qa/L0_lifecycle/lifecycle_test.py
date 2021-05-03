@@ -320,7 +320,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
                 # one model uses sequence batcher while the other uses dynamic batcher
                 model_names = [
-                    "custom_sequence_int32", "custom_int32_int32_int32"
+                    "onnx_sequence_int32", "onnx_int32_int32_int32"
                 ]
                 for model_name in model_names:
                     self.assertFalse(triton_client.is_model_ready(model_name))

@@ -68,7 +68,7 @@ TRITON_VERSION_MAP = {
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
-CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
+CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
     'openvino'
@@ -262,8 +262,6 @@ def core_cmake_args(components, backends, install_dir):
         if (be in CORE_BACKENDS) and (be in backends):
             if be == 'tensorrt':
                 cargs += tensorrt_cmake_args()
-            elif be == 'custom':
-                pass
             elif be == 'ensemble':
                 pass
             else:

@@ -114,16 +114,6 @@ for trial in graphdef savedmodel onnx ; do
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 done
 
-# custom float32 model needs to be obtained elsewhere
-full=custom_float32_float32_float32
-rm -rf $MODELSDIR/${full}/1/*
-mkdir -p $MODELSDIR/${full}/1 && \
-    cp -r ../custom_models/${full}/1/* $MODELSDIR/${full}/1/. && \
-    cp ../custom_models/${full}/config.pbtxt $MODELSDIR/${full}/.
-        (cd $MODELSDIR/${full} && \
-                sed -i "s/label_filename:.*//" config.pbtxt && \
-                echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
-
 # set up "addsub" ensemble for custom float32 model
 cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && \
     (cd $MODELSDIR/fan_${full} && \
@@ -135,7 +125,7 @@ cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
 
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do
-        for trial in graphdef savedmodel onnx libtorch plan custom python; do
+        for trial in graphdef savedmodel onnx libtorch plan python; do
             # TensorRT Plan should only be deployed on GPU device
             model_devices="-1 0 1" && [[ "$trial" == "plan" ]] && model_devices="0 1"
             for model_device in $model_devices; do

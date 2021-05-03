@@ -844,7 +844,8 @@ TRITONBACKEND_ModelInstanceExecute(
 
     if (input_memory_type == TRITONSERVER_MEMORY_GPU) {
       cudaMemcpy(
-          const_cast<int32_t*>(ipbuffer_int), input_buffer, input_byte_size, cudaMemcpyDeviceToHost);
+          const_cast<int32_t*>(ipbuffer_int), input_buffer, input_byte_size,
+          cudaMemcpyDeviceToHost);
     } else {
       ipbuffer_int = reinterpret_cast<const int32_t*>(input_buffer);
     }
@@ -921,7 +922,7 @@ TRITONBACKEND_ModelInstanceExecute(
         }
 
         int32_t* obuffer_int = nullptr;
-        std::vector<int32_t> obuffer_vec(buffer_byte_size/4);
+        std::vector<int32_t> obuffer_vec(buffer_byte_size / 4);
         if (output_memory_type == TRITONSERVER_MEMORY_GPU) {
           obuffer_int = obuffer_vec.data();
         } else {

@@ -109,4 +109,3 @@ if __name__ == '__main__':
                 print("error: expected output {} to match input {}".format(
                     output_data, input_data))
                 sys.exit(1)
-

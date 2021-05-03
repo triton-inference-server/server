@@ -47,6 +47,10 @@ if [ -z "$TEST_VALGRIND" ]; then
     TEST_VALGRIND="0"
 fi
 
+if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
+    TEST_CUDA_SHARED_MEMORY="0"
+fi
+
 # Add valgrind flag check
 if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
@@ -72,6 +76,7 @@ TF_VERSION=${TF_VERSION:=1}
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    OS_WINDOWS="1"
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
@@ -79,6 +84,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
     export USE_HTTP=0
     export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER
 else
+    OS_WINDOWS="0"
     MODELDIR=${MODELDIR:=`pwd`}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     OPTDIR=${OPTDIR:="/opt"}
@@ -92,7 +98,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 export BACKENDS
 
 # Basic batcher tests
@@ -123,11 +129,7 @@ DIFFERENT_SHAPE_TESTS=${DIFFERENT_SHAPE_TESTS:="test_multi_batch_not_preferred_d
 # Setup non-variable-size model repository
 rm -fr *.log *.serverlog models && mkdir models
 for BACKEND in $BACKENDS; do
-    if [ "$BACKEND" != "custom" ]; then
-      TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
-    else
-      TMP_MODEL_DIR="../custom_models/custom_float32_float32_float32"
-    fi
+    TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
 
     cp -r $TMP_MODEL_DIR models/. &&
     (cd models/$(basename $TMP_MODEL_DIR) && \
@@ -139,11 +141,7 @@ done
 # Setup variable-size model repository
 rm -fr var_models && mkdir var_models
 for BACKEND in $BACKENDS; do
-    if [ "$BACKEND" != "custom" ]; then
-      TMP_MODEL_DIR="$DATADIR/qa_variable_model_repository/${BACKEND}_float32_float32_float32"
-    else
-      TMP_MODEL_DIR="../custom_models/custom_float32_float32_float32 ../custom_models/custom_zero_1_float32"
-    fi
+    TMP_MODEL_DIR="$DATADIR/qa_variable_model_repository/${BACKEND}_float32_float32_float32"
 
     for TMP_DIR in $TMP_MODEL_DIR; do
       cp -r $TMP_DIR var_models/. &&
@@ -403,10 +401,12 @@ done
 # by comparing the "response send" timestamps.
 TEST_CASE=test_multi_batch_preserve_ordering
 
-if [[ $BACKENDS == *"custom"* ]]; then
+# FIXME sleep_for does not delay for expected time when passing 400ms 
+# when using I/O is in GPU memory. Skip for Windows test.
+if [ "$OS_WINDOWS" -eq "0" ] && [ "$TEST_CUDA_SHARED_MEMORY" -eq 0 ]; then
     rm -fr ./custom_models && mkdir ./custom_models && \
         cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
-        mkdir -p ./custom_models/custom_zero_1_float32/1 && \
+        mkdir -p ./custom_models/custom_zero_1_float32/1
 
     # Two instances will be created for the custom model, one delays 100 ms while
     # the other delays 400 ms
@@ -420,7 +420,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
             echo "{ key: \"instance_wise_delay_multiplier\"; value: { string_value: \"4\" }}" >> config.pbtxt && \
             echo "]" >> config.pbtxt)
 
-    # equeue 3 batches to guarantee that a large delay batch will be followed by
+    # enqueue 3 batches to guarantee that a large delay batch will be followed by
     # a small delay one regardless of the order issued to model instances.
     # i.e. the 3 batches will be queued: [1, 2, 3] and there are two delay instances
     # [small, large], then the distributions can be the following:
