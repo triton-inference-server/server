@@ -72,12 +72,14 @@ TF_VERSION=${TF_VERSION:=1}
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    export OS_WINDOWS="1"
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     export USE_HTTP=0
 else
+    export OS_WINDOWS="0"
     MODELDIR=${MODELDIR:=`pwd`/models}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     OPTDIR=${OPTDIR:="/opt"}
@@ -106,7 +108,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom python"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
@@ -130,13 +132,9 @@ for TARGET in cpu gpu; do
 
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
-      if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
+      if [ "$BACKEND" != "python" ]; then
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
-      elif [ "$BACKEND" == "custom" ]; then
-        cp -r ../custom_models/custom_float32_* models/. && \
-        cp -r ../custom_models/custom_int32_* models/. && \
-        cp -r ../custom_models/custom_nobatch_* models/.
       elif [ "$BACKEND" == "python" ]; then
         # We will be using ONNX models config.pbtxt and tweak them to make them
         # appropriate for Python backend
@@ -173,16 +171,18 @@ for TARGET in cpu gpu; do
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
-      if [[ $BACKENDS == *"custom"* ]]; then
+
+      # Copy identity backend models and ensembled for non-Windows test
+      if [ "$OS_WINDOWS" -eq "0" ]; then
         for BACKEND in $BACKENDS; do
-          if [ "$BACKEND" != "custom" ] && [ "$BACKEND" != "python" ]; then
+          if [ "$BACKEND" != "python" ]; then
               cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
                 models/.
-          elif [ "$BACKEND" == "custom" ]; then
-            cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
-              models/.
           fi
         done
+
+        cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
+          models/.
 
         create_nop_version_dir `pwd`/models
       fi
@@ -190,7 +190,7 @@ for TARGET in cpu gpu; do
       if [[ $BACKENDS == *"graphdef"* ]]; then
         ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
 
-        if [[ $BACKENDS == *"custom"* ]]; then
+        if [ "$OS_WINDOWS" -eq "0" ]; then
           ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
         fi
 
@@ -218,9 +218,9 @@ for TARGET in cpu gpu; do
     done
 
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
-    # This is done after the instance group change above so that identity custom backends
-    # are run on CPU
-    if [[ $BACKENDS == *"custom"* ]]; then
+    # This is done after the instance group change above so that identity backend models
+    # are run on CPU. Skip for Windows test.
+    if [ "$OS_WINDOWS" -eq "0" ]; then
       cp -r ../custom_models/custom_zero_1_float32 models/. &&\
           mkdir -p models/custom_zero_1_float32/1 && \
           (cd models/custom_zero_1_float32 && \

@@ -77,16 +77,13 @@ for FW in graphdef savedmodel onnx libtorch plan; do
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
 done
 
-# Copy custom model
-cp -r /opt/tritonserver/qa/custom_models/custom_float32_float32_float32/ models/
-
 # Copy models with string inputs and remove nobatch (bs=1) models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object models/
 
 rm -rf models/*nobatch*
 
 KIND="KIND_GPU"
-for FW in graphdef savedmodel onnx libtorch plan custom; do
+for FW in graphdef savedmodel onnx libtorch plan; do
     for MC in `ls models/${FW}*/config.pbtxt`; do
         echo "instance_group [ { kind: ${KIND} }]" >> $MC
     done

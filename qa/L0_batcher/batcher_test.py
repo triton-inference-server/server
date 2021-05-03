@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -56,14 +56,10 @@ if USE_GRPC and USE_HTTP:
     USE_GRPC = False
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
-BACKENDS = os.environ.get('BACKENDS',
-                          "graphdef savedmodel onnx libtorch plan custom")
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx libtorch plan")
 
 _trials = BACKENDS.split(" ")
-if "custom" in BACKENDS:
-    _ragged_batch_supported_trials = ("custom",)
-else:
-    _ragged_batch_supported_trials = ()
+_ragged_batch_supported_trials = ()
 
 _max_queue_delay_ms = 10000
 
@@ -138,8 +134,8 @@ class BatcherTest(tu.TestResultCollector):
         try:
             start_ms = int(round(time.time() * 1000))
 
-            if trial == "savedmodel" or trial == "graphdef" or trial == "custom" \
-                    or trial == "libtorch" or trial == "onnx" or trial == "plan":
+            if trial == "savedmodel" or trial == "graphdef" or trial == "libtorch" \
+                    or trial == "onnx" or trial == "plan":
                 tensor_shape = (bs, input_size)
                 iu.infer_exact(
                     self,
@@ -1307,8 +1303,10 @@ class BatcherTest(tu.TestResultCollector):
                                      args=(self, model_base, 1, dtype, shapes,
                                            shapes),
                                      kwargs={
-                                         'use_grpc': USE_GRPC,
-                                         'use_http': USE_HTTP,
+                                         'use_grpc':
+                                             USE_GRPC,
+                                         'use_http':
+                                             USE_HTTP,
                                          'use_http_json_tensors':
                                              False,
                                          'use_streaming':

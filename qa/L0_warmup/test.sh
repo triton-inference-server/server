@@ -45,7 +45,7 @@ IMAGE="../images/vulture.jpeg"
 DATADIR=`pwd`/models
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --exit-timeout-secs=120"
@@ -59,13 +59,8 @@ for BACKEND in ${BACKENDS}; do
     # Test for fixed-size data type
     # Use the addsub models as example.
     rm -fr models && mkdir models
-    if [ "$BACKEND" != "custom" ]; then
-        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${BACKEND}_float32_float32_float32 models/. && \
-        cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/${BACKEND}_sequence_int32 models/.
-    else
-        cp -r ../custom_models/${BACKEND}_float32_float32_float32 models/. && \
-        cp -r ../custom_models/${BACKEND}_sequence_int32 models/.
-    fi
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${BACKEND}_float32_float32_float32 models/. && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/${BACKEND}_sequence_int32 models/.
 
     INPUT_PREFIX="INPUT" && [ "$BACKEND" == "libtorch" ] && INPUT_PREFIX="INPUT__"
     SEQ_INPUT="INPUT" && [ "$BACKEND" == "libtorch" ] && SEQ_INPUT="INPUT__0"
@@ -166,16 +161,6 @@ for BACKEND in ${BACKENDS}; do
     if [ "$SUPPORT_STRING" == "1" ] ; then
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/${BACKEND}_sequence_object models/.
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${BACKEND}_zero_1_object models/.
-        if [ "$BACKEND" = "custom" ]; then
-            cp -r ../custom_models/custom_zero_1_float32 models/custom_zero_1_object && \
-                mkdir -p models/custom_zero_1_object/1 && \
-                (cd models/custom_zero_1_object && \
-                        echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
-                        sed -i "s/custom_zero_1_float32/custom_zero_1_object/" config.pbtxt && \
-                        sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
-                        sed -i "s/TYPE_FP32/TYPE_STRING/" config.pbtxt && \
-                        sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
-        fi
 
         # random and zero data (two samples)
         #

@@ -108,25 +108,6 @@ def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
     return True
 
 
-def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
-                              input_shape, output0_shape, output1_shape):
-    """Return True if input and output dtypes are supported by custom model."""
-
-    # The custom model is src/custom/addsub... it only supports int32
-    # and fp32, and input and output datatype must be equal.
-    if (input_dtype != np.int32) and (input_dtype != np.float32):
-        return False
-    if (output0_dtype != input_dtype) or (output1_dtype != input_dtype):
-        return False
-
-    # Input and output shapes must be fixed-size.
-    if (not shape_is_fixed(input_shape) or not shape_is_fixed(output0_shape) or
-            not shape_is_fixed(output1_shape)):
-        return False
-
-    return True
-
-
 def validate_for_ensemble_model(ensemble_type, input_dtype, output0_dtype,
                                 output1_dtype, input_shape, output0_shape,
                                 output1_shape):

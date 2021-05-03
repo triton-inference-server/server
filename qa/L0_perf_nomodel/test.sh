@@ -141,7 +141,6 @@ TEST_CONCURRENCY+=(
     16)
 TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch python"
 
-
 mkdir -p ${REPO_VERSION}
 
 #

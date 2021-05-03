@@ -42,6 +42,7 @@ _max_queue_delay_ms = 10000
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
+
 class ModelQueueTest(tu.TestResultCollector):
 
     def setUp(self):
@@ -458,7 +459,7 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(
-                    "Request timeout expired"  in ex.message(),
+                    "Request timeout expired" in ex.message(),
                     "Expected error message \"Request timeout expired\", got: {}"
                     .format(ex))
 
