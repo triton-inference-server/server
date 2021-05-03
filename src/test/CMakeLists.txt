@@ -297,9 +297,10 @@ target_link_libraries(
   PRIVATE proto-library          # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE ${LIBEVENT_LIBRARIES}
+  PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
   PRIVATE -lz
-  PRIVATE ${LIBEVENT_LIBRARIES}
 )
 install(
   TARGETS data_compressor_test
