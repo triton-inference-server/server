@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,7 @@ to build Triton on a platform that is not listed here.
 
 ## <a name="ubuntu"></a>Building for Ubuntu 20.04
 
-For Ubuntu-20.04 build.py supports both a Docker build and a
+For Ubuntu-20.04, build.py supports both a Docker build and a
 non-Docker build.
 
 * [Build using Docker](#ubuntu-docker) and the TensorFlow and PyTorch
@@ -98,13 +98,15 @@ invocation builds all features, backends, and repository agents.
 $ ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=azure_storage --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=pytorch:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=openvino:<container tag> --backend=python:<container tag> --backend=dali:<container tag> --repoagent=checksum:<container tag>
 ```
 
-If you are building on master/main branch then \<container tag\>
-should be set to "main". If you are building on a release branch you
-should set \<container tag\> to match the branch name. For example, if
-you are building on the r21.04 branch you should set \<container tag\>
-to be "r21.04". You can use a different \<container tag\> for a
-component to instead use the corresponding branch/tag in the
-build. For example, if you have a branch called "mybranch" in the
+If you are building on master/main branch then \<container tag\> will
+default to "main". If you are building on a release branch then
+\<container tag\> will default to the branch name. For example, if you
+are building on the r21.04 branch, \<container tag\> will default to
+r21.04. Therefore, you typically do not need to provide \<container
+tag\> at all (nor the preceding colon). You can use a different
+\<container tag\> for a component to instead use the corresponding
+branch/tag in the build. For example, if you have a branch called
+"mybranch" in the
 [identity_backend](https://github.com/triton-inference-server/identity_backend)
 repo that you want to use in the build, you would specify
 --backend=identity:mybranch.
@@ -194,7 +196,88 @@ issues since non-supported versions are not tested.
 
 ## <a name="windows"></a>Building for Windows 10
 
-*Under Construction*
+For Windows 10, build.py supports both a Docker build and a non-Docker
+build in a similar way as described for [Ubuntu](#ubuntu). The primary
+difference is that the \<xx.yy\>-py3-min image used as the base of the
+Ubuntu Docker build is not available for Windows and so you must
+generated it yourself, as described below. For a non-Docker build you
+must install the dependencies contained in this base Dockerfile on
+your build system.
+
+### Windows and Docker
+
+Depending on your version of Windows 10 and your version of Docker you
+may need to perform these additional steps before any of the following
+steps.
+
+* Set your Docker to work with "Windows containers". Right click on
+  the whale icon in the lower-right status area and select "Switch to
+  Windows containers".
+
+* When running "docker build" or "docker run" you may need to specify
+  '--network="Default Switch"' if you see errors like "remote name
+  could not be resolved".
+
+### Windows 10 "Min" Container
+
+The "min" container describes the base dependencies needed to perform
+the Windows build. The Windows min container is
+[Dockerfile.win10.min](../Dockerfile.win10.min).
+
+Before building the min container you must download the appropriate
+cuDNN and TensorRT versions and place them in the local directory.
+
+* For cuDNN the CUDNN_VERSION and CUDNN_ZIP arguments indicate the
+  version of cuDNN that your should download from
+  https://developer.nvidia.com/rdp/cudnn-archive.
+
+* For TensorRT the TENSORRT_VERSION and TENSORRT_ZIP arguments
+  indicate the version of TensorRT that your should download from
+  https://developer.nvidia.com/nvidia-tensorrt-download.
+
+After downloading the zip files for cuDNN and TensorRT, you build the
+min container using the following command.
+
+```
+$ docker build -t win10-py3-min -f Dockerfile.win10.min .
+```
+
+### Build Triton Server
+
+Triton is built using the build.py script. The build system must have
+Docker, Python3 (plus pip installed *docker* module) and git installed
+so that it can execute build.py and perform a docker build. By
+default, build.py does not enable any of Triton's optional features
+and so you must enable them explicitly. The following build.py
+invocation builds all features and backends available on windows.
+
+```
+$ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt --backend=onnxruntime:<container tag>
+```
+
+If you are building on master/main branch then \<container tag\> will
+default to "main". If you are building on a release branch then
+\<container tag\> will default to the branch name. For example, if you
+are building on the r21.04 branch, \<container tag\> will default to
+r21.04. Therefore, you typically do not need to provide \<container
+tag\> at all (nor the preceding colon). You can use a different
+\<container tag\> for a component to instead use the corresponding
+branch/tag in the build. For example, if you have a branch called
+"mybranch" in the
+[onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
+repo that you want to use in the build, you would specify
+--backend=onnxruntime:mybranch.
+
+### Extract Build Artifacts
+
+When build.py completes, a Docker image called *tritonserver* will
+contain the built Triton Server executable, libraries and other
+artifacts. Windows containers do not support GPU access so you likely
+want to extract the necessary files from the tritonserver image and
+run them directly on your host system. All the Triton artifacts can be
+found in /opt/tritonserver directory of the tritonserver image.  Your
+host system will need to install the same CUDA, cuDNN and TensorRT
+versions that were used for the build.
 
 ## Building on Unsupported Platforms
 
