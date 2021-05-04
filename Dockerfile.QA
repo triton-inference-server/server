@@ -251,7 +251,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; the
         exit 1; \
     fi
 
-# go client requires golang and CI/QA for memcheck requires valgrind
+# CI/QA for memcheck requires valgrind
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               libopencv-dev \
@@ -262,7 +262,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               python3-protobuf \
                               python3-setuptools \
                               swig \
-                              golang-go \
                               nginx \
                               protobuf-compiler \
                               maven \
@@ -276,7 +275,10 @@ RUN rm -f /usr/bin/python && \
 RUN pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil awscli six boofuzz grpcio-channelz azure-cli
 
-# need protoc-gen-go to generate go specific gRPC modules
+# go needed to example go client test.
+ADD https://golang.org/dl/go1.16.3.linux-amd64.tar.gz go1.16.3.linux-amd64.tar.gz
+RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-amd64.tar.gz
+ENV PATH $PATH:/usr/local/go/bin
 RUN go get github.com/golang/protobuf/protoc-gen-go && \
     go get google.golang.org/grpc
 
@@ -294,6 +296,3 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     xargs pip3 install --upgrade
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
-
-ENV GOPATH /root/go
-ENV PATH $PATH:$GOPATH/bin
