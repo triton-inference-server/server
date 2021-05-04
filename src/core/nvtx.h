@@ -28,30 +28,17 @@
 #ifdef TRITON_ENABLE_NVTX
 
 #include <nvtx3/nvToolsExt.h>
-#include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 
 // Updates a server stat with duration measured by a C++ scope.
 class NvtxRange {
  public:
-  explicit NvtxRange(const std::string& label)
-  {
-    depth_ = nvtxRangePushA(label.c_str());
-    if (depth_ < 0) {
-      LOG_ERROR << "Unable to start NVTX range '" << label << "'";
-    }
-  }
+  explicit NvtxRange(const char* label) { nvtxRangePushA(label); }
 
-  ~NvtxRange()
-  {
-    if (depth_ >= 0) {
-      nvtxRangePop();
-    }
-  }
+  explicit NvtxRange(const std::string& label) : NvtxRange(label.c_str()) {}
 
- private:
-  int depth_;
+  ~NvtxRange() { nvtxRangePop(); }
 };
 
 }}  // namespace nvidia::inferenceserver
