@@ -157,11 +157,37 @@ for MC in `ls var_models/*/config.pbtxt`; do
 done
 
 # Create allow-ragged model to variable-size model repository
-if [[ $BACKENDS == *"custom"* ]]; then
+cp -r ../custom_models/custom_zero_1_float32 var_models/. && \
     (cd var_models/custom_zero_1_float32 && mkdir 1 && \
         echo "instance_group [ { kind: KIND_CPU count: 1 }]" >> config.pbtxt && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
-        sed -i "s/name:.*\"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt)
+        sed -i "s/name:.*\"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
+        sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
+        echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+if [[ $BACKENDS == *"plan"* ]]; then
+    # Use nobatch model to match the ragged test requirement
+    cp -r $DATADIR/qa_identity_model_repository/plan_nobatch_zero_1_float32 var_models/plan_zero_1_float32 && \
+        (cd var_models/plan_zero_1_float32 && \
+            sed -i "s/nobatch//" config.pbtxt && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/name: \"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
+            echo "batch_output [{target_name: \"OUTPUT0\" \
+                                    kind: BATCH_SCATTER_WITH_INPUT_SHAPE \
+                                    source_input: \"INPUT0\" }] \
+                    dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+fi
+if [[ $BACKENDS == *"onnx"* ]]; then
+    # Use nobatch model to match the ragged test requirement
+    cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32 var_models/onnx_zero_1_float32 && \
+        (cd var_models/onnx_zero_1_float32 && \
+            sed -i "s/nobatch//" config.pbtxt && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/name: \"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
+            echo "batch_output [{target_name: \"OUTPUT0\" \
+                                    kind: BATCH_SCATTER_WITH_INPUT_SHAPE \
+                                    source_input: \"INPUT0\" }] \
+                    dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 fi
 
 # Need to launch the server for each test so that the model status is

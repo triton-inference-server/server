@@ -46,12 +46,12 @@ _test_cuda_shared_memory = bool(
 
 _no_batching = (int(os.environ.get('NO_BATCHING', 0)) == 1)
 
-_trials = ("savedmodel", "graphdef", "plan", "onnx", "libtorch")
+_trials = ("custom", "savedmodel", "graphdef", "plan", "onnx", "libtorch")
 if _no_batching:
     _trials += ("savedmodel_nobatch", "graphdef_nobatch", "plan_nobatch",
                 "onnx_nobatch", "libtorch_nobatch")
 
-_ragged_batch_supported_trials = list()
+_ragged_batch_supported_trials = list("custom")
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
