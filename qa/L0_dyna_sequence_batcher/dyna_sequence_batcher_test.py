@@ -51,7 +51,7 @@ if _no_batching:
     _trials += ("savedmodel_nobatch", "graphdef_nobatch", "plan_nobatch",
                 "onnx_nobatch", "libtorch_nobatch")
 
-_ragged_batch_supported_trials = list("custom")
+_ragged_batch_supported_trials = ["custom",]
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000

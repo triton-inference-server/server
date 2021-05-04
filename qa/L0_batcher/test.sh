@@ -169,7 +169,7 @@ if [[ $BACKENDS == *"plan"* ]]; then
     # Use nobatch model to match the ragged test requirement
     cp -r $DATADIR/qa_identity_model_repository/plan_nobatch_zero_1_float32 var_models/plan_zero_1_float32 && \
         (cd var_models/plan_zero_1_float32 && \
-            sed -i "s/nobatch//" config.pbtxt && \
+            sed -i "s/nobatch_//" config.pbtxt && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
             sed -i "s/name: \"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
             echo "batch_output [{target_name: \"OUTPUT0\" \
@@ -181,7 +181,7 @@ if [[ $BACKENDS == *"onnx"* ]]; then
     # Use nobatch model to match the ragged test requirement
     cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32 var_models/onnx_zero_1_float32 && \
         (cd var_models/onnx_zero_1_float32 && \
-            sed -i "s/nobatch//" config.pbtxt && \
+            sed -i "s/nobatch_//" config.pbtxt && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
             sed -i "s/name: \"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
             echo "batch_output [{target_name: \"OUTPUT0\" \
