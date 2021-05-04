@@ -51,6 +51,11 @@ sed -i 's/.\/nvidia_inferenceserver/nvidia_inferenceserver/g' $SIMPLE_GO_CLIENT
 PACKAGE_PATH="${GOPATH}/src"
 mkdir -p ${PACKAGE_PATH}
 
+# Get the proto files from the common repo
+git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
+    https://github.com/triton-inference-server/common.git
+mkdir core && cp common/protobuf/*.proto core/.
+
 # Requires protoc and protoc-gen-go plugin: https://github.com/golang/protobuf#installation
 # Use "M" arguements since go_package is not specified in .proto files.
 # As mentioned here: https://developers.google.com/protocol-buffers/docs/reference/go-generated#package

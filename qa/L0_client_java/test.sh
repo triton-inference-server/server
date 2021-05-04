@@ -41,8 +41,10 @@ RET=0
 
 rm -f *.log.*
 
-# Copy protobuf files from server core
-cp core/*.proto java/library/src/main/proto/.
+# Get the proto files from the common repo
+git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
+    https://github.com/triton-inference-server/common.git
+cp common/protobuf/*.proto java/library/src/main/proto/.
 
 # Compile library
 (cd java/library && \
