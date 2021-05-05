@@ -281,6 +281,7 @@ RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-amd64.tar.gz
 ENV PATH $PATH:/usr/local/go/bin
 RUN go get github.com/golang/protobuf/protoc-gen-go && \
     go get google.golang.org/grpc
+ENV GOPATH /root/go
 
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
