@@ -941,25 +941,17 @@ CompressionTypeUsed(const std::string accept_encoding)
 
 }  // namespace
 
-// Handle HTTP requests to inference server APIs
-class HTTPAPIServer : public HTTPServerImpl {
+// Base HTTP API server class that implements Triton protocols
+class BaseAPIServer : public HTTPServerImpl {
  public:
-  explicit HTTPAPIServer(
+  explicit BaseAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
-        allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
-        model_regex_(
-            R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats))?)"),
-        modelcontrol_regex_(
-            R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
-        systemsharedmemory_regex_(
-            R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
-        cudasharedmemory_regex_(
-            R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))")
+        allocator_(nullptr)
   {
     // FIXME, don't cache server metadata. The http endpoint should
     // not be deciding that server metadata will not change during
@@ -985,7 +977,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         "creating response allocator");
   }
 
-  ~HTTPAPIServer()
+  ~BaseAPIServer()
   {
     if (server_metadata_err_ != nullptr) {
       TRITONSERVER_ErrorDelete(server_metadata_err_);
@@ -1087,7 +1079,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     std::atomic<uint32_t> response_count_;
   };
 
- private:
+ protected:
   static TRITONSERVER_Error* InferResponseAlloc(
       TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
       size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
@@ -1098,8 +1090,6 @@ class HTTPAPIServer : public HTTPServerImpl {
       TRITONSERVER_ResponseAllocator* allocator, void* buffer,
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
-
-  void Handle(evhtp_request_t* req) override;
   void HandleServerHealth(evhtp_request_t* req, const std::string& kind);
   void HandleServerMetadata(evhtp_request_t* req);
   void HandleModelReady(
@@ -1149,16 +1139,10 @@ class HTTPAPIServer : public HTTPServerImpl {
   // The allocator that will be used to allocate buffers for the
   // inference result tensors.
   TRITONSERVER_ResponseAllocator* allocator_;
-
-  re2::RE2 server_regex_;
-  re2::RE2 model_regex_;
-  re2::RE2 modelcontrol_regex_;
-  re2::RE2 systemsharedmemory_regex_;
-  re2::RE2 cudasharedmemory_regex_;
 };
 
 TRITONSERVER_Error*
-HTTPAPIServer::InferResponseAlloc(
+BaseAPIServer::InferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
@@ -1253,7 +1237,7 @@ HTTPAPIServer::InferResponseAlloc(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServer::InferResponseFree(
+BaseAPIServer::InferResponseFree(
     TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
@@ -1270,87 +1254,7 @@ HTTPAPIServer::InferResponseFree(
 }
 
 void
-HTTPAPIServer::Handle(evhtp_request_t* req)
-{
-  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
-                 << req->uri->path->full;
-
-  if (std::string(req->uri->path->full) == "/v2/models/stats") {
-    // model statistics
-    HandleModelStats(req);
-    return;
-  }
-
-  std::string model_name, version, kind;
-  if (RE2::FullMatch(
-          std::string(req->uri->path->full), model_regex_, &model_name,
-          &version, &kind)) {
-    if (kind == "ready") {
-      // model ready
-      HandleModelReady(req, model_name, version);
-      return;
-    } else if (kind == "infer") {
-      // model infer
-      HandleInfer(req, model_name, version);
-      return;
-    } else if (kind == "config") {
-      // model configuration
-      HandleModelConfig(req, model_name, version);
-      return;
-    } else if (kind == "stats") {
-      // model statistics
-      HandleModelStats(req, model_name, version);
-      return;
-    } else if (kind == "") {
-      // model metadata
-      HandleModelMetadata(req, model_name, version);
-      return;
-    }
-  }
-
-  std::string region, action, rest, repo_name;
-  if (std::string(req->uri->path->full) == "/v2") {
-    // server metadata
-    HandleServerMetadata(req);
-    return;
-  } else if (RE2::FullMatch(
-                 std::string(req->uri->path->full), server_regex_, &rest)) {
-    // server health
-    HandleServerHealth(req, rest);
-    return;
-  } else if (RE2::FullMatch(
-                 std::string(req->uri->path->full), systemsharedmemory_regex_,
-                 &region, &action)) {
-    // system shared memory
-    HandleSystemSharedMemory(req, region, action);
-    return;
-  } else if (RE2::FullMatch(
-                 std::string(req->uri->path->full), cudasharedmemory_regex_,
-                 &region, &action)) {
-    // cuda shared memory
-    HandleCudaSharedMemory(req, region, action);
-    return;
-  } else if (RE2::FullMatch(
-                 std::string(req->uri->path->full), modelcontrol_regex_,
-                 &repo_name, &kind, &model_name, &action)) {
-    // model repository
-    if (kind == "index") {
-      HandleRepositoryIndex(req, repo_name);
-      return;
-    } else if (kind.find("models", 0) == 0) {
-      HandleRepositoryControl(req, repo_name, model_name, action);
-      return;
-    }
-  }
-
-  LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
-                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
-
-  evhtp_send_reply(req, EVHTP_RES_BADREQ);
-}
-
-void
-HTTPAPIServer::HandleServerHealth(evhtp_request_t* req, const std::string& kind)
+BaseAPIServer::HandleServerHealth(evhtp_request_t* req, const std::string& kind)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -1373,7 +1277,7 @@ HTTPAPIServer::HandleServerHealth(evhtp_request_t* req, const std::string& kind)
 }
 
 void
-HTTPAPIServer::HandleRepositoryIndex(
+BaseAPIServer::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
   if (req->method != htp_method_POST) {
@@ -1446,7 +1350,7 @@ HTTPAPIServer::HandleRepositoryIndex(
 }
 
 void
-HTTPAPIServer::HandleRepositoryControl(
+BaseAPIServer::HandleRepositoryControl(
     evhtp_request_t* req, const std::string& repository_name,
     const std::string& model_name, const std::string& action)
 {
@@ -1526,7 +1430,7 @@ HTTPAPIServer::HandleRepositoryControl(
 }
 
 void
-HTTPAPIServer::HandleModelReady(
+BaseAPIServer::HandleModelReady(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -1557,7 +1461,7 @@ HTTPAPIServer::HandleModelReady(
 }
 
 void
-HTTPAPIServer::HandleModelMetadata(
+BaseAPIServer::HandleModelMetadata(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -1606,7 +1510,7 @@ HTTPAPIServer::HandleModelMetadata(
 }
 
 void
-HTTPAPIServer::HandleModelConfig(
+BaseAPIServer::HandleModelConfig(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -1656,7 +1560,7 @@ HTTPAPIServer::HandleModelConfig(
 }
 
 void
-HTTPAPIServer::HandleModelStats(
+BaseAPIServer::HandleModelStats(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -1707,7 +1611,7 @@ HTTPAPIServer::HandleModelStats(
 }
 
 void
-HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
+BaseAPIServer::HandleServerMetadata(evhtp_request_t* req)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -1729,7 +1633,7 @@ HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServer::HandleSystemSharedMemory(
+BaseAPIServer::HandleSystemSharedMemory(
     evhtp_request_t* req, const std::string& region_name,
     const std::string& action)
 {
@@ -1840,7 +1744,7 @@ HTTPAPIServer::HandleSystemSharedMemory(
 }
 
 void
-HTTPAPIServer::HandleCudaSharedMemory(
+BaseAPIServer::HandleCudaSharedMemory(
     evhtp_request_t* req, const std::string& region_name,
     const std::string& action)
 {
@@ -1966,7 +1870,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServer::EVBufferToInput(
+BaseAPIServer::EVBufferToInput(
     const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
     evbuffer* input_buffer, InferRequestClass* infer_req, size_t header_length)
 {
@@ -2311,7 +2215,7 @@ HTTPAPIServer::EVBufferToInput(
 }
 
 void
-HTTPAPIServer::HandleInfer(
+BaseAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -2457,10 +2361,10 @@ HTTPAPIServer::HandleInfer(
 }
 
 void
-HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
+BaseAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
+  BaseAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<BaseAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_OK);
@@ -2482,10 +2386,10 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 void
-HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
+BaseAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
+  BaseAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<BaseAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
@@ -2506,7 +2410,7 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   delete infer_request;
 }
 
-HTTPAPIServer::InferRequestClass::InferRequestClass(
+BaseAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req)
     : server_(server), req_(req), response_count_(0)
 {
@@ -2516,7 +2420,7 @@ HTTPAPIServer::InferRequestClass::InferRequestClass(
 }
 
 void
-HTTPAPIServer::InferRequestClass::InferRequestComplete(
+BaseAPIServer::InferRequestClass::InferRequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   // FIXME need to manage the lifetime of InferRequestClass so that we
@@ -2533,7 +2437,7 @@ HTTPAPIServer::InferRequestClass::InferRequestComplete(
 }
 
 void
-HTTPAPIServer::InferRequestClass::InferResponseComplete(
+BaseAPIServer::InferRequestClass::InferResponseComplete(
     TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
   // FIXME can't use InferRequestClass object here since it's lifetime
@@ -2545,8 +2449,8 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
   // But for now userp is the InferRequestClass object and the end of
   // its life is in the OK or BAD ReplyCallback.
 
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
+  BaseAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<BaseAPIServer::InferRequestClass*>(userp);
 
   auto response_count = infer_request->IncrementResponseCount();
 
@@ -2584,7 +2488,7 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServer::InferRequestClass::FinalizeResponse(
+BaseAPIServer::InferRequestClass::FinalizeResponse(
     TRITONSERVER_InferenceResponse* response)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(response));
@@ -2868,9 +2772,172 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 }
 
 uint32_t
-HTTPAPIServer::InferRequestClass::IncrementResponseCount()
+BaseAPIServer::InferRequestClass::IncrementResponseCount()
 {
   return response_count_++;
+}
+
+// Handle HTTP requests to inference server APIs
+class HTTPAPIServer : public BaseAPIServer {
+ public:
+  explicit HTTPAPIServer(
+      const std::shared_ptr<TRITONSERVER_Server>& server,
+      nvidia::inferenceserver::TraceManager* trace_manager,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
+      const int32_t port, const int thread_cnt)
+      : BaseAPIServer(server, trace_manager, shm_manager, port, thread_cnt),
+        server_regex_(R"(/v2(?:/health/(live|ready))?)"),
+        model_regex_(
+            R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats))?)"),
+        modelcontrol_regex_(
+            R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
+        systemsharedmemory_regex_(
+            R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
+        cudasharedmemory_regex_(
+            R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))")
+  {
+  }
+
+ private:
+  void Handle(evhtp_request_t* req) override;
+
+  re2::RE2 server_regex_;
+  re2::RE2 model_regex_;
+  re2::RE2 modelcontrol_regex_;
+  re2::RE2 systemsharedmemory_regex_;
+  re2::RE2 cudasharedmemory_regex_;
+};
+
+void
+HTTPAPIServer::Handle(evhtp_request_t* req)
+{
+  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
+                 << req->uri->path->full;
+
+  if (std::string(req->uri->path->full) == "/v2/models/stats") {
+    // model statistics
+    HandleModelStats(req);
+    return;
+  }
+
+  std::string model_name, version, kind;
+  if (RE2::FullMatch(
+          std::string(req->uri->path->full), model_regex_, &model_name,
+          &version, &kind)) {
+    if (kind == "ready") {
+      // model ready
+      HandleModelReady(req, model_name, version);
+      return;
+    } else if (kind == "infer") {
+      // model infer
+      HandleInfer(req, model_name, version);
+      return;
+    } else if (kind == "config") {
+      // model configuration
+      HandleModelConfig(req, model_name, version);
+      return;
+    } else if (kind == "stats") {
+      // model statistics
+      HandleModelStats(req, model_name, version);
+      return;
+    } else if (kind == "") {
+      // model metadata
+      HandleModelMetadata(req, model_name, version);
+      return;
+    }
+  }
+
+  std::string region, action, rest, repo_name;
+  if (std::string(req->uri->path->full) == "/v2") {
+    // server metadata
+    HandleServerMetadata(req);
+    return;
+  } else if (RE2::FullMatch(
+                 std::string(req->uri->path->full), server_regex_, &rest)) {
+    // server health
+    HandleServerHealth(req, rest);
+    return;
+  } else if (RE2::FullMatch(
+                 std::string(req->uri->path->full), systemsharedmemory_regex_,
+                 &region, &action)) {
+    // system shared memory
+    HandleSystemSharedMemory(req, region, action);
+    return;
+  } else if (RE2::FullMatch(
+                 std::string(req->uri->path->full), cudasharedmemory_regex_,
+                 &region, &action)) {
+    // cuda shared memory
+    HandleCudaSharedMemory(req, region, action);
+    return;
+  } else if (RE2::FullMatch(
+                 std::string(req->uri->path->full), modelcontrol_regex_,
+                 &repo_name, &kind, &model_name, &action)) {
+    // model repository
+    if (kind == "index") {
+      HandleRepositoryIndex(req, repo_name);
+      return;
+    } else if (kind.find("models", 0) == 0) {
+      HandleRepositoryControl(req, repo_name, model_name, action);
+      return;
+    }
+  }
+
+  LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
+                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
+
+  evhtp_send_reply(req, EVHTP_RES_BADREQ);
+}
+
+
+// Handle Sagemaker HTTP requests to inference server APIs
+class SagemakerAPIServer : public BaseAPIServer {
+ public:
+  explicit SagemakerAPIServer(
+      const std::shared_ptr<TRITONSERVER_Server>& server,
+      nvidia::inferenceserver::TraceManager* trace_manager,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
+      const int32_t port, const int thread_cnt)
+      : BaseAPIServer(server, trace_manager, shm_manager, port, thread_cnt),
+        ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
+        ping_mode_("ready"), model_name_("model"), model_version_str_("")
+  {
+  }
+
+ private:
+  void Handle(evhtp_request_t* req) override;
+  re2::RE2 ping_regex_;
+  re2::RE2 invocations_regex_;
+
+  const std::string ping_mode_;
+
+  // [FIXME] Assume model name "model" and always use latest for single model
+  // mode, may change it to be read from environemnt variables?
+  const std::string model_name_;
+  const std::string model_version_str_;
+};
+
+void
+SagemakerAPIServer::Handle(evhtp_request_t* req)
+{
+  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
+                 << req->uri->path->full;
+
+  // [FIXME] header usage is restricted in sage maker, will need to update
+  // the helper functions to be header insensitive
+  if (RE2::FullMatch(std::string(req->uri->path->full), ping_regex_)) {
+    HandleServerHealth(req, ping_mode_);
+    return;
+  }
+
+  if (RE2::FullMatch(std::string(req->uri->path->full), invocations_regex_)) {
+    HandleInfer(req, model_name_, model_version_str_);
+    return;
+  }
+
+  LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
+                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
+
+  evhtp_send_reply(req, EVHTP_RES_BADREQ);
 }
 
 TRITONSERVER_Error*
@@ -2907,6 +2974,22 @@ HTTPServer::CreateMetricsServer(
 
   return nullptr;
 #endif  // TRITON_ENABLE_METRICS
+}
+
+TRITONSERVER_Error*
+HTTPServer::CreateSagemakerAPIServer(
+    const std::shared_ptr<TRITONSERVER_Server>& server,
+    nvidia::inferenceserver::TraceManager* trace_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
+    const int thread_cnt, std::unique_ptr<HTTPServer>* http_server)
+{
+  http_server->reset(new SagemakerAPIServer(
+      server, trace_manager, shm_manager, port, thread_cnt));
+
+  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  LOG_INFO << "Started Sagemaker HTTPService at " << addr;
+
+  return nullptr;
 }
 
 }}  // namespace nvidia::inferenceserver

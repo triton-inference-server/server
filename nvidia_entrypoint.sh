@@ -81,8 +81,9 @@ fi
 
 echo
 
-if [[ $# -eq 0 ]]; then
-  exec "/bin/bash"
+if [[ "$1" = "serve" ]]; then
+  shift 1
+  tritonserver --model-repository=/opt/ml --allow-grpc=false --allow-http=false --allow-metrics=false
 else
   exec "$@"
 fi

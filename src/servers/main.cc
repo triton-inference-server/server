@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -69,13 +69,18 @@ namespace {
 int32_t repository_poll_secs_ = 15;
 
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
-// default values and modifyied based on command-line args. Set to -1
-// to indicate the protocol is disabled.
+// default values and modifyied based on command-line args.
 #ifdef TRITON_ENABLE_HTTP
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> http_service_;
 bool allow_http_ = true;
 int32_t http_port_ = 8000;
 #endif  // TRITON_ENABLE_HTTP
+
+#ifdef TRITON_ENABLE_SAGEMAKER
+std::unique_ptr<nvidia::inferenceserver::HTTPServer> sagemaker_service_;
+bool allow_sagemaker_ = true;
+int32_t sagemaker_port_ = 8080;
+#endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef TRITON_ENABLE_GRPC
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
@@ -112,6 +117,12 @@ int grpc_infer_allocation_pool_size_ = 8;
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
 #endif  // TRITON_ENABLE_HTTP
+
+
+#if defined(TRITON_ENABLE_SAGEMAKER)
+// The number of threads to initialize for the HTTP front-end.
+int sagemaker_thread_cnt_ = 8;
+#endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef _WIN32
 // Minimum implementation of <getopt.h> for Windows
@@ -207,6 +218,11 @@ enum OptionId {
   OPTION_GRPC_ROOT_CERT,
   OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL,
 #endif  // TRITON_ENABLE_GRPC
+#if defined(TRITON_ENABLE_SAGEMAKER)
+  OPTION_ALLOW_SAGEMAKER,
+  OPTION_SAGEMAKER_PORT,
+  OPTION_SAGEMAKER_THREAD_COUNT,
+#endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
@@ -329,6 +345,14 @@ std::vector<Option> options_
        "the peer. Allowed values are none, low, medium and high. By default, "
        "compression level is selected as none."},
 #endif  // TRITON_ENABLE_GRPC
+#if defined(TRITON_ENABLE_SAGEMAKER)
+      {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
+       "Allow the server to listen for Sagemaker requests."},
+      {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
+       "The port for the server to listen on for Sagemaker requests."},
+      {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count", Option::ArgInt,
+       "Number of threads handling Sagemaker requests."},
+#endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_METRICS
       {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
        "Allow the server to provide prometheus metrics."},
@@ -415,8 +439,7 @@ CheckPortCollision()
 {
 #if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_GRPC)
   // Check if HTTP and GRPC have shared ports
-  if ((grpc_port_ == http_port_) && (grpc_port_ != -1) && allow_http_ &&
-      allow_grpc_) {
+  if ((http_port_ == grpc_port_) && allow_http_ && allow_grpc_) {
     std::cerr << "The server cannot listen to HTTP requests "
               << "and GRPC requests at the same port" << std::endl;
     return true;
@@ -425,8 +448,7 @@ CheckPortCollision()
 
 #if defined(TRITON_ENABLE_GRPC) && defined(TRITON_ENABLE_METRICS)
   // Check if Metric and GRPC have shared ports
-  if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
-      allow_metrics_) {
+  if ((grpc_port_ == metrics_port_) && allow_grpc_ && allow_metrics_) {
     std::cerr << "The server cannot provide metrics on same port used for "
               << "GRPC requests" << std::endl;
     return true;
@@ -435,13 +457,37 @@ CheckPortCollision()
 
 #if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_METRICS)
   // Check if Metric and HTTP have shared ports
-  if ((http_port_ == metrics_port_) && (metrics_port_ != -1) && allow_http_ &&
-      allow_metrics_) {
+  if ((http_port_ == metrics_port_) && allow_http_ && allow_metrics_) {
     std::cerr << "The server cannot provide metrics on same port used for "
               << "HTTP requests" << std::endl;
     return true;
   }
 #endif  // TRITON_ENABLE_HTTP && TRITON_ENABLE_METRICS
+
+#if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_HTTP)
+  if ((sagemaker_port_ == http_port_) && allow_sagemaker_ && allow_http_) {
+    std::cerr << "The server cannot listen to SageMaker requests "
+              << "and HTTP requests at the same port" << std::endl;
+    return true;
+  }
+#endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_HTTP
+
+#if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_GRPC)
+  if ((sagemaker_port_ == grpc_port_) && allow_sagemaker_ && allow_grpc_) {
+    std::cerr << "The server cannot listen to SageMaker requests "
+              << "and GRPC requests at the same port" << std::endl;
+    return true;
+  }
+#endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_GRPC
+
+#if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_METRICS)
+  if ((sagemaker_port_ == metrics_port_) && allow_sagemaker_ &&
+      allow_metrics_) {
+    std::cerr << "The server cannot listen to SageMaker requests "
+              << "and metrics requests at the same port" << std::endl;
+    return true;
+  }
+#endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_METRICS
 
   return false;
 }
@@ -516,6 +562,31 @@ StartMetricsService(
 }
 #endif  // TRITON_ENABLE_METRICS
 
+#ifdef TRITON_ENABLE_SAGEMAKER
+TRITONSERVER_Error*
+StartSagemakerService(
+    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
+    const std::shared_ptr<TRITONSERVER_Server>& server,
+    nvidia::inferenceserver::TraceManager* trace_manager,
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
+        shm_manager)
+{
+  TRITONSERVER_Error* err =
+      nvidia::inferenceserver::HTTPServer::CreateSagemakerAPIServer(
+          server, trace_manager, shm_manager, sagemaker_port_,
+          sagemaker_thread_cnt_, service);
+  if (err == nullptr) {
+    err = (*service)->Start();
+  }
+
+  if (err != nullptr) {
+    service->reset();
+  }
+
+  return err;
+}
+#endif  // TRITON_ENABLE_SAGEMAKER
+
 bool
 StartEndpoints(
     const std::shared_ptr<TRITONSERVER_Server>& server,
@@ -525,7 +596,7 @@ StartEndpoints(
 {
 #ifdef TRITON_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
-  if (allow_grpc_ && (grpc_port_ != -1)) {
+  if (allow_grpc_) {
     TRITONSERVER_Error* err =
         StartGrpcService(&grpc_service_, server, trace_manager, shm_manager);
     if (err != nullptr) {
@@ -537,7 +608,7 @@ StartEndpoints(
 
 #ifdef TRITON_ENABLE_HTTP
   // Enable HTTP endpoints if requested...
-  if (allow_http_ && (http_port_ != -1)) {
+  if (allow_http_) {
     TRITONSERVER_Error* err =
         StartHttpService(&http_service_, server, trace_manager, shm_manager);
     if (err != nullptr) {
@@ -547,9 +618,22 @@ StartEndpoints(
   }
 #endif  // TRITON_ENABLE_HTTP
 
+
+#ifdef TRITON_ENABLE_SAGEMAKER
+  // Enable Sagemaker endpoints if requested...
+  if (allow_sagemaker_) {
+    TRITONSERVER_Error* err = StartSagemakerService(
+        &sagemaker_service_, server, trace_manager, shm_manager);
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to start Sagemaker service");
+      return false;
+    }
+  }
+#endif  // TRITON_ENABLE_SAGEMAKER
+
 #ifdef TRITON_ENABLE_METRICS
   // Enable metrics endpoint if requested...
-  if (metrics_port_ != -1) {
+  if (allow_metrics_) {
     TRITONSERVER_Error* err = StartMetricsService(&metrics_service_, server);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to start Metrics service");
@@ -601,6 +685,18 @@ StopEndpoints()
     metrics_service_.reset();
   }
 #endif  // TRITON_ENABLE_METRICS
+
+#ifdef TRITON_ENABLE_SAGEMAKER
+  if (sagemaker_service_) {
+    TRITONSERVER_Error* err = sagemaker_service_->Stop();
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to stop Sagemaker service");
+      ret = false;
+    }
+
+    sagemaker_service_.reset();
+  }
+#endif  // TRITON_ENABLE_SAGEMAKER
 
   return ret;
 }
@@ -860,6 +956,11 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       grpc_response_compression_level_;
 #endif  // TRITON_ENABLE_GRPC
 
+#if defined(TRITON_ENABLE_SAGEMAKER)
+  int32_t sagemaker_port = sagemaker_port_;
+  int32_t sagemaker_thread_cnt = sagemaker_thread_cnt_;
+#endif  // TRITON_ENABLE_SAGEMAKER
+
 #ifdef TRITON_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
   bool allow_gpu_metrics = true;
@@ -937,6 +1038,18 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         http_thread_cnt = ParseIntOption(optarg);
         break;
 #endif  // TRITON_ENABLE_HTTP
+
+#if defined(TRITON_ENABLE_SAGEMAKER)
+      case OPTION_ALLOW_SAGEMAKER:
+        allow_sagemaker_ = ParseBoolOption(optarg);
+        break;
+      case OPTION_SAGEMAKER_PORT:
+        sagemaker_port = ParseIntOption(optarg);
+        break;
+      case OPTION_SAGEMAKER_THREAD_COUNT:
+        sagemaker_thread_cnt = ParseIntOption(optarg);
+        break;
+#endif  // TRITON_ENABLE_SAGEMAKER
 
 #if defined(TRITON_ENABLE_GRPC)
       case OPTION_ALLOW_GRPC:
@@ -1087,6 +1200,11 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRITON_ENABLE_HTTP
 
+#if defined(TRITON_ENABLE_SAGEMAKER)
+  sagemaker_port_ = sagemaker_port;
+  sagemaker_thread_cnt_ = sagemaker_thread_cnt;
+#endif  // TRITON_ENABLE_SAGEMAKER
+
 #if defined(TRITON_ENABLE_GRPC)
   grpc_port_ = grpc_port;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
@@ -1095,7 +1213,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
-  metrics_port_ = allow_metrics_ ? metrics_port : -1;
+  metrics_port_ = metrics_port;
   allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
 #endif  // TRITON_ENABLE_METRICS
 

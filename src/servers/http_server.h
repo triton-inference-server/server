@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -46,6 +46,13 @@ class HTTPServer {
   static TRITONSERVER_Error* CreateMetricsServer(
       const std::shared_ptr<TRITONSERVER_Server>& server, int32_t port,
       int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server);
+
+  static TRITONSERVER_Error* CreateSagemakerAPIServer(
+      const std::shared_ptr<TRITONSERVER_Server>& server,
+      nvidia::inferenceserver::TraceManager* trace_manager,
+      const std::shared_ptr<SharedMemoryManager>& smb_manager,
+      const int32_t port, const int thread_cnt,
+      std::unique_ptr<HTTPServer>* http_server);
 
   virtual ~HTTPServer() = default;
 

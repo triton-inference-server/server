@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -108,6 +108,10 @@ if(${TRITON_ENABLE_HTTP})
   add_definitions(-DTRITON_ENABLE_HTTP=1)
 endif() # TRITON_ENABLE_HTTP
 
+if(${TRITON_ENABLE_SAGEMAKER})
+  add_definitions(-DTRITON_ENABLE_SAGEMAKER=1)
+endif() # TRITON_ENABLE_SAGEMAKER
+
 if(${TRITON_ENABLE_GRPC})
   add_definitions(-DTRITON_ENABLE_GRPC=1)
 endif() # TRITON_ENABLE_GRPC
@@ -200,7 +204,7 @@ include_directories(${Boost_INCLUDE_DIRS})
 #
 # libevent
 #
-if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR ${TRITON_ENABLE_SAGEMAKER})
   find_package(Libevent CONFIG REQUIRED)
   message(STATUS "Using libevent ${Libevent_VERSION}")
   include_directories(${LIBEVENT_INCLUDE_DIRS})
