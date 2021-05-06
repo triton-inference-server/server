@@ -51,7 +51,7 @@ class TraceManager {
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should
   // occur.
-  TRITONSERVER_InferenceTrace* SampleTrace();
+  TRITONSERVER_InferenceTrace* SampleTrace(void** userp = nullptr);
 
   // Capture a timestamp generated outside of triton and associate it
   // with a trace id. If 'timestamp_ns' is 0 the current timestamp
@@ -60,6 +60,8 @@ class TraceManager {
       const uint64_t trace_id, TRITONSERVER_InferenceTraceLevel level,
       const std::string& name, uint64_t timestamp_ns = 0);
 
+  static void TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp);
+
  private:
   TraceManager(
       const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
@@ -67,7 +69,6 @@ class TraceManager {
 
   void WriteTrace(const std::stringstream& ss);
 
-  static void TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp);
   static void TraceActivity(
       TRITONSERVER_InferenceTrace* trace,
       TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,

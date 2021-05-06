@@ -92,7 +92,7 @@ TraceManager::~TraceManager()
 }
 
 TRITONSERVER_InferenceTrace*
-TraceManager::SampleTrace()
+TraceManager::SampleTrace(void** userp)
 {
   uint64_t s = sample_.fetch_add(1);
   if ((s % rate_) != 0) {
@@ -101,18 +101,21 @@ TraceManager::SampleTrace()
 
   // userp is a pair of the trace manager and a string buffer where
   // the trace collects its trace activity output.
-  std::unique_ptr<TraceStreams> userp(new TraceStreams(this));
+  std::unique_ptr<TraceStreams> luserp(new TraceStreams(this));
 
   TRITONSERVER_InferenceTrace* trace;
   TRITONSERVER_Error* err = TRITONSERVER_InferenceTraceNew(
       &trace, level_, 0 /* parent_id */, TraceActivity, TraceRelease,
-      userp.get());
+      luserp.get());
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "creating inference trace object");
     return nullptr;
   }
 
-  userp.release();
+  if (userp != nullptr) {
+    *userp = luserp.get();
+  }
+  luserp.release();
 
   return trace;
 }
@@ -165,7 +168,9 @@ TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
     std::lock_guard<std::mutex> lk(ts->mtx_);
     ss = ts->streams_[id].get();
   }
-  ts->manager_->WriteTrace(*ss);
+  if (ss != nullptr) {
+    ts->manager_->WriteTrace(*ss);
+  }
 
   uint64_t parent_id;
   LOG_TRITONSERVER_ERROR(
