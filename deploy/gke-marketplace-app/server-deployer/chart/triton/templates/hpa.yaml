@@ -38,7 +38,7 @@ spec:
   - type: External
     external:
       metricName: kubernetes.io|container|accelerator|duty_cycle
-      targetAverageValue: 85
+      targetAverageValue: {{ .Values.HPATargetAverageValue }}
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment

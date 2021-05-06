@@ -59,7 +59,11 @@ assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx libtorch plan")
 
 _trials = BACKENDS.split(" ")
-_ragged_batch_supported_trials = ()
+_ragged_batch_supported_trials = ["custom",]
+if "plan" in _trials:
+    _ragged_batch_supported_trials.append("plan")
+if "onnx" in _trials:
+    _ragged_batch_supported_trials.append("onnx")
 
 _max_queue_delay_ms = 10000
 

@@ -155,6 +155,8 @@ if(${TRITON_ENABLE_GPU})
   set(HOST_COMPILER_FLAGS "")
   if (WIN32)
     set(HOST_COMPILER_FLAGS "/MD")
+  else()
+    set(HOST_COMPILER_FLAGS "-fPIC")
   endif()
 
   set(CUDA_LIBRARIES PUBLIC ${CUDA_LIBRARIES})

@@ -51,29 +51,26 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 RET=0
 
 MODEL_SUFFIX=nobatch_zero_1_float32
-rm -fr models && mkdir models
+rm -fr all_models && mkdir all_models
 for TARGET in graphdef savedmodel onnx libtorch plan; do
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${TARGET}_$MODEL_SUFFIX \
-       models/.
+       all_models/.
 done
-cp -r ../custom_models/custom_zero_1_float32 models/. && \
-    mkdir -p models/custom_zero_1_float32/1 && \
-    (cd models/custom_zero_1_float32 && \
-            echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
-            sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
-            sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
 
-mkdir -p models/python_$MODEL_SUFFIX/1/
-cp ../python_models/identity_fp32/config.pbtxt models/python_$MODEL_SUFFIX/
-(cd models/python_$MODEL_SUFFIX && \
+mkdir -p all_models/python_$MODEL_SUFFIX/1/
+cp ../python_models/identity_fp32/config.pbtxt all_models/python_$MODEL_SUFFIX/
+(cd all_models/python_$MODEL_SUFFIX && \
             sed -i "s/max_batch_size: 64/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/name: \"identity_fp32\"/name: \"python_$MODEL_SUFFIX\"/" config.pbtxt)
 
-cp ../python_models/identity_fp32/model.py models/python_$MODEL_SUFFIX/1/model.py
+cp ../python_models/identity_fp32/model.py all_models/python_$MODEL_SUFFIX/1/model.py
 
 # Restart server before every test to make sure server state
 # is invariant to previous test
 for TARGET in graphdef savedmodel onnx libtorch plan python; do
+    rm -fr models && mkdir models && \
+        cp -r all_models/${TARGET}_$MODEL_SUFFIX models/.
+
     SERVER_LOG=$SERVER_LOG_BASE.$TARGET
     CLIENT_LOG=$CLIENT_LOG_BASE.$TARGET
 
