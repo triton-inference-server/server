@@ -1965,6 +1965,13 @@ class InferHandlerState {
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
       : tritonserver_(tritonserver)
   {
+#ifdef TRITON_ENABLE_TRACING
+    trace_manager_ = nullptr;
+    trace_ = nullptr;
+    trace_id_ = 0;
+    trace_userp_ = nullptr;
+#endif  // TRITON_ENABLE_TRACING
+
     // For debugging and testing,
     const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
     delay_response_ms_ = 0;
@@ -1973,6 +1980,17 @@ class InferHandlerState {
     }
     response_queue_.reset(new ResponseQueue<ResponseType>());
     Reset(context, start_step);
+  }
+
+  ~InferHandlerState()
+  {
+#ifdef TRITON_ENABLE_TRACING
+    if (trace_ != nullptr) {
+      TraceManager::TraceRelease(trace_, trace_userp_);
+      trace_ = nullptr;
+      trace_userp_ = nullptr;
+    }
+#endif  // TRITON_ENABLE_TRACING
   }
 
   void Reset(
@@ -1986,6 +2004,13 @@ class InferHandlerState {
     complete_ = false;
     request_.Clear();
     response_queue_->Reset();
+#ifdef TRITON_ENABLE_TRACING
+    if (trace_ != nullptr) {
+      TraceManager::TraceRelease(trace_, trace_userp_);
+      trace_ = nullptr;
+      trace_userp_ = nullptr;
+    }
+#endif  // TRITON_ENABLE_TRACING
   }
 
   void Release() { context_ = nullptr; }
@@ -2011,6 +2036,7 @@ class InferHandlerState {
   TraceManager* trace_manager_;
   TRITONSERVER_InferenceTrace* trace_;
   uint64_t trace_id_;
+  void* trace_userp_;
 #endif  // TRITON_ENABLE_TRACING
 
   bool is_decoupled_;
@@ -3098,8 +3124,9 @@ ModelInferHandler::StartNewRequest()
   state->trace_manager_ = nullptr;
   state->trace_ = nullptr;
   state->trace_id_ = 0;
+  state->trace_userp_ = nullptr;
   if (trace_manager_ != nullptr) {
-    state->trace_ = trace_manager_->SampleTrace();
+    state->trace_ = trace_manager_->SampleTrace(&state->trace_userp_);
     if (state->trace_ != nullptr) {
       state->trace_manager_ = trace_manager_;
       TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
@@ -3215,6 +3242,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       TRITONSERVER_InferenceTrace* trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
       trace = state->trace_;
+      // Ownership of TRITONSERVER_InferenceTrace will be transferred
+      state->trace_ = nullptr;
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = ISSUED;
@@ -3448,8 +3477,9 @@ ModelStreamInferHandler::StartNewRequest()
   state->trace_manager_ = nullptr;
   state->trace_ = nullptr;
   state->trace_id_ = 0;
+  state->trace_userp_ = nullptr;
   if (trace_manager_ != nullptr) {
-    state->trace_ = trace_manager_->SampleTrace();
+    state->trace_ = trace_manager_->SampleTrace(&state->trace_userp_);
     if (state->trace_ != nullptr) {
       state->trace_manager_ = trace_manager_;
       TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
@@ -3602,6 +3632,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       TRITONSERVER_InferenceTrace* trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
       trace = state->trace_;
+      // Ownership of TRITONSERVER_InferenceTrace will be transferred
+      state->trace_ = nullptr;
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = ISSUED;
@@ -3655,8 +3687,10 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     next_read_state->trace_manager_ = nullptr;
     next_read_state->trace_ = nullptr;
     next_read_state->trace_id_ = 0;
+    next_read_state->trace_userp_ = nullptr;
     if (trace_manager_ != nullptr) {
-      next_read_state->trace_ = trace_manager_->SampleTrace();
+      next_read_state->trace_ =
+          trace_manager_->SampleTrace(&next_read_state->trace_userp_);
       if (next_read_state->trace_ != nullptr) {
         next_read_state->trace_manager_ = trace_manager_;
         TRITONSERVER_InferenceTraceId(
