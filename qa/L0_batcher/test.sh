@@ -427,9 +427,8 @@ done
 # by comparing the "response send" timestamps.
 TEST_CASE=test_multi_batch_preserve_ordering
 
-# FIXME sleep_for does not delay for expected time when passing 400ms 
-# when using I/O is in GPU memory. Skip for Windows test.
-if [ "$OS_WINDOWS" -eq "0" ] && [ "$TEST_CUDA_SHARED_MEMORY" -eq 0 ]; then
+# Skip test for Windows. Does not build identity backend
+if [ "$OS_WINDOWS" -eq "0" ]; then
     rm -fr ./custom_models && mkdir ./custom_models && \
         cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
         mkdir -p ./custom_models/custom_zero_1_float32/1
