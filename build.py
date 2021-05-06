@@ -233,6 +233,8 @@ def core_cmake_args(components, backends, install_dir):
         cmake_enable(FLAGS.enable_gpu_metrics)))
     cargs.append('-DTRITON_ENABLE_TRACING:BOOL={}'.format(
         cmake_enable(FLAGS.enable_tracing)))
+    cargs.append('-DTRITON_ENABLE_NVTX:BOOL={}'.format(
+        cmake_enable(FLAGS.enable_nvtx)))
 
     cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
         cmake_enable(FLAGS.enable_gpu)))
