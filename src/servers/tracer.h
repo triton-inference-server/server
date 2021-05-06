@@ -81,7 +81,6 @@ class TraceManager {
   std::mutex mu_;
   uint32_t trace_cnt_;
 
-
   // Atomically incrementing counter used to implement sampling rate.
   std::atomic<uint64_t> sample_;
 };
