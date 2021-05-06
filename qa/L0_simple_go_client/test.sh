@@ -61,7 +61,7 @@ protoc -I core --go_out=plugins=grpc:${PACKAGE_PATH} --go_opt=Mgrpc_service.prot
 set +e
 
 # Runs test for GRPC variant of go client
-go run $SIMPLE_GO_CLIENT >>client.log 2>&1
+GO111MODULE=off go run $SIMPLE_GO_CLIENT >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
