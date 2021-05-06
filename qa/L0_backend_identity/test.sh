@@ -31,7 +31,7 @@ CLIENT_PY=./identity_test.py
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/all_models"
+SERVER_ARGS="--model-repository=`pwd`/all_models --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
