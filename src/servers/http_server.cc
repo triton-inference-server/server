@@ -2910,8 +2910,7 @@ class SagemakerAPIServer : public BaseAPIServer {
 
   const std::string ping_mode_;
 
-  // [FIXME] Assume model name "model" and always use latest for single model
-  // mode, may change it to be read from environemnt variables?
+  // For single model mode, assume that only one version of "model" is presented
   const std::string model_name_;
   const std::string model_version_str_;
 };
