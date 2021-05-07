@@ -1,0 +1,107 @@
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Windows min container for Triton build
+
+ARG BASE_IMAGE=mcr.microsoft.com/dotnet/framework/sdk:4.8
+
+FROM ${BASE_IMAGE}
+
+ARG CUDA_MAJOR=11
+ARG CUDA_MINOR=1
+ARG CUDA_PATCH=1
+ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
+ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   nvml_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cublas_${CUDA_MAJOR}.${CUDA_MINOR} cublas_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cufft_${CUDA_MAJOR}.${CUDA_MINOR} cufft_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   curand_${CUDA_MAJOR}.${CUDA_MINOR} curand_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cusolver_${CUDA_MAJOR}.${CUDA_MINOR} cusolver_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cusparse_${CUDA_MAJOR}.${CUDA_MINOR} cusparse_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   visual_studio_integration_${CUDA_MAJOR}.${CUDA_MINOR}"
+ARG CUDA_INSTALL_ROOT_WP="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${CUDA_MAJOR}.${CUDA_MINOR}"
+
+ARG TENSORRT_VERSION=7.2.2.3
+ARG TENSORRT_ZIP=TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.1.cudnn8.0.zip
+
+ARG CUDNN_VERSION=8.0.5.39
+ARG CUDNN_ZIP=cudnn-11.1-windows-x64-v${CUDNN_VERSION}.zip
+
+SHELL ["cmd", "/S", "/C"]
+
+RUN mkdir c:\tmp
+WORKDIR /tmp
+
+RUN powershell.exe -ExecutionPolicy RemoteSigned iex (new-object net.webclient).downloadstring('https://get.scoop.sh')
+RUN scoop install python git docker unzip
+RUN pip3 install --upgrade wheel setuptools docker
+
+# Download and install Build Tools for Visual Studio.
+ADD https://aka.ms/vs/16/release/vs_buildtools.exe vs_buildtools.exe
+ADD https://aka.ms/vs/16/release/channel VisualStudio.chman
+ARG VS_INSTALL_PATH_WP="C:\BuildTools"
+RUN vs_buildtools.exe --quiet --wait --norestart --nocache --installPath %VS_INSTALL_PATH_WP% --channelUri C:\tmp\VisualStudio.chman --installChannelUri C:\tmp\VisualStudio.chman --add Microsoft.VisualStudio.Workload.VCTools;includeRecommended --add Microsoft.Component.MSBuild || IF "%ERRORLEVEL%"=="3010" EXIT 0
+
+WORKDIR /
+RUN git clone --depth=1 --single-branch -b 2021.04.30 https://github.com/microsoft/vcpkg.git
+WORKDIR /vcpkg
+RUN bootstrap-vcpkg.bat
+RUN vcpkg.exe update
+RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows zlib:x64-windows
+RUN vcpkg.exe integrate install
+
+WORKDIR /tmp
+ADD https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_win10_network.exe cuda_${CUDA_VERSION}_win10_network.exe
+COPY ${CUDNN_ZIP} .
+COPY ${TENSORRT_ZIP} .
+
+WORKDIR /
+RUN unzip /tmp/%TENSORRT_ZIP%
+RUN move TensorRT-%TENSORRT_VERSION% TensorRT
+
+WORKDIR /tmp
+RUN cuda_%CUDA_VERSION%_win10_network.exe -s %CUDA_PACKAGES%
+RUN unzip %CUDNN_ZIP%
+RUN copy cuda\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
+RUN copy cuda\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
+RUN copy cuda\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
+
+# Copy the CUDA visualstudio integration from where is was installed
+# into the appropriate place in BuildTools
+RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensions\*" "%VS_INSTALL_PATH_WP%\MSBuild\Microsoft\VC\v160\BuildCustomizations"
+
+RUN setx PATH "%PATH%;c:\TensorRT\lib;%CUDA_INSTALL_ROOT_WP%\bin"
+
+# It is important that the entrypoint initialize VisualStudio
+# environment otherwise the build will fail. Also set
+# CMAKE_TOOLCHAIN_FILE and VCPKG_TARGET_TRIPLET so
+# that cmake can find the packages installed by vcpkg.
+ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
+ENV VCPKG_TARGET_TRIPLET x64-windows
+ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
+ENV TRITONBUILD_VCPKG_TARGET_TRIPLET x64-windows
+ENTRYPOINT C:\BuildTools\Common7\Tools\VsDevCmd.bat &&
