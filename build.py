@@ -71,7 +71,7 @@ EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'armnn'
+    'openvino', 'tflite'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -328,8 +328,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = dali_cmake_args()
     elif be == 'pytorch':
         args = pytorch_cmake_args(images)
-    elif be == 'armnn':
-        args = armnn_cmake_args(images)
+    elif be == 'tflite':
+        args = tflite_cmake_args()
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
@@ -465,10 +465,11 @@ def dali_cmake_args():
         '-DTRITON_DALI_SKIP_DOWNLOAD=OFF',
     ]
 
-def armnn_cmake_args():
+
+def tflite_cmake_args():
     return [
         '-DTRITON_ENABLE_GPU=OFF',
-        '-DJOBS=$(nproc)'
+        '-DJOBS={}'.format(multiprocessing.cpu_count())
     ]
 
 
@@ -500,6 +501,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # python3-dev is needed by Torchvision
 # python3-pip is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
+# scons gcc7 needed for tflite backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -520,6 +522,10 @@ RUN apt-get update && \
             rapidjson-dev \
             software-properties-common \
             unzip \
+            scons \
+            gcc-7 \
+            g++-7 \
+            xxd \
             wget \
             zlib1g-dev \
             pkg-config \
@@ -1279,9 +1285,9 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, be, 'install')
 
         mkdir(FLAGS.build_dir)
-        # If armnn backend, source from external repo for git clone
-        if (be == 'armnn'):
-            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be, 'git@gitlab.com:arm-research/smarter/')
+        # If tflite backend, source from external repo for git clone
+        if (be == 'tflite'):
+            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be, 'https://gitlab.com/arm-research/smarter/')
         else:
             gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be, FLAGS.github_organization)
         mkdir(repo_build_dir)
