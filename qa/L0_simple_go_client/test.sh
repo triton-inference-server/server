@@ -27,6 +27,8 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
+TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
+
 SIMPLE_GO_CLIENT=grpc_simple_client.go
 
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -52,6 +54,7 @@ PACKAGE_PATH="${GOPATH}/src"
 mkdir -p ${PACKAGE_PATH}
 
 # Get the proto files from the common repo
+rm -fr common
 git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
     https://github.com/triton-inference-server/common.git
 mkdir core && cp common/protobuf/*.proto core/.
