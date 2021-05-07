@@ -1043,7 +1043,8 @@ class BaseAPIServer : public HTTPServerImpl {
   class InferRequestClass {
    public:
     explicit InferRequestClass(
-        TRITONSERVER_Server* server, evhtp_request_t* req);
+        TRITONSERVER_Server* server, evhtp_request_t* req,
+        DataCompressor::Type response_compression_type);
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
@@ -1074,6 +1075,8 @@ class BaseAPIServer : public HTTPServerImpl {
     TRITONSERVER_Server* server_;
     evhtp_request_t* req_;
     evthr_t* thread_;
+
+    DataCompressor::Type response_compression_type_;
 
     // Counter to keep track of number of responses generated.
     std::atomic<uint32_t> response_count_;
@@ -1118,6 +1121,12 @@ class BaseAPIServer : public HTTPServerImpl {
   void HandleCudaSharedMemory(
       evhtp_request_t* req, const std::string& region_name,
       const std::string& action);
+
+  // Get the inference header length. Return 0 if the whole request body is
+  // the inference header.
+  virtual size_t GetInferenceHeaderLength(evhtp_request_t* req);
+  virtual DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req);
+  virtual DataCompressor::Type GetResponseCompressionType(evhtp_request_t* req);
 
   TRITONSERVER_Error* EVBufferToInput(
       const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
@@ -1869,6 +1878,54 @@ BaseAPIServer::HandleCudaSharedMemory(
   }
 }
 
+size_t
+BaseAPIServer::GetInferenceHeaderLength(evhtp_request_t* req)
+{
+  // Find Inference-Header-Content-Length in header. If missing set to 0
+  size_t header_length = 0;
+  const char* header_length_c_str =
+      evhtp_kv_find(req->headers_in, kInferHeaderContentLengthHTTPHeader);
+  if (header_length_c_str != NULL) {
+    header_length = std::atoi(header_length_c_str);
+  }
+  return header_length;
+}
+
+DataCompressor::Type
+BaseAPIServer::GetRequestCompressionType(evhtp_request_t* req)
+{
+  const char* content_encoding_c_str =
+      evhtp_kv_find(req->headers_in, kContentEncodingHTTPHeader);
+  if (content_encoding_c_str != NULL) {
+    std::string content_encoding(content_encoding_c_str);
+    if (content_encoding == "deflate") {
+      return DataCompressor::Type::DEFLATE;
+    } else if (content_encoding == "gzip") {
+      return DataCompressor::Type::GZIP;
+    } else if (!content_encoding.empty() && (content_encoding != "identity")) {
+      return DataCompressor::Type::UNKNOWN;
+    }
+  }
+  return DataCompressor::Type::IDENTITY;
+}
+
+DataCompressor::Type
+BaseAPIServer::GetResponseCompressionType(evhtp_request_t* req)
+{
+  // Find Accept-Encoding in header. Try to compress if found
+  const char* accept_encoding_c_str =
+      evhtp_kv_find(req->headers_in, kAcceptEncodingHTTPHeader);
+  if (accept_encoding_c_str != NULL) {
+    std::string accept_encoding = CompressionTypeUsed(accept_encoding_c_str);
+    if (accept_encoding == "deflate") {
+      return DataCompressor::Type::DEFLATE;
+    } else if (accept_encoding == "gzip") {
+      return DataCompressor::Type::GZIP;
+    }
+  }
+  return DataCompressor::Type::IDENTITY;
+}
+
 TRITONSERVER_Error*
 BaseAPIServer::EVBufferToInput(
     const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
@@ -2279,36 +2336,22 @@ BaseAPIServer::HandleInfer(
 
   if (err == nullptr) {
     connection_paused = true;
-    std::unique_ptr<InferRequestClass> infer_request(
-        new InferRequestClass(server_.get(), req));
-#ifdef TRITON_ENABLE_TRACING
-    infer_request->trace_manager_ = trace_manager_;
-    infer_request->trace_id_ = trace_id;
-#endif  // TRITON_ENABLE_TRACING
 
-    // Find Inference-Header-Content-Length in header. If missing set to 0
-    size_t header_length = 0;
-    const char* header_length_c_str =
-        evhtp_kv_find(req->headers_in, kInferHeaderContentLengthHTTPHeader);
-    if (header_length_c_str != NULL) {
-      header_length = std::atoi(header_length_c_str);
-    }
+    // Get the header length
+    size_t header_length = GetInferenceHeaderLength(req);
 
-    // Find Content-Encoding in header. Decompress if not empty
+    // Decompress request body if it is compressed in supported type
+    auto compression_type = GetRequestCompressionType(req);
     evbuffer* decompressed_buffer = nullptr;
-    const char* content_encoding_c_str =
-        evhtp_kv_find(req->headers_in, kContentEncodingHTTPHeader);
-    if (content_encoding_c_str != NULL) {
-      std::string content_encoding(content_encoding_c_str);
-      if (content_encoding == "deflate") {
+    switch (compression_type) {
+      case DataCompressor::Type::DEFLATE:
+      case DataCompressor::Type::GZIP: {
         decompressed_buffer = evbuffer_new();
         err = DataCompressor::DecompressData(
-            DataCompressor::Type::DEFLATE, req->buffer_in, decompressed_buffer);
-      } else if (content_encoding == "gzip") {
-        decompressed_buffer = evbuffer_new();
-        err = DataCompressor::DecompressData(
-            DataCompressor::Type::GZIP, req->buffer_in, decompressed_buffer);
-      } else if (!content_encoding.empty()) {
+            compression_type, req->buffer_in, decompressed_buffer);
+        break;
+      }
+      case DataCompressor::Type::UNKNOWN: {
         // Encounter unsupported compressed type,
         // send 415 error with supported types in Accept-Encoding
         evhtp_headers_add_header(
@@ -2317,7 +2360,18 @@ BaseAPIServer::HandleInfer(
         evhtp_send_reply(req, EVHTP_RES_UNSUPPORTED);
         return;
       }
+      case DataCompressor::Type::IDENTITY:
+        // Do nothing
+        break;
     }
+
+    std::unique_ptr<InferRequestClass> infer_request(new InferRequestClass(
+        server_.get(), req, GetResponseCompressionType(req)));
+#ifdef TRITON_ENABLE_TRACING
+    infer_request->trace_manager_ = trace_manager_;
+    infer_request->trace_id_ = trace_id;
+#endif  // TRITON_ENABLE_TRACING
+
     if (err == nullptr) {
       err = EVBufferToInput(
           model_name, irequest,
@@ -2411,8 +2465,10 @@ BaseAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 BaseAPIServer::InferRequestClass::InferRequestClass(
-    TRITONSERVER_Server* server, evhtp_request_t* req)
-    : server_(server), req_(req), response_count_(0)
+    TRITONSERVER_Server* server, evhtp_request_t* req,
+    DataCompressor::Type response_compression_type)
+    : server_(server), req_(req),
+      response_compression_type_(response_compression_type), response_count_(0)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
@@ -2721,20 +2777,21 @@ BaseAPIServer::InferRequestClass::FinalizeResponse(
   }
 
   evbuffer* response_body = response_placeholder;
-  // Find Accept-Encoding in header. Try to compress if found
-  const char* accept_encoding_c_str =
-      evhtp_kv_find(req_->headers_in, kAcceptEncodingHTTPHeader);
-  if (accept_encoding_c_str != NULL) {
-    std::string accept_encoding = CompressionTypeUsed(accept_encoding_c_str);
-    if (accept_encoding == "deflate") {
+  switch (response_compression_type_) {
+    case DataCompressor::Type::DEFLATE:
+    case DataCompressor::Type::GZIP: {
       auto compressed_buffer = evbuffer_new();
       auto err = DataCompressor::CompressData(
-          DataCompressor::Type::DEFLATE, response_placeholder,
-          compressed_buffer);
+          response_compression_type_, response_placeholder, compressed_buffer);
       if (err == nullptr) {
         evhtp_headers_add_header(
             req_->headers_out,
-            evhtp_header_new(kContentEncodingHTTPHeader, "deflate", 1, 1));
+            evhtp_header_new(
+                kContentEncodingHTTPHeader,
+                (response_compression_type_ == DataCompressor::Type::DEFLATE)
+                    ? "deflate"
+                    : "gzip",
+                1, 1));
         response_body = compressed_buffer;
         evbuffer_free(response_placeholder);
       } else {
@@ -2744,25 +2801,14 @@ BaseAPIServer::InferRequestClass::FinalizeResponse(
         TRITONSERVER_ErrorDelete(err);
         evbuffer_free(compressed_buffer);
       }
-    } else if (accept_encoding == "gzip") {
-      auto compressed_buffer = evbuffer_new();
-      auto err = DataCompressor::CompressData(
-          DataCompressor::Type::GZIP, response_placeholder, compressed_buffer);
-      if (err == nullptr) {
-        evhtp_headers_add_header(
-            req_->headers_out,
-            evhtp_header_new(kContentEncodingHTTPHeader, "gzip", 1, 1));
-        response_body = compressed_buffer;
-        evbuffer_free(response_placeholder);
-      } else {
-        // just log the compression error and return the uncompressed data
-        LOG_VERBOSE(1) << "unable to compress response: "
-                       << TRITONSERVER_ErrorMessage(err);
-        TRITONSERVER_ErrorDelete(err);
-        evbuffer_free(compressed_buffer);
-      }
+      break;
     }
+    case DataCompressor::Type::IDENTITY:
+    case DataCompressor::Type::UNKNOWN:
+      // Do nothing for other cases
+      break;
   }
+
   evbuffer_add_buffer(req_->buffer_out, response_body);
   // Destroy the evbuffer object as the data has been moved
   // to HTTP response buffer
@@ -2905,6 +2951,17 @@ class SagemakerAPIServer : public BaseAPIServer {
 
  private:
   void Handle(evhtp_request_t* req) override;
+  size_t GetInferenceHeaderLength(evhtp_request_t* req) override;
+  // Currently the compresssion schema hasn't been defined,
+  // assume identity compression type is used for both request and response
+  DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req) override
+  {
+    return DataCompressor::Type::IDENTITY;
+  }
+  DataCompressor::Type GetResponseCompressionType(evhtp_request_t* req) override
+  {
+    return DataCompressor::Type::IDENTITY;
+  }
   re2::RE2 ping_regex_;
   re2::RE2 invocations_regex_;
 
@@ -2913,7 +2970,30 @@ class SagemakerAPIServer : public BaseAPIServer {
   // For single model mode, assume that only one version of "model" is presented
   const std::string model_name_;
   const std::string model_version_str_;
+
+  static const std::string binary_mime_type_;
 };
+
+const std::string SagemakerAPIServer::binary_mime_type_(
+    "application/vnd.sagemaker-triton.binary+json;json-header-size=");
+
+size_t
+SagemakerAPIServer::GetInferenceHeaderLength(evhtp_request_t* req)
+{
+  // Check mime type and set inference header length. If missing set to 0
+  size_t header_length = 0;
+  const char* content_type_c_str =
+      evhtp_kv_find(req->headers_in, kContentTypeHeader);
+  if (content_type_c_str != NULL) {
+    std::string content_type(content_type_c_str);
+    size_t pos = content_type.find(binary_mime_type_);
+    if (pos != std::string::npos) {
+      header_length =
+          std::atoi(content_type_c_str + pos + binary_mime_type_.length());
+    }
+  }
+  return header_length;
+}
 
 void
 SagemakerAPIServer::Handle(evhtp_request_t* req)
