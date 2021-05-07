@@ -159,7 +159,7 @@ done
 # Create allow-ragged model to variable-size model repository
 cp -r ../custom_models/custom_zero_1_float32 var_models/. && \
     (cd var_models/custom_zero_1_float32 && mkdir 1 && \
-        echo "instance_group [ { kind: KIND_CPU count: 1 }]" >> config.pbtxt && \
+        echo "instance_group [ { kind: KIND_GPU count: 1 }]" >> config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
         sed -i "s/name:.*\"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
@@ -439,7 +439,7 @@ if [ "$OS_WINDOWS" -eq "0" ]; then
             sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
             sed -i "s/max_batch_size:.*/max_batch_size: 4/g" config.pbtxt && \
             echo "dynamic_batching { preferred_batch_size: [ 4 ] }" >> config.pbtxt && \
-            echo "instance_group [ { kind: KIND_CPU count: 2 }]" >> config.pbtxt && \
+            echo "instance_group [ { kind: KIND_GPU count: 2 }]" >> config.pbtxt && \
             echo "parameters [" >> config.pbtxt && \
             echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}," >> config.pbtxt && \
             echo "{ key: \"instance_wise_delay_multiplier\"; value: { string_value: \"4\" }}" >> config.pbtxt && \
