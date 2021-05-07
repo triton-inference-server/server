@@ -43,6 +43,8 @@ rm -rf models
 rm -f *.log
 rm -f *.out
 
+SAGEMAKER_TEST=sagemaker_test.py
+
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./server.log"
@@ -110,19 +112,20 @@ fi
 
 # Inference in minimal setting
 set +e
-code=`curl -s -w %{http_code} -o ./invocations.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8080/invocations`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./invocations.out
+python $SAGEMAKER_TEST SageMakerTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
+else
+    check_test_results $CLIENT_LOG 3
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
-if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./invocations.out` != "1" ]; then
-    RET=1
-fi
-if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./invocations.out` != "1" ]; then
-    RET=1
-fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
