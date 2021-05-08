@@ -36,7 +36,6 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 import tritonclient.http as httpclient
-from tritonclientutils import InferenceServerException
 
 import argparse
 import csv
@@ -45,14 +44,6 @@ import os
 import requests
 import socket
 import sys
-
-FLAGS = None
-
-
-def post_to_url(url, data):
-    headers = {'Content-Type': 'application/json', 'Accept-Charset': 'UTF-8'}
-    r = requests.post(url, data=data, headers=headers)
-    r.raise_for_status()
 
 
 class SageMakerTest(tu.TestResultCollector):
@@ -110,7 +101,7 @@ class SageMakerTest(tu.TestResultCollector):
             "Expected response body: {}; got: {}".format(
                 self.expected_result_, r.json()))
 
-    def test_inference_client_generated_body(self):
+    def test_inference_client_generated_request(self):
         inputs = []
         outputs = []
         inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
@@ -138,7 +129,7 @@ class SageMakerTest(tu.TestResultCollector):
             "Expected response body: {}; got: {}".format(
                 self.expected_result_, r.json()))
 
-    def test_inference_client_generated_body_binary(self):
+    def test_inference_client_generated_request_binary(self):
         inputs = []
         outputs = []
         inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
@@ -169,6 +160,72 @@ class SageMakerTest(tu.TestResultCollector):
             self.expected_result_, r.json(),
             "Expected response body: {}; got: {}".format(
                 self.expected_result_, r.json()))
+
+    def test_inference_client_generated_response(self):
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+
+        # Initialize the data
+        input_data = np.array(self.input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=False)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+        request_body, _ = httpclient.InferenceServerClient.make_body(
+            inputs, outputs=outputs)
+
+        headers = {'Content-Type': 'application/json'}
+        r = requests.post(self.url_, data=request_body, headers=headers)
+        r.raise_for_status()
+
+        result = httpclient.InferenceServerClient.make_infer_result(r._content)
+
+        output0_data = result.as_numpy('OUTPUT0')
+        output1_data = result.as_numpy('OUTPUT1')
+        for i in range(16):
+            self.assertEqual(output0_data[0][i], self.expected_output0_data_[i])
+            self.assertEqual(output1_data[0][i], self.expected_output1_data_[i])
+
+    def test_inference_client_generated_response_binary(self):
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+
+        # Initialize the data
+        input_data = np.array(self.input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=False)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+        request_body, _ = httpclient.InferenceServerClient.make_body(
+            inputs, outputs=outputs)
+
+        headers = {'Content-Type': 'application/json'}
+        r = requests.post(self.url_, data=request_body, headers=headers)
+        r.raise_for_status()
+
+        header_length_prefix = "application/vnd.sagemaker-triton.binary+json;json-header-size="
+        header_length_str = r.headers['Content-Type'][len(header_length_prefix
+                                                         ):]
+        result = httpclient.InferenceServerClient.make_infer_result(
+            r._content, header_length=int(header_length_str))
+
+        output0_data = result.as_numpy('OUTPUT0')
+        output1_data = result.as_numpy('OUTPUT1')
+        for i in range(16):
+            self.assertEqual(output0_data[0][i], self.expected_output0_data_[i])
+            self.assertEqual(output1_data[0][i], self.expected_output1_data_[i])
 
 
 if __name__ == '__main__':

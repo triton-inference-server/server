@@ -1045,6 +1045,7 @@ class BaseAPIServer : public HTTPServerImpl {
     explicit InferRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type);
+    virtual ~InferRequestClass() = default;
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
@@ -1056,6 +1057,9 @@ class BaseAPIServer : public HTTPServerImpl {
         void* userp);
     TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response);
+
+    virtual void SetResponseHeader(
+        const bool has_binary_data, const size_t header_length);
 
     uint32_t IncrementResponseCount();
 
@@ -1071,7 +1075,7 @@ class BaseAPIServer : public HTTPServerImpl {
     // lifetime of the request.
     std::list<std::vector<char>> serialized_data_;
 
-   private:
+   protected:
     TRITONSERVER_Server* server_;
     evhtp_request_t* req_;
     evthr_t* thread_;
@@ -1122,6 +1126,12 @@ class BaseAPIServer : public HTTPServerImpl {
       evhtp_request_t* req, const std::string& region_name,
       const std::string& action);
 
+  virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
+      evhtp_request_t* req)
+  {
+    return std::unique_ptr<InferRequestClass>(new InferRequestClass(
+        server_.get(), req, GetResponseCompressionType(req)));
+  }
   // Get the inference header length. Return 0 if the whole request body is
   // the inference header.
   virtual size_t GetInferenceHeaderLength(evhtp_request_t* req);
@@ -1328,7 +1338,7 @@ BaseAPIServer::HandleRepositoryIndex(
 
   evhtp_headers_add_header(
       req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   if (err == nullptr) {
     uint32_t flags = 0;
@@ -1370,7 +1380,7 @@ BaseAPIServer::HandleRepositoryControl(
 
   evhtp_headers_add_header(
       req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Error* err = nullptr;
   if (!repository_name.empty()) {
@@ -1489,7 +1499,7 @@ BaseAPIServer::HandleModelMetadata(
 
   evhtp_headers_add_header(
       req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Message* message = nullptr;
 
@@ -1538,7 +1548,7 @@ BaseAPIServer::HandleModelConfig(
 
   evhtp_headers_add_header(
       req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Message* message = nullptr;
 
@@ -1580,7 +1590,7 @@ BaseAPIServer::HandleModelStats(
 
   evhtp_headers_add_header(
       req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
 #ifdef TRITON_ENABLE_STATS
   TRITONSERVER_Message* model_stats_message = nullptr;
@@ -1629,7 +1639,7 @@ BaseAPIServer::HandleServerMetadata(evhtp_request_t* req)
 
   evhtp_headers_add_header(
       req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   if (server_metadata_err_ == nullptr) {
     evbuffer_add(
@@ -1656,7 +1666,7 @@ BaseAPIServer::HandleSystemSharedMemory(
 
   evhtp_headers_add_header(
       req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Error* err = nullptr;
   if (action == "status") {
@@ -1767,7 +1777,7 @@ BaseAPIServer::HandleCudaSharedMemory(
 
   evhtp_headers_add_header(
       req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Error* err = nullptr;
   if (action == "status") {
@@ -2281,10 +2291,6 @@ BaseAPIServer::HandleInfer(
     return;
   }
 
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
-
   bool connection_paused = false;
 
   int64_t requested_model_version;
@@ -2365,8 +2371,7 @@ BaseAPIServer::HandleInfer(
         break;
     }
 
-    std::unique_ptr<InferRequestClass> infer_request(new InferRequestClass(
-        server_.get(), req, GetResponseCompressionType(req)));
+    auto infer_request = CreateInferRequest(req);
 #ifdef TRITON_ENABLE_TRACING
     infer_request->trace_manager_ = trace_manager_;
     infer_request->trace_id_ = trace_id;
@@ -2401,6 +2406,9 @@ BaseAPIServer::HandleInfer(
 
   if (err != nullptr) {
     LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+    evhtp_headers_add_header(
+        req->headers_out,
+        evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
     EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     if (connection_paused) {
@@ -2769,11 +2777,6 @@ BaseAPIServer::InferRequestClass::FinalizeResponse(
     for (evbuffer* b : ordered_buffers) {
       evbuffer_add_buffer(response_placeholder, b);
     }
-
-    evhtp_headers_add_header(
-        req_->headers_out, evhtp_header_new(
-                               kInferHeaderContentLengthHTTPHeader,
-                               std::to_string(buffer.Size()).c_str(), 1, 1));
   }
 
   evbuffer* response_body = response_placeholder;
@@ -2784,14 +2787,6 @@ BaseAPIServer::InferRequestClass::FinalizeResponse(
       auto err = DataCompressor::CompressData(
           response_compression_type_, response_placeholder, compressed_buffer);
       if (err == nullptr) {
-        evhtp_headers_add_header(
-            req_->headers_out,
-            evhtp_header_new(
-                kContentEncodingHTTPHeader,
-                (response_compression_type_ == DataCompressor::Type::DEFLATE)
-                    ? "deflate"
-                    : "gzip",
-                1, 1));
         response_body = compressed_buffer;
         evbuffer_free(response_placeholder);
       } else {
@@ -2800,6 +2795,7 @@ BaseAPIServer::InferRequestClass::FinalizeResponse(
                        << TRITONSERVER_ErrorMessage(err);
         TRITONSERVER_ErrorDelete(err);
         evbuffer_free(compressed_buffer);
+        response_compression_type_ = DataCompressor::Type::IDENTITY;
       }
       break;
     }
@@ -2808,13 +2804,48 @@ BaseAPIServer::InferRequestClass::FinalizeResponse(
       // Do nothing for other cases
       break;
   }
-
+  SetResponseHeader(!ordered_buffers.empty(), buffer.Size());
   evbuffer_add_buffer(req_->buffer_out, response_body);
   // Destroy the evbuffer object as the data has been moved
   // to HTTP response buffer
   evbuffer_free(response_body);
 
   return nullptr;  // success
+}
+
+void
+BaseAPIServer::InferRequestClass::SetResponseHeader(
+    bool has_binary_data, size_t header_length)
+{
+  if (has_binary_data) {
+    evhtp_headers_add_header(
+        req_->headers_out,
+        evhtp_header_new(kContentTypeHeader, "application/octet-stream", 1, 1));
+    evhtp_headers_add_header(
+        req_->headers_out, evhtp_header_new(
+                               kInferHeaderContentLengthHTTPHeader,
+                               std::to_string(header_length).c_str(), 1, 1));
+  } else {
+    evhtp_headers_add_header(
+        req_->headers_out,
+        evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
+  }
+
+  switch (response_compression_type_) {
+    case DataCompressor::Type::DEFLATE:
+      evhtp_headers_add_header(
+          req_->headers_out,
+          evhtp_header_new(kContentEncodingHTTPHeader, "deflate", 1, 1));
+      break;
+    case DataCompressor::Type::GZIP:
+      evhtp_headers_add_header(
+          req_->headers_out,
+          evhtp_header_new(kContentEncodingHTTPHeader, "gzip", 1, 1));
+      break;
+    case DataCompressor::Type::IDENTITY:
+    case DataCompressor::Type::UNKNOWN:
+      break;
+  }
 }
 
 uint32_t
@@ -2938,6 +2969,19 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 // Handle Sagemaker HTTP requests to inference server APIs
 class SagemakerAPIServer : public BaseAPIServer {
  public:
+  class SagemakeInferRequestClass : public InferRequestClass {
+   public:
+    explicit SagemakeInferRequestClass(
+        TRITONSERVER_Server* server, evhtp_request_t* req,
+        DataCompressor::Type response_compression_type)
+        : InferRequestClass(server, req, response_compression_type)
+    {
+    }
+
+    void SetResponseHeader(
+        const bool has_binary_data, const size_t header_length) override;
+  };
+
   explicit SagemakerAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
@@ -2951,6 +2995,12 @@ class SagemakerAPIServer : public BaseAPIServer {
 
  private:
   void Handle(evhtp_request_t* req) override;
+  std::unique_ptr<InferRequestClass> CreateInferRequest(
+      evhtp_request_t* req) override
+  {
+    return std::unique_ptr<InferRequestClass>(new SagemakeInferRequestClass(
+        server_.get(), req, GetResponseCompressionType(req)));
+  }
   size_t GetInferenceHeaderLength(evhtp_request_t* req) override;
   // Currently the compresssion schema hasn't been defined,
   // assume identity compression type is used for both request and response
@@ -2993,6 +3043,23 @@ SagemakerAPIServer::GetInferenceHeaderLength(evhtp_request_t* req)
     }
   }
   return header_length;
+}
+
+void
+SagemakerAPIServer::SagemakeInferRequestClass::SetResponseHeader(
+    bool has_binary_data, size_t header_length)
+{
+  if (has_binary_data) {
+    evhtp_headers_add_header(
+        req_->headers_out,
+        evhtp_header_new(
+            kContentTypeHeader,
+            (binary_mime_type_ + std::to_string(header_length)).c_str(), 1, 1));
+  } else {
+    evhtp_headers_add_header(
+        req_->headers_out,
+        evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
+  }
 }
 
 void
