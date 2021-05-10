@@ -51,7 +51,9 @@
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "src/servers/http_server.h"
 #endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
-
+#ifdef TRITON_ENABLE_SAGEMAKER
+#include "src/servers/sagemaker_server.h"
+#endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
@@ -565,10 +567,9 @@ StartHttpService(
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
-  TRITONSERVER_Error* err =
-      nvidia::inferenceserver::HTTPServer::CreateAPIServer(
-          server, trace_manager, shm_manager, http_port_, http_thread_cnt_,
-          service);
+  TRITONSERVER_Error* err = nvidia::inferenceserver::HTTPAPIServer::Create(
+      server, trace_manager, shm_manager, http_port_, http_thread_cnt_,
+      service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -587,9 +588,8 @@ StartMetricsService(
     std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server)
 {
-  TRITONSERVER_Error* err =
-      nvidia::inferenceserver::HTTPServer::CreateMetricsServer(
-          server, metrics_port_, 1 /* HTTP thread count */, service);
+  TRITONSERVER_Error* err = nvidia::inferenceserver::HTTPMetricsServer::Create(
+      server, metrics_port_, 1 /* HTTP thread count */, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -610,10 +610,9 @@ StartSagemakerService(
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
-  TRITONSERVER_Error* err =
-      nvidia::inferenceserver::HTTPServer::CreateSagemakerAPIServer(
-          server, trace_manager, shm_manager, sagemaker_port_,
-          sagemaker_thread_cnt_, service);
+  TRITONSERVER_Error* err = nvidia::inferenceserver::SagemakerAPIServer::Create(
+      server, trace_manager, shm_manager, sagemaker_port_,
+      sagemaker_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
