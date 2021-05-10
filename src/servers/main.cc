@@ -80,6 +80,8 @@ int32_t http_port_ = 8000;
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> sagemaker_service_;
 bool allow_sagemaker_ = true;
 int32_t sagemaker_port_ = 8080;
+bool sagemaker_safe_range_set_ = false;
+std::pair<int32_t, int32_t> sagemaker_safe_range_ = {0, 0};
 #endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef TRITON_ENABLE_GRPC
@@ -221,6 +223,7 @@ enum OptionId {
 #if defined(TRITON_ENABLE_SAGEMAKER)
   OPTION_ALLOW_SAGEMAKER,
   OPTION_SAGEMAKER_PORT,
+  OPTION_SAGEMAKER_SAFE_PORT_RANGE,
   OPTION_SAGEMAKER_THREAD_COUNT,
 #endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_METRICS
@@ -350,6 +353,10 @@ std::vector<Option> options_
        "Allow the server to listen for Sagemaker requests."},
       {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
        "The port for the server to listen on for Sagemaker requests."},
+      {OPTION_SAGEMAKER_SAFE_PORT_RANGE, "sagemaker-safe-port-range",
+       "<integer>:<integer>",
+       "Set the allowed port range for endpoints other than the SageMaker "
+       "endpoints."},
       {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count", Option::ArgInt,
        "Number of threads handling Sagemaker requests."},
 #endif  // TRITON_ENABLE_SAGEMAKER
@@ -465,27 +472,59 @@ CheckPortCollision()
 #endif  // TRITON_ENABLE_HTTP && TRITON_ENABLE_METRICS
 
 #if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_HTTP)
-  if ((sagemaker_port_ == http_port_) && allow_sagemaker_ && allow_http_) {
-    std::cerr << "The server cannot listen to SageMaker requests "
-              << "and HTTP requests at the same port" << std::endl;
-    return true;
+  if (allow_http_) {
+    if (sagemaker_safe_range_set_ &&
+        ((http_port_ < sagemaker_safe_range_.first) ||
+         (http_port_ > sagemaker_safe_range_.second))) {
+      std::cerr << "The server cannot listen to HTTP requests at port "
+                << http_port_ << ", allowed port range is ["
+                << sagemaker_safe_range_.first << ", "
+                << sagemaker_safe_range_.second << "]" << std::endl;
+      return true;
+    }
+    if ((sagemaker_port_ == http_port_) && allow_sagemaker_) {
+      std::cerr << "The server cannot listen to SageMaker requests "
+                << "and HTTP requests at the same port" << std::endl;
+      return true;
+    }
   }
 #endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_GRPC)
-  if ((sagemaker_port_ == grpc_port_) && allow_sagemaker_ && allow_grpc_) {
-    std::cerr << "The server cannot listen to SageMaker requests "
-              << "and GRPC requests at the same port" << std::endl;
-    return true;
+  if (allow_grpc_) {
+    if (sagemaker_safe_range_set_ &&
+        ((grpc_port_ < sagemaker_safe_range_.first) ||
+         (grpc_port_ > sagemaker_safe_range_.second))) {
+      std::cerr << "The server cannot listen to GRPC requests at port "
+                << grpc_port_ << ", allowed port range is ["
+                << sagemaker_safe_range_.first << ", "
+                << sagemaker_safe_range_.second << "]" << std::endl;
+      return true;
+    }
+    if ((sagemaker_port_ == grpc_port_) && allow_sagemaker_) {
+      std::cerr << "The server cannot listen to SageMaker requests "
+                << "and GRPC requests at the same port" << std::endl;
+      return true;
+    }
   }
 #endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_GRPC
 
 #if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_METRICS)
-  if ((sagemaker_port_ == metrics_port_) && allow_sagemaker_ &&
-      allow_metrics_) {
-    std::cerr << "The server cannot listen to SageMaker requests "
-              << "and metrics requests at the same port" << std::endl;
-    return true;
+  if (allow_metrics_) {
+    if (sagemaker_safe_range_set_ &&
+        ((metrics_port_ < sagemaker_safe_range_.first) ||
+         (metrics_port_ > sagemaker_safe_range_.second))) {
+      std::cerr << "The server cannot listen to metrics requests at port "
+                << metrics_port_ << ", allowed port range is ["
+                << sagemaker_safe_range_.first << ", "
+                << sagemaker_safe_range_.second << "]" << std::endl;
+      return true;
+    }
+    if ((sagemaker_port_ == metrics_port_) && allow_sagemaker_) {
+      std::cerr << "The server cannot listen to SageMaker requests "
+                << "and metrics requests at the same port" << std::endl;
+      return true;
+    }
   }
 #endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_METRICS
 
@@ -792,6 +831,25 @@ ParseBoolOption(std::string arg)
   exit(1);
 }
 
+// Template specialization for ParsePairOption
+// [FIXME] replace ParseXXXOPtion with these
+template <typename T>
+T ParseOption(const std::string& arg);
+
+template <>
+int
+ParseOption(const std::string& arg)
+{
+  return std::stoi(arg);
+}
+
+template <>
+uint64_t
+ParseOption(const std::string& arg)
+{
+  return std::stoll(arg);
+}
+
 int
 ParseIntOption(const std::string arg)
 {
@@ -893,29 +951,27 @@ ParseBackendConfigOption(const std::string arg)
   return {name_string, setting_string, value_string};
 }
 
-std::pair<int, uint64_t>
+template <typename T1, typename T2>
+std::pair<T1, T2>
 ParsePairOption(const std::string arg)
 {
   int delim = arg.find(":");
 
   if ((delim < 0)) {
     std::cerr << "Cannot parse pair option due to incorrect number of inputs."
-                 "--<pair option> argument requires format <key>:<value>. "
+                 "--<pair option> argument requires format <first>:<second>. "
               << "Found: " << arg << std::endl;
     std::cerr << Usage() << std::endl;
     exit(1);
   }
 
-  std::string key_string = arg.substr(0, delim);
-  std::string value_string = arg.substr(delim + 1);
+  std::string first_string = arg.substr(0, delim);
+  std::string second_string = arg.substr(delim + 1);
 
   // Specific conversion from key-value string to actual key-value type,
   // should be extracted out of this function if we need to parse
   // more pair option of different types.
-  int key = ParseIntOption(key_string);
-  uint64_t value = ParseLongLongOption(value_string);
-
-  return {key, value};
+  return {ParseOption<T1>(first_string), ParseOption<T2>(second_string)};
 }
 
 bool
@@ -959,6 +1015,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #if defined(TRITON_ENABLE_SAGEMAKER)
   int32_t sagemaker_port = sagemaker_port_;
   int32_t sagemaker_thread_cnt = sagemaker_thread_cnt_;
+  bool sagemaker_safe_range_set = sagemaker_safe_range_set_;
+  std::pair<int32_t, int32_t> sagemaker_safe_range = sagemaker_safe_range_;
 #endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef TRITON_ENABLE_METRICS
@@ -1045,6 +1103,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_SAGEMAKER_PORT:
         sagemaker_port = ParseIntOption(optarg);
+        break;
+      case OPTION_SAGEMAKER_SAFE_PORT_RANGE:
+        sagemaker_safe_range_set = true;
+        sagemaker_safe_range = ParsePairOption<int, int>(optarg);
         break;
       case OPTION_SAGEMAKER_THREAD_COUNT:
         sagemaker_thread_cnt = ParseIntOption(optarg);
@@ -1151,7 +1213,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         pinned_memory_pool_byte_size = ParseLongLongOption(optarg);
         break;
       case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE:
-        cuda_pools.push_back(ParsePairOption(optarg));
+        cuda_pools.push_back(ParsePairOption<int, uint64_t>(optarg));
         break;
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
         min_supported_compute_capability = ParseDoubleOption(optarg);
@@ -1203,6 +1265,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #if defined(TRITON_ENABLE_SAGEMAKER)
   sagemaker_port_ = sagemaker_port;
   sagemaker_thread_cnt_ = sagemaker_thread_cnt;
+  sagemaker_safe_range_set_ = sagemaker_safe_range_set;
+  sagemaker_safe_range_ = sagemaker_safe_range;
 #endif  // TRITON_ENABLE_SAGEMAKER
 
 #if defined(TRITON_ENABLE_GRPC)

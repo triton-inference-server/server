@@ -579,7 +579,8 @@ RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
         dfile.write(df)
 
 
-def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents):
+def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents,
+                            endpoints):
     df = '''
 #
 # Multistage build.
@@ -697,12 +698,19 @@ LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
 
+    # Add feature labels for SageMaker endpoint
+    if 'sagemaker' in endpoints:
+        df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+'''
+
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
 
-def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends, repoagents):
+def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends, repoagents,
+                              endpoints):
     df = '''
 #
 # Multistage build.
@@ -761,12 +769,18 @@ LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
 
+    # Add feature labels for SageMaker endpoint
+    if 'sagemaker' in endpoints:
+        df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+'''
+
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
 
-def container_build(images, backends, repoagents):
+def container_build(images, backends, repoagents, endpoints):
     # The cmake, build and install directories within the container.
     build_dir = os.path.join(os.sep, 'tmp', 'tritonbuild')
     install_dir = os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
@@ -943,10 +957,10 @@ def container_build(images, backends, repoagents):
         # container.
         if target_platform() == 'windows':
             create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents)
+                              backends, repoagents, endpoints)
         else:
             create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents)
+                              backends, repoagents, endpoints)
         p = subprocess.Popen([
                 'docker', 'build', '-f',
                 os.path.join(FLAGS.build_dir, 'Dockerfile')
@@ -1254,7 +1268,7 @@ if __name__ == '__main__':
     # tritonserver container holding the results of the build.
     if not FLAGS.no_container_build:
         import docker
-        container_build(images, backends, repoagents)
+        container_build(images, backends, repoagents, FLAGS.endpoint)
         sys.exit(0)
 
     # If there is a container pre-build command assume this invocation
