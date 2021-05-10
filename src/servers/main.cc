@@ -354,7 +354,7 @@ std::vector<Option> options_
       {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
        "The port for the server to listen on for Sagemaker requests."},
       {OPTION_SAGEMAKER_SAFE_PORT_RANGE, "sagemaker-safe-port-range",
-       "<integer>:<integer>",
+       "<integer>-<integer>",
        "Set the allowed port range for endpoints other than the SageMaker "
        "endpoints."},
       {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count", Option::ArgInt,
@@ -471,7 +471,7 @@ CheckPortCollision()
   }
 #endif  // TRITON_ENABLE_HTTP && TRITON_ENABLE_METRICS
 
-#if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_HTTP)
+#if defined(TRITON_ENABLE_SAGEMAKER) && defined(TRITON_ENABLE_HTTP)
   if (allow_http_) {
     if (sagemaker_safe_range_set_ &&
         ((http_port_ < sagemaker_safe_range_.first) ||
@@ -488,9 +488,9 @@ CheckPortCollision()
       return true;
     }
   }
-#endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_HTTP
+#endif  // TRITON_ENABLE_SAGEMAKER && TRITON_ENABLE_HTTP
 
-#if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_GRPC)
+#if defined(TRITON_ENABLE_SAGEMAKER) && defined(TRITON_ENABLE_GRPC)
   if (allow_grpc_) {
     if (sagemaker_safe_range_set_ &&
         ((grpc_port_ < sagemaker_safe_range_.first) ||
@@ -507,9 +507,9 @@ CheckPortCollision()
       return true;
     }
   }
-#endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_GRPC
+#endif  // TRITON_ENABLE_SAGEMAKER && TRITON_ENABLE_GRPC
 
-#if defined(TRITON_ENABLE_SAGMAKER) && defined(TRITON_ENABLE_METRICS)
+#if defined(TRITON_ENABLE_SAGEMAKER) && defined(TRITON_ENABLE_METRICS)
   if (allow_metrics_) {
     if (sagemaker_safe_range_set_ &&
         ((metrics_port_ < sagemaker_safe_range_.first) ||
@@ -526,7 +526,7 @@ CheckPortCollision()
       return true;
     }
   }
-#endif  // TRITON_ENABLE_SAGMAKER && TRITON_ENABLE_METRICS
+#endif  // TRITON_ENABLE_SAGEMAKER && TRITON_ENABLE_METRICS
 
   return false;
 }
@@ -953,20 +953,21 @@ ParseBackendConfigOption(const std::string arg)
 
 template <typename T1, typename T2>
 std::pair<T1, T2>
-ParsePairOption(const std::string arg)
+ParsePairOption(const std::string& arg, const std::string& delim_str)
 {
-  int delim = arg.find(":");
+  int delim = arg.find(delim_str);
 
   if ((delim < 0)) {
     std::cerr << "Cannot parse pair option due to incorrect number of inputs."
-                 "--<pair option> argument requires format <first>:<second>. "
+                 "--<pair option> argument requires format <first>"
+              << delim_str << "<second>. "
               << "Found: " << arg << std::endl;
     std::cerr << Usage() << std::endl;
     exit(1);
   }
 
   std::string first_string = arg.substr(0, delim);
-  std::string second_string = arg.substr(delim + 1);
+  std::string second_string = arg.substr(delim + delim_str.length());
 
   // Specific conversion from key-value string to actual key-value type,
   // should be extracted out of this function if we need to parse
@@ -1106,7 +1107,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_SAGEMAKER_SAFE_PORT_RANGE:
         sagemaker_safe_range_set = true;
-        sagemaker_safe_range = ParsePairOption<int, int>(optarg);
+        sagemaker_safe_range = ParsePairOption<int, int>(optarg, "-");
         break;
       case OPTION_SAGEMAKER_THREAD_COUNT:
         sagemaker_thread_cnt = ParseIntOption(optarg);
@@ -1213,7 +1214,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         pinned_memory_pool_byte_size = ParseLongLongOption(optarg);
         break;
       case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE:
-        cuda_pools.push_back(ParsePairOption<int, uint64_t>(optarg));
+        cuda_pools.push_back(ParsePairOption<int, uint64_t>(optarg, ":"));
         break;
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
         min_supported_compute_capability = ParseDoubleOption(optarg);

@@ -49,7 +49,9 @@ import sys
 class SageMakerTest(tu.TestResultCollector):
 
     def setUp(self):
-        self.url_ = "http://localhost:8080/invocations"
+        SAGEMAKER_BIND_TO_PORT = os.getenv('SAGEMAKER_BIND_TO_PORT', '8080')
+        self.url_ = "http://localhost:{}/invocations".format(
+            SAGEMAKER_BIND_TO_PORT)
         self.input_data_ = [
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
         ]

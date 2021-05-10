@@ -68,6 +68,11 @@ function sagemaker_wait_for_server_ready() {
 
     WAIT_RET=0
 
+    ping_address="localhost:8080/ping"
+    if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
+        ping_address="localhost:${SAGEMAKER_BIND_TO_PORT}/ping"
+    fi
+
     local wait_secs=$wait_time_secs
     until test $wait_secs -eq 0 ; do
         if ! kill -0 $spid; then
@@ -79,7 +84,7 @@ function sagemaker_wait_for_server_ready() {
         sleep 1;
 
         set +e
-        code=`curl -s -w %{http_code} localhost:8080/ping`
+        code=`curl -s -w %{http_code} $ping_address`
         set -e
         if [ "$code" == "200" ]; then
             return
@@ -111,7 +116,7 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-# Inference in minimal setting
+# Inference in default setting
 set +e
 python $SAGEMAKER_TEST SageMakerTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -127,6 +132,112 @@ else
     fi
 fi
 set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Change SageMaker port in the same way as in nvidia_entrypoint.sh
+export SAGEMAKER_BIND_TO_PORT=8000
+SAGEMAKER_ARGS="--model-repository=`pwd`/models"
+if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
+fi
+if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
+fi
+
+SERVER_ARGS="--allow-grpc false --allow-http false --allow-metrics false \
+             $SAGEMAKER_ARGS"
+run_server_nowait
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Inference with the new port
+set +e
+python $SAGEMAKER_TEST SageMakerTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $CLIENT_LOG 5
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+unset SAGEMAKER_BIND_TO_PORT
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Set SageMaker safe port range in the same way as in nvidia_entrypoint.sh
+export SAGEMAKER_SAFE_PORT_RANGE="8081-9000"
+SAGEMAKER_ARGS="--model-repository=`pwd`/models"
+if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
+fi
+if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
+fi
+
+# Enable HTTP endpoint and expect server fail to start (default port 8000 < 8081)
+SERVER_ARGS="--allow-grpc false --allow-http true --allow-metrics false \
+             $SAGEMAKER_ARGS"
+run_server_nowait
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" == "0" ]; then
+    echo -e "\n***\n*** Expect failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    RET=1
+else
+    grep "The server cannot listen to HTTP requests at port" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected error on using disallowed port\n***"
+        RET=1
+    fi
+fi
+
+# Disable HTTP endpoint and expect SageMaker endpoint on default port 8080 (< 8081)
+# is working
+SERVER_ARGS="--allow-grpc false --allow-http false --allow-metrics false \
+             $SAGEMAKER_ARGS"
+run_server_nowait
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Inference with the new port
+set +e
+python $SAGEMAKER_TEST SageMakerTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $CLIENT_LOG 5
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+unset SAGEMAKER_SAFE_PORT_RANGE
 
 kill $SERVER_PID
 wait $SERVER_PID
