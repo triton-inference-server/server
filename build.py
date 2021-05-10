@@ -68,10 +68,10 @@ TRITON_VERSION_MAP = {
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
-CORE_BACKENDS = ['tensorrt', 'ensemble']
+CORE_BACKENDS = ['ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino'
+    'openvino', 'tensorrt'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -332,6 +332,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = dali_cmake_args()
     elif be == 'pytorch':
         args = pytorch_cmake_args(images)
+    elif be == 'tensorrt':
+        args = []
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
