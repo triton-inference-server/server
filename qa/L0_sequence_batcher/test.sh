@@ -284,6 +284,10 @@ for model_trial in $MODEL_TRIALS; do
     if [ "$ENSEMBLES" == "1" ]; then
       cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_PATH/.
         create_nop_version_dir `pwd`/$MODEL_PATH
+      # Must load identity backend on GPU to avoid cuda init delay during 1st run
+      for NOP_MODEL in `pwd`/$MODEL_PATH/nop_*; do
+        (cd $NOP_MODEL && sed -i "s/kind: KIND_CPU/kind: KIND_GPU/" config.pbtxt)
+      done
     fi
 
     # Need to launch the server for each test so that the model status
