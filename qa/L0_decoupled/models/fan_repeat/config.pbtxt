@@ -73,7 +73,7 @@ ensemble_scheduling {
         value: "identity_out"
       }
       output_map {
-        key: "OUTPUT__0"
+        key: "OUTPUT__1"
         value: "OUT"
       }
 
