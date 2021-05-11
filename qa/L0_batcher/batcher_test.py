@@ -38,6 +38,7 @@ import test_util as tu
 
 import tritonclient.grpc as grpcclient
 
+OS_WINDOWS = bool(int(os.environ.get('OS_WINDOWS', 0)))
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
@@ -59,7 +60,11 @@ assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx libtorch plan")
 
 _trials = BACKENDS.split(" ")
-_ragged_batch_supported_trials = ["custom",]
+
+_ragged_batch_supported_trials = []
+if not OS_WINDOWS:
+    # FIXME enable once windows builds the identity backend
+    _ragged_batch_supported_trials.append("custom")
 if "plan" in _trials:
     _ragged_batch_supported_trials.append("plan")
 if "onnx" in _trials:

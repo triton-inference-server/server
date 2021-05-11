@@ -48,7 +48,7 @@ assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 BACKENDS = os.environ.get('BACKENDS',
                           "graphdef savedmodel onnx libtorch plan python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
-OS_WINDOWS = bool(int(os.environ.get('OS_WINDOWS', 1)))
+OS_WINDOWS = bool(int(os.environ.get('OS_WINDOWS', 0)))
 
 np_dtype_string = np.dtype(object)
 
