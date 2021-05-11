@@ -43,11 +43,12 @@ add_library(
   libtorch-backend-library EXCLUDE_FROM_ALL OBJECT
   ${LIBTORCH_SRCS} ${LIBTORCH_HDRS}
 )
-add_dependencies(libtorch-backend-library proto-library)
 
 target_link_libraries(
   libtorch-backend-library
-  PUBLIC 
+  PRIVATE
+    proto-library
+  PUBLIC
     triton-core-serverapi     # from repo-core
     triton-common-sync-queue  # from repo-common
 )

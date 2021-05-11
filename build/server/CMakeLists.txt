@@ -70,6 +70,12 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
   GIT_TAG ${TRITON_BACKEND_REPO_TAG}
 )
+
+set(TRITON_COMMON_ENABLE_PROTOBUF ON)
+if(TRITON_ENABLE_GRPC)
+  set(TRITON_COMMON_ENABLE_GRPC ON)
+endif() # TRITON_ENABLE_GRPC
+
 FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
 

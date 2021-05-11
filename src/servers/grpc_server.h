@@ -26,7 +26,7 @@
 #pragma once
 
 #include <grpc++/grpc++.h>
-#include "src/core/grpc_service.grpc.pb.h"
+#include "grpc_service.grpc.pb.h"
 #include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
 #include "triton/core/tritonserver.h"
