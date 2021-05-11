@@ -81,16 +81,8 @@ fi
 
 echo
 
-if [[ "$1" = "serve" ]]; then
-  SAGEMAKER_ARGS="--model-repository=/opt/ml"
-  if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
-      SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
-  fi
-  if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
-      SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
-  fi
-  shift 1
-  tritonserver --allow-grpc=false --allow-http=false --allow-metrics=false $SAGEMAKER_ARGS
+if [[ $# -eq 0 ]]; then
+  exec "/bin/bash"
 else
   exec "$@"
 fi

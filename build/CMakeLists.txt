@@ -46,7 +46,7 @@ option(TRITON_ENABLE_ENSEMBLE "Include ensemble support in server" OFF)
 # Endpoints
 option(TRITON_ENABLE_HTTP "Include HTTP API in server" ON)
 option(TRITON_ENABLE_GRPC "Include GRPC API in server" ON)
-option(TRITON_ENABLE_SAGEMAKER "Include AWS SageMaker API in server" ON)
+option(TRITON_ENABLE_SAGEMAKER "Include AWS SageMaker API in server" OFF)
 option(TRITON_ENABLE_METRICS "Include metrics support in server" ON)
 option(TRITON_ENABLE_METRICS_GPU "Include GPU metrics support in server" ON)
 

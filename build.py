@@ -702,6 +702,7 @@ LABEL com.nvidia.build.ref={}
     if 'sagemaker' in endpoints:
         df += '''
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
 '''
 
     mkdir(ddir)
@@ -709,8 +710,7 @@ LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
         dfile.write(df)
 
 
-def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends, repoagents,
-                              endpoints):
+def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends, repoagents):
     df = '''
 #
 # Multistage build.
@@ -768,12 +768,6 @@ LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
-
-    # Add feature labels for SageMaker endpoint
-    if 'sagemaker' in endpoints:
-        df += '''
-LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
-'''
 
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -957,7 +951,7 @@ def container_build(images, backends, repoagents, endpoints):
         # container.
         if target_platform() == 'windows':
             create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents, endpoints)
+                              backends, repoagents)
         else:
             create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
                               backends, repoagents, endpoints)
@@ -1138,7 +1132,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified endpoint in build. Allowed values are "grpc" ,"http" and "sagemaker".'
+        'Include specified endpoint in build. Allowed values are "grpc", "http" and "sagemaker".'
     )
     parser.add_argument(
         '--filesystem',
