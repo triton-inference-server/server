@@ -119,7 +119,7 @@ class SageMakerTest(tu.TestResultCollector):
             httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
         outputs.append(
             httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
-        request_body, _ = httpclient.InferenceServerClient.make_body(
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(
             inputs, outputs=outputs)
 
         headers = {'Content-Type': 'application/json'}
@@ -147,7 +147,7 @@ class SageMakerTest(tu.TestResultCollector):
             httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
         outputs.append(
             httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
-        request_body, header_length = httpclient.InferenceServerClient.make_body(
+        request_body, header_length = httpclient.InferenceServerClient.generate_request_body(
             inputs, outputs=outputs)
 
         headers = {
@@ -179,14 +179,14 @@ class SageMakerTest(tu.TestResultCollector):
             httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
         outputs.append(
             httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
-        request_body, _ = httpclient.InferenceServerClient.make_body(
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(
             inputs, outputs=outputs)
 
         headers = {'Content-Type': 'application/json'}
         r = requests.post(self.url_, data=request_body, headers=headers)
         r.raise_for_status()
 
-        result = httpclient.InferenceServerClient.make_infer_result(r._content)
+        result = httpclient.InferenceServerClient.parse_response_body(r._content)
 
         output0_data = result.as_numpy('OUTPUT0')
         output1_data = result.as_numpy('OUTPUT1')
@@ -210,7 +210,7 @@ class SageMakerTest(tu.TestResultCollector):
             httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
         outputs.append(
             httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
-        request_body, _ = httpclient.InferenceServerClient.make_body(
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(
             inputs, outputs=outputs)
 
         headers = {'Content-Type': 'application/json'}
@@ -220,7 +220,7 @@ class SageMakerTest(tu.TestResultCollector):
         header_length_prefix = "application/vnd.sagemaker-triton.binary+json;json-header-size="
         header_length_str = r.headers['Content-Type'][len(header_length_prefix
                                                          ):]
-        result = httpclient.InferenceServerClient.make_infer_result(
+        result = httpclient.InferenceServerClient.parse_response_body(
             r._content, header_length=int(header_length_str))
 
         output0_data = result.as_numpy('OUTPUT0')
