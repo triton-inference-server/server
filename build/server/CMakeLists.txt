@@ -59,20 +59,23 @@ FetchContent_Declare(
   repo-common
   GIT_REPOSITORY https://github.com/triton-inference-server/common.git
   GIT_TAG ${TRITON_COMMON_REPO_TAG}
-  GIT_SHALLOW ON
 )
 FetchContent_Declare(
   repo-core
   GIT_REPOSITORY https://github.com/triton-inference-server/core.git
   GIT_TAG ${TRITON_CORE_REPO_TAG}
-  GIT_SHALLOW ON
 )
 FetchContent_Declare(
   repo-backend
   GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
   GIT_TAG ${TRITON_BACKEND_REPO_TAG}
-  GIT_SHALLOW ON
 )
+
+set(TRITON_COMMON_ENABLE_PROTOBUF ON)
+if(TRITON_ENABLE_GRPC)
+  set(TRITON_COMMON_ENABLE_GRPC ON)
+endif() # TRITON_ENABLE_GRPC
+
 FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
 

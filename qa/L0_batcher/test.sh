@@ -76,7 +76,7 @@ TF_VERSION=${TF_VERSION:=1}
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-    OS_WINDOWS="1"
+    export OS_WINDOWS="1"
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
@@ -84,7 +84,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
     export USE_HTTP=0
     export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER
 else
-    OS_WINDOWS="0"
+    export OS_WINDOWS="0"
     MODELDIR=${MODELDIR:=`pwd`}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     OPTDIR=${OPTDIR:="/opt"}
@@ -157,14 +157,18 @@ for MC in `ls var_models/*/config.pbtxt`; do
 done
 
 # Create allow-ragged model to variable-size model repository
-cp -r ../custom_models/custom_zero_1_float32 var_models/. && \
-    (cd var_models/custom_zero_1_float32 && mkdir 1 && \
-        echo "instance_group [ { kind: KIND_CPU count: 1 }]" >> config.pbtxt && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
-        sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
-        sed -i "s/name:.*\"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
-        sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-        echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+# Skip test for Windows. Does not build identity backend
+if [[ "$(< /proc/sys/kernel/osrelease)" != *Microsoft ]]; then
+    cp -r ../custom_models/custom_zero_1_float32 var_models/. && \
+        (cd var_models/custom_zero_1_float32 && mkdir 1 && \
+            echo "instance_group [ { kind: KIND_GPU count: 1 }]" >> config.pbtxt && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
+            sed -i "s/name:.*\"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
+            sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
+            echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+fi
+
 if [[ $BACKENDS == *"plan"* ]]; then
     # Use nobatch model to match the ragged test requirement
     cp -r $DATADIR/qa_identity_model_repository/plan_nobatch_zero_1_float32 var_models/plan_zero_1_float32 && \
@@ -177,6 +181,7 @@ if [[ $BACKENDS == *"plan"* ]]; then
                                     source_input: \"INPUT0\" }] \
                     dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 fi
+
 if [[ $BACKENDS == *"onnx"* ]]; then
     # Use nobatch model to match the ragged test requirement
     cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32 var_models/onnx_zero_1_float32 && \
@@ -427,9 +432,8 @@ done
 # by comparing the "response send" timestamps.
 TEST_CASE=test_multi_batch_preserve_ordering
 
-# FIXME sleep_for does not delay for expected time when passing 400ms 
-# when using I/O is in GPU memory. Skip for Windows test.
-if [ "$OS_WINDOWS" -eq "0" ] && [ "$TEST_CUDA_SHARED_MEMORY" -eq 0 ]; then
+# Skip test for Windows. Does not build identity backend
+if [[ "$(< /proc/sys/kernel/osrelease)" != *Microsoft ]]; then
     rm -fr ./custom_models && mkdir ./custom_models && \
         cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
         mkdir -p ./custom_models/custom_zero_1_float32/1
@@ -440,7 +444,7 @@ if [ "$OS_WINDOWS" -eq "0" ] && [ "$TEST_CUDA_SHARED_MEMORY" -eq 0 ]; then
             sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
             sed -i "s/max_batch_size:.*/max_batch_size: 4/g" config.pbtxt && \
             echo "dynamic_batching { preferred_batch_size: [ 4 ] }" >> config.pbtxt && \
-            echo "instance_group [ { kind: KIND_CPU count: 2 }]" >> config.pbtxt && \
+            echo "instance_group [ { kind: KIND_GPU count: 2 }]" >> config.pbtxt && \
             echo "parameters [" >> config.pbtxt && \
             echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}," >> config.pbtxt && \
             echo "{ key: \"instance_wise_delay_multiplier\"; value: { string_value: \"4\" }}" >> config.pbtxt && \

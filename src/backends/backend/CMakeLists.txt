@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,7 +52,6 @@ add_library(
   triton-backend-library EXCLUDE_FROM_ALL OBJECT
   ${BACKEND_SRCS} ${BACKEND_HDRS}
 )
-add_dependencies(triton-backend-library proto-library)
 
 if(${TRITON_ENABLE_GPU})
   target_include_directories(triton-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -66,6 +65,8 @@ endif() # TRITON_ENABLE_METRICS
 
 target_link_libraries(
   triton-backend-library
+  PRIVATE
+    proto-library           # from repo-common
   PUBLIC
     triton-core-backendapi  # from repo-core
     triton-core-serverapi   # from repo-core

@@ -54,14 +54,11 @@ if(${TRITON_ENABLE_GRPC})
     target_include_directories(grpc-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
   endif() # TRITON_ENABLE_GPU
 
-  add_dependencies(grpc-endpoint-library proto-library)
-  if(${TRITON_ENABLE_GRPC})
-    add_dependencies(grpc-endpoint-library grpc-library)
-  endif() # TRITON_ENABLE_GRPC
-
   target_link_libraries(
     grpc-endpoint-library
     PUBLIC
+      grpc-service-library
+      proto-library           # from repo-common
       triton-core-serverapi   # from repo-core
       triton-common-json      # from repo-common
   )
@@ -69,17 +66,13 @@ if(${TRITON_ENABLE_GRPC})
   set(
     GRPC_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:grpc-endpoint-library>
+    $<TARGET_OBJECTS:grpc-service-library>
     $<TARGET_OBJECTS:proto-library>
     )
-  if(${TRITON_ENABLE_GRPC})
-    list(APPEND
-      GRPC_ENDPOINT_OBJECTS
-      $<TARGET_OBJECTS:grpc-library>
-      )
-  endif() # TRITON_ENABLE_GRPC
 
   set(
     GRPC_ENDPOINT_LIBRARIES
+    PRIVATE grpc-service-library
     PRIVATE gRPC::grpc++
     PRIVATE gRPC::grpc
     PRIVATE protobuf::libprotobuf
@@ -116,7 +109,6 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
     target_include_directories(http-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
   endif() # TRITON_ENABLE_GPU
 
-  add_dependencies(http-endpoint-library proto-library)
   target_include_directories(
     http-endpoint-library
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
@@ -124,6 +116,8 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
 
   target_link_libraries(
     http-endpoint-library
+    PRIVATE
+      proto-library           # from repo-common
     PUBLIC
       triton-core-serverapi   # from repo-core
       triton-common-json      # from repo-common

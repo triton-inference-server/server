@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,48 +24,83 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-export CUDA_VISIBLE_DEVICES=0
+name: "fan_repeat"
+max_batch_size: 0
+platform: "ensemble"
+ensemble_scheduling {
+  step [
+    {
+      model_name: "repeat_int32"
+      model_version: -1
+      input_map {
+        key: "IN"
+        value: "IN"
+      }
+      input_map {
+        key: "DELAY"
+        value: "DELAY"
+      }
+      input_map {
+        key: "WAIT"
+        value: "WAIT"
+      }
+      output_map {
+        key: "OUT"
+        value: "repeat_out"
+      }
+    },
+    {
+      model_name: "identity_int32"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "repeat_out"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "identity_out"
+      }
+    },
+    {
+      model_name: "libtorch_nobatch_int32_int32_int32"
+      model_version: -1
+      input_map {
+        key: "INPUT__0"
+        value: "repeat_out"
+      }
+      input_map {
+        key: "INPUT__1"
+        value: "identity_out"
+      }
+      output_map {
+        key: "OUTPUT__1"
+        value: "OUT"
+      }
 
-DALI_BACKEND_DIR=$1
-
-CLIENT_PY=$DALI_BACKEND_DIR/qa/inception_ensemble/ensemble_client.py
-CLIENT_LOG="./client.log"
-
-MODEL_REPO=$DALI_BACKEND_DIR/docs/examples/inception_ensemble/model_repository
-
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$MODEL_REPO"
-SERVER_LOG="./inference_server.log"
-source ../common/util.sh
-
-pushd $MODEL_REPO/..
-/bin/bash -x ./setup_inception_example.sh
-popd
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-  echo -e "\n***\n*** Failed to start $SERVER $SERVER_ARGS\n***"
-  cat $SERVER_LOG
-  exit 1
-fi
-
-RET=0
-
-set +e
-python $CLIENT_PY --img_dir $DALI_BACKEND_DIR/qa/inception_ensemble/images --model_name ensemble_dali_inception --batch_size 3 >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
-else
-  cat $CLIENT_LOG
-  echo -e "\n***\n*** Test FAILED\n***"
-fi
-
-exit $RET
+    }
+  ]
+}
+input [
+  {
+    name: "IN"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  },
+  {
+    name: "DELAY"
+    data_type: TYPE_UINT32
+    dims: [ -1 ]
+  },
+  {
+    name: "WAIT"
+    data_type: TYPE_UINT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]

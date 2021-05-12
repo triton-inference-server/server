@@ -27,75 +27,16 @@
 cmake_minimum_required (VERSION 3.18)
 
 #
-# Protobuf
-#
-file(GLOB proto-srcs *.proto)
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${proto-srcs})
-protobuf_generate_python(PROTO_PY ${proto-srcs})
-
-set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
-if(${TRITON_ENABLE_GRPC})
-  set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
-endif()
-
-add_library(
-  proto-library EXCLUDE_FROM_ALL OBJECT
-  ${PROTO_SRCS} ${PROTO_HDRS}
-)
-
-add_custom_target(proto-py-library DEPENDS ${PROTO_PY})
-
-#
-# GRPC
-#
-get_filename_component(grpc_service_proto_abspath "grpc_service.proto" ABSOLUTE)
-get_filename_component(grpc_service_proto_dir "${grpc_service_proto_abspath}" PATH)
-set(GRPC_SRCS "grpc_service.grpc.pb.cc")
-set(GRPC_HDRS "grpc_service.grpc.pb.h")
-set(GRPC_PY "grpc_service.grpc.py")
-
-add_custom_command(
-  OUTPUT "${GRPC_SRCS}" "${GRPC_HDRS}"
-  COMMAND ${_PROTOBUF_PROTOC}
-  ARGS
-    --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
-    --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
-    -I "${grpc_service_proto_dir}"
-    --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
-    "grpc_service.proto"
-  DEPENDS "grpc_service.proto" proto-library
-)
-
-find_package(Python REQUIRED COMPONENTS Interpreter)
-add_custom_command(
-  OUTPUT "${GRPC_PY}"
-  COMMAND ${Python_EXECUTABLE}
-  ARGS
-    -m grpc_tools.protoc
-    -I "${grpc_service_proto_dir}"
-    --grpc_python_out "${CMAKE_CURRENT_BINARY_DIR}"
-    "grpc_service.proto"
-  DEPENDS "grpc_service.proto" proto-library
-)
-
-add_library(
-  grpc-library EXCLUDE_FROM_ALL OBJECT
-  ${GRPC_SRCS} ${GRPC_HDRS}
-)
-
-add_custom_target(grpc-py-library DEPENDS ${GRPC_PY})
-
-#
 # Model configuration utilities used by both clients and server.
 #
 add_library(
   model-config-library EXCLUDE_FROM_ALL OBJECT
   model_config.cc model_config.h
 )
-add_dependencies(model-config-library proto-library)
 target_link_libraries(
   model-config-library
   PUBLIC
+    proto-library           # from repo-common
     triton-core-serverapi   # from repo-core
 )
 
@@ -105,7 +46,11 @@ if(${TRITON_ENABLE_GPU})
     model_config_cuda.cc model_config_cuda.h
   )
   target_include_directories(model-config-cuda-library PRIVATE ${CUDA_INCLUDE_DIRS})
-  add_dependencies(model-config-cuda-library proto-library)
+  target_link_libraries(
+    model-config-cuda-library
+    PUBLIC
+      proto-library     # from repo-common
+  )
 endif() # TRITON_ENABLE_GPU
 
 #
@@ -125,14 +70,14 @@ add_library(
   triton-repoagent-library EXCLUDE_FROM_ALL OBJECT
   ${REPOAGENT_SRCS} ${REPOAGENT_HDRS}
 )
-add_dependencies(triton-repoagent-library proto-library)
-
 target_link_libraries(
   triton-repoagent-library
+  PRIVATE
+    proto-library             # from repo-common
   PUBLIC
     triton-core-repoagentapi  # from repo-core
-    triton-core-serverapi   # from repo-core
-    triton-common-json      # from repo-common
+    triton-core-serverapi     # from repo-core
+    triton-common-json        # from repo-common
 )
 
 #
@@ -161,7 +106,7 @@ if(${TRITON_ENABLE_GPU})
 
   set(CUDA_LIBRARIES PUBLIC ${CUDA_LIBRARIES})
   cuda_add_library(
-    kernel-library 
+    kernel-library
     kernel.cu kernel.h
     OPTIONS -arch compute_53
     OPTIONS -code compute_53,sm_53,sm_60,sm_61,sm_62,sm_70,sm_72,sm_75
@@ -255,7 +200,6 @@ add_library(
   server-library EXCLUDE_FROM_ALL OBJECT
   ${SERVER_SRCS} ${SERVER_HDRS}
 )
-add_dependencies(server-library proto-library)
 
 if(${TRITON_ENABLE_GPU})
   target_include_directories(
@@ -295,6 +239,8 @@ endif() # TRITON_ENABLE_AZURE_STORAGE
 
 target_link_libraries(
   server-library
+  PRIVATE
+    proto-library                    # from repo-common
   PUBLIC
     triton-core-backendapi           # from repo-core
     triton-core-serverapi            # from repo-core

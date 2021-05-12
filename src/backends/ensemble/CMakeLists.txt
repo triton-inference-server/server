@@ -45,7 +45,6 @@ add_library(
   ensemble-backend-library EXCLUDE_FROM_ALL OBJECT
   ${ENSEMBLE_SRCS} ${ENSEMBLE_HDRS}
 )
-add_dependencies(ensemble-backend-library proto-library)
 
 if(${TRITON_ENABLE_GPU})
   target_include_directories(ensemble-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -59,7 +58,9 @@ endif() # TRITON_ENABLE_METRICS
 
 target_link_libraries(
   ensemble-backend-library
-  PUBLIC 
+  PRIVATE
+    proto-library             # from repo-common
+  PUBLIC
     triton-core-serverapi     # from repo-core
     triton-common-sync-queue  # from repo-common
 )

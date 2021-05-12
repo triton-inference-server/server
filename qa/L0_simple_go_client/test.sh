@@ -27,6 +27,8 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
+TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
+
 SIMPLE_GO_CLIENT=grpc_simple_client.go
 
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -51,6 +53,12 @@ sed -i 's/.\/nvidia_inferenceserver/nvidia_inferenceserver/g' $SIMPLE_GO_CLIENT
 PACKAGE_PATH="${GOPATH}/src"
 mkdir -p ${PACKAGE_PATH}
 
+# Get the proto files from the common repo
+rm -fr common
+git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
+    https://github.com/triton-inference-server/common.git
+mkdir core && cp common/protobuf/*.proto core/.
+
 # Requires protoc and protoc-gen-go plugin: https://github.com/golang/protobuf#installation
 # Use "M" arguements since go_package is not specified in .proto files.
 # As mentioned here: https://developers.google.com/protocol-buffers/docs/reference/go-generated#package
@@ -61,7 +69,7 @@ protoc -I core --go_out=plugins=grpc:${PACKAGE_PATH} --go_opt=Mgrpc_service.prot
 set +e
 
 # Runs test for GRPC variant of go client
-go run $SIMPLE_GO_CLIENT >>client.log 2>&1
+GO111MODULE=off go run $SIMPLE_GO_CLIENT >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi

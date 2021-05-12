@@ -64,7 +64,7 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.10.0dev': ('21.05dev', '21.04', '1.7.1', '2021.2.200', '2021.2.200')
+    '2.11.0dev': ('21.06dev', '21.04', '1.7.1', '2021.2.200', '2021.2.200')
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -233,6 +233,8 @@ def core_cmake_args(components, backends, install_dir):
         cmake_enable(FLAGS.enable_gpu_metrics)))
     cargs.append('-DTRITON_ENABLE_TRACING:BOOL={}'.format(
         cmake_enable(FLAGS.enable_tracing)))
+    cargs.append('-DTRITON_ENABLE_NVTX:BOOL={}'.format(
+        cmake_enable(FLAGS.enable_nvtx)))
 
     cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
         cmake_enable(FLAGS.enable_gpu)))
@@ -609,7 +611,7 @@ RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
         dfile.write(df)
 
 
-def create_dockerfile(ddir, dockerfile_name, argmap, backends, repoagents):
+def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents):
     df = '''
 #
 # Multistage build.
@@ -689,6 +691,7 @@ WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 LICENSE .
 COPY --chown=1000:1000 TRITON_VERSION .
+COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
@@ -718,12 +721,74 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoag
     && ldconfig \
     && rm -f ${{_CUDA_COMPAT_PATH}}/lib
 '''
-
     df += '''
-COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf /opt/tritonserver
 COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tritonserver
 ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 
+ENV NVIDIA_BUILD_ID {}
+LABEL com.nvidia.build.id={}
+LABEL com.nvidia.build.ref={}
+'''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
+           argmap['NVIDIA_BUILD_REF'])
+
+    mkdir(ddir)
+    with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
+        dfile.write(df)
+
+
+def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends, repoagents):
+    df = '''
+#
+# Multistage build.
+#
+ARG TRITON_VERSION={}
+ARG TRITON_CONTAINER_VERSION={}
+
+ARG BASE_IMAGE={}
+ARG BUILD_IMAGE=tritonserver_build
+
+############################################################################
+##  Build image
+############################################################################
+FROM ${{BUILD_IMAGE}} AS tritonserver_build
+
+############################################################################
+##  Production stage: Create container with just inference server executable
+############################################################################
+FROM ${{BASE_IMAGE}}
+
+ARG TRITON_VERSION
+ARG TRITON_CONTAINER_VERSION
+
+ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
+ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
+ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
+ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
+LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
+
+RUN setx path "%path%;C:\opt\tritonserver\bin"
+'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
+           argmap['BASE_IMAGE'])
+    df += '''
+WORKDIR /opt/tritonserver
+RUN rmdir /S/Q * || exit 0
+COPY LICENSE .
+COPY TRITON_VERSION .
+COPY NVIDIA_Deep_Learning_Container_License.pdf .
+COPY --from=tritonserver_build /tmp/tritonbuild/install/bin bin
+COPY --from=tritonserver_build /tmp/tritonbuild/install/lib/tritonserver.lib lib/
+COPY --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
+'''
+
+    for noncore in NONCORE_BACKENDS:
+        if noncore in backends:
+            df += '''
+COPY --from=tritonserver_build /tmp/tritonbuild/install/backends backends
+'''
+            break
+
+    df += '''
+ENTRYPOINT cmd.exe &&
 ENV NVIDIA_BUILD_ID {}
 LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}
@@ -911,17 +976,19 @@ def container_build(images, backends, repoagents):
 
         # Final base image... this is a multi-stage build that uses
         # the install artifacts from the tritonserver_build
-        # container. Windows containers can't access GPUs so we don't
-        # bother to create the base image for windows.
-        if target_platform() != 'windows':
-            create_dockerfile(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
+        # container.
+        if target_platform() == 'windows':
+            create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
                               backends, repoagents)
-            p = subprocess.Popen([
+        else:
+            create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
+                              backends, repoagents)
+        p = subprocess.Popen([
                 'docker', 'build', '-f',
                 os.path.join(FLAGS.build_dir, 'Dockerfile')
             ] + ['-t', 'tritonserver', '.'])
-            p.wait()
-            fail_if(p.returncode != 0, 'docker build tritonserver failed')
+        p.wait()
+        fail_if(p.returncode != 0, 'docker build tritonserver failed')
 
     except Exception as e:
         logging.error(traceback.format_exc())
