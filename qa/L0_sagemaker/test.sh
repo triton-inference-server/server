@@ -35,6 +35,13 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+# Make sure we can safety use symbolic link for SageMaker serve script
+if [ -d "/opt/ml" ] || [ -L "/opt/ml" ]; then
+    echo -e "Default SageMaker model path must not be used for testing"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 export CUDA_VISIBLE_DEVICES=0
 
 RET=0
@@ -49,9 +56,8 @@ CLIENT_LOG="./client.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./server.log"
-# Server args is similar to when docker is run in SageMaker environment,
-# except the model repository is not at the designated path "/opt/ml"
-SERVER_ARGS="--model-repository `pwd`/models --allow-grpc false --allow-http false --allow-metrics false"
+# Link model repository to "/opt/ml"
+ln -s `pwd`/models /opt/ml
 source ../common/util.sh
 
 mkdir models && \
@@ -97,7 +103,12 @@ function sagemaker_wait_for_server_ready() {
     WAIT_RET=1
 }
 
-run_server_nowait
+# Start server with 'serve' script
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
 sagemaker_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" != "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -134,21 +145,15 @@ fi
 set -e
 
 kill $SERVER_PID
-wait $SERVER_PID
+wait $SERVE_PID
 
-# Change SageMaker port in the same way as in nvidia_entrypoint.sh
+# Change SageMaker port
 export SAGEMAKER_BIND_TO_PORT=8000
-SAGEMAKER_ARGS="--model-repository=`pwd`/models"
-if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
-    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
-fi
-if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
-    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
-fi
-
-SERVER_ARGS="--allow-grpc false --allow-http false --allow-metrics false \
-             $SAGEMAKER_ARGS"
-run_server_nowait
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
 sagemaker_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" != "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -177,11 +182,14 @@ set -e
 unset SAGEMAKER_BIND_TO_PORT
 
 kill $SERVER_PID
-wait $SERVER_PID
+wait $SERVE_PID
 
-# Set SageMaker safe port range in the same way as in nvidia_entrypoint.sh
+# Set SageMaker safe port range
 export SAGEMAKER_SAFE_PORT_RANGE="8081-9000"
-SAGEMAKER_ARGS="--model-repository=`pwd`/models"
+
+# Start Triton in a similar way to 'serve' script, as 'serve' script can't
+# be used to satisfy the setting under test
+SAGEMAKER_ARGS="--model-repository=/opt/ml"
 if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
 fi
@@ -207,11 +215,14 @@ else
     fi
 fi
 
-# Disable HTTP endpoint and expect SageMaker endpoint on default port 8080 (< 8081)
+# Run 'serve' script and expect SageMaker endpoint on default port 8080 (< 8081)
 # is working
-SERVER_ARGS="--allow-grpc false --allow-http false --allow-metrics false \
-             $SAGEMAKER_ARGS"
-run_server_nowait
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+
 sagemaker_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" != "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -240,7 +251,7 @@ set -e
 unset SAGEMAKER_SAFE_PORT_RANGE
 
 kill $SERVER_PID
-wait $SERVER_PID
+wait $SERVE_PID
 
 # Run server with invalid model and exit-on-error=false
 rm models/model/1/*
@@ -266,6 +277,8 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+unlink /opt/ml
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
