@@ -1,0 +1,69 @@
+{
+    "data" :
+        [
+            [
+                {
+                    "INPUT" :
+                    {
+                        "content": [1.0],
+                        "shape": [1]
+                    }
+                },
+                {
+                    "INPUT" :
+                    {
+                        "content": [2.0, 3.0]
+                    }
+                },
+                {
+                    "INPUT" :
+                    {
+                        "content": [4.0, 5.0]
+                    }
+                },
+                {
+                    "INPUT" :
+                    {
+                        "content": [1.0, 2.0, 3.0],
+                        "shape": [3]
+                    }
+                }
+            ],
+            [
+                {
+                    "INPUT" :
+                    {
+                        "content": [1.0],
+                        "shape": [1]
+                    }
+                },
+                {
+                    "INPUT" :
+                    {
+                        "content": [2.0, 3.0]
+                    }
+                },
+                {
+                    "INPUT" :
+                    {
+                        "content": [4.0, 5.0]
+                    }
+                }
+            ],
+            [
+                {
+                    "INPUT" :
+                    {
+                        "content": [1.0],
+                        "shape": [1]
+                    }
+                },
+                {
+                    "INPUT" :
+                    {
+                        "content": [2.0, 3.0]
+                    }
+                }
+            ]
+        ]
+}
