@@ -210,7 +210,7 @@ RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
     cp /tmp/tritonbuild/install/backends/identity/libtriton_identity.so \
         qa/L0_repoagent_checksum/models/identity_int32/1/.
 RUN mkdir -p qa/L0_passive_instance/models/distributed_int32_int32_int32/1 && \
-    cp /tmp/tritonbuild/install/backends/distributed_addsub/libtriton_distributed_addsub.so \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/distributed_addsub/libtriton_distributed_addsub.so \
         qa/L0_passive_instance/models/distributed_int32_int32_int32/1/.
 
 ############################################################################
