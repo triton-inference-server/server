@@ -1,0 +1,534 @@
+I0513 20:18:42.810748 196730 metrics.cc:228] Collecting metrics for GPU 0: NVIDIA TITAN V
+I0513 20:18:43.105963 196730 libtorch.cc:932] TRITONBACKEND_Initialize: pytorch
+I0513 20:18:43.105994 196730 libtorch.cc:942] Triton TRITONBACKEND API version: 1.0
+I0513 20:18:43.105999 196730 libtorch.cc:948] 'pytorch' TRITONBACKEND API version: 1.0
+2021-05-13 20:18:43.263921: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+I0513 20:18:43.296407 196730 tensorflow.cc:2165] TRITONBACKEND_Initialize: tensorflow
+I0513 20:18:43.296436 196730 tensorflow.cc:2175] Triton TRITONBACKEND API version: 1.0
+I0513 20:18:43.296442 196730 tensorflow.cc:2181] 'tensorflow' TRITONBACKEND API version: 1.0
+I0513 20:18:43.296447 196730 tensorflow.cc:2205] backend configuration:
+{}
+I0513 20:18:43.297951 196730 onnxruntime.cc:1828] TRITONBACKEND_Initialize: onnxruntime
+I0513 20:18:43.297967 196730 onnxruntime.cc:1838] Triton TRITONBACKEND API version: 1.0
+I0513 20:18:43.297973 196730 onnxruntime.cc:1844] 'onnxruntime' TRITONBACKEND API version: 1.0
+I0513 20:18:43.312637 196730 openvino.cc:1168] TRITONBACKEND_Initialize: openvino
+I0513 20:18:43.312652 196730 openvino.cc:1178] Triton TRITONBACKEND API version: 1.0
+I0513 20:18:43.312658 196730 openvino.cc:1184] 'openvino' TRITONBACKEND API version: 1.0
+I0513 20:18:43.520430 196730 pinned_memory_manager.cc:206] Pinned memory pool is created at '0x7f46ee000000' with size 268435456
+I0513 20:18:43.520699 196730 cuda_memory_manager.cc:103] CUDA memory pool is created on device 0 with size 67108864
+I0513 20:18:43.525474 196730 model_repository_manager.cc:1043] loading: graphdef_nobatch_int32_int32_int32:1
+I0513 20:18:43.625762 196730 model_repository_manager.cc:1043] loading: graphdef_nobatch_int32_int32_int32:2
+I0513 20:18:43.626434 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_nobatch_int32_int32_int32 (version 1)
+I0513 20:18:43.628712 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_nobatch_int32_int32_int32 (GPU device 0)
+2021-05-13 20:18:43.633286: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcuda.so.1
+2021-05-13 20:18:43.634973: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:43.635022: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:43.635084: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:43.635148: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:43.635197: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:43.635263: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:43.635309: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:43.635354: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:43.638371: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+I0513 20:18:43.726093 196730 model_repository_manager.cc:1043] loading: graphdef_nobatch_int32_int32_int32:3
+I0513 20:18:43.726871 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_nobatch_int32_int32_int32 (version 2)
+I0513 20:18:43.727893 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_nobatch_int32_int32_int32 (GPU device 0)
+I0513 20:18:43.826551 196730 model_repository_manager.cc:1043] loading: graphdef_int32_int32_int32:1
+I0513 20:18:43.826976 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_nobatch_int32_int32_int32 (version 3)
+I0513 20:18:43.827965 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_nobatch_int32_int32_int32 (GPU device 0)
+I0513 20:18:43.926867 196730 model_repository_manager.cc:1043] loading: graphdef_int32_int32_int32:2
+I0513 20:18:43.927421 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_int32_int32_int32 (version 1)
+I0513 20:18:43.928377 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_int32_int32_int32 (GPU device 0)
+I0513 20:18:44.027207 196730 model_repository_manager.cc:1043] loading: graphdef_int32_int32_int32:3
+I0513 20:18:44.027794 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_int32_int32_int32 (version 2)
+I0513 20:18:44.028782 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_int32_int32_int32 (GPU device 0)
+I0513 20:18:44.127664 196730 model_repository_manager.cc:1043] loading: graphdef_int32_int32_float32:1
+I0513 20:18:44.128109 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_int32_int32_int32 (version 3)
+I0513 20:18:44.129090 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_int32_int32_int32 (GPU device 0)
+I0513 20:18:44.228056 196730 model_repository_manager.cc:1043] loading: graphdef_nobatch_object_object_object:1
+I0513 20:18:44.228501 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_int32_int32_float32 (version 1)
+I0513 20:18:44.229454 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_int32_int32_float32 (GPU device 0)
+I0513 20:18:44.328445 196730 model_repository_manager.cc:1043] loading: graphdef_object_int32_int32:1
+I0513 20:18:44.328874 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_nobatch_object_object_object (version 1)
+I0513 20:18:44.329831 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_nobatch_object_object_object (GPU device 0)
+I0513 20:18:44.428905 196730 model_repository_manager.cc:1043] loading: graphdef_object_object_object:1
+I0513 20:18:44.429352 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_object_int32_int32 (version 1)
+I0513 20:18:44.430395 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_object_int32_int32 (GPU device 0)
+I0513 20:18:44.529355 196730 model_repository_manager.cc:1043] loading: graphdef_sequence_float32:1
+I0513 20:18:44.529783 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_object_object_object (version 1)
+I0513 20:18:44.530898 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_object_object_object (GPU device 0)
+I0513 20:18:44.629804 196730 model_repository_manager.cc:1043] loading: inception_v1_graphdef:1
+I0513 20:18:44.630256 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: graphdef_sequence_float32 (version 1)
+I0513 20:18:44.631412 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: graphdef_sequence_float32_0 (GPU device 0)
+I0513 20:18:44.730290 196730 model_repository_manager.cc:1043] loading: nop_TYPE_FP32_-1:1
+I0513 20:18:44.730958 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: inception_v1_graphdef (version 1)
+I0513 20:18:44.731879 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: inception_v1_graphdef (GPU device 0)
+I0513 20:18:44.830702 196730 model_repository_manager.cc:1043] loading: plan_zero_1_float32:1
+I0513 20:18:44.831603 196730 identity.cc:348] TRITONBACKEND_Initialize: identity
+I0513 20:18:44.831645 196730 identity.cc:358] Triton TRITONBACKEND API version: 1.0
+I0513 20:18:44.831662 196730 identity.cc:364] 'identity' TRITONBACKEND API version: 1.0
+I0513 20:18:44.831676 196730 identity.cc:389] backend configuration:
+{}
+I0513 20:18:44.832666 196730 identity.cc:436] TRITONBACKEND_ModelInitialize: nop_TYPE_FP32_-1 (version 1)
+I0513 20:18:44.832689 196730 identity.cc:451] Repository location: /workspace/qa/L0_perf_analyzer_capi/models/nop_TYPE_FP32_-1
+I0513 20:18:44.832704 196730 identity.cc:464] backend state is 'backend state'
+I0513 20:18:44.833507 196730 identity.cc:155] model configuration:
+{
+    "name": "nop_TYPE_FP32_-1",
+    "platform": "",
+    "backend": "identity",
+    "version_policy": {
+        "latest": {
+            "num_versions": 1
+        }
+    },
+    "max_batch_size": 1024,
+    "input": [
+        {
+            "name": "INPUT0",
+            "data_type": "TYPE_FP32",
+            "format": "FORMAT_NONE",
+            "dims": [
+                -1
+            ],
+            "is_shape_tensor": false,
+            "allow_ragged_batch": false
+        },
+        {
+            "name": "INPUT1",
+            "data_type": "TYPE_FP32",
+            "format": "FORMAT_NONE",
+            "dims": [
+                -1
+            ],
+            "is_shape_tensor": false,
+            "allow_ragged_batch": false
+        }
+    ],
+    "output": [
+        {
+            "name": "OUTPUT0",
+            "data_type": "TYPE_FP32",
+            "dims": [
+                -1
+            ],
+            "label_filename": "",
+            "is_shape_tensor": false
+        },
+        {
+            "name": "OUTPUT1",
+            "data_type": "TYPE_FP32",
+            "dims": [
+                -1
+            ],
+            "label_filename": "",
+            "is_shape_tensor": false
+        }
+    ],
+    "batch_input": [],
+    "batch_output": [],
+    "optimization": {
+        "priority": "PRIORITY_DEFAULT",
+        "input_pinned_memory": {
+            "enable": true
+        },
+        "output_pinned_memory": {
+            "enable": true
+        },
+        "gather_kernel_buffer_threshold": 0,
+        "eager_batching": false
+    },
+    "instance_group": [
+        {
+            "name": "nop_TYPE_FP32_-1_0",
+            "kind": "KIND_CPU",
+            "count": 1,
+            "gpus": [],
+            "profile": []
+        }
+    ],
+    "default_model_filename": "",
+    "cc_model_filenames": {},
+    "metric_tags": {},
+    "parameters": {},
+    "model_warmup": []
+}
+I0513 20:18:44.833613 196730 identity.cc:519] TRITONBACKEND_ModelInstanceInitialize: nop_TYPE_FP32_-1_0 (CPU device 0)
+I0513 20:18:44.833880 196730 model_repository_manager.cc:1210] successfully loaded 'nop_TYPE_FP32_-1' version 1
+I0513 20:18:44.931165 196730 model_repository_manager.cc:1043] loading: resnet50v1.5_fp16_savedmodel:1
+I0513 20:18:45.031601 196730 model_repository_manager.cc:1043] loading: savedmodel_sequence_object:1
+I0513 20:18:45.031989 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: resnet50v1.5_fp16_savedmodel (version 1)
+I0513 20:18:45.032972 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: resnet50v1.5_fp16_savedmodel (GPU device 0)
+2021-05-13 20:18:45.126712: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /workspace/qa/L0_perf_analyzer_capi/models/resnet50v1.5_fp16_savedmodel/1/model.savedmodel
+I0513 20:18:45.132440 196730 tensorflow.cc:2265] TRITONBACKEND_ModelInitialize: savedmodel_sequence_object (version 1)
+I0513 20:18:45.133512 196730 tensorflow.cc:2314] TRITONBACKEND_ModelInstanceInitialize: savedmodel_sequence_object_0 (GPU device 0)
+2021-05-13 20:18:45.144981: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2021-05-13 20:18:45.391610: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /workspace/qa/L0_perf_analyzer_capi/models/savedmodel_sequence_object/1/model.savedmodel
+2021-05-13 20:18:45.391960: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+I0513 20:18:56.681382 196730 plan_backend.cc:386] Creating instance plan_zero_1_float32_0_gpu0 on GPU 0 (7.0) using model.plan
+I0513 20:18:56.717390 196730 plan_backend.cc:770] Created instance plan_zero_1_float32_0_gpu0 on GPU 0 with stream priority 0 and optimization profile default[0];
+I0513 20:18:56.717636 196730 model_repository_manager.cc:1210] successfully loaded 'plan_zero_1_float32' version 1
+2021-05-13 20:18:57.045076: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.045121: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.045139: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.046716: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.060154: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7f44af8aad20 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2021-05-13 20:18:57.060178: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): NVIDIA TITAN V, Compute Capability 7.0
+2021-05-13 20:18:57.078369: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3398350000 Hz
+2021-05-13 20:18:57.079287: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7f44afd67340 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2021-05-13 20:18:57.079315: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2021-05-13 20:18:57.081016: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.081081: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.081107: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.081145: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.081171: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.081196: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.081220: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.081240: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.084074: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.084125: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.084144: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.084159: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.087078: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.089410: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.089469: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.089494: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.089522: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.089547: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.089572: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.089595: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.089631: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.092445: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.092490: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.092508: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.092523: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.095393: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.097475: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.097537: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.097562: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.097590: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.097615: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.097640: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.097664: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.097683: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.100497: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.100545: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.100562: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.100576: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.103222: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.104818: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.104861: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.104878: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.104898: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.104915: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.104932: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.104949: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.104963: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.107020: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.107061: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.107076: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.107089: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.109576: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.111855: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.111911: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.111934: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.111958: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.111981: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.112002: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.112023: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.112041: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.114528: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.114574: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.114590: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.114603: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.116918: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.118980: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.119042: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.119068: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.119096: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.119122: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.119146: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.119170: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.119190: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.121976: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.122018: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.122049: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.122065: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.124356: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.126736: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.126799: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.126825: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.126854: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.126879: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.126903: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.126927: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.126947: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.129755: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.129797: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.129815: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.129830: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.132698: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.134780: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.134842: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.134865: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.134894: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.134918: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.134942: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.134966: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.134984: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.137405: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.137443: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.137459: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.137471: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.139961: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.141867: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.141922: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.141945: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.141974: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.141999: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.142023: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.142046: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.142064: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.143609: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.143637: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.143648: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.143655: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.145091: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+I0513 20:18:57.146170 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_nobatch_int32_int32_int32' version 1
+2021-05-13 20:18:57.147271: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.147339: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.147365: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.147393: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.147420: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.147444: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.147469: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.147489: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.150314: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.150362: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.150380: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.150395: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.153250: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+I0513 20:18:57.154231 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_nobatch_int32_int32_int32' version 2
+I0513 20:18:57.154241 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_int32_int32_int32' version 2I0513 20:18:57.154277 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_int32_int32_int32' version 1
+I0513 20:18:57.154337 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_nobatch_object_object_object' version 1
+
+I0513 20:18:57.154428 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_nobatch_int32_int32_int32' version 3
+I0513 20:18:57.154453 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_int32_int32_float32' version 1
+2021-05-13 20:18:57.155190: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.155238: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.155255: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.155277: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.155294: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.155311: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.155326: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.155339: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.157051: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.157081: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.157093: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.157102: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.158864: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.159904: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.159936: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.159948: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.159963: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.159976: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.159988: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.160000: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.160010: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.161263: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.161285: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.161294: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.161301: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.162693: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+I0513 20:18:57.163727 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_object_int32_int32' version 1
+2021-05-13 20:18:57.164887: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1666] Found device 0 with properties: 
+name: NVIDIA TITAN V major: 7 minor: 0 memoryClockRate(GHz): 1.455
+pciBusID: 0000:01:00.0
+2021-05-13 20:18:57.164959: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudart.so.11.0
+2021-05-13 20:18:57.164987: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+2021-05-13 20:18:57.165027: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcufft.so.10
+2021-05-13 20:18:57.165056: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcurand.so.10
+2021-05-13 20:18:57.165083: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusolver.so.11
+2021-05-13 20:18:57.165110: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcusparse.so.11
+2021-05-13 20:18:57.165131: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:18:57.167742: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1794] Adding visible gpu devices: 0
+2021-05-13 20:18:57.167783: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1206] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-05-13 20:18:57.167798: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1212]      0 
+2021-05-13 20:18:57.167811: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1225] 0:   N 
+2021-05-13 20:18:57.170156: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1351] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 9498 MB memory) -> physical GPU (device: 0, name: NVIDIA TITAN V, pci bus id: 0000:01:00.0, compute capability: 7.0)
+2021-05-13 20:18:57.170953: I tensorflow/cc/saved_model/loader.cc:251] Restoring SavedModel bundle.
+2021-05-13 20:18:57.171044: I tensorflow/cc/saved_model/loader.cc:261] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /workspace/qa/L0_perf_analyzer_capi/models/savedmodel_sequence_object/1/model.savedmodel/variables/variables.index
+I0513 20:18:57.171087 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_int32_int32_int32' version 3
+2021-05-13 20:18:57.171094: I tensorflow/cc/saved_model/loader.cc:379] SavedModel load for tags { serve }; Status: success. Took 11779490 microseconds.
+I0513 20:18:57.171168 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_sequence_float32' version 1
+I0513 20:18:57.171212 196730 model_repository_manager.cc:1210] successfully loaded 'graphdef_object_object_object' version 1
+I0513 20:18:57.171435 196730 model_repository_manager.cc:1210] successfully loaded 'savedmodel_sequence_object' version 1
+I0513 20:18:57.194267 196730 model_repository_manager.cc:1210] successfully loaded 'inception_v1_graphdef' version 1
+2021-05-13 20:18:57.207453: I tensorflow/cc/saved_model/loader.cc:251] Restoring SavedModel bundle.
+2021-05-13 20:18:57.562192: I tensorflow/cc/saved_model/loader.cc:200] Running initialization op on SavedModel bundle at path: /workspace/qa/L0_perf_analyzer_capi/models/resnet50v1.5_fp16_savedmodel/1/model.savedmodel
+2021-05-13 20:18:57.595376: I tensorflow/cc/saved_model/loader.cc:379] SavedModel load for tags { serve }; Status: success. Took 12468672 microseconds.
+I0513 20:18:57.595587 196730 model_repository_manager.cc:1210] successfully loaded 'resnet50v1.5_fp16_savedmodel' version 1
+I0513 20:18:57.595943 196730 model_repository_manager.cc:1043] loading: simple_savedmodel_sequence_object:1
+I0513 20:18:57.696347 196730 model_repository_manager.cc:1210] successfully loaded 'simple_savedmodel_sequence_object' version 1
+I0513 20:18:57.696501 196730 server.cc:504] 
++------------------+------+
+| Repository Agent | Path |
++------------------+------+
++------------------+------+
+
+I0513 20:18:57.696622 196730 server.cc:543] 
++-------------+-----------------------------------------------------------------+--------+
+| Backend     | Path                                                            | Config |
++-------------+-----------------------------------------------------------------+--------+
+| tensorrt    | <built-in>                                                      | {}     |
+| pytorch     | /opt/tritonserver/backends/pytorch/libtriton_pytorch.so         | {}     |
+| identity    | /opt/tritonserver/backends/identity/libtriton_identity.so       | {}     |
+| tensorflow  | /opt/tritonserver/backends/tensorflow1/libtriton_tensorflow1.so | {}     |
+| onnxruntime | /opt/tritonserver/backends/onnxruntime/libtriton_onnxruntime.so | {}     |
+| openvino    | /opt/tritonserver/backends/openvino/libtriton_openvino.so       | {}     |
++-------------+-----------------------------------------------------------------+--------+
+
+I0513 20:18:57.696810 196730 server.cc:586] 
++---------------------------------------+---------+--------+
+| Model                                 | Version | Status |
++---------------------------------------+---------+--------+
+| graphdef_int32_int32_float32          | 1       | READY  |
+| graphdef_int32_int32_int32            | 1       | READY  |
+| graphdef_int32_int32_int32            | 2       | READY  |
+| graphdef_int32_int32_int32            | 3       | READY  |
+| graphdef_nobatch_int32_int32_int32    | 1       | READY  |
+| graphdef_nobatch_int32_int32_int32    | 2       | READY  |
+| graphdef_nobatch_int32_int32_int32    | 3       | READY  |
+| graphdef_nobatch_object_object_object | 1       | READY  |
+| graphdef_object_int32_int32           | 1       | READY  |
+| graphdef_object_object_object         | 1       | READY  |
+| graphdef_sequence_float32             | 1       | READY  |
+| inception_v1_graphdef                 | 1       | READY  |
+| nop_TYPE_FP32_-1                      | 1       | READY  |
+| plan_zero_1_float32                   | 1       | READY  |
+| resnet50v1.5_fp16_savedmodel          | 1       | READY  |
+| savedmodel_sequence_object            | 1       | READY  |
+| simple_savedmodel_sequence_object     | 1       | READY  |
++---------------------------------------+---------+--------+
+
+I0513 20:18:57.696983 196730 tritonserver.cc:1659] 
++----------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Option                           | Value                                                                                                                                                                                  |
++----------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| server_id                        | triton                                                                                                                                                                                 |
+| server_version                   | 2.10.0dev                                                                                                                                                                              |
+| server_extensions                | classification sequence model_repository model_repository(unload_dependents) schedule_policy model_configuration system_shared_memory cuda_shared_memory binary_tensor_data statistics |
+| model_repository_path[0]         | /workspace/qa/L0_perf_analyzer_capi/models                                                                                                                                             |
+| model_control_mode               | MODE_NONE                                                                                                                                                                              |
+| strict_model_config              | 1                                                                                                                                                                                      |
+| pinned_memory_pool_byte_size     | 268435456                                                                                                                                                                              |
+| cuda_memory_pool_byte_size{0}    | 67108864                                                                                                                                                                               |
+| min_supported_compute_capability | 6.0                                                                                                                                                                                    |
+| strict_readiness                 | 1                                                                                                                                                                                      |
+| exit_timeout                     | 30                                                                                                                                                                                     |
++----------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+I0513 20:18:57.698707 196730 grpc_server.cc:4028] Started GRPCInferenceService at 0.0.0.0:8001
+I0513 20:18:57.699174 196730 http_server.cc:2887] Started HTTPService at 0.0.0.0:8000
+I0513 20:18:57.741503 196730 http_server.cc:2906] Started Metrics Service at 0.0.0.0:8002
+2021-05-13 20:20:04.265727: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcudnn.so.8
+2021-05-13 20:20:05.187100: I tensorflow/stream_executor/platform/default/dso_loader.cc:49] Successfully opened dynamic library libcublas.so.11
+W0513 20:27:13.164206 196730 sequence_batch_scheduler.cc:401] sequence 1 for model 'graphdef_sequence_float32' has a conflict. The previous sequence did not end before this sequence start. Previous sequence will be terminated early.
+W0513 20:27:15.764801 196730 sequence_batch_scheduler.cc:401] sequence 1 for model 'graphdef_sequence_float32' has a conflict. The previous sequence did not end before this sequence start. Previous sequence will be terminated early.
+W0513 20:34:48.038327 196730 sequence_batch_scheduler.cc:401] sequence 1 for model 'graphdef_sequence_float32' has a conflict. The previous sequence did not end before this sequence start. Previous sequence will be terminated early.
+W0513 20:34:50.639285 196730 sequence_batch_scheduler.cc:401] sequence 1 for model 'graphdef_sequence_float32' has a conflict. The previous sequence did not end before this sequence start. Previous sequence will be terminated early.
+Signal (15) received.
+I0513 20:34:53.075008 196730 server.cc:234] Waiting for in-flight requests to complete.
+I0513 20:34:53.075064 196730 model_repository_manager.cc:1076] unloading: simple_savedmodel_sequence_object:1
+I0513 20:34:53.075227 196730 model_repository_manager.cc:1076] unloading: savedmodel_sequence_object:1
+I0513 20:34:53.075361 196730 model_repository_manager.cc:1076] unloading: plan_zero_1_float32:1
+I0513 20:34:53.075497 196730 model_repository_manager.cc:1076] unloading: nop_TYPE_FP32_-1:1
+I0513 20:34:53.075525 196730 model_repository_manager.cc:1193] successfully unloaded 'simple_savedmodel_sequence_object' version 1
+I0513 20:34:53.075693 196730 model_repository_manager.cc:1076] unloading: graphdef_sequence_float32:1
+I0513 20:34:53.075771 196730 model_repository_manager.cc:1076] unloading: inception_v1_graphdef:1
+I0513 20:34:53.075901 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.075936 196730 identity.cc:567] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.076008 196730 model_repository_manager.cc:1076] unloading: graphdef_nobatch_object_object_object:1
+I0513 20:34:53.076077 196730 identity.cc:496] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.076107 196730 identity.cc:413] TRITONBACKEND_Finalize: state is 'backend state'
+I0513 20:34:53.076216 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.076243 196730 model_repository_manager.cc:1076] unloading: graphdef_nobatch_int32_int32_int32:1
+I0513 20:34:53.076263 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.076361 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.076388 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.076438 196730 model_repository_manager.cc:1076] unloading: graphdef_nobatch_int32_int32_int32:2
+I0513 20:34:53.076570 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.077294 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.077453 196730 model_repository_manager.cc:1076] unloading: graphdef_nobatch_int32_int32_int32:3
+I0513 20:34:53.077475 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.077534 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_sequence_float32' version 1
+I0513 20:34:53.077516 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.077614 196730 model_repository_manager.cc:1193] successfully unloaded 'nop_TYPE_FP32_-1' version 1
+I0513 20:34:53.077631 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.077648 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.077722 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.077787 196730 model_repository_manager.cc:1076] unloading: graphdef_object_int32_int32:1
+I0513 20:34:53.077874 196730 model_repository_manager.cc:1076] unloading: graphdef_int32_int32_int32:1
+I0513 20:34:53.078053 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.078083 196730 model_repository_manager.cc:1193] successfully unloaded 'savedmodel_sequence_object' version 1
+I0513 20:34:53.078156 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.078376 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_nobatch_int32_int32_int32' version 2
+I0513 20:34:53.078386 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_nobatch_object_object_object' version 1
+I0513 20:34:53.078400 196730 model_repository_manager.cc:1076] unloading: graphdef_int32_int32_int32:2
+I0513 20:34:53.078522 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.078527 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.078576 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.078528 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_nobatch_int32_int32_int32' version 1I0513 20:34:53.078629 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+
+I0513 20:34:53.078669 196730 model_repository_manager.cc:1076] unloading: graphdef_int32_int32_int32:3
+I0513 20:34:53.078778 196730 model_repository_manager.cc:1076] unloading: resnet50v1.5_fp16_savedmodel:1
+I0513 20:34:53.078799 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.078900 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.079037 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_int32_int32_int32' version 1
+I0513 20:34:53.079055 196730 model_repository_manager.cc:1076] unloading: graphdef_object_object_object:1
+I0513 20:34:53.079129 196730 model_repository_manager.cc:1193] successfully unloaded 'plan_zero_1_float32' version 1
+I0513 20:34:53.079185 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.079273 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.079418 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.079465 196730 model_repository_manager.cc:1076] unloading: graphdef_int32_int32_float32:1
+I0513 20:34:53.079538 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.079547 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_nobatch_int32_int32_int32' version 3
+I0513 20:34:53.079584 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_object_int32_int32' version 1
+I0513 20:34:53.079597 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_int32_int32_int32' version 2
+I0513 20:34:53.079657 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.079760 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.079785 196730 server.cc:249] Timeout 30: Found 5 live models and 0 in-flight non-inference requests
+I0513 20:34:53.079999 196730 tensorflow.cc:2352] TRITONBACKEND_ModelInstanceFinalize: delete instance state
+I0513 20:34:53.080071 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_int32_int32_int32' version 3
+I0513 20:34:53.080213 196730 tensorflow.cc:2291] TRITONBACKEND_ModelFinalize: delete model state
+I0513 20:34:53.080715 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_object_object_object' version 1
+I0513 20:34:53.080958 196730 model_repository_manager.cc:1193] successfully unloaded 'graphdef_int32_int32_float32' version 1
+I0513 20:34:53.086252 196730 model_repository_manager.cc:1193] successfully unloaded 'inception_v1_graphdef' version 1
+I0513 20:34:53.104233 196730 model_repository_manager.cc:1193] successfully unloaded 'resnet50v1.5_fp16_savedmodel' version 1
+I0513 20:34:54.079940 196730 server.cc:249] Timeout 29: Found 0 live models and 0 in-flight non-inference requests
