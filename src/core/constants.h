@@ -33,6 +33,7 @@ constexpr char kInferHeaderContentLengthHTTPHeader[] =
     "Inference-Header-Content-Length";
 constexpr char kAcceptEncodingHTTPHeader[] = "Accept-Encoding";
 constexpr char kContentEncodingHTTPHeader[] = "Content-Encoding";
+constexpr char kContentTypeHeader[] = "Content-Type";
 
 #ifdef TRITON_ENABLE_TENSORFLOW
 constexpr char kTensorFlowGraphDefPlatform[] = "tensorflow_graphdef";
