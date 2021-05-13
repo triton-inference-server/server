@@ -350,14 +350,14 @@ gpu_execution_accelerator property.
 
 ```
 optimization { execution_accelerators {
-  gpu_execution_accelerator : [ 
+  gpu_execution_accelerator : [
     { name : "auto_mixed_precision" }
   ]
 }}
 ```
 
 The options are described in detail in the
-[ModelOptimizationPolicy](../src/core/model_config.proto)
+[ModelOptimizationPolicy](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
 section of the model configuration protobuf.
 
 You can follow the steps described above for TensorRT to see how this
