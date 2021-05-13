@@ -44,4 +44,5 @@ plus several extensions that are defined in the following documents:
 - [Statistics extension](./extension_statistics.md)
 
 For the GRPC protocol the [protobuf
-specification](../../src/core/grpc_service.proto) is also available.
+specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
+is also available.

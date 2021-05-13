@@ -32,15 +32,16 @@ Each model in a [model repository](model_repository.md) must include a
 model configuration that provides required and optional information
 about the model. Typically, this configuration is provided in a
 config.pbtxt file specified as [ModelConfig
-protobuf](../src/core/model_config.proto). In some cases, discussed in
-[Auto-Generated Model
+protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+In some cases, discussed in [Auto-Generated Model
 Configuraton](#auto-generated-model-configuration), the model
 configuration can be generated automatically by Triton and so does not
 need to be provided explicitly.
 
 This section describes the most important model configuration
 properties but the documentation in the [ModelConfig
-protobuf](../src/core/model_config.proto) should also be consulted.
+protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+should also be consulted.
 
 ## Minimal Model Configuration
 
@@ -580,7 +581,9 @@ as is, even though it is not a preferred size.
 
 The *preserve_ordering* property is used to force all responses to be
 returned in the same order as requests were received. See the
-[protobuf documentation](../src/core/model_config.proto) for details.
+[protobuf
+documentation](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+for details.
 
 #### Priority Levels
 
@@ -647,8 +650,8 @@ The model configuration *ModelOptimizationPolicy* property is used to
 specify optimization and prioritization settings for a model. These
 settings control if/how a model is optimized by the backend and how it
 is scheduled and executed by Triton. See the [ModelConfig
-protobuf](../src/core/model_config.proto) and
-[optimization](optimization.md#framework-specific-optimization)
+protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+and [optimization](optimization.md#framework-specific-optimization)
 documentation for the currently available settings.
 
 ## Model Warmup
