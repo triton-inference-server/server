@@ -56,9 +56,12 @@ SHELL ["cmd", "/S", "/C"]
 RUN mkdir c:\tmp
 WORKDIR /tmp
 
+# Be aware that pip can interact badly with VS cmd shell so need to pip install before
+# vsdevcmd.bat (see https://bugs.python.org/issue38989)
 RUN powershell.exe -ExecutionPolicy RemoteSigned iex (new-object net.webclient).downloadstring('https://get.scoop.sh')
 RUN scoop install python git docker unzip
 RUN pip3 install --upgrade wheel setuptools docker
+RUN pip3 install grpcio-tools
 
 # Download and install Build Tools for Visual Studio.
 ADD https://aka.ms/vs/16/release/vs_buildtools.exe vs_buildtools.exe
