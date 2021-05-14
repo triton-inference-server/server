@@ -36,7 +36,7 @@ namespace nvidia { namespace inferenceserver {
 TritonModelInstance::TritonModelInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-    const std::set<std::string>& profile_names, const bool passive)
+    const std::vector<std::string>& profile_names, const bool passive)
     : model_(model), name_(name), index_(index), kind_(kind),
       device_id_(device_id), profile_names_(profile_names), passive_(passive),
       state_(nullptr)
@@ -70,9 +70,9 @@ TritonModelInstance::CreateInstances(
     TritonModel* model, const inference::ModelConfig& model_config)
 {
   for (const auto& group : model_config.instance_group()) {
-    std::set<std::string> profile_names;
+    std::vector<std::string> profile_names;
     for (const auto& profile_name : group.profile()) {
-      profile_names.insert(profile_name);
+      profile_names.push_back(profile_name);
     }
     for (int32_t c = 0; c < group.count(); ++c) {
       std::string instance_name{group.count() > 1
@@ -109,7 +109,7 @@ Status
 TritonModelInstance::CreateInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-    const std::set<std::string>& profile_names, const bool passive)
+    const std::vector<std::string>& profile_names, const bool passive)
 {
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
       model, name, index, kind, device_id, profile_names, passive));
@@ -184,13 +184,8 @@ TRITONBACKEND_ModelInstanceProfileName(
             .c_str());
   }
 
-  uint32_t cnt = 0;
-  for (const auto& rprofile : rprofiles) {
-    if (cnt++ == index) {
-      *profile_name = rprofile.c_str();
-      break;
-    }
-  }
+  *profile_name = rprofiles[index].c_str();
+
   return nullptr;  // success
 }
 

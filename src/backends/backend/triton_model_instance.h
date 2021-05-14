@@ -50,7 +50,7 @@ class TritonModelInstance {
   TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
   int32_t DeviceId() const { return device_id_; }
   bool IsPassive() const { return passive_; }
-  const std::set<std::string>& Profiles() const { return profile_names_; }
+  const std::vector<std::string>& Profiles() const { return profile_names_; }
 
   TritonModel* Model() { return model_; }
   void* State() { return state_; }
@@ -64,11 +64,11 @@ class TritonModelInstance {
   TritonModelInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-      const std::set<std::string>& profile_names, const bool passive);
+      const std::vector<std::string>& profile_names, const bool passive);
   static Status CreateInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-      const std::set<std::string>& profile_names, const bool passive);
+      const std::vector<std::string>& profile_names, const bool passive);
 
   // The TritonModel object that owns this instance. The instance
   // holds this as a raw pointer because the lifetime of the model is
@@ -83,7 +83,7 @@ class TritonModelInstance {
   // GPU device to be used by the instance.
   TRITONSERVER_InstanceGroupKind kind_;
   int32_t device_id_;
-  std::set<std::string> profile_names_;
+  std::vector<std::string> profile_names_;
   bool passive_;
 
   // Reporter for metrics, or nullptr if no metrics should be reported
