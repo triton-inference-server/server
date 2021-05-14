@@ -1270,40 +1270,39 @@ OldestSequenceBatch::OldestSequenceBatch(
           continue_input_overrides, notready_input_overrides),
       in_flight_(seq_slot_cnt, false), queues_(seq_slot_cnt)
 {
-// FIXME: Fix with sequence  batcher change
-#if 0
-  // Initialize to handle CORRID control. If error just exit
-  // now... that means the corresponding model instance will not have
-  // any runner and so will not get used for execution.
-  if (!CreateCorrelationIDControl(config)) {
-    is_initialized->set_value(false);
-    return;
-  }
+//// FIXME: Fix with sequence  batcher change
+//  // Initialize to handle CORRID control. If error just exit
+//  // now... that means the corresponding model instance will not have
+//  // any runner and so will not get used for execution.
+//  if (!CreateCorrelationIDControl(config)) {
+//    is_initialized->set_value(false);
+//    return;
+//  }
+//
+//  // Create a dynamic batcher use to batch together sequences for
+//  // inference.
+//  std::set<int32_t> preferred_batch_sizes;
+//  for (const auto size :
+//       config.sequence_batching().oldest().preferred_batch_size()) {
+//    preferred_batch_sizes.insert(size);
+//  }
+//
+//  Status status = DynamicBatchScheduler::Create(
+//      batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
+//      OnWarmup, OnSchedule, true /* dynamic_batching_enabled */,
+//      config.max_batch_size(), enforce_equal_shape_tensors_,
+//      true /* preserve_ordering */, preferred_batch_sizes,
+//      config.sequence_batching().oldest().max_queue_delay_microseconds(),
+//      &dynamic_batcher_);
+//  if (!status.IsOk()) {
+//    LOG_ERROR << "failed creating dynamic sequence batcher for OldestFirst "
+//              << batcher_idx_ << ": " << status.Message();
+//    is_initialized->set_value(false);
+//    return;
+//  }
+//
+//  is_initialized->set_value(true);
 
-  // Create a dynamic batcher use to batch together sequences for
-  // inference.
-  std::set<int32_t> preferred_batch_sizes;
-  for (const auto size :
-       config.sequence_batching().oldest().preferred_batch_size()) {
-    preferred_batch_sizes.insert(size);
-  }
-
-  Status status = DynamicBatchScheduler::Create(
-      batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
-      OnWarmup, OnSchedule, true /* dynamic_batching_enabled */,
-      config.max_batch_size(), enforce_equal_shape_tensors_,
-      true /* preserve_ordering */, preferred_batch_sizes,
-      config.sequence_batching().oldest().max_queue_delay_microseconds(),
-      &dynamic_batcher_);
-  if (!status.IsOk()) {
-    LOG_ERROR << "failed creating dynamic sequence batcher for OldestFirst "
-              << batcher_idx_ << ": " << status.Message();
-    is_initialized->set_value(false);
-    return;
-  }
-
-  is_initialized->set_value(true);
-#endif
 }
 
 OldestSequenceBatch::~OldestSequenceBatch() {}

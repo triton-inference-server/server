@@ -90,20 +90,18 @@ WarmupResponseComplete(
 }
 
 // FIxME: Move the warmup logic into TritonModelInstance
-#if 0
-void
-WarmupRequestComplete(
-    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
-{
-  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
-    TRITONSERVER_InferenceRequestDelete(request);
-    if (userp != nullptr) {
-      auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
-      warmup_promise->set_value();
-    }
-  }
-}
-#endif
+//void
+//WarmupRequestComplete(
+//    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
+//{
+//  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+//    TRITONSERVER_InferenceRequestDelete(request);
+//    if (userp != nullptr) {
+//      auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
+//      warmup_promise->set_value();
+//    }
+//  }
+//}
 
 }  // namespace
 
