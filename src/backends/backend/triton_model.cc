@@ -157,8 +157,8 @@ TritonModel::Create(
   local_model->initialized_ = true;
 
   // Create and initialize the model instances for this model.
-  RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
-      raw_local_model, model_config, &local_model->instances_));
+  RETURN_IF_ERROR(
+      TritonModelInstance::CreateInstances(raw_local_model, model_config));
 
   // Create a scheduler with 1 thread per instance. The backend is
   // already initialized so there is no need to have the scheduler
@@ -209,6 +209,17 @@ TritonModel::Create(
 
   *model = std::move(local_model);
   return Status::Success;
+}
+
+void
+TritonModel::AddInstance(
+    std::unique_ptr<TritonModelInstance>&& instance, const bool passive)
+{
+  if (passive) {
+    passive_instances_.emplace_back(std::move(instance));
+  } else {
+    instances_.emplace_back(std::move(instance));
+  }
 }
 
 Status
@@ -304,6 +315,7 @@ TritonModel::~TritonModel()
   // Explicitly delete/finalize all model instances before finalizing
   // the model itself.
   instances_.clear();
+  passive_instances_.clear();
 
   // Model finalization is optional... The TRITONBACKEND_Model
   // object is this TritonModel object.
