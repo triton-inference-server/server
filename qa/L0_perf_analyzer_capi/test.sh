@@ -46,14 +46,14 @@ TESTDATADIR=`pwd`/test_data
 
 SERVER_LIBRARY_PATH=/opt/tritonserver
 
-INT_JSONDATAFILE=`pwd`/json_input_data_files/int_data.json
-INT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/int_data_diff_shape.json
-FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/float_data_with_shape.json
-STRING_JSONDATAFILE=`pwd`/json_input_data_files/string_data.json
-STRING_WITHSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/string_data_with_shape.json
-SEQ_JSONDATAFILE=`pwd`/json_input_data_files/seq_data.json
-SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
-IMAGE_JSONDATAFILE=`pwd`/json_input_data_files/image_data.json
+INT_JSONDATAFILE=`pwd`/../L0_perf_analyzer/json_input_data_files/int_data.json
+INT_DIFFSHAPE_JSONDATAFILE=`pwd`/../L0_perf_analyzer/json_input_data_files/int_data_diff_shape.json
+FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/../L0_perf_analyzer/json_input_data_files/float_data_with_shape.json
+STRING_JSONDATAFILE=`pwd`/../L0_perf_analyzer/json_input_data_files/string_data.json
+STRING_WITHSHAPE_JSONDATAFILE=`pwd`/../L0_perf_analyzer/json_input_data_files/string_data_with_shape.json
+SEQ_JSONDATAFILE=`pwd`/../L0_perf_analyzer/json_input_data_files/seq_data.json
+SHAPETENSORADTAFILE=`pwd`/../L0_perf_analyzer/json_input_data_files/shape_tensor_data.json
+IMAGE_JSONDATAFILE=`pwd`/../L0_perf_analyzer/json_input_data_files/image_data.json
 
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
@@ -100,9 +100,10 @@ for INPUT in INPUT0 INPUT1; do
         echo '1' >> $TESTDATADIR/${INPUT}
     done
 done
+
 RET=0
+
 ########## Test C API #############
-# C API tests
 # Make sure tritonserver is not running first
 SERVER_PID=$(pidof tritonserver)
 if [ $? -ne 1 ]; then
@@ -111,10 +112,9 @@ echo -e "\n There was a previous instance of tritonserver, killing \n"
   wait $SERVER_PID
 fi
 
-# #Testing simple configurations
-
+# Testing simple configuration
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -125,10 +125,9 @@ if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-
 
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -140,46 +139,40 @@ if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-
 #Testing that async does NOT work
-
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-
 
 #Testing that shared memory does not work
 for SHARED_MEMORY_TYPE in system cuda; do
     set +e
     $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 --shared-memory=$SHARED_MEMORY_TYPE \
-    --service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+    --service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
     if [ $? -ne 1 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-    
+    set -e
 done
 
 # Testing --request-rate-range does NOT work
-
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 -p1000 -b 1 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-
 # Testing with inception model
-
 $PERF_ANALYZER -v -m inception_v1_graphdef -t 1 -p2000 -b 1 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -192,9 +185,8 @@ if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
 fi
 
 # Testing with resnet50 models with large batch sizes
-
 $PERF_ANALYZER -v -m inception_v1_graphdef -t 2 -p2000 -b 64 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -210,7 +202,7 @@ fi
 for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     # Valid batch size
     $PERF_ANALYZER -v  -m $MODEL -t 1 -p2000 -b 1 \
-    --service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+    --service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -219,7 +211,7 @@ for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     # Invalid batch sizes
     for STATIC_BATCH in 0 10; do
         $PERF_ANALYZER -v -m $MODEL -t 1 -p2000 -b $STATIC_BATCH \
-        --service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+        --service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
         if [ $? -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -230,7 +222,7 @@ done
 
 # Test concurrency
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -243,9 +235,8 @@ if [ $(cat $CLIENT_LOG | grep "error | Request count: 0 | : 0 infer/sec\|: 0 use
 fi
 
 #Testing with string input
-set +e
 $PERF_ANALYZER -v -m graphdef_object_object_object --string-data=1 -p2000 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -258,9 +249,8 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
 fi
 
 # Testing with different file inputs
-set +e
 $PERF_ANALYZER -v -m graphdef_object_object_object --input-data=$TESTDATADIR -p2000 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -272,7 +262,7 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     RET=1
 fi
 $PERF_ANALYZER -v -m graphdef_object_object_object --input-data=$STRING_JSONDATAFILE -p2000 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -284,22 +274,19 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-
 # Testing with variable inputs
- 
 $PERF_ANALYZER -v -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
 --shape INPUT0:2,8 --shape INPUT1:2,8 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-
 $PERF_ANALYZER -v -m graphdef_object_int32_int32 --input-data=$STRING_WITHSHAPE_JSONDATAFILE \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -312,10 +299,9 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-
 $PERF_ANALYZER -v -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
 --shape INPUT1:2,8,2 -p2000 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -327,12 +313,10 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-
 # Shape tensor I/O model (server needs the shape tensor on the CPU)
-
 $PERF_ANALYZER -v -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
 --shape DUMMY_INPUT0:4,4 -p2000 -b 8 \
---service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -344,12 +328,11 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-
 # # FIXME: simple_savedmodel_sequence_object segfaults with local CAPI
 # 
 # $PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
 # --input-data=$SEQ_JSONDATAFILE \
-# --service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+# --service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 # if [ $? -ne 0 ]; then
 #     cat $CLIENT_LOG
 #     echo -e "\n***\n*** Test Failed\n***"
@@ -364,7 +347,7 @@ fi
 # # FIXME: Testing with variable ensemble model doesn't work
 # $PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
 # --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 \
-# --service-kind=triton_local --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+# --service-kind=triton_c_api --model-repo=$DATADIR --library-name=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
 # 
 # if [ $? -eq 0 ]; then
 #     cat $CLIENT_LOG
@@ -392,5 +375,4 @@ if [ $RET -eq 0 ]; then
 else
   echo -e "\n***\n*** Test FAILED\n***"
 fi
-
 exit $RET
