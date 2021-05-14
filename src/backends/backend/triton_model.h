@@ -65,12 +65,17 @@ class TritonModel : public InferenceBackend {
       const uint32_t config_version,
       TRITONSERVER_Message* updated_config_message);
   const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
+  const std::vector<std::unique_ptr<TritonModelInstance>>& Instances() const
+  {
+    return instances_;
+  }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
   void AddInstance(
       std::unique_ptr<TritonModelInstance>&& instance, const bool passive);
 
-  void WarmUp(uint32_t runner_idx, WarmupData& sample) override;
+  Status Initialize();
+  Status WarmUp();
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModel);

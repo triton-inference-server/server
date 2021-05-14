@@ -1270,6 +1270,8 @@ OldestSequenceBatch::OldestSequenceBatch(
           continue_input_overrides, notready_input_overrides),
       in_flight_(seq_slot_cnt, false), queues_(seq_slot_cnt)
 {
+// FIXME: Fix with sequence  batcher change
+#if 0
   // Initialize to handle CORRID control. If error just exit
   // now... that means the corresponding model instance will not have
   // any runner and so will not get used for execution.
@@ -1301,6 +1303,7 @@ OldestSequenceBatch::OldestSequenceBatch(
   }
 
   is_initialized->set_value(true);
+#endif
 }
 
 OldestSequenceBatch::~OldestSequenceBatch() {}

@@ -25,10 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "model_config.pb.h"
 #include "src/core/backend_context.h"
 #include "src/core/infer_stats.h"
 #include "src/core/label_provider.h"
-#include "model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 
@@ -179,9 +179,9 @@ class InferenceBackend {
 
   // Set the scheduler based on the model configuration. The scheduler
   // can only be set once for a backend.
-  Status SetConfiguredScheduler(
-      const uint32_t runner_cnt, const Scheduler::StandardInitFunc& OnInit,
-      const Scheduler::StandardRunFunc& OnRun);
+  // FIXME: The pointer is of TritonModel* type and is doen to keep ensemble
+  // happy
+  Status SetConfiguredScheduler(void* model);
 
   // Get the raw pointer to the scheduler of this backend.
   Scheduler* BackendScheduler() { return scheduler_.get(); }
