@@ -110,21 +110,15 @@ sleep 10
 
 # Test 1 Scenarios:
 # 1. access blob using shared key in envs
-# 2. adding more scenarios in future 
+# 2. adding more scenarios in future
 for ENV_VAR in "shared_key"; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
     MODEL_REPO="${AS_URL}/models"
-    if [ "$ENV_VAR" == "sas" ]; then
-        unset AZURE_STORAGE_KEY
-        sas=`az storage blob generate-sas --container-name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} --name models`
-        sas_without_quote=$(eval echo $sas)
-        export AZURE_STORAGE_SAS="?$sas_without_quote"
-    fi
 
     # Now start model tests
     # set server arguments
-    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"  
+    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -159,7 +153,7 @@ done
 # Add test for explicit model control
 SERVER_LOG=$SERVER_LOG_BASE.explicit.log
 CLIENT_LOG=$CLIENT_LOG_BASE.explicit.log
-SERVER_ARGS="--model-repository=${AS_URL}/models --model-control-mode=explicit"  
+SERVER_ARGS="--model-repository=${AS_URL}/models --model-control-mode=explicit"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

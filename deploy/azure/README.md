@@ -42,7 +42,7 @@ helm). Note the following requirements:
 * The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prpmetheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resourses to support these services.
 
 * If you want Triton Server to use GPUs for inferencing, your cluster
-must be configured to contain the desired number of GPU nodes (EC2 G4 instances recommended)
+must be configured to contain the desired number of GPU nodes (Azure NC series VMs recommended)
 with support for the NVIDIA driver and CUDA version required by the version
 of the inference server you are using.
 
@@ -53,21 +53,10 @@ metrics reported by the inference server.
 
 ## Installing Helm
 
-### Helm v3
-
 If you do not already have Helm installed in your Kubernetes cluster,
 executing the following steps from the [official helm install
 guide](https://helm.sh/docs/intro/install/) will
 give you a quick setup.
-
-If you're currently using Helm v2 and would like to migrate to Helm v3,
-please see the [official migration guide](https://helm.sh/docs/topics/v2_v3_migration/).
-
-### Helm v2
-
-> **NOTE**: Moving forward this chart will only be tested and maintained for Helm v3.
-
-Below are example instructions for installing Helm v2. 
 
 ```
 $ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
@@ -75,14 +64,12 @@ $ chmod 700 get_helm.sh
 $ ./get_helm.sh
 ```
 
-If you run into any issues, you can refer to the official installation guide [here](https://v2.helm.sh/docs/install/).
-
 ## Model Repository
 
 If you already have a model repository you may use that with this helm
 chart. If you do not have a model repository, you can checkout a local
 copy of the inference server source repository to create an example
-model repository::
+model repository:
 
 ```
 $ git clone https://github.com/triton-inference-server/server.git
@@ -90,17 +77,20 @@ $ git clone https://github.com/triton-inference-server/server.git
 
 Triton Server needs a repository of models that it will make available
 for inferencing. For this example you will place the model repository
-in an AWS S3 Storage bucket.
+in an Azure Storage Container.
 
 ```
-$ aws mb s3://triton-inference-server-repository
+az storage container create --name triton-inference-server-repository
 ```
 
 Following the [QuickStart](../../docs/quickstart.md) download the
-example model repository to your system and copy it into the AWS S3
-bucket.
+example model repository to your system and copy it into the Azure Storage Container
 
 ```
+$ cd ./docs/examples
+$ for file in `find model_repository -type f`; do
+  az storage blob upload --container-name triton-inference-server-repository --account-name
+done
 $ aws cp -r docs/examples/model_repository s3://triton-inference-server-repository/model_repository
 ```
 
@@ -111,7 +101,7 @@ To load the model from the AWS S3, you need to convert the following AWS credent
 echo -n 'REGION' | base64
 ```
 ```
-echo -n 'SECRET_KEY_ID' | base64
+echo -n 'SECRECT_KEY_ID' | base64
 ```
 ```
 echo -n 'SECRET_ACCESS_KEY' | base64

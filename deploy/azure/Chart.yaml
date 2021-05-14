@@ -24,18 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-replicaCount: 1
-
-image:
-  imageName: nvcr.io/nvidia/tritonserver:21.06-py3
-  pullPolicy: IfNotPresent
-  modelRepositoryPath: s3://triton-inference-server-repository/model_repository
-  numGpus: 1
-
-service:
-  type: LoadBalancer
-
-secret:
-  region: AWS_REGION
-  id: AWS_SECRET_KEY_ID
-  key: AWS_SECRET_ACCESS_KEY
+apiVersion: v1
+appVersion: "1.0"
+description: Triton Inference Server
+name: triton-inference-server
+version: 1.0.0
