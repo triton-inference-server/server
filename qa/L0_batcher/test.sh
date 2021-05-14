@@ -210,7 +210,7 @@ for model_type in FIXED VARIABLE; do
             # We rely on HTTP endpoint in run_server so until HTTP is
             # implemented for win we do this hack...
             run_server_nowait
-            sleep 15
+            sleep 60
         else
             run_server
         fi
@@ -268,7 +268,7 @@ for model_type in FIXED VARIABLE; do
             # We rely on HTTP endpoint in run_server so until HTTP is
             # implemented for win we do this hack...
             run_server_nowait
-            sleep 15
+            sleep 60
         else
             run_server
         fi
@@ -323,7 +323,7 @@ for i in $DIFFERENT_SHAPE_TESTS ; do
         # We rely on HTTP endpoint in run_server so until HTTP is
         # implemented for win we do this hack...
         run_server_nowait
-        sleep 15
+        sleep 60
     else
         run_server
     fi
@@ -381,7 +381,7 @@ for i in \
         # We rely on HTTP endpoint in run_server so until HTTP is
         # implemented for win we do this hack...
         run_server_nowait
-        sleep 15
+        sleep 60
     else
         run_server
     fi
@@ -466,7 +466,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" != *Microsoft ]]; then
         # We rely on HTTP endpoint in run_server so until HTTP is
         # implemented for win we do this hack...
         run_server_nowait
-        sleep 15
+        sleep 60
     else
         run_server
     fi
@@ -526,7 +526,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" != *Microsoft ]]; then
         # We rely on HTTP endpoint in run_server so until HTTP is
         # implemented for win we do this hack...
         run_server_nowait
-        sleep 15
+        sleep 60
     else
         run_server
     fi
