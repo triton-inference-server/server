@@ -26,18 +26,19 @@
 
 #include "src/backends/backend/triton_model_instance.h"
 
+#include "model_config.pb.h"
 #include "src/backends/backend/triton_model.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
-#include "model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
 TritonModelInstance::TritonModelInstance(
     TritonModel* model, const std::string& name, const size_t index,
-    const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id)
+    const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
+    const bool passive)
     : model_(model), name_(name), index_(index), kind_(kind),
-      device_id_(device_id), state_(nullptr)
+      device_id_(device_id), passive_(passive), state_(nullptr)
 {
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
@@ -65,28 +66,28 @@ TritonModelInstance::~TritonModelInstance()
 
 Status
 TritonModelInstance::CreateInstances(
-    TritonModel* model, const inference::ModelConfig& model_config,
-    std::vector<std::unique_ptr<TritonModelInstance>>* instances)
+    TritonModel* model, const inference::ModelConfig& model_config)
 {
   for (const auto& group : model_config.instance_group()) {
     for (int32_t c = 0; c < group.count(); ++c) {
       std::string instance_name{group.count() > 1
                                     ? group.name() + "_" + std::to_string(c)
                                     : group.name()};
+      const bool passive = group.passive();
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
-            0 /* device_id */, instances));
+            0 /* device_id */, passive));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           RETURN_IF_ERROR(CreateInstance(
               model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
-              device_id, instances));
+              device_id, passive));
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
-            0 /* device_id */, instances));
+            0 /* device_id */, passive));
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -103,10 +104,10 @@ Status
 TritonModelInstance::CreateInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-    std::vector<std::unique_ptr<TritonModelInstance>>* instances)
+    const bool passive)
 {
   std::unique_ptr<TritonModelInstance> local_instance(
-      new TritonModelInstance(model, name, index, kind, device_id));
+      new TritonModelInstance(model, name, index, kind, device_id, passive));
 
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
@@ -117,7 +118,7 @@ TritonModelInstance::CreateInstance(
         model->Backend()->ModelInstanceInitFn()(triton_instance));
   }
 
-  instances->push_back(std::move(local_instance));
+  model->AddInstance(std::move(local_instance), passive);
 
   return Status::Success;
 }
@@ -148,6 +149,15 @@ TRITONBACKEND_ModelInstanceDeviceId(
 {
   TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
   *device_id = ti->DeviceId();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceIsPassive(
+    TRITONBACKEND_ModelInstance* instance, bool* is_passive)
+{
+  TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
+  *is_passive = ti->IsPassive();
   return nullptr;  // success
 }
 

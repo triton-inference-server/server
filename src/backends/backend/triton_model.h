@@ -27,11 +27,11 @@
 
 #include <memory>
 #include <string>
+#include "model_config.pb.h"
 #include "src/backends/backend/triton_backend_manager.h"
 #include "src/core/backend.h"
 #include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
-#include "model_config.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -67,6 +67,8 @@ class TritonModel : public InferenceBackend {
   const std::shared_ptr<TritonBackend>& Backend() const { return backend_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
+  void AddInstance(
+      std::unique_ptr<TritonModelInstance>&& instance, const bool passive);
 
   void WarmUp(uint32_t runner_idx, WarmupData& sample) override;
 
@@ -97,6 +99,7 @@ class TritonModel : public InferenceBackend {
 
   // The model instances for this model.
   std::vector<std::unique_ptr<TritonModelInstance>> instances_;
+  std::vector<std::unique_ptr<TritonModelInstance>> passive_instances_;
 
   // Opaque state associated with this model.
   void* state_;

@@ -466,4 +466,5 @@ install(
 
 add_subdirectory(sequence sequence)
 add_subdirectory(dyna_sequence dyna_sequence)
+add_subdirectory(distributed_addsub distributed_addsub)
 add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)
