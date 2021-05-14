@@ -25,6 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# TESTS COPIED FROM L0_perf_analyzer/test.sh
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -38,16 +39,12 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./perf_analyzer.log"
-#PERF_ANALYZER=../clients/perf_analyzer
-PERF_ANALYZER=/workspace/install/bin/perf_client
+PERF_ANALYZER=../clients/perf_analyzer
 
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
 
 SERVER_LIBRARY_PATH=/opt/tritonserver
-SERVER=$SERVER_LIBRARY_PATH/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR}"
-SERVER_LOG="./inference_server.log"
 
 INT_JSONDATAFILE=`pwd`/json_input_data_files/int_data.json
 INT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/int_data_diff_shape.json
@@ -63,39 +60,38 @@ ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 
 source ../common/util.sh
 
-DATASRC=/tmp/host/data
-rm -f $SERVER_LOG $CLIENT_LOG
+rm -f $CLIENT_LOG
 rm -rf $DATADIR $TESTDATADIR $ENSEMBLE_DATADIR
 
 mkdir -p $DATADIR
 # Copy fixed-shape models
-cp -r ${DATASRC}/qa_model_repository/graphdef_int32_int32_int32 $DATADIR/
-cp -r ${DATASRC}/qa_model_repository/graphdef_nobatch_int32_int32_int32 $DATADIR/
-cp -r ${DATASRC}/qa_model_repository/graphdef_object_object_object $DATADIR/
-cp -r ${DATASRC}/qa_model_repository/graphdef_nobatch_object_object_object $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_int32_int32_int32 $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_nobatch_int32_int32_int32 $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_object_object_object $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_nobatch_object_object_object $DATADIR/
 
 # Copy a variable-shape models
-cp -r ${DATASRC}/qa_variable_model_repository/graphdef_object_int32_int32 $DATADIR/
-cp -r ${DATASRC}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_object_int32_int32 $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
 
 # Copy shape tensor models
-cp -r ${DATASRC}/qa_shapetensor_model_repository/plan_zero_1_float32 $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/plan_zero_1_float32 $DATADIR/
 
 # Copying ensemble including a sequential model
-cp -r ${DATASRC}/qa_sequence_model_repository/savedmodel_sequence_object $DATADIR
-cp -r ${DATASRC}/qa_ensemble_model_repository/qa_sequence_model_repository/simple_savedmodel_sequence_object $DATADIR
-cp -r ${DATASRC}/qa_ensemble_model_repository/qa_sequence_model_repository/nop_TYPE_FP32_-1 $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_object $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/simple_savedmodel_sequence_object $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/nop_TYPE_FP32_-1 $DATADIR
 
 # Copying variable sequence model
-cp -r ${DATASRC}/qa_variable_sequence_model_repository/graphdef_sequence_float32 $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_sequence_model_repository/graphdef_sequence_float32 $DATADIR
 
 mkdir $DATADIR/nop_TYPE_FP32_-1/1
 
 # Copy inception model to the model repository
-cp -r ${DATASRC}/tf_model_store/inception_v1_graphdef $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v1_graphdef $DATADIR
 
 # Copy resnet50v1.5_fp16
-cp -r ${DATASRC}/perf_model_store/resnet50v1.5_fp16_savedmodel $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/perf_model_store/resnet50v1.5_fp16_savedmodel $DATADIR
 
 # Generating test data
 mkdir -p $TESTDATADIR
@@ -104,7 +100,6 @@ for INPUT in INPUT0 INPUT1; do
         echo '1' >> $TESTDATADIR/${INPUT}
     done
 done
-set -x #echo on
 RET=0
 ########## Test C API #############
 # C API tests
