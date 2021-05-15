@@ -264,7 +264,8 @@ PlanBackend::Context::~Context()
 
 Status
 PlanBackend::CreateExecutionContexts(
-    const std::unordered_map<std::string, std::vector<char>>& models)
+    const std::unordered_map<std::string, std::vector<char>>& models,
+    const NumaConfig& numa_config)
 {
   // TensorRT engine creation is not thread-safe, so multiple creations
   // are serialized with a global lock.
@@ -338,6 +339,9 @@ PlanBackend::CreateExecutionContexts(
         // The last entry in contexts_ is the newly created context
         auto& queue = available_context_queue_[runner_idx];
         queue->Put(contexts_.size());
+
+        RETURN_IF_ERROR(SetNumaConfigOnThread(
+            numa_config, TRITONSERVER_INSTANCEGROUPKIND_GPU, gpu_device));
 
         std::string instance_name;
         if (dla_core_id != -1) {
@@ -422,6 +426,7 @@ PlanBackend::CreateExecutionContexts(
         RETURN_IF_ERROR(CreateExecutionContext(
             instance_name, gpu_device, dla_core_id, mn_itr->second,
             group.profile(), queue));
+        RETURN_IF_ERROR(ResetNumaMemoryPolicy());
       }
     }
   }
@@ -451,9 +456,15 @@ PlanBackend::CreateExecutionContexts(
   // context queue will be formed differently to fit the scheduler's need.
   RETURN_IF_ERROR(SetConfiguredScheduler(
       available_context_queue_.size(),
-      [this](uint32_t runner_idx) -> Status {
+      [this, numa_config](uint32_t runner_idx) -> Status {
         // Obtain any context as the next context for the corresponding runner
         next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
+        // Get the device kind and id of the associated instance to
+        // set NUMA config for the thread
+        const auto& instance = contexts_[next_context_[runner_idx]];
+        RETURN_IF_ERROR(SetNumaConfigOnThread(
+            numa_config, TRITONSERVER_INSTANCEGROUPKIND_GPU,
+            instance->gpu_device_));
         return Status::Success;
       },
       [this](

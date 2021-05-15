@@ -29,8 +29,9 @@
 #include <functional>
 #include <map>
 #include <mutex>
-#include "src/core/model_config.h"
 #include "model_config.pb.h"
+#include "src/core/model_config.h"
+#include "src/core/numa_utils.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -140,6 +141,7 @@ class ModelRepositoryManager {
   /// Cannot be set to true if polling_enabled is true.
   /// \param min_compute_capability The minimum support CUDA compute
   /// capability.
+  /// \param numa_config The NUMA config used when loading models.
   /// \param model_repository_manager Return the model repository manager.
   /// \return The error status.
   static Status Create(
@@ -150,7 +152,7 @@ class ModelRepositoryManager {
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
       const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
       const bool polling_enabled, const bool model_control_enabled,
-      const double min_compute_capability,
+      const double min_compute_capability, const NumaConfig& numa_config,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
 
   /// Poll the model repository to determine the new set of models and

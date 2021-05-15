@@ -134,6 +134,7 @@ set(
   metrics.cc
   model_config_utils.cc
   model_repository_manager.cc
+  numa_utils.cc
   persistent_backend_manager.cc
   pinned_memory_manager.cc
   scheduler_utils.cc
@@ -167,6 +168,7 @@ set(
   metrics.h
   model_config_utils.h
   model_repository_manager.h
+  numa_utils.h
   nvtx.h
   persistent_backend_manager.h
   pinned_memory_manager.h

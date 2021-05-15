@@ -67,7 +67,8 @@ TritonModelInstance::~TritonModelInstance()
 
 Status
 TritonModelInstance::CreateInstances(
-    TritonModel* model, const inference::ModelConfig& model_config)
+    TritonModel* model, const NumaConfig& numa_config,
+    const inference::ModelConfig& model_config)
 {
   for (const auto& group : model_config.instance_group()) {
     std::vector<std::string> profile_names;
@@ -80,16 +81,22 @@ TritonModelInstance::CreateInstances(
                                     : group.name()};
       const bool passive = group.passive();
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
+        RETURN_IF_ERROR(SetNumaConfigOnThread(
+            numa_config, TRITONSERVER_INSTANCEGROUPKIND_CPU, 0));
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
             0 /* device_id */, profile_names, passive));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
+          RETURN_IF_ERROR(SetNumaConfigOnThread(
+              numa_config, TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id));
           RETURN_IF_ERROR(CreateInstance(
               model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
               device_id, profile_names, passive));
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
+        // Skip setting numa config on KIND_MODEL as we can't assume
+        // the model placement
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
             0 /* device_id */, profile_names, passive));

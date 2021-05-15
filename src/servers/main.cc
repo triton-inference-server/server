@@ -248,7 +248,8 @@ enum OptionId {
   OPTION_BACKEND_DIR,
   OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
-  OPTION_BACKEND_CONFIG
+  OPTION_BACKEND_CONFIG,
+  OPTION_NUMA_CONFIG
 };
 
 struct Option {
@@ -435,12 +436,21 @@ std::vector<Option> options_
        Option::ArgInt,
        "The number of threads used to accelerate copies and other operations "
        "required to manage input and output tensor contents. Default is 0."},
-  {
-    OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
-        "Specify a backend-specific configuration setting. The format of this "
-        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
-        "<backend_name> is the name of the backend, such as 'tensorrt'."
-  }
+      {OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
+       "Specify a backend-specific configuration setting. The format of this "
+       "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
+       "<backend_name> is the name of the backend, such as 'tensorrt'."},
+      {OPTION_NUMA_CONFIG, "numa-config",
+       "<string>_<integer>:<integer>:<integer>-<integer>[,<integer>-<integer>"
+       "...]",
+       "Specify a NUMA configuration setting associated with a device. The "
+       "format of this flag is "
+       "--numa-config=<device_kind>_<device_id>:<NUMA_node_id>:<lower_cpu_"
+       "core_id>-<upper_cpu_core_id>[,<lower_cpu_core_id>-<upper_cpu_core_id>"
+       "...]. "
+       "This option may be specified multiple times to associate different "
+       "devices to a NUMA node, but a repeated specification on the same "
+       "device will overwrite the previous setting for the device."}
 };
 
 bool
@@ -950,6 +960,90 @@ ParseBackendConfigOption(const std::string arg)
   return {name_string, setting_string, value_string};
 }
 
+std::tuple<TRITONSERVER_InstanceGroupKind, int, int32_t, std::vector<int>>
+ParseNumaConfigOption(const std::string arg)
+{
+  // Format is "<device>:<node>:<cores>"
+  auto delim_device = arg.find(":");
+  auto delim_node = arg.find(":", delim_device + 1);
+
+  // Check for 2 delimeters
+  if ((delim_device == std::string::npos) ||
+      (delim_node == std::string::npos)) {
+    std::cerr
+        << "--numa-config option format is '<device>:<node>:<cores>'. Got "
+        << arg << std::endl;
+    exit(1);
+  }
+
+  // Parse device
+  TRITONSERVER_InstanceGroupKind device_type;
+  int device_id;
+  {
+    auto delim_device_id = arg.find("_");
+    if (delim_device_id == std::string::npos) {
+      std::cerr << "--numa-config option device format is '<kind>_<id>'. Got "
+                << arg.substr(0, delim_device) << std::endl;
+      exit(1);
+    }
+    std::string device_type_str = arg.substr(0, delim_device_id);
+    if (device_type_str == "cpu") {
+      device_type = TRITONSERVER_INSTANCEGROUPKIND_CPU;
+    } else if (device_type_str == "gpu") {
+      device_type = TRITONSERVER_INSTANCEGROUPKIND_GPU;
+    } else {
+      std::cerr
+          << "--numa-config option expects device type 'cpu' or 'gpu'. Got "
+          << device_type_str << std::endl;
+      exit(1);
+    }
+    device_id = ParseOption<int>(
+        arg.substr(delim_device_id + 1, delim_device - (delim_device_id + 1)));
+  }
+
+  int32_t node_id = ParseOption<int>(
+      arg.substr(delim_device + 1, delim_node - (delim_device + 1)));
+
+  // Parse CPUs
+  std::vector<int> cpus;
+  {
+    auto delim_cpus = arg.find(",", delim_node + 1);
+    int current_pos = delim_node + 1;
+    while (true) {
+      auto delim_range = arg.find("-", current_pos);
+      if (delim_range == std::string::npos) {
+        std::cerr << "--numa-config option cpu range format is "
+                     "'<lower_cpu_core_id>-<upper_cpu_core_id>'. Got "
+                  << arg.substr(
+                         current_pos,
+                         ((delim_cpus == std::string::npos) ? (arg.length() + 1)
+                                                            : delim_cpus) -
+                             current_pos)
+                  << std::endl;
+        exit(1);
+      }
+      int lower =
+          ParseOption<int>(arg.substr(current_pos, delim_range - current_pos));
+      int upper = ParseOption<int>(
+          (delim_cpus == std::string::npos)
+              ? arg.substr(delim_range + 1)
+              : arg.substr(delim_range + 1, delim_cpus - (delim_range + 1)));
+      for (; lower <= upper; ++lower) {
+        cpus.push_back(lower);
+      }
+      // break if the processed range is the last specified range
+      if (delim_cpus != std::string::npos) {
+        current_pos = delim_cpus + 1;
+        delim_cpus = arg.find(",", current_pos);
+      } else {
+        break;
+      }
+    }
+  }
+
+  return {device_type, device_id, node_id, cpus};
+}
+
 template <typename T1, typename T2>
 std::pair<T1, T2>
 ParsePairOption(const std::string& arg, const std::string& delim_str)
@@ -992,6 +1086,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::string repoagent_dir = "/opt/tritonserver/repoagents";
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
+  std::vector<std::tuple<
+      TRITONSERVER_InstanceGroupKind, int, int32_t, std::vector<int>>>
+      numa_configs;
 
 #ifdef TRITON_ENABLE_GPU
   double min_supported_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
@@ -1233,6 +1330,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_BACKEND_CONFIG:
         backend_config_settings.push_back(ParseBackendConfigOption(optarg));
         break;
+      case OPTION_NUMA_CONFIG:
+        numa_configs.push_back(ParseNumaConfigOption(optarg));
+        break;
     }
   }
 
@@ -1382,6 +1482,13 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         TRITONSERVER_ServerOptionsSetBackendConfig(
             loptions, std::get<0>(bcs).c_str(), std::get<1>(bcs).c_str(),
             std::get<2>(bcs).c_str()),
+        "setting backend configurtion");
+  }
+  for (const auto& nc : numa_configs) {
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsSetNumaConfig(
+            loptions, std::get<0>(nc), std::get<1>(nc), std::get<2>(nc),
+            std::get<3>(nc).data(), std::get<3>(nc).size()),
         "setting backend configurtion");
   }
 

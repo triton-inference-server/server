@@ -32,6 +32,7 @@
 #include "src/core/backend.h"
 #include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
+#include "src/core/numa_utils.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -50,8 +51,8 @@ class TritonModel : public InferenceBackend {
   static Status Create(
       InferenceServer* server, const std::string& model_repository_path,
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
-      const std::string& model_name, const int64_t version,
-      const inference::ModelConfig& model_config,
+      const NumaConfig& numa_config, const std::string& model_name,
+      const int64_t version, const inference::ModelConfig& model_config,
       std::unique_ptr<TritonModel>* model);
   ~TritonModel();
 

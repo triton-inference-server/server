@@ -30,6 +30,7 @@
 #include "model_config.pb.h"
 #include "src/core/constants.h"
 #include "src/core/metric_model_reporter.h"
+#include "src/core/numa_utils.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -42,7 +43,8 @@ class TritonModel;
 class TritonModelInstance {
  public:
   static Status CreateInstances(
-      TritonModel* model, const inference::ModelConfig& model_config);
+      TritonModel* model, const NumaConfig& numa_config,
+      const inference::ModelConfig& model_config);
   ~TritonModelInstance();
 
   const std::string& Name() const { return name_; }

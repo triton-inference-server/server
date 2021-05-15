@@ -459,6 +459,7 @@ set_target_properties(
 target_link_libraries(
   tritonserver
   PRIVATE dl
+  PRIVATE numa
 )
 endif()
 target_link_libraries(

@@ -202,6 +202,8 @@ class InferenceServer {
     backend_cmdline_config_map_ = bc;
   }
 
+  void SetNumaConfig(const NumaConfig& nc) { numa_config_ = nc; }
+
   void SetRepoAgentDir(const std::string& d) { repoagent_dir_ = d; }
 
   // FIXME TF specific functions should be removed once all backends
@@ -249,6 +251,7 @@ class InferenceServer {
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_supported_compute_capability_;
   BackendCmdlineConfigMap backend_cmdline_config_map_;
+  NumaConfig numa_config_;
   std::string repoagent_dir_;
 
   // FIXME, remove once all backends use backend config.

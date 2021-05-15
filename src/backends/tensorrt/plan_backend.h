@@ -32,6 +32,7 @@
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/metric_model_reporter.h"
+#include "src/core/numa_utils.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 #include "triton/common/sync_queue.h"
@@ -57,7 +58,8 @@ class PlanBackend : public InferenceBackend {
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(
-      const std::unordered_map<std::string, std::vector<char>>& models);
+      const std::unordered_map<std::string, std::vector<char>>& models,
+      const NumaConfig& numa_config);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const int64_t dla_core_id, const std::vector<char>& models,
