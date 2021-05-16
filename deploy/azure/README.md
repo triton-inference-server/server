@@ -53,12 +53,12 @@ metrics reported by the inference server.
 
 ## Installing Helm
 
-If you do not already have Helm installed in your Kubernetes cluster,
+If you do not already have Helm installed,
 executing the following steps from the [official helm install
 guide](https://helm.sh/docs/intro/install/) will
 give you a quick setup.
 
-```
+```sh
 $ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
 $ chmod 700 get_helm.sh
 $ ./get_helm.sh
@@ -71,40 +71,42 @@ chart. If you do not have a model repository, you can checkout a local
 copy of the inference server source repository to create an example
 model repository:
 
-```
+```sh
 $ git clone https://github.com/triton-inference-server/server.git
 ```
 
 Triton Server needs a repository of models that it will make available
 for inferencing. For this example you will place the model repository
-in an Azure Storage Container.
+in an Azure Storage Container in an Azure Storage Account. Replace the value of `$AZURE_STORAGE_ACCOUNT` with the name of an Azure Storage Account you have access to.
 
-```
-az storage container create --name triton-inference-server-repository
+```sh
+$ AZURE_STORAGE_ACCOUNT=mystorageaccount
+$ AZURE_STORAGE_CONTAINER=triton-inference-server-repository
+
+$ az storage container create --name $AZURE_STORAGE_CONTAINER --account-name $AZURE_STORAGE_ACCOUNT
 ```
 
 Following the [QuickStart](../../docs/quickstart.md) download the
-example model repository to your system and copy it into the Azure Storage Container
+example model repository to your system and copy it into the Azure Storage Container.
 
-```
+```sh
 $ cd ./docs/examples
-$ for file in `find model_repository -type f`; do
-  az storage blob upload --container-name triton-inference-server-repository --account-name
-done
-$ aws cp -r docs/examples/model_repository s3://triton-inference-server-repository/model_repository
+$ az storage blob directory upload -c $AZURE_STORAGE_CONTAINER -d . -s model_repository --account-name $AZURE_STORAGE_ACCOUNT --recursive
 ```
 
-### AWS Model Repository
-To load the model from the AWS S3, you need to convert the following AWS credentials in the base64 format and add it to the values.yaml
+### Azure Model Repository
+To load models from the Blob Storage Container, you need to convert the following Azure credentials to base64 format and add them to the Helm Chart's [values.yaml](./values.yaml)
 
+For `AZURE_STORAGE_ACCOUNT_NAME`:
+```sh
+$ echo -n $AZURE_STORAGE_ACCOUNT | base64
 ```
-echo -n 'REGION' | base64
-```
-```
-echo -n 'SECRECT_KEY_ID' | base64
-```
-```
-echo -n 'SECRET_ACCESS_KEY' | base64
+
+For `AZURE_STORAGE_KEY`:
+```sh
+$ AZURE_STORAGE_KEY=`az storage account keys list -n $AZURE_STORAGE_ACCOUNT --query "[0].value"`
+
+$ echo -n $AZURE_STORAGE_KEY | base64
 ```
 
 ## Deploy Prometheus and Grafana
@@ -242,9 +244,9 @@ CRDs](https://github.com/helm/charts/tree/master/stable/prometheus-operator#unin
 $ kubectl delete crd alertmanagers.monitoring.coreos.com servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com
 ```
 
-You may also want to delete the AWS bucket you created to hold the
+You may also want to delete the Azure Blob Storage Container you created to hold the
 model repository.
 
-```
-$ aws s3 rm -r gs://triton-inference-server-repository
+```sh
+$ az storage container delete -n $AZURE_STORAGE_CONTAINER --account-name $AZURE_STORAGE_ACCOUNT
 ```

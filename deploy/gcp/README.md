@@ -58,13 +58,18 @@ metrics reported by the inference server.
 
 ## Installing Helm
 
+<<<<<<< HEAD
 ### Helm v3
 
 If you do not already have Helm installed in your Kubernetes cluster,
+=======
+If you do not already have Helm installed,
+>>>>>>> use more azure cli commands
 executing the following steps from the [official helm install
 guide](https://helm.sh/docs/intro/install/) will
 give you a quick setup.
 
+<<<<<<< HEAD
 If you're currently using Helm v2 and would like to migrate to Helm v3,
 please see the [official migration guide](https://helm.sh/docs/topics/v2_v3_migration/).
 
@@ -80,6 +85,12 @@ $ kubectl create serviceaccount -n kube-system tiller
 serviceaccount/tiller created
 $ kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
 $ helm init --service-account tiller --wait
+=======
+```sh
+$ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+$ chmod 700 get_helm.sh
+$ ./get_helm.sh
+>>>>>>> use more azure cli commands
 ```
 
 If you run into any issues, you can refer to the official installation guide [here](https://v2.helm.sh/docs/install/).

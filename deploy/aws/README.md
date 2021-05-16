@@ -67,7 +67,7 @@ please see the [official migration guide](https://helm.sh/docs/topics/v2_v3_migr
 
 > **NOTE**: Moving forward this chart will only be tested and maintained for Helm v3.
 
-Below are example instructions for installing Helm v2. 
+Below are example instructions for installing Helm v2.
 
 ```
 $ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
