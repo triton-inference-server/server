@@ -93,7 +93,7 @@ class TritonModelInstance {
   std::vector<std::string> profile_names_;
   bool passive_;
 
-  // std::vector<WarmupData> sampels_;
+  // std::vector<WarmupData> samples_;
 
   // Reporter for metrics, or nullptr if no metrics should be reported
   std::shared_ptr<MetricModelReporter> reporter_;

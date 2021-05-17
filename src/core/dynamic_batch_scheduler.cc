@@ -147,6 +147,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->QueueStartNs());
 
   Status enqueue_status;
+  bool wake_runner = false;
   {
     std::lock_guard<std::mutex> lock(mu_);
 
@@ -155,9 +156,24 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     // Assuming no error is returned, this call takes ownership of
     // 'request' and so we can't use it after this point.
     RETURN_IF_ERROR(queue_.Enqueue(request->Priority(), request));
+
+    // TODO: Enable with rate limiter integration.
+    // If there are any idle runners and the queued batch size is greater or
+    // equal to next preferred batch size, then wake one up to service this
+    // request. We do the actual wake outside of the lock to avoid having the
+    // woken thread immediately block on the lock
+    // wake_runner = (rate_limiter_->AvailableInstanceCount(model) > 0);
+
+     // We may wake up runner less often if we don't enforce equal shape within
+    // a batch, otherwise must always wake up runner to check it
+    if (enforce_equal_shape_tensors_.empty()) {
+      wake_runner &= (queued_batch_size_ >= next_preferred_batch_size_);
+    }
   }
 
-  cv_.notify_one();
+  if (wake_runner) {
+    cv_.notify_one();
+  }
 
   return Status::Success;
 }
