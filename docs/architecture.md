@@ -657,7 +657,7 @@ scheduler will:
    "RAW_IMAGE" in the preprocess model.
 
 2. Check models within the ensemble and send an internal request to the
-   preprocess model becuase all the input tensors required are ready.
+   preprocess model because all the input tensors required are ready.
 
 3. Recognize the completion of the internal request, collect the output
    tensor and map the content to "preprocessed_image" which is an unique name
