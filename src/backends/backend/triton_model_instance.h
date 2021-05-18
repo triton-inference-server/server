@@ -35,6 +35,7 @@
 namespace nvidia { namespace inferenceserver {
 
 class TritonModel;
+class InferenceRequest;
 
 //
 // Represents a model instance.
@@ -51,6 +52,12 @@ class TritonModelInstance {
   int32_t DeviceId() const { return device_id_; }
   bool IsPassive() const { return passive_; }
   const std::vector<std::string>& Profiles() const { return profile_names_; }
+
+  Status Initialize() { return Status::Success; }
+
+  Status WarmUp();
+
+  Status Schedule(std::vector<std::unique_ptr<InferenceRequest>>&& requests);
 
   TritonModel* Model() { return model_; }
   void* State() { return state_; }
@@ -85,6 +92,8 @@ class TritonModelInstance {
   int32_t device_id_;
   std::vector<std::string> profile_names_;
   bool passive_;
+
+  // std::vector<WarmupData> samples_;
 
   // Reporter for metrics, or nullptr if no metrics should be reported
   std::shared_ptr<MetricModelReporter> reporter_;
