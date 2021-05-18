@@ -38,6 +38,7 @@
 #include "src/backends/backend/triton_model.h"
 #include "src/backends/backend/triton_model_instance.h"
 #include "src/core/model_config.h"
+#include "src/core/rate_limiter.h"
 #include "src/core/scheduler.h"
 #include "src/core/scheduler_utils.h"
 #include "src/core/status.h"
@@ -75,7 +76,8 @@ class DynamicBatchScheduler : public Scheduler {
 
  private:
   DynamicBatchScheduler(
-      const bool dynamic_batching_enabled, const int32_t max_batch_size,
+      TritonModel* model, const bool dynamic_batching_enabled,
+      const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
@@ -83,10 +85,11 @@ class DynamicBatchScheduler : public Scheduler {
       const inference::ModelQueuePolicy& default_queue_policy,
       const uint32_t priority_levels,
       const ModelQueuePolicyMap& queue_policy_map);
-  void SchedulerThread(
-      TritonModel* model, const int nice, std::promise<bool>* is_initialized);
+  void SchedulerThread(const int nice, std::promise<bool>* is_initialized);
   uint64_t GetDynamicBatch();
   void FinalizeResponses();
+
+  TritonModel* model_;
 
   // True if dynamic batching is enabled.
   const bool dynamic_batching_enabled_;
@@ -102,6 +105,8 @@ class DynamicBatchScheduler : public Scheduler {
   // Mutex and condvar for signalling scheduler thread
   std::mutex mu_;
   std::condition_variable cv_;
+
+  RateLimiter* rate_limiter_;
 
   size_t max_batch_size_;
   size_t max_preferred_batch_size_;

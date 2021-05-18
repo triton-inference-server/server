@@ -57,9 +57,11 @@ class TritonModelInstance {
 
   Status WarmUp();
 
-  Status Schedule(std::vector<std::unique_ptr<InferenceRequest>>&& requests);
+  Status Schedule(
+      std::vector<std::unique_ptr<InferenceRequest>>&& requests,
+      std::function<void()> OnCompletion);
 
-  TritonModel* Model() { return model_; }
+  TritonModel* Model() const { return model_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
 
@@ -75,7 +77,8 @@ class TritonModelInstance {
   static Status CreateInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-      const std::vector<std::string>& profile_names, const bool passive);
+      const std::vector<std::string>& profile_names, const bool passive,
+      const inference::ModelRateLimiter& rate_limiter_config);
 
   // The TritonModel object that owns this instance. The instance
   // holds this as a raw pointer because the lifetime of the model is

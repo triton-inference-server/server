@@ -35,13 +35,13 @@
 #include <utility>
 #include <vector>
 
+#include "model_config.pb.h"
 #include "src/backends/backend/triton_backend_manager.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
@@ -149,6 +149,12 @@ InferenceServer::Init()
     status = CommonErrorToStatus(triton::common::AsyncWorkQueue::Initialize(
         buffer_manager_thread_count_));
   }
+
+  bool ignore_resources_and_priority =
+      (rate_limit_mode_ == RateLimitMode::RL_OFF);
+  status = RateLimiter::Create(
+      ignore_resources_and_priority, rate_limit_resource_map_, &rate_limiter_);
+
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return status;

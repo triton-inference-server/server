@@ -32,6 +32,7 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/server.h"
 #include "src/core/server_message.h"
 #include "src/core/tritonserver_apis.h"
 
@@ -167,15 +168,21 @@ TritonModel::Create(
   return Status::Success;
 }
 
-void
+Status
 TritonModel::AddInstance(
-    std::unique_ptr<TritonModelInstance>&& instance, const bool passive)
+    std::unique_ptr<TritonModelInstance>&& instance, const bool passive,
+    const inference::ModelRateLimiter& rate_limiter_config)
 {
   if (passive) {
     passive_instances_.emplace_back(std::move(instance));
   } else {
+    TritonModelInstance* raw_instance = instance.get();
     instances_.emplace_back(std::move(instance));
+    RETURN_IF_ERROR(server_->GetRateLimiter()->RegisterModelInstance(
+        raw_instance, rate_limiter_config));
   }
+
+  return Status::Success;
 }
 
 Status
@@ -248,6 +255,9 @@ TritonModel::~TritonModel()
   // cleaned up once legacy InferenceBackend is completed replaced by
   // TritonModel.
   scheduler_.reset();
+
+  // Unregister itself from the rate limiter
+  server_->GetRateLimiter()->UnregisterModel(this);
 
   // Explicitly delete/finalize all model instances before finalizing
   // the model itself.
