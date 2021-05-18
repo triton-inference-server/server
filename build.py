@@ -241,6 +241,10 @@ def core_cmake_args(components, backends, install_dir):
     cargs.append('-DTRITON_MIN_COMPUTE_CAPABILITY={}'.format(
         FLAGS.min_compute_capability))
 
+    # If building the TFLite backend set enable MALI GPU
+    if ('tflite' in backends):
+        cargs.append('-DTRITON_ENABLE_MALI_GPU:BOOL=ON')
+
     cargs.append('-DTRITON_ENABLE_GRPC:BOOL={}'.format(
         cmake_enable('grpc' in FLAGS.endpoint)))
     cargs.append('-DTRITON_ENABLE_HTTP:BOOL={}'.format(
@@ -473,6 +477,7 @@ def dali_cmake_args():
 def tflite_cmake_args():
     return [
         '-DTRITON_ENABLE_GPU=OFF',
+        '-DTRITON_ENABLE_MALI_GPU=ON',
         '-DJOBS={}'.format(multiprocessing.cpu_count())
     ]
 

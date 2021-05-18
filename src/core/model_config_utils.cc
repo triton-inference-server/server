@@ -1227,12 +1227,12 @@ ValidateModelConfig(
                   " has kind KIND_MODEL but specifies one or more GPUs");
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
-#ifndef TRITON_ENABLE_GPU
+#if ! defined (TRITON_ENABLE_GPU) && ! defined (TRITON_ENABLE_MALI_GPU)
         return Status(
             Status::Code::INVALID_ARG,
             "instance group " + group.name() + " of model " + config.name() +
                 " has kind KIND_GPU but server does not support GPUs");
-#else
+#elif defined (TRITON_ENABLE_GPU)
         if (group.gpus().size() == 0) {
           if (supported_gpus.size() == 0) {
             return Status(
@@ -1269,7 +1269,7 @@ ValidateModelConfig(
                     " are: " + supported_gpus_str);
           }
         }
-#endif  // !TRITON_ENABLE_GPU
+#endif  // ! TRITON_ENABLE_GPU && ! TRITON_ENABLE_MALI_GPU
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         if (group.gpus().size() > 0) {
           return Status(
