@@ -1335,6 +1335,26 @@ TRITONSERVER_InferenceRequestAppendInputData(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestAppendInputDataForDevice(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id, TRITONSERVER_InstanceGroupKind device_kind,
+    int device_id)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+
+  // Madhu fixme
+  ni::InferenceRequest::Input* input;
+  RETURN_IF_STATUS_ERROR(lrequest->MutableOriginalInput(name, &input));
+  RETURN_IF_STATUS_ERROR(input->AppendDataForDevice(
+      base, byte_size, memory_type, memory_type_id, device_kind, device_id));
+
+  return nullptr;  // Success
+}
+
+
+TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestRemoveAllInputData(
     TRITONSERVER_InferenceRequest* inference_request, const char* name)
 {

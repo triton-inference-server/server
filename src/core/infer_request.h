@@ -106,6 +106,10 @@ class InferenceRequest {
     // The data for this input.
     const std::shared_ptr<Memory>& Data() const { return data_; }
 
+    // The data for this input for a specific device
+    const std::shared_ptr<Memory>& Data(
+        TRITONSERVER_InstanceGroupKind kind, int device_id) const;
+
     // Set the data for this input. Error if input already has some
     // data.
     Status SetData(const std::shared_ptr<Memory>& data);
@@ -114,6 +118,11 @@ class InferenceRequest {
     Status AppendData(
         const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
         int64_t memory_type_id);
+
+    Status AppendDataForDevice(
+        const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+        int64_t memory_type_id, TRITONSERVER_InstanceGroupKind device_kind,
+        int device_id);
 
     // Remove all existing data for the input.
     Status RemoveAllData();
@@ -137,10 +146,54 @@ class InferenceRequest {
         const size_t idx, const void** base, size_t* byte_size,
         TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const;
 
+    // Returns true if data was added for this input using the
+    // AppendDataForDevice function
+    bool DeviceSpecificData() const { return has_device_specific_data_; }
+
+    // Get the 'idx' buffer containing a contiguous chunk of bytes for
+    // the input. Return error is 'idx' refers to a buffer that does
+    // not exist. Return a pointer to the chunk in 'base' and the
+    // size of the chunk in 'byte_size'. 'memory_type' acts as
+    // both input and output. On input 'memory_type' is the buffer
+    // memory type preferred by the function caller. On return
+    // 'memory_type' gives the actual memory type of the chunk pointed
+    // to by 'base'.  'memory_type_id' acts as both input and
+    // output. On input 'memory_type_id' is the buffer memory type id
+    // preferred by the function caller.  On return 'memory_type_id'
+    // gives the actual memory type id of the chunk pointed to by
+    // 'base'.
+    Status DataBufferForDevice(
+        const size_t idx, const void** base, size_t* byte_size,
+        TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
+        TRITONSERVER_InstanceGroupKind device_kind, int device_id) const;
+
    private:
     DISALLOW_COPY_AND_ASSIGN(Input);
     friend std::ostream& operator<<(
         std::ostream& out, const InferenceRequest::Input& input);
+
+    class DeviceInfo {
+     public:
+      DeviceInfo();
+      DeviceInfo(TRITONSERVER_InstanceGroupKind kind, int id)
+          : device_kind_(kind), device_id_(id)
+      {
+      }
+      bool operator==(const DeviceInfo& device_info) const
+      {
+        return device_info.device_id_ == this->device_id_ &&
+               device_info.device_kind_ == this->device_kind_;
+      }
+      bool operator<(const DeviceInfo& device_info) const
+      {
+        return (
+            this->device_id_ < device_info.device_id_ &&
+            device_info.device_kind_ == this->device_kind_);
+      }
+
+      TRITONSERVER_InstanceGroupKind device_kind_;
+      int device_id_;
+    };
 
     std::string name_;
     inference::DataType datatype_;
@@ -149,6 +202,10 @@ class InferenceRequest {
     std::vector<int64_t> shape_with_batch_dim_;
     bool is_shape_tensor_;
     std::shared_ptr<Memory> data_;
+
+    bool has_device_specific_data_;
+    // A map of device info to input data memory
+    std::map<DeviceInfo, std::shared_ptr<Memory>> device_specific_data_;
   };
 
   // InferenceRequest

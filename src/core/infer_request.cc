@@ -750,14 +750,17 @@ InferenceRequest::ReportStatisticsWithDuration(
 //
 // Input
 //
-InferenceRequest::Input::Input() : data_(new MemoryReference) {}
+InferenceRequest::Input::Input()
+    : data_(new MemoryReference), has_device_specific_data_(false)
+{
+}
 
 InferenceRequest::Input::Input(
     const std::string& name, const inference::DataType datatype,
     const int64_t* shape, const uint64_t dim_count)
     : name_(name), datatype_(datatype),
       original_shape_(shape, shape + dim_count), is_shape_tensor_(false),
-      data_(new MemoryReference)
+      data_(new MemoryReference), has_device_specific_data_(false)
 {
 }
 
@@ -765,7 +768,8 @@ InferenceRequest::Input::Input(
     const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& shape)
     : name_(name), datatype_(datatype), original_shape_(shape),
-      is_shape_tensor_(false), data_(new MemoryReference)
+      is_shape_tensor_(false), data_(new MemoryReference),
+      has_device_specific_data_(false)
 {
 }
 
@@ -776,6 +780,18 @@ InferenceRequest::Input::SetIsShapeTensor(const bool is_shape_tensor)
   return Status::Success;
 }
 
+const std::shared_ptr<Memory>&
+InferenceRequest::Input::Data(
+    TRITONSERVER_InstanceGroupKind device_kind, int device_id) const
+{
+  DeviceInfo dev_info(device_kind, device_id);
+  auto device_data = device_specific_data_.find(dev_info);
+  if (device_data == device_specific_data_.end()) {
+    return data_;
+  }
+  return device_data->second;
+}
+
 Status
 InferenceRequest::Input::AppendData(
     const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
@@ -784,6 +800,29 @@ InferenceRequest::Input::AppendData(
   if (byte_size > 0) {
     std::static_pointer_cast<MemoryReference>(data_)->AddBuffer(
         static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
+  }
+
+  return Status::Success;
+}
+
+Status
+InferenceRequest::Input::AppendDataForDevice(
+    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id, TRITONSERVER_InstanceGroupKind device_kind,
+    int device_id)
+{
+  DeviceInfo dev_info(device_kind, device_id);
+  auto device_data = device_specific_data_.find(dev_info);
+  has_device_specific_data_ = true;
+  if (device_data == device_specific_data_.end()) {
+    device_specific_data_.insert(std::make_pair(dev_info, new MemoryReference));
+  }
+  device_data = device_specific_data_.find(dev_info);
+  if (byte_size > 0) {
+    std::static_pointer_cast<MemoryReference>(device_data->second)
+        ->AddBuffer(
+            static_cast<const char*>(base), byte_size, memory_type,
+            memory_type_id);
   }
 
   return Status::Success;
@@ -807,6 +846,7 @@ Status
 InferenceRequest::Input::RemoveAllData()
 {
   data_ = std::make_shared<MemoryReference>();
+  device_specific_data_.clear();
   return Status::Success;
 }
 
@@ -816,6 +856,24 @@ InferenceRequest::Input::DataBuffer(
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const
 {
   *base = data_->BufferAt(idx, byte_size, memory_type, memory_type_id);
+
+  return Status::Success;
+}
+
+Status
+InferenceRequest::Input::DataBufferForDevice(
+    const size_t idx, const void** base, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
+    TRITONSERVER_InstanceGroupKind device_type, int device_id) const
+{
+  DeviceInfo dev_info(device_type, device_id);
+  auto device_data = device_specific_data_.find(dev_info);
+  if (device_data == device_specific_data_.end()) {
+    *base = data_->BufferAt(idx, byte_size, memory_type, memory_type_id);
+  } else {
+    *base = device_data->second->BufferAt(
+        idx, byte_size, memory_type, memory_type_id);
+  }
 
   return Status::Success;
 }

@@ -962,9 +962,15 @@ BackendInputCollector::SetFixedSizeInputTensor(
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
-    Status status = request_input->DataBuffer(
-        idx, &src_buffer, &src_byte_size, &src_memory_type,
-        &src_memory_type_id);
+    Status status = request_input->DeviceSpecificData()
+                        ? request_input->DataBufferForDevice(
+                              idx, &src_buffer, &src_byte_size,
+                              &src_memory_type, &src_memory_type_id,
+                              collector_device_kind_, collector_device_id_)
+                        : request_input->DataBuffer(
+                              idx, &src_buffer, &src_byte_size,
+                              &src_memory_type, &src_memory_type_id);
+
     if (!status.IsOk()) {
       InferenceResponse::SendWithStatus(
           std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
@@ -1327,11 +1333,20 @@ BackendInputCollector::LaunchCopyKernel(
     for (size_t buffer_idx = 0; buffer_idx < input->DataBufferCount();
          ++buffer_idx) {
       input_ptr_buffer_host.emplace_back();
-      RETURN_IF_ERROR(input->DataBuffer(
+      if(input->DeviceSpecificData())
+      {
+        RETURN_IF_ERROR(input->DataBufferForDevice(
           buffer_idx, (const void**)(&input_ptr_buffer_host.back()),
           &buffer_byte_size, &kernel_buffer_memory_type,
-          &kernel_buffer_memory_id));
-
+          &kernel_buffer_memory_id, collector_device_kind_, collector_device_id_));
+      }
+      else
+      {
+        RETURN_IF_ERROR(input->DataBuffer(
+            buffer_idx, (const void**)(&input_ptr_buffer_host.back()),
+            &buffer_byte_size, &kernel_buffer_memory_type,
+            &kernel_buffer_memory_id));
+      }
       byte_size_offset_buffer_host.emplace_back(byte_size_offset);
       byte_size_buffer_host.emplace_back(buffer_byte_size);
       byte_size_offset += buffer_byte_size;

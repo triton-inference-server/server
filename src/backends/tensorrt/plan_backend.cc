@@ -2623,10 +2623,12 @@ PlanBackend::Context::Run(
   auto prev_input_ready_event =
       eager_batching_ ? events_[prev_set].ready_for_input_ : nullptr;
   std::vector<int64_t> input_dims{(int64_t)payload_->total_batch_size_};
+  auto device_kind = TRITONSERVER_INSTANCEGROUPKIND_GPU;
+  auto device_id = gpu_device_;
   payload_->collector_.reset(new BackendInputCollector(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
-      gather_kernel_buffer_threshold_, input_copy_stream_,
-      events_[next_set_].input_ready_, prev_input_ready_event));
+      gather_kernel_buffer_threshold_, input_copy_stream_, device_kind,
+      device_id, events_[next_set_].input_ready_, prev_input_ready_event));
   // For each input, concatenate input values from each request into
   // the corresponding binding.
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
