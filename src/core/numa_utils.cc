@@ -64,6 +64,11 @@ SetNumaThreadAffinity(
   return Status::Success;
 }
 #else
+// Use variable to make sure no NUMA related function is actually called
+// if Triton is not running with NUMA awareness. i.e. Extra docker permission
+// is needed to call the NUMA functions and this ensures backward compatibility.
+thread_local bool numa_set = false;
+
 Status
 SetNumaConfigOnThread(
     const NumaConfig& numa_config,
@@ -86,9 +91,12 @@ SetNumaMemoryPolicy(
 {
   const auto it = numa_config.find(std::make_pair(device_kind, device_id));
   if (it != numa_config.end()) {
+    numa_set = true;
     unsigned long node_mask = 1UL << it->second.first;
     if (set_mempolicy(MPOL_BIND, &node_mask, numa_max_node() + 1) != 0) {
-      return Status(Status::Code::INTERNAL, strerror(errno));
+      return Status(
+          Status::Code::INTERNAL,
+          std::string("Unable to set NUMA memory policy: ") + strerror(errno));
     }
   }
   return Status::Success;
@@ -97,9 +105,12 @@ SetNumaMemoryPolicy(
 Status
 ResetNumaMemoryPolicy()
 {
-  if (set_mempolicy(MPOL_DEFAULT, nullptr, 0) != 0) {
-    return Status(Status::Code::INTERNAL, strerror(errno));
+  if (numa_set && (set_mempolicy(MPOL_DEFAULT, nullptr, 0) != 0)) {
+    return Status(
+        Status::Code::INTERNAL,
+        std::string("Unable to reset NUMA memory policy: ") + strerror(errno));
   }
+  numa_set = false;
   return Status::Success;
 }
 
@@ -110,13 +121,17 @@ SetNumaThreadAffinity(
 {
   const auto it = numa_config.find(std::make_pair(device_kind, device_id));
   if (it != numa_config.end()) {
+    numa_set = true;
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     for (int cpu : it->second.second) {
       CPU_SET(cpu, &cpuset);
     }
     if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset) != 0) {
-      return Status(Status::Code::INTERNAL, strerror(errno));
+      return Status(
+          Status::Code::INTERNAL,
+          std::string("Unable to set NUMA thread affinity: ") +
+              strerror(errno));
     }
   }
   return Status::Success;

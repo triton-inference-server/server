@@ -106,6 +106,7 @@ TritonModelInstance::CreateInstances(
             std::string("instance_group kind ") +
                 ModelInstanceGroup_Kind_Name(group.kind()) + " not supported");
       }
+      RETURN_IF_ERROR(ResetNumaMemoryPolicy());
     }
   }
 
