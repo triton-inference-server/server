@@ -387,10 +387,11 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     if (!requests.empty()) {
-      auto sched_cb = [&requests, &pending_request_rate_limiter](
+      auto sched_cb = [this, &requests, &pending_request_rate_limiter](
                           RateLimiter::ModelInstance* mi) {
         mi->ScheduleNow(std::move(requests));
         pending_request_rate_limiter.store(false);
+        this->cv_.notify_all();
       };
       pending_request_rate_limiter.store(true);
       rate_limiter_->RequestModelInstance(sched_cb, model_);
