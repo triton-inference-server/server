@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
 
 #include <memory>
 #include <string>
+#include "model_config.pb.h"
 #include "src/core/constants.h"
 #include "src/core/metric_model_reporter.h"
-#include "model_config.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -42,14 +42,15 @@ class TritonModel;
 class TritonModelInstance {
  public:
   static Status CreateInstances(
-      TritonModel* model, const inference::ModelConfig& model_config,
-      std::vector<std::unique_ptr<TritonModelInstance>>* instances);
+      TritonModel* model, const inference::ModelConfig& model_config);
   ~TritonModelInstance();
 
   const std::string& Name() const { return name_; }
   size_t Index() const { return index_; }
   TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
   int32_t DeviceId() const { return device_id_; }
+  bool IsPassive() const { return passive_; }
+  const std::vector<std::string>& Profiles() const { return profile_names_; }
 
   TritonModel* Model() { return model_; }
   void* State() { return state_; }
@@ -62,11 +63,12 @@ class TritonModelInstance {
 
   TritonModelInstance(
       TritonModel* model, const std::string& name, const size_t index,
-      const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id);
+      const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
+      const std::vector<std::string>& profile_names, const bool passive);
   static Status CreateInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-      std::vector<std::unique_ptr<TritonModelInstance>>* instances);
+      const std::vector<std::string>& profile_names, const bool passive);
 
   // The TritonModel object that owns this instance. The instance
   // holds this as a raw pointer because the lifetime of the model is
@@ -81,6 +83,8 @@ class TritonModelInstance {
   // GPU device to be used by the instance.
   TRITONSERVER_InstanceGroupKind kind_;
   int32_t device_id_;
+  std::vector<std::string> profile_names_;
+  bool passive_;
 
   // Reporter for metrics, or nullptr if no metrics should be reported
   std::shared_ptr<MetricModelReporter> reporter_;

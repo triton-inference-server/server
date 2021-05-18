@@ -67,9 +67,10 @@ languages if there is a need.
 We provide the GRPC API as a way to generate your own client library
 for a large number of languages. By following the official GRPC
 documentation and using
-[grpc_service.proto](../src/core/grpc_service.proto) you can generate
-language bindings for all the languages supported by GRPC. We provide
-two examples of this for [Go](../src/clients/go/README.rst) and
+[grpc_service.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
+you can generate language bindings for all the languages supported by
+GRPC. We provide two examples of this for
+[Go](../src/clients/go/README.rst) and
 [Python](../src/clients/python/examples/grpc_client.py).
 
 In general the client libraries (and client examples) are meant to be
@@ -124,7 +125,7 @@ model-by-model basis.
   a relatively small increase in latency.
 
 As a general rule, batching is the most beneficial way to increase GPU
-utilization. So you should alway try enabling the [dynamic
+utilization. So you should always try enabling the [dynamic
 batcher](architecture.md#dynamic-batcher) with your models. Using
 multiple instances of a model can also provide some benefit but is
 typically most useful for models that have small compute

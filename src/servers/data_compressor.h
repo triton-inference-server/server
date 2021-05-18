@@ -40,7 +40,7 @@
 namespace nvidia { namespace inferenceserver {
 class DataCompressor {
  public:
-  enum class Type { GZIP, DEFLATE };
+  enum class Type { UNKNOWN, IDENTITY, GZIP, DEFLATE };
 
   // Specialization where the source and destination buffer are stored as
   // evbuffer
@@ -59,6 +59,11 @@ class DataCompressor {
     stream.zfree = Z_NULL;
     stream.opaque = Z_NULL;
     switch (type) {
+      case Type::UNKNOWN:
+      case Type::IDENTITY: {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG, "nothing to be compressed");
+      }
       case Type::GZIP:
         if (deflateInit2(
                 &stream, Z_DEFAULT_COMPRESSION /* level */,
@@ -157,7 +162,7 @@ class DataCompressor {
     // nothing to be decompressed
     if (evbuffer_get_length(source) == 0) {
       return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG, "nothing to be compressed");
+          TRITONSERVER_ERROR_INVALID_ARG, "nothing to be decompressed");
     }
     // Set reasonable size for each output buffer to be allocated
     size_t output_buffer_size = (source_byte_size > (1 << 20 /* 1MB */))
@@ -165,6 +170,11 @@ class DataCompressor {
                                     : (1 << 20 /* 1MB */);
 
     switch (type) {
+      case Type::UNKNOWN:
+      case Type::IDENTITY: {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG, "nothing to be decompressed");
+      }
       case Type::GZIP:
       case Type::DEFLATE:
         // zlib can automatically detect compression type

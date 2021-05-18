@@ -245,6 +245,8 @@ def core_cmake_args(components, backends, install_dir):
         cmake_enable('grpc' in FLAGS.endpoint)))
     cargs.append('-DTRITON_ENABLE_HTTP:BOOL={}'.format(
         cmake_enable('http' in FLAGS.endpoint)))
+    cargs.append('-DTRITON_ENABLE_SAGEMAKER:BOOL={}'.format(
+        cmake_enable('sagemaker' in FLAGS.endpoint)))
 
     cargs.append('-DTRITON_ENABLE_GCS:BOOL={}'.format(
         cmake_enable('gcs' in FLAGS.filesystem)))
@@ -611,7 +613,8 @@ RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
         dfile.write(df)
 
 
-def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents):
+def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents,
+                            endpoints):
     df = '''
 #
 # Multistage build.
@@ -731,6 +734,13 @@ LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
 
+    # Add feature labels for SageMaker endpoint
+    if 'sagemaker' in endpoints:
+        df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
+'''
+
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -800,7 +810,7 @@ LABEL com.nvidia.build.ref={}
         dfile.write(df)
 
 
-def container_build(images, backends, repoagents):
+def container_build(images, backends, repoagents, endpoints):
     # The cmake, build and install directories within the container.
     build_dir = os.path.join(os.sep, 'tmp', 'tritonbuild')
     install_dir = os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
@@ -982,7 +992,7 @@ def container_build(images, backends, repoagents):
                               backends, repoagents)
         else:
             create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents)
+                              backends, repoagents, endpoints)
         p = subprocess.Popen([
                 'docker', 'build', '-f',
                 os.path.join(FLAGS.build_dir, 'Dockerfile')
@@ -1160,7 +1170,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified endpoint in build. Allowed values are "grpc" and "http".'
+        'Include specified endpoint in build. Allowed values are "grpc", "http" and "sagemaker".'
     )
     parser.add_argument(
         '--filesystem',
@@ -1290,7 +1300,7 @@ if __name__ == '__main__':
     # tritonserver container holding the results of the build.
     if not FLAGS.no_container_build:
         import docker
-        container_build(images, backends, repoagents)
+        container_build(images, backends, repoagents, FLAGS.endpoint)
         sys.exit(0)
 
     # If there is a container pre-build command assume this invocation

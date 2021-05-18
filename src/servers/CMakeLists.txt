@@ -85,20 +85,30 @@ endif() # TRITON_ENABLE_GRPC
 set(HTTP_ENDPOINT_OBJECTS "")
 set(HTTP_ENDPOINT_LIBRARIES "")
 
-if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR ${TRITON_ENABLE_SAGEMAKER})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
+  list(APPEND
+    HTTP_ENDPOINT_SRCS
+    http_server.cc
+  )
+  list(APPEND
+    HTTP_ENDPOINT_HDRS
+    http_server.h
+  )
+
+  # Add header / src files based on HTTP related endpoint requested
+  if(${TRITON_ENABLE_SAGEMAKER})
     list(APPEND
       HTTP_ENDPOINT_SRCS
-      http_server.cc
-      )
+      sagemaker_server.cc
+    )
     list(APPEND
       HTTP_ENDPOINT_HDRS
-      http_server.h
-      )
-  endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
+      sagemaker_server.h
+    )
+  endif() # TRITON_ENABLE_SAGEMAKER
 
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
@@ -139,7 +149,7 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
     PRIVATE b64
     PRIVATE z
   )
-endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
+endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER
 
 #
 # tracing

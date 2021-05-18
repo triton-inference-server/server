@@ -1,5 +1,4 @@
-<!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,25 +23,26 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
--->
 
-# HTTP/REST and GRPC Protocol
+import sys
+sys.path.append("../common")
 
-This directory contains documents related to the HTTP/REST and GRPC
-protocols used by Triton. Triton uses the [KFServing community
-standard inference
-protocols](https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2)
-plus several extensions that are defined in the following documents:
+import unittest
+import numpy as np
+import infer_util as iu
+import test_util as tu
+import tritonclient.http as httpclient
 
-- [Binary tensor data extension](./extension_binary_data.md)
-- [Classification extension](./extension_classification.md)
-- [Model configuration extension](./extension_model_configuration.md)
-- [Model repository extension](./extension_model_repository.md)
-- [Schedule policy extension](./extension_schedule_policy.md)
-- [Sequence extension](./extension_sequence.md)
-- [Shared-memory extension](./extension_shared_memory.md)
-- [Statistics extension](./extension_statistics.md)
 
-For the GRPC protocol the [protobuf
-specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-is also available.
+class PassiveInstanceTest(tu.TestResultCollector):
+
+    def test_inference(self):
+        try:
+            iu.infer_exact(self, "distributed", (1, 16), 1, np.int32, np.int32,
+                           np.int32)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+
+if __name__ == '__main__':
+    unittest.main()

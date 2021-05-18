@@ -540,15 +540,15 @@ procedure that involves multiple models, such as "data preprocessing
 purpose can avoid the overhead of transferring intermediate tensors
 and minimize the number of requests that must be sent to Triton.
 
-The [ensemble scheduler](#ensemble-scheduler) must be used for
-ensemble models, regardless of the scheduler used by the models within
-the ensemble. With respect to the ensemble scheduler, an *ensemble*
-model is not an actual model. Instead, it specifies the dataflow
-between models within the ensemble as *ModelEnsembling::Step* entries
-in the model configuration. The scheduler collects the output tensors
-in each step, provides them as input tensors for other steps according
-to the specification. In spite of that, the ensemble model is still
-viewed as a single model from an external view.
+The ensemble scheduler must be used for ensemble models, regardless of
+the scheduler used by the models within the ensemble. With respect to
+the ensemble scheduler, an *ensemble* model is not an actual
+model. Instead, it specifies the dataflow between models within the
+ensemble as *ModelEnsembling::Step* entries in the model
+configuration. The scheduler collects the output tensors in each step,
+provides them as input tensors for other steps according to the
+specification. In spite of that, the ensemble model is still viewed as
+a single model from an external view.
 
 Note that the ensemble models will inherit the characteristics of the
 models involved, so the meta-data in the request header must comply
@@ -657,7 +657,7 @@ scheduler will:
    "RAW_IMAGE" in the preprocess model.
 
 2. Check models within the ensemble and send an internal request to the
-   preprocess model becuase all the input tensors required are ready.
+   preprocess model because all the input tensors required are ready.
 
 3. Recognize the completion of the internal request, collect the output
    tensor and map the content to "preprocessed_image" which is an unique name
