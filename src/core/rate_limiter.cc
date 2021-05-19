@@ -431,12 +431,7 @@ RateLimiter::ModelInstance::ScheduleNow(
 {
   executed_ = (!requests.empty());
   auto OnCompletion = [this]() { this->Release(); };
-  auto status =
-      triton_model_instance_->Schedule(std::move(requests), OnCompletion);
-  if (!status.IsOk()) {
-    LOG_ERROR << "Error encountered when scheduling request on model instance: "
-              << status.Message();
-  }
+  triton_model_instance_->Schedule(std::move(requests), OnCompletion);
 }
 
 void

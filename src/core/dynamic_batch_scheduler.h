@@ -103,7 +103,7 @@ class DynamicBatchScheduler : public Scheduler {
   std::thread scheduler_thread_;
   std::atomic<bool> scheduler_thread_exit_;
 
-  // Mutex and condvar for signalling scheduler thread
+  // Mutex and condvar for signaling scheduler thread
   std::mutex mu_;
   std::condition_variable cv_;
 
