@@ -534,7 +534,6 @@ RUN apt-get update && \
             scons \
             gcc-7 \
             g++-7 \
-            xxd \
             wget \
             zlib1g-dev \
             pkg-config \
@@ -545,9 +544,7 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker && \
     pip3 install grpcio-tools grpcio-channelz
-'''
-    if target_platform() == 'ubuntu/arm64':
-        df += '''
+
 # Install cmake 3.19 from source for ubuntu
 RUN build=1 && \
     mkdir /temp && \
@@ -558,17 +555,6 @@ RUN build=1 && \
     ./bootstrap --parallel=$(nproc) && \
     make -j$(nproc) && \
     make install
-'''
-    else:
-        df += '''
-# Server build requires recent version of CMake (FetchContent required)
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-      cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
 '''
 
     # Copy in the triton source. We remove existing contents first in

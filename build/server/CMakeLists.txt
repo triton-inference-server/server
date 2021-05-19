@@ -67,7 +67,7 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
   repo-backend
-  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+  GIT_REPOSITORY https://github.com/jishminor/backend.git
   GIT_TAG ${TRITON_BACKEND_REPO_TAG}
 )
 
