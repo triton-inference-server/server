@@ -1229,6 +1229,11 @@ S3FileSystem::ParsePath(
       *bucket = clean_path.substr(bucket_start);
       *object = "";
     }
+  } else {
+    // Erase leading '/' that is left behind in object name
+    if ((*object)[0] == '/') {
+      object->erase(0, 1);
+    }
   }
 
   if (bucket->empty()) {
