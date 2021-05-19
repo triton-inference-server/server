@@ -82,17 +82,17 @@ TritonModelInstance::CreateInstances(
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
-            0 /* device_id */, profile_names, passive));
+            0 /* device_id */, profile_names, passive, group.rate_limiter()));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           RETURN_IF_ERROR(CreateInstance(
               model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
-              device_id, profile_names, passive));
+              device_id, profile_names, passive, group.rate_limiter()));
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
-            0 /* device_id */, profile_names, passive));
+            0 /* device_id */, profile_names, passive, group.rate_limiter()));
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -109,7 +109,8 @@ Status
 TritonModelInstance::CreateInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-    const std::vector<std::string>& profile_names, const bool passive)
+    const std::vector<std::string>& profile_names, const bool passive,
+    const inference::ModelRateLimiter& rate_limiter_config)
 {
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
       model, name, index, kind, device_id, profile_names, passive));
@@ -123,14 +124,16 @@ TritonModelInstance::CreateInstance(
         model->Backend()->ModelInstanceInitFn()(triton_instance));
   }
 
-  model->AddInstance(std::move(local_instance), passive);
+  RETURN_IF_ERROR(model->AddInstance(
+      std::move(local_instance), passive, rate_limiter_config));
 
   return Status::Success;
 }
 
 Status
 TritonModelInstance::Schedule(
-    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests,
+    std::function<void()> OnCompletion)
 {
   // Use a thread local vector to avoid needing to malloc each
   // time an inference is run.
@@ -163,6 +166,8 @@ TritonModelInstance::Schedule(
     TRITONSERVER_ErrorDelete(err);
   }
 
+  OnCompletion();
+
   return Status::Success;
 }
 
@@ -171,44 +176,45 @@ TritonModelInstance::WarmUp()
 {
   LOG_ERROR << "WarmUp is not yet supported";
   return Status::Success;
-//  std::vector<TRITONBACKEND_Request*> triton_requests(1024);
-//  triton_requests.clear();
-//  for (auto& request : sample.requests_) {
-//    // Capture timestamp before run to avoid incorrect accumulation from
-//    // sequential warmup runs
-//#ifdef TRITON_ENABLE_STATS
-//    request->CaptureRequestStartNs();
-//#endif  // TRITON_ENABLE_STATS
-//    request->CaptureQueueStartNs();
-//    triton_requests.push_back(
-//        reinterpret_cast<TRITONBACKEND_Request*>(request.release()));
-//  }
-//  TRITONBACKEND_ModelInstance* triton_model_instance =
-//      reinterpret_cast<TRITONBACKEND_ModelInstance*>(this);
-//  TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
-//      backend_->ModelInstanceExecFn();
-//
-//  // If there is an error then we retain ownership of 'requests'
-//  // and must send error responses.
-//  TRITONSERVER_Error* err = inst_exec_fn(
-//      triton_model_instance, &triton_requests[0], triton_requests.size());
-//  if (err != nullptr) {
-//    Status status = Status(
-//        TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
-//        TRITONSERVER_ErrorMessage(err));
-//    for (TRITONBACKEND_Request* tr : triton_requests) {
-//      std::unique_ptr<InferenceRequest> ur(
-//          reinterpret_cast<InferenceRequest*>(tr));
-//      InferenceRequest::RespondIfError(ur, status, true /* release_requests */);
-//    }
-//
-//    TRITONSERVER_ErrorDelete(err);
-//  }
+  //  std::vector<TRITONBACKEND_Request*> triton_requests(1024);
+  //  triton_requests.clear();
+  //  for (auto& request : sample.requests_) {
+  //    // Capture timestamp before run to avoid incorrect accumulation from
+  //    // sequential warmup runs
+  //#ifdef TRITON_ENABLE_STATS
+  //    request->CaptureRequestStartNs();
+  //#endif  // TRITON_ENABLE_STATS
+  //    request->CaptureQueueStartNs();
+  //    triton_requests.push_back(
+  //        reinterpret_cast<TRITONBACKEND_Request*>(request.release()));
+  //  }
+  //  TRITONBACKEND_ModelInstance* triton_model_instance =
+  //      reinterpret_cast<TRITONBACKEND_ModelInstance*>(this);
+  //  TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
+  //      backend_->ModelInstanceExecFn();
+  //
+  //  // If there is an error then we retain ownership of 'requests'
+  //  // and must send error responses.
+  //  TRITONSERVER_Error* err = inst_exec_fn(
+  //      triton_model_instance, &triton_requests[0], triton_requests.size());
+  //  if (err != nullptr) {
+  //    Status status = Status(
+  //        TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
+  //        TRITONSERVER_ErrorMessage(err));
+  //    for (TRITONBACKEND_Request* tr : triton_requests) {
+  //      std::unique_ptr<InferenceRequest> ur(
+  //          reinterpret_cast<InferenceRequest*>(tr));
+  //      InferenceRequest::RespondIfError(ur, status, true /* release_requests
+  //      */);
+  //    }
+  //
+  //    TRITONSERVER_ErrorDelete(err);
+  //  }
 }
 
 
-//Status
-//TritonModelInstance::GenerateWarmupData()
+// Status
+// TritonModelInstance::GenerateWarmupData()
 //{
 //  samples_->clear();
 //  for (const auto& warmup_setting : model_->Config().model_warmup()) {
@@ -230,8 +236,8 @@ TritonModelInstance::WarmUp()
 //      if (element_count == -1) {
 //        return Status(
 //            Status::Code::INVALID_ARG,
-//            "warmup setting expects all variable-size dimensions are specified "
-//            "for input '" +
+//            "warmup setting expects all variable-size dimensions are specified
+//            " "for input '" +
 //                input_meta.first + "'");
 //      }
 //
@@ -248,7 +254,8 @@ TritonModelInstance::WarmUp()
 //        case inference::ModelWarmup_Input::InputDataTypeCase::kRandomData: {
 //          if (input_meta.second.data_type() ==
 //              inference::DataType::TYPE_STRING) {
-//            max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
+//            max_zero_byte_size = std::max(batch_byte_size,
+//            max_zero_byte_size);
 //          } else {
 //            max_random_byte_size =
 //                std::max(batch_byte_size, max_random_byte_size);
@@ -268,12 +275,12 @@ TritonModelInstance::WarmUp()
 //    warmup_data.zero_data_.reset(new AllocatedMemory(
 //        max_zero_byte_size, TRITONSERVER_MEMORY_CPU_PINNED /* memory_type */,
 //        0 /* memory_type_id */));
-//    char* zero_buffer = warmup_data.zero_data_->MutableBuffer(&type, &type_id);
-//    memset(zero_buffer, 0, max_zero_byte_size);
+//    char* zero_buffer = warmup_data.zero_data_->MutableBuffer(&type,
+//    &type_id); memset(zero_buffer, 0, max_zero_byte_size);
 //
 //    warmup_data.random_data_.reset(new AllocatedMemory(
-//        max_random_byte_size, TRITONSERVER_MEMORY_CPU_PINNED /* memory_type */,
-//        0 /* memory_type_id */));
+//        max_random_byte_size, TRITONSERVER_MEMORY_CPU_PINNED /* memory_type
+//        */, 0 /* memory_type_id */));
 //    char* random_buffer =
 //        warmup_data.random_data_->MutableBuffer(&type, &type_id);
 //    for (int64_t offset = 0; offset < max_random_byte_size; offset++) {
@@ -282,8 +289,8 @@ TritonModelInstance::WarmUp()
 //
 //    // Prepare the inference request for the specified sample.
 //    for (size_t cnt = 0; cnt < warmup_setting.batch_size(); cnt++) {
-//      warmup_data.requests_.emplace_back(new InferenceRequest(this, Version()));
-//      auto& lrequest = warmup_data.requests_.back();
+//      warmup_data.requests_.emplace_back(new InferenceRequest(this,
+//      Version())); auto& lrequest = warmup_data.requests_.back();
 //
 //      // Second pass to prepare original inputs.
 //      std::vector<std::shared_ptr<InferenceRequest::Input>> input_sps;
@@ -325,7 +332,8 @@ TritonModelInstance::WarmUp()
 //            } else if (((size_t)batch_byte_size) > input_data->size()) {
 //              return Status(
 //                  Status::Code::INVALID_ARG,
-//                  "warmup setting expects " + std::to_string(batch_byte_size) +
+//                  "warmup setting expects " + std::to_string(batch_byte_size)
+//                  +
 //                      " bytes, but the data "
 //                      "provided from " +
 //                      input_meta.second.input_data_file() + "only has " +
@@ -338,7 +346,8 @@ TritonModelInstance::WarmUp()
 //            return Status(
 //                Status::Code::INVALID_ARG, "warmup setting expects input '" +
 //                                               input_meta.first +
-//                                               "' to have input_data_type set");
+//                                               "' to have input_data_type
+//                                               set");
 //        }
 //
 //        const inference::ModelInput* input_config;
@@ -356,8 +365,8 @@ TritonModelInstance::WarmUp()
 //        }
 //        if (is_original_input) {
 //          RETURN_IF_ERROR(lrequest->AddOriginalInput(
-//              input_meta.first, input_meta.second.data_type(), input_meta_shape,
-//              &input));
+//              input_meta.first, input_meta.second.data_type(),
+//              input_meta_shape, &input));
 //        } else {
 //          input_sps.emplace_back();
 //          RETURN_IF_ERROR(lrequest->AddOverrideInput(
@@ -368,7 +377,8 @@ TritonModelInstance::WarmUp()
 //        }
 //        RETURN_IF_ERROR(input->AppendData(
 //            allocated_ptr, batch_byte_size,
-//            TRITONSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
+//            TRITONSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id
+//            */));
 //      }
 //
 //      RETURN_IF_ERROR(lrequest->PrepareForInference());

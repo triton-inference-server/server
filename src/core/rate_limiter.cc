@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,6 +26,8 @@
 
 #include "src/core/rate_limiter.h"
 
+#include "src/core/logging.h"
+
 namespace nvidia { namespace inferenceserver {
 
 //=========================================================================
@@ -35,122 +37,97 @@ namespace nvidia { namespace inferenceserver {
 Status
 RateLimiter::Create(
     const bool ignore_resources_and_priority,
+    const RateLimiter::ResourceMap& resource_map,
     std::unique_ptr<RateLimiter>* rate_limiter)
 {
   std::unique_ptr<RateLimiter> local_rate_limiter(
-      new RateLimiter(ignore_resources_and_priority));
+      new RateLimiter(ignore_resources_and_priority, resource_map));
   *rate_limiter = std::move(local_rate_limiter);
 
   return Status::Success;
 }
 
 Status
-RateLimiter::AddModel(
-    const std::string& model_name, const int64_t version,
-    const inference::ModelConfig& model_config)
+RateLimiter::RegisterModelInstance(
+    TritonModelInstance* triton_model_instance,
+    const RateLimiterConfig& rate_limiter_config)
 {
   {
     std::lock_guard<std::mutex> lk1(model_contexts_mtx_);
     std::lock_guard<std::mutex> lk2(model_instances_mtx_);
 
-    auto& model_context = model_contexts_[std::make_pair(model_name, version)];
-    auto& model_instances =
-        model_instances_[std::make_pair(model_name, version)];
-    {
-      // TODO: Use the TritonModel and TritonModelInstance abstractions
-      // to preventrepeating this code. The signature of RateLimiter
-      // must be modified as well when integrating the rate limiter
-      // with the server.
-      for (const auto& group : model_config.instance_group()) {
-        for (int c = 0; c < group.count(); c++) {
-          if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
-            AddModelHelper(
-                model_name, version, ResourceManager::NO_GPU_DEVICE,
-                group.rate_limiter(), &model_context, &model_instances);
-          } else {
-            for (int gpu_device : group.gpus()) {
-              AddModelHelper(
-                  model_name, version, gpu_device, group.rate_limiter(),
-                  &model_context, &model_instances);
-            }
-          }
-        }
-      }
-      model_context.SetSpecificQueueCount(model_instances.size());
+    auto& model_context = model_contexts_[triton_model_instance->Model()];
+    auto& model_instances = model_instances_[triton_model_instance->Model()];
+
+    model_instances.push_back(std::shared_ptr<ModelInstance>(new ModelInstance(
+        triton_model_instance, &model_context, rate_limiter_config,
+        [this](ModelInstance* instance) { OnStage(instance); },
+        [this](ModelInstance* instance) { OnRelease(instance); })));
+    model_context.AddAvailableInstance(model_instances.back().get());
+    model_context.AddSpecificRequestQueue();
+
+    if (!ignore_resources_and_priority_) {
+      resource_manager_->AddModelInstance(model_instances.back().get());
+      RETURN_IF_ERROR(resource_manager_->UpdateResourceLimits());
     }
   }
-
-  // To reduce the number of scans, update the resources limits
-  // once all the model instances are added.
-  resource_manager_->UpdateResourceLimits();
 
   return Status::Success;
 }
 
-void
-RateLimiter::AddModelHelper(
-    const std::string& model_name, const int64_t version, const int device_id,
-    const RateLimiterConfig& rate_limter_config, ModelContext* model_context,
-    std::vector<std::shared_ptr<ModelInstance>>* model_instances)
-{
-  int index = model_instances->size();
-  model_instances->push_back(std::shared_ptr<ModelInstance>(new ModelInstance(
-      model_name, version, model_context, index, device_id, rate_limter_config,
-      [this](ModelInstance* instance) { OnStage(instance); },
-      [this](ModelInstance* instance) { OnRelease(instance); })));
-  model_context->AddAvailableInstance(model_instances->back().get());
-  resource_manager_->AddModelInstance(model_instances->back().get());
-}
-
-
 Status
-RateLimiter::RemoveModel(const std::string& model_name, const int64_t version)
+RateLimiter::UnregisterModel(const TritonModel* model)
 {
   {
     std::lock_guard<std::mutex> lk1(model_contexts_mtx_);
     std::lock_guard<std::mutex> lk2(model_instances_mtx_);
 
-    auto& model_context = model_contexts_[std::make_pair(model_name, version)];
+    auto& model_context = model_contexts_[model];
 
     model_context.RequestRemoval();
-    for (const auto& instance :
-         model_instances_[std::make_pair(model_name, version)]) {
+    for (const auto& instance : model_instances_[model]) {
       instance->WaitForRemoval();
-      resource_manager_->RemoveModelInstance(instance.get());
+      if (!ignore_resources_and_priority_) {
+        resource_manager_->RemoveModelInstance(instance.get());
+      }
     }
 
-    model_instances_.erase(std::make_pair(model_name, version));
-    model_contexts_.erase(std::make_pair(model_name, version));
+    model_instances_.erase(model);
+    model_contexts_.erase(model);
   }
 
-  resource_manager_->UpdateResourceLimits();
+  if (!ignore_resources_and_priority_) {
+    RETURN_IF_ERROR(resource_manager_->UpdateResourceLimits());
+  }
 
   return Status::Success;
 }
 
 Status
 RateLimiter::RequestModelInstance(
-    const StandardScheduleFunc& OnSchedule, const std::string& model_name,
-    const int64_t version, const int instance_index)
+    const StandardScheduleFunc& OnSchedule, const TritonModel* model,
+    TritonModelInstance* triton_model_instance)
 {
   std::lock_guard<std::mutex> lk(model_contexts_mtx_);
 
-  auto itr = model_contexts_.find(std::make_pair(model_name, version));
+  auto itr = model_contexts_.find(model);
   if (itr == model_contexts_.end()) {
     return Status(
-        Status::Code::INTERNAL, "No added model found with name " + model_name +
-                                    " and version " + std::to_string(version));
+        Status::Code::INTERNAL,
+        "Requested model is not yet registered with rate limiter");
   }
 
   if (itr->second.isRemovalInProgress()) {
     return Status(
         Status::Code::INTERNAL,
-        "New model requests can not be made to a model that is being removed");
+        "New model requests can not be made to a model that is being "
+        "removed");
   }
 
-  itr->second.EnqueueModelInstanceRequest(OnSchedule, instance_index);
+  itr->second.EnqueueModelInstanceRequest(OnSchedule, triton_model_instance);
   if (ignore_resources_and_priority_) {
-    // Directly allocate an available model instance if not using rate limiter.
+    // Directly allocate an available model instance if not using rate
+    // limiter.
     itr->second.AllocateInstanceIfAvailable();
   } else {
     itr->second.StageInstanceIfAvailable();
@@ -159,10 +136,25 @@ RateLimiter::RequestModelInstance(
   return Status::Success;
 }
 
-RateLimiter::RateLimiter(const bool ignore_resources_and_priority)
+size_t
+RateLimiter::AvailableInstanceCount(const TritonModel* model)
+{
+  std::lock_guard<std::mutex> lk(model_contexts_mtx_);
+  size_t count = 0;
+  auto itr = model_contexts_.find(model);
+  if (itr != model_contexts_.end()) {
+    count = itr->second.AvailableInstanceCount();
+  }
+
+  return count;
+}
+
+
+RateLimiter::RateLimiter(
+    const bool ignore_resources_and_priority, const ResourceMap& resource_map)
     : ignore_resources_and_priority_(ignore_resources_and_priority)
 {
-  ResourceManager::Create(&resource_manager_);
+  ResourceManager::Create(resource_map, &resource_manager_);
 }
 
 void
@@ -178,10 +170,12 @@ RateLimiter::OnStage(ModelInstance* instance)
 void
 RateLimiter::OnRelease(ModelInstance* instance)
 {
-  auto& model_context = model_contexts_[instance->ModelIdentifier()];
+  auto& model_context = model_contexts_[instance->RawInstance()->Model()];
   model_context.AddAvailableInstance(instance);
-  resource_manager_->ReleaseResources(instance);
-  if (model_context.ContainsPendingRequests(instance->Index())) {
+  if (!ignore_resources_and_priority_) {
+    resource_manager_->ReleaseResources(instance);
+  }
+  if (model_context.ContainsPendingRequests(instance->RawInstance()->Index())) {
     if (ignore_resources_and_priority_) {
       // Directly allocate an available model instance if not using rate
       // limiter.
@@ -199,7 +193,8 @@ RateLimiter::AttemptAllocation()
   std::lock_guard<std::recursive_mutex> lk(staged_instances_mtx_);
   if (!staged_instances_.empty()) {
     ModelInstance* instance = staged_instances_.top();
-    if (resource_manager_->AllocateResources(instance)) {
+    if (ignore_resources_and_priority_ ||
+        resource_manager_->AllocateResources(instance)) {
       staged_instances_.pop();
       instance->Allocate();
     }
@@ -214,20 +209,23 @@ RateLimiter::ModelContext::ModelContext() : removal_in_progress_(false) {}
 
 Status
 RateLimiter::ModelContext::EnqueueModelInstanceRequest(
-    const StandardScheduleFunc& OnSchedule, const int instance_index)
+    const StandardScheduleFunc& OnSchedule,
+    TritonModelInstance* triton_model_instance)
 {
   std::lock_guard<std::recursive_mutex> lk(request_queue_mtx_);
 
-  if (instance_index == -1) {
+  if (triton_model_instance == nullptr) {
     generic_request_queue_.push(OnSchedule);
-  } else if ((uint32_t)instance_index < specific_request_queues_.size()) {
-    specific_request_queues_[instance_index].push(OnSchedule);
+  } else if (
+      (uint32_t)triton_model_instance->Index() <
+      specific_request_queues_.size()) {
+    specific_request_queues_[triton_model_instance->Index()].push(OnSchedule);
   } else {
     return Status(
         Status::Code::INTERNAL,
         "expected instance index between 0 and " +
             std::to_string(specific_request_queues_.size()) + ", got " +
-            std::to_string(instance_index));
+            std::to_string(triton_model_instance->Index()));
   }
 
   return Status::Success;
@@ -241,6 +239,13 @@ RateLimiter::ModelContext::AddAvailableInstance(ModelInstance* instance)
   instance->MarkAvailable();
 }
 
+size_t
+RateLimiter::ModelContext::AvailableInstanceCount()
+{
+  std::lock_guard<std::recursive_mutex> lk(avbl_instances_mtx_);
+  return avbl_instances_.size();
+}
+
 void
 RateLimiter::ModelContext::StageInstanceIfAvailable()
 {
@@ -249,12 +254,12 @@ RateLimiter::ModelContext::StageInstanceIfAvailable()
   PriorityQueue backup_queue;
   while (!avbl_instances_.empty()) {
     ModelInstance* instance = avbl_instances_.top();
-    if (!specific_request_queues_[instance->Index()].empty()) {
+    if (!specific_request_queues_[instance->RawInstance()->Index()].empty()) {
       // Prioritize the specific requests for the available model
       // instance highest priority.
       const StandardScheduleFunc func =
-          specific_request_queues_[instance->Index()].front();
-      specific_request_queues_[instance->Index()].pop();
+          specific_request_queues_[instance->RawInstance()->Index()].front();
+      specific_request_queues_[instance->RawInstance()->Index()].pop();
       instance->Stage(func);
     } else if (!generic_request_queue_.empty()) {
       // If request is for generic model instance then use the
@@ -285,12 +290,12 @@ RateLimiter::ModelContext::AllocateInstanceIfAvailable()
   PriorityQueue backup_queue;
   while (!avbl_instances_.empty()) {
     ModelInstance* instance = avbl_instances_.top();
-    if (!specific_request_queues_[instance->Index()].empty()) {
+    if (!specific_request_queues_[instance->RawInstance()->Index()].empty()) {
       // Prioritize the specific requests for the available model
       // instance highest priority.
       const StandardScheduleFunc func =
-          specific_request_queues_[instance->Index()].front();
-      specific_request_queues_[instance->Index()].pop();
+          specific_request_queues_[instance->RawInstance()->Index()].front();
+      specific_request_queues_[instance->RawInstance()->Index()].pop();
       instance->DirectAllocate(func);
     } else if (!generic_request_queue_.empty()) {
       // If request is for generic model instance then use the
@@ -314,10 +319,10 @@ RateLimiter::ModelContext::AllocateInstanceIfAvailable()
 }
 
 void
-RateLimiter::ModelContext::SetSpecificQueueCount(int queue_count)
+RateLimiter::ModelContext::AddSpecificRequestQueue()
 {
   std::lock_guard<std::recursive_mutex> lk(request_queue_mtx_);
-  specific_request_queues_.resize(queue_count);
+  specific_request_queues_.emplace_back();
 }
 
 bool
@@ -340,23 +345,16 @@ RateLimiter::ModelContext::RequestRemoval()
 //=========================================================================
 
 RateLimiter::ModelInstance::ModelInstance(
-    const std::string& model_name, const int64_t version,
-    RateLimiter::ModelContext* model_context, const uint32_t index,
-    const int gpu_device,
+    TritonModelInstance* triton_model_instance,
+    RateLimiter::ModelContext* model_context,
     const RateLimiter::RateLimiterConfig& rate_limiter_config,
     RateLimiter::StandardStageFunc OnStage,
     RateLimiter::StandardReleaseFunc OnRelease)
-    : model_name_(model_name), version_(version), model_context_(model_context),
-      index_(index), gpu_device_(gpu_device),
-      rate_limiter_config_(rate_limiter_config), OnStage_(OnStage),
-      OnRelease_(OnRelease), exec_count_(0), state_(AVAILABLE)
+    : triton_model_instance_(triton_model_instance),
+      model_context_(model_context), rate_limiter_config_(rate_limiter_config),
+      OnStage_(OnStage), OnRelease_(OnRelease), exec_count_(0),
+      state_(AVAILABLE)
 {
-}
-
-std::pair<std::string, int64_t>
-RateLimiter::ModelInstance::ModelIdentifier()
-{
-  return std::make_pair(model_name_, version_);
 }
 
 void
@@ -399,7 +397,6 @@ RateLimiter::ModelInstance::Allocate()
           "Can not allocate a model instance that is not yet staged");
     }
 
-    exec_count_++;
     state_ = ALLOCATED;
   }
 
@@ -420,7 +417,6 @@ RateLimiter::ModelInstance::DirectAllocate(StandardScheduleFunc OnSchedule)
           "Can not allocate a model instance that is not yet available");
     }
 
-    exec_count_++;
     state_ = ALLOCATED;
   }
 
@@ -430,14 +426,33 @@ RateLimiter::ModelInstance::DirectAllocate(StandardScheduleFunc OnSchedule)
 }
 
 void
+RateLimiter::ModelInstance::ScheduleNow(
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
+{
+  executed_ = (!requests.empty());
+  auto OnCompletion = [this]() { this->Release(); };
+  auto status =
+      triton_model_instance_->Schedule(std::move(requests), OnCompletion);
+  if (!status.IsOk()) {
+    LOG_ERROR << "Error encountered when scheduling request on model instance: "
+              << status.Message();
+  }
+}
+
+void
 RateLimiter::ModelInstance::Release()
 {
+  if (executed_) {
+    exec_count_++;
+  }
+
   OnRelease_(this);
 
   {
     std::lock_guard<std::mutex> lk(state_mtx_);
     if ((model_context_->isRemovalInProgress()) && (state_ == AVAILABLE) &&
-        (!model_context_->ContainsPendingRequests(index_))) {
+        (!model_context_->ContainsPendingRequests(
+            triton_model_instance_->Index()))) {
       state_ = REMOVED;
     }
   }
@@ -450,8 +465,8 @@ RateLimiter::ModelInstance::RequestRemoval()
 {
   std::lock_guard<std::mutex> lk(state_mtx_);
 
-  if ((state_ == AVAILABLE) &&
-      (!model_context_->ContainsPendingRequests(index_))) {
+  if ((state_ == AVAILABLE) && (!model_context_->ContainsPendingRequests(
+                                   triton_model_instance_->Index()))) {
     state_ = REMOVED;
   }
 }
@@ -487,10 +502,11 @@ RateLimiter::ModelInstance::ScaledPriority()
 
 Status
 RateLimiter::ResourceManager::Create(
+    const ResourceMap& resource_map,
     std::unique_ptr<ResourceManager>* resource_manager)
 {
   std::unique_ptr<ResourceManager> local_resource_manager(
-      new ResourceManager());
+      new ResourceManager(resource_map));
   *resource_manager = std::move(local_resource_manager);
   return Status::Success;
 }
@@ -506,7 +522,7 @@ RateLimiter::ResourceManager::AddModelInstance(
       (pr.first->second[GLOBAL_RESOURCE_KEY])[resource.name()] =
           resource.count();
     } else {
-      (pr.first->second[instance->DeviceId()])[resource.name()] =
+      (pr.first->second[instance->RawInstance()->DeviceId()])[resource.name()] =
           resource.count();
     }
   }
@@ -526,7 +542,7 @@ RateLimiter::ResourceManager::RemoveModelInstance(
   return Status::Success;
 }
 
-void
+Status
 RateLimiter::ResourceManager::UpdateResourceLimits()
 {
   std::lock_guard<std::mutex> lk1(max_resources_mtx_);
@@ -534,8 +550,6 @@ RateLimiter::ResourceManager::UpdateResourceLimits()
   max_resources_.clear();
   // Obtain the maximum resource across all the instances
   // and use it as the default available.
-  // TODO: Add the enhancement to provide resources via CLI
-  // Will save some cycles in obtaineing the resource limits.
   for (const auto& instance_resources : model_resources_) {
     for (const auto& resource_device_map : instance_resources.second) {
       auto ditr = max_resources_.find(resource_device_map.first);
@@ -558,6 +572,108 @@ RateLimiter::ResourceManager::UpdateResourceLimits()
       }
     }
   }
+  if (!explicit_max_resources_.empty()) {
+    RETURN_IF_ERROR(ParseAndValidateExplicitResources());
+  }
+  RETURN_IF_ERROR(ValidateMaxResources());
+
+  if (LOG_VERBOSE_IS_ON(1)) {
+    std::string resource_map_str{"\nMax Resource Map===>\n"};
+    for (const auto& ditr : max_resources_) {
+      if (!ditr.second.empty()) {
+        std::string device_str{(ditr.first == GLOBAL_RESOURCE_KEY)
+                                   ? "GLOBAL"
+                                   : std::to_string(ditr.first)};
+        resource_map_str += "\tDevice: " + device_str + "\n";
+        for (const auto& ritr : ditr.second) {
+          resource_map_str += "\t\tResource: " + ritr.first +
+                              "\t Count: " + std::to_string(ritr.second) + "\n";
+        }
+      }
+    }
+    LOG_VERBOSE(1) << resource_map_str;
+  }
+
+  return Status::Success;
+}
+
+Status
+RateLimiter::ResourceManager::ValidateMaxResources()
+{
+  for (const auto& global_resource : max_resources_[GLOBAL_RESOURCE_KEY]) {
+    for (const auto& ditr : max_resources_) {
+      if (ditr.first != GLOBAL_RESOURCE_KEY) {
+        for (const auto& ritr : ditr.second) {
+          if (global_resource.first.compare(ritr.first) == 0) {
+            return Status(
+                Status::Code::INVALID_ARG,
+                (std::string("Resource \"") + ritr.first +
+                 "\" is present as both global and device-specific resource in "
+                 "the model configuration.")
+                    .c_str());
+          }
+        }
+      }
+    }
+  }
+  return Status::Success;
+}
+
+Status
+RateLimiter::ResourceManager::ParseAndValidateExplicitResources()
+{
+  for (auto& ditr : max_resources_) {
+    for (auto& ritr : ditr.second) {
+      // If not specified explicitly, consider the resource to be unavailable.
+      size_t resource_count = 0;
+      if (ditr.first == GLOBAL_RESOURCE_KEY) {
+        // Ignore the device specification... will search for all resources in
+        // the map...
+        for (const auto& exp_ditr : explicit_max_resources_) {
+          for (const auto& exp_ritr : exp_ditr.second) {
+            if (ritr.first.compare(exp_ritr.first) == 0) {
+              if (resource_count < exp_ritr.second) {
+                resource_count = exp_ritr.second;
+              }
+            }
+          }
+        }
+      } else {
+        // Search only for the device specific or per-device resources...
+        // device-specific
+        for (const auto& exp_ritr : explicit_max_resources_[ditr.first]) {
+          if (ritr.first.compare(exp_ritr.first) == 0) {
+            if (resource_count < exp_ritr.second) {
+              resource_count = exp_ritr.second;
+            }
+          }
+        }
+        // per-device
+        for (const auto& exp_ritr :
+             explicit_max_resources_[PER_DEVICE_RESOURCE_KEY]) {
+          if (ritr.first.compare(exp_ritr.first) == 0) {
+            if (resource_count < exp_ritr.second) {
+              resource_count = exp_ritr.second;
+            }
+          }
+        }
+      }
+      if (resource_count < ritr.second) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            (std::string("Resource \"") + ritr.first + "\" is limited to " +
+             std::to_string(resource_count) +
+             " which will prevent scheduling of one or more model "
+             "instances... the minimum expected count is " +
+             std::to_string(ritr.second))
+                .c_str());
+      } else {
+        ritr.second = resource_count;
+      }
+    }
+  }
+
+  return Status::Success;
 }
 
 bool
@@ -578,7 +694,7 @@ RateLimiter::ResourceManager::AllocateResources(
         if (allocated_ditr == allocated_resources_.end()) {
           allocated_ditr =
               allocated_resources_
-                  .emplace(ditr.first, std::map<std::string, uint32_t>())
+                  .emplace(ditr.first, std::map<std::string, size_t>())
                   .first;
         }
         for (const auto& ritr : ditr.second) {
@@ -628,6 +744,9 @@ RateLimiter::ResourceManager::ReleaseResources(
   return Status::Success;
 }
 
-RateLimiter::ResourceManager::ResourceManager() {}
+RateLimiter::ResourceManager::ResourceManager(const ResourceMap& resource_map)
+    : explicit_max_resources_(resource_map)
+{
+}
 
 }}  // namespace nvidia::inferenceserver

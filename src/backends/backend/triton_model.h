@@ -71,8 +71,9 @@ class TritonModel : public InferenceBackend {
   }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
-  void AddInstance(
-      std::unique_ptr<TritonModelInstance>&& instance, const bool passive);
+  Status AddInstance(
+      std::unique_ptr<TritonModelInstance>&& instance, const bool passive,
+      const inference::ModelRateLimiter& rate_limiter_config);
 
   Status Initialize();
   Status WarmUp();
