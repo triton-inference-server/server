@@ -89,6 +89,7 @@ class DynamicBatchScheduler : public Scheduler {
   uint64_t GetDynamicBatch();
   void FinalizeResponses();
 
+  // FIXME: Use shared_ptr for model once InferenceBackend class is cleaned up.
   TritonModel* model_;
 
   // True if dynamic batching is enabled.
@@ -106,7 +107,7 @@ class DynamicBatchScheduler : public Scheduler {
   std::mutex mu_;
   std::condition_variable cv_;
 
-  RateLimiter* rate_limiter_;
+  std::shared_ptr<RateLimiter> rate_limiter_;
 
   size_t max_batch_size_;
   size_t max_preferred_batch_size_;

@@ -251,7 +251,7 @@ class InferenceServer {
   }
 
   // Return the pointer to RateLimiter object.
-  RateLimiter* GetRateLimiter() { return rate_limiter_.get(); }
+  std::shared_ptr<RateLimiter> GetRateLimiter() { return rate_limiter_; }
 
  private:
   const std::string version_;
@@ -287,7 +287,7 @@ class InferenceServer {
   // requests but that is determined by backend shared_ptr).
   std::atomic<uint64_t> inflight_request_counter_;
 
-  std::unique_ptr<RateLimiter> rate_limiter_;
+  std::shared_ptr<RateLimiter> rate_limiter_;
   std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
   std::shared_ptr<PersistentBackendManager> persist_backend_manager_;
 };

@@ -65,6 +65,23 @@ ResourceString(const std::string& name, const int count, const int device_id)
       " \"device\":" + std::to_string(device_id) + "}");
 }
 
+std::string
+RateLimitModeToString(const ni::RateLimitMode rate_limit_mode)
+{
+  std::string rl_mode_str("<unknown>");
+  switch (rate_limit_mode) {
+    case ni::RateLimitMode::RL_EXEC_COUNT: {
+      rl_mode_str = "EXEC_COUNT";
+      break;
+    }
+    case ni::RateLimitMode::RL_OFF: {
+      rl_mode_str = "OFF";
+      break;
+    }
+  }
+  return rl_mode_str;
+}
+
 //
 // TritonServerError
 //
@@ -1724,21 +1741,7 @@ TRITONSERVER_ServerNew(
   options_table.InsertRow(std::vector<std::string>{
       "strict_model_config",
       std::to_string(lserver->StrictModelConfigEnabled())});
-  std::string rate_limit;
-  auto rate_limit_mode = lserver->RateLimiterMode();
-  switch (rate_limit_mode) {
-    case ni::RateLimitMode::RL_EXEC_COUNT: {
-      rate_limit = "EXEC_COUNT";
-      break;
-    }
-    case ni::RateLimitMode::RL_OFF: {
-      rate_limit = "OFF";
-      break;
-    }
-    default: {
-      rate_limit = "<unknown>";
-    }
-  }
+  std::string rate_limit = RateLimitModeToString(lserver->RateLimiterMode());
   options_table.InsertRow(std::vector<std::string>{"rate_limit", rate_limit});
   i = 0;
   for (const auto& device_resources : lserver->RateLimiterResources()) {

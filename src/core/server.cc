@@ -150,10 +150,12 @@ InferenceServer::Init()
         buffer_manager_thread_count_));
   }
 
+  std::unique_ptr<RateLimiter> local_rate_limiter;
   bool ignore_resources_and_priority =
       (rate_limit_mode_ == RateLimitMode::RL_OFF);
   status = RateLimiter::Create(
-      ignore_resources_and_priority, rate_limit_resource_map_, &rate_limiter_);
+      ignore_resources_and_priority, rate_limit_resource_map_, &local_rate_limiter);
+  rate_limiter_ = std::move(local_rate_limiter);
 
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
