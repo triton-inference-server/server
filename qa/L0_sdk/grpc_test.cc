@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,15 +26,15 @@
 
 #include "grpc_client.h"
 
-namespace nvic = nvidia::inferenceserver::client;
+namespace tc = triton::client;
 
 int
 main(int argc, char* argv[])
 {
-  std::unique_ptr<nvic::InferenceServerGrpcClient> client;
+  std::unique_ptr<tc::InferenceServerGrpcClient> client;
   // Add a symbol from protobufs to verify correct linking
   inference::ModelConfigResponse model_config;
-  nvic::InferenceServerGrpcClient::Create(&client, "localhost:8001");
+  tc::InferenceServerGrpcClient::Create(&client, "localhost:8001");
   bool live;
   client->IsServerLive(&live);
 
