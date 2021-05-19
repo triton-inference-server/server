@@ -36,10 +36,11 @@ namespace nvidia { namespace inferenceserver {
 TritonModelInstance::TritonModelInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-    const std::vector<std::string>& profile_names, const bool passive)
+    const std::vector<std::string>& profile_names, const bool passive,
+    const int32_t numa_id)
     : model_(model), name_(name), index_(index), kind_(kind),
-      device_id_(device_id), profile_names_(profile_names), passive_(passive),
-      state_(nullptr)
+      device_id_(device_id), numa_id_(numa_id), profile_names_(profile_names),
+      passive_(passive), state_(nullptr)
 {
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
@@ -82,24 +83,24 @@ TritonModelInstance::CreateInstances(
       const bool passive = group.passive();
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         RETURN_IF_ERROR(SetNumaConfigOnThread(
-            numa_config, TRITONSERVER_INSTANCEGROUPKIND_CPU, 0));
+            numa_config, TRITONSERVER_INSTANCEGROUPKIND_CPU, group.numa_id()));
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
-            0 /* device_id */, profile_names, passive));
+            0 /* device_id */, profile_names, passive, group.numa_id()));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           RETURN_IF_ERROR(SetNumaConfigOnThread(
               numa_config, TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id));
           RETURN_IF_ERROR(CreateInstance(
               model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
-              device_id, profile_names, passive));
+              device_id, profile_names, passive, device_id /* numa_id */));
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         // Skip setting numa config on KIND_MODEL as we can't assume
         // the model placement
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
-            0 /* device_id */, profile_names, passive));
+            0 /* device_id */, profile_names, passive, group.numa_id()));
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -117,10 +118,11 @@ Status
 TritonModelInstance::CreateInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
-    const std::vector<std::string>& profile_names, const bool passive)
+    const std::vector<std::string>& profile_names, const bool passive,
+    const int32_t numa_id)
 {
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
-      model, name, index, kind, device_id, profile_names, passive));
+      model, name, index, kind, device_id, profile_names, passive, numa_id));
 
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
@@ -162,6 +164,15 @@ TRITONBACKEND_ModelInstanceDeviceId(
 {
   TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
   *device_id = ti->DeviceId();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceNumaId(
+    TRITONBACKEND_ModelInstance* instance, int32_t* numa_id)
+{
+  TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
+  *numa_id = ti->NumaId();
   return nullptr;  // success
 }
 
