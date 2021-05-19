@@ -43,14 +43,14 @@ PERF_ANALYZER=../clients/perf_analyzer
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
 
-INT_JSONDATAFILE=`pwd`/json_input_data_files/int_data.json
-INT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/int_data_diff_shape.json
-FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/float_data_with_shape.json
-STRING_JSONDATAFILE=`pwd`/json_input_data_files/string_data.json
-STRING_WITHSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/string_data_with_shape.json
-SEQ_JSONDATAFILE=`pwd`/json_input_data_files/seq_data.json
-SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
-IMAGE_JSONDATAFILE=`pwd`/json_input_data_files/image_data.json
+INT_JSONDATAFILE=`pwd`/../common/json_input_data_files/int_data.json
+INT_DIFFSHAPE_JSONDATAFILE=`pwd`/../common/json_input_data_files/int_data_diff_shape.json
+FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/../common/json_input_data_files/float_data_with_shape.json
+STRING_JSONDATAFILE=`pwd`/../common/json_input_data_files/string_data.json
+STRING_WITHSHAPE_JSONDATAFILE=`pwd`/../common/json_input_data_files/string_data_with_shape.json
+SEQ_JSONDATAFILE=`pwd`/../common/json_input_data_files/seq_data.json
+SHAPETENSORADTAFILE=`pwd`/../common/json_input_data_files/shape_tensor_data.json
+IMAGE_JSONDATAFILE=`pwd`/../common/json_input_data_files/image_data.json
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${DATADIR}"
