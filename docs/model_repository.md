@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -129,6 +129,15 @@ subsequently the bucket path.
 
 ```bash
 $ tritonserver --model-repository=s3://host:port/bucket/path/to/model/repository ...
+```
+
+By default, Triton uses HTTP to communicate with your instance of S3. If 
+your instance of S3 supports HTTPS and you wish for Triton to use the HTTPS
+protocol to communicate with it, you can specify the same in the model 
+repository path by prefixing the host name with https://.
+
+```bash
+$ tritonserver --model-repository=s3://https://host:port/bucket/path/to/model/repository ...
 ```
 
 When using S3, the credentials and default region can be passed by
