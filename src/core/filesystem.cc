@@ -1231,7 +1231,7 @@ S3FileSystem::ParsePath(
     }
   } else {
     // Erase leading '/' that is left behind in object name
-    if (object->length() > 1) {
+    if ((*object)[0] == '/') {
       object->erase(0, 1);
     }
   }
