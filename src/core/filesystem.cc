@@ -1214,9 +1214,10 @@ S3FileSystem::ParsePath(
   RETURN_IF_ERROR(CleanPath(path, &clean_path));
 
   // Get the bucket name and the object path. Return error if path is malformed
-  std::string host_name, host_port;
+  std::string protocol, host_name, host_port;
   if (!RE2::FullMatch(
-          clean_path, s3_regex_, &host_name, &host_port, bucket, object)) {
+          clean_path, s3_regex_, &protocol, &host_name, &host_port, bucket,
+          object)) {
     int bucket_start = clean_path.find("s3://") + strlen("s3://");
     int bucket_end = clean_path.find("/", bucket_start);
 
@@ -1250,6 +1251,19 @@ S3FileSystem::CleanPath(const std::string& s3_path, std::string* clean_path)
   } else {
     path = s3_path;
     *clean_path = "";
+  }
+
+  // Must handle paths with https:// or http:// prefix
+  size_t https_start = path.find("https://");
+  if (https_start != std::string::npos) {
+    path = path.substr(https_start + strlen("https://"));
+    *clean_path += "https://";
+  } else {
+    size_t http_start = path.find("http://");
+    if (http_start != std::string::npos) {
+      path = path.substr(http_start + strlen("http://"));
+      *clean_path += "http://";
+    }
   }
 
   // Remove trailing slashes
@@ -1325,7 +1339,7 @@ S3FileSystem::S3FileSystem(
           clean_path, s3_regex_, &protocol, &host_name, &host_port, &bucket,
           &object)) {
     config.endpointOverride = Aws::String(host_name + ":" + host_port);
-    if (protocol == "https") {
+    if (protocol == "https://") {
       config.scheme = Aws::Http::Scheme::HTTPS;
     } else {
       config.scheme = Aws::Http::Scheme::HTTP;
