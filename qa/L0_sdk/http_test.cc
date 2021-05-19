@@ -26,11 +26,13 @@
 
 #include "http_client.h"
 
+namespace tc = triton::client;
+
 int
 main(int argc, char* argv[])
 {
-  std::unique_ptr<triton::client::InferenceServerHttpClient> client;
-  triton::client::InferenceServerHttpClient::Create(&client, "localhost:8001");
+  std::unique_ptr<tc::InferenceServerHttpClient> client;
+  tc::InferenceServerHttpClient::Create(&client, "localhost:8001");
   bool live;
   client->IsServerLive(&live);
 

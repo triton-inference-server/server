@@ -26,13 +26,15 @@
 
 #include "grpc_client.h"
 
+namespace tc = triton::client;
+
 int
 main(int argc, char* argv[])
 {
-  std::unique_ptr<triton::client::InferenceServerGrpcClient> client;
+  std::unique_ptr<tc::InferenceServerGrpcClient> client;
   // Add a symbol from protobufs to verify correct linking
   inference::ModelConfigResponse model_config;
-  triton::client::InferenceServerGrpcClient::Create(&client, "localhost:8001");
+  tc::InferenceServerGrpcClient::Create(&client, "localhost:8001");
   bool live;
   client->IsServerLive(&live);
 
