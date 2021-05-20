@@ -73,7 +73,8 @@ TritonModelInstance::~TritonModelInstance()
 
 Status
 TritonModelInstance::CreateInstances(
-    TritonModel* model, const inference::ModelConfig& model_config)
+    TritonModel* model, const inference::ModelConfig& model_config,
+    const bool device_blocking)
 {
   bool use_backend_threads = false;
   size_t count = 0;
@@ -86,6 +87,9 @@ TritonModelInstance::CreateInstances(
       }
     }
   }
+  // This structure is used to allocate BackendThread to instances on same
+  // device for
+  std::map<uint32_t, std::shared_ptr<TritonBackendThread>> device_to_thread_map;
 
   for (const auto& group : model_config.instance_group()) {
     std::vector<std::string> profile_names;
@@ -101,19 +105,19 @@ TritonModelInstance::CreateInstances(
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
             0 /* device_id */, profile_names, passive, group.rate_limiter(),
-            use_backend_threads));
+            use_backend_threads, device_blocking, &device_to_thread_map));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           RETURN_IF_ERROR(CreateInstance(
               model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
               device_id, profile_names, passive, group.rate_limiter(),
-              use_backend_threads));
+              use_backend_threads, device_blocking, &device_to_thread_map));
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
             0 /* device_id */, profile_names, passive, group.rate_limiter(),
-            use_backend_threads));
+            use_backend_threads, device_blocking, &device_to_thread_map));
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -132,7 +136,9 @@ TritonModelInstance::CreateInstance(
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
     const std::vector<std::string>& profile_names, const bool passive,
     const inference::ModelRateLimiter& rate_limiter_config,
-    const bool use_backend_threads)
+    const bool use_backend_threads, const bool device_blocking,
+    std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
+        device_to_thread_map)
 {
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
       model, name, index, kind, device_id, profile_names, passive));
@@ -141,7 +147,8 @@ TritonModelInstance::CreateInstance(
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
 
   if (use_backend_threads) {
-    local_instance->SetBackendThread();
+    local_instance->SetBackendThread(
+        device_id, device_blocking, device_to_thread_map);
   }
 
   // Instance initialization is optional...
@@ -157,16 +164,26 @@ TritonModelInstance::CreateInstance(
 }
 
 Status
-TritonModelInstance::SetBackendThread()
+TritonModelInstance::SetBackendThread(
+    const int32_t device_id, const bool device_blocking,
+    std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
+        device_to_thread_map)
 {
-  // TODO: Currently each instance has a dedicated TritonBackendThread.
-  // For device blocking execution policy we must share the
-  // TritonBackendThread object with the instances on same device.
-  std::unique_ptr<TritonBackendThread> local_backend_thread;
-  RETURN_IF_ERROR(TritonBackendThread::CreateBackendThread(
-      Name(), 0 /* nice */, &local_backend_thread));
-  triton_backend_thread_ = std::move(local_backend_thread);
-
+  if (device_blocking) {
+    auto thread_it = device_to_thread_map->find(device_id);
+    if (thread_it != device_to_thread_map->end()) {
+      LOG_VERBOSE(1) << "Using already started backend thread for " << Name()
+                     << " on device " << device_id;
+      triton_backend_thread_ = thread_it->second;
+    }
+  }
+  if (triton_backend_thread_.get() == nullptr) {
+    std::unique_ptr<TritonBackendThread> local_backend_thread;
+    RETURN_IF_ERROR(TritonBackendThread::CreateBackendThread(
+        Name(), 0 /* nice */, device_id, &local_backend_thread));
+    triton_backend_thread_ = std::move(local_backend_thread);
+    device_to_thread_map->insert({device_id, triton_backend_thread_});
+  }
   return Status::Success;
 }
 
@@ -263,16 +280,17 @@ TritonModelInstance::WarmUpFunc()
 
 Status
 TritonModelInstance::TritonBackendThread::CreateBackendThread(
-    const std::string name, const int nice,
+    const std::string name, const int nice, const int32_t device_id,
     std::unique_ptr<TritonBackendThread>* triton_backend_thread)
 {
   TritonBackendThread* raw_triton_backend_thread =
       new TritonBackendThread(name);
   std::unique_ptr<TritonBackendThread> runner(raw_triton_backend_thread);
 
-  runner->backend_thread_ = std::thread([raw_triton_backend_thread, nice]() {
-    raw_triton_backend_thread->BackendThread(nice);
-  });
+  runner->backend_thread_ =
+      std::thread([raw_triton_backend_thread, nice, device_id]() {
+        raw_triton_backend_thread->BackendThread(nice, device_id);
+      });
 
   triton_backend_thread->reset(runner.release());
 
@@ -327,7 +345,6 @@ TritonModelInstance::TritonBackendThread::Payload::Execute(bool* should_exit)
   switch (op_type_) {
     case Operation::INFER_RUN:
       instance_->ScheduleFunc(std::move(requests_), OnCompletion_);
-
       break;
     case Operation::INIT:
       status = instance_->InitializeFunc();
@@ -350,20 +367,22 @@ TritonModelInstance::TritonBackendThread::Enqueue(
 }
 
 void
-TritonModelInstance::TritonBackendThread::BackendThread(const int nice)
+TritonModelInstance::TritonBackendThread::BackendThread(
+    const int nice, const int32_t device_id)
 {
 #ifndef _WIN32
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting backend thread for " << name_ << " at nice "
-                   << nice << "...";
+                   << nice << " on device " << device_id << "...";
   } else {
     LOG_VERBOSE(1) << "Starting backend thread for " << name_
-                   << " at default nice (requested nice " << nice
-                   << " failed)...";
+                   << " at default nice (requested nice " << nice << " failed)"
+                   << " on device " << device_id << "...";
   }
 #else
   LOG_VERBOSE(1) << "Starting backend thread for " << name_
-                 << " at default nice...";
+                 << " at default nice"
+                 << " on device " << device_id << "...";
 #endif
 
   bool should_exit = false;

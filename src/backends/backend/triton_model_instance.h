@@ -47,7 +47,8 @@ class InferenceRequest;
 class TritonModelInstance {
  public:
   static Status CreateInstances(
-      TritonModel* model, const inference::ModelConfig& model_config);
+      TritonModel* model, const inference::ModelConfig& model_config,
+      const bool device_blocking);
   ~TritonModelInstance();
 
   const std::string& Name() const { return name_; }
@@ -63,8 +64,6 @@ class TritonModelInstance {
       std::vector<std::unique_ptr<InferenceRequest>>&& requests,
       const std::function<void()>& OnCompletion);
 
-  void BackendThread(const int nice);
-
   TritonModel* Model() const { return model_; }
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
@@ -73,7 +72,7 @@ class TritonModelInstance {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModelInstance);
-
+  class TritonBackendThread;
   TritonModelInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
@@ -83,8 +82,13 @@ class TritonModelInstance {
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
       const std::vector<std::string>& profile_names, const bool passive,
       const inference::ModelRateLimiter& rate_limiter_config,
-      const bool use_backend_threads);
-  Status SetBackendThread();
+      const bool use_backend_threads, const bool device_blocking,
+      std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
+          device_to_thread_map);
+  Status SetBackendThread(
+      const int32_t device_id, const bool device_blocking,
+      std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
+          device_to_thread_map);
 
   Status InitializeFunc() { return Status::Success; }
   Status WarmUpFunc();
@@ -95,7 +99,7 @@ class TritonModelInstance {
   class TritonBackendThread {
    public:
     static Status CreateBackendThread(
-        const std::string name, const int nice,
+        const std::string name, const int nice, const int32_t device_id,
         std::unique_ptr<TritonBackendThread>* triton_backend_thread);
     ~TritonBackendThread();
 
@@ -123,7 +127,7 @@ class TritonModelInstance {
 
    private:
     TritonBackendThread(const std::string& name);
-    void BackendThread(const int nice);
+    void BackendThread(const int nice, const int32_t device_id);
 
     std::string name_;
 
