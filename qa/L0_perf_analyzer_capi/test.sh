@@ -47,10 +47,10 @@ TESTDATADIR=`pwd`/test_data
 
 SERVER_LIBRARY_PATH=/opt/tritonserver
 
-FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/../common/json_input_data_files/float_data_with_shape.json
-STRING_WITHSHAPE_JSONDATAFILE=`pwd`/../common/json_input_data_files/string_data_with_shape.json
-SEQ_JSONDATAFILE=`pwd`/../common/json_input_data_files/seq_data.json
-SHAPETENSORADTAFILE=`pwd`/../common/json_input_data_files/shape_tensor_data.json
+FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/float_data_with_shape.json
+STRING_WITHSHAPE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/string_data_with_shape.json
+SEQ_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_data.json
+SHAPETENSORADTAFILE=`pwd`/../common/perf_analyzer_input_data_json/shape_tensor_data.json
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 NON_SUPPORTED_ERROR_STRING="supported by C API"
@@ -259,6 +259,7 @@ for SHARED_MEMORY_TYPE in system cuda; do
     fi
     set -e
 done
+set +e
 
 # Testing --request-rate-range does NOT work
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 -p1000 -b 1 \
@@ -272,7 +273,7 @@ fi
 
 # Make sure server is not still running
 SERVER_PID=$(pidof tritonserver)
-if [ $? -eq 1 ]; then
+if [ $? -eq 0 ]; then
   echo -e "\n Tritonserver did not exit properly, killing \n"
   kill $SERVER_PID
   wait $SERVER_PID
