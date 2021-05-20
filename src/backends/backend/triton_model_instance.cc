@@ -87,8 +87,8 @@ TritonModelInstance::CreateInstances(
       }
     }
   }
-  // This structure is used to allocate BackendThread to instances on same
-  // device for
+  // This structure is used to allocate TritonBackendThread to instances on same
+  // device for device blocking execution policy.
   std::map<uint32_t, std::shared_ptr<TritonBackendThread>> device_to_thread_map;
 
   for (const auto& group : model_config.instance_group()) {
@@ -381,8 +381,7 @@ TritonModelInstance::TritonBackendThread::BackendThread(
   }
 #else
   LOG_VERBOSE(1) << "Starting backend thread for " << name_
-                 << " at default nice"
-                 << " on device " << device_id << "...";
+                 << " at default nice on device " << device_id << "...";
 #endif
 
   bool should_exit = false;
