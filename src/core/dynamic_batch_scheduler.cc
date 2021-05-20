@@ -197,9 +197,6 @@ DynamicBatchScheduler::SchedulerThread(
                  << model_->Name() << " at default nice...";
 #endif
 
-  // TODO: Move Initialize and WarmUp to triton_model and
-  // triton_model_instance.
-
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
   // any runner and so will not get used for execution.

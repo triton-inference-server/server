@@ -32,6 +32,7 @@
 #include <thread>
 #include "model_config.pb.h"
 #include "src/core/constants.h"
+#include "src/core/memory.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/status.h"
 #include "triton/common/sync_queue.h"
@@ -89,12 +90,14 @@ class TritonModelInstance {
       const int32_t device_id, const bool device_blocking,
       std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
           device_to_thread_map);
+  Status GenerateWarmupData();
 
   Status InitializeFunc() { return Status::Success; }
   Status WarmUpFunc();
   void ScheduleFunc(
       std::vector<std::unique_ptr<InferenceRequest>>&& requests,
       const std::function<void()>& OnCompletion);
+  void Execute(std::vector<TRITONBACKEND_Request*>& triton_requests);
 
   class TritonBackendThread {
    public:
@@ -135,8 +138,20 @@ class TritonModelInstance {
     std::atomic<bool> backend_thread_exit_;
     triton::common::SyncQueue<std::shared_ptr<Payload>> queue_;
   };
-
   std::shared_ptr<TritonBackendThread> triton_backend_thread_;
+
+  struct WarmupData {
+    WarmupData(const std::string& sample_name) : sample_name_(sample_name) {}
+
+    std::string sample_name_;
+    std::vector<std::unique_ptr<InferenceRequest>> requests_;
+
+    // Placeholder for input data
+    std::unique_ptr<AllocatedMemory> zero_data_;
+    std::unique_ptr<AllocatedMemory> random_data_;
+    std::vector<std::unique_ptr<std::string>> provided_data_;
+  };
+  std::vector<WarmupData> warmup_samples_;
 
   // The TritonModel object that owns this instance. The instance
   // holds this as a raw pointer because the lifetime of the model is
@@ -153,8 +168,6 @@ class TritonModelInstance {
   int32_t device_id_;
   std::vector<std::string> profile_names_;
   bool passive_;
-
-  // std::vector<WarmupData> samples_;
 
   std::shared_ptr<TritonBackendThread> backend_thread_;
 
