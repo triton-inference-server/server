@@ -56,12 +56,16 @@ SHELL ["cmd", "/S", "/C"]
 RUN mkdir c:\tmp
 WORKDIR /tmp
 
+RUN powershell.exe [Net.ServicePointManager]::Expect100Continue = $true; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Ssl3; Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+RUN scoop install git docker unzip
+
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
 # vsdevcmd.bat (see https://bugs.python.org/issue38989)
-RUN powershell.exe [Net.ServicePointManager]::Expect100Continue = $true; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Ssl3; Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
-RUN scoop install python git docker unzip
-RUN pip3 install --upgrade wheel setuptools docker
-RUN pip3 install grpcio-tools
+ADD https://www.python.org/ftp/python/3.8.10/python-3.8.10-amd64.exe python-3.8.10-amd64.exe
+RUN python-3.8.10-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_doc=0
+RUN mklink "c:\Program Files\Python38\python3.exe" "c:\Program Files\Python38\python.exe"
+RUN pip install --upgrade wheel setuptools docker
+RUN pip install grpcio-tools
 
 # Download and install Build Tools for Visual Studio.
 ADD https://aka.ms/vs/16/release/vs_buildtools.exe vs_buildtools.exe
