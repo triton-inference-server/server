@@ -146,6 +146,10 @@ class AllocatedMemory : public MutableMemory {
       size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
 
+  AllocatedMemory(
+      size_t byte_size, TRITONSERVER_MemoryType memory_type,
+      int64_t memory_type_id, TRITONSERVER_InstanceGroupKind kind, int numa_id);
+
   ~AllocatedMemory() override;
 };
 

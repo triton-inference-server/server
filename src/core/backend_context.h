@@ -138,11 +138,12 @@ class BackendResponder {
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const int max_batch_size, const bool pinned_enabled, cudaStream_t stream,
-      cudaEvent_t event = nullptr)
+      cudaEvent_t event, TRITONSERVER_InstanceGroupKind kind, int32_t numa_id)
       : need_sync_(false), requests_(requests), responses_(responses),
         max_batch_size_(max_batch_size), pinned_enabled_(pinned_enabled),
         use_async_cpu_copy_(triton::common::AsyncWorkQueue::WorkerCount() > 1),
-        stream_(stream), event_(event), pending_pinned_byte_size_(0)
+        stream_(stream), event_(event), pending_pinned_byte_size_(0),
+        kind_(kind), numa_id_(numa_id)
   {
   }
 
@@ -195,6 +196,8 @@ class BackendResponder {
   size_t pending_pinned_byte_size_;
   size_t pending_pinned_offset_;
   ResponsesList pending_pinned_outputs_;
+  TRITONSERVER_InstanceGroupKind kind_;
+  int32_t numa_id_;
 
   // Pinned memories that need to live over the lifetime of this
   // BackendResponder object.
@@ -229,8 +232,8 @@ class BackendInputCollector {
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const bool pinned_enabled, const size_t kernel_buffer_threshold,
-      cudaStream_t stream, cudaEvent_t event = nullptr,
-      cudaEvent_t buffer_ready_event = nullptr)
+      cudaStream_t stream, cudaEvent_t event, cudaEvent_t buffer_ready_event,
+      TRITONSERVER_InstanceGroupKind kind, int32_t numa_id)
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
         kernel_buffer_threshold_(kernel_buffer_threshold),
@@ -239,7 +242,8 @@ class BackendInputCollector {
         pending_pinned_byte_size_(0), pending_pinned_offset_(0),
         pending_copy_kernel_buffer_byte_size_(0),
         pending_copy_kernel_buffer_offset_(0),
-        pending_copy_kernel_input_buffer_counts_(0), async_task_count_(0)
+        pending_copy_kernel_input_buffer_counts_(0), async_task_count_(0),
+        kind_(kind), numa_id_(numa_id)
   {
   }
 
@@ -360,6 +364,9 @@ class BackendInputCollector {
   // FIXME use future to maintain an issue-order queue to drop task count
   triton::common::SyncQueue<bool> completion_queue_;
   size_t async_task_count_;
+
+  TRITONSERVER_InstanceGroupKind kind_;
+  int32_t numa_id_;
 };
 
 }}  // namespace nvidia::inferenceserver

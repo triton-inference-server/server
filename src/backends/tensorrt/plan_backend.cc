@@ -1405,9 +1405,10 @@ PlanBackend::Context::InitializeBatchInputBindings(
                              TRITONSERVER_MEMORY_CPU_PINNED, 0)));
       } else {
         io_binding_info.batch_input_.reset(new BatchInputData(
-            batch_input, new AllocatedMemory(
-                             io_binding_info.byte_size_,
-                             TRITONSERVER_MEMORY_CPU_PINNED, 0)));
+            batch_input,
+            new AllocatedMemory(
+                io_binding_info.byte_size_, TRITONSERVER_MEMORY_CPU_PINNED, 0,
+                TRITONSERVER_INSTANCEGROUPKIND_GPU, gpu_device_)));
       }
     }
   }
@@ -2612,7 +2613,8 @@ PlanBackend::Context::Run(
   payload_->collector_.reset(new BackendInputCollector(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
       gather_kernel_buffer_threshold_, input_copy_stream_,
-      events_[next_set_].input_ready_, prev_input_ready_event));
+      events_[next_set_].input_ready_, prev_input_ready_event,
+      TRITONSERVER_INSTANCEGROUPKIND_GPU, gpu_device_));
   // For each input, concatenate input values from each request into
   // the corresponding binding.
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
@@ -2999,7 +3001,8 @@ PlanBackend::Context::Run(
   // actual model output and then copy that output from the GPU
   payload_->responder_.reset(new BackendResponder(
       payload_->requests_, &payload_->responses_, max_batch_size_,
-      enable_pinned_output_, output_stream, events_[next_set_].output_ready_));
+      enable_pinned_output_, output_stream, events_[next_set_].output_ready_,
+      TRITONSERVER_INSTANCEGROUPKIND_GPU, gpu_device_));
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
     auto& io_binding_info =
         io_binding_infos_[next_buffer_binding_set_][io_index];

@@ -93,6 +93,61 @@ TRITONBACKEND_MemoryManagerAllocate(
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_MemoryManagerDeviceAllocate(
+    TRITONBACKEND_MemoryManager* manager, void** buffer,
+    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id,
+    const uint64_t byte_size, const TRITONSERVER_InstanceGroupKind kind,
+    const int numa_id)
+{
+  switch (memory_type) {
+    case TRITONSERVER_MEMORY_GPU:
+#ifdef TRITON_ENABLE_GPU
+    {
+      auto status = CudaMemoryManager::Alloc(buffer, byte_size, memory_type_id);
+      if (!status.IsOk()) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNAVAILABLE, status.Message().c_str());
+      }
+      break;
+    }
+#else
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "GPU memory allocation not supported");
+#endif  // TRITON_ENABLE_GPU
+
+    case TRITONSERVER_MEMORY_CPU_PINNED:
+#ifdef TRITON_ENABLE_GPU
+    {
+      TRITONSERVER_MemoryType mt = memory_type;
+      auto status = PinnedMemoryManager::Alloc(
+          buffer, byte_size, &mt, false, kind, numa_id);
+      if (!status.IsOk()) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNAVAILABLE, status.Message().c_str());
+      }
+      break;
+    }
+#else
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "Pinned memory allocation not supported");
+#endif  // TRITON_ENABLE_GPU
+
+    case TRITONSERVER_MEMORY_CPU: {
+      *buffer = malloc(byte_size);
+      if (*buffer == nullptr) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNAVAILABLE, "CPU memory allocation failed");
+      }
+      break;
+    }
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_MemoryManagerFree(
     TRITONBACKEND_MemoryManager* manager, void* buffer,
     const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
