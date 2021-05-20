@@ -263,7 +263,8 @@ DynamicBatchScheduler::SchedulerThread(
     RateLimiter::ModelInstance* allocated_instance = nullptr;
     state.store(SchedState::RETRIEVING_REQUEST);
 
-    while (state != READY_FOR_NEW_REQUESTS && !scheduler_thread_exit_.load()) {
+    while ((state != READY_FOR_NEW_REQUESTS) &&
+           (!scheduler_thread_exit_.load())) {
       switch (state.load()) {
         case SchedState::RETRIEVING_REQUEST: {
           uint64_t wait_microseconds = 0;

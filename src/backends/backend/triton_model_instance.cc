@@ -162,7 +162,6 @@ TritonModelInstance::SetBackendThread()
   // TODO: Currently each instance has a dedicated TritonBackendThread.
   // For device blocking execution policy we must share the
   // TritonBackendThread object with the instances on same device.
-  // FIXME: Get the nice value for the thread from config
   std::unique_ptr<TritonBackendThread> local_backend_thread;
   RETURN_IF_ERROR(TritonBackendThread::CreateBackendThread(
       Name(), 0 /* nice */, &local_backend_thread));
