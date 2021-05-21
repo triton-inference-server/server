@@ -157,9 +157,12 @@ TritonModel::Create(
   }
   local_model->initialized_ = true;
 
+  // FIXME: Should we use device blocking even for the sequential models?
+  const bool device_blocking = (local_model->backend_->ExecutionPolicy() == TRITONBACKEND_EXECUTION_DEVICE_BLOCKING);
+
   // Create and initialize the model instances for this model.
   RETURN_IF_ERROR(
-      TritonModelInstance::CreateInstances(raw_local_model, model_config));
+      TritonModelInstance::CreateInstances(raw_local_model, model_config, device_blocking));
 
   RETURN_IF_ERROR(
       local_model->SetConfiguredScheduler(static_cast<void*>(raw_local_model)));
