@@ -64,7 +64,7 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.11.0dev': ('21.06dev', '21.04', '1.7.1', '2021.2.200', '2021.2.200')
+    '2.11.0dev': ('21.06dev', '21.05', '1.7.1', '2021.2.200', '2021.2.200')
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
