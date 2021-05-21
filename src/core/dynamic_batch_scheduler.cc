@@ -149,10 +149,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->QueueStartNs());
 
   Status enqueue_status;
-  // If dynamic batching is not enabled the schduler thread should be woken up
-  // with every request. Each request will be enqueued on the rate limiter to
-  // be scheduled whenever conditions are met.
-  bool wake_sched_thread = (!dynamic_batching_enabled_);
+  bool wake_sched_thread = false;
   {
     std::lock_guard<std::mutex> lock(mu_);
 
@@ -162,18 +159,16 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     // 'request' and so we can't use it after this point.
     RETURN_IF_ERROR(queue_.Enqueue(request->Priority(), request));
 
-    if (dynamic_batching_enabled_) {
-      // If there are any idle model instance and the queued batch size is
-      // greater or equal to next preferred batch size, then wake scheduler
-      // thread up to service this request. We do the actual wake outside of the
-      // lock to avoid having the woken thread immediately block on the lock
-      wake_sched_thread = (rate_limiter_->AvailableInstanceCount(model_) > 0);
+    // If there are any idle model instance and the queued batch size is
+    // greater or equal to next preferred batch size, then wake scheduler
+    // thread up to service this request. We do the actual wake outside of the
+    // lock to avoid having the woken thread immediately block on the lock
+    wake_sched_thread = (rate_limiter_->AvailableInstanceCount(model_) > 0);
 
-      // We may wake up scheduler thread less often if we don't enforce equal
-      // shape within a batch, otherwise must always wake up runner to check it
-      if (enforce_equal_shape_tensors_.empty()) {
-        wake_sched_thread &= (queued_batch_size_ >= next_preferred_batch_size_);
-      }
+    // We may wake up scheduler thread less often if we don't enforce equal
+    // shape within a batch, otherwise must always wake up runner to check it
+    if (enforce_equal_shape_tensors_.empty()) {
+      wake_sched_thread &= (queued_batch_size_ >= next_preferred_batch_size_);
     }
   }
 
@@ -251,7 +246,13 @@ DynamicBatchScheduler::SchedulerThread(
 
   const uint64_t default_wait_microseconds = 500 * 1000;
 
-  std::atomic<bool> pending_request_rate_limiter{false};
+  enum SchedState {
+    RETRIEVING_REQUEST = 0,
+    REQUESTED_MODEL_INSTANCE = 1,
+    RECEIVED_MODEL_INSTANCE = 2,
+    READY_FOR_NEW_REQUESTS = 3
+  };
+  std::atomic<SchedState> state{SchedState::RETRIEVING_REQUEST};
 
   while (!scheduler_thread_exit_.load()) {
     NVTX_RANGE(nvtx_, "DynamicBatchScheduler " + model_->Name());
@@ -259,161 +260,204 @@ DynamicBatchScheduler::SchedulerThread(
     std::vector<std::unique_ptr<InferenceRequest>> requests;
     std::shared_ptr<std::vector<std::deque<std::unique_ptr<InferenceRequest>>>>
         rejected_requests;
-    uint64_t wait_microseconds = 0;
+    RateLimiter::ModelInstance* allocated_instance = nullptr;
+    state.store(SchedState::RETRIEVING_REQUEST);
 
-    // Hold the lock for as short a time as possible.
-    {
-      std::unique_lock<std::mutex> lock(mu_);
-      if (delay_cnt > 0) {
-        // Debugging/testing... wait until queue contains 'delay_cnt'
-        // items...
-        wait_microseconds = 10 * 1000;
-        if (queue_.Size() >= delay_cnt) {
-          delay_cnt = 0;
-        }
-        LOG_VERBOSE(1) << "Delaying scheduler thread for " << model_->Name()
-                       << " until " << delay_cnt
-                       << " queued requests, current total = " << queue_.Size();
-      } else if (queue_.Empty()) {
-        wait_microseconds = default_wait_microseconds;
-      } else if (dynamic_batching_enabled_) {
-        // TODO: This method of blocking the scheduler thread till last request
-        // is not scheduled by the rate limiter does not ensure the batched
-        // request is largest possible. There might be new requests queued on
-        // scheduler while rate limiter deferred the execution on model
-        // instance.
-        //
-        // For dynamic batching if there are no available model instance to
-        // allocate or there is already a request pending to be scheduled by the
-        // rate limiter then block the scheduler thread. This is done to allow
-        // dynamic batcher issue a request with largest batchsize.
-        auto ublock_scheduler = [this,
-                                 &pending_request_rate_limiter]() -> bool {
-          return !(
-              (this->rate_limiter_->AvailableInstanceCount(model_) == 0) ||
-              (pending_request_rate_limiter.load()));
-        };
-        cv_.wait(lock, ublock_scheduler);
-        // Use dynamic batching to get request(s) to execute.
-        wait_microseconds = GetDynamicBatch();
+    while ((state != READY_FOR_NEW_REQUESTS) &&
+           (!scheduler_thread_exit_.load())) {
+      switch (state.load()) {
+        case SchedState::RETRIEVING_REQUEST: {
+          uint64_t wait_microseconds = 0;
 
-        // Get requests that are rejected from searching dynamic batch.
-        queue_.ReleaseRejectedRequests(&rejected_requests);
+          // Hold the lock for as short a time as possible.
+          {
+            std::unique_lock<std::mutex> lock(mu_);
+            if (delay_cnt > 0) {
+              // Debugging/testing... wait until queue contains 'delay_cnt'
+              // items...
+              wait_microseconds = 10 * 1000;
+              if (queue_.Size() >= delay_cnt) {
+                delay_cnt = 0;
+              }
+              LOG_VERBOSE(1)
+                  << "Delaying scheduler thread for " << model_->Name()
+                  << " until " << delay_cnt
+                  << " queued requests, current total = " << queue_.Size();
+            } else if (queue_.Empty()) {
+              wait_microseconds = default_wait_microseconds;
+            } else if (dynamic_batching_enabled_) {
+              // Blocking scheduler thread till there is an instance available
+              // with rate limiter. This is done to ensure the batch size of
+              // the request is as large as possible. Unfortunately, this
+              // does not ensure RateLimiter is able to allocate the instance
+              // right away.
+              auto instance_available = [this]() -> bool {
+                return !(
+                    this->scheduler_thread_exit_.load() ||
+                    (this->rate_limiter_->AvailableInstanceCount(model_) == 0));
+              };
+              cv_.wait(lock, instance_available);
+              // Use dynamic batching to get request(s) to execute.
+              wait_microseconds = GetDynamicBatch();
 
-        // Extract batch only if there is pending batch
-        auto pending_batch_queue_cnt = queue_.PendingBatchCount();
-        if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
-          requests.reserve(pending_batch_queue_cnt);
-          for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
-            std::unique_ptr<InferenceRequest> request;
-            auto status = queue_.Dequeue(&request);
-            if (status.IsOk()) {
-              requests.emplace_back(std::move(request));
-            } else {
-              // The queue is empty which conflicts with pending batch count.
-              // Send the current batch if any and reset related variables.
-              LOG_ERROR << "Failed to retrieve request from scheduler queue: "
+              // Get requests that are rejected from searching dynamic batch.
+              queue_.ReleaseRejectedRequests(&rejected_requests);
+
+              // Extract batch only if there is pending batch
+              auto pending_batch_queue_cnt = queue_.PendingBatchCount();
+              if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
+                requests.reserve(pending_batch_queue_cnt);
+                for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
+                  std::unique_ptr<InferenceRequest> request;
+                  auto status = queue_.Dequeue(&request);
+                  if (status.IsOk()) {
+                    requests.emplace_back(std::move(request));
+                  } else {
+                    // The queue is empty which conflicts with pending batch
+                    // count. Send the current batch if any and reset related
+                    // variables.
+                    LOG_ERROR
+                        << "Failed to retrieve request from scheduler queue: "
                         << status.Message();
-              queue_.ResetCursor();
-              queued_batch_size_ = 0;
-              pending_batch_size_ = 0;
-              break;
+                    queue_.ResetCursor();
+                    queued_batch_size_ = 0;
+                    pending_batch_size_ = 0;
+                    break;
+                  }
+                }
+                if (preserve_ordering_ && !requests.empty()) {
+                  std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+                  for (auto& request : requests) {
+                    completion_queue_.emplace_back();
+                    auto queue_slot = &completion_queue_.back();
+                    request->SetResponseDelegator(
+                        [this, queue_slot](
+                            std::unique_ptr<InferenceResponse>&& response,
+                            const uint32_t flags) {
+                          {
+                            std::lock_guard<std::mutex> lock(
+                                completion_queue_mtx_);
+                            queue_slot->emplace_back(
+                                std::move(response), flags);
+                          }
+                          FinalizeResponses();
+                        });
+                  }
+                }
+
+                queued_batch_size_ -= pending_batch_size_;
+                // Set next preferred to be 0 so that enqueue thread will wake
+                // up runners when new request arrives. In the case where the
+                // queue becomes empty, this helps the runners to set up proper
+                // wait time instead of waiting for the default timer or actual
+                // next preferred batch size is reached.
+                next_preferred_batch_size_ = 0;
+
+                pending_batch_size_ = 0;
+                required_equal_inputs_.clear();
+              }
+            } else {
+              // No batching... execute next request
+              std::unique_ptr<InferenceRequest> request;
+              auto status = queue_.Dequeue(&request);
+              if (status.IsOk()) {
+                requests.emplace_back(std::move(request));
+                if (preserve_ordering_) {
+                  std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+                  for (auto& request : requests) {
+                    completion_queue_.emplace_back();
+                    auto queue_slot = &completion_queue_.back();
+                    request->SetResponseDelegator(
+                        [this, queue_slot](
+                            std::unique_ptr<InferenceResponse>&& response,
+                            const uint32_t flags) {
+                          {
+                            std::lock_guard<std::mutex> lock(
+                                completion_queue_mtx_);
+                            queue_slot->emplace_back(
+                                std::move(response), flags);
+                          }
+                          FinalizeResponses();
+                        });
+                  }
+                }
+              } else {
+                LOG_ERROR << "Failed to retrieve request from scheduler queue: "
+                          << status.Message();
+              }
             }
-          }
-          if (preserve_ordering_ && !requests.empty()) {
-            std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-            for (auto& request : requests) {
-              completion_queue_.emplace_back();
-              auto queue_slot = &completion_queue_.back();
-              request->SetResponseDelegator(
-                  [this, queue_slot](
-                      std::unique_ptr<InferenceResponse>&& response,
-                      const uint32_t flags) {
-                    {
-                      std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      queue_slot->emplace_back(std::move(response), flags);
-                    }
-                    FinalizeResponses();
-                  });
+
+            // If no requests are to be handled, wait for notification or
+            // for the specified timeout before checking the queue again.
+            if (wait_microseconds > 0) {
+              std::chrono::microseconds wait_timeout(wait_microseconds);
+              cv_.wait_for(lock, wait_timeout);
             }
           }
 
-          queued_batch_size_ -= pending_batch_size_;
-          // Set next preferred to be 0 so that enqueue thread will wake up
-          // runners when new request arrives. In the case where the queue
-          // becomes empty, this helps the runners to set up proper wait time
-          // instead of waiting for the default timer or actual next preferred
-          // batch size is reached.
-          next_preferred_batch_size_ = 0;
+          if (!requests.empty()) {
+            auto sched_cb = [this, &state, &allocated_instance](
+                                RateLimiter::ModelInstance* mi) {
+              allocated_instance = mi;
+              state.store(SchedState::RECEIVED_MODEL_INSTANCE);
+              this->cv_.notify_all();
+            };
+            state.store(SchedState::REQUESTED_MODEL_INSTANCE);
+            rate_limiter_->RequestModelInstance(sched_cb, model_);
 
-          pending_batch_size_ = 0;
-          required_equal_inputs_.clear();
+            // FIXME: This should not be valid anymore.
+            // For testing we introduce a delay here to make the
+            // "DynamicBatchScheduler destroyed by this thread" case
+            // described in the comment below reproducible.
+            if (backend_release_wait_milliseconds > 0) {
+              std::this_thread::sleep_for(
+                  std::chrono::milliseconds(backend_release_wait_milliseconds));
+            }
+          }
+
+          // Finish rejected requests if any
+          if (rejected_requests != nullptr) {
+            static Status rejected_status =
+                Status(Status::Code::UNAVAILABLE, "Request timeout expired");
+            for (auto& rejected_queue : *rejected_requests) {
+              for (auto& rejected_request : rejected_queue) {
+                InferenceRequest::RespondIfError(
+                    rejected_request, rejected_status, true);
+              }
+            }
+          }
+          break;
         }
-      } else {
-        // No batching... execute next request
-        std::unique_ptr<InferenceRequest> request;
-        auto status = queue_.Dequeue(&request);
-        if (status.IsOk()) {
-          requests.emplace_back(std::move(request));
-          if (preserve_ordering_) {
-            std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-            for (auto& request : requests) {
-              completion_queue_.emplace_back();
-              auto queue_slot = &completion_queue_.back();
-              request->SetResponseDelegator(
-                  [this, queue_slot](
-                      std::unique_ptr<InferenceResponse>&& response,
-                      const uint32_t flags) {
-                    {
-                      std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-                      queue_slot->emplace_back(std::move(response), flags);
-                    }
-                    FinalizeResponses();
-                  });
-            }
+        case SchedState::REQUESTED_MODEL_INSTANCE: {
+          // The control will reach this block iff rate limiter could not
+          // allocate a model instance to run inference. In such cases we will
+          // block the scheduler thread till a model instance is received by
+          // rate limiter.
+          // TODO: This method of blocking scheduler thread is a nice
+          // approximation to improve the possibility of forming larger batch
+          // sizes for next requests, however a better approach will be to try
+          // to grow size of the current batch itself using any newly arrived
+          // requests. Also there might be some requests in the current deferred
+          // batch that must be rejected but currently isn't.
+          {
+            std::unique_lock<std::mutex> lock(mu_);
+            auto received_instance = [this, &state]() -> bool {
+              return (!this->scheduler_thread_exit_.load()) &&
+                     (state.load() == SchedState::RECEIVED_MODEL_INSTANCE);
+            };
+            cv_.wait(lock, received_instance);
           }
-        } else {
-          LOG_ERROR << "Failed to retrieve request from scheduler queue: "
-                    << status.Message();
+          break;
         }
-      }
-
-      // If no requests are to be handled, wait for notification or
-      // for the specified timeout before checking the queue again.
-      if (wait_microseconds > 0) {
-        std::chrono::microseconds wait_timeout(wait_microseconds);
-        cv_.wait_for(lock, wait_timeout);
-      }
-    }
-
-    if (!requests.empty()) {
-      auto sched_cb = [this, &requests, &pending_request_rate_limiter](
-                          RateLimiter::ModelInstance* mi) {
-        mi->ScheduleNow(std::move(requests));
-        pending_request_rate_limiter.store(false);
-        this->cv_.notify_all();
-      };
-      pending_request_rate_limiter.store(true);
-      rate_limiter_->RequestModelInstance(sched_cb, model_);
-
-      // FIXME: This should not be valid anymore.
-      // For testing we introduce a delay here to make the
-      // "DynamicBatchScheduler destroyed by this thread" case
-      // described in the comment below reproducible.
-      if (backend_release_wait_milliseconds > 0) {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(backend_release_wait_milliseconds));
-      }
-    }
-
-    // Finish rejected requests if any
-    if (rejected_requests != nullptr) {
-      static Status rejected_status =
-          Status(Status::Code::UNAVAILABLE, "Request timeout expired");
-      for (auto& rejected_queue : *rejected_requests) {
-        for (auto& rejected_request : rejected_queue) {
-          InferenceRequest::RespondIfError(
-              rejected_request, rejected_status, true);
+        case SchedState::RECEIVED_MODEL_INSTANCE: {
+          // Schedule the request on allocated model instance
+          allocated_instance->ScheduleNow(std::move(requests));
+          allocated_instance = nullptr;
+          state.store(SchedState::READY_FOR_NEW_REQUESTS);
+          break;
+        }
+        case SchedState::READY_FOR_NEW_REQUESTS: {
+          break;
         }
       }
     }

@@ -25,12 +25,16 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <functional>
+#include <future>
 #include <memory>
 #include <string>
+#include <thread>
 #include "model_config.pb.h"
 #include "src/core/constants.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/status.h"
+#include "triton/common/sync_queue.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -53,13 +57,13 @@ class TritonModelInstance {
   bool IsPassive() const { return passive_; }
   const std::vector<std::string>& Profiles() const { return profile_names_; }
 
-  Status Initialize() { return Status::Success; }
-
+  Status Initialize();
   Status WarmUp();
-
-  Status Schedule(
+  void Schedule(
       std::vector<std::unique_ptr<InferenceRequest>>&& requests,
-      std::function<void()> OnCompletion);
+      const std::function<void()>& OnCompletion);
+
+  void BackendThread(const int nice);
 
   TritonModel* Model() const { return model_; }
   void* State() { return state_; }
@@ -78,7 +82,57 @@ class TritonModelInstance {
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
       const std::vector<std::string>& profile_names, const bool passive,
-      const inference::ModelRateLimiter& rate_limiter_config);
+      const inference::ModelRateLimiter& rate_limiter_config,
+      const bool use_backend_threads);
+  Status SetBackendThread();
+
+  Status InitializeFunc() { return Status::Success; }
+  Status WarmUpFunc();
+  void ScheduleFunc(
+      std::vector<std::unique_ptr<InferenceRequest>>&& requests,
+      const std::function<void()>& OnCompletion);
+
+  class TritonBackendThread {
+   public:
+    static Status CreateBackendThread(
+        const std::string name, const int nice,
+        std::unique_ptr<TritonBackendThread>* triton_backend_thread);
+    ~TritonBackendThread();
+
+    enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
+    class Payload {
+     public:
+      Payload(const Operation op_type, TritonModelInstance* instance);
+      Payload(
+          const Operation op_type, TritonModelInstance* instance,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests,
+          std::function<void()> OnCompletion);
+
+      void Execute(bool* should_exit);
+      Status Wait();
+
+     private:
+      Operation op_type_;
+      TritonModelInstance* instance_;
+      std::vector<std::unique_ptr<InferenceRequest>> requests_;
+      std::function<void()> OnCompletion_;
+      std::promise<Status> status_;
+    };
+
+    void Enqueue(std::shared_ptr<Payload> payload);
+
+   private:
+    TritonBackendThread(const std::string& name);
+    void BackendThread(const int nice);
+
+    std::string name_;
+
+    std::thread backend_thread_;
+    std::atomic<bool> backend_thread_exit_;
+    triton::common::SyncQueue<std::shared_ptr<Payload>> queue_;
+  };
+
+  std::shared_ptr<TritonBackendThread> triton_backend_thread_;
 
   // The TritonModel object that owns this instance. The instance
   // holds this as a raw pointer because the lifetime of the model is
@@ -97,6 +151,8 @@ class TritonModelInstance {
   bool passive_;
 
   // std::vector<WarmupData> samples_;
+
+  std::shared_ptr<TritonBackendThread> backend_thread_;
 
   // Reporter for metrics, or nullptr if no metrics should be reported
   std::shared_ptr<MetricModelReporter> reporter_;
