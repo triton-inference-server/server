@@ -59,8 +59,7 @@ To create an image containing the minimal possible Triton use the
 following multi-stage Dockerfile. As mentioned above the amount of
 customization currently available is limited. As a result the minimum
 Triton still contains both HTTP/REST and GRPC endpoints; S3, GCS and
-Azure Storage filesystem support; and the TensorRT and legacy custom
-backends.
+Azure Storage filesystem support; and the TensorRT backend.
 
 ```
 FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full
