@@ -489,7 +489,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
-# python3-pip is needed by python backend
+# python3-pip and libarchive-dev is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -513,6 +513,7 @@ RUN apt-get update && \
             unzip \
             wget \
             zlib1g-dev \
+            libarchive-dev \
             pkg-config \
             uuid-dev && \
     rm -rf /var/lib/apt/lists/*

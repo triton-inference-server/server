@@ -285,7 +285,6 @@ cp ../python_models/fini_error/config.pbtxt ./models/fini_error/
 
 set +e
 prev_num_pages=`get_shm_pages`
-echo "Hi"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
