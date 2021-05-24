@@ -28,10 +28,10 @@
 #include <NvInfer.h>
 #include <cuda_runtime_api.h>
 #include <thread>
+#include "model_config.pb.h"
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/metric_model_reporter.h"
-#include "model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 #include "triton/common/sync_queue.h"
@@ -60,7 +60,7 @@ class PlanBackend : public InferenceBackend {
       const std::unordered_map<std::string, std::vector<char>>& models);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::vector<char>& models,
+      const int dla_core_id, const std::vector<char>& models,
       const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
       const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue);
 
@@ -430,9 +430,16 @@ class PlanBackend : public InferenceBackend {
     bool eager_batching_;
   };
 
-  // CUDA engine shared across all model instances on the same device.
+  // CUDA engine shared across all model instances on the same GPU.
   std::map<int, std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
-      device_engines_;
+      gpu_engines_;
+
+  // CUDA engine shared across all model instances using the same DLA core on
+  // same GPU.
+  std::map<
+      std::pair<int, int>,
+      std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
+      dla_engines_;
 
   // vector for storing available context queue associated with a runner
   std::vector<std::shared_ptr<triton::common::SyncQueue<size_t>>>

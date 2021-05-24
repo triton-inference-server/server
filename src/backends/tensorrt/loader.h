@@ -41,9 +41,11 @@ namespace nvidia { namespace inferenceserver {
 /// to create
 /// \param engine Returns the ICudaEngine object, or nullptr if failed
 /// to create
+/// \param dla_core_id The DLA core to use for this runtime. Defaults to -1
+/// and does not use DLA when set to -1.
 /// \return Error status.
 Status LoadPlan(
     const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
-    nvinfer1::ICudaEngine** engine);
+    nvinfer1::ICudaEngine** engine, int32_t dla_core_id = -1);
 
 }}  // namespace nvidia::inferenceserver

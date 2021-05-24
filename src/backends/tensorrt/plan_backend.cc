@@ -290,6 +290,19 @@ PlanBackend::CreateExecutionContexts(
               " must be KIND_GPU and must specify at least one GPU id");
     }
 
+    // Use DLA core id or GPU id from config based on instance group type
+    int32_t dla_core_id = -1;
+    uint32_t secondary_device_count = group.secondary_devices().size();
+    if (secondary_device_count != 0) {
+      if (secondary_device_count != 1) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            group.name() + " of model " + Name() +
+                " must have either zero or or one secondary devices");
+      }
+      dla_core_id = group.secondary_devices().at(0).device_id();
+    }
+
     for (int c = 0; c < group.count(); c++) {
       for (int gpu_device : group.gpus()) {
         size_t runner_idx = 0;
@@ -312,13 +325,20 @@ PlanBackend::CreateExecutionContexts(
           }
           runner_idx = it->second;
         }
+
         // The last entry in contexts_ is the newly created context
         auto& queue = available_context_queue_[runner_idx];
         queue->Put(contexts_.size());
 
-        const std::string instance_name = group.name() + "_" +
-                                          std::to_string(c) + "_gpu" +
-                                          std::to_string(gpu_device);
+        std::string instance_name;
+        if (dla_core_id != -1) {
+          instance_name = group.name() + "_" + std::to_string(c) + "_gpu" +
+                          std::to_string(gpu_device) + "_dla" +
+                          std::to_string(dla_core_id);
+        } else {
+          instance_name = group.name() + "_" + std::to_string(c) + "_gpu" +
+                          std::to_string(gpu_device);
+        }
 
         // Determine the model file to use for device compute capability
         cudaDeviceProp cuprops;
@@ -347,11 +367,11 @@ PlanBackend::CreateExecutionContexts(
         }
 
         // Create shared engine for the device if haven't tried so.
-        auto eit = device_engines_.find(gpu_device);
-        if (eit == device_engines_.end()) {
-          eit = device_engines_
-                    .emplace(gpu_device, std::make_pair(nullptr, nullptr))
-                    .first;
+        auto eit = gpu_engines_.find(gpu_device);
+        if (eit == gpu_engines_.end()) {
+          eit =
+              gpu_engines_.emplace(gpu_device, std::make_pair(nullptr, nullptr))
+                  .first;
 
           // Create a CUDA engine shared by all contexts
           cuerr = cudaSetDevice(gpu_device);
@@ -361,24 +381,45 @@ PlanBackend::CreateExecutionContexts(
                                             ": " + cudaGetErrorString(cuerr));
           }
 
-          RETURN_IF_ERROR(LoadPlan(
-              mn_itr->second, &eit->second.first, &eit->second.second));
+          nvinfer1::ICudaEngine* shared_engine = nullptr;
+          if (dla_core_id != -1) {
+            auto device_pair = std::make_pair(gpu_device, dla_core_id);
+            auto dla_eit = dla_engines_.find(device_pair);
+            if (dla_eit == dla_engines_.end()) {
+              dla_eit =
+                  dla_engines_
+                      .emplace(device_pair, std::make_pair(nullptr, nullptr))
+                      .first;
+            }
+
+            RETURN_IF_ERROR(LoadPlan(
+                mn_itr->second, &dla_eit->second.first,
+                &dla_eit->second.second));
+            shared_engine = dla_eit->second.second;
+          } else {
+            RETURN_IF_ERROR(LoadPlan(
+                mn_itr->second, &eit->second.first, &eit->second.second));
+            shared_engine = eit->second.second;
+          }
+
           // Validate whether the engine can be shared
           bool is_dynamic = false;
-          for (int idx = 0; idx < eit->second.second->getNbBindings(); idx++) {
-            auto dims = eit->second.second->getBindingDimensions(idx);
+          for (int idx = 0; idx < shared_engine->getNbBindings(); idx++) {
+            auto dims = shared_engine->getBindingDimensions(idx);
+
             // Detect whether dynamic or not
             if (ContainsWildcard(dims)) {
               is_dynamic = true;
               break;
             }
           }
+
           // Model with dynamic shapes can't share engine, set to engine to
           // 'nullptr' as hint, but keeping runtime as it can be used repeatedly
           if (is_dynamic) {
-            if (eit->second.second != nullptr) {
-              eit->second.second->destroy();
-              eit->second.second = nullptr;
+            if (shared_engine != nullptr) {
+              shared_engine->destroy();
+              shared_engine = nullptr;
             }
           }
         }
@@ -386,7 +427,8 @@ PlanBackend::CreateExecutionContexts(
         LOG_INFO << "Creating instance " << instance_name << " on GPU "
                  << gpu_device << " (" << cc << ") using " << cc_model_filename;
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, gpu_device, mn_itr->second, group.profile(), queue));
+            instance_name, gpu_device, dla_core_id, mn_itr->second,
+            group.profile(), queue));
       }
     }
   }
@@ -551,7 +593,7 @@ PlanBackend::Context::InitOptimizationProfiles(
 Status
 PlanBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
-    const std::vector<char>& model,
+    const int dla_core_id, const std::vector<char>& model,
     const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
     const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue)
 {
@@ -611,7 +653,7 @@ PlanBackend::CreateExecutionContext(
   RETURN_IF_ERROR(
       context->InitEventSet(Config().optimization().cuda().busy_wait_events()));
 
-  auto eit = device_engines_.find(gpu_device);
+  auto eit = gpu_engines_.find(gpu_device);
   if (eit->second.second == nullptr) {
     context->is_shared_engine_ = false;
     RETURN_IF_ERROR(LoadPlan(model, &eit->second.first, &context->engine_));
@@ -2212,8 +2254,22 @@ PlanBackend::~PlanBackend()
   // Must destory all TensorRT contexts before engine
   contexts_.clear();
 
-  for (auto& device_engine : device_engines_) {
+  for (auto& device_engine : gpu_engines_) {
     cudaSetDevice(device_engine.first);
+    auto& runtime = device_engine.second.first;
+    auto& engine = device_engine.second.second;
+    if (engine != nullptr) {
+      engine->destroy();
+      engine = nullptr;
+    }
+    if (runtime != nullptr) {
+      runtime->destroy();
+      runtime = nullptr;
+    }
+  }
+
+  for (auto& device_engine : dla_engines_) {
+    cudaSetDevice(device_engine.first.first);
     auto& runtime = device_engine.second.first;
     auto& engine = device_engine.second.second;
     if (engine != nullptr) {
