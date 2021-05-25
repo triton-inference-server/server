@@ -69,7 +69,7 @@ Triton and so does not appear in /opt/tritonserver/backends).
 The first step for any build is to checkout the
 [triton-inference-server/server](https://github.com/triton-inference-server/server)
 repo branch for the release you are interested in building (or the
-master branch to build from the development branch). Then run build.py
+master/main branch to build from the development branch). Then run build.py
 as described below. The build.py script performs these steps when
 building with Docker.
 
@@ -129,7 +129,7 @@ without Docker.
 The first step for any build is to checkout the
 [triton-inference-server/server](https://github.com/triton-inference-server/server)
 repo branch for the release you are interested in building (or the
-master branch to build from the development branch). Then run build.py
+master/main branch to build from the development branch). Then run build.py
 as described below. The build.py script will perform the following
 steps (note that if you are building with Docker that these same steps
 will be performed during the Docker build within the

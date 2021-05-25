@@ -221,7 +221,7 @@ configuration file.
 When using --strict-model-config=false you can see the model
 configuration that was generated for a model by using the [model
 configuration
-endpoint](https://github.com/triton-inference-server/server/blob/master/docs/protocol/extension_model_configuration.md). The
+endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md). The
 easiest way to do this is to use a utility like *curl*:
 
 ```bash
