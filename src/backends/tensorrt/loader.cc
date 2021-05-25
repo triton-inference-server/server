@@ -53,7 +53,7 @@ LoadPlan(
       (*runtime)->setDLACore(dla_core_id);
     } else {
       return Status(
-          Status::Code::INTERNAL,
+          Status::Code::INVALID_ARG,
           ("unable to create TensorRT runtime with DLA Core ID: " +
            std::to_string(dla_core_id))
               .c_str());

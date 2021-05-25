@@ -376,11 +376,12 @@ PlanBackend::CreateExecutionContexts(
         }
 
         // Create shared engine for the device if haven't tried so.
-        auto eit = gpu_engines_.find(gpu_device);
-        if (eit == gpu_engines_.end()) {
-          eit =
-              gpu_engines_.emplace(gpu_device, std::make_pair(nullptr, nullptr))
-                  .first;
+        auto device_pair = std::make_pair(gpu_device, dla_core_id);
+        auto eit = device_engines_.find(device_pair);
+        if (eit == device_engines_.end()) {
+          eit = device_engines_
+                    .emplace(device_pair, std::make_pair(nullptr, nullptr))
+                    .first;
 
           // Create a CUDA engine shared by all contexts
           cuerr = cudaSetDevice(gpu_device);
@@ -390,31 +391,13 @@ PlanBackend::CreateExecutionContexts(
                                             ": " + cudaGetErrorString(cuerr));
           }
 
-          nvinfer1::ICudaEngine* shared_engine = nullptr;
-          if (dla_core_id != -1) {
-            auto device_pair = std::make_pair(gpu_device, dla_core_id);
-            auto dla_eit = dla_engines_.find(device_pair);
-            if (dla_eit == dla_engines_.end()) {
-              dla_eit =
-                  dla_engines_
-                      .emplace(device_pair, std::make_pair(nullptr, nullptr))
-                      .first;
-            }
-
-            RETURN_IF_ERROR(LoadPlan(
-                mn_itr->second, &dla_eit->second.first, &dla_eit->second.second,
-                dla_core_id));
-            shared_engine = dla_eit->second.second;
-          } else {
-            RETURN_IF_ERROR(LoadPlan(
-                mn_itr->second, &eit->second.first, &eit->second.second));
-            shared_engine = eit->second.second;
-          }
+          RETURN_IF_ERROR(LoadPlan(
+              mn_itr->second, &eit->second.first, &eit->second.second));
 
           // Validate whether the engine can be shared
           bool is_dynamic = false;
-          for (int idx = 0; idx < shared_engine->getNbBindings(); idx++) {
-            auto dims = shared_engine->getBindingDimensions(idx);
+          for (int idx = 0; idx < eit->second.second->getNbBindings(); idx++) {
+            auto dims = eit->second.second->getBindingDimensions(idx);
 
             // Detect whether dynamic or not
             if (ContainsWildcard(dims)) {
@@ -426,9 +409,9 @@ PlanBackend::CreateExecutionContexts(
           // Model with dynamic shapes can't share engine, set to engine to
           // 'nullptr' as hint, but keeping runtime as it can be used repeatedly
           if (is_dynamic) {
-            if (shared_engine != nullptr) {
-              shared_engine->destroy();
-              shared_engine = nullptr;
+            if (eit->second.second != nullptr) {
+              eit->second.second->destroy();
+              eit->second.second = nullptr;
             }
           }
         }
@@ -662,7 +645,8 @@ PlanBackend::CreateExecutionContext(
   RETURN_IF_ERROR(
       context->InitEventSet(Config().optimization().cuda().busy_wait_events()));
 
-  auto eit = gpu_engines_.find(gpu_device);
+  auto device_pair = std::make_pair(gpu_device, dla_core_id);
+  auto eit = device_engines_.find(device_pair);
   if (eit->second.second == nullptr) {
     context->is_shared_engine_ = false;
     RETURN_IF_ERROR(LoadPlan(model, &eit->second.first, &context->engine_));
@@ -2263,21 +2247,7 @@ PlanBackend::~PlanBackend()
   // Must destory all TensorRT contexts before engine
   contexts_.clear();
 
-  for (auto& device_engine : gpu_engines_) {
-    cudaSetDevice(device_engine.first);
-    auto& runtime = device_engine.second.first;
-    auto& engine = device_engine.second.second;
-    if (engine != nullptr) {
-      engine->destroy();
-      engine = nullptr;
-    }
-    if (runtime != nullptr) {
-      runtime->destroy();
-      runtime = nullptr;
-    }
-  }
-
-  for (auto& device_engine : dla_engines_) {
+  for (auto& device_engine : device_engines_) {
     cudaSetDevice(device_engine.first.first);
     auto& runtime = device_engine.second.first;
     auto& engine = device_engine.second.second;

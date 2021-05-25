@@ -430,16 +430,12 @@ class PlanBackend : public InferenceBackend {
     bool eager_batching_;
   };
 
-  // CUDA engine shared across all model instances on the same GPU.
-  std::map<int, std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
-      gpu_engines_;
-
   // CUDA engine shared across all model instances using the same DLA core on
   // same GPU.
   std::map<
       std::pair<int, int>,
       std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
-      dla_engines_;
+      device_engines_;
 
   // vector for storing available context queue associated with a runner
   std::vector<std::shared_ptr<triton::common::SyncQueue<size_t>>>
