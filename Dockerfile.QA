@@ -286,10 +286,17 @@ RUN GO111MODULE=off go get github.com/golang/protobuf/protoc-gen-go && \
     GO111MODULE=off go get google.golang.org/grpc
 
 # DCGM needed for GPU Metrics
-ARG DCGM_VERSION=2.0.13
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
-    dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb
-
+# Install DCGM
+# Note: The current version is missing header files so we applied a patch to fix the build. This patch should be removed
+# after DCGM team fixes this issue in their new release.
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
+    && sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
+    && sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
+    && sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+RUN apt-get update \
+    && apt-get install -y datacenter-gpu-manager
+RUN cp /workspace/tools/dcgm_api_export.h /usr/include/
+  
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
 # user.

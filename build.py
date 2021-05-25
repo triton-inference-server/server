@@ -537,9 +537,15 @@ RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
 
 # Install DCGM
-ARG DCGM_VERSION=2.0.13
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
-    dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb
+# Note: The current version is missing header files so we applied a patch to fix the build. This patch should be removed
+# after DCGM team fixes this issue in their new release.
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
+    && sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
+    && sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
+    && sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+RUN apt-get update \
+    && apt-get install -y datacenter-gpu-manager
+  
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
@@ -571,6 +577,15 @@ ENTRYPOINT []
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 '''
+    if target_platform() != 'windows':
+        df += '''
+# Install DCGM - patch
+# Note: The current version is missing header files so we applied a patch to fix the build. This patch should be removed
+# after DCGM team fixes this issue in their new release.
+RUN cp /workspace/tools/dcgm_api_export.h /usr/include/
+'''
+
+
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)

@@ -253,19 +253,11 @@ Metrics::InitializeDcgmMetrics()
 
   // create a gpu group
   char groupName[16] = "mygroup";
-  dcgmReturn_t dcgmerr =
-      dcgmGroupCreate(handle, DCGM_GROUP_DEFAULT, groupName, &groupId_);
+  dcgmerr =
+      dcgmGroupCreate(dcgm_handle_, DCGM_GROUP_DEFAULT, groupName, &groupId_);
   if (dcgmerr != DCGM_ST_OK) {
     LOG_WARNING << "error, cannot cannot make group. Err:"
                 << errorString(dcgmerr);
-  }
-  dcgmGroupInfo_t info;
-  info.version = dcgmGroupInfo_version2;
-  dcgmerr = dcgmGroupGetInfo(handle, groupId_, &info);
-  if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "error, cannot get group info " << errorString(dcgmerr);
-  } else {
-    LOG_INFO << "created group:" << groupId_
   }
 
   // Periodically send the DCGM metrics...
@@ -273,7 +265,7 @@ Metrics::InitializeDcgmMetrics()
     dcgmHandle_t handle = dcgm_handle_;
     dcgmGpuGrp_t groupId = groupId_;
     dcgm_thread_exit_.store(false);
-    dcgm_thread_.reset(new std::thread([this, available_gpu_ids, handle] {
+    dcgm_thread_.reset(new std::thread([this, available_gpu_ids, handle, groupId] {
       int available_gpu_count = available_gpu_ids.size();
       // Stop attempting metrics if they fail multiple consecutive
       // times for a device.
@@ -299,7 +291,8 @@ Metrics::InitializeDcgmMetrics()
       };
 
       char fieldName[16] = "myfields";
-      dcgmerr = dcgmFieldGroupCreate(
+      dcgmFieldGrp_t fieldGroupId;
+      dcgmReturn_t dcgmerr = dcgmFieldGroupCreate(
           handle, field_count, &fields[0], fieldName, &fieldGroupId);
       if (dcgmerr != DCGM_ST_OK) {
         LOG_WARNING << "error, cannot cannot make field group. Err:"
@@ -371,8 +364,6 @@ Metrics::InitializeDcgmMetrics()
                   }
                   gpu_energy_consumption_[didx]->Increment(
                       (double)(energy - last_energy[didx]) * 0.001);
-                  LOG_WARNING << "energy consumption:"
-                              << (double)(energy - last_energy[didx]) * 0.001;
                   last_energy[didx] = energy;
                 } else {
                   energy_fail_cnt[didx]++;
