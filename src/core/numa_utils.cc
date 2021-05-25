@@ -78,6 +78,13 @@ SetNumaMemoryPolicy(const HostPolicyCmdlineConfig& host_policy)
 }
 
 Status
+GetNumaMemoryPolicyNodeMask(unsigned long* node_mask)
+{
+  *node_mask = 0;
+  return Status::Success;
+}
+
+Status
 ResetNumaMemoryPolicy()
 {
   return Status::Success;
