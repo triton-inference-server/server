@@ -1683,17 +1683,53 @@ HTTPAPIServer::HandleCudaSharedMemory(
   }
 }
 
-size_t
-HTTPAPIServer::GetInferenceHeaderLength(evhtp_request_t* req)
+TRITONSERVER_Error*
+HTTPAPIServer::GetInferenceHeaderLength(
+    evhtp_request_t* req, size_t* header_length)
 {
   // Find Inference-Header-Content-Length in header. If missing set to 0
-  size_t header_length = 0;
+  *header_length = 0;
   const char* header_length_c_str =
       evhtp_kv_find(req->headers_in, kInferHeaderContentLengthHTTPHeader);
   if (header_length_c_str != NULL) {
-    header_length = std::atoi(header_length_c_str);
+    int parsed_value;
+    try {
+      parsed_value = std::atoi(header_length_c_str);
+    }
+    catch (const std::invalid_argument& ia) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG, (std::string("Unable to parse ") +
+                                           kInferHeaderContentLengthHTTPHeader +
+                                           ", got: " + header_length_c_str)
+                                              .c_str());
+    }
+    // Set to large value in case there is no Content-Length to compare with
+    int32_t content_length = INT32_MAX;
+    const char* content_length_c_str =
+        evhtp_kv_find(req->headers_in, kContentLengthHeader);
+    if (content_length_c_str != nullptr) {
+      try {
+        content_length = std::atoi(content_length_c_str);
+      }
+      catch (const std::invalid_argument& ia) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Unable to parse Content-Length, got: ") +
+             content_length_c_str)
+                .c_str());
+      }
+    }
+    // Check if the content length is in proper range
+    if ((parsed_value < 0) || (parsed_value > content_length)) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("inference header size should be in range (0, ") +
+           std::to_string(content_length) + "), got: " + header_length_c_str)
+              .c_str());
+    }
+    *header_length = parsed_value;
   }
-  return header_length;
+  return nullptr;
 }
 
 DataCompressor::Type
@@ -2134,12 +2170,14 @@ HTTPAPIServer::HandleInfer(
     err = TRITONSERVER_InferenceRequestNew(
         &irequest, server_.get(), model_name.c_str(), requested_model_version);
   }
+  // Get the header length
+  size_t header_length;
+  if (err == nullptr) {
+    err = GetInferenceHeaderLength(req, &header_length);
+  }
 
   if (err == nullptr) {
     connection_paused = true;
-
-    // Get the header length
-    size_t header_length = GetInferenceHeaderLength(req);
 
     // Decompress request body if it is compressed in supported type
     auto compression_type = GetRequestCompressionType(req);

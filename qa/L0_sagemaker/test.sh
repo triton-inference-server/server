@@ -51,6 +51,7 @@ rm -f *.log
 rm -f *.out
 
 SAGEMAKER_TEST=sagemaker_test.py
+UNIT_TEST_COUNT=9
 CLIENT_LOG="./client.log"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
@@ -135,7 +136,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG 5
+    check_test_results $CLIENT_LOG $UNIT_TEST_COUNT
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -170,7 +171,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG 5
+    check_test_results $CLIENT_LOG $UNIT_TEST_COUNT
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -239,7 +240,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG 5
+    check_test_results $CLIENT_LOG $UNIT_TEST_COUNT
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
