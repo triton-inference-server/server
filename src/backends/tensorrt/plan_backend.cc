@@ -300,7 +300,16 @@ PlanBackend::CreateExecutionContexts(
             group.name() + " of model " + Name() +
                 " must have either zero or or one secondary devices");
       }
-      dla_core_id = group.secondary_devices().at(0).device_id();
+
+      auto secondary_device = group.secondary_devices().at(0);
+      if (secondary_device.kind() !=
+          inference::ModelInstanceGroup::SecondaryDevice::KIND_NVDLA) {
+        return Status(
+            Status::Code::INVALID_ARG, "secondary device " + group.name() +
+                                           " of model " + Name() +
+                                           " must be KIND_NVDLA");
+      }
+      dla_core_id = secondary_device.device_id();
     }
 
     for (int c = 0; c < group.count(); c++) {
@@ -393,8 +402,8 @@ PlanBackend::CreateExecutionContexts(
             }
 
             RETURN_IF_ERROR(LoadPlan(
-                mn_itr->second, &dla_eit->second.first,
-                &dla_eit->second.second));
+                mn_itr->second, &dla_eit->second.first, &dla_eit->second.second,
+                dla_core_id));
             shared_engine = dla_eit->second.second;
           } else {
             RETURN_IF_ERROR(LoadPlan(

@@ -51,9 +51,10 @@ LoadPlan(
   if (dla_core_id != -1) {
     if (dla_core_id < (*runtime)->getNbDLACores()) {
       (*runtime)->setDLACore(dla_core_id);
+    } else {
       return Status(
           Status::Code::INTERNAL,
-          ("unable to create TensorRT runtime with invalid DLA Core Id: " +
+          ("unable to create TensorRT runtime with DLA Core ID: " +
            std::to_string(dla_core_id))
               .c_str());
     }
