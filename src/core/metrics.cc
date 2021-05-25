@@ -37,6 +37,7 @@
 #ifdef TRITON_ENABLE_METRICS_GPU
 #include <cuda_runtime_api.h>
 #include <dcgm_agent.h>
+#include <string>
 #endif  // TRITON_ENABLE_METRICS_GPU
 
 namespace nvidia { namespace inferenceserver {
@@ -133,7 +134,7 @@ Metrics::~Metrics()
   if (dcgm_thread_ != nullptr) {
     dcgm_thread_exit_.store(true);
     dcgm_thread_->join();
-
+    dcgmGroupDestroy(dcgm_handle_, groupId_);
     // Stop and shutdown DCGM
     dcgmReturn_t derr = dcgmStopEmbedded(dcgm_handle_);
     if (derr != DCGM_ST_OK) {
@@ -250,9 +251,27 @@ Metrics::InitializeDcgmMetrics()
     }
   }
 
+  // create a gpu group
+  char groupName[16] = "mygroup";
+  dcgmReturn_t dcgmerr =
+      dcgmGroupCreate(handle, DCGM_GROUP_DEFAULT, groupName, &groupId_);
+  if (dcgmerr != DCGM_ST_OK) {
+    LOG_WARNING << "error, cannot cannot make group. Err:"
+                << errorString(dcgmerr);
+  }
+  dcgmGroupInfo_t info;
+  info.version = dcgmGroupInfo_version2;
+  dcgmerr = dcgmGroupGetInfo(handle, groupId_, &info);
+  if (dcgmerr != DCGM_ST_OK) {
+    LOG_WARNING << "error, cannot get group info " << errorString(dcgmerr);
+  } else {
+    LOG_INFO << "created group:" << groupId_
+  }
+
   // Periodically send the DCGM metrics...
   if (available_gpu_ids.size() > 0) {
     dcgmHandle_t handle = dcgm_handle_;
+    dcgmGpuGrp_t groupId = groupId_;
     dcgm_thread_exit_.store(false);
     dcgm_thread_.reset(new std::thread([this, available_gpu_ids, handle] {
       int available_gpu_count = available_gpu_ids.size();
@@ -269,117 +288,134 @@ Metrics::InitializeDcgmMetrics()
       for (int didx = 0; didx < available_gpu_count; ++didx) {
         last_energy[didx] = 0;
       }
+      size_t field_count = 6;
+      unsigned short fields[field_count] = {
+          DCGM_FI_DEV_POWER_MGMT_LIMIT,
+          DCGM_FI_DEV_POWER_USAGE,
+          DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION,
+          DCGM_FI_DEV_GPU_UTIL,
+          DCGM_FI_DEV_FB_USED,
+          DCGM_FI_DEV_FB_TOTAL,
+      };
 
-      while (!dcgm_thread_exit_.load()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-        size_t field_count = 6;
-        unsigned short fields[field_count] = {
-            DCGM_FI_DEV_POWER_MGMT_LIMIT,
-            DCGM_FI_DEV_POWER_USAGE,
-            DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION,
-            DCGM_FI_DEV_GPU_UTIL,
-            DCGM_FI_DEV_FB_USED,
-            DCGM_FI_DEV_FB_TOTAL,
-        };
-
-        for (int didx = 0; didx < available_gpu_count; ++didx) {
-          dcgmFieldValue_v1 field_values[field_count];
-          dcgmReturn_t dcgmerr = dcgmGetLatestValuesForFields(
-              handle, available_gpu_ids[didx], fields, field_count,
-              field_values);
-          if (dcgmerr != DCGM_ST_OK) {
-            power_limit_fail_cnt[didx]++;
-            power_usage_fail_cnt[didx]++;
-            energy_fail_cnt[didx]++;
-            util_fail_cnt[didx]++;
-            mem_fail_cnt[didx]++;
-            LOG_WARNING << "error, unable to get field values for device "
-                        << available_gpu_ids[didx] << ": "
-                        << errorString(dcgmerr);
-          } else {
-            // Power limit
-            if (power_limit_fail_cnt[didx] < fail_threshold) {
-              unsigned int power_limit = field_values[0].value.i64;
-              if ((field_values[0].status == DCGM_ST_OK) &&
-                  (!DCGM_INT64_IS_BLANK(power_limit))) {
-                power_limit_fail_cnt[didx] = 0;
-              } else {
-                power_limit_fail_cnt[didx]++;
-                power_limit = 0;
-                LOG_WARNING << "error, unable to get power limit for GPU "
-                            << didx << ": " << errorString(dcgmerr);
-              }
-              gpu_power_limit_[didx]->Set((double)power_limit * 0.001);
-            }
-
-            // Power usage
-            if (power_usage_fail_cnt[didx] < fail_threshold) {
-              unsigned int power_usage = field_values[1].value.i64;
-              if ((field_values[1].status == DCGM_ST_OK) &&
-                  (!DCGM_INT64_IS_BLANK(power_usage))) {
-                power_usage_fail_cnt[didx] = 0;
-              } else {
-                power_usage_fail_cnt[didx]++;
-                power_usage = 0;
-                LOG_WARNING << "error, unable to get power usage for GPU "
-                            << didx << ": " << errorString(dcgmerr);
-              }
-              gpu_power_usage_[didx]->Set((double)power_usage * 0.001);
-            }
-
-            // Energy Consumption
-            if (energy_fail_cnt[didx] < fail_threshold) {
-              unsigned int energy = field_values[2].value.i64;
-              if ((field_values[2].status == DCGM_ST_OK) &&
-                  (!DCGM_INT64_IS_BLANK(energy))) {
-                energy_fail_cnt[didx] = 0;
-                if (last_energy[didx] == 0) {
-                  last_energy[didx] = energy;
+      char fieldName[16] = "myfields";
+      dcgmerr = dcgmFieldGroupCreate(
+          handle, field_count, &fields[0], fieldName, &fieldGroupId);
+      if (dcgmerr != DCGM_ST_OK) {
+        LOG_WARNING << "error, cannot cannot make field group. Err:"
+                    << errorString(dcgmerr);
+      }
+      dcgmerr = dcgmWatchFields(
+          handle, groupId, fieldGroupId, 2000000 /*update period, usec*/,
+          5.0 /*maxKeepAge, sec*/, 5 /*maxKeepSamples*/);
+      if (dcgmerr != DCGM_ST_OK) {
+        LOG_WARNING << "error, cannot start watching fields. Err:"
+                    << errorString(dcgmerr);
+      } else {
+        while (!dcgm_thread_exit_.load()) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+          dcgmUpdateAllFields(handle, 1 /* wait for update*/);
+          for (int didx = 0; didx < available_gpu_count; ++didx) {
+            dcgmFieldValue_v1 field_values[field_count];
+            dcgmReturn_t dcgmerr = dcgmGetLatestValuesForFields(
+                handle, available_gpu_ids[didx], fields, field_count,
+                field_values);
+            if (dcgmerr != DCGM_ST_OK) {
+              power_limit_fail_cnt[didx]++;
+              power_usage_fail_cnt[didx]++;
+              energy_fail_cnt[didx]++;
+              util_fail_cnt[didx]++;
+              mem_fail_cnt[didx]++;
+              LOG_WARNING << "error, unable to get field values for device "
+                          << available_gpu_ids[didx] << ": "
+                          << errorString(dcgmerr);
+            } else {
+              // Power limit
+              if (power_limit_fail_cnt[didx] < fail_threshold) {
+                unsigned int power_limit = field_values[0].value.i64;
+                if ((field_values[0].status == DCGM_ST_OK) &&
+                    (!DCGM_INT64_IS_BLANK(power_limit))) {
+                  power_limit_fail_cnt[didx] = 0;
+                } else {
+                  power_limit_fail_cnt[didx]++;
+                  power_limit = 0;
+                  LOG_WARNING << "error, unable to get power limit for GPU "
+                              << didx << ": " << errorString(dcgmerr);
                 }
-                gpu_energy_consumption_[didx]->Increment(
-                    (double)(energy - last_energy[didx]) * 0.001);
-                last_energy[didx] = energy;
-              } else {
-                energy_fail_cnt[didx]++;
-                energy = 0;
-                LOG_WARNING << "error, unable to get energy consumption for "
-                            << "GPU " << didx << ": " << errorString(dcgmerr);
+                gpu_power_limit_[didx]->Set((double)power_limit * 0.001);
               }
-            }
 
-            // Utilization
-            if (util_fail_cnt[didx] < fail_threshold) {
-              unsigned int util = field_values[3].value.i64;
-              if ((field_values[3].status == DCGM_ST_OK) &&
-                  (!DCGM_INT64_IS_BLANK(util))) {
-                util_fail_cnt[didx] = 0;
-              } else {
-                util_fail_cnt[didx]++;
-                util = 0;
-                LOG_WARNING << "error, unable to get GPU utilization for GPU "
-                            << didx << ": " << errorString(dcgmerr);
+              // Power usage
+              if (power_usage_fail_cnt[didx] < fail_threshold) {
+                unsigned int power_usage = field_values[1].value.i64;
+                if ((field_values[1].status == DCGM_ST_OK) &&
+                    (!DCGM_INT64_IS_BLANK(power_usage))) {
+                  power_usage_fail_cnt[didx] = 0;
+                } else {
+                  power_usage_fail_cnt[didx]++;
+                  power_usage = 0;
+                  LOG_WARNING << "error, unable to get power usage for GPU "
+                              << didx << ": " << errorString(dcgmerr);
+                }
+                gpu_power_usage_[didx]->Set((double)power_usage * 0.001);
               }
-              gpu_utilization_[didx]->Set((double)util * 0.01);
-            }
 
-            // Memory Usage
-            if (mem_fail_cnt[didx] < fail_threshold) {
-              unsigned int memory_used = field_values[4].value.i64;
-              unsigned int memory_total = field_values[5].value.i64;
-              if ((field_values[4].status == DCGM_ST_OK) &&
-                  (!DCGM_INT64_IS_BLANK(memory_used)) &&
-                  (field_values[5].status == DCGM_ST_OK) &&
-                  (!DCGM_INT64_IS_BLANK(memory_total))) {
-                mem_fail_cnt[didx] = 0;
-              } else {
-                memory_total = 0;
-                memory_used = 0;
-                mem_fail_cnt[didx]++;
-                LOG_WARNING << "error, unable to get memory usage for GPU "
-                            << didx << ": " << errorString(dcgmerr);
+              // Energy Consumption
+              if (energy_fail_cnt[didx] < fail_threshold) {
+                unsigned int energy = field_values[2].value.i64;
+                if ((field_values[2].status == DCGM_ST_OK) &&
+                    (!DCGM_INT64_IS_BLANK(energy))) {
+                  energy_fail_cnt[didx] = 0;
+                  if (last_energy[didx] == 0) {
+                    last_energy[didx] = energy;
+                  }
+                  gpu_energy_consumption_[didx]->Increment(
+                      (double)(energy - last_energy[didx]) * 0.001);
+                  LOG_WARNING << "energy consumption:"
+                              << (double)(energy - last_energy[didx]) * 0.001;
+                  last_energy[didx] = energy;
+                } else {
+                  energy_fail_cnt[didx]++;
+                  energy = 0;
+                  LOG_WARNING << "error, unable to get energy consumption for "
+                              << "GPU " << didx << ": " << errorString(dcgmerr);
+                }
               }
-              gpu_memory_total_[didx]->Set(memory_total);
-              gpu_memory_used_[didx]->Set(memory_used);
+
+              // Utilization
+              if (util_fail_cnt[didx] < fail_threshold) {
+                unsigned int util = field_values[3].value.i64;
+                if ((field_values[3].status == DCGM_ST_OK) &&
+                    (!DCGM_INT64_IS_BLANK(util))) {
+                  util_fail_cnt[didx] = 0;
+                } else {
+                  util_fail_cnt[didx]++;
+                  util = 0;
+                  LOG_WARNING << "error, unable to get GPU utilization for GPU "
+                              << didx << ": " << errorString(dcgmerr);
+                }
+                gpu_utilization_[didx]->Set((double)util * 0.01);
+              }
+
+              // Memory Usage
+              if (mem_fail_cnt[didx] < fail_threshold) {
+                unsigned int memory_used = field_values[4].value.i64;
+                unsigned int memory_total = field_values[5].value.i64;
+                if ((field_values[4].status == DCGM_ST_OK) &&
+                    (!DCGM_INT64_IS_BLANK(memory_used)) &&
+                    (field_values[5].status == DCGM_ST_OK) &&
+                    (!DCGM_INT64_IS_BLANK(memory_total))) {
+                  mem_fail_cnt[didx] = 0;
+                } else {
+                  memory_total = 0;
+                  memory_used = 0;
+                  mem_fail_cnt[didx]++;
+                  LOG_WARNING << "error, unable to get memory usage for GPU "
+                              << didx << ": " << errorString(dcgmerr);
+                }
+                gpu_memory_total_[didx]->Set(memory_total);
+                gpu_memory_used_[didx]->Set(memory_used);
+              }
             }
           }
         }
@@ -408,6 +444,7 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
 #else
 
   dcgmDeviceAttributes_t gpu_attributes;
+  gpu_attributes.version = dcgmDeviceAttributes_version;
   dcgmReturn_t dcgmerr = dcgmGetDeviceAttributes(
       singleton->dcgm_handle_, cuda_device, &gpu_attributes);
   if (dcgmerr != DCGM_ST_OK) {

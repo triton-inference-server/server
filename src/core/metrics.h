@@ -169,6 +169,7 @@ class Metrics {
   bool metrics_enabled_;
   bool gpu_metrics_enabled_;
   std::mutex gpu_metrics_enabling_;
+  dcgmGpuGrp_t groupId_;
 };
 
 }}  // namespace nvidia::inferenceserver
