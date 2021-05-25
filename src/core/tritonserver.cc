@@ -37,7 +37,6 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
-#include "src/core/numa_utils.h"
 #include "src/core/nvtx.h"
 #include "src/core/response_allocator.h"
 #include "src/core/server.h"
@@ -255,10 +254,13 @@ class TritonServerOptions {
       const std::string& backend_name, const std::string& setting,
       const std::string& value);
 
-  TRITONSERVER_Error* SetNumaConfig(
-      TRITONSERVER_InstanceGroupKind device_kind, const int device_id,
-      const int32_t numa_node_idx, const int* cpu_set, const size_t set_count);
-  const ni::NumaConfig& NumaConfig() const { return numa_config_; }
+  TRITONSERVER_Error* SetHostPolicy(
+      const std::string& policy_name, const std::string& setting,
+      const std::string& value);
+  const ni::HostPolicyCmdlineConfigMap& HostPolicyCmdlineConfigMap() const
+  {
+    return host_policy_map_;
+  }
 
   bool TensorFlowSoftPlacement() const { return tf_soft_placement_; }
   void SetTensorFlowSoftPlacement(bool b) { tf_soft_placement_ = b; }
@@ -284,7 +286,7 @@ class TritonServerOptions {
   std::string backend_dir_;
   std::string repoagent_dir_;
   ni::BackendCmdlineConfigMap backend_cmdline_config_map_;
-  ni::NumaConfig numa_config_;
+  ni::HostPolicyCmdlineConfigMap host_policy_map_;
 
   bool tf_soft_placement_;
   float tf_gpu_mem_fraction_;
@@ -374,14 +376,23 @@ TritonServerOptions::AddBackendConfig(
 }
 
 TRITONSERVER_Error*
-TritonServerOptions::SetNumaConfig(
-    TRITONSERVER_InstanceGroupKind device_kind, const int device_id,
-    const int32_t numa_node_idx, const int* cpu_set, const size_t set_count)
+TritonServerOptions::SetHostPolicy(
+    const std::string& policy_name, const std::string& setting,
+    const std::string& value)
 {
-  std::vector<int> cpu_vec;
-  cpu_vec.assign(cpu_set, cpu_set + set_count);
-  numa_config_[std::make_pair(device_kind, device_id)] =
-      std::make_pair(numa_node_idx, cpu_vec);
+  // Check if supported setting is passed
+  if ((setting != "numa-node") && (setting != "cpu-cores")) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string(
+            "Unsupported host policy setting '" + setting +
+            "' is specified, supported settings are 'numa-node', 'cpu-cores'")
+            .c_str());
+  }
+
+  ni::HostPolicyCmdlineConfig& hp = host_policy_map_[policy_name];
+  hp[setting] = value;
+
   return nullptr;  // success
 }
 
@@ -1133,15 +1144,13 @@ TRITONSERVER_ServerOptionsSetBackendConfig(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsSetNumaConfig(
-    TRITONSERVER_ServerOptions* options,
-    TRITONSERVER_InstanceGroupKind device_kind, const int device_id,
-    const int32_t numa_node_idx, const int* cpu_set, const size_t set_count)
+TRITONSERVER_ServerOptionsSetHostPolicy(
+    TRITONSERVER_ServerOptions* options, const char* policy_name,
+    const char* setting, const char* value)
 {
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
-  return loptions->SetNumaConfig(
-      device_kind, device_id, numa_node_idx, cpu_set, set_count);
+  return loptions->SetHostPolicy(policy_name, setting, value);
 }
 
 //
@@ -1594,7 +1603,7 @@ TRITONSERVER_ServerNew(
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
-  lserver->SetNumaConfig(loptions->NumaConfig());
+  lserver->SetHostPolicyCmdlineConfig(loptions->HostPolicyCmdlineConfigMap());
   lserver->SetRepoAgentDir(loptions->RepoAgentDir());
   lserver->SetBufferManagerThreadCount(loptions->BufferManagerThreadCount());
 

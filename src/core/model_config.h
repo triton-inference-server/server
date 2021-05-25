@@ -39,6 +39,12 @@ using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 using MetricTagsMap = ::google::protobuf::Map<
     ::google::protobuf::string, ::google::protobuf::string>;
 
+// Map from a host policy name to <setting, value> map of cmdline
+// settings for the host policy.
+using HostPolicyCmdlineConfig = std::map<std::string, std::string>;
+using HostPolicyCmdlineConfigMap =
+    std::unordered_map<std::string, HostPolicyCmdlineConfig>;
+
 // Map from backend name to list of setting=value pairs of cmdline
 // settings for the backend.
 using BackendCmdlineConfig = std::vector<std::pair<std::string, std::string>>;

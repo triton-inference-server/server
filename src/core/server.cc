@@ -198,8 +198,8 @@ InferenceServer::Init()
       this, version_, model_repository_paths_, startup_models_,
       strict_model_config_, backend_cmdline_config_map_,
       tf_gpu_memory_fraction_, tf_soft_placement_enabled_, polling_enabled,
-      model_control_enabled, min_supported_compute_capability_, numa_config_,
-      &model_repository_manager_);
+      model_control_enabled, min_supported_compute_capability_,
+      host_policy_map_, &model_repository_manager_);
   if (!status.IsOk()) {
     if (model_repository_manager_ == nullptr) {
       ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;

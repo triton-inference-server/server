@@ -32,6 +32,7 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/numa_utils.h"
 #include "src/core/server_message.h"
 #include "src/core/tritonserver_apis.h"
 
@@ -41,8 +42,9 @@ Status
 TritonModel::Create(
     InferenceServer* server, const std::string& model_repository_path,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
-    const NumaConfig& numa_config, const std::string& model_name,
-    const int64_t version, const inference::ModelConfig& model_config,
+    const HostPolicyCmdlineConfigMap& host_policy_map,
+    const std::string& model_name, const int64_t version,
+    const inference::ModelConfig& model_config,
     std::unique_ptr<TritonModel>* model)
 {
   model->reset();
@@ -158,7 +160,7 @@ TritonModel::Create(
 
   // Create and initialize the model instances for this model.
   RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
-      raw_local_model, numa_config, model_config));
+      raw_local_model, host_policy_map, model_config));
 
   // Create a scheduler with 1 thread per instance. The backend is
   // already initialized so there is no need to have the scheduler
@@ -166,12 +168,11 @@ TritonModel::Create(
   RETURN_IF_ERROR(local_model->SetConfiguredScheduler(
       local_model->instances_.size() /* runner_cnt */,
       /* Initialization callback */
-      [raw_local_model, numa_config](uint32_t runner_idx) -> Status {
+      [raw_local_model](uint32_t runner_idx) -> Status {
         // Get the device kind and id of the associated instance to
         // set NUMA config for the thread
         const auto& instance = raw_local_model->instances_[runner_idx];
-        RETURN_IF_ERROR(SetNumaConfigOnThread(
-            numa_config, instance->Kind(), instance->DeviceId()));
+        RETURN_IF_ERROR(SetNumaConfigOnThread(instance->HostPolicy()));
         return Status::Success;
       },
       /* Run callback */

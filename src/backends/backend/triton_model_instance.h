@@ -30,7 +30,7 @@
 #include "model_config.pb.h"
 #include "src/core/constants.h"
 #include "src/core/metric_model_reporter.h"
-#include "src/core/numa_utils.h"
+#include "src/core/server_message.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -43,7 +43,7 @@ class TritonModel;
 class TritonModelInstance {
  public:
   static Status CreateInstances(
-      TritonModel* model, const NumaConfig& numa_config,
+      TritonModel* model, const HostPolicyCmdlineConfigMap& host_policy_map,
       const inference::ModelConfig& model_config);
   ~TritonModelInstance();
 
@@ -51,7 +51,11 @@ class TritonModelInstance {
   size_t Index() const { return index_; }
   TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
   int32_t DeviceId() const { return device_id_; }
-  int32_t NumaId() const { return numa_id_; }
+  const HostPolicyCmdlineConfig& HostPolicy() const { return host_policy_; }
+  const TritonServerMessage& HostPolicyMessage() const
+  {
+    return host_policy_message_;
+  }
   bool IsPassive() const { return passive_; }
   const std::vector<std::string>& Profiles() const { return profile_names_; }
 
@@ -68,12 +72,14 @@ class TritonModelInstance {
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
       const std::vector<std::string>& profile_names, const bool passive,
-      const int32_t numa_id);
+      const HostPolicyCmdlineConfig& host_policy,
+      const TritonServerMessage& host_policy_message);
   static Status CreateInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
       const std::vector<std::string>& profile_names, const bool passive,
-      const int32_t numa_id);
+      const std::string& host_policy_name,
+      const HostPolicyCmdlineConfig& host_policy);
 
   // The TritonModel object that owns this instance. The instance
   // holds this as a raw pointer because the lifetime of the model is
@@ -88,7 +94,8 @@ class TritonModelInstance {
   // GPU device to be used by the instance.
   TRITONSERVER_InstanceGroupKind kind_;
   int32_t device_id_;
-  int32_t numa_id_;
+  const HostPolicyCmdlineConfig host_policy_;
+  TritonServerMessage host_policy_message_;
   std::vector<std::string> profile_names_;
   bool passive_;
 

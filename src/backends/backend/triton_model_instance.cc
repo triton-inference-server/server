@@ -30,6 +30,7 @@
 #include "src/backends/backend/triton_model.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/numa_utils.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -37,9 +38,11 @@ TritonModelInstance::TritonModelInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
     const std::vector<std::string>& profile_names, const bool passive,
-    const int32_t numa_id)
+    const HostPolicyCmdlineConfig& host_policy,
+    const TritonServerMessage& host_policy_message)
     : model_(model), name_(name), index_(index), kind_(kind),
-      device_id_(device_id), numa_id_(numa_id), profile_names_(profile_names),
+      device_id_(device_id), host_policy_(host_policy),
+      host_policy_message_(host_policy_message), profile_names_(profile_names),
       passive_(passive), state_(nullptr)
 {
 #ifdef TRITON_ENABLE_METRICS
@@ -68,9 +71,10 @@ TritonModelInstance::~TritonModelInstance()
 
 Status
 TritonModelInstance::CreateInstances(
-    TritonModel* model, const NumaConfig& numa_config,
+    TritonModel* model, const HostPolicyCmdlineConfigMap& host_policy_map,
     const inference::ModelConfig& model_config)
 {
+  static HostPolicyCmdlineConfig empty_host_policy;
   for (const auto& group : model_config.instance_group()) {
     std::vector<std::string> profile_names;
     for (const auto& profile_name : group.profile()) {
@@ -82,25 +86,52 @@ TritonModelInstance::CreateInstances(
                                     : group.name()};
       const bool passive = group.passive();
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
-        RETURN_IF_ERROR(SetNumaConfigOnThread(
-            numa_config, TRITONSERVER_INSTANCEGROUPKIND_CPU, group.numa_id()));
+        const std::string policy_name =
+            group.host_policy().empty() ? "cpu" : group.host_policy();
+        const HostPolicyCmdlineConfig* host_policy;
+        const auto policy_it = host_policy_map.find(policy_name);
+        if (policy_it != host_policy_map.end()) {
+          host_policy = &policy_it->second;
+        } else {
+          host_policy = &empty_host_policy;
+        }
+        RETURN_IF_ERROR(SetNumaConfigOnThread(*host_policy));
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
-            0 /* device_id */, profile_names, passive, group.numa_id()));
+            0 /* device_id */, profile_names, passive, policy_name,
+            *host_policy));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
-          RETURN_IF_ERROR(SetNumaConfigOnThread(
-              numa_config, TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id));
+          const std::string policy_name =
+              group.host_policy().empty() ? ("gpu_" + std::to_string(device_id))
+                                          : group.host_policy();
+          const HostPolicyCmdlineConfig* host_policy;
+          const auto policy_it = host_policy_map.find(policy_name);
+          if (policy_it != host_policy_map.end()) {
+            host_policy = &policy_it->second;
+          } else {
+            host_policy = &empty_host_policy;
+          }
+          RETURN_IF_ERROR(SetNumaConfigOnThread(*host_policy));
           RETURN_IF_ERROR(CreateInstance(
               model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
-              device_id, profile_names, passive, device_id /* numa_id */));
+              device_id, profile_names, passive, policy_name, *host_policy));
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
-        // Skip setting numa config on KIND_MODEL as we can't assume
-        // the model placement
+        const std::string policy_name =
+            group.host_policy().empty() ? "model" : group.host_policy();
+        const HostPolicyCmdlineConfig* host_policy;
+        const auto policy_it = host_policy_map.find(policy_name);
+        if (policy_it != host_policy_map.end()) {
+          host_policy = &policy_it->second;
+        } else {
+          host_policy = &empty_host_policy;
+        }
+        RETURN_IF_ERROR(SetNumaConfigOnThread(*host_policy));
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
-            0 /* device_id */, profile_names, passive, group.numa_id()));
+            0 /* device_id */, profile_names, passive, policy_name,
+            *host_policy));
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -119,10 +150,28 @@ TritonModelInstance::CreateInstance(
     TritonModel* model, const std::string& name, const size_t index,
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
     const std::vector<std::string>& profile_names, const bool passive,
-    const int32_t numa_id)
+    const std::string& host_policy_name,
+    const HostPolicyCmdlineConfig& host_policy)
 {
+  // Create the JSON representation of the backend configuration.
+  triton::common::TritonJson::Value host_policy_json(
+      triton::common::TritonJson::ValueType::OBJECT);
+  if (!host_policy.empty()) {
+    triton::common::TritonJson::Value policy_setting_json(
+        host_policy_json, triton::common::TritonJson::ValueType::OBJECT);
+    for (const auto& pr : host_policy) {
+      RETURN_IF_ERROR(
+          policy_setting_json.AddString(pr.first.c_str(), pr.second));
+    }
+
+    RETURN_IF_ERROR(host_policy_json.Add(
+        host_policy_name.c_str(), std::move(policy_setting_json)));
+  }
+  TritonServerMessage host_policy_message(host_policy_json);
+
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
-      model, name, index, kind, device_id, profile_names, passive, numa_id));
+      model, name, index, kind, device_id, profile_names, passive, host_policy,
+      host_policy_message));
 
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
@@ -168,11 +217,12 @@ TRITONBACKEND_ModelInstanceDeviceId(
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_ModelInstanceNumaId(
-    TRITONBACKEND_ModelInstance* instance, int32_t* numa_id)
+TRITONBACKEND_ModelInstanceHostPolicy(
+    TRITONBACKEND_ModelInstance* instance, TRITONSERVER_Message** host_policy)
 {
   TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
-  *numa_id = ti->NumaId();
+  *host_policy = const_cast<TRITONSERVER_Message*>(
+      reinterpret_cast<const TRITONSERVER_Message*>(&ti->HostPolicyMessage()));
   return nullptr;  // success
 }
 

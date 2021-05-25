@@ -39,12 +39,12 @@ class TritonBackendFactory {
   static Status Create(
       InferenceServer* server,
       const BackendCmdlineConfigMap& cmdline_config_map,
-      const NumaConfig& numa_config,
+      const HostPolicyCmdlineConfigMap& host_policy_map,
       std::unique_ptr<TritonBackendFactory>* factory)
   {
     LOG_VERBOSE(1) << "Create TritonBackendFactory";
     factory->reset(
-        new TritonBackendFactory(server, cmdline_config_map, numa_config));
+        new TritonBackendFactory(server, cmdline_config_map, host_policy_map));
     return Status::Success;
   }
 
@@ -55,7 +55,7 @@ class TritonBackendFactory {
   {
     std::unique_ptr<TritonModel> model;
     RETURN_IF_ERROR(TritonModel::Create(
-        server_, model_repository_path, cmdline_config_map_, numa_config_,
+        server_, model_repository_path, cmdline_config_map_, host_policy_map_,
         model_name, version, model_config, &model));
     backend->reset(model.release());
     return Status::Success;
@@ -69,15 +69,15 @@ class TritonBackendFactory {
   TritonBackendFactory(
       InferenceServer* server,
       const BackendCmdlineConfigMap& cmdline_config_map,
-      const NumaConfig& numa_config)
+      const HostPolicyCmdlineConfigMap& host_policy_map)
       : server_(server), cmdline_config_map_(cmdline_config_map),
-        numa_config_(numa_config)
+        host_policy_map_(host_policy_map)
   {
   }
 
   InferenceServer* server_;
   const BackendCmdlineConfigMap cmdline_config_map_;
-  const NumaConfig numa_config_;
+  const HostPolicyCmdlineConfigMap host_policy_map_;
 };
 
 }}  // namespace nvidia::inferenceserver

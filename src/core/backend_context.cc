@@ -475,8 +475,7 @@ BackendResponder::FlushPendingPinned(
   int64_t pinned_memory_id = 0;
 
   std::unique_ptr<AllocatedMemory> pinned_memory(new AllocatedMemory(
-      pending_pinned_byte_size_, pinned_memory_type, pinned_memory_id, kind_,
-      numa_id_));
+      pending_pinned_byte_size_, pinned_memory_type, pinned_memory_id));
   char* pinned_buffer =
       pinned_memory->MutableBuffer(&pinned_memory_type, &pinned_memory_id);
 
@@ -740,7 +739,7 @@ BackendInputCollector::ProcessBatchInput(
   // Need a CPU buffer for modifying the value
   if (memory_type == TRITONSERVER_MEMORY_GPU) {
     internal_buffer.reset(new AllocatedMemory(
-        buffer_byte_size, TRITONSERVER_MEMORY_CPU_PINNED, 0, kind_, numa_id_));
+        buffer_byte_size, TRITONSERVER_MEMORY_CPU_PINNED, 0));
     input_buffer = internal_buffer->MutableBuffer();
   }
   const auto& data_type = batch_input.data_type();
@@ -1074,8 +1073,7 @@ BackendInputCollector::FlushPendingPinned(
   int64_t pinned_memory_id = 0;
 
   std::unique_ptr<AllocatedMemory> pinned_memory(new AllocatedMemory(
-      pending_pinned_byte_size_, pinned_memory_type, pinned_memory_id, kind_,
-      numa_id_));
+      pending_pinned_byte_size_, pinned_memory_type, pinned_memory_id));
   char* pinned_buffer =
       pinned_memory->MutableBuffer(&pinned_memory_type, &pinned_memory_id);
 
@@ -1342,7 +1340,7 @@ BackendInputCollector::LaunchCopyKernel(
 
   in_use_memories_.emplace_back(new AllocatedMemory(
       pending_copy_kernel_input_buffer_counts_ * sizeof(int8_t*),
-      tensor_memory_type, tensor_memory_type_id, kind_, numa_id_));
+      tensor_memory_type, tensor_memory_type_id));
   char* input_ptr_buffer = in_use_memories_.back()->MutableBuffer(
       &kernel_buffer_memory_type, &kernel_buffer_memory_id);
   if ((kernel_buffer_memory_type != tensor_memory_type) ||
@@ -1353,7 +1351,7 @@ BackendInputCollector::LaunchCopyKernel(
   }
   in_use_memories_.emplace_back(new AllocatedMemory(
       pending_copy_kernel_input_buffer_counts_ * sizeof(size_t),
-      tensor_memory_type, tensor_memory_type_id, kind_, numa_id_));
+      tensor_memory_type, tensor_memory_type_id));
   char* byte_size_buffer = in_use_memories_.back()->MutableBuffer(
       &kernel_buffer_memory_type, &kernel_buffer_memory_id);
   if ((kernel_buffer_memory_type != tensor_memory_type) ||
@@ -1364,7 +1362,7 @@ BackendInputCollector::LaunchCopyKernel(
   }
   in_use_memories_.emplace_back(new AllocatedMemory(
       pending_copy_kernel_input_buffer_counts_ * sizeof(size_t),
-      tensor_memory_type, tensor_memory_type_id, kind_, numa_id_));
+      tensor_memory_type, tensor_memory_type_id));
   char* byte_size_offset_buffer = in_use_memories_.back()->MutableBuffer(
       &kernel_buffer_memory_type, &kernel_buffer_memory_id);
   if ((kernel_buffer_memory_type != tensor_memory_type) ||

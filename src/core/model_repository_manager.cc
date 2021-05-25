@@ -374,7 +374,7 @@ class ModelRepositoryManager::BackendLifeCycle {
       InferenceServer* server, const double min_compute_capability,
       const BackendConfigMap& backend_config_map,
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
-      const NumaConfig& numa_config,
+      const HostPolicyCmdlineConfigMap& host_policy_map,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
   ~BackendLifeCycle() { map_.clear(); }
@@ -496,14 +496,14 @@ ModelRepositoryManager::BackendLifeCycle::Create(
     InferenceServer* server, const double min_compute_capability,
     const BackendConfigMap& backend_config_map,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
-    const NumaConfig& numa_config,
+    const HostPolicyCmdlineConfigMap& host_policy_map,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
       new BackendLifeCycle(min_compute_capability));
   {
     RETURN_IF_ERROR(TritonBackendFactory::Create(
-        server, backend_cmdline_config_map, numa_config,
+        server, backend_cmdline_config_map, host_policy_map,
         &(local_life_cycle->triton_backend_factory_)));
   }
 #ifdef TRITON_ENABLE_TENSORRT
@@ -511,7 +511,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
     const std::shared_ptr<BackendConfig>& config =
         backend_config_map.find(kTensorRTPlanPlatform)->second;
     RETURN_IF_ERROR(PlanBackendFactory::Create(
-        config, numa_config, &(local_life_cycle->plan_factory_)));
+        config, host_policy_map, &(local_life_cycle->plan_factory_)));
   }
 #endif  // TRITON_ENABLE_TENSORRT
 #ifdef TRITON_ENABLE_ENSEMBLE
@@ -1248,7 +1248,8 @@ ModelRepositoryManager::Create(
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     const bool polling_enabled, const bool model_control_enabled,
-    const double min_compute_capability, const NumaConfig& numa_config,
+    const double min_compute_capability,
+    const HostPolicyCmdlineConfigMap& host_policy_map,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
 {
   // The rest only matters if repository path is valid directory
@@ -1277,7 +1278,7 @@ ModelRepositoryManager::Create(
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
       server, min_compute_capability, backend_config_map,
-      backend_cmdline_config_map, numa_config, &life_cycle));
+      backend_cmdline_config_map, host_policy_map, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(

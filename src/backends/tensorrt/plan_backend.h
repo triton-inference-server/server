@@ -32,7 +32,6 @@
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/metric_model_reporter.h"
-#include "src/core/numa_utils.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 #include "triton/common/sync_queue.h"
@@ -59,12 +58,13 @@ class PlanBackend : public InferenceBackend {
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(
       const std::unordered_map<std::string, std::vector<char>>& models,
-      const NumaConfig& numa_config);
+      const HostPolicyCmdlineConfigMap& host_policy);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const int64_t dla_core_id, const std::vector<char>& models,
       const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
-      const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue);
+      const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue,
+      const HostPolicyCmdlineConfig& host_policy);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
@@ -97,7 +97,8 @@ class PlanBackend : public InferenceBackend {
         const bool enable_pinned_input, const bool enable_pinned_output,
         const size_t gather_kernel_buffer_threshold,
         const bool separate_output_copy_stream,
-        std::shared_ptr<MetricModelReporter>&& metric_reporter);
+        std::shared_ptr<MetricModelReporter>&& metric_reporter,
+        const HostPolicyCmdlineConfig& host_policy);
     ~Context();
 
     DISALLOW_MOVE(Context);
@@ -430,6 +431,9 @@ class PlanBackend : public InferenceBackend {
 
     // Whether to prepare the next batch before the context is ready for it
     bool eager_batching_;
+
+    // The host polciy associated with this instance
+    const HostPolicyCmdlineConfig host_policy_;
   };
 
   // CUDA engine shared across all model instances using the same (or no) DLA

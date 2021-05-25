@@ -30,7 +30,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include "src/core/numa_utils.h"
+#include "src/core/model_config.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -42,13 +42,14 @@ class PinnedMemoryManager {
  public:
   // Options to configure pinned memeory manager.
   struct Options {
-    Options(uint64_t b = 0, const NumaConfig& numa_config = {})
-        : pinned_memory_pool_byte_size_(b), numa_config_(numa_config)
+    Options(
+        uint64_t b = 0, const HostPolicyCmdlineConfigMap& host_policy_map = {})
+        : pinned_memory_pool_byte_size_(b), host_policy_map_(host_policy_map)
     {
     }
 
     uint64_t pinned_memory_pool_byte_size_;
-    NumaConfig numa_config_;
+    HostPolicyCmdlineConfigMap host_policy_map_;
   };
 
   ~PinnedMemoryManager();
@@ -65,14 +66,6 @@ class PinnedMemoryManager {
   static Status Alloc(
       void** ptr, uint64_t size, TRITONSERVER_MemoryType* allocated_type,
       bool allow_nonpinned_fallback);
-
-  // Overload Alloc() where additional 'kind' and 'numa_id' will be used to
-  // returned memory buffer that is close to the given device when possible.
-  // Return Status object indicating success or failure.
-  static Status Alloc(
-      void** ptr, uint64_t size, TRITONSERVER_MemoryType* allocated_type,
-      bool allow_nonpinned_fallback, TRITONSERVER_InstanceGroupKind kind,
-      int numa_id);
 
   // Free the memory allocated by the pinned memory manager.
   // Return Status object indicating success or failure.
@@ -101,18 +94,14 @@ class PinnedMemoryManager {
   Status FreeInternal(void* ptr);
   void AddPinnedMemoryBuffer(
       const std::shared_ptr<PinnedMemory>& pinned_memory_buffer,
-      TRITONSERVER_InstanceGroupKind kind, int numa_id);
-
+      unsigned long node_mask);
 
   static std::unique_ptr<PinnedMemoryManager> instance_;
   static uint64_t pinned_memory_byte_size_;
 
   std::mutex info_mtx_;
   std::map<void*, std::pair<bool, PinnedMemory*>> memory_info_;
-  std::map<
-      std::pair<TRITONSERVER_InstanceGroupKind, int>,
-      std::shared_ptr<PinnedMemory>>
-      pinned_memory_buffers_;
+  std::map<unsigned long, std::shared_ptr<PinnedMemory>> pinned_memory_buffers_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -26,7 +26,6 @@
 #pragma once
 
 #include "src/backends/tensorrt/plan_backend.h"
-#include "src/core/numa_utils.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -43,7 +42,7 @@ class PlanBackendFactory {
 
   static Status Create(
       const std::shared_ptr<BackendConfig>& backend_config,
-      const NumaConfig& numa_config,
+      const HostPolicyCmdlineConfigMap& host_policy_map,
       std::unique_ptr<PlanBackendFactory>* factory);
 
   Status CreateBackend(
@@ -58,13 +57,13 @@ class PlanBackendFactory {
 
   PlanBackendFactory(
       const std::shared_ptr<Config>& backend_config,
-      const NumaConfig& numa_config)
-      : backend_config_(backend_config), numa_config_(numa_config)
+      const HostPolicyCmdlineConfigMap& host_policy_map)
+      : backend_config_(backend_config), host_policy_map_(host_policy_map)
   {
   }
 
   const std::shared_ptr<Config> backend_config_;
-  const NumaConfig numa_config_;
+  const HostPolicyCmdlineConfigMap host_policy_map_;
 };
 
 }}  // namespace nvidia::inferenceserver

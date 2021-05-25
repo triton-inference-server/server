@@ -31,6 +31,8 @@
 #endif
 #include "src/core/logging.h"
 
+namespace nvidia { namespace inferenceserver {
+
 namespace {
 std::string
 VectorToString(const std::vector<int>& vec)
@@ -45,24 +47,32 @@ VectorToString(const std::vector<int>& vec)
   return str;
 }
 
-}  // namespace
+Status
+ParseIntOption(const std::string& msg, const std::string& arg, int* value)
+{
+  try {
+    *value = std::stoi(arg);
+  }
+  catch (const std::invalid_argument& ia) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        msg + ": Can't parse '" + arg + "' to integer");
+  }
+  return Status::Success;
+}
 
-namespace nvidia { namespace inferenceserver {
+}  // namespace
 
 // NUMA setting will be ignored on Windows platform
 #ifdef _WIN32
 Status
-SetNumaConfigOnThread(
-    const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id)
+SetNumaConfigOnThread(const HostPolicyCmdlineConfig& host_policy)
 {
   return Status::Success;
 }
 
 Status
-SetNumaMemoryPolicy(
-    const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id)
+SetNumaMemoryPolicy(const HostPolicyCmdlineConfig& host_policy)
 {
   return Status::Success;
 }
@@ -75,8 +85,8 @@ ResetNumaMemoryPolicy()
 
 Status
 SetNumaThreadAffinity(
-    std::thread::native_handle_type thread, const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id)
+    std::thread::native_handle_type thread,
+    const HostPolicyCmdlineConfig& host_policy)
 {
   return Status::Success;
 }
@@ -87,39 +97,49 @@ SetNumaThreadAffinity(
 thread_local bool numa_set = false;
 
 Status
-SetNumaConfigOnThread(
-    const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id)
+SetNumaConfigOnThread(const HostPolicyCmdlineConfig& host_policy)
 {
   // Set thread affinity
-  RETURN_IF_ERROR(
-      SetNumaThreadAffinity(pthread_self(), numa_config, device_kind, numa_id));
+  RETURN_IF_ERROR(SetNumaThreadAffinity(pthread_self(), host_policy));
 
   // Set memory policy
-  RETURN_IF_ERROR(SetNumaMemoryPolicy(numa_config, device_kind, numa_id));
+  RETURN_IF_ERROR(SetNumaMemoryPolicy(host_policy));
 
   return Status::Success;
 }
 
 Status
-SetNumaMemoryPolicy(
-    const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id)
+SetNumaMemoryPolicy(const HostPolicyCmdlineConfig& host_policy)
 {
-  const auto it = numa_config.find(std::make_pair(device_kind, numa_id));
-  if (it != numa_config.end()) {
-    LOG_VERBOSE(1) << "Device thread ("
-                   << TRITONSERVER_InstanceGroupKindString(device_kind) << "_"
-                   << numa_id << ") is binding to NUMA node "
-                   << it->second.first
+  const auto it = host_policy.find("numa-node");
+  if (it != host_policy.end()) {
+    int node_id;
+    RETURN_IF_ERROR(
+        ParseIntOption("Parsing 'numa-node' value", it->second, &node_id));
+    LOG_VERBOSE(1) << "Thread is binding to NUMA node " << it->second
                    << ". Max NUMA node count: " << numa_max_node();
     numa_set = true;
-    unsigned long node_mask = 1UL << it->second.first;
+    unsigned long node_mask = 1UL << node_id;
     if (set_mempolicy(MPOL_BIND, &node_mask, numa_max_node() + 1) != 0) {
       return Status(
           Status::Code::INTERNAL,
           std::string("Unable to set NUMA memory policy: ") + strerror(errno));
     }
+  }
+  return Status::Success;
+}
+
+Status
+GetNumaMemoryPolicyNodeMask(unsigned long* node_mask)
+{
+  *node_mask = 0;
+  int mode;
+  if (numa_set &&
+      get_mempolicy(&mode, node_mask, numa_max_node() + 1, NULL, 0) != 0) {
+    return Status(
+        Status::Code::INTERNAL,
+        std::string("Unable to get NUMA node for current thread: ") +
+            strerror(errno));
   }
   return Status::Success;
 }
@@ -138,19 +158,60 @@ ResetNumaMemoryPolicy()
 
 Status
 SetNumaThreadAffinity(
-    std::thread::native_handle_type thread, const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id)
+    std::thread::native_handle_type thread,
+    const HostPolicyCmdlineConfig& host_policy)
 {
-  const auto it = numa_config.find(std::make_pair(device_kind, numa_id));
-  if (it != numa_config.end()) {
-    LOG_VERBOSE(1) << "Device thread ("
-                   << TRITONSERVER_InstanceGroupKindString(device_kind) << "_"
-                   << numa_id << ") is binding to one of the CPUs: "
-                   << VectorToString(it->second.second);
+  const auto it = host_policy.find("cpu-cores");
+  if (it != host_policy.end()) {
+    // Parse CPUs
+    std::vector<int> cpus;
+    {
+      const auto& cpu_str = it->second;
+      auto delim_cpus = cpu_str.find(",");
+      int current_pos = 0;
+      while (true) {
+        auto delim_range = cpu_str.find("-", current_pos);
+        if (delim_range == std::string::npos) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              std::string("host policy setting 'cpu-cores' format is "
+                          "'<lower_cpu_core_id>-<upper_cpu_core_id>'. Got ") +
+                  cpu_str.substr(
+                      current_pos, ((delim_cpus == std::string::npos)
+                                        ? (cpu_str.length() + 1)
+                                        : delim_cpus) -
+                                       current_pos));
+        }
+        int lower, upper;
+        RETURN_IF_ERROR(ParseIntOption(
+            "Parsing 'cpu-cores' value",
+            cpu_str.substr(current_pos, delim_range - current_pos), &lower));
+        RETURN_IF_ERROR(ParseIntOption(
+            "Parsing 'cpu-cores' value",
+            (delim_cpus == std::string::npos)
+                ? cpu_str.substr(delim_range + 1)
+                : cpu_str.substr(
+                      delim_range + 1, delim_cpus - (delim_range + 1)),
+            &upper));
+        for (; lower <= upper; ++lower) {
+          cpus.push_back(lower);
+        }
+        // break if the processed range is the last specified range
+        if (delim_cpus != std::string::npos) {
+          current_pos = delim_cpus + 1;
+          delim_cpus = cpu_str.find(",", current_pos);
+        } else {
+          break;
+        }
+      }
+    }
+
+    LOG_VERBOSE(1) << "Thread is binding to one of the CPUs: "
+                   << VectorToString(cpus);
     numa_set = true;
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    for (int cpu : it->second.second) {
+    for (int cpu : cpus) {
       CPU_SET(cpu, &cpuset);
     }
     if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset) != 0) {

@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "model_config.pb.h"
+#include "src/core/model_config.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/persistent_backend_manager.h"
 #include "src/core/status.h"
@@ -202,7 +203,10 @@ class InferenceServer {
     backend_cmdline_config_map_ = bc;
   }
 
-  void SetNumaConfig(const NumaConfig& nc) { numa_config_ = nc; }
+  void SetHostPolicyCmdlineConfig(const HostPolicyCmdlineConfigMap& hp)
+  {
+    host_policy_map_ = hp;
+  }
 
   void SetRepoAgentDir(const std::string& d) { repoagent_dir_ = d; }
 
@@ -251,7 +255,7 @@ class InferenceServer {
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_supported_compute_capability_;
   BackendCmdlineConfigMap backend_cmdline_config_map_;
-  NumaConfig numa_config_;
+  HostPolicyCmdlineConfigMap host_policy_map_;
   std::string repoagent_dir_;
 
   // FIXME, remove once all backends use backend config.

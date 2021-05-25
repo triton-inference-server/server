@@ -28,34 +28,28 @@
 #include <map>
 #include <thread>
 #include <vector>
+#include "src/core/model_config.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// Map from a device identifier (kind and id) to a pair of NUMA node id and
-// the list of CPUs binds to the node.
-using NumaConfig = std::map<
-    std::pair<TRITONSERVER_InstanceGroupKind, int>,
-    std::pair<int32_t, std::vector<int>>>;
-
 // Helper function to set memory policy and thread affinity on current thread
-Status SetNumaConfigOnThread(
-    const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id);
+Status SetNumaConfigOnThread(const HostPolicyCmdlineConfig& host_policy);
 
 // Restrict the memory allocation to specific NUMA node.
-Status SetNumaMemoryPolicy(
-    const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id);
+Status SetNumaMemoryPolicy(const HostPolicyCmdlineConfig& host_policy);
+
+// Retrieve the node mask used to set memory policy for the current thread
+Status GetNumaMemoryPolicyNodeMask(unsigned long* node_mask);
 
 // Reset the memory allocation setting.
 Status ResetNumaMemoryPolicy();
 
 // Set a thread affinity to be on specific cpus.
 Status SetNumaThreadAffinity(
-    std::thread::native_handle_type thread, const NumaConfig& numa_config,
-    const TRITONSERVER_InstanceGroupKind device_kind, const int numa_id);
+    std::thread::native_handle_type thread,
+    const HostPolicyCmdlineConfig& host_policy);
 
 
 }}  // namespace nvidia::inferenceserver

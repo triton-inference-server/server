@@ -157,48 +157,6 @@ AllocatedMemory::AllocatedMemory(
   total_byte_size_ = (buffer_ == nullptr) ? 0 : total_byte_size_;
 }
 
-AllocatedMemory::AllocatedMemory(
-    size_t byte_size, TRITONSERVER_MemoryType memory_type,
-    int64_t memory_type_id, TRITONSERVER_InstanceGroupKind kind, int numa_id)
-    : MutableMemory(nullptr, byte_size, memory_type, memory_type_id)
-{
-  if (total_byte_size_ != 0) {
-    // Allocate memory with the following fallback policy:
-    // CUDA memory -> pinned system memory -> non-pinned system memory
-    switch (memory_type_) {
-#ifdef TRITON_ENABLE_GPU
-      case TRITONSERVER_MEMORY_GPU: {
-        auto status = CudaMemoryManager::Alloc(
-            (void**)&buffer_, total_byte_size_, memory_type_id_);
-        if (!status.IsOk()) {
-          static bool warning_logged = false;
-          if (!warning_logged) {
-            LOG_WARNING << status.Message()
-                        << ", falling back to pinned system memory";
-            warning_logged = true;
-          }
-
-          goto pinned_memory_allocation;
-        }
-        break;
-      }
-      pinned_memory_allocation:
-#endif  // TRITON_ENABLE_GPU
-      default: {
-        auto status = PinnedMemoryManager::Alloc(
-            (void**)&buffer_, total_byte_size_, &memory_type_, true, kind,
-            numa_id);
-        if (!status.IsOk()) {
-          LOG_ERROR << status.Message();
-          buffer_ = nullptr;
-        }
-        break;
-      }
-    }
-  }
-  total_byte_size_ = (buffer_ == nullptr) ? 0 : total_byte_size_;
-}
-
 AllocatedMemory::~AllocatedMemory()
 {
   if (buffer_ != nullptr) {
