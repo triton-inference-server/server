@@ -505,7 +505,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # python3-dev is needed by Torchvision
 # python3-pip is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
-# scons gcc7 needed for tflite backend
+# scons needed for tflite backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -527,8 +527,6 @@ RUN apt-get update && \
             software-properties-common \
             unzip \
             scons \
-            gcc-7 \
-            g++-7 \
             wget \
             zlib1g-dev \
             pkg-config \
