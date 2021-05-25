@@ -56,18 +56,25 @@ SHELL ["cmd", "/S", "/C"]
 RUN mkdir c:\tmp
 WORKDIR /tmp
 
+RUN powershell.exe [Net.ServicePointManager]::Expect100Continue = $true; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Ssl3; Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+RUN scoop install git docker unzip
+
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
 # vsdevcmd.bat (see https://bugs.python.org/issue38989)
-RUN powershell.exe -ExecutionPolicy RemoteSigned iex (new-object net.webclient).downloadstring('https://get.scoop.sh')
-RUN scoop install python git docker unzip
-RUN pip3 install --upgrade wheel setuptools docker
-RUN pip3 install grpcio-tools
+ADD https://www.python.org/ftp/python/3.8.10/python-3.8.10-amd64.exe python-3.8.10-amd64.exe
+RUN python-3.8.10-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_doc=0
+RUN mklink "c:\Program Files\Python38\python3.exe" "c:\Program Files\Python38\python.exe"
+RUN pip install --upgrade wheel setuptools docker
+RUN pip install grpcio-tools
 
-# Download and install Build Tools for Visual Studio.
-ADD https://aka.ms/vs/16/release/vs_buildtools.exe vs_buildtools.exe
-ADD https://aka.ms/vs/16/release/channel VisualStudio.chman
+# Download and install Build Tools for Visual Studio. VS seems to not
+# uncommonly break something or other so we want to stick with a
+# working compiler. Currently this is 16.8.5. This page contains
+# download links for buildtools.
+# https://docs.microsoft.com/en-us/visualstudio/releases/2019/history#release-dates-and-build-numbers
+ADD https://download.visualstudio.microsoft.com/download/pr/20130c62-1bc8-43d6-b4f0-c20bb7c79113/145a319d79a83376915d8f855605e152ef5f6fa2b2f1d2dca411fb03722eea72/vs_BuildTools.exe vs_buildtools.exe
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
-RUN vs_buildtools.exe --quiet --wait --norestart --nocache --installPath %VS_INSTALL_PATH_WP% --channelUri C:\tmp\VisualStudio.chman --installChannelUri C:\tmp\VisualStudio.chman --add Microsoft.VisualStudio.Workload.VCTools;includeRecommended --add Microsoft.Component.MSBuild || IF "%ERRORLEVEL%"=="3010" EXIT 0
+RUN vs_buildtools.exe --quiet --wait --norestart --nocache --installPath %VS_INSTALL_PATH_WP% --channelUri C:\tmp\doesnotexist.chman --add Microsoft.VisualStudio.Workload.VCTools;includeRecommended --add Microsoft.Component.MSBuild || IF "%ERRORLEVEL%"=="3010" EXIT 0
 
 WORKDIR /
 RUN git clone --depth=1 --single-branch -b 2021.04.30 https://github.com/microsoft/vcpkg.git
