@@ -1544,7 +1544,8 @@ ValidateModelConfigInt64()
       "ModelConfig::model_warmup::inputs::value::dims",
       "ModelConfig::optimization::cuda::graph_spec::input::value::dim",
       "ModelConfig::optimization::cuda::graph_spec::graph_lower_bound::input::"
-      "value::dim"};
+      "value::dim",
+      "ModelConfig::instance_group::secondary_devices::device_id"};
 
   if (int64_fields != expected) {
     return Status(
