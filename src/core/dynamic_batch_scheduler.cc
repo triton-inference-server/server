@@ -132,7 +132,7 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
 {
   // Signal the scheduler thread to exit and then wait for it..
   scheduler_thread_exit_.store(true);
-  cv_.notify_all();
+  cv_.notify_one();
   if (scheduler_thread_.joinable()) {
     scheduler_thread_.join();
   }
@@ -149,7 +149,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->QueueStartNs());
 
   Status enqueue_status;
-  bool wake_sched_thread = false;
+  bool wake_sched_thread = true;
   {
     std::lock_guard<std::mutex> lock(mu_);
 
@@ -159,16 +159,12 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     // 'request' and so we can't use it after this point.
     RETURN_IF_ERROR(queue_.Enqueue(request->Priority(), request));
 
-    // If there are any idle model instance and the queued batch size is
-    // greater or equal to next preferred batch size, then wake scheduler
-    // thread up to service this request. We do the actual wake outside of the
-    // lock to avoid having the woken thread immediately block on the lock
-    wake_sched_thread = (rate_limiter_->AvailableInstanceCount(model_) > 0);
-
-    // We may wake up scheduler thread less often if we don't enforce equal
-    // shape within a batch, otherwise must always wake up runner to check it
-    if (enforce_equal_shape_tensors_.empty()) {
-      wake_sched_thread &= (queued_batch_size_ >= next_preferred_batch_size_);
+    if (dynamic_batching_enabled_) {
+      // We may wake up scheduler thread less often if we don't enforce equal
+      // shape within a batch, otherwise must always wake up runner to check it
+      if (enforce_equal_shape_tensors_.empty()) {
+        wake_sched_thread &= (queued_batch_size_ >= next_preferred_batch_size_);
+      }
     }
   }
 
@@ -269,6 +265,16 @@ DynamicBatchScheduler::SchedulerThread(
           // Hold the lock for as short a time as possible.
           {
             std::unique_lock<std::mutex> lock(mu_);
+            auto request_available = [this]() -> bool {
+              return (
+                  (this->scheduler_thread_exit_.load()) || (!queue_.Empty()));
+            };
+            if (dynamic_batching_enabled_) {
+              std::chrono::microseconds wait_timeout(default_wait_microseconds);
+              cv_.wait_for(lock, wait_timeout, request_available);
+            } else {
+              cv_.wait(lock, request_available);
+            }
             if (delay_cnt > 0) {
               // Debugging/testing... wait until queue contains 'delay_cnt'
               // items...
@@ -288,10 +294,12 @@ DynamicBatchScheduler::SchedulerThread(
               // the request is as large as possible. Unfortunately, this
               // does not ensure RateLimiter is able to allocate the instance
               // right away.
+              // FIXME: There is no notification for this cv_. Revisit the logic
+              // when covering dynamic_batching_enabled_ case.
               auto instance_available = [this]() -> bool {
-                return !(
-                    this->scheduler_thread_exit_.load() ||
-                    (this->rate_limiter_->AvailableInstanceCount(model_) == 0));
+                return (
+                    (this->scheduler_thread_exit_.load()) ||
+                    (this->rate_limiter_->AvailableInstanceCount(model_) != 0));
               };
               cv_.wait(lock, instance_available);
               // Use dynamic batching to get request(s) to execute.
@@ -395,9 +403,12 @@ DynamicBatchScheduler::SchedulerThread(
           if (!requests.empty()) {
             auto sched_cb = [this, &state, &allocated_instance](
                                 RateLimiter::ModelInstance* mi) {
-              allocated_instance = mi;
-              state.store(SchedState::RECEIVED_MODEL_INSTANCE);
-              this->cv_.notify_all();
+              {
+                std::unique_lock<std::mutex> instance_lock(this->instance_mu_);
+                allocated_instance = mi;
+                state.store(SchedState::RECEIVED_MODEL_INSTANCE);
+              }
+              this->instance_cv_.notify_one();
             };
             state.store(SchedState::REQUESTED_MODEL_INSTANCE);
             rate_limiter_->RequestModelInstance(sched_cb, model_);
@@ -437,12 +448,12 @@ DynamicBatchScheduler::SchedulerThread(
           // requests. Also there might be some requests in the current deferred
           // batch that must be rejected but currently isn't.
           {
-            std::unique_lock<std::mutex> lock(mu_);
+            std::unique_lock<std::mutex> instance_lock(instance_mu_);
             auto received_instance = [this, &state]() -> bool {
-              return (!this->scheduler_thread_exit_.load()) &&
+              return (this->scheduler_thread_exit_.load()) ||
                      (state.load() == SchedState::RECEIVED_MODEL_INSTANCE);
             };
-            cv_.wait(lock, received_instance);
+            instance_cv_.wait(instance_lock, received_instance);
           }
           break;
         }
