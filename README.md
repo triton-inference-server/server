@@ -30,7 +30,7 @@
 
 # Triton Inference Server
 
-**LATEST RELEASE: You are currently on the master branch which tracks
+**LATEST RELEASE: You are currently on the main branch which tracks
 under-development progress towards the next release. The latest
 release of the Triton Inference Server is 2.10.0 and is available on
 branch
