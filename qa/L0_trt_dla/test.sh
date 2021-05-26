@@ -56,30 +56,10 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -fr models && mkdir models 
-cp -r $DATADIR/caffe_models/trt_model_store/resnet50_plan models/.
+cp -r $DATADIR/trt_dla_model_store/resnet50_plan models/.
 rm -f *.log
 
 set +e
-
-# Create the PLAN file
-mkdir -p models/resnet50_plan/1 && rm -f models/resnet50_plan/1/model.plan && \
-    $CAFFE2PLAN -b32 -n prob -o models/resnet50_plan/1/model.plan \
-                $DATADIR/caffe_models/resnet50_dla.prototxt $DATADIR/caffe_models/resnet50.caffemodel
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to generate resnet50 DLA compatible PLAN\n***"
-    exit 1
-fi
-
-set -e
-
-# Enable NVDLA by specifying secondary devices in instance group
-echo "instance_group [{" >> models/resnet50_plan/config.pbtxt
-echo "    kind: KIND_GPU" >> models/resnet50_plan/config.pbtxt
-echo "    secondary_devices [{" >> models/resnet50_plan/config.pbtxt
-echo "          kind: KIND_NVDLA " >> models/resnet50_plan/config.pbtxt
-echo "          device_id: 0" >> models/resnet50_plan/config.pbtxt
-echo "    }]" >> models/resnet50_plan/config.pbtxt
-echo "}]" >> models/resnet50_plan/config.pbtxt
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
