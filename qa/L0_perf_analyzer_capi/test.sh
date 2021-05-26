@@ -24,7 +24,7 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+set -x
 # TESTS COPIED FROM L0_perf_analyzer/test.sh
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
@@ -39,7 +39,8 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./perf_analyzer.log"
-PERF_ANALYZER=../clients/perf_analyzer
+PERF_ANALYZER=/workspace/install/bin/perf_client
+#../clients/perf_analyzer
 
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
@@ -90,12 +91,14 @@ RET=0
 
 ########## Test C API #############
 # Make sure tritonserver is not running first
+set +e
 SERVER_PID=$(pidof tritonserver)
 if [ $? -ne 1 ]; then
 echo -e "\n There was a previous instance of tritonserver, killing \n"
   kill $SERVER_PID
   wait $SERVER_PID
 fi
+set -e
 
 # Testing simple configuration
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 \
@@ -235,6 +238,7 @@ fi
 # fi
 
 #Testing that async does NOT work
+set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
 --service-kind=triton_c_api --model-repository=$DATADIR \
 --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
@@ -243,6 +247,7 @@ if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; 
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+set -e
 
 #Testing that shared memory does NOT work
 for SHARED_MEMORY_TYPE in system cuda; do
@@ -258,9 +263,10 @@ for SHARED_MEMORY_TYPE in system cuda; do
     fi
     set -e
 done
-set +e
+
 
 # Testing --request-rate-range does NOT work
+set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 -p1000 -b 1 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
 --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
@@ -269,8 +275,10 @@ if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; 
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+set -e
 
 # Make sure server is not still running
+set +e
 SERVER_PID=$(pidof tritonserver)
 if [ $? -eq 0 ]; then
   echo -e "\n Tritonserver did not exit properly, killing \n"
@@ -278,6 +286,7 @@ if [ $? -eq 0 ]; then
   wait $SERVER_PID
   RET=1
 fi
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
@@ -285,3 +294,4 @@ else
   echo -e "\n***\n*** Test FAILED\n***"
 fi
 exit $RET
+set +x
