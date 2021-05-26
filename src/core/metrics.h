@@ -164,12 +164,12 @@ class Metrics {
   dcgmHandle_t dcgm_handle_;
   std::unique_ptr<std::thread> dcgm_thread_;
   std::atomic<bool> dcgm_thread_exit_;
+  dcgmGpuGrp_t groupId_;
 #endif  // TRITON_ENABLE_METRICS_GPU
 
   bool metrics_enabled_;
   bool gpu_metrics_enabled_;
   std::mutex gpu_metrics_enabling_;
-  dcgmGpuGrp_t groupId_;
 };
 
 }}  // namespace nvidia::inferenceserver
