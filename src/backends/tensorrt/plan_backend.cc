@@ -436,10 +436,11 @@ PlanBackend::CreateExecutionContexts(
 
         LOG_INFO << "Creating instance " << instance_name << " on GPU "
                  << gpu_device << " (" << cc << ") using " << cc_model_filename;
-        RETURN_IF_ERROR(CreateExecutionContext(
+        auto err = CreateExecutionContext(
             instance_name, gpu_device, dla_core_id, mn_itr->second,
-            group.profile(), queue, *host_policy));
+            group.profile(), queue, *host_policy);
         RETURN_IF_ERROR(ResetNumaMemoryPolicy());
+        RETURN_IF_ERROR(err);
       }
     }
   }

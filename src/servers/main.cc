@@ -405,7 +405,9 @@ std::vector<Option> options_
        "The total byte size that can be allocated as pinned system memory. "
        "If GPU support is enabled, the server will allocate pinned system "
        "memory to accelerate data transfer between host and devices until it "
-       "exceeds the specified byte size. This option will not affect the "
+       "exceeds the specified byte size. If 'numa-node' is configured via "
+       "--host-policy, the pinned system memory of the pool size will be "
+       "allocated on each numa node. This option will not affect the "
        "allocation conducted by the backend frameworks. Default is 256 MB."},
       {OPTION_CUDA_MEMORY_POOL_BYTE_SIZE, "cuda-memory-pool-byte-size",
        "<integer>:<integer>",
@@ -444,7 +446,9 @@ std::vector<Option> options_
     OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
         "Specify a host policy setting associated with a policy name. The "
         "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
-        "Currently supported settings are 'numa-node', 'cpu-cores'"
+        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
+        "'numa-node' setting will affect pinned memory pool behavior, see "
+        "--pinned-memory-pool for more detail."
   }
 };
 
