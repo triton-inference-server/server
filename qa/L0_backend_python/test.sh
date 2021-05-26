@@ -60,7 +60,7 @@ create_conda_env() {
   env_name=$2
   conda create -n $env_name python=$python_version -y
   conda activate $env_name
-  conda install conda-pack numpy -y
+  conda install conda-pack -y
 }
 
 create_python_backend_stub() {
@@ -467,6 +467,7 @@ install_conda
 
 # Create a model with python 3.9 version
 create_conda_env "3.9" "python-3-9"
+conda install numpy=1.20.1 -y
 create_python_backend_stub
 conda-pack -o python3.9.tar.gz
 path_to_conda_pack=`pwd`/python3.9.tar.gz
@@ -481,6 +482,7 @@ conda deactivate
 
 # Create a model with python 3.6 version
 create_conda_env "3.6" "python-3-6"
+conda install numpy=1.18.1 -y
 conda-pack -o python3.6.tar.gz
 path_to_conda_pack=`pwd`/python3.6.tar.gz
 create_python_backend_stub
@@ -504,17 +506,17 @@ kill $SERVER_PID
 wait $SERVER_PID
 sleep 5
 
-grep "Python version is 3.6" $SERVER_LOG
+grep "Python version is 3.6 and NumPy version is 1.18.1" $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** Python 3.6 was not found in Triton logs. \n***"
+    echo -e "\n***\n*** Python 3.6 and NumPy 1.18.1 was not found in Triton logs. \n***"
     RET=1
 fi
 
-grep "Python version is 3.9" $SERVER_LOG
+grep "Python version is 3.9 and NumPy version is 1.20.1" $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** Python 3.9 was not found in Triton logs. \n***"
+    echo -e "\n***\n*** Python 3.9 and NumPy 1.20.1 was not found in Triton logs. \n***"
     RET=1
 fi
 set -e
