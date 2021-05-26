@@ -45,18 +45,18 @@ LoadPlan(
       return Status(
           Status::Code::INTERNAL, "unable to create TensorRT runtime");
     }
-  }
 
-  // If there are no DLA cores or dla_core_id < number of DLA cores report error
-  if (dla_core_id != -1) {
-    if (dla_core_id < (*runtime)->getNbDLACores()) {
-      (*runtime)->setDLACore(dla_core_id);
-    } else {
-      return Status(
-          Status::Code::INVALID_ARG,
-          ("unable to create TensorRT runtime with DLA Core ID: " +
-           std::to_string(dla_core_id))
-              .c_str());
+    // Report error if 'dla_core_id' >= number of DLA cores
+    if (dla_core_id != -1) {
+      if (dla_core_id < (*runtime)->getNbDLACores()) {
+        (*runtime)->setDLACore(dla_core_id);
+      } else {
+        return Status(
+            Status::Code::INVALID_ARG,
+            ("unable to create TensorRT runtime with DLA Core ID: " +
+             std::to_string(dla_core_id))
+                .c_str());
+      }
     }
   }
 
