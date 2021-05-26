@@ -1,6 +1,6 @@
 #ifndef DCGM_DCGM_API_EXPORT_H
 #define DCGM_DCGM_API_EXPORT_H
-​
+
 #undef DCGM_PUBLIC_API
 #undef DCGM_PRIVATE_API
 ​
@@ -13,7 +13,6 @@
 #endif
 #endif
 ​
-#define DCGM_PRIVATE_API __attribute((visibility("hidden")))
-​
-​
+#define DCGM_PRIVATE_API __attribute((visibility("hidden")))​
+
 #endif // DCGM_DCGM_API_EXPORT_H
