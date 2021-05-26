@@ -1714,8 +1714,8 @@ HTTPAPIServer::GetInferenceHeaderLength(
       catch (const std::invalid_argument& ia) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("Unable to parse Content-Length, got: ") +
-             content_length_c_str)
+            (std::string("Unable to parse ") + kContentLengthHeader +
+             ", got: " + content_length_c_str)
                 .c_str());
       }
     }
