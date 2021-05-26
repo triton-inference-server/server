@@ -60,7 +60,7 @@ class PlanBackend : public InferenceBackend {
       const std::unordered_map<std::string, std::vector<char>>& models);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const int dla_core_id, const std::vector<char>& models,
+      const int64_t dla_core_id, const std::vector<char>& models,
       const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
       const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue);
 
@@ -430,10 +430,11 @@ class PlanBackend : public InferenceBackend {
     bool eager_batching_;
   };
 
-  // CUDA engine shared across all model instances using the same DLA core on
-  // same GPU.
+  // CUDA engine shared across all model instances using the same (or no) DLA
+  // core on same GPU. The first element in the key pair is the GPU ID, the
+  // second is the DLA core ID.
   std::map<
-      std::pair<int, int>,
+      std::pair<int, int64_t>,
       std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
       device_engines_;
 

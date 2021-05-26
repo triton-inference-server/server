@@ -291,7 +291,7 @@ PlanBackend::CreateExecutionContexts(
     }
 
     // Use DLA core id or GPU id from config based on instance group type
-    int32_t dla_core_id = -1;
+    int64_t dla_core_id = -1;
     uint32_t secondary_device_count = group.secondary_devices().size();
     if (secondary_device_count != 0) {
       if (secondary_device_count != 1) {
@@ -392,7 +392,8 @@ PlanBackend::CreateExecutionContexts(
           }
 
           RETURN_IF_ERROR(LoadPlan(
-              mn_itr->second, &eit->second.first, &eit->second.second));
+              mn_itr->second, dla_core_id, &eit->second.first,
+              &eit->second.second));
 
           // Validate whether the engine can be shared
           bool is_dynamic = false;
@@ -585,7 +586,7 @@ PlanBackend::Context::InitOptimizationProfiles(
 Status
 PlanBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
-    const int dla_core_id, const std::vector<char>& model,
+    const int64_t dla_core_id, const std::vector<char>& model,
     const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
     const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue)
 {
@@ -649,7 +650,8 @@ PlanBackend::CreateExecutionContext(
   auto eit = device_engines_.find(device_pair);
   if (eit->second.second == nullptr) {
     context->is_shared_engine_ = false;
-    RETURN_IF_ERROR(LoadPlan(model, &eit->second.first, &context->engine_));
+    RETURN_IF_ERROR(
+        LoadPlan(model, dla_core_id, &eit->second.first, &context->engine_));
   } else {
     context->engine_ = eit->second.second;
   }

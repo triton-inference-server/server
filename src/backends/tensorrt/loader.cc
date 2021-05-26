@@ -35,8 +35,8 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 LoadPlan(
-    const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
-    nvinfer1::ICudaEngine** engine, int32_t dla_core_id)
+    const std::vector<char>& model_data, int64_t dla_core_id,
+    nvinfer1::IRuntime** runtime, nvinfer1::ICudaEngine** engine)
 {
   // Create runtime only if it is not provided
   if (*runtime == nullptr) {
