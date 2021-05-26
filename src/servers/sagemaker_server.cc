@@ -30,22 +30,69 @@ namespace nvidia { namespace inferenceserver {
 const std::string SagemakerAPIServer::binary_mime_type_(
     "application/vnd.sagemaker-triton.binary+json;json-header-size=");
 
-size_t
-SagemakerAPIServer::GetInferenceHeaderLength(evhtp_request_t* req)
+TRITONSERVER_Error*
+SagemakerAPIServer::GetInferenceHeaderLength(
+    evhtp_request_t* req, size_t* header_length)
 {
   // Check mime type and set inference header length. If missing set to 0
-  size_t header_length = 0;
+  *header_length = 0;
   const char* content_type_c_str =
       evhtp_kv_find(req->headers_in, kContentTypeHeader);
   if (content_type_c_str != NULL) {
     std::string content_type(content_type_c_str);
     size_t pos = content_type.find(binary_mime_type_);
     if (pos != std::string::npos) {
-      header_length =
-          std::atoi(content_type_c_str + pos + binary_mime_type_.length());
+      if (pos != 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("expect MIME type for binary data starts with '") +
+             binary_mime_type_ + "', got: " + content_type)
+                .c_str());
+      }
+
+      // Parse
+      int32_t parsed_value;
+      try {
+        parsed_value =
+            std::atoi(content_type_c_str + binary_mime_type_.length());
+      }
+      catch (const std::invalid_argument& ia) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Unable to parse inference header size, got: ") +
+             (content_type_c_str + binary_mime_type_.length()))
+                .c_str());
+      }
+      // Set to large value in case there is no Content-Length to compare with
+      int32_t content_length = INT32_MAX;
+      const char* content_length_c_str =
+          evhtp_kv_find(req->headers_in, kContentLengthHeader);
+      if (content_length_c_str != nullptr) {
+        try {
+          content_length = std::atoi(content_length_c_str);
+        }
+        catch (const std::invalid_argument& ia) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("Unable to parse ") + kContentLengthHeader +
+               ", got: " + content_length_c_str)
+                  .c_str());
+        }
+      }
+
+      // Check if the content length is in proper range
+      if ((parsed_value < 0) || (parsed_value > content_length)) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("inference header size should be in range (0, ") +
+             std::to_string(content_length) +
+             "), got: " + (content_type_c_str + binary_mime_type_.length()))
+                .c_str());
+      }
+      *header_length = parsed_value;
     }
   }
-  return header_length;
+  return nullptr;
 }
 
 void

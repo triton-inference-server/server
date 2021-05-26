@@ -234,7 +234,8 @@ class HTTPAPIServer : public HTTPServer {
   //
   // Get the inference header length. Return 0 if the whole request body is
   // the inference header.
-  virtual size_t GetInferenceHeaderLength(evhtp_request_t* req);
+  virtual TRITONSERVER_Error* GetInferenceHeaderLength(
+      evhtp_request_t* req, size_t* header_length);
   virtual DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req);
   virtual DataCompressor::Type GetResponseCompressionType(evhtp_request_t* req);
 
