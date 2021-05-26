@@ -39,7 +39,7 @@ protocols](https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2
 that have been proposed by the [KFServing
 project](https://github.com/kubeflow/kfserving). To fully enable all
 capabilities Triton also implements a number [HTTP/REST and GRPC
-extensions](https://github.com/triton-inference-server/server/tree/master/docs/protocol).
+extensions](https://github.com/triton-inference-server/server/tree/main/docs/protocol).
 to the KFServing inference protocol.
 
 The HTTP/REST and GRPC protcols provide endpoints to check server and
