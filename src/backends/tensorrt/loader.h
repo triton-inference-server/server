@@ -36,14 +36,16 @@ namespace nvidia { namespace inferenceserver {
 /// responsibility to destroy any returned runtime or engine object
 /// even if an error is returned.
 ///
-/// \param model_data The binary blob of the plan data
+/// \param model_data The binary blob of the plan data.
+/// \param dla_core_id The DLA core to use for this runtime. Does not
+/// use DLA when set to -1.
 /// \param runtime Returns the IRuntime object, or nullptr if failed
-/// to create
+/// to create.
 /// \param engine Returns the ICudaEngine object, or nullptr if failed
-/// to create
+/// to create.
 /// \return Error status.
 Status LoadPlan(
-    const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
-    nvinfer1::ICudaEngine** engine);
+    const std::vector<char>& model_data, int64_t dla_core_id,
+    nvinfer1::IRuntime** runtime, nvinfer1::ICudaEngine** engine);
 
 }}  // namespace nvidia::inferenceserver
