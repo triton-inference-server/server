@@ -39,8 +39,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./perf_analyzer.log"
-PERF_ANALYZER=/workspace/install/bin/perf_client
-#../clients/perf_analyzer
+PERF_ANALYZER=../clients/perf_analyzer
 
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
