@@ -544,14 +544,6 @@ if(${TRITON_ENABLE_METRICS_GPU})
   )
 endif() # TRITON_ENABLE_METRICS_GPU
 
-#if(${TRITON_ENABLE_GPU})
-#target_include_directories(identity PRIVATE ${CUDA_INCLUDE_DIRS})
-#target_link_libraries(
-#  identity
-#  PUBLIC ${CUDA_nvml_LIBRARY}
-#  PRIVATE ${CUDA_LIBRARIES}
-#)
-
 install(
   TARGETS tritonserver
   LIBRARY DESTINATION lib
