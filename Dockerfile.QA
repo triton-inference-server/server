@@ -296,7 +296,8 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
     && add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
 RUN apt-get update \
     && apt-get install -y datacenter-gpu-manager
-RUN cp /workspace/tools/dcgm_api_export.h /usr/include/
+WORKDIR /workspace
+RUN cp --from=build /workspace/tools/dcgm_api_export.h /usr/include/
   
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
