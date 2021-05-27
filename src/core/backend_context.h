@@ -138,7 +138,7 @@ class BackendResponder {
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const int max_batch_size, const bool pinned_enabled, cudaStream_t stream,
-      cudaEvent_t event = nullptr)
+      cudaEvent_t event)
       : need_sync_(false), requests_(requests), responses_(responses),
         max_batch_size_(max_batch_size), pinned_enabled_(pinned_enabled),
         use_async_cpu_copy_(triton::common::AsyncWorkQueue::WorkerCount() > 1),
@@ -229,8 +229,7 @@ class BackendInputCollector {
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const bool pinned_enabled, const size_t kernel_buffer_threshold,
-      cudaStream_t stream, cudaEvent_t event = nullptr,
-      cudaEvent_t buffer_ready_event = nullptr)
+      cudaStream_t stream, cudaEvent_t event, cudaEvent_t buffer_ready_event)
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
         kernel_buffer_threshold_(kernel_buffer_threshold),
