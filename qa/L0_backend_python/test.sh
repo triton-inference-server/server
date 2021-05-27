@@ -31,6 +31,7 @@ EXPECTED_NUM_TESTS="10"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
@@ -40,6 +41,34 @@ source ../common/util.sh
 get_shm_pages() {
   shm_pages=(`ls /dev/shm`)
   echo ${#shm_pages[@]}
+}
+
+install_conda() {
+  rm -rf ./miniconda
+  file_name="Miniconda3-py38_4.9.2-Linux-x86_64.sh"
+  wget https://repo.anaconda.com/miniconda/$file_name
+
+  # install miniconda in silent mode
+  bash $file_name -p ./miniconda -b
+
+  # activate conda
+  eval "$(./miniconda/bin/conda shell.bash hook)"
+}
+
+create_conda_env() {
+  python_version=$1
+  env_name=$2
+  conda create -n $env_name python=$python_version -y
+  conda activate $env_name
+  conda install conda-pack -y
+}
+
+create_python_backend_stub() {
+  rm -rf python_backend
+  git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_BRANCH
+  (cd python_backend/ && mkdir builddir && cd builddir && \
+  cmake -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
+  make -j18 triton-python-backend-stub)
 }
 
 rm -fr *.log ./models
@@ -163,6 +192,7 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+sleep 4
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -261,9 +291,11 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+sleep 5
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -272,9 +304,10 @@ if [ $current_num_pages -ne $prev_num_pages ]; then
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
+    exit 1
 fi
 
+set +e
 grep "name 'undefined_variable' is not defined" $SERVER_LOG
 
 if [ $? -ne 0 ]; then
@@ -284,6 +317,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+set +e
 # Test KIND_GPU
 rm -rf models/
 mkdir -p models/add_sub_gpu/1/
@@ -299,13 +333,15 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** KIND_GPU model test failed \n***"
     RET=1
 fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+sleep 5
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -314,7 +350,7 @@ if [ $current_num_pages -ne $prev_num_pages ]; then
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
+    exit 1
 fi
 
 # Test Multi file models
@@ -325,6 +361,7 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
 (cd models/multi_file && \
           sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
 
+set +e
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -334,22 +371,25 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** multi-file model test failed \n***"
     RET=1
 fi
 
+set +e
 kill $SERVER_PID
 wait $SERVER_PID
+sleep 5
+set -e
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     ls /dev/shm
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
+    exit 1
 fi
 
 # Test environment variable propagation
@@ -367,9 +407,11 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
+set +e
 
 kill $SERVER_PID
 wait $SERVER_PID
+sleep 5
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -378,7 +420,7 @@ if [ $current_num_pages -ne $prev_num_pages ]; then
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
+    exit 1
 fi
 
 rm -fr ./models
@@ -405,14 +447,84 @@ $page_size."
         RET=1
     fi
 done
+set +e
 
 kill $SERVER_PID
 wait $SERVER_PID
+sleep 5
+
+rm -fr ./models
+rm -rf *.tar.gz
+apt update && apt install software-properties-common rapidjson-dev -y
+wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+	gpg --dearmor - |  \
+	tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+	apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+	apt-get update && \
+	apt-get install -y --no-install-recommends \
+	cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
+install_conda
+
+# Create a model with python 3.9 version
+create_conda_env "3.9" "python-3-9"
+conda install numpy=1.20.1 -y
+create_python_backend_stub
+conda-pack -o python3.9.tar.gz
+path_to_conda_pack=`pwd`/python3.9.tar.gz
+mkdir -p models/python_3_9/1/
+cp ../python_models/python_version/config.pbtxt ./models/python_3_9
+(cd models/python_3_9 && \
+          sed -i "s/^name:.*/name: \"python_3_9\"/" config.pbtxt && \
+          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
+cp ../python_models/python_version/model.py ./models/python_3_9/1/
+cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
+conda deactivate
+
+# Create a model with python 3.6 version
+create_conda_env "3.6" "python-3-6"
+conda install numpy=1.18.1 -y
+conda-pack -o python3.6.tar.gz
+path_to_conda_pack=`pwd`/python3.6.tar.gz
+create_python_backend_stub
+mkdir -p models/python_3_6/1/
+cp ../python_models/python_version/config.pbtxt ./models/python_3_6
+(cd models/python_3_6 && \
+          sed -i "s/^name:.*/name: \"python_3_6\"/" config.pbtxt && \
+          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
+cp ../python_models/python_version/model.py ./models/python_3_6/1/
+cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+
+kill $SERVER_PID
+wait $SERVER_PID
+sleep 5
+
+grep "Python version is 3.6 and NumPy version is 1.18.1" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Python 3.6 and NumPy 1.18.1 was not found in Triton logs. \n***"
+    RET=1
+fi
+
+grep "Python version is 3.9 and NumPy version is 1.20.1" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Python 3.9 and NumPy 1.20.1 was not found in Triton logs. \n***"
+    RET=1
+fi
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
