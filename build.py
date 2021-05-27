@@ -464,6 +464,24 @@ def dali_cmake_args():
         '-DTRITON_DALI_SKIP_DOWNLOAD=OFF',
     ]
 
+def install_dcgm_libraries():
+    return '''
+# Install DCGM
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
+&& mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
+&& apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
+&& add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+RUN apt-get update \
+&& apt-get install -y datacenter-gpu-manager
+'''
+
+def fail_if_dcgm_api_export_exists():
+    return '''
+# Note: The current version is missing header files so we applied a dcgm_api_export.h to fix the build. This fix should be removed
+# after DCGM team fixes this issue in their new release.
+RUN if test -s /usr/include/dcgm_api_export.h;then echo "/usr/include/dcgm_api_export.h exists! Remove copy from build.py" | exit 1;fi
+'''
 
 def fil_cmake_args(images):
     cargs = [
@@ -536,17 +554,6 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
 
-# Install DCGM
-# Note: The current version is missing header files so we applied a patch to fix the build. This patch should be removed
-# after DCGM team fixes this issue in their new release.
-RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
-    && mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
-    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
-    && add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
-RUN apt-get update \
-    && apt-get install -y datacenter-gpu-manager
-
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
       gpg --dearmor - |  \
@@ -577,11 +584,10 @@ ENTRYPOINT []
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 '''
-    if target_platform() != 'windows':
-        df += '''
-# Install DCGM - patch
-# Note: The current version is missing header files so we applied a patch to fix the build. This patch should be removed
-# after DCGM team fixes this issue in their new release.
+    df += install_dcgm_libraries()
+    df += fail_if_dcgm_api_export_exists()
+    df += '''
+WORKDIR /workspace
 RUN cp /workspace/tools/dcgm_api_export.h /usr/include/
 '''
 
@@ -701,6 +707,12 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/includ
 # Top-level include/core not copied so --chown does not set it correctly,
 # so explicit set on all of include
 RUN chown -R triton-server:triton-server include
+'''
+
+    df += install_dcgm_libraries()
+    df += fail_if_dcgm_api_export_exists()
+    df += '''
+COPY --from=tritonserver_build RUN /workspace/tools/dcgm_api_export.h /usr/include/
 '''
 
     for noncore in NONCORE_BACKENDS:

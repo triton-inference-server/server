@@ -10,5 +10,5 @@
 #error(Should be public)
 #endif
 #endif
-#define DCGM_PRIVATE_API __attribute((visibility("hidden")))​
+#define DCGM_PRIVATE_API __attribute((visibility("hidden")))
 #endif // DCGM_DCGM_API_EXPORT_H
