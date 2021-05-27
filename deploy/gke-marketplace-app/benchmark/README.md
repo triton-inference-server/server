@@ -1,0 +1,70 @@
+<!--
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+
+# Benchmarking with NVIDIA Triton Inference Server GKE Marketplace Application
+
+**Table Of Contents**
+- [Models](#models)
+
+## Models
+
+First, we collect a set of TensorFlow and TensorRT models to compare:
+
+- Get [Distill Bert fine-tuned with Squad Q&A task](https://huggingface.co/distilbert-base-cased-distilled-squad/tree/main) from Huggingface. `wget https://huggingface.co/distilbert-base-cased-distilled-squad/blob/main/saved_model.tar.gz`
+- Get [Bert base fine-tuned with Squad Q&A task](https://huggingface.co/deepset/bert-base-cased-squad2/tree/main) from Huggingface `wget https://huggingface.co/deepset/bert-base-cased-squad2/blob/main/saved_model.tar.gz`
+- Follow [TensorRT Demo Bert](https://github.com/NVIDIA/TensorRT/tree/master/demo/BERT) to convert BERT base model to TensorRT Engine, choose sequence length of 384 to match previous 2 TensorFlow models. Last step, we choose to create TensorRT engine with 2 optimization profile, profile 0 for batch size 1 and profile 1 for batch size 4 run: `python3 builder.py -m models/fine-tuned/bert_tf_ckpt_base_qa_squad2_amp_384_v19.03.1/model.ckpt -o engines/model.plan -b 1 -b 4 -s 384 --fp16 --int8 --strict -c models/fine-tuned/bert_tf_ckpt_base_qa_squad2_amp_384_v19.03.1 --squad-json ./squad/train-v2.0.json -v models/fine-tuned/bert_tf_ckpt_base_qa_squad2_amp_384_v19.03.1/vocab.txt --calib-num 100 -iln -imh`. This needs to be ran on the inference GPU respectively (Engine optimized with A100 cannot be used for inference on T4).
+
+We the place the model into a GCS with following structure, `config.pbtxt` was provided.
+```
+    ├── bert_base_trt_gpu
+    │   ├── 1
+    │   │   └── model.plan
+    │   └── config.pbtxt   
+    ├── bert_base_tf_gpu
+    │   ├── 1
+    │   │   └── model.savedmodel
+    │   └── config.pbtxt      
+    ├── bert_base_tf_cpu
+    │   ├── 1
+    │   │   └── model.savedmodel
+    │   └── config.pbtxt
+    ├── bert_distill_tf_gpu 
+    │   ├── 1
+    │   │   └── model.savedmodel
+    │   └── config.pbtxt
+    └── bert_distill_tf_cpu
+        ├── 1
+        │   └── model.savedmodel
+        └── config.pbtxt 
+```
+
+When deploy Triton GKE application, point the model repository to directory contains the structure above with actual models. We provided a directory in `gs://triton_sample_models/21_05_mig5g_benchmark` to benchmark 21.05 release on A100 MIG 5gb slice. 
+
+## Performance
+
+We use perf analyzer of Triton to 

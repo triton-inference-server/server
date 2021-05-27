@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,25 +25,34 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-export REGISTRY=gcr.io/$(gcloud config get-value project | tr ':' '/')
-export APP_NAME=tritonserver
-export MAJOR_VERSION=2.10.0
-export MINOR_VERSION=2.10.0
-export NGC_VERSION=21.05-py3
+SERVER_HOST=${1:-"${INGRESS_HOST}:${INGRESS_PORT}"} # need update public IP
+MODEL_NAME=${2:-"bert_base_trt_gpu"}
+precision=${3:-"fp32"}
+BATCH_SIZE=${4:-1}
+MAX_LATENCY=${5:-5000}
+MAX_CLIENT_THREADS=${6:-20}
+MAX_CONCURRENCY=${7:-32}
+MODEL_VERSION=${8:-1}
+SEQ_LENGTH=${9:-"384"}
+PERFCLIENT_PERCENTILE=${10:-90}
+MAX_TRIALS=${12:-40}
 
-docker pull nvcr.io/nvidia/$APP_NAME:$NGC_VERSION
+ARGS="\
+   --max-threads ${MAX_CLIENT_THREADS} \
+   -m ${MODEL_NAME} \
+   -x ${MODEL_VERSION} \
+   -p 3000 \
+   --async \
+   --concurrency-range 4:${MAX_CONCURRENCY}:4 \
+   -r ${MAX_TRIALS} \
+   -v \
+   -i HTTP \
+   -u ${SERVER_HOST} \
+   -b ${BATCH_SIZE} \
+   -l ${MAX_LATENCY} \
+   -z \
+   --percentile=${PERFCLIENT_PERCENTILE}"
 
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$NGC_VERSION
+echo "Using args:  $(echo "$ARGS" | sed -e 's/   -/\n-/g')"
 
-docker push $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME:$NGC_VERSION
-
-docker build --tag $REGISTRY/$APP_NAME/deployer .
-
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
+/workspace/install/bin/perf_client $ARGS -f perf.csv
