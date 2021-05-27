@@ -485,6 +485,22 @@ on the CPU.
   ]
 ```
 
+The instance group setting is associated with a host policy. The following
+configuration will associate all instances created by the instance group setting
+with host policy "policy_0". By default the host policy will be set according to
+the device kind of the instance, for instance, KIND_CPU is "cpu", KIND_MODEL is
+"model", and KIND_GPU is "gpu_\<gpu_id\>".
+
+```
+  instance_group [
+    {
+      count: 2
+      kind: KIND_CPU
+      host_policy: "policy_0"
+    }
+  ]
+```
+
 ## Scheduling And Batching
 
 Triton supports batch inferencing by allowing individual inference

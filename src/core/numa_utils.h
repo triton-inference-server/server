@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,45 +25,31 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/backends/tensorrt/plan_backend.h"
+#include <map>
+#include <thread>
+#include <vector>
+#include "src/core/model_config.h"
 #include "src/core/status.h"
+#include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// Adapter that converts storage paths pointing to PLAN files into the
-// corresponding plan backend.
-class PlanBackendFactory {
- public:
-  struct Config : public BackendConfig {
-    // Autofill missing required model configuration settings based on
-    // model definition file.
-    bool autofill;
-  };
+// Helper function to set memory policy and thread affinity on current thread
+Status SetNumaConfigOnThread(const HostPolicyCmdlineConfig& host_policy);
 
-  static Status Create(
-      const std::shared_ptr<BackendConfig>& backend_config,
-      const HostPolicyCmdlineConfigMap& host_policy_map,
-      std::unique_ptr<PlanBackendFactory>* factory);
+// Restrict the memory allocation to specific NUMA node.
+Status SetNumaMemoryPolicy(const HostPolicyCmdlineConfig& host_policy);
 
-  Status CreateBackend(
-      const std::string& path, const inference::ModelConfig& model_config,
-      const double min_compute_capability,
-      std::unique_ptr<InferenceBackend>* backend);
+// Retrieve the node mask used to set memory policy for the current thread
+Status GetNumaMemoryPolicyNodeMask(unsigned long* node_mask);
 
-  ~PlanBackendFactory() = default;
+// Reset the memory allocation setting.
+Status ResetNumaMemoryPolicy();
 
- private:
-  DISALLOW_COPY_AND_ASSIGN(PlanBackendFactory);
+// Set a thread affinity to be on specific cpus.
+Status SetNumaThreadAffinity(
+    std::thread::native_handle_type thread,
+    const HostPolicyCmdlineConfig& host_policy);
 
-  PlanBackendFactory(
-      const std::shared_ptr<Config>& backend_config,
-      const HostPolicyCmdlineConfigMap& host_policy_map)
-      : backend_config_(backend_config), host_policy_map_(host_policy_map)
-  {
-  }
-
-  const std::shared_ptr<Config> backend_config_;
-  const HostPolicyCmdlineConfigMap host_policy_map_;
-};
 
 }}  // namespace nvidia::inferenceserver
