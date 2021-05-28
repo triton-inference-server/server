@@ -24,7 +24,7 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-set -x
+
 # TESTS COPIED FROM L0_perf_analyzer/test.sh
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
@@ -203,7 +203,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-# # FIXME: simple_savedmodel_sequence_object segfaults with local CAPI
+# # TODO: simple_savedmodel_sequence_object segfaults with CAPI
 # $PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
 # --input-data=$SEQ_JSONDATAFILE \
 # --service-kind=triton_c_api --model-repository=$DATADIR \
@@ -219,7 +219,7 @@ fi
 #     RET=1
 # fi
 # 
-# # FIXME: Testing with variable ensemble model doesn't work
+# # TODO: Testing with variable ensemble model doesn't work
 # $PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 \
 # --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
 # --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 \
@@ -293,4 +293,3 @@ else
   echo -e "\n***\n*** Test FAILED\n***"
 fi
 exit $RET
-set +x
