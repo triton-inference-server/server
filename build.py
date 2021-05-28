@@ -582,7 +582,6 @@ ENTRYPOINT []
         df += install_dcgm_libraries()
         df += fail_if_dcgm_api_export_exists()
         df += '''
-WORKDIR /workspace
 RUN cp /workspace/tools/dcgm_api_export.h /usr/include/
 '''
 
@@ -708,7 +707,6 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/includ
 # so explicit set on all of include
 RUN chown -R triton-server:triton-server include
 '''
-
     df += install_dcgm_libraries()
     df += fail_if_dcgm_api_export_exists()
     df += '''
