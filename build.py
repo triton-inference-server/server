@@ -476,13 +476,6 @@ RUN apt-get update \
 && apt-get install -y datacenter-gpu-manager
 '''
 
-def fail_if_dcgm_api_export_exists():
-    return '''
-# Note: The current version is missing header files so we applied a dcgm_api_export.h to fix the build. This fix should be removed
-# after DCGM team fixes this issue in their new release.
-RUN if test -s /usr/include/dcgm_api_export.h;then echo "/usr/include/dcgm_api_export.h exists! Remove copy from build.py" | exit 1;fi
-'''
-
 def fil_cmake_args(images):
     cargs = [
         '-DTRITON_FIL_DOCKER_BUILD=ON'
@@ -494,7 +487,6 @@ def fil_cmake_args(images):
             TRITON_VERSION_MAP[FLAGS.version][1]))
 
     return cargs
-
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
     df = '''
@@ -580,9 +572,8 @@ COPY . .
 ENTRYPOINT []
 '''
         df += install_dcgm_libraries()
-        df += fail_if_dcgm_api_export_exists()
         df += '''
-RUN cp /workspace/tools/dcgm_api_export.h /usr/include/
+RUN patch -ruN -d /usr/include/ < /workspace/build/libdcgm/dcgm_api_export.patch
 '''
 
     df += '''
@@ -708,10 +699,6 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/includ
 RUN chown -R triton-server:triton-server include
 '''
     df += install_dcgm_libraries()
-    df += fail_if_dcgm_api_export_exists()
-    df += '''
-COPY --from=tritonserver_build /workspace/tools/dcgm_api_export.h /usr/include/
-'''
 
     for noncore in NONCORE_BACKENDS:
         if noncore in backends:
