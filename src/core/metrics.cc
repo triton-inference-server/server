@@ -285,7 +285,7 @@ Metrics::InitializeDcgmMetrics()
           DCGM_FI_DEV_POWER_MGMT_LIMIT,
           DCGM_FI_DEV_POWER_USAGE,
           DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION,
-          DCGM_FI_DEV_GPU_UTIL,
+          DCGM_FI_PROF_GR_ENGINE_ACTIVE,
           DCGM_FI_DEV_FB_USED,
           DCGM_FI_DEV_FB_TOTAL,
       };
