@@ -671,6 +671,9 @@ RUN apt-get update && \
          libre2-5 && \
     rm -rf /var/lib/apt/lists/*
 '''
+
+    df += install_dcgm_libraries()
+
     # Add dependencies needed for python backend
     if 'python' in backends:
         df += '''
@@ -698,7 +701,6 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/includ
 # so explicit set on all of include
 RUN chown -R triton-server:triton-server include
 '''
-    df += install_dcgm_libraries()
 
     for noncore in NONCORE_BACKENDS:
         if noncore in backends:
