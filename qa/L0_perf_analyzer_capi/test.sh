@@ -203,7 +203,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-# # TODO: simple_savedmodel_sequence_object segfaults with CAPI
+# TODO: Re-enable after sequence model support if fixed for CAPI
 # $PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
 # --input-data=$SEQ_JSONDATAFILE \
 # --service-kind=triton_c_api --model-repository=$DATADIR \
@@ -219,7 +219,7 @@ fi
 #     RET=1
 # fi
 # 
-# # TODO: Testing with variable ensemble model doesn't work
+# TODO: Re-enable after variable model support if fixed for CAPI
 # $PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 \
 # --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
 # --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 \
