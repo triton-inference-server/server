@@ -579,16 +579,16 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
+        df += install_dcgm_libraries()
+        df += fail_if_dcgm_api_export_exists()
+        df += '''
+WORKDIR /workspace
+RUN cp /workspace/tools/dcgm_api_export.h /usr/include/
+'''
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
-'''
-    df += install_dcgm_libraries()
-    df += fail_if_dcgm_api_export_exists()
-    df += '''
-WORKDIR /workspace
-RUN cp /workspace/tools/dcgm_api_export.h /usr/include/
 '''
 
     mkdir(ddir)
@@ -712,7 +712,7 @@ RUN chown -R triton-server:triton-server include
     df += install_dcgm_libraries()
     df += fail_if_dcgm_api_export_exists()
     df += '''
-COPY --from=tritonserver_build RUN /workspace/tools/dcgm_api_export.h /usr/include/
+COPY --from=tritonserver_build /workspace/tools/dcgm_api_export.h /usr/include/
 '''
 
     for noncore in NONCORE_BACKENDS:
