@@ -109,9 +109,8 @@ class TritonModelInstance {
     enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
     class Payload {
      public:
-      Payload();
-      void Set(const Operation op_type, TritonModelInstance* instance);
-      void Set(
+      Payload(const Operation op_type, TritonModelInstance* instance);
+      Payload(
           const Operation op_type, TritonModelInstance* instance,
           std::vector<std::unique_ptr<InferenceRequest>>&& requests,
           std::function<void()> OnCompletion);
@@ -124,12 +123,10 @@ class TritonModelInstance {
       TritonModelInstance* instance_;
       std::vector<std::unique_ptr<InferenceRequest>> requests_;
       std::function<void()> OnCompletion_;
-      std::unique_ptr<std::promise<Status>> status_;
+      std::promise<Status> status_;
     };
 
     void Enqueue(std::shared_ptr<Payload> payload);
-    template <typename... Args>
-    std::shared_ptr<Payload> GetPayload(Args&&... args);
 
    private:
     TritonBackendThread(const std::string& name);
@@ -140,7 +137,6 @@ class TritonModelInstance {
     std::thread backend_thread_;
     std::atomic<bool> backend_thread_exit_;
     triton::common::SyncQueue<std::shared_ptr<Payload>> queue_;
-    triton::common::SyncQueue<std::shared_ptr<Payload>> available_payloads_;
   };
   std::shared_ptr<TritonBackendThread> triton_backend_thread_;
 

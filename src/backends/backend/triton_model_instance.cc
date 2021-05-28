@@ -437,7 +437,7 @@ TritonModelInstance::Initialize()
 {
   Status status;
   if (triton_backend_thread_.get() != nullptr) {
-    auto payload = triton_backend_thread_->GetPayload(
+    auto payload = std::make_shared<TritonBackendThread::Payload>(
         TritonBackendThread::Operation::INIT, this);
     triton_backend_thread_->Enqueue(payload);
     status = payload->Wait();
@@ -452,7 +452,7 @@ TritonModelInstance::WarmUp()
 {
   Status status;
   if (triton_backend_thread_.get() != nullptr) {
-    auto payload = triton_backend_thread_->GetPayload(
+    auto payload = std::make_shared<TritonBackendThread::Payload>(
         TritonBackendThread::Operation::WARM_UP, this);
     triton_backend_thread_->Enqueue(payload);
     status = payload->Wait();
@@ -468,7 +468,7 @@ TritonModelInstance::Schedule(
     const std::function<void()>& OnCompletion)
 {
   if (triton_backend_thread_.get() != nullptr) {
-    auto payload = triton_backend_thread_->GetPayload(
+    auto payload = std::make_shared<TritonBackendThread::Payload>(
         TritonBackendThread::Operation::INFER_RUN, this, std::move(requests),
         OnCompletion);
     triton_backend_thread_->Enqueue(payload);
@@ -586,48 +586,34 @@ TritonModelInstance::TritonBackendThread::TritonBackendThread(
 TritonModelInstance::TritonBackendThread::~TritonBackendThread()
 {
   // Signal the backend thread to exit and then wait for it..
-  auto exit_payload = GetPayload(Operation::EXIT, nullptr);
+  auto exit_payload = std::make_shared<Payload>(Operation::EXIT, nullptr);
   queue_.Put(exit_payload);
   if (backend_thread_.joinable()) {
     backend_thread_.join();
   }
 }
 
-TritonModelInstance::TritonBackendThread::Payload::Payload()
-    : op_type_(Operation::EXIT), instance_(nullptr),
+TritonModelInstance::TritonBackendThread::Payload::Payload(
+    const Operation op_type, TritonModelInstance* instance)
+    : op_type_(op_type), instance_(instance),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
       OnCompletion_([]() {})
 {
 }
 
-void
-TritonModelInstance::TritonBackendThread::Payload::Set(
-    const Operation op_type, TritonModelInstance* instance)
-{
-  op_type_ = op_type;
-  instance_ = instance;
-  requests_ = std::vector<std::unique_ptr<InferenceRequest>>();
-  OnCompletion_ = []() {};
-  status_.reset(new std::promise<Status>());
-}
-
-void
-TritonModelInstance::TritonBackendThread::Payload::Set(
+TritonModelInstance::TritonBackendThread::Payload::Payload(
     const Operation op_type, TritonModelInstance* instance,
     std::vector<std::unique_ptr<InferenceRequest>>&& requests,
     std::function<void()> OnCompletion)
+    : op_type_(op_type), instance_(instance), requests_(std::move(requests)),
+      OnCompletion_(OnCompletion)
 {
-  op_type_ = op_type;
-  instance_ = instance;
-  requests_ = std::move(requests);
-  OnCompletion_ = OnCompletion;
-  status_.reset(new std::promise<Status>());
 }
 
 Status
 TritonModelInstance::TritonBackendThread::Payload::Wait()
 {
-  return status_->get_future().get();
+  return status_.get_future().get();
 }
 
 void
@@ -650,7 +636,7 @@ TritonModelInstance::TritonBackendThread::Payload::Execute(bool* should_exit)
       *should_exit = true;
   }
 
-  status_->set_value(status);
+  status_.set_value(status);
 }
 
 void
@@ -658,20 +644,6 @@ TritonModelInstance::TritonBackendThread::Enqueue(
     std::shared_ptr<Payload> payload)
 {
   queue_.Put(payload);
-}
-
-template <typename... Args>
-std::shared_ptr<TritonModelInstance::TritonBackendThread::Payload>
-TritonModelInstance::TritonBackendThread::GetPayload(Args&&... args)
-{
-  std::shared_ptr<Payload> payload;
-  if (available_payloads_.Empty()) {
-    payload = std::make_shared<TritonBackendThread::Payload>();
-  } else {
-    payload = available_payloads_.Get();
-  }
-  payload->Set(std::forward<Args>(args)...);
-  return payload;
 }
 
 void
@@ -694,10 +666,9 @@ TritonModelInstance::TritonBackendThread::BackendThread(
 
   bool should_exit = false;
   while (!should_exit) {
-    NVTX_RANGE(nvtx_, "BackendThread " + name_);
     auto payload = queue_.Get();
+    NVTX_RANGE(nvtx_, "BackendThread " + name_);
     payload->Execute(&should_exit);
-    available_payloads_.Put(payload);
   }
 
   LOG_VERBOSE(1) << "Stopping backend thread for " << name_ << "...";
