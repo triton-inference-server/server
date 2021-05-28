@@ -259,7 +259,9 @@ optimization { execution_accelerators {
 
 As Triton starts you should check the console output and wait until
 Triton prints the "Staring endpoints" message. ONNX model loading can
-be significantly slower when TensorRT optimization is enabled.  Now
+be significantly slower when TensorRT optimization is enabled. In production you can use [model
+warmup](model_configuration.md#model-warmup) to avoid this model
+startup/optimization slowdown. Now
 run perf_analyzer using the same options as for the baseline.
 
 ```
