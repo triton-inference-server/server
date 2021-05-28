@@ -265,7 +265,8 @@ Metrics::InitializeDcgmMetrics()
     dcgmHandle_t handle = dcgm_handle_;
     dcgmGpuGrp_t groupId = groupId_;
     dcgm_thread_exit_.store(false);
-    dcgm_thread_.reset(new std::thread([this, available_gpu_ids, handle, groupId] {
+    dcgm_thread_.reset(new std::thread([this, available_gpu_ids, handle,
+                                        groupId] {
       int available_gpu_count = available_gpu_ids.size();
       // Stop attempting metrics if they fail multiple consecutive
       // times for a device.
