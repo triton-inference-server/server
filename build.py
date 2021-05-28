@@ -71,7 +71,7 @@ EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino'
+    'openvino', 'fil'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -332,6 +332,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = dali_cmake_args()
     elif be == 'pytorch':
         args = pytorch_cmake_args(images)
+    elif be == 'fil':
+        args = fil_cmake_args(images)
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
@@ -461,6 +463,19 @@ def dali_cmake_args():
     return [
         '-DTRITON_DALI_SKIP_DOWNLOAD=OFF',
     ]
+
+
+def fil_cmake_args(images):
+    cargs = [
+        '-DTRITON_FIL_DOCKER_BUILD=ON'
+    ]
+    if 'base' in images:
+        cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    else:
+        cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][1]))
+
+    return cargs
 
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
