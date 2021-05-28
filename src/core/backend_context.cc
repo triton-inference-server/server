@@ -956,20 +956,30 @@ BackendInputCollector::SetFixedSizeInputTensor(
   // Request input tensor data may be in multiple non-contiguous
   // buffers.
   size_t input_offset = 0;
-  for (size_t idx = 0; idx < request_input->DataBufferCount(); ++idx) {
+
+  // Use fallback data buffer count if there is no HostPolicy specific data
+  // buffer data
+  size_t data_buffer_count = request_input->DataBufferCount();
+  if (request_input->HostPolicySpecificData() &&
+      request_input->DataBufferCountForHostPolicy(host_policy_name_) != 0) {
+    data_buffer_count =
+        request_input->DataBufferCountForHostPolicy(host_policy_name_);
+  }
+
+  for (size_t idx = 0; idx < data_buffer_count; ++idx) {
     const void* src_buffer;
     size_t src_byte_size;
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
-    Status status = request_input->DeviceSpecificData()
-                        ? request_input->DataBufferForDevice(
-                              idx, &src_buffer, &src_byte_size,
-                              &src_memory_type, &src_memory_type_id,
-                              collector_device_kind_, collector_device_id_)
-                        : request_input->DataBuffer(
-                              idx, &src_buffer, &src_byte_size,
-                              &src_memory_type, &src_memory_type_id);
+    Status status =
+        request_input->HostPolicySpecificData()
+            ? request_input->DataBufferForHostPolicy(
+                  idx, &src_buffer, &src_byte_size, &src_memory_type,
+                  &src_memory_type_id, host_policy_name_)
+            : request_input->DataBuffer(
+                  idx, &src_buffer, &src_byte_size, &src_memory_type,
+                  &src_memory_type_id);
 
     if (!status.IsOk()) {
       InferenceResponse::SendWithStatus(
@@ -1330,18 +1340,20 @@ BackendInputCollector::LaunchCopyKernel(
   for (const auto& response_input : pending_copy_kernel_inputs_) {
     const auto& input = response_input.second;
 
-    for (size_t buffer_idx = 0; buffer_idx < input->DataBufferCount();
-         ++buffer_idx) {
+    size_t data_buffer_count = input->DataBufferCount();
+    if (input->HostPolicySpecificData() &&
+        input->DataBufferCountForHostPolicy(host_policy_name_) != 0) {
+      data_buffer_count =
+          input->DataBufferCountForHostPolicy(host_policy_name_);
+    }
+    for (size_t buffer_idx = 0; buffer_idx < data_buffer_count; ++buffer_idx) {
       input_ptr_buffer_host.emplace_back();
-      if(input->DeviceSpecificData())
-      {
-        RETURN_IF_ERROR(input->DataBufferForDevice(
-          buffer_idx, (const void**)(&input_ptr_buffer_host.back()),
-          &buffer_byte_size, &kernel_buffer_memory_type,
-          &kernel_buffer_memory_id, collector_device_kind_, collector_device_id_));
-      }
-      else
-      {
+      if (input->HostPolicySpecificData()) {
+        RETURN_IF_ERROR(input->DataBufferForHostPolicy(
+            buffer_idx, (const void**)(&input_ptr_buffer_host.back()),
+            &buffer_byte_size, &kernel_buffer_memory_type,
+            &kernel_buffer_memory_id, host_policy_name_));
+      } else {
         RETURN_IF_ERROR(input->DataBuffer(
             buffer_idx, (const void**)(&input_ptr_buffer_host.back()),
             &buffer_byte_size, &kernel_buffer_memory_type,

@@ -751,7 +751,7 @@ InferenceRequest::ReportStatisticsWithDuration(
 // Input
 //
 InferenceRequest::Input::Input()
-    : data_(new MemoryReference), has_device_specific_data_(false)
+    : data_(new MemoryReference), has_host_policy_specific_data_(false)
 {
 }
 
@@ -760,7 +760,7 @@ InferenceRequest::Input::Input(
     const int64_t* shape, const uint64_t dim_count)
     : name_(name), datatype_(datatype),
       original_shape_(shape, shape + dim_count), is_shape_tensor_(false),
-      data_(new MemoryReference), has_device_specific_data_(false)
+      data_(new MemoryReference), has_host_policy_specific_data_(false)
 {
 }
 
@@ -769,7 +769,7 @@ InferenceRequest::Input::Input(
     const std::vector<int64_t>& shape)
     : name_(name), datatype_(datatype), original_shape_(shape),
       is_shape_tensor_(false), data_(new MemoryReference),
-      has_device_specific_data_(false)
+      has_host_policy_specific_data_(false)
 {
 }
 
@@ -781,12 +781,12 @@ InferenceRequest::Input::SetIsShapeTensor(const bool is_shape_tensor)
 }
 
 const std::shared_ptr<Memory>&
-InferenceRequest::Input::Data(
-    TRITONSERVER_InstanceGroupKind device_kind, int device_id) const
+InferenceRequest::Input::Data(const char* host_policy_name) const
 {
-  DeviceInfo dev_info(device_kind, device_id);
-  auto device_data = device_specific_data_.find(dev_info);
-  if (device_data == device_specific_data_.end()) {
+  auto device_data = host_policy_data_map_.find(host_policy_name);
+  if (device_data == host_policy_data_map_.end()) {
+    // Fall back on default data if there is no data that has been added for
+    // this host policy
     return data_;
   }
   return device_data->second;
@@ -806,18 +806,17 @@ InferenceRequest::Input::AppendData(
 }
 
 Status
-InferenceRequest::Input::AppendDataForDevice(
+InferenceRequest::Input::AppendDataForHostPolicy(
     const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
-    int64_t memory_type_id, TRITONSERVER_InstanceGroupKind device_kind,
-    int device_id)
+    int64_t memory_type_id, const char* host_policy_name)
 {
-  DeviceInfo dev_info(device_kind, device_id);
-  auto device_data = device_specific_data_.find(dev_info);
-  has_device_specific_data_ = true;
-  if (device_data == device_specific_data_.end()) {
-    device_specific_data_.insert(std::make_pair(dev_info, new MemoryReference));
+  auto device_data = host_policy_data_map_.find(host_policy_name);
+  has_host_policy_specific_data_ = true;
+  if (device_data == host_policy_data_map_.end()) {
+    host_policy_data_map_.insert(
+        std::make_pair(std::string(host_policy_name), new MemoryReference));
+    device_data = host_policy_data_map_.find(host_policy_name);
   }
-  device_data = device_specific_data_.find(dev_info);
   if (byte_size > 0) {
     std::static_pointer_cast<MemoryReference>(device_data->second)
         ->AddBuffer(
@@ -846,7 +845,8 @@ Status
 InferenceRequest::Input::RemoveAllData()
 {
   data_ = std::make_shared<MemoryReference>();
-  device_specific_data_.clear();
+  host_policy_data_map_.clear();
+  has_host_policy_specific_data_ = false;
   return Status::Success;
 }
 
@@ -861,14 +861,14 @@ InferenceRequest::Input::DataBuffer(
 }
 
 Status
-InferenceRequest::Input::DataBufferForDevice(
+InferenceRequest::Input::DataBufferForHostPolicy(
     const size_t idx, const void** base, size_t* byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
-    TRITONSERVER_InstanceGroupKind device_type, int device_id) const
+    const std::string host_policy_name) const
 {
-  DeviceInfo dev_info(device_type, device_id);
-  auto device_data = device_specific_data_.find(dev_info);
-  if (device_data == device_specific_data_.end()) {
+  auto device_data = host_policy_data_map_.find(host_policy_name);
+  if (device_data == host_policy_data_map_.end()) {
+    // Return data buffer if there is no host-policy specific buffer available
     *base = data_->BufferAt(idx, byte_size, memory_type, memory_type_id);
   } else {
     *base = device_data->second->BufferAt(
@@ -878,6 +878,16 @@ InferenceRequest::Input::DataBufferForDevice(
   return Status::Success;
 }
 
+size_t
+InferenceRequest::Input::DataBufferCountForHostPolicy(
+    const std::string host_policy_name) const
+{
+  auto policy_data = host_policy_data_map_.find(host_policy_name);
+  if (policy_data != host_policy_data_map_.end()) {
+    return policy_data->second->BufferCount();
+  }
+  return 0;
+}
 
 std::ostream&
 operator<<(std::ostream& out, const InferenceRequest& request)

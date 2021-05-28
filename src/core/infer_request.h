@@ -107,8 +107,7 @@ class InferenceRequest {
     const std::shared_ptr<Memory>& Data() const { return data_; }
 
     // The data for this input for a specific device
-    const std::shared_ptr<Memory>& Data(
-        TRITONSERVER_InstanceGroupKind kind, int device_id) const;
+    const std::shared_ptr<Memory>& Data(const char* host_policy_name) const;
 
     // Set the data for this input. Error if input already has some
     // data.
@@ -119,16 +118,20 @@ class InferenceRequest {
         const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
         int64_t memory_type_id);
 
-    Status AppendDataForDevice(
+    Status AppendDataForHostPolicy(
         const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
-        int64_t memory_type_id, TRITONSERVER_InstanceGroupKind device_kind,
-        int device_id);
+        int64_t memory_type_id, const char* host_policy_name);
 
     // Remove all existing data for the input.
     Status RemoveAllData();
 
     // Get the number of buffers containing the input tensor data.
     size_t DataBufferCount() const { return data_->BufferCount(); }
+
+    // Get the number of buffers containing the input tensor data.
+    //
+    size_t DataBufferCountForHostPolicy(
+        const std::string host_policy_name) const;
 
     // Get the 'idx' buffer containing a contiguous chunk of bytes for
     // the input. Return error is 'idx' refers to a buffer that does
@@ -148,7 +151,10 @@ class InferenceRequest {
 
     // Returns true if data was added for this input using the
     // AppendDataForDevice function
-    bool DeviceSpecificData() const { return has_device_specific_data_; }
+    bool HostPolicySpecificData() const
+    {
+      return has_host_policy_specific_data_;
+    }
 
     // Get the 'idx' buffer containing a contiguous chunk of bytes for
     // the input. Return error is 'idx' refers to a buffer that does
@@ -162,38 +168,15 @@ class InferenceRequest {
     // preferred by the function caller.  On return 'memory_type_id'
     // gives the actual memory type id of the chunk pointed to by
     // 'base'.
-    Status DataBufferForDevice(
+    Status DataBufferForHostPolicy(
         const size_t idx, const void** base, size_t* byte_size,
         TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
-        TRITONSERVER_InstanceGroupKind device_kind, int device_id) const;
+        const std::string host_policy_name) const;
 
    private:
     DISALLOW_COPY_AND_ASSIGN(Input);
     friend std::ostream& operator<<(
         std::ostream& out, const InferenceRequest::Input& input);
-
-    class DeviceInfo {
-     public:
-      DeviceInfo();
-      DeviceInfo(TRITONSERVER_InstanceGroupKind kind, int id)
-          : device_kind_(kind), device_id_(id)
-      {
-      }
-      bool operator==(const DeviceInfo& device_info) const
-      {
-        return device_info.device_id_ == this->device_id_ &&
-               device_info.device_kind_ == this->device_kind_;
-      }
-      bool operator<(const DeviceInfo& device_info) const
-      {
-        return (
-            this->device_id_ < device_info.device_id_ &&
-            device_info.device_kind_ == this->device_kind_);
-      }
-
-      TRITONSERVER_InstanceGroupKind device_kind_;
-      int device_id_;
-    };
 
     std::string name_;
     inference::DataType datatype_;
@@ -203,9 +186,9 @@ class InferenceRequest {
     bool is_shape_tensor_;
     std::shared_ptr<Memory> data_;
 
-    bool has_device_specific_data_;
-    // A map of device info to input data memory
-    std::map<DeviceInfo, std::shared_ptr<Memory>> device_specific_data_;
+    bool has_host_policy_specific_data_;
+    // A map of host policy to input data memory
+    std::map<std::string, std::shared_ptr<Memory>> host_policy_data_map_;
   };
 
   // InferenceRequest

@@ -139,14 +139,16 @@ PlanBackend::Context::Context(
     const size_t gather_kernel_buffer_threshold,
     const bool separate_output_stream,
     std::shared_ptr<MetricModelReporter>&& metric_reporter,
-    const HostPolicyCmdlineConfig& host_policy)
+    const HostPolicyCmdlineConfig& host_policy,
+    const std::string host_policy_name)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
           enable_pinned_output, gather_kernel_buffer_threshold,
           std::move(metric_reporter)),
       engine_(nullptr), is_shared_engine_(true), total_bindings_(0),
       num_expected_bindings_(0),
-      use_output_copy_stream_(separate_output_stream), host_policy_(host_policy)
+      use_output_copy_stream_(separate_output_stream),
+      host_policy_(host_policy), host_policy_name_(host_policy_name)
 {
   stream_ = nullptr;
   signal_stream_ = nullptr;
@@ -438,7 +440,7 @@ PlanBackend::CreateExecutionContexts(
                  << gpu_device << " (" << cc << ") using " << cc_model_filename;
         auto err = CreateExecutionContext(
             instance_name, gpu_device, dla_core_id, mn_itr->second,
-            group.profile(), queue, *host_policy);
+            group.profile(), queue, *host_policy, policy_name);
         RETURN_IF_ERROR(ResetNumaMemoryPolicy());
         RETURN_IF_ERROR(err);
       }
@@ -613,7 +615,7 @@ PlanBackend::CreateExecutionContext(
     const int64_t dla_core_id, const std::vector<char>& model,
     const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
     const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue,
-    const HostPolicyCmdlineConfig& host_policy)
+    const HostPolicyCmdlineConfig& host_policy, const std::string policy_name)
 {
   // Max batch size. A value of 0 in the config becomes NO_BATCHING.
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
@@ -639,7 +641,7 @@ PlanBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
       gather_kernel_buffer_threshold, separate_output_stream,
-      std::move(metric_reporter), host_policy));
+      std::move(metric_reporter), host_policy, policy_name));
   Context* context = static_cast<Context*>(contexts_.back().get());
   auto context_idx = contexts_.size() - 1;
 
@@ -2623,12 +2625,11 @@ PlanBackend::Context::Run(
   auto prev_input_ready_event =
       eager_batching_ ? events_[prev_set].ready_for_input_ : nullptr;
   std::vector<int64_t> input_dims{(int64_t)payload_->total_batch_size_};
-  auto device_kind = TRITONSERVER_INSTANCEGROUPKIND_GPU;
-  auto device_id = gpu_device_;
   payload_->collector_.reset(new BackendInputCollector(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
-      gather_kernel_buffer_threshold_, input_copy_stream_, device_kind,
-      device_id, events_[next_set_].input_ready_, prev_input_ready_event));
+      gather_kernel_buffer_threshold_, input_copy_stream_,
+      events_[next_set_].input_ready_, prev_input_ready_event,
+      host_policy_name_));
   // For each input, concatenate input values from each request into
   // the corresponding binding.
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {

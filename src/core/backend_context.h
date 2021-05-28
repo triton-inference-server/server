@@ -229,7 +229,8 @@ class BackendInputCollector {
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const bool pinned_enabled, const size_t kernel_buffer_threshold,
-      cudaStream_t stream, cudaEvent_t event, cudaEvent_t buffer_ready_event)
+      cudaStream_t stream, cudaEvent_t event, cudaEvent_t buffer_ready_event,
+      const std::string host_policy_name)
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
         kernel_buffer_threshold_(kernel_buffer_threshold),
@@ -239,28 +240,7 @@ class BackendInputCollector {
         pending_copy_kernel_buffer_byte_size_(0),
         pending_copy_kernel_buffer_offset_(0),
         pending_copy_kernel_input_buffer_counts_(0), async_task_count_(0),
-        collector_device_kind_(TRITONSERVER_INSTANCEGROUPKIND_AUTO),
-        collector_device_id_(0)
-  {
-  }
-
-  explicit BackendInputCollector(
-      const std::vector<std::unique_ptr<InferenceRequest>>& requests,
-      std::vector<std::unique_ptr<InferenceResponse>>* responses,
-      const bool pinned_enabled, const size_t kernel_buffer_threshold,
-      cudaStream_t stream, TRITONSERVER_InstanceGroupKind device_type,
-      int device_id, cudaEvent_t event = nullptr,
-      cudaEvent_t buffer_ready_event = nullptr)
-      : need_sync_(false), requests_(requests), responses_(responses),
-        pinned_enabled_(pinned_enabled),
-        kernel_buffer_threshold_(kernel_buffer_threshold),
-        use_async_cpu_copy_(triton::common::AsyncWorkQueue::WorkerCount() > 1),
-        stream_(stream), event_(event), buffer_ready_event_(buffer_ready_event),
-        pending_pinned_byte_size_(0), pending_pinned_offset_(0),
-        pending_copy_kernel_buffer_byte_size_(0),
-        pending_copy_kernel_buffer_offset_(0),
-        pending_copy_kernel_input_buffer_counts_(0), async_task_count_(0),
-        collector_device_kind_(device_type), collector_device_id_(device_id)
+        host_policy_name_(host_policy_name)
   {
   }
 
@@ -384,8 +364,7 @@ class BackendInputCollector {
 
   // Device information required by the collector when there are device
   // specific input buffers
-  TRITONSERVER_InstanceGroupKind collector_device_kind_;
-  int collector_device_id_;
+  std::string host_policy_name_;
 };
 
 }}  // namespace nvidia::inferenceserver
