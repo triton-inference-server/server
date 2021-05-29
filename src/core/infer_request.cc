@@ -813,9 +813,9 @@ InferenceRequest::Input::AppendDataForHostPolicy(
   auto device_data = host_policy_data_map_.find(host_policy_name);
   has_host_policy_specific_data_ = true;
   if (device_data == host_policy_data_map_.end()) {
-    host_policy_data_map_.insert(
+    auto insert_pair = host_policy_data_map_.insert(
         std::make_pair(std::string(host_policy_name), new MemoryReference));
-    device_data = host_policy_data_map_.find(host_policy_name);
+    device_data = insert_pair.first;
   }
   if (byte_size > 0) {
     std::static_pointer_cast<MemoryReference>(device_data->second)
