@@ -104,13 +104,17 @@ gcloud beta container node-pools create accel \
   --project ${PROJECT_ID} \
   --zone ${ZONE} \
   --cluster ${DEPLOYMENT_NAME} \
-  --num-nodes 2 \
+  --num-nodes 1 \
   --accelerator type=nvidia-tesla-a100,count=1,gpu-partition-size=1g.5gb  \
-  --enable-autoscaling --min-nodes 2 --max-nodes 3 \
+  --enable-autoscaling --min-nodes 1 --max-nodes 2 \
   --machine-type=a2-highgpu-1g  \
   --disk-size=100 \
   --scopes cloud-platform \
   --verbosity error
+
+# deploy a newer NVIDIA device plugin for GKE to prepare GPU nodes for driver install, additional line to install MIG
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/cmd/nvidia_gpu/device-plugin.yaml
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-nvidia-mig.yaml
 ```
 
 Please note that A100 MIG in GKE does not support GPU metrics yet, also Triton GPU Metrics is not compatiable with A100 MIG. Hence, please disable GPU metrics by unselect allowGPUMetrics while deploy Triton GKE app. Also for the same reason, this deployer doesn't support inference workfload auto-scaling on A100 MIG as well.  

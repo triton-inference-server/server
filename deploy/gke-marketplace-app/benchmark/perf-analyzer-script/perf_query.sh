@@ -26,14 +26,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 SERVER_HOST=${1:-"${INGRESS_HOST}:${INGRESS_PORT}"} # need update public IP
-MODEL_NAME=${2:-"bert_base_trt_gpu"}
-precision=${3:-"fp32"}
-BATCH_SIZE=${4:-1}
+MODEL_NAME=${2:-"${MODEL_NAME}"}
+SEQ_LENGTH=${3:-"${SEQ_LEN}"}
+BATCH_SIZE=${4:-2}
 MAX_LATENCY=${5:-5000}
 MAX_CLIENT_THREADS=${6:-20}
-MAX_CONCURRENCY=${7:-32}
+MAX_CONCURRENCY=${7:-8}
 MODEL_VERSION=${8:-1}
-SEQ_LENGTH=${9:-"384"}
+precision=${9:-"fp32"}
 PERFCLIENT_PERCENTILE=${10:-90}
 MAX_TRIALS=${12:-40}
 
@@ -43,7 +43,7 @@ ARGS="\
    -x ${MODEL_VERSION} \
    -p 3000 \
    --async \
-   --concurrency-range 4:${MAX_CONCURRENCY}:4 \
+   --concurrency-range 4:${MAX_CONCURRENCY}:2 \
    -r ${MAX_TRIALS} \
    -v \
    -i HTTP \
