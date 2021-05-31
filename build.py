@@ -71,7 +71,7 @@ EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino'
+    'openvino', 'fil'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -332,6 +332,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = dali_cmake_args()
     elif be == 'pytorch':
         args = pytorch_cmake_args(images)
+    elif be == 'fil':
+        args = fil_cmake_args(images)
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
@@ -463,6 +465,19 @@ def dali_cmake_args():
     ]
 
 
+def fil_cmake_args(images):
+    cargs = [
+        '-DTRITON_FIL_DOCKER_BUILD=ON'
+    ]
+    if 'base' in images:
+        cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    else:
+        cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][1]))
+
+    return cargs
+
+
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
     df = '''
 ARG TRITON_VERSION={}
@@ -489,7 +504,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
-# python3-pip is needed by python backend
+# python3-pip and libarchive-dev is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -513,14 +528,13 @@ RUN apt-get update && \
             unzip \
             wget \
             zlib1g-dev \
+            libarchive-dev \
             pkg-config \
             uuid-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# grpcio-tools grpcio-channelz are needed by python backend
 RUN pip3 install --upgrade pip && \
-    pip3 install --upgrade wheel setuptools docker && \
-    pip3 install grpcio-tools grpcio-channelz
+    pip3 install --upgrade wheel setuptools docker
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
@@ -648,11 +662,11 @@ RUN apt-get update && \
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-         python3 \
+         python3 libarchive-dev \
          python3-pip && \
     pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade grpcio-tools grpcio-channelz numpy && \
+    pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 '''
     df += '''
