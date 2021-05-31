@@ -26,7 +26,7 @@
 
 export REGISTRY=gcr.io/$(gcloud config get-value project | tr ':' '/')
 export APP_NAME=tritonserver
-export MAJOR_VERSION=2.10.0
+export MAJOR_VERSION=2.10
 export MINOR_VERSION=2.10.0
 export NGC_VERSION=21.05-py3
 

@@ -30,6 +30,7 @@
 
 **Table Of Contents**
 - [Models](#models)
+- [Performance](#performance)
 
 ## Models
 
@@ -78,13 +79,18 @@ export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -
 bash perf_query.sh 35.194.5.119:80 bert_base_trt_gpu 384
 ```
 
-For all the model with sequence length of 384:
-CPU BERT BASE: 
-GPU BERT BASE: latency: throughput:
-CPU Distill BERT: latency: throughput:
-GPU Distill BERT: latency: throughput
-GPU TensorRT BERT BASE: latency: throughput:
+We deploy model on n1-standard-96 for CPU BERT BASE and Distill BERT and (n1-standard-4 + T4) for GPU BERT models, the sequence length  of the BERT model is 384 token, and measure the latency/throughput with a concurrency sweep with Triton's performance analyzer. The latency includes Istio ingress/load balancing and reflect the true round trip cost in the same GCP zone.
 
-To show the impact of sequence length on performance, we also measured a group with sequence length of 128
-GPU TensorRT BERT BASE: latency: 56ms, throughput: 1380 qps
+For all the model with sequence length of 384:
+CPU BERT BASE: latency: 700ms, throughput: 12 qps
+CPU Distill BERT: latency: 369ms, throughput: 24 qps
+
+GPU BERT BASE: latency: 230ms, throughput: 34.7 qps
+GPU Distill BERT: latency: 118ms, throughput: 73.3 qps
+GPU TensorRT BERT BASE: latency: 50ms, throughput: 465 qps
+
+With n1-standard-96 priced at $4.56/hr and n1-standard-4 at $0.19/hr and T4 at $0.35/hr totaling $0.54/hr. While achieving a much lower latency, the TCO of BERT inference with TensorRT on T4 is over 163 times that of Distill BERT inference on n1-standard-96.
+
+  
+
  
