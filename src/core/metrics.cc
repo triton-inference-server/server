@@ -38,6 +38,7 @@
 #include <cuda_runtime_api.h>
 #include <dcgm_agent.h>
 #include <string>
+#include <cstring>
 #endif  // TRITON_ENABLE_METRICS_GPU
 
 namespace nvidia { namespace inferenceserver {
@@ -136,7 +137,12 @@ Metrics::~Metrics()
     dcgm_thread_->join();
     dcgmGroupDestroy(dcgm_handle_, groupId_);
     // Stop and shutdown DCGM
-    dcgmReturn_t derr = dcgmStopEmbedded(dcgm_handle_);
+    dcgmReturn_t derr;
+    if (standalone_) {
+      derr = dcgmDisconnect(dcgm_handle_);
+    } else {
+      derr = dcgmStopEmbedded(dcgm_handle_);
+    }
     if (derr != DCGM_ST_OK) {
       LOG_WARNING << "error, unable to stop DCGM: " << errorString(derr);
     }
@@ -194,18 +200,27 @@ Metrics::InitializeDcgmMetrics()
     return false;
   }
 
-  dcgmerr = dcgmStartEmbedded(DCGM_OPERATION_MODE_MANUAL, &dcgm_handle_);
+  if (standalone_) {
+  char hostIpAddress[16]  = { 0 };
+  std::string ipAddress = "127.0.0.1";
+  strncpy(hostIpAddress, ipAddress.c_str(), 15);
+  dcgmerr = dcgmConnect(hostIpAddress, &dcgm_handle_);
+  } else {
+    dcgmerr = dcgmStartEmbedded(DCGM_OPERATION_MODE_MANUAL, &dcgm_handle_);
+  }
   if (dcgmerr != DCGM_ST_OK) {
     LOG_WARNING << "error, DCGM unable to start: " << errorString(dcgmerr);
     return false;
   }
 
-  dcgmerr = dcgmUpdateAllFields(dcgm_handle_, 1);
-  if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "error, DCGM unable to update all fields, GPU metrics will "
-                   "not be available: "
-                << errorString(dcgmerr);
-    return false;
+  if (standalone_) {
+    dcgmerr = dcgmUpdateAllFields(dcgm_handle_, 1);
+    if (dcgmerr != DCGM_ST_OK) {
+      LOG_WARNING << "error, DCGM unable to update all fields, GPU metrics will "
+                    "not be available: "
+                  << errorString(dcgmerr);
+      return false;
+    }
   }
 
   unsigned int all_gpu_ids[DCGM_MAX_NUM_DEVICES];
@@ -282,11 +297,13 @@ Metrics::InitializeDcgmMetrics()
         last_energy[didx] = 0;
       }
       size_t field_count = 6;
+      short util_flag = standalone ? 
+      DCGM_FI_PROF_GR_ENGINE_ACTIVE : DCGM_FI_DEV_GPU_UTIL;
       unsigned short fields[field_count] = {
           DCGM_FI_DEV_POWER_MGMT_LIMIT,
           DCGM_FI_DEV_POWER_USAGE,
           DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION,
-          DCGM_FI_PROF_GR_ENGINE_ACTIVE,
+          util_flag,
           DCGM_FI_DEV_FB_USED,
           DCGM_FI_DEV_FB_TOTAL,
       };
