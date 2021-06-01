@@ -297,7 +297,7 @@ Metrics::InitializeDcgmMetrics()
         last_energy[didx] = 0;
       }
       size_t field_count = 6;
-      short util_flag = standalone ? 
+      unsigned short util_flag = standalone_ ? 
       DCGM_FI_PROF_GR_ENGINE_ACTIVE : DCGM_FI_DEV_GPU_UTIL;
       unsigned short fields[field_count] = {
           DCGM_FI_DEV_POWER_MGMT_LIMIT,
