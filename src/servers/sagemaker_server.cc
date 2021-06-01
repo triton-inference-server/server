@@ -32,7 +32,7 @@ const std::string SagemakerAPIServer::binary_mime_type_(
 
 TRITONSERVER_Error*
 SagemakerAPIServer::GetInferenceHeaderLength(
-    evhtp_request_t* req, size_t* header_length)
+    evhtp_request_t* req, int32_t content_length, size_t* header_length)
 {
   // Check mime type and set inference header length. If missing set to 0
   *header_length = 0;
@@ -62,22 +62,6 @@ SagemakerAPIServer::GetInferenceHeaderLength(
             (std::string("Unable to parse inference header size, got: ") +
              (content_type_c_str + binary_mime_type_.length()))
                 .c_str());
-      }
-      // Set to large value in case there is no Content-Length to compare with
-      int32_t content_length = INT32_MAX;
-      const char* content_length_c_str =
-          evhtp_kv_find(req->headers_in, kContentLengthHeader);
-      if (content_length_c_str != nullptr) {
-        try {
-          content_length = std::atoi(content_length_c_str);
-        }
-        catch (const std::invalid_argument& ia) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              (std::string("Unable to parse ") + kContentLengthHeader +
-               ", got: " + content_length_c_str)
-                  .c_str());
-        }
       }
 
       // Check if the content length is in proper range

@@ -73,7 +73,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
         server_.get(), req, GetResponseCompressionType(req)));
   }
   TRITONSERVER_Error* GetInferenceHeaderLength(
-      evhtp_request_t* req, size_t* header_length) override;
+      evhtp_request_t* req, int32_t content_length,
+      size_t* header_length) override;
 
   // Currently the compresssion schema hasn't been defined,
   // assume identity compression type is used for both request and response
