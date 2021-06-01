@@ -36,7 +36,7 @@ if [ -z "$REPO_VERSION" ]; then
 fi
 
 # Make sure we can safety use symbolic link for SageMaker serve script
-if [ -d "/opt/ml" ] || [ -L "/opt/ml" ]; then
+if [ -d "/opt/ml/model" ] || [ -L "/opt/ml/model" ]; then
     echo -e "Default SageMaker model path must not be used for testing"
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
@@ -57,14 +57,15 @@ CLIENT_LOG="./client.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./server.log"
-# Link model repository to "/opt/ml"
-ln -s `pwd`/models /opt/ml
+# Link model repository to "/opt/ml/model"
+mkdir /opt/ml/
+ln -s `pwd`/models /opt/ml/model
 source ../common/util.sh
 
 mkdir models && \
-    cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models/model && \
-    rm -r models/model/2 && rm -r models/model/3 && \
-    sed -i "s/onnx_int32_int32_int32/model/" models/model/config.pbtxt
+    cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models/sm_model && \
+    rm -r models/sm_model/2 && rm -r models/sm_model/3 && \
+    sed -i "s/onnx_int32_int32_int32/sm_model/" models/sm_model/config.pbtxt
 
 # Use SageMaker's ping endpoint to check server status
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
@@ -105,6 +106,7 @@ function sagemaker_wait_for_server_ready() {
 }
 
 # Start server with 'serve' script
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=sm_model
 serve > $SERVER_LOG 2>&1 &
 SERVE_PID=$!
 # Obtain Triton PID in such way as $! will return the script PID
@@ -190,7 +192,7 @@ export SAGEMAKER_SAFE_PORT_RANGE="8081-9000"
 
 # Start Triton in a similar way to 'serve' script, as 'serve' script can't
 # be used to satisfy the setting under test
-SAGEMAKER_ARGS="--model-repository=/opt/ml"
+SAGEMAKER_ARGS="--model-repository=/opt/ml/model"
 if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
 fi
@@ -200,6 +202,7 @@ fi
 
 # Enable HTTP endpoint and expect server fail to start (default port 8000 < 8081)
 SERVER_ARGS="--allow-grpc false --allow-http true --allow-metrics false \
+             --model-control-mode=explicit --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME} \
              $SAGEMAKER_ARGS"
 run_server_nowait
 sagemaker_wait_for_server_ready $SERVER_PID 10
@@ -250,13 +253,90 @@ fi
 set -e
 
 unset SAGEMAKER_SAFE_PORT_RANGE
+unset SAGEMAKER_TRITON_DEFAULT_MODEL_NAME
 
 kill $SERVER_PID
 wait $SERVE_PID
 
-# Run server with invalid model and exit-on-error=false
-rm models/model/1/*
+# Test serve with incorrect model name
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=incorrect_model_name
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+if [ -n "$SERVER_PID" ]; then
+    echo -e "\n***\n*** Expect failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    RET=1
+else
+    grep "ERROR: Directory with provided SAGEMAKER_TRITON_DEFAULT_MODEL_NAME ${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME} does not exist" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected error on model name and dir name mismatch\n***"
+        RET=1
+    fi
+fi
+
+unset SAGEMAKER_TRITON_DEFAULT_MODEL_NAME
+
+# Test serve with SAGEMAKER_TRITON_DEFAULT_MODEL_NAME unset, but containing single model directory
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+else
+    grep "WARNING: No SAGEMAKER_TRITON_DEFAULT_MODEL_NAME provided" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected server to start with only existing directory as model.\n***"
+	RET=1
+    fi
+fi
+
+kill $SERVER_PID
+wait $SERVE_PID
+
+# Test unspecified SAGEMAKER_TRITON_DEFAULT_MODEL_NAME for ecs/eks case
 SERVER_ARGS="--model-repository `pwd`/models --allow-grpc false --allow-http false --allow-metrics false \
+             --model-control-mode=explicit --exit-on-error=false"
+run_server_nowait
+sleep 5
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+code=`curl -X POST -s -w %{http_code} -o ./invoke.out localhost:8080/invocations --data-raw 'dummy'`
+set -e
+if [ "$code" == "200" ]; then
+    cat ./invoke.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    grep "Request for unknown model: 'unspecified_SAGEMAKER_TRITON_DEFAULT_MODEL_NAME' is not found" ./invoke.out
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected inference to fail with unspecified model error.\n***"
+    fi
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# TODO: Test ensemble backend
+
+# Run server with invalid model and exit-on-error=false
+rm models/sm_model/1/*
+SERVER_ARGS="--model-repository `pwd`/models --allow-grpc false --allow-http false --allow-metrics false \
+             --model-control-mode=explicit --load-model=sm_model \
              --exit-on-error=false"
 run_server_nowait
 sleep 5
@@ -279,7 +359,8 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
-unlink /opt/ml
+unlink /opt/ml/model
+rm -rf /opt/ml/model
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
