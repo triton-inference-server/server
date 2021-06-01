@@ -166,7 +166,6 @@ if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Lifecycle test FAILED. \n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Lifecycle test PASSED. \n***"
 fi
 

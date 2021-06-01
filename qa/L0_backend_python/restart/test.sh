@@ -24,74 +24,48 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=./lifecycle_test.py
+CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
+EXPECTED_NUM_TESTS="7"
 SERVER=/opt/tritonserver/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
-EXPECTED_NUM_TESTS="1"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+source ../../common/util.sh
+source ../common.sh
+
+rm -fr *.log ./models
+
+mkdir -p models/identity_fp32/1/
+cp ../../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
+cp ../../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
 RET=0
 
-source ../common.sh
-source ../../common/util.sh
-
-rm -rf models/ $CLIENT_LOG
-
-# Ensemble Model
-mkdir -p models/ensemble/1/
-cp ../../python_models/ensemble/config.pbtxt ./models/ensemble
-
-mkdir -p models/add_sub_1/1/
-cp ../../python_models/add_sub/config.pbtxt ./models/add_sub_1
-(cd models/add_sub_1 && \
-          sed -i "s/^name:.*/name: \"add_sub_1\"/" config.pbtxt)
-cp ../../python_models/add_sub/model.py ./models/add_sub_1/1/
-
-mkdir -p models/add_sub_2/1/
-cp ../../python_models/add_sub/config.pbtxt ./models/add_sub_2/
-(cd models/add_sub_2 && \
-          sed -i "s/^name:.*/name: \"add_sub_2\"/" config.pbtxt)
-cp ../../python_models/add_sub/model.py ./models/add_sub_2/1/
-
-# Ensemble GPU Model
-mkdir -p models/ensemble_gpu/1/
-cp ../../python_models/ensemble_gpu/config.pbtxt ./models/ensemble_gpu
-cp -r ${DATADIR}/qa_model_repository/libtorch_float32_float32_float32/ ./models
-(cd models/libtorch_float32_float32_float32 && \
-          echo "instance_group [ { kind: KIND_GPU }]" >> config.pbtxt)
-(cd models/libtorch_float32_float32_float32 && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 0/" config.pbtxt)
-(cd models/libtorch_float32_float32_float32 && \
-          sed -i "s/^version_policy:.*//" config.pbtxt)
-rm -rf models/libtorch_float32_float32_float32/2
-rm -rf models/libtorch_float32_float32_float32/3
-
 prev_num_pages=`get_shm_pages`
-
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    RET=1
+    exit 1
 fi
 
-set +e
-python3 ensemble_test.py 2>&1 > $CLIENT_LOG
 
+triton_procs=`pgrep --parent $SERVER_PID`
+echo $triton_procs
+
+set +e
+for proc in $triton_procs; do
+    kill -9 $proc
+done
+
+python3 restart_test.py  > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** ensemble_test.py FAILED. \n***"
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** restart_test.py test FAILED. \n***"
     RET=1
-else
-    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
@@ -100,18 +74,19 @@ wait $SERVER_PID
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
     ls /dev/shm
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
+    exit 1
 fi
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
-    echo -e "\n***\n*** Ensemble test FAILED. \n***"
+    echo -e "\n***\n*** Restart test FAILED. \n***"
 else
-    echo -e "\n***\n*** Ensemble test PASSED. \n***"
+    echo -e "\n***\n*** Restart test PASSED. \n***"
 fi
 
 exit $RET
