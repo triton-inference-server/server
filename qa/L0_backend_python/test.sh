@@ -282,22 +282,22 @@ done
 kill $SERVER_PID
 wait $SERVER_PID
 
-(cd env/ && bash -ex ./test.sh)
+(cd env && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi
 
-(cd lifecycle/ && bash -ex ./test.sh)
+(cd lifecycle && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi
 
-(cd ensemble/ && bash -ex ./test.sh)
+(cd ensemble && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi
 
-(cd restart/ && bash -ex ./test.sh)
+(cd restart && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi
