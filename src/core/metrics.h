@@ -165,7 +165,7 @@ class Metrics {
   std::unique_ptr<std::thread> dcgm_thread_;
   std::atomic<bool> dcgm_thread_exit_;
   dcgmGpuGrp_t groupId_;
-  bool standalone_ = true;
+  bool standalone_ = false;
 #endif  // TRITON_ENABLE_METRICS_GPU
 
   bool metrics_enabled_;
