@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: nv-triton-client
+  name: nv-triton-client
+  namespace: default
+spec:
+  containers:
+  - image: nvcr.io/nvidia/tritonserver:21.05-py3-sdk
+    imagePullPolicy: Always
+    name: nv-triton-client
+    securityContext:
+      privileged: true
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "while true; do sleep 30; done;" ]

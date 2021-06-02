@@ -1,0 +1,11 @@
+platform: "tensorrt_plan"
+max_batch_size: 8
+dynamic_batching {
+   preferred_batch_size: 8
+   max_queue_delay_microseconds: 200000
+}
+instance_group {
+   count: 2
+   kind: KIND_GPU
+}
+
