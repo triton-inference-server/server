@@ -781,7 +781,7 @@ InferenceRequest::Input::SetIsShapeTensor(const bool is_shape_tensor)
 }
 
 const std::shared_ptr<Memory>&
-InferenceRequest::Input::Data(const char* host_policy_name) const
+InferenceRequest::Input::Data(const std::string host_policy_name) const
 {
   auto device_data = host_policy_data_map_.find(host_policy_name);
   if (device_data == host_policy_data_map_.end()) {
@@ -886,7 +886,7 @@ InferenceRequest::Input::DataBufferCountForHostPolicy(
   if (policy_data != host_policy_data_map_.end()) {
     return policy_data->second->BufferCount();
   }
-  return 0;
+  return data_->BufferCount();
 }
 
 std::ostream&

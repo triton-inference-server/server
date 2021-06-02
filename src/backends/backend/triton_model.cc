@@ -818,9 +818,6 @@ TRITONBACKEND_InputProperties(
   return nullptr;  // success
 }
 
-///
-/// TRITONBACKEND_Input
-///
 TRITONSERVER_Error*
 TRITONBACKEND_InputPropertiesForHostPolicy(
     TRITONBACKEND_Input* input, const char* host_policy_name, const char** name,

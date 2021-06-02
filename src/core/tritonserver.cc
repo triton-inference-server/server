@@ -1343,7 +1343,6 @@ TRITONSERVER_InferenceRequestAppendInputDataForHostPolicy(
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
 
-  // Madhu fixme
   ni::InferenceRequest::Input* input;
   RETURN_IF_STATUS_ERROR(lrequest->MutableOriginalInput(name, &input));
   RETURN_IF_STATUS_ERROR(input->AppendDataForHostPolicy(

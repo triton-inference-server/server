@@ -97,6 +97,13 @@ class InferenceRequest {
       return &shape_with_batch_dim_;
     }
 
+    // Returns true if data was added for this input using the
+    // AppendDataForDevice function
+    bool HasHostPolicySpecificData() const
+    {
+      return has_host_policy_specific_data_;
+    }
+
     // Whether or not the input is a tensorrt shape tensor
     bool IsShapeTensor() const { return is_shape_tensor_; }
 
@@ -107,7 +114,7 @@ class InferenceRequest {
     const std::shared_ptr<Memory>& Data() const { return data_; }
 
     // The data for this input for a specific device
-    const std::shared_ptr<Memory>& Data(const char* host_policy_name) const;
+    const std::shared_ptr<Memory>& Data(const std::string host_policy_name) const;
 
     // Set the data for this input. Error if input already has some
     // data.
@@ -128,8 +135,10 @@ class InferenceRequest {
     // Get the number of buffers containing the input tensor data.
     size_t DataBufferCount() const { return data_->BufferCount(); }
 
-    // Get the number of buffers containing the input tensor data.
-    //
+    // Get the number of buffers containing the input tensor data with
+    // host policy. If there are no buffers corresponding to the specific
+    // host policy, the number of buffers in the fallback input data is
+    // returned.
     size_t DataBufferCountForHostPolicy(
         const std::string host_policy_name) const;
 
@@ -149,12 +158,6 @@ class InferenceRequest {
         const size_t idx, const void** base, size_t* byte_size,
         TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const;
 
-    // Returns true if data was added for this input using the
-    // AppendDataForDevice function
-    bool HostPolicySpecificData() const
-    {
-      return has_host_policy_specific_data_;
-    }
 
     // Get the 'idx' buffer containing a contiguous chunk of bytes for
     // the input. Return error is 'idx' refers to a buffer that does
