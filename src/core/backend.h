@@ -146,18 +146,6 @@ class InferenceBackend {
   }
 
  protected:
-  struct WarmupData {
-    WarmupData(const std::string& sample_name) : sample_name_(sample_name) {}
-
-    std::string sample_name_;
-    std::vector<std::unique_ptr<InferenceRequest>> requests_;
-
-    // Placeholder for input data
-    std::unique_ptr<AllocatedMemory> zero_data_;
-    std::unique_ptr<AllocatedMemory> random_data_;
-    std::vector<std::unique_ptr<std::string>> provided_data_;
-  };
-
   // Run model on the context associated with 'runner_idx' to execute
   // for one or more requests. This function takes ownership of
   // 'requests' and is responsible for generating responses and
@@ -165,9 +153,6 @@ class InferenceBackend {
   virtual void Run(
       uint32_t runner_idx,
       std::vector<std::unique_ptr<InferenceRequest>>&& requests);
-
-  // Warm up context associated with 'runner_idx' with provided 'sample'.
-  virtual void WarmUp(uint32_t runner_idx, WarmupData& sample);
 
   // Set the configuration of the model being served.
   Status SetModelConfig(
@@ -192,9 +177,6 @@ class InferenceBackend {
   std::unique_ptr<Scheduler> scheduler_;
 
  private:
-  // Generate warmup data
-  Status GenerateWarmupData(std::vector<WarmupData>* samples);
-
   // The minimum supported CUDA compute capability.
   const double min_compute_capability_;
 
