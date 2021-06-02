@@ -1473,16 +1473,16 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Start the HTTP, GRPC, and metrics endpoints.
-  if (!StartEndpoints(server, trace_manager, shm_manager)) {
-    exit(1);
-  }
-
   // Trap SIGINT and SIGTERM to allow server to exit gracefully
   TRITONSERVER_Error* signal_err =
       nvidia::inferenceserver::RegisterSignalHandler();
   if (signal_err != nullptr) {
     LOG_TRITONSERVER_ERROR(signal_err, "failed to register signal handler");
+    exit(1);
+  }
+
+  // Start the HTTP, GRPC, and metrics endpoints.
+  if (!StartEndpoints(server, trace_manager, shm_manager)) {
     exit(1);
   }
 
