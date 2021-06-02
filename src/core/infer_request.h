@@ -97,8 +97,7 @@ class InferenceRequest {
       return &shape_with_batch_dim_;
     }
 
-    // Returns true if data was added for this input using the
-    // AppendDataForDevice function
+    // Return true if host-specific data was added for this input
     bool HasHostPolicySpecificData() const
     {
       return has_host_policy_specific_data_;
