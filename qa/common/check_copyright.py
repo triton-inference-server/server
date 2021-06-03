@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,8 +52,8 @@ SKIP_PATHS = (
     'src/clients/c++/library/cencode.c', 'src/clients/c++/library/cencode.h',
     'src/clients/java', 'TRITON_VERSION')
 
-COPYRIGHT_YEAR_RE0 = 'Copyright \\(c\\) (20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
-COPYRIGHT_YEAR_RE1 = 'Copyright \\(c\\) (20[0-9][0-9])-(20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
+COPYRIGHT_YEAR_RE0 = 'Copyright \\(c\\) (20[0-9][0-9]), NVIDIA CORPORATION(?: & AFFILIATES)?. All rights reserved.'
+COPYRIGHT_YEAR_RE1 = 'Copyright \\(c\\) (20[0-9][0-9])-(20[0-9][0-9]), NVIDIA CORPORATION(?: & AFFILIATES)?. All rights reserved.'
 
 COPYRIGHT = '''
 
