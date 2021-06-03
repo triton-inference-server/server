@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -273,7 +273,7 @@ Metrics::InitializeDcgmMetrics()
   dcgmerr =
       dcgmGroupCreate(dcgm_handle_, DCGM_GROUP_DEFAULT, groupName, &groupId_);
   if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "error, cannot cannot make group. Err:"
+    LOG_WARNING << "error, cannot cannot make GPU group. Err:"
                 << errorString(dcgmerr);
   }
 
@@ -393,9 +393,9 @@ Metrics::InitializeDcgmMetrics()
               energy_fail_cnt[didx]++;
               util_fail_cnt[didx]++;
               mem_fail_cnt[didx]++;
-              LOG_WARNING << "error, unable to get field values for device "
-                          << available_gpu_ids[didx] << ": "
-                          << errorString(dcgmerr);
+              LOG_WARNING << "error, unable to get field values for GPU ID:"
+                          << available_gpu_ids[didx]
+                          << ". Err:" << errorString(dcgmerr);
             } else {
               // Power limit
               if (power_limit_fail_cnt[didx] < fail_threshold) {
@@ -407,7 +407,7 @@ Metrics::InitializeDcgmMetrics()
                   power_limit_fail_cnt[didx]++;
                   power_limit = 0;
                   LOG_WARNING << "error, unable to get power limit for GPU "
-                              << didx << ": " << errorString(dcgmerr);
+                              << didx << ". Err:" << errorString(dcgmerr);
                 }
                 gpu_power_limit_[didx]->Set(power_limit);
               }
@@ -422,7 +422,7 @@ Metrics::InitializeDcgmMetrics()
                   power_usage_fail_cnt[didx]++;
                   power_usage = 0;
                   LOG_WARNING << "error, unable to get power usage for GPU "
-                              << didx << ": " << errorString(dcgmerr);
+                              << didx << ". Err:" << errorString(dcgmerr);
                 }
                 gpu_power_usage_[didx]->Set(power_usage);
               }
@@ -443,7 +443,8 @@ Metrics::InitializeDcgmMetrics()
                   energy_fail_cnt[didx]++;
                   energy = 0;
                   LOG_WARNING << "error, unable to get energy consumption for "
-                              << "GPU " << didx << ": " << errorString(dcgmerr);
+                              << "GPU " << didx
+                              << ". Err:" << errorString(dcgmerr);
                 }
               }
 
@@ -457,7 +458,7 @@ Metrics::InitializeDcgmMetrics()
                   util_fail_cnt[didx]++;
                   util = 0;
                   LOG_WARNING << "error, unable to get GPU utilization for GPU "
-                              << didx << ": " << errorString(dcgmerr);
+                              << didx << ". Err:" << errorString(dcgmerr);
                 }
                 gpu_utilization_[didx]->Set((double)util * 0.01);
               }
@@ -476,7 +477,7 @@ Metrics::InitializeDcgmMetrics()
                   memory_used = 0;
                   mem_fail_cnt[didx]++;
                   LOG_WARNING << "error, unable to get memory usage for GPU "
-                              << didx << ": " << errorString(dcgmerr);
+                              << didx << ". Err:" << errorString(dcgmerr);
                 }
                 gpu_memory_total_[didx]->Set(memory_total * 1e6);  // bytes
                 gpu_memory_used_[didx]->Set(memory_used * 1e6);    // bytes

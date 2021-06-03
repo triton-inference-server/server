@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -464,6 +464,7 @@ def dali_cmake_args():
         '-DTRITON_DALI_SKIP_DOWNLOAD=OFF',
     ]
 
+
 def install_dcgm_libraries():
     return '''
 # Install DCGM
@@ -742,7 +743,8 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
         dfile.write(df)
 
 
-def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends, repoagents):
+def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends,
+                              repoagents):
     df = '''
 #
 # Multistage build.
@@ -982,15 +984,16 @@ def container_build(images, backends, repoagents, endpoints):
         # the install artifacts from the tritonserver_build
         # container.
         if target_platform() == 'windows':
-            create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents)
+            create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile',
+                                      dockerfileargmap, backends, repoagents)
         else:
-            create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents, endpoints)
+            create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile',
+                                    dockerfileargmap, backends, repoagents,
+                                    endpoints)
         p = subprocess.Popen([
-                'docker', 'build', '-f',
-                os.path.join(FLAGS.build_dir, 'Dockerfile')
-            ] + ['-t', 'tritonserver', '.'])
+            'docker', 'build', '-f',
+            os.path.join(FLAGS.build_dir, 'Dockerfile')
+        ] + ['-t', 'tritonserver', '.'])
         p.wait()
         fail_if(p.returncode != 0, 'docker build tritonserver failed')
 
