@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020,21 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,8 +52,11 @@ SKIP_PATHS = (
     'src/clients/c++/library/cencode.c', 'src/clients/c++/library/cencode.h',
     'src/clients/java', 'TRITON_VERSION')
 
+# COPYRIGHT for existing files not significantly modified
 COPYRIGHT_YEAR_RE0 = 'Copyright \\(c\\) (20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
 COPYRIGHT_YEAR_RE1 = 'Copyright \\(c\\) (20[0-9][0-9])-(20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
+# COPYRIGHT for new or significantly modified files
+COPYRIGHT_YEAR_RE2 = 'Copyright \\(c\\) (20[2-9][0-9])(,[2-9][0-9](-[2-9][0-9])*)* NVIDIA CORPORATION & AFFILIATES. All rights reserved.'
 
 COPYRIGHT = '''
 
@@ -84,6 +87,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 single_re = re.compile(COPYRIGHT_YEAR_RE0)
 range_re = re.compile(COPYRIGHT_YEAR_RE1)
+new_range_re = re.compile(COPYRIGHT_YEAR_RE2)
 
 
 def visit(path):
@@ -150,34 +154,42 @@ def visit(path):
                 + path + ": " + line)
             return False
 
-        start_year = 0
-        end_year = 0
+        years = []
 
         m = single_re.match(line[len(prefix):])
         if m and len(m.groups()) == 1:
-            start_year = end_year = int(m.group(1))
+            years.append(int(m.group(1)))
         else:
             m = range_re.match(line[len(prefix):])
             if m and len(m.groups()) == 2:
-                start_year = int(m.group(1))
-                end_year = int(m.group(2))
+                years.append(int(m.group(1)))
+                years.append(int(m.group(2)))
             else:
-                print("copyright year is not recognized for " + path + ": " +
-                      line)
-                return False
-
-        if start_year > FLAGS.year:
+                copyright_row = line[len(prefix):]
+                if new_range_re.match(copyright_row):
+                    year_str = copyright_row.split("(c) ")[1].split(
+                        " NVIDIA ")[0]
+                    for year in year_str.split(","):
+                        if len(year) == 4:  # 2021
+                            years.append(int(year))
+                        elif len(year) == 2:  # 21
+                            years.append(int(year) + 2000)
+                        else:  # 21-23
+                            years.append(int(year[0:2]) + 2000)
+                            years.append(int(year[3:5]) + 2000)
+                else:
+                    print("copyright year is not recognized for " + path +
+                          ": " + line)
+                    return False
+        if years[0] > FLAGS.year:
             print("copyright start year greater than current year for " + path +
                   ": " + line)
             return False
-        if end_year > FLAGS.year:
-            print("copyright end year greater than current year for " + path +
-                  ": " + line)
-            return False
-        if end_year < start_year:
-            print("copyright start year greater than end year for " + path +
-                  ": " + line)
-            return False
+        for i in range(1, len(years)):
+            if years[i - 1] >= years[i]:
+                print("copyright years are not increasing for " + path + ": " +
+                      line)
+                return False
 
         # Subsequent lines must match the copyright body.
         copyright_body = [
