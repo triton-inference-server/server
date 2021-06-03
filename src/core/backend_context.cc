@@ -675,7 +675,7 @@ BackendInputCollector::ProcessTensor(
           memory_type_id, use_pinned_memory_type, use_kernel, true, &response);
     }
 
-    buffer_offset += request_input->Data()->TotalByteSize();
+    buffer_offset += request_input->Data(host_policy_name_)->TotalByteSize();
   }
 
   // Done with the tensor, flush any pending pinned copies.
@@ -938,7 +938,8 @@ BackendInputCollector::SetFixedSizeInputTensor(
 {
   bool cuda_copy = false;
 
-  if ((tensor_buffer_offset + request_input->Data()->TotalByteSize()) >
+  if ((tensor_buffer_offset +
+       request_input->Data(host_policy_name_)->TotalByteSize()) >
       tensor_buffer_byte_size) {
     InferenceResponse::SendWithStatus(
         std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,
@@ -947,7 +948,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
             "unexpected total byte size " +
                 std::to_string(
                     tensor_buffer_offset +
-                    request_input->Data()->TotalByteSize()) +
+                    request_input->Data(host_policy_name_)->TotalByteSize()) +
                 " for input '" + request_input->Name() + "', expecting " +
                 std::to_string(tensor_buffer_byte_size)));
     return cuda_copy;
@@ -956,16 +957,22 @@ BackendInputCollector::SetFixedSizeInputTensor(
   // Request input tensor data may be in multiple non-contiguous
   // buffers.
   size_t input_offset = 0;
-  for (size_t idx = 0; idx < request_input->DataBufferCount(); ++idx) {
+
+  size_t data_buffer_count =
+      request_input->DataBufferCountForHostPolicy(host_policy_name_);
+
+  for (size_t idx = 0; idx < data_buffer_count; ++idx) {
     const void* src_buffer;
     size_t src_byte_size;
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
-    Status status = request_input->DataBuffer(
-        idx, &src_buffer, &src_byte_size, &src_memory_type,
-        &src_memory_type_id);
-    if (!status.IsOk()) {
+    Status status = request_input->DataBufferForHostPolicy(
+        idx, &src_buffer, &src_byte_size, &src_memory_type, &src_memory_type_id,
+        host_policy_name_);
+
+    if (!status.IsOk())
+    {
       InferenceResponse::SendWithStatus(
           std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
       return cuda_copy;
@@ -986,7 +993,8 @@ BackendInputCollector::SetFixedSizeInputTensor(
         pending_pinned_offset_ = tensor_buffer_offset;
       }
 
-      pending_pinned_byte_size_ += request_input->Data()->TotalByteSize();
+      pending_pinned_byte_size_ +=
+          request_input->Data(host_policy_name_)->TotalByteSize();
       pending_pinned_inputs_.push_back(std::make_pair(response, request_input));
       return cuda_copy;
     }
@@ -1018,9 +1026,9 @@ BackendInputCollector::SetFixedSizeInputTensor(
         }
 
         pending_copy_kernel_buffer_byte_size_ +=
-            request_input->Data()->TotalByteSize();
+            request_input->Data(host_policy_name_)->TotalByteSize();
         pending_copy_kernel_input_buffer_counts_ +=
-            request_input->DataBufferCount();
+            request_input->DataBufferCountForHostPolicy(host_policy_name_);
         pending_copy_kernel_inputs_.push_back(
             std::make_pair(response, request_input));
         return cuda_copy;
@@ -1092,7 +1100,7 @@ BackendInputCollector::FlushPendingPinned(
           request_input, pending_pinned_offset_ + offset, tensor_buffer,
           tensor_buffer_byte_size, tensor_memory_type, tensor_memory_type_id,
           TRITONSERVER_MEMORY_CPU_PINNED, false, true, response);
-      offset += request_input->Data()->TotalByteSize();
+      offset += request_input->Data(host_policy_name_)->TotalByteSize();
     }
   }
   // We have a pinned buffer so copy the pending input buffer(s) into
@@ -1109,7 +1117,7 @@ BackendInputCollector::FlushPendingPinned(
             request_input, offset, pinned_buffer, pending_pinned_byte_size_,
             pinned_memory_type, pinned_memory_id,
             TRITONSERVER_MEMORY_CPU_PINNED, false, false, response);
-        offset += request_input->Data()->TotalByteSize();
+        offset += request_input->Data(host_policy_name_)->TotalByteSize();
       }
 
       cuda_copy |= cuda_used;
@@ -1179,7 +1187,8 @@ BackendInputCollector::FlushPendingPinned(
         auto end_it = pending_it;
         auto next_offset = offset;
         for (size_t idx = 0; idx < stride; idx++) {
-          next_offset += (*end_it).second->Data()->TotalByteSize();
+          next_offset +=
+              (*end_it).second->Data(host_policy_name_)->TotalByteSize();
           end_it++;
           if (end_it == deferred_pinned_.back().requests_.end()) {
             break;
@@ -1201,7 +1210,8 @@ BackendInputCollector::FlushPendingPinned(
                         pending_pinned_byte_size, pinned_memory_type,
                         pinned_memory_id, TRITONSERVER_MEMORY_CPU_PINNED, false,
                         false, response);
-                    offset += request_input->Data()->TotalByteSize();
+                    offset +=
+                        request_input->Data(host_policy_name_)->TotalByteSize();
                   }
                   // The last segmented task will start the next phase of
                   // the internal pinned buffer copy
@@ -1282,7 +1292,7 @@ BackendInputCollector::FlushPendingCopyKernel(
           tensor_buffer, tensor_buffer_byte_size, tensor_memory_type,
           tensor_memory_type_id, TRITONSERVER_MEMORY_CPU_PINNED, false, true,
           response);
-      offset += request_input->Data()->TotalByteSize();
+      offset += request_input->Data(host_policy_name_)->TotalByteSize();
     }
   }
 
@@ -1324,13 +1334,14 @@ BackendInputCollector::LaunchCopyKernel(
   for (const auto& response_input : pending_copy_kernel_inputs_) {
     const auto& input = response_input.second;
 
-    for (size_t buffer_idx = 0; buffer_idx < input->DataBufferCount();
-         ++buffer_idx) {
+    size_t data_buffer_count =
+        input->DataBufferCountForHostPolicy(host_policy_name_);
+    for (size_t buffer_idx = 0; buffer_idx < data_buffer_count; ++buffer_idx) {
       input_ptr_buffer_host.emplace_back();
-      RETURN_IF_ERROR(input->DataBuffer(
+      RETURN_IF_ERROR(input->DataBufferForHostPolicy(
           buffer_idx, (const void**)(&input_ptr_buffer_host.back()),
           &buffer_byte_size, &kernel_buffer_memory_type,
-          &kernel_buffer_memory_id));
+          &kernel_buffer_memory_id, host_policy_name_));
 
       byte_size_offset_buffer_host.emplace_back(byte_size_offset);
       byte_size_buffer_host.emplace_back(buffer_byte_size);

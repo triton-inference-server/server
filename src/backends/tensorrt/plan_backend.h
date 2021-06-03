@@ -64,7 +64,8 @@ class PlanBackend : public InferenceBackend {
       const int64_t dla_core_id, const std::vector<char>& models,
       const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
       const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue,
-      const HostPolicyCmdlineConfig& host_policy);
+      const HostPolicyCmdlineConfig& host_policy,
+      const std::string host_policy_name);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
@@ -98,7 +99,8 @@ class PlanBackend : public InferenceBackend {
         const size_t gather_kernel_buffer_threshold,
         const bool separate_output_copy_stream,
         std::shared_ptr<MetricModelReporter>&& metric_reporter,
-        const HostPolicyCmdlineConfig& host_policy);
+        const HostPolicyCmdlineConfig& host_policy,
+        const std::string policy_name);
     ~Context();
 
     DISALLOW_MOVE(Context);
@@ -434,6 +436,7 @@ class PlanBackend : public InferenceBackend {
 
     // The host polciy associated with this instance
     const HostPolicyCmdlineConfig host_policy_;
+    const std::string host_policy_name_;
   };
 
   // CUDA engine shared across all model instances using the same (or no) DLA

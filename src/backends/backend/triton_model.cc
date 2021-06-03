@@ -819,6 +819,36 @@ TRITONBACKEND_InputProperties(
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_InputPropertiesForHostPolicy(
+    TRITONBACKEND_Input* input, const char* host_policy_name, const char** name,
+    TRITONSERVER_DataType* datatype, const int64_t** shape,
+    uint32_t* dims_count, uint64_t* byte_size, uint32_t* buffer_count)
+{
+  InferenceRequest::Input* ti =
+      reinterpret_cast<InferenceRequest::Input*>(input);
+  if (name != nullptr) {
+    *name = ti->Name().c_str();
+  }
+  if (datatype != nullptr) {
+    *datatype = DataTypeToTriton(ti->DType());
+  }
+  if (shape != nullptr) {
+    *shape = ti->ShapeWithBatchDim().data();
+  }
+  if (dims_count != nullptr) {
+    *dims_count = ti->ShapeWithBatchDim().size();
+  }
+  if (byte_size != nullptr) {
+    *byte_size = ti->Data(host_policy_name)->TotalByteSize();
+  }
+  if (buffer_count != nullptr) {
+    *buffer_count = ti->DataBufferCountForHostPolicy(host_policy_name);
+  }
+  return nullptr;  // success
+}
+
+
+TRITONSERVER_Error*
 TRITONBACKEND_InputBuffer(
     TRITONBACKEND_Input* input, const uint32_t index, const void** buffer,
     uint64_t* buffer_byte_size, TRITONSERVER_MemoryType* memory_type,
@@ -828,6 +858,26 @@ TRITONBACKEND_InputBuffer(
       reinterpret_cast<InferenceRequest::Input*>(input);
   Status status = ti->DataBuffer(
       index, buffer, buffer_byte_size, memory_type, memory_type_id);
+  if (!status.IsOk()) {
+    *buffer = nullptr;
+    *buffer_byte_size = 0;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_InputBufferForHostPolicy(
+    TRITONBACKEND_Input* input, const char* host_policy_name,
+    const uint32_t index, const void** buffer, uint64_t* buffer_byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  InferenceRequest::Input* ti =
+      reinterpret_cast<InferenceRequest::Input*>(input);
+  Status status = ti->DataBufferForHostPolicy(
+      index, buffer, buffer_byte_size, memory_type, memory_type_id,
+      host_policy_name);
   if (!status.IsOk()) {
     *buffer = nullptr;
     *buffer_byte_size = 0;

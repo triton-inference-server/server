@@ -97,6 +97,12 @@ class InferenceRequest {
       return &shape_with_batch_dim_;
     }
 
+    // Return true if host-specific data was added for this input
+    bool HasHostPolicySpecificData() const
+    {
+      return has_host_policy_specific_data_;
+    }
+
     // Whether or not the input is a tensorrt shape tensor
     bool IsShapeTensor() const { return is_shape_tensor_; }
 
@@ -105,6 +111,9 @@ class InferenceRequest {
 
     // The data for this input.
     const std::shared_ptr<Memory>& Data() const { return data_; }
+
+    // The data for this input for a specific device
+    const std::shared_ptr<Memory>& Data(const std::string host_policy_name) const;
 
     // Set the data for this input. Error if input already has some
     // data.
@@ -115,11 +124,22 @@ class InferenceRequest {
         const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
         int64_t memory_type_id);
 
+    Status AppendDataForHostPolicy(
+        const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+        int64_t memory_type_id, const char* host_policy_name);
+
     // Remove all existing data for the input.
     Status RemoveAllData();
 
     // Get the number of buffers containing the input tensor data.
     size_t DataBufferCount() const { return data_->BufferCount(); }
+
+    // Get the number of buffers containing the input tensor data with
+    // host policy. If there are no buffers corresponding to the specific
+    // host policy, the number of buffers in the fallback input data is
+    // returned.
+    size_t DataBufferCountForHostPolicy(
+        const std::string host_policy_name) const;
 
     // Get the 'idx' buffer containing a contiguous chunk of bytes for
     // the input. Return error is 'idx' refers to a buffer that does
@@ -137,6 +157,24 @@ class InferenceRequest {
         const size_t idx, const void** base, size_t* byte_size,
         TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const;
 
+
+    // Get the 'idx' buffer containing a contiguous chunk of bytes for
+    // the input. Return error is 'idx' refers to a buffer that does
+    // not exist. Return a pointer to the chunk in 'base' and the
+    // size of the chunk in 'byte_size'. 'memory_type' acts as
+    // both input and output. On input 'memory_type' is the buffer
+    // memory type preferred by the function caller. On return
+    // 'memory_type' gives the actual memory type of the chunk pointed
+    // to by 'base'.  'memory_type_id' acts as both input and
+    // output. On input 'memory_type_id' is the buffer memory type id
+    // preferred by the function caller.  On return 'memory_type_id'
+    // gives the actual memory type id of the chunk pointed to by
+    // 'base'.
+    Status DataBufferForHostPolicy(
+        const size_t idx, const void** base, size_t* byte_size,
+        TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
+        const std::string host_policy_name) const;
+
    private:
     DISALLOW_COPY_AND_ASSIGN(Input);
     friend std::ostream& operator<<(
@@ -149,6 +187,10 @@ class InferenceRequest {
     std::vector<int64_t> shape_with_batch_dim_;
     bool is_shape_tensor_;
     std::shared_ptr<Memory> data_;
+
+    bool has_host_policy_specific_data_;
+    // A map of host policy to input data memory
+    std::map<std::string, std::shared_ptr<Memory>> host_policy_data_map_;
   };
 
   // InferenceRequest
