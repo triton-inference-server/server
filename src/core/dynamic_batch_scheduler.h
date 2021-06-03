@@ -107,6 +107,9 @@ class DynamicBatchScheduler : public Scheduler {
   std::mutex mu_;
   std::condition_variable cv_;
 
+  std::mutex instance_mu_;
+  std::condition_variable instance_cv_;
+
   std::shared_ptr<RateLimiter> rate_limiter_;
 
   size_t max_batch_size_;

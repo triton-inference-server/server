@@ -246,7 +246,7 @@ TritonModelInstance::SetBackendThread(
   if (triton_backend_thread_.get() == nullptr) {
     std::unique_ptr<TritonBackendThread> local_backend_thread;
     RETURN_IF_ERROR(TritonBackendThread::CreateBackendThread(
-        Name(), 0 /* nice */, device_id, &local_backend_thread));
+        Name(), 5 /* nice */, device_id, &local_backend_thread));
     triton_backend_thread_ = std::move(local_backend_thread);
     device_to_thread_map->insert({device_id, triton_backend_thread_});
   }
@@ -666,8 +666,8 @@ TritonModelInstance::TritonBackendThread::BackendThread(
 
   bool should_exit = false;
   while (!should_exit) {
-    NVTX_RANGE(nvtx_, "BackendThread " + name_);
     auto payload = queue_.Get();
+    NVTX_RANGE(nvtx_, "BackendThread " + name_);
     payload->Execute(&should_exit);
   }
 

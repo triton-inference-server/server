@@ -452,7 +452,9 @@ RateLimiter::ModelInstance::Release()
     }
   }
 
-  cv_.notify_all();
+  if (state_ == REMOVED) {
+    cv_.notify_all();
+  }
 }
 
 void
