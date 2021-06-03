@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "model_config.pb.h"
+#include "src/core/model_config.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/persistent_backend_manager.h"
 #include "src/core/status.h"
@@ -202,6 +203,11 @@ class InferenceServer {
     backend_cmdline_config_map_ = bc;
   }
 
+  void SetHostPolicyCmdlineConfig(const HostPolicyCmdlineConfigMap& hp)
+  {
+    host_policy_map_ = hp;
+  }
+
   void SetRepoAgentDir(const std::string& d) { repoagent_dir_ = d; }
 
   // FIXME TF specific functions should be removed once all backends
@@ -249,6 +255,7 @@ class InferenceServer {
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_supported_compute_capability_;
   BackendCmdlineConfigMap backend_cmdline_config_map_;
+  HostPolicyCmdlineConfigMap host_policy_map_;
   std::string repoagent_dir_;
 
   // FIXME, remove once all backends use backend config.

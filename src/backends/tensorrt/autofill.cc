@@ -471,7 +471,7 @@ AutoFillPlan::Create(
     }
     std::vector<char> plan_data(plan_data_str.begin(), plan_data_str.end());
 
-    if (!LoadPlan(plan_data, &runtime, &engine).IsOk()) {
+    if (!LoadPlan(plan_data, -1 /* dla_core_id */, &runtime, &engine).IsOk()) {
       if (engine != nullptr) {
         engine->destroy();
         engine = nullptr;

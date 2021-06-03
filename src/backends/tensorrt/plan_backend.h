@@ -28,10 +28,10 @@
 #include <NvInfer.h>
 #include <cuda_runtime_api.h>
 #include <thread>
+#include "model_config.pb.h"
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/metric_model_reporter.h"
-#include "model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 #include "triton/common/sync_queue.h"
@@ -57,12 +57,14 @@ class PlanBackend : public InferenceBackend {
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(
-      const std::unordered_map<std::string, std::vector<char>>& models);
+      const std::unordered_map<std::string, std::vector<char>>& models,
+      const HostPolicyCmdlineConfigMap& host_policy);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::vector<char>& models,
+      const int64_t dla_core_id, const std::vector<char>& models,
       const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
-      const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue);
+      const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue,
+      const HostPolicyCmdlineConfig& host_policy);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
@@ -95,7 +97,8 @@ class PlanBackend : public InferenceBackend {
         const bool enable_pinned_input, const bool enable_pinned_output,
         const size_t gather_kernel_buffer_threshold,
         const bool separate_output_copy_stream,
-        std::shared_ptr<MetricModelReporter>&& metric_reporter);
+        std::shared_ptr<MetricModelReporter>&& metric_reporter,
+        const HostPolicyCmdlineConfig& host_policy);
     ~Context();
 
     DISALLOW_MOVE(Context);
@@ -428,10 +431,17 @@ class PlanBackend : public InferenceBackend {
 
     // Whether to prepare the next batch before the context is ready for it
     bool eager_batching_;
+
+    // The host polciy associated with this instance
+    const HostPolicyCmdlineConfig host_policy_;
   };
 
-  // CUDA engine shared across all model instances on the same device.
-  std::map<int, std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
+  // CUDA engine shared across all model instances using the same (or no) DLA
+  // core on same GPU. The first element in the key pair is the GPU ID, the
+  // second is the DLA core ID.
+  std::map<
+      std::pair<int, int64_t>,
+      std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
       device_engines_;
 
   // vector for storing available context queue associated with a runner

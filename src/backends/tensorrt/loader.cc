@@ -35,8 +35,8 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 LoadPlan(
-    const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
-    nvinfer1::ICudaEngine** engine)
+    const std::vector<char>& model_data, int64_t dla_core_id,
+    nvinfer1::IRuntime** runtime, nvinfer1::ICudaEngine** engine)
 {
   // Create runtime only if it is not provided
   if (*runtime == nullptr) {
@@ -44,6 +44,19 @@ LoadPlan(
     if (*runtime == nullptr) {
       return Status(
           Status::Code::INTERNAL, "unable to create TensorRT runtime");
+    }
+
+    // Report error if 'dla_core_id' >= number of DLA cores
+    if (dla_core_id != -1) {
+      if (dla_core_id < (*runtime)->getNbDLACores()) {
+        (*runtime)->setDLACore(dla_core_id);
+      } else {
+        return Status(
+            Status::Code::INVALID_ARG,
+            ("unable to create TensorRT runtime with DLA Core ID: " +
+             std::to_string(dla_core_id))
+                .c_str());
+      }
     }
   }
 

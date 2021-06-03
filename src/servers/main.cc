@@ -248,7 +248,8 @@ enum OptionId {
   OPTION_BACKEND_DIR,
   OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
-  OPTION_BACKEND_CONFIG
+  OPTION_BACKEND_CONFIG,
+  OPTION_HOST_POLICY
 };
 
 struct Option {
@@ -404,7 +405,9 @@ std::vector<Option> options_
        "The total byte size that can be allocated as pinned system memory. "
        "If GPU support is enabled, the server will allocate pinned system "
        "memory to accelerate data transfer between host and devices until it "
-       "exceeds the specified byte size. This option will not affect the "
+       "exceeds the specified byte size. If 'numa-node' is configured via "
+       "--host-policy, the pinned system memory of the pool size will be "
+       "allocated on each numa node. This option will not affect the "
        "allocation conducted by the backend frameworks. Default is 256 MB."},
       {OPTION_CUDA_MEMORY_POOL_BYTE_SIZE, "cuda-memory-pool-byte-size",
        "<integer>:<integer>",
@@ -435,11 +438,17 @@ std::vector<Option> options_
        Option::ArgInt,
        "The number of threads used to accelerate copies and other operations "
        "required to manage input and output tensor contents. Default is 0."},
+      {OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
+       "Specify a backend-specific configuration setting. The format of this "
+       "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
+       "<backend_name> is the name of the backend, such as 'tensorrt'."},
   {
-    OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
-        "Specify a backend-specific configuration setting. The format of this "
-        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
-        "<backend_name> is the name of the backend, such as 'tensorrt'."
+    OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
+        "Specify a host policy setting associated with a policy name. The "
+        "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
+        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
+        "'numa-node' setting will affect pinned memory pool behavior, see "
+        "--pinned-memory-pool for more detail."
   }
 };
 
@@ -950,6 +959,36 @@ ParseBackendConfigOption(const std::string arg)
   return {name_string, setting_string, value_string};
 }
 
+std::tuple<std::string, std::string, std::string>
+ParseHostPolicyOption(const std::string arg)
+{
+  // Format is "<backend_name>,<setting>=<value>"
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
+
+  // Check for 2 semicolons
+  if ((delim_name < 0) || (delim_setting < 0)) {
+    std::cerr << "--host-policy option format is '<policy "
+                 "name>,<setting>=<value>'. Got "
+              << arg << std::endl;
+    exit(1);
+  }
+
+  std::string name_string = arg.substr(0, delim_name);
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
+
+  if (name_string.empty() || setting_string.empty() || value_string.empty()) {
+    std::cerr << "--host-policy option format is '<policy "
+                 "name>,<setting>=<value>'. Got "
+              << arg << std::endl;
+    exit(1);
+  }
+
+  return {name_string, setting_string, value_string};
+}
+
 template <typename T1, typename T2>
 std::pair<T1, T2>
 ParsePairOption(const std::string& arg, const std::string& delim_str)
@@ -992,6 +1031,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::string repoagent_dir = "/opt/tritonserver/repoagents";
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
+  std::vector<std::tuple<std::string, std::string, std::string>> host_policies;
 
 #ifdef TRITON_ENABLE_GPU
   double min_supported_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
@@ -1233,6 +1273,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_BACKEND_CONFIG:
         backend_config_settings.push_back(ParseBackendConfigOption(optarg));
         break;
+      case OPTION_HOST_POLICY:
+        host_policies.push_back(ParseHostPolicyOption(optarg));
+        break;
     }
   }
 
@@ -1384,6 +1427,13 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
             std::get<2>(bcs).c_str()),
         "setting backend configurtion");
   }
+  for (const auto& hp : host_policies) {
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsSetHostPolicy(
+            loptions, std::get<0>(hp).c_str(), std::get<1>(hp).c_str(),
+            std::get<2>(hp).c_str()),
+        "setting host policy");
+  }
 
   return true;
 }
@@ -1423,16 +1473,16 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Start the HTTP, GRPC, and metrics endpoints.
-  if (!StartEndpoints(server, trace_manager, shm_manager)) {
-    exit(1);
-  }
-
   // Trap SIGINT and SIGTERM to allow server to exit gracefully
   TRITONSERVER_Error* signal_err =
       nvidia::inferenceserver::RegisterSignalHandler();
   if (signal_err != nullptr) {
     LOG_TRITONSERVER_ERROR(signal_err, "failed to register signal handler");
+    exit(1);
+  }
+
+  // Start the HTTP, GRPC, and metrics endpoints.
+  if (!StartEndpoints(server, trace_manager, shm_manager)) {
     exit(1);
   }
 

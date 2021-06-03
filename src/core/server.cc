@@ -35,13 +35,13 @@
 #include <utility>
 #include <vector>
 
+#include "model_config.pb.h"
 #include "src/backends/backend/triton_backend_manager.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
@@ -199,7 +199,7 @@ InferenceServer::Init()
       strict_model_config_, backend_cmdline_config_map_,
       tf_gpu_memory_fraction_, tf_soft_placement_enabled_, polling_enabled,
       model_control_enabled, min_supported_compute_capability_,
-      &model_repository_manager_);
+      host_policy_map_, &model_repository_manager_);
   if (!status.IsOk()) {
     if (model_repository_manager_ == nullptr) {
       ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;

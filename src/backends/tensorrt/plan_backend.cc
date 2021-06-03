@@ -37,6 +37,7 @@
 #include "src/core/metrics.h"
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/numa_utils.h"
 #include "src/core/nvtx.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -137,13 +138,15 @@ PlanBackend::Context::Context(
     const bool enable_pinned_input, const bool enable_pinned_output,
     const size_t gather_kernel_buffer_threshold,
     const bool separate_output_stream,
-    std::shared_ptr<MetricModelReporter>&& metric_reporter)
+    std::shared_ptr<MetricModelReporter>&& metric_reporter,
+    const HostPolicyCmdlineConfig& host_policy)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
           enable_pinned_output, gather_kernel_buffer_threshold,
           std::move(metric_reporter)),
       engine_(nullptr), is_shared_engine_(true), total_bindings_(0),
-      num_expected_bindings_(0), use_output_copy_stream_(separate_output_stream)
+      num_expected_bindings_(0),
+      use_output_copy_stream_(separate_output_stream), host_policy_(host_policy)
 {
   stream_ = nullptr;
   signal_stream_ = nullptr;
@@ -264,8 +267,10 @@ PlanBackend::Context::~Context()
 
 Status
 PlanBackend::CreateExecutionContexts(
-    const std::unordered_map<std::string, std::vector<char>>& models)
+    const std::unordered_map<std::string, std::vector<char>>& models,
+    const HostPolicyCmdlineConfigMap& host_policy_map)
 {
+  static HostPolicyCmdlineConfig empty_host_policy;
   // TensorRT engine creation is not thread-safe, so multiple creations
   // are serialized with a global lock.
   static std::mutex global_context_mu;
@@ -290,8 +295,40 @@ PlanBackend::CreateExecutionContexts(
               " must be KIND_GPU and must specify at least one GPU id");
     }
 
+    // Use DLA core id or GPU id from config based on instance group type
+    int64_t dla_core_id = -1;
+    uint32_t secondary_device_count = group.secondary_devices().size();
+    if (secondary_device_count != 0) {
+      if (secondary_device_count != 1) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            group.name() + " of model " + Name() +
+                " must have either zero or or one secondary devices");
+      }
+
+      auto secondary_device = group.secondary_devices().at(0);
+      if (secondary_device.kind() !=
+          inference::ModelInstanceGroup::SecondaryDevice::KIND_NVDLA) {
+        return Status(
+            Status::Code::INVALID_ARG, "secondary device " + group.name() +
+                                           " of model " + Name() +
+                                           " must be KIND_NVDLA");
+      }
+      dla_core_id = secondary_device.device_id();
+    }
+
     for (int c = 0; c < group.count(); c++) {
       for (int gpu_device : group.gpus()) {
+        const std::string policy_name =
+            group.host_policy().empty() ? ("gpu_" + std::to_string(gpu_device))
+                                        : group.host_policy();
+        const HostPolicyCmdlineConfig* host_policy;
+        const auto policy_it = host_policy_map.find(policy_name);
+        if (policy_it != host_policy_map.end()) {
+          host_policy = &policy_it->second;
+        } else {
+          host_policy = &empty_host_policy;
+        }
         size_t runner_idx = 0;
         if (Config().has_sequence_batching()) {
           // For sequence batcher, there must be one runner per instance
@@ -312,13 +349,22 @@ PlanBackend::CreateExecutionContexts(
           }
           runner_idx = it->second;
         }
+
         // The last entry in contexts_ is the newly created context
         auto& queue = available_context_queue_[runner_idx];
         queue->Put(contexts_.size());
 
-        const std::string instance_name = group.name() + "_" +
-                                          std::to_string(c) + "_gpu" +
-                                          std::to_string(gpu_device);
+        RETURN_IF_ERROR(SetNumaConfigOnThread(*host_policy));
+
+        std::string instance_name;
+        if (dla_core_id != -1) {
+          instance_name = group.name() + "_" + std::to_string(c) + "_gpu" +
+                          std::to_string(gpu_device) + "_dla" +
+                          std::to_string(dla_core_id);
+        } else {
+          instance_name = group.name() + "_" + std::to_string(c) + "_gpu" +
+                          std::to_string(gpu_device);
+        }
 
         // Determine the model file to use for device compute capability
         cudaDeviceProp cuprops;
@@ -347,10 +393,11 @@ PlanBackend::CreateExecutionContexts(
         }
 
         // Create shared engine for the device if haven't tried so.
-        auto eit = device_engines_.find(gpu_device);
+        auto device_pair = std::make_pair(gpu_device, dla_core_id);
+        auto eit = device_engines_.find(device_pair);
         if (eit == device_engines_.end()) {
           eit = device_engines_
-                    .emplace(gpu_device, std::make_pair(nullptr, nullptr))
+                    .emplace(device_pair, std::make_pair(nullptr, nullptr))
                     .first;
 
           // Create a CUDA engine shared by all contexts
@@ -362,17 +409,21 @@ PlanBackend::CreateExecutionContexts(
           }
 
           RETURN_IF_ERROR(LoadPlan(
-              mn_itr->second, &eit->second.first, &eit->second.second));
+              mn_itr->second, dla_core_id, &eit->second.first,
+              &eit->second.second));
+
           // Validate whether the engine can be shared
           bool is_dynamic = false;
           for (int idx = 0; idx < eit->second.second->getNbBindings(); idx++) {
             auto dims = eit->second.second->getBindingDimensions(idx);
+
             // Detect whether dynamic or not
             if (ContainsWildcard(dims)) {
               is_dynamic = true;
               break;
             }
           }
+
           // Model with dynamic shapes can't share engine, set to engine to
           // 'nullptr' as hint, but keeping runtime as it can be used repeatedly
           if (is_dynamic) {
@@ -385,8 +436,11 @@ PlanBackend::CreateExecutionContexts(
 
         LOG_INFO << "Creating instance " << instance_name << " on GPU "
                  << gpu_device << " (" << cc << ") using " << cc_model_filename;
-        RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, gpu_device, mn_itr->second, group.profile(), queue));
+        auto err = CreateExecutionContext(
+            instance_name, gpu_device, dla_core_id, mn_itr->second,
+            group.profile(), queue, *host_policy);
+        RETURN_IF_ERROR(ResetNumaMemoryPolicy());
+        RETURN_IF_ERROR(err);
       }
     }
   }
@@ -419,6 +473,11 @@ PlanBackend::CreateExecutionContexts(
       [this](uint32_t runner_idx) -> Status {
         // Obtain any context as the next context for the corresponding runner
         next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
+        // Get the device kind and id of the associated instance to
+        // set NUMA config for the thread
+        const auto& instance = reinterpret_cast<Context*>(
+            contexts_[next_context_[runner_idx]].get());
+        RETURN_IF_ERROR(SetNumaConfigOnThread(instance->host_policy_));
         return Status::Success;
       },
       [this](
@@ -551,9 +610,10 @@ PlanBackend::Context::InitOptimizationProfiles(
 Status
 PlanBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
-    const std::vector<char>& model,
+    const int64_t dla_core_id, const std::vector<char>& model,
     const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
-    const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue)
+    const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue,
+    const HostPolicyCmdlineConfig& host_policy)
 {
   // Max batch size. A value of 0 in the config becomes NO_BATCHING.
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
@@ -579,7 +639,7 @@ PlanBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
       gather_kernel_buffer_threshold, separate_output_stream,
-      std::move(metric_reporter)));
+      std::move(metric_reporter), host_policy));
   Context* context = static_cast<Context*>(contexts_.back().get());
   auto context_idx = contexts_.size() - 1;
 
@@ -611,10 +671,12 @@ PlanBackend::CreateExecutionContext(
   RETURN_IF_ERROR(
       context->InitEventSet(Config().optimization().cuda().busy_wait_events()));
 
-  auto eit = device_engines_.find(gpu_device);
+  auto device_pair = std::make_pair(gpu_device, dla_core_id);
+  auto eit = device_engines_.find(device_pair);
   if (eit->second.second == nullptr) {
     context->is_shared_engine_ = false;
-    RETURN_IF_ERROR(LoadPlan(model, &eit->second.first, &context->engine_));
+    RETURN_IF_ERROR(
+        LoadPlan(model, dla_core_id, &eit->second.first, &context->engine_));
   } else {
     context->engine_ = eit->second.second;
   }
@@ -2213,7 +2275,7 @@ PlanBackend::~PlanBackend()
   contexts_.clear();
 
   for (auto& device_engine : device_engines_) {
-    cudaSetDevice(device_engine.first);
+    cudaSetDevice(device_engine.first.first);
     auto& runtime = device_engine.second.first;
     auto& engine = device_engine.second.second;
     if (engine != nullptr) {

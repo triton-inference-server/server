@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env bash
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,12 +25,34 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-apiVersion: v1
-kind: Secret
-metadata:
-  name: aws-credentials
-type: Opaque
-data:
-  AWS_DEFAULT_REGION: {{ .Values.service.type }}
-  AWS_ACCESS_KEY_ID: {{ .Values.service.id }}
-  AWS_SECRET_ACCESS_KEY: {{ .Values.service.key }}
+SERVER_HOST=${1:-"${INGRESS_HOST}:${INGRESS_PORT}"} # need update public IP
+MODEL_NAME=${2:-"${MODEL_NAME}"}
+SEQ_LENGTH=${3:-"${SEQ_LEN}"}
+BATCH_SIZE=${4:-2}
+MAX_LATENCY=${5:-5000}
+MAX_CLIENT_THREADS=${6:-20}
+MAX_CONCURRENCY=${7:-24}
+MODEL_VERSION=${8:-1}
+precision=${9:-"fp32"}
+PERFCLIENT_PERCENTILE=${10:-90}
+MAX_TRIALS=${12:-40}
+
+ARGS="\
+   --max-threads ${MAX_CLIENT_THREADS} \
+   -m ${MODEL_NAME} \
+   -x ${MODEL_VERSION} \
+   -p 3000 \
+   --async \
+   --concurrency-range 4:${MAX_CONCURRENCY}:2 \
+   -r ${MAX_TRIALS} \
+   -v \
+   -i HTTP \
+   -u ${SERVER_HOST} \
+   -b ${BATCH_SIZE} \
+   -l ${MAX_LATENCY} \
+   -z \
+   --percentile=${PERFCLIENT_PERCENTILE}"
+
+echo "Using args:  $(echo "$ARGS" | sed -e 's/   -/\n-/g')"
+
+/workspace/install/bin/perf_client $ARGS -f perf.csv

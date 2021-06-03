@@ -31,7 +31,6 @@ sys.path.append("../common")
 
 import unittest
 import numpy as np
-import infer_util as iu
 import test_util as tu
 import os
 import requests as httpreq
@@ -68,14 +67,16 @@ class PythonTest(tu.TestResultCollector):
         shape = [total_byte_size]
         with self.assertRaises(InferenceServerException) as ex:
             self._infer_help(model_name, shape, dtype)
-        self.assertIn("Failed to increase the shared memory pool size", str(ex.exception))
+        self.assertIn("Failed to increase the shared memory pool size",
+                      str(ex.exception))
 
         # 512 MiBs payload leads to error in the Python stub process.
         total_byte_size = 512 * 1024 * 1024
         shape = [total_byte_size]
         with self.assertRaises(InferenceServerException) as ex:
             self._infer_help(model_name, shape, dtype)
-        self.assertIn("Failed to increase the shared memory pool size", str(ex.exception))
+        self.assertIn("Failed to increase the shared memory pool size",
+                      str(ex.exception))
 
         # 2 MiBs
         # Send a small paylaod to make sure it is still working properly
@@ -179,27 +180,6 @@ class PythonTest(tu.TestResultCollector):
             self.assertTrue(output0 is not None)
             self.assertTrue(np.all(output0 == input_data))
 
-    def test_infer_pymodel_error(self):
-        model_name = "wrong_model"
-        shape = [2, 2]
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
-            inputs = [
-                httpclient.InferInput("IN", input_data.shape,
-                                      np_to_triton_dtype(input_data.dtype))
-            ]
-            inputs[0].set_data_from_numpy(input_data)
-            try:
-                client.infer(model_name, inputs)
-            except InferenceServerException as e:
-                self.assertTrue(
-                    e.message().startswith("Failed to process the request(s),"),
-                    "Exception message is not correct")
-            else:
-                self.assertTrue(
-                    False,
-                    "Wrong exception raised or did not raise an exception")
-
     def test_infer_pytorch(self):
         model_name = "pytorch_fp32_fp32"
         shape = [1, 1, 28, 28]
@@ -222,45 +202,6 @@ class PythonTest(tu.TestResultCollector):
             self.assertTrue(np.allclose(output_data[0], expected_result),
                             'Inference result is not correct')
 
-    def test_batch_error(self):
-        # The execute_error model returns an error for the first request and
-        # sucessfully processes the second request.  This is making sure that
-        # an error in a single request does not completely fail the batch.
-        model_name = "execute_error"
-        shape = [2, 2]
-        request_parallelism = 2
-
-        with httpclient.InferenceServerClient(
-                "localhost:8000", concurrency=request_parallelism) as client:
-            input_datas = []
-            requests = []
-            for i in range(request_parallelism):
-                input_data = np.random.randn(*shape).astype(np.float32)
-                input_datas.append(input_data)
-                inputs = [
-                    httpclient.InferInput("IN", input_data.shape,
-                                          np_to_triton_dtype(input_data.dtype))
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-                requests.append(client.async_infer(model_name, inputs))
-
-            for i in range(request_parallelism):
-                results = None
-                if i == 0:
-                    with self.assertRaises(InferenceServerException):
-                        results = requests[i].get_result()
-                    continue
-                else:
-                    results = requests[i].get_result()
-
-                print(results)
-                output_data = results.as_numpy("OUT")
-                self.assertIsNotNone(output_data, "error: expected 'OUT'")
-                self.assertTrue(
-                    np.array_equal(output_data, input_datas[i]),
-                    "error: expected output {} to match input {}".format(
-                        output_data, input_datas[i]))
-
     def test_init_args(self):
         model_name = "init_args"
         shape = [2, 2]
@@ -272,54 +213,10 @@ class PythonTest(tu.TestResultCollector):
             ]
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
-            # output response in this model is the number of keys in the args
+            # output respone in this model is the number of keys in the args
             self.assertTrue(
                 result.as_numpy("OUT") == 7,
                 "Number of keys in the init args is not correct")
-
-    def test_ensemble(self):
-        model_name = "ensemble"
-        shape = [16]
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_data_0 = np.random.random(shape).astype(np.float32)
-            input_data_1 = np.random.random(shape).astype(np.float32)
-            inputs = [
-                httpclient.InferInput("INPUT0", input_data_0.shape,
-                                      np_to_triton_dtype(input_data_0.dtype)),
-                httpclient.InferInput("INPUT1", input_data_1.shape,
-                                      np_to_triton_dtype(input_data_1.dtype))
-            ]
-            inputs[0].set_data_from_numpy(input_data_0)
-            inputs[1].set_data_from_numpy(input_data_1)
-            result = client.infer(model_name, inputs)
-            output0 = result.as_numpy('OUTPUT0')
-            output1 = result.as_numpy('OUTPUT1')
-            self.assertIsNotNone(output0)
-            self.assertIsNotNone(output1)
-
-            self.assertTrue(np.allclose(output0, 2 * input_data_0))
-            self.assertTrue(np.allclose(output1, 2 * input_data_1))
-
-        model_name = "ensemble_gpu"
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_data_0 = np.random.random(shape).astype(np.float32)
-            input_data_1 = np.random.random(shape).astype(np.float32)
-            inputs = [
-                httpclient.InferInput("INPUT0", input_data_0.shape,
-                                      np_to_triton_dtype(input_data_0.dtype)),
-                httpclient.InferInput("INPUT1", input_data_1.shape,
-                                      np_to_triton_dtype(input_data_1.dtype))
-            ]
-            inputs[0].set_data_from_numpy(input_data_0)
-            inputs[1].set_data_from_numpy(input_data_1)
-            result = client.infer(model_name, inputs)
-            output0 = result.as_numpy('OUTPUT0')
-            output1 = result.as_numpy('OUTPUT1')
-            self.assertIsNotNone(output0)
-            self.assertIsNotNone(output1)
-
-            self.assertTrue(np.allclose(output0, 2 * input_data_0))
-            self.assertTrue(np.allclose(output1, 2 * input_data_1))
 
     def test_unicode(self):
         model_name = "string"

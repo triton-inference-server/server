@@ -27,26 +27,24 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="10"
+EXPECTED_NUM_TESTS="7"
 
 SERVER=/opt/tritonserver/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 source ../common/util.sh
-
-get_shm_pages() {
-  shm_pages=(`ls /dev/shm`)
-  echo ${#shm_pages[@]}
-}
+source ./common.sh
 
 rm -fr *.log ./models
 
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
 cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
+RET=0
 
 cp -r ./models/identity_fp32 ./models/identity_uint8
 (cd models/identity_uint8 && \
@@ -71,59 +69,15 @@ cp -r ./models/identity_fp32 ./models/identity_bool
           sed -i "s/^name:.*/name: \"identity_bool\"/" config.pbtxt && \
           sed -i "s/TYPE_FP32/TYPE_BOOL/g" config.pbtxt)
 
-mkdir -p models/wrong_model/1/
-cp ../python_models/wrong_model/model.py ./models/wrong_model/1/
-cp ../python_models/wrong_model/config.pbtxt ./models/wrong_model/
-(cd models/wrong_model && \
-          sed -i "s/^name:.*/name: \"wrong_model\"/" config.pbtxt && \
-          sed -i "s/TYPE_FP32/TYPE_UINT32/g" config.pbtxt)
-
 mkdir -p models/pytorch_fp32_fp32/1/
 cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
 cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
 (cd models/pytorch_fp32_fp32 && \
           sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
-mkdir -p models/execute_error/1/
-cp ../python_models/execute_error/model.py ./models/execute_error/1/
-cp ../python_models/execute_error/config.pbtxt ./models/execute_error/
-(cd models/execute_error && \
-          sed -i "s/^name:.*/name: \"execute_error\"/" config.pbtxt && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
-          echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 12000000 }" >> config.pbtxt)
-
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
-
-# Ensemble Model
-mkdir -p models/ensemble/1/
-cp ../python_models/ensemble/config.pbtxt ./models/ensemble
-
-mkdir -p models/add_sub_1/1/
-cp ../python_models/add_sub/config.pbtxt ./models/add_sub_1
-(cd models/add_sub_1 && \
-          sed -i "s/^name:.*/name: \"add_sub_1\"/" config.pbtxt)
-cp ../python_models/add_sub/model.py ./models/add_sub_1/1/
-
-mkdir -p models/add_sub_2/1/
-cp ../python_models/add_sub/config.pbtxt ./models/add_sub_2/
-(cd models/add_sub_2 && \
-          sed -i "s/^name:.*/name: \"add_sub_2\"/" config.pbtxt)
-cp ../python_models/add_sub/model.py ./models/add_sub_2/1/
-
-# Ensemble GPU Model
-mkdir -p models/ensemble_gpu/1/
-cp ../python_models/ensemble_gpu/config.pbtxt ./models/ensemble_gpu
-cp -r ${DATADIR}/qa_model_repository/libtorch_float32_float32_float32/ ./models
-(cd models/libtorch_float32_float32_float32 && \
-          echo "instance_group [ { kind: KIND_GPU }]" >> config.pbtxt)
-(cd models/libtorch_float32_float32_float32 && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 0/" config.pbtxt)
-(cd models/libtorch_float32_float32_float32 && \
-          sed -i "s/^version_policy:.*//" config.pbtxt)
-rm -rf models/libtorch_float32_float32_float32/2
-rm -rf models/libtorch_float32_float32_float32/3
 
 # Unicode Characters
 mkdir -p models/string/1/
@@ -144,8 +98,6 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-
-RET=0
 
 set +e
 python3 $CLIENT_PY >>$CLIENT_LOG 2>&1
@@ -206,84 +158,6 @@ for triton_proc in $triton_procs; do
 done
 set -e
 
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
-fi
-
-# These models have errors in the initialization and finalization
-# steps and we want to ensure that correct error is being returned
-
-rm -rf models/
-mkdir -p models/init_error/1/
-cp ../python_models/init_error/model.py ./models/init_error/1/
-cp ../python_models/init_error/config.pbtxt ./models/init_error/
-
-set +e
-prev_num_pages=`get_shm_pages`
-run_server_nowait
-
-wait $SERVER_PID
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
-fi
-
-grep "name 'lorem_ipsum' is not defined" $SERVER_LOG
-
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** init_error model test failed \n***"
-    RET=1
-fi
-set -e
-
-rm -rf models/
-mkdir -p models/fini_error/1/
-cp ../python_models/fini_error/model.py ./models/fini_error/1/
-cp ../python_models/fini_error/config.pbtxt ./models/fini_error/
-
-set +e
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
-fi
-
-grep "name 'undefined_variable' is not defined" $SERVER_LOG
-
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** fini_error model test failed \n***"
-    RET=1
-fi
-set -e
-
 # Test KIND_GPU
 rm -rf models/
 mkdir -p models/add_sub_gpu/1/
@@ -299,7 +173,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** KIND_GPU model test failed \n***"
     RET=1
 fi
@@ -314,7 +188,7 @@ if [ $current_num_pages -ne $prev_num_pages ]; then
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
+    exit 1
 fi
 
 # Test Multi file models
@@ -334,7 +208,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** multi-file model test failed \n***"
     RET=1
 fi
@@ -344,12 +218,12 @@ wait $SERVER_PID
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     ls /dev/shm
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
+    exit 1
 fi
 
 # Test environment variable propagation
@@ -378,7 +252,7 @@ if [ $current_num_pages -ne $prev_num_pages ]; then
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
+    exit 1
 fi
 
 rm -fr ./models
@@ -409,11 +283,26 @@ done
 kill $SERVER_PID
 wait $SERVER_PID
 
+(cd env/ && bash -ex ./test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd lifecycle/ && bash -ex ./test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd ensemble/ && bash -ex ./test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test FAILED\n***"
+  cat $SERVER_LOG
+  echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET
