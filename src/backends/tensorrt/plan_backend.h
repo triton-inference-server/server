@@ -199,7 +199,7 @@ class PlanBackend : public InferenceBackend {
       }
       std::string profile_name_;
       int profile_idx_;
-      nvinfer1::IExecutionContext* context_;
+      std::shared_ptr<nvinfer1::IExecutionContext> context_;
 
       // Struct that holds cudaGraphExec_t and the dimensions of the inputs
       // used to capture the graph
@@ -300,8 +300,7 @@ class PlanBackend : public InferenceBackend {
     // across all contexts and it must not be destroyed by the contexts.
     // In the future version of TensorRT, the engine may be shared even in the
     // dynamic shape case.
-    nvinfer1::ICudaEngine* engine_;
-    bool is_shared_engine_;
+    std::shared_ptr<nvinfer1::ICudaEngine> engine_;
 
     // CUDA stream use to track execution status
     cudaStream_t signal_stream_;
@@ -443,8 +442,9 @@ class PlanBackend : public InferenceBackend {
   // core on same GPU. The first element in the key pair is the GPU ID, the
   // second is the DLA core ID.
   std::map<
-      std::pair<int, int64_t>,
-      std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
+      std::pair<int, int64_t>, std::pair<
+                                   std::shared_ptr<nvinfer1::IRuntime>,
+                                   std::shared_ptr<nvinfer1::ICudaEngine>>>
       device_engines_;
 
   // vector for storing available context queue associated with a runner

@@ -48,7 +48,7 @@ ConvertTrtTypeToDataType(nvinfer1::DataType trt_type)
 }
 
 bool
-UseTensorRTv2API(const nvinfer1::ICudaEngine* engine)
+UseTensorRTv2API(const std::shared_ptr<nvinfer1::ICudaEngine>& engine)
 {
   // In order to use TensorRT V2 API, engine must contain
   // an explicit batch dimension. Detecting the presence of

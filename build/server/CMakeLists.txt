@@ -40,7 +40,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 else()
   # Disable Triton kernel if on "aarch64" platform
   execute_process(COMMAND uname -p OUTPUT_VARIABLE ARCH)
-  set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror -Wno-deprecated-declarations")
+  set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
   set(CMAKE_CXX_FLAGS_DEBUG "-g")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 endif()

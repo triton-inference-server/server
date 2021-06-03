@@ -27,6 +27,7 @@
 #include "src/backends/tensorrt/loader.h"
 
 #include <NvInferPlugin.h>
+#include <memory>
 #include <mutex>
 #include "src/backends/tensorrt/logging.h"
 #include "src/core/logging.h"
@@ -36,11 +37,12 @@ namespace nvidia { namespace inferenceserver {
 Status
 LoadPlan(
     const std::vector<char>& model_data, int64_t dla_core_id,
-    nvinfer1::IRuntime** runtime, nvinfer1::ICudaEngine** engine)
+    std::shared_ptr<nvinfer1::IRuntime>* runtime,
+    std::shared_ptr<nvinfer1::ICudaEngine>* engine)
 {
   // Create runtime only if it is not provided
   if (*runtime == nullptr) {
-    *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
+    runtime->reset(nvinfer1::createInferRuntime(tensorrt_logger));
     if (*runtime == nullptr) {
       return Status(
           Status::Code::INTERNAL, "unable to create TensorRT runtime");
@@ -60,8 +62,8 @@ LoadPlan(
     }
   }
 
-  *engine =
-      (*runtime)->deserializeCudaEngine(&model_data[0], model_data.size());
+  engine->reset(
+      (*runtime)->deserializeCudaEngine(&model_data[0], model_data.size()));
   if (*engine == nullptr) {
     return Status(Status::Code::INTERNAL, "unable to create TensorRT engine");
   }

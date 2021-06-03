@@ -43,23 +43,13 @@ class AutoFillPlanImpl : public AutoFill {
  public:
   AutoFillPlanImpl(
       const std::string& model_name, const std::string& plan_filename,
-      nvinfer1::ICudaEngine* engine, nvinfer1::IRuntime* runtime)
+      const std::shared_ptr<nvinfer1::ICudaEngine>& engine,
+      const std::shared_ptr<nvinfer1::IRuntime>& runtime)
       : AutoFill(model_name), plan_filename_(plan_filename), engine_(engine),
         runtime_(runtime), max_batch_size_(0), num_profile_bindings_(0)
   {
     if (!UseTensorRTv2API(engine_)) {
       num_profile_bindings_ = engine_->getNbBindings();
-    }
-  }
-
-  ~AutoFillPlanImpl()
-  {
-    if (engine_ != nullptr) {
-      engine_->destroy();
-    }
-
-    if (runtime_ != nullptr) {
-      runtime_->destroy();
     }
   }
 
@@ -96,8 +86,8 @@ class AutoFillPlanImpl : public AutoFill {
 
   const std::string plan_filename_;
   inference::ModelConfig config_;
-  nvinfer1::ICudaEngine* engine_;
-  nvinfer1::IRuntime* runtime_;
+  std::shared_ptr<nvinfer1::ICudaEngine> engine_;
+  std::shared_ptr<nvinfer1::IRuntime> runtime_;
   int max_batch_size_;
   int num_profile_bindings_;
 };
@@ -455,8 +445,8 @@ AutoFillPlan::Create(
   RETURN_IF_ERROR(GetDirectoryFiles(
       version_path, true /* skip_hidden_files */, &plan_files));
 
-  nvinfer1::IRuntime* runtime = nullptr;
-  nvinfer1::ICudaEngine* engine = nullptr;
+  std::shared_ptr<nvinfer1::IRuntime> runtime;
+  std::shared_ptr<nvinfer1::ICudaEngine> engine;
   std::string plan_file;
   Status status;
   bool found = false;
@@ -473,12 +463,10 @@ AutoFillPlan::Create(
 
     if (!LoadPlan(plan_data, -1 /* dla_core_id */, &runtime, &engine).IsOk()) {
       if (engine != nullptr) {
-        engine->destroy();
-        engine = nullptr;
+        engine.reset();
       }
       if (runtime != nullptr) {
-        runtime->destroy();
-        runtime = nullptr;
+        runtime.reset();
       }
     } else {
       plan_file = file;

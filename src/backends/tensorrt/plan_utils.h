@@ -32,7 +32,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-bool UseTensorRTv2API(const nvinfer1::ICudaEngine* engine);
+bool UseTensorRTv2API(const std::shared_ptr<nvinfer1::ICudaEngine>& engine);
 
 inference::DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
 

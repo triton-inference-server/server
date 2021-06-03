@@ -26,6 +26,7 @@
 #pragma once
 
 #include <NvInfer.h>
+#include <memory>
 #include <vector>
 #include "src/core/status.h"
 
@@ -46,6 +47,7 @@ namespace nvidia { namespace inferenceserver {
 /// \return Error status.
 Status LoadPlan(
     const std::vector<char>& model_data, int64_t dla_core_id,
-    nvinfer1::IRuntime** runtime, nvinfer1::ICudaEngine** engine);
+    std::shared_ptr<nvinfer1::IRuntime>* runtime,
+    std::shared_ptr<nvinfer1::ICudaEngine>* engine);
 
 }}  // namespace nvidia::inferenceserver
