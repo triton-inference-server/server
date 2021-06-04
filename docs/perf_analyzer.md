@@ -401,38 +401,29 @@ By default perf_analyzer uses HTTP to communicate with Triton. The GRPC
 protocol can be specificed with the -i option. If GRPC is selected the
 --streaming option can also be specified for GRPC streaming.
 
-## Using C API directly
+## Benchmarking Triton directly via C API
 
 ### Prerequisite
-Have the Triton SDK container and the Inference Server container on your machine
+Pull the Triton SDK and the Inference Server container images on target machine.
 Since you will need access to the Tritonserver install, it might be easier if 
 you copy the perf_analyzer binary to the Inference Server container.
 
 ### Required Params
-Use the --help option to see complete documentation for how to use the C API.
-By default perf_analyzer relies on the triton instance running. You can select
-the C API mode with the --service-kind option. In additon, you will need to point
+Use the --help option to see complete documentation on how to use the C API.
+By default perf_analyzer expects the Triton instance to already be running. You can configure the C API mode using the --service-kind option. In additon, you will need to point
 perf_analyzer to the triton library path (e.g. /opt/tritonserver) and the model 
 repository path (e.g. /data/).
 A example run would look like:
 ```
-perf_analyzer -m graphdef_int32_int32_int32 \
---service-kind=triton_c_api \
---model-repo=/workspace/qa/L0_perf_analyzer_capi/models \
---library-name=/opt/tritonserver
+perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api --model-repository=/workspace/qa/L0_perf_analyzer_capi/models --triton-server-directory=opt/tritonserver
 ```
-Right now, the internal setting is to run tritonserver with
- `--strict-model-config=true`. If the server is run successfully, there is a
+If the server is run successfully, there is a
  prompt: "server is alive!" and perf_analyzer will print the stats, as normal.
 
-
 ### Non-supported functionalities
-There are a few functionalities that are missing with the C API. They are:
-1. Async mode (`-a` command)
+There are a few functionalities that are missing from the C API. They are:
+1. Async mode (`-a`)
 2. Using shared memory mode (`--shared-memory=cuda` or `--shared-memory=system`)
-3. Request rate range mode (`--request-rate-range` cannot be specified)
+3. Request rate range mode
 4. For additonal known non-working cases, please refer to 
    `qa/L0_perf_analyzer_capi/test.sh`
-
-
-
