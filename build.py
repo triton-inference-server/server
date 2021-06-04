@@ -477,10 +477,9 @@ RUN apt-get update \
 && apt-get install -y datacenter-gpu-manager
 '''
 
+
 def fil_cmake_args(images):
-    cargs = [
-        '-DTRITON_FIL_DOCKER_BUILD=ON'
-    ]
+    cargs = ['-DTRITON_FIL_DOCKER_BUILD=ON']
     if 'base' in images:
         cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
     else:
@@ -488,6 +487,7 @@ def fil_cmake_args(images):
             TRITON_VERSION_MAP[FLAGS.version][1]))
 
     return cargs
+
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
     df = '''
@@ -648,7 +648,6 @@ ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
 ENV TF_AUTOTUNE_THRESHOLD       2
-
 # Create a user that can be used to run triton as
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
@@ -659,10 +658,8 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
     fi && \
     [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
     [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
-
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
-
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
 RUN apt-get update && \
@@ -672,9 +669,7 @@ RUN apt-get update && \
          libre2-5 && \
     rm -rf /var/lib/apt/lists/*
 '''
-
     df += install_dcgm_libraries()
-
     # Add dependencies needed for python backend
     if 'python' in backends:
         df += '''
@@ -697,7 +692,6 @@ COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
-
 # Top-level include/core not copied so --chown does not set it correctly,
 # so explicit set on all of include
 RUN chown -R triton-server:triton-server include
@@ -721,10 +715,8 @@ RUN ln -sf ${{_CUDA_COMPAT_PATH}}/lib.real ${{_CUDA_COMPAT_PATH}}/lib \
  && echo ${{_CUDA_COMPAT_PATH}}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
  && ldconfig \
  && rm -f ${{_CUDA_COMPAT_PATH}}/lib
-
 COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tritonserver
 ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
-
 ENV NVIDIA_BUILD_ID {}
 LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}
@@ -751,29 +743,23 @@ def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends,
 #
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
-
 ARG BASE_IMAGE={}
 ARG BUILD_IMAGE=tritonserver_build
-
 ############################################################################
 ##  Build image
 ############################################################################
 FROM ${{BUILD_IMAGE}} AS tritonserver_build
-
 ############################################################################
 ##  Production stage: Create container with just inference server executable
 ############################################################################
 FROM ${{BASE_IMAGE}}
-
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
-
 ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
 ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
 ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
 ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
 LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
-
 RUN setx path "%path%;C:\opt\tritonserver\bin"
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
