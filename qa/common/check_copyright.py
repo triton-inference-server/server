@@ -173,8 +173,8 @@ def visit(path):
                         if len(year) == 4:  # 2021
                             years.append(int(year))
                         elif len(year) == 7:  # 2021-22
-                            years.append(int(year[0:3]))
-                            years.append(int(year[5:6]) + 2000)
+                            years.append(int(year[0:4]))
+                            years.append(int(year[5:7]) + 2000)
                         elif len(year) == 2:  # 21
                             years.append(int(year) + 2000)
                         else:  # 21-23
