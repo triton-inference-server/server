@@ -34,7 +34,7 @@ cat <<EOF
 
 NVIDIA Release ${NVIDIA_TRITON_SERVER_VERSION} (build ${NVIDIA_BUILD_ID})
 
-Copyright (c) 2018-2021, NVIDIA CORPORATION.  All rights reserved.
+Copyright (c) 2018-21, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
 
 Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
 
@@ -48,7 +48,6 @@ if [[ "$(find -L /usr -name libcuda.so.1 | grep -v "compat") " == " " || "$(ls /
   echo "WARNING: The NVIDIA Driver was not detected.  GPU functionality will not be available."
   echo "   Use Docker with NVIDIA Container Toolkit to start this container; see"
   echo "   https://github.com/NVIDIA/nvidia-docker."
-  ln -s `find / -name libnvidia-ml.so -print -quit` /opt/tritonserver/lib/libnvidia-ml.so.1
   export TRITON_SERVER_CPU_ONLY=1
 else
   ( /usr/local/bin/checkSMVER.sh )
