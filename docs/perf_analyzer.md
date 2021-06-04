@@ -408,17 +408,16 @@ Pull the Triton SDK and the Inference Server container images on target machine.
 Since you will need access to the Tritonserver install, it might be easier if 
 you copy the perf_analyzer binary to the Inference Server container.
 
-### Required Params
-Use the --help option to see complete documentation on how to use the C API.
-By default perf_analyzer expects the Triton instance to already be running. You can configure the C API mode using the --service-kind option. In additon, you will need to point
-perf_analyzer to the triton library path (e.g. /opt/tritonserver) and the model 
-repository path (e.g. /data/).
+### Required Parameters
+Use the --help option to see complete list of supported command line arguments.
+By default perf_analyzer expects the Triton instance to already be running. You can configure the C API mode using the `--service-kind` option. In additon, you will need to point
+perf_analyzer to the Triton server library path using the `--triton-server-directory` option and the model 
+repository path using the `--model-repository` option.
+If the server is run successfully, there is a prompt: "server is alive!" and perf_analyzer will print the stats, as normal.
 A example run would look like:
 ```
-perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api --model-repository=/workspace/qa/L0_perf_analyzer_capi/models --triton-server-directory=opt/tritonserver
+perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api --triton-server-directory=/opt/tritonserver --model-repository=/workspace/qa/L0_perf_analyzer_capi/models
 ```
-If the server is run successfully, there is a
- prompt: "server is alive!" and perf_analyzer will print the stats, as normal.
 
 ### Non-supported functionalities
 There are a few functionalities that are missing from the C API. They are:
@@ -426,4 +425,4 @@ There are a few functionalities that are missing from the C API. They are:
 2. Using shared memory mode (`--shared-memory=cuda` or `--shared-memory=system`)
 3. Request rate range mode
 4. For additonal known non-working cases, please refer to 
-   `qa/L0_perf_analyzer_capi/test.sh`
+   [qa/L0_perf_analyzer_capi/test.sh](https://github.com/triton-inference-server/server/blob/79bdd0cc01a070be524e7587d78eb3f0ea5cda3a/qa/L0_perf_analyzer_capi/test.sh#L239-L277)
