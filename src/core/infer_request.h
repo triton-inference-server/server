@@ -113,7 +113,8 @@ class InferenceRequest {
     const std::shared_ptr<Memory>& Data() const { return data_; }
 
     // The data for this input for a specific device
-    const std::shared_ptr<Memory>& Data(const std::string host_policy_name) const;
+    const std::shared_ptr<Memory>& Data(
+        const std::string host_policy_name) const;
 
     // Set the data for this input. Error if input already has some
     // data.
