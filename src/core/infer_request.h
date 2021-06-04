@@ -125,7 +125,7 @@ class InferenceRequest {
         const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
         int64_t memory_type_id);
 
-    Status AppendDataForHostPolicy(
+    Status AppendDataWithHostPolicy(
         const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
         int64_t memory_type_id, const char* host_policy_name);
 
