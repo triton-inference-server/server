@@ -1335,7 +1335,7 @@ TRITONSERVER_InferenceRequestAppendInputData(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestAppendInputDataForHostPolicy(
+TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
     const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id, const char* host_policy_name)
@@ -1345,7 +1345,7 @@ TRITONSERVER_InferenceRequestAppendInputDataForHostPolicy(
 
   ni::InferenceRequest::Input* input;
   RETURN_IF_STATUS_ERROR(lrequest->MutableOriginalInput(name, &input));
-  RETURN_IF_STATUS_ERROR(input->AppendDataForHostPolicy(
+  RETURN_IF_STATUS_ERROR(input->AppendDataWithHostPolicy(
       base, byte_size, memory_type, memory_type_id, host_policy_name));
 
   return nullptr;  // Success
