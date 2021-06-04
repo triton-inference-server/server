@@ -34,8 +34,8 @@
 #include <queue>
 #include <set>
 #include <thread>
-#include "src/core/model_config.h"
 #include "model_config.pb.h"
+#include "src/core/model_config.h"
 #include "src/core/scheduler.h"
 #include "src/core/scheduler_utils.h"
 #include "src/core/status.h"

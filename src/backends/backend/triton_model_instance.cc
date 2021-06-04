@@ -85,16 +85,24 @@ TritonModelInstance::CreateInstances(
                                     ? group.name() + "_" + std::to_string(c)
                                     : group.name()};
       const bool passive = group.passive();
-      std::vector<std::tuple<std::string, TRITONSERVER_InstanceGroupKind, int32_t>> instance_setting;
+      std::vector<
+          std::tuple<std::string, TRITONSERVER_InstanceGroupKind, int32_t>>
+          instance_setting;
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
-        instance_setting.emplace_back(group.host_policy().empty() ? "cpu" : group.host_policy(), TRITONSERVER_INSTANCEGROUPKIND_CPU, 0 /* device_id */);
+        instance_setting.emplace_back(
+            group.host_policy().empty() ? "cpu" : group.host_policy(),
+            TRITONSERVER_INSTANCEGROUPKIND_CPU, 0 /* device_id */);
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
-          instance_setting.emplace_back(group.host_policy().empty() ? ("gpu_" + std::to_string(device_id))
-                                          : group.host_policy(), TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id);
+          instance_setting.emplace_back(
+              group.host_policy().empty() ? ("gpu_" + std::to_string(device_id))
+                                          : group.host_policy(),
+              TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id);
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
-        instance_setting.emplace_back(group.host_policy().empty() ? "model" : group.host_policy(), TRITONSERVER_INSTANCEGROUPKIND_MODEL, 0 /* device_id */);
+        instance_setting.emplace_back(
+            group.host_policy().empty() ? "model" : group.host_policy(),
+            TRITONSERVER_INSTANCEGROUPKIND_MODEL, 0 /* device_id */);
       } else {
         return Status(
             Status::Code::INVALID_ARG,

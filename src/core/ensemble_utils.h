@@ -29,8 +29,8 @@
 
 #include <deque>
 #include <unordered_map>
-#include "src/core/model_config.h"
 #include "model_config.pb.h"
+#include "src/core/model_config.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/status.h"
 
