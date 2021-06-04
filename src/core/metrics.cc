@@ -235,6 +235,22 @@ Metrics::InitializeDcgmMetrics()
     return false;
   }
 
+  // Get CUDA-visible PCI bus ids
+  std::set<std::string> pciBusIds;
+  for (int i = 0; i < gpu_count; ++i) {
+    std::string pciBusId = "0000";  // pad 0's for uniformity
+    char pcibusid_str[64];
+    cudaError_t cudaerr =
+        cudaDeviceGetPCIBusId(pcibusid_str, sizeof(pcibusid_str) - 1, i);
+    if (cudaerr == cudaSuccess) {
+      pciBusId.append(pcibusid_str);
+      pciBusIds.emplace(pciBusId);
+    } else {
+      LOG_WARNING << "error, CUDA unable to get PCI bus information for GPU:"
+                  << i;
+    }
+  }
+
   // Get DCGM metrics for each GPU. Some devices may have problems using DCGM
   // API and thus these devices needs to be ignored.
   std::vector<uint32_t> available_gpu_ids;
@@ -249,14 +265,17 @@ Metrics::InitializeDcgmMetrics()
                   << ", GPU metrics will not be available for this device: "
                   << errorString(dcgmerr);
     } else {
+      // Filter out CUDA visible GPUs from GPUs found by DCGM
+      if (pciBusIds.count(gpu_attributes[i].identifiers.pciBusId) <= 0) {
+        LOG_INFO << "Skipping GPU:" << i << " since it's not CUDA enabled.";
+        continue;
+      }
       LOG_INFO << "Collecting metrics for GPU " << all_gpu_ids[i] << ": "
                << std::string(gpu_attributes[i].identifiers.deviceName);
-
       std::map<std::string, std::string> gpu_labels;
       gpu_labels.insert(std::map<std::string, std::string>::value_type(
           kMetricsLabelGpuUuid,
           std::string(gpu_attributes[i].identifiers.uuid)));
-
       gpu_utilization_.push_back(&gpu_utilization_family_.Add(gpu_labels));
       gpu_memory_total_.push_back(&gpu_memory_total_family_.Add(gpu_labels));
       gpu_memory_used_.push_back(&gpu_memory_used_family_.Add(gpu_labels));
@@ -267,67 +286,12 @@ Metrics::InitializeDcgmMetrics()
       available_gpu_ids.emplace_back(i);
     }
   }
-
   // create a gpu group
-  char groupName[16] = "dcgm_group";
+  char groupName[] = "dcgm_group";
   dcgmerr =
       dcgmGroupCreate(dcgm_handle_, DCGM_GROUP_DEFAULT, groupName, &groupId_);
   if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "error, cannot make GPU group: "
-                << errorString(dcgmerr);
-  }
-
-  {
-    // Filter out CUDA visible GPUs from GPUs found by DCGM
-    std::vector<uint32_t> new_available_gpu_ids;
-    std::set<std::string> pci_bus_ids;
-    dcgmFieldGrp_t pciFieldId;
-    size_t field_count = 1;
-    unsigned short pciField[field_count] = {DCGM_FI_DEV_PCI_BUSID};
-    char pciFieldName[] = "pciFields";
-    dcgmerr = dcgmFieldGroupCreate(
-        dcgm_handle_, field_count, &pciField[0], pciFieldName, &pciFieldId);
-    if (dcgmerr != DCGM_ST_OK) {
-      LOG_WARNING
-          << "error, cannot make field group for PCI fields: "
-          << errorString(dcgmerr);
-    }
-    // We only watch once here, so update period/maxKeepAge/maxKeepSamples do not matter
-    // since dcgmUpdateAllFields is the thing that updates the watch fields.
-    dcgmerr = dcgmWatchFields(
-        dcgm_handle_, groupId_, pciFieldId, 2000000 /*update period, usec*/,
-        5.0 /*maxKeepAge, sec*/, 1 /*maxKeepSamples*/);
-    dcgmUpdateAllFields(dcgm_handle_, 1 /* wait for update*/);
-    // Get CUDA-visible PCI bus ids
-    for (size_t didx = 0; didx < available_gpu_ids.size(); ++didx) {
-      char pcibusid_str[64];
-      std::string pciBusId = "0000";
-      cudaError_t cudaerr =
-          cudaDeviceGetPCIBusId(pcibusid_str, sizeof(pcibusid_str) - 1, didx);
-      if (cudaerr == cudaSuccess) {
-        pciBusId.append(pcibusid_str);
-        pci_bus_ids.emplace(pciBusId);
-      }
-    }
-
-    dcgmFieldValue_v1 field_values[field_count];
-    for (size_t didx = 0; didx < available_gpu_ids.size(); ++didx) {
-      dcgmerr = dcgmGetLatestValuesForFields(
-          dcgm_handle_, available_gpu_ids[didx], pciField, field_count,
-          field_values);
-      if (dcgmerr != DCGM_ST_OK) {
-        LOG_WARNING << "error, cannot get PCI fields: "
-                    << errorString(dcgmerr);
-      }
-      std::string pciBusId = field_values[0].value.str;
-      if ((field_values[0].status == DCGM_ST_OK) &&
-          (!DCGM_STR_IS_BLANK(pciBusId.c_str()))) {
-        if (pci_bus_ids.count(pciBusId) > 0) {
-          new_available_gpu_ids.emplace_back(available_gpu_ids[didx]);
-        }
-      }
-    }
-    available_gpu_ids = new_available_gpu_ids;
+    LOG_WARNING << "error, cannot make GPU group: " << errorString(dcgmerr);
   }
 
   // Periodically send the DCGM metrics...
@@ -394,8 +358,8 @@ Metrics::InitializeDcgmMetrics()
               util_fail_cnt[didx]++;
               mem_fail_cnt[didx]++;
               LOG_WARNING << "error, unable to get field values for GPU ID "
-                          << available_gpu_ids[didx]
-                          << ": " << errorString(dcgmerr);
+                          << available_gpu_ids[didx] << ": "
+                          << errorString(dcgmerr);
             } else {
               // Power limit
               if (power_limit_fail_cnt[didx] < fail_threshold) {
@@ -443,8 +407,7 @@ Metrics::InitializeDcgmMetrics()
                   energy_fail_cnt[didx]++;
                   energy = 0;
                   LOG_WARNING << "error, unable to get energy consumption for "
-                              << "GPU " << didx
-                              << ": " << errorString(dcgmerr);
+                              << "GPU " << didx << ": " << errorString(dcgmerr);
                 }
               }
 
