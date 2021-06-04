@@ -552,6 +552,7 @@ GCSFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
+    *mtime_ns = 0;
     return Status::Success;
   }
 
@@ -1456,6 +1457,7 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
+    *mtime_ns = 0;
     return Status::Success;
   }
 
