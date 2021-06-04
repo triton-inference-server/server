@@ -300,10 +300,17 @@ if(${TRITON_ENABLE_GPU})
 target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   simple
-  PUBLIC ${CUDA_nvml_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRITON_ENABLE_GPU
+
+if(${TRITON_ENABLE_METRICS_GPU})
+  target_link_libraries(
+    simple
+    PUBLIC -ldcgm
+  )
+endif() # TRITON_ENABLE_METRICS_GPU
+
 install(
   TARGETS simple
   RUNTIME DESTINATION bin
@@ -384,12 +391,19 @@ set_target_properties(
 )
 target_link_libraries(
   memory_alloc
-  PUBLIC ${CUDA_nvml_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
+
+if(${TRITON_ENABLE_METRICS_GPU})
+  target_link_libraries(
+    memory_alloc
+    PUBLIC -ldcgm
+  )
+endif() # TRITON_ENABLE_METRICS_GPU
+
 install(
   TARGETS memory_alloc
   RUNTIME DESTINATION bin
