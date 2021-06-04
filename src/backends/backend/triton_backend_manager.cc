@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -65,10 +65,19 @@ TritonBackend::Create(
   RETURN_IF_ERROR(local_backend->LoadBackendLibrary());
 
   // Backend initialization is optional... The TRITONBACKEND_Backend
-  // object is this TritonBackend object.
+  // object is this TritonBackend object. We must set set shared
+  // library path to point to the backend directory in case the
+  // backend library attempts to load additional shared libaries.
   if (local_backend->backend_init_fn_ != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(local_backend->backend_init_fn_(
-        reinterpret_cast<TRITONBACKEND_Backend*>(local_backend.get())));
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
+    RETURN_IF_ERROR(slib->SetLibraryDirectory(local_backend->dir_));
+
+    TRITONSERVER_Error* err = local_backend->backend_init_fn_(
+        reinterpret_cast<TRITONBACKEND_Backend*>(local_backend.get()));
+
+    RETURN_IF_ERROR(slib->ResetLibraryDirectory());
+    RETURN_IF_TRITONSERVER_ERROR(err);
   }
 
   *backend = std::move(local_backend);

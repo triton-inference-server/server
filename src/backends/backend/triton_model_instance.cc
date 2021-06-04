@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/numa_utils.h"
+#include "src/core/shared_library.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -162,10 +163,19 @@ TritonModelInstance::CreateInstance(
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
 
-  // Instance initialization is optional...
+  // Instance initialization is optional... We must set set shared
+  // library path to point to the backend directory in case the
+  // backend library attempts to load additional shared libaries.
   if (model->Backend()->ModelInstanceInitFn() != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(
-        model->Backend()->ModelInstanceInitFn()(triton_instance));
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
+    RETURN_IF_ERROR(slib->SetLibraryDirectory(model->Backend()->Directory()));
+
+    TRITONSERVER_Error* err =
+        model->Backend()->ModelInstanceInitFn()(triton_instance);
+
+    RETURN_IF_ERROR(slib->ResetLibraryDirectory());
+    RETURN_IF_TRITONSERVER_ERROR(err);
   }
 
   model->AddInstance(std::move(local_instance), passive);
