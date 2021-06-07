@@ -1,4 +1,5 @@
-// Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights
+// reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -145,12 +146,12 @@ Metrics::~Metrics()
       derr = dcgmStopEmbedded(dcgm_handle_);
     }
     if (derr != DCGM_ST_OK) {
-      LOG_WARNING << "error, unable to stop DCGM: " << errorString(derr);
+      LOG_WARNING << "Unable to stop DCGM: " << errorString(derr);
     }
 
     derr = dcgmShutdown();
     if (derr != DCGM_ST_OK) {
-      LOG_WARNING << "error, unable to shutdown DCGM: " << errorString(derr);
+      LOG_WARNING << "Unable to shutdown DCGM: " << errorString(derr);
     }
   }
 #endif  // TRITON_ENABLE_METRICS_GPU
@@ -210,72 +211,79 @@ Metrics::InitializeDcgmMetrics()
     dcgmerr = dcgmStartEmbedded(DCGM_OPERATION_MODE_MANUAL, &dcgm_handle_);
   }
   if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "error, DCGM unable to start: " << errorString(dcgmerr);
+    LOG_WARNING << "DCGM unable to start: " << errorString(dcgmerr);
     return false;
   }
 
   if (standalone_) {
     dcgmerr = dcgmUpdateAllFields(dcgm_handle_, 1);
     if (dcgmerr != DCGM_ST_OK) {
-      LOG_WARNING
-          << "error, DCGM unable to update all fields, GPU metrics will "
-             "not be available: "
-          << errorString(dcgmerr);
+      LOG_WARNING << "DCGM unable to update all fields, GPU metrics will "
+                     "not be available: "
+                  << errorString(dcgmerr);
       return false;
     }
   }
 
-  unsigned int all_gpu_ids[DCGM_MAX_NUM_DEVICES];
-  int gpu_count;
-  dcgmerr = dcgmGetAllDevices(dcgm_handle_, all_gpu_ids, &gpu_count);
+  unsigned int dcgm_gpu_ids[DCGM_MAX_NUM_DEVICES];
+  int dcgm_gpu_count;
+  dcgmerr = dcgmGetAllDevices(dcgm_handle_, dcgm_gpu_ids, &dcgm_gpu_count);
   if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "error, DCGM unable to get device info and count, GPU "
+    LOG_WARNING << "DCGM unable to get device info and count, GPU "
                    "metrics will not be available: "
                 << errorString(dcgmerr);
     return false;
   }
 
-  // Get CUDA-visible PCI bus ids
-  std::set<std::string> pciBusIds;
-  for (int i = 0; i < gpu_count; ++i) {
-    std::string pciBusId = "0000";  // pad 0's for uniformity
-    char pcibusid_str[64];
-    cudaError_t cudaerr =
-        cudaDeviceGetPCIBusId(pcibusid_str, sizeof(pcibusid_str) - 1, i);
-    if (cudaerr == cudaSuccess) {
-      pciBusId.append(pcibusid_str);
-      pciBusIds.emplace(pciBusId);
-    } else {
-      LOG_WARNING << "error, CUDA unable to get PCI bus information for GPU:"
-                  << i;
-    }
-  }
-
-  // Get DCGM metrics for each GPU. Some devices may have problems using DCGM
-  // API and thus these devices needs to be ignored.
-  std::vector<uint32_t> available_gpu_ids;
+  // Get PCI Bus ID to DCGM device Id map.
+  // Some devices may have problems using DCGM API and
+  // these devices needs to be ignored.
+  std::map<std::string, size_t> pci_bus_id_to_dcgm_id;
+  std::map<std::string, std::map<std::string, std::string> >
+      pci_bus_id_to_gpu_labels;
+  std::map<std::string, std::string> pci_bus_id_to_device_name;
   dcgmDeviceAttributes_t gpu_attributes[DCGM_MAX_NUM_DEVICES];
-  for (int i = 0; i < gpu_count; i++) {
+  for (int i = 0; i < dcgm_gpu_count; i++) {
     gpu_attributes[i].version = dcgmDeviceAttributes_version;
     dcgmerr = dcgmGetDeviceAttributes(
-        dcgm_handle_, all_gpu_ids[i], &gpu_attributes[i]);
+        dcgm_handle_, dcgm_gpu_ids[i], &gpu_attributes[i]);
     if (dcgmerr != DCGM_ST_OK) {
-      LOG_WARNING << "error, DCGM unable to get device properties for device "
-                  << all_gpu_ids[i]
+      LOG_WARNING << "DCGM unable to get device properties for DCGM device "
+                  << dcgm_gpu_ids[i]
                   << ", GPU metrics will not be available for this device: "
                   << errorString(dcgmerr);
     } else {
-      // Filter out CUDA visible GPUs from GPUs found by DCGM
-      if (pciBusIds.count(gpu_attributes[i].identifiers.pciBusId) <= 0) {
-        LOG_INFO << "Skipping GPU:" << i << " since it's not CUDA enabled.";
-        continue;
-      }
-      LOG_INFO << "Collecting metrics for GPU " << all_gpu_ids[i] << ": "
-               << std::string(gpu_attributes[i].identifiers.deviceName);
+      std::string pciBusId = gpu_attributes[i].identifiers.pciBusId;
+      pci_bus_id_to_dcgm_id[pciBusId] = i;
+      pci_bus_id_to_device_name[pciBusId] =
+          std::string(gpu_attributes[i].identifiers.deviceName);
       std::map<std::string, std::string> gpu_labels;
       gpu_labels.insert(std::map<std::string, std::string>::value_type(
           kMetricsLabelGpuUuid,
           std::string(gpu_attributes[i].identifiers.uuid)));
+      pci_bus_id_to_gpu_labels[pciBusId] = gpu_labels;
+    }
+  }
+
+
+  // Get CUDA-visible PCI Bus Ids and get DCGM metrics for each CUDA-visible GPU
+  std::map<uint32_t, uint32_t> dcgm_ids_to_cuda_ids;
+  std::vector<uint32_t> available_gpu_ids;
+  for (int i = 0; i < dcgm_gpu_count; ++i) {
+    std::string pci_bus_id = "0000";  // pad 0's for uniformity
+    char pcibusid_str[64];
+    cudaError_t cudaerr =
+        cudaDeviceGetPCIBusId(pcibusid_str, sizeof(pcibusid_str) - 1, i);
+    if (cudaerr == cudaSuccess) {
+      pci_bus_id.append(pcibusid_str);
+      // Filter out CUDA visible GPUs from GPUs found by DCGM
+      if (pci_bus_id_to_dcgm_id.count(pci_bus_id) <= 0) {
+        LOG_INFO << "Skipping GPU:" << i << " since it's not CUDA enabled.";
+        continue;
+      }
+      LOG_INFO << "Collecting metrics for GPU " << i << ": "
+               << pci_bus_id_to_device_name[pci_bus_id];
+      auto& gpu_labels = pci_bus_id_to_gpu_labels[pci_bus_id];
       gpu_utilization_.push_back(&gpu_utilization_family_.Add(gpu_labels));
       gpu_memory_total_.push_back(&gpu_memory_total_family_.Add(gpu_labels));
       gpu_memory_used_.push_back(&gpu_memory_used_family_.Add(gpu_labels));
@@ -283,15 +291,20 @@ Metrics::InitializeDcgmMetrics()
       gpu_power_limit_.push_back(&gpu_power_limit_family_.Add(gpu_labels));
       gpu_energy_consumption_.push_back(
           &gpu_energy_consumption_family_.Add(gpu_labels));
-      available_gpu_ids.emplace_back(i);
+      uint32_t dcgm_id = pci_bus_id_to_dcgm_id[pci_bus_id];
+      dcgm_ids_to_cuda_ids[dcgm_id] = i;
+      available_gpu_ids.emplace_back(dcgm_id);
+    } else {
+      LOG_WARNING << "GPU metrics will not be available for device:" << i;
     }
   }
+
   // create a gpu group
   char groupName[] = "dcgm_group";
   dcgmerr =
       dcgmGroupCreate(dcgm_handle_, DCGM_GROUP_DEFAULT, groupName, &groupId_);
   if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "error, cannot make GPU group: " << errorString(dcgmerr);
+    LOG_WARNING << "Cannot make GPU group: " << errorString(dcgmerr);
   }
 
   // Periodically send the DCGM metrics...
@@ -299,8 +312,8 @@ Metrics::InitializeDcgmMetrics()
     dcgmHandle_t handle = dcgm_handle_;
     dcgmGpuGrp_t groupId = groupId_;
     dcgm_thread_exit_.store(false);
-    dcgm_thread_.reset(new std::thread([this, available_gpu_ids, handle,
-                                        groupId] {
+    dcgm_thread_.reset(new std::thread([this, available_gpu_ids,
+                                        dcgm_ids_to_cuda_ids, handle, groupId] {
       int available_gpu_count = available_gpu_ids.size();
       // Stop attempting metrics if they fail multiple consecutive
       // times for a device.
@@ -333,33 +346,36 @@ Metrics::InitializeDcgmMetrics()
       dcgmReturn_t dcgmerr = dcgmFieldGroupCreate(
           handle, field_count, &fields[0], fieldName, &fieldGroupId);
       if (dcgmerr != DCGM_ST_OK) {
-        LOG_WARNING << "error, cannot make field group: "
-                    << errorString(dcgmerr);
+        LOG_WARNING << "Cannot make field group: " << errorString(dcgmerr);
       }
       dcgmerr = dcgmWatchFields(
           handle, groupId, fieldGroupId, 2000000 /*update period, usec*/,
           5.0 /*maxKeepAge, sec*/, 5 /*maxKeepSamples*/);
       if (dcgmerr != DCGM_ST_OK) {
-        LOG_WARNING << "error, cannot start watching fields: "
-                    << errorString(dcgmerr);
+        LOG_WARNING << "Cannot start watching fields: " << errorString(dcgmerr);
       } else {
         while (!dcgm_thread_exit_.load()) {
           std::this_thread::sleep_for(std::chrono::milliseconds(2000));
           dcgmUpdateAllFields(handle, 1 /* wait for update*/);
           for (int didx = 0; didx < available_gpu_count; ++didx) {
+            uint32_t dcgm_id = available_gpu_ids[didx];
+            if (dcgm_ids_to_cuda_ids.count(dcgm_id) <= 0) {
+              LOG_WARNING << "Cannot find cuda id for dcgm id " << dcgm_id;
+              continue;
+            }
+            uint32_t cuda_id = dcgm_ids_to_cuda_ids.at(dcgm_id);
             dcgmFieldValue_v1 field_values[field_count];
             dcgmReturn_t dcgmerr = dcgmGetLatestValuesForFields(
-                handle, available_gpu_ids[didx], fields, field_count,
-                field_values);
+                handle, dcgm_id, fields, field_count, field_values);
+
             if (dcgmerr != DCGM_ST_OK) {
               power_limit_fail_cnt[didx]++;
               power_usage_fail_cnt[didx]++;
               energy_fail_cnt[didx]++;
               util_fail_cnt[didx]++;
               mem_fail_cnt[didx]++;
-              LOG_WARNING << "error, unable to get field values for GPU ID "
-                          << available_gpu_ids[didx] << ": "
-                          << errorString(dcgmerr);
+              LOG_WARNING << "Unable to get field values for GPU ID " << cuda_id
+                          << ": " << errorString(dcgmerr);
             } else {
               // Power limit
               if (power_limit_fail_cnt[didx] < fail_threshold) {
@@ -370,8 +386,8 @@ Metrics::InitializeDcgmMetrics()
                 } else {
                   power_limit_fail_cnt[didx]++;
                   power_limit = 0;
-                  LOG_WARNING << "error, unable to get power limit for GPU "
-                              << didx << ": " << errorString(dcgmerr);
+                  LOG_WARNING << "Unable to get power limit for GPU " << cuda_id
+                              << ": " << errorString(dcgmerr);
                 }
                 gpu_power_limit_[didx]->Set(power_limit);
               }
@@ -385,8 +401,8 @@ Metrics::InitializeDcgmMetrics()
                 } else {
                   power_usage_fail_cnt[didx]++;
                   power_usage = 0;
-                  LOG_WARNING << "error, unable to get power usage for GPU "
-                              << didx << ": " << errorString(dcgmerr);
+                  LOG_WARNING << "Unable to get power usage for GPU " << cuda_id
+                              << ": " << errorString(dcgmerr);
                 }
                 gpu_power_usage_[didx]->Set(power_usage);
               }
@@ -406,8 +422,9 @@ Metrics::InitializeDcgmMetrics()
                 } else {
                   energy_fail_cnt[didx]++;
                   energy = 0;
-                  LOG_WARNING << "error, unable to get energy consumption for "
-                              << "GPU " << didx << ": " << errorString(dcgmerr);
+                  LOG_WARNING << "Unable to get energy consumption for "
+                              << "GPU " << cuda_id << ": "
+                              << errorString(dcgmerr);
                 }
               }
 
@@ -420,8 +437,8 @@ Metrics::InitializeDcgmMetrics()
                 } else {
                   util_fail_cnt[didx]++;
                   util = 0;
-                  LOG_WARNING << "error, unable to get GPU utilization for GPU "
-                              << didx << ": " << errorString(dcgmerr);
+                  LOG_WARNING << "Unable to get GPU utilization for GPU "
+                              << cuda_id << ": " << errorString(dcgmerr);
                 }
                 gpu_utilization_[didx]->Set((double)util * 0.01);
               }
@@ -439,8 +456,8 @@ Metrics::InitializeDcgmMetrics()
                   memory_total = 0;
                   memory_used = 0;
                   mem_fail_cnt[didx]++;
-                  LOG_WARNING << "error, unable to get memory usage for GPU "
-                              << didx << ": " << errorString(dcgmerr);
+                  LOG_WARNING << "Unable to get memory usage for GPU "
+                              << cuda_id << ": " << errorString(dcgmerr);
                 }
                 gpu_memory_total_[didx]->Set(memory_total * 1e6);  // bytes
                 gpu_memory_used_[didx]->Set(memory_used * 1e6);    // bytes
@@ -477,7 +494,7 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
   dcgmReturn_t dcgmerr = dcgmGetDeviceAttributes(
       singleton->dcgm_handle_, cuda_device, &gpu_attributes);
   if (dcgmerr != DCGM_ST_OK) {
-    LOG_ERROR << "error, unable to get device UUID: " << errorString(dcgmerr);
+    LOG_ERROR << "Unable to get device UUID: " << errorString(dcgmerr);
     return false;
   }
 
