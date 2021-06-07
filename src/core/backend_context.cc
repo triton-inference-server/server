@@ -971,8 +971,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
         idx, &src_buffer, &src_byte_size, &src_memory_type, &src_memory_type_id,
         host_policy_name_);
 
-    if (!status.IsOk())
-    {
+    if (!status.IsOk()) {
       InferenceResponse::SendWithStatus(
           std::move(*response), TRITONSERVER_RESPONSE_COMPLETE_FINAL, status);
       return cuda_copy;

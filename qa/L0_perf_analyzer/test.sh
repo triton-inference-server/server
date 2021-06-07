@@ -116,6 +116,20 @@ fi
 # in certain test cases that are expected to raise this warning
 SERVER_ERROR_STRING="The previous sequence did not end before this sequence start"
 
+set +e
+$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes in string inputs\n***"
+  RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "input INPUT0 contains dynamic shape, provide shapes to send along with the request" | wc -l) -ne 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed: \n***"
+  RET=1
+fi
+set -e
+
 # Testing with ensemble and sequential model variants
 $PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
 --input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
