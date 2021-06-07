@@ -747,13 +747,14 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
         "openvino_nobatch" if max_batch == 0 else "openvino", io_cnt, dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
+    batch_dim = () if max_batch == 0 else (max_batch,)
     openvino_inputs = []
     openvino_outputs = []
     for io_num in range(io_cnt):
         in_name = "INPUT{}".format(io_num)
         out_name = "OUTPUT{}".format(io_num)
         openvino_inputs.append(
-            ng.parameter(shape=input_shapes[io_num], dtype=dtype, name=in_name))
+            ng.parameter(shape=batch_dim + input_shapes[io_num], dtype=dtype, name=in_name))
 
         if input_shapes[io_num] == output_shapes[io_num]:
             openvino_outputs.append(
@@ -761,15 +762,15 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
         else:
             openvino_outputs.append(
                 ng.reshape(openvino_inputs[io_num],
-                           output_shapes[io_num],
-                           name=out_name))
+                           batch_dim + output_shapes[io_num],
+                           name=out_name, special_zero=False))
 
     function = ng.impl.Function(openvino_outputs, openvino_inputs, model_name)
     ie_network = IENetwork(ng.impl.Function.to_capsule(function))
 
     # Batch size needs to be a positive integer value
-    if max_batch != 0:
-        ie_network.batch_size = max_batch
+    # if max_batch != 0:
+    #     ie_network.batch_size = max_batch
 
     try:
         os.makedirs(model_version_dir)
