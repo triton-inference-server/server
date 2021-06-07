@@ -403,9 +403,7 @@ protocol can be specificed with the -i option. If GRPC is selected the
 
 ## Benchmarking Triton directly via C API
 
-By default, Triton inferencing uses http/grpc endpoints to complete requests. 
-However this can introduce latency to the system. Perf analyzer with C API 
-allows users to benchmark without the request latency of http/grpc. 
+Besides using HTTP or gRPC server endpoints to communicate with Triton, perf_analyzer also allows user to benchmark Triton directly using C API. HTTP/gRPC endpoints introduces an additional latency in the pipeline which may not be of interest to the user who is using Triton via C API within their application. Specifically, this feature is useful to benchmark bare minimum Triton without additional overheads from HTTP/gRPC communication.
 
 ### Prerequisite
 Pull the Triton SDK and the Inference Server container images on target machine.
