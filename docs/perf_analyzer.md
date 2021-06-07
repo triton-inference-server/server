@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -403,6 +403,10 @@ protocol can be specificed with the -i option. If GRPC is selected the
 
 ## Benchmarking Triton directly via C API
 
+By default, Triton inferencing uses http/grpc endpoints to complete requests. 
+However this can introduce latency to the system. Perf analyzer with C API 
+allows users to benchmark without the request latency of http/grpc. 
+
 ### Prerequisite
 Pull the Triton SDK and the Inference Server container images on target machine.
 Since you will need access to the Tritonserver install, it might be easier if 
@@ -414,7 +418,7 @@ By default perf_analyzer expects the Triton instance to already be running. You 
 perf_analyzer to the Triton server library path using the `--triton-server-directory` option and the model 
 repository path using the `--model-repository` option.
 If the server is run successfully, there is a prompt: "server is alive!" and perf_analyzer will print the stats, as normal.
-A example run would look like:
+An example run would look like:
 ```
 perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api --triton-server-directory=/opt/tritonserver --model-repository=/workspace/qa/L0_perf_analyzer_capi/models
 ```
@@ -425,4 +429,4 @@ There are a few functionalities that are missing from the C API. They are:
 2. Using shared memory mode (`--shared-memory=cuda` or `--shared-memory=system`)
 3. Request rate range mode
 4. For additonal known non-working cases, please refer to 
-   [qa/L0_perf_analyzer_capi/test.sh](https://github.com/triton-inference-server/server/blob/79bdd0cc01a070be524e7587d78eb3f0ea5cda3a/qa/L0_perf_analyzer_capi/test.sh#L239-L277)
+   [qa/L0_perf_analyzer_capi/test.sh](https://github.com/triton-inference-server/server/blob/main/qa/L0_perf_analyzer_capi/test.sh#L239-L277)
