@@ -52,7 +52,6 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-
 triton_procs=`pgrep --parent $SERVER_PID`
 echo $triton_procs
 
@@ -82,6 +81,38 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
+# Test if the Triton server exits gracefully when the stub has been killed.
+rm $SERVER_LOG
+prev_num_pages=`get_shm_pages`
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+triton_procs=`pgrep --parent $SERVER_PID`
+echo $triton_procs
+
+set +e
+for proc in $triton_procs; do
+    kill -9 $proc
+done
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    exit 1
+fi
+
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Restart test FAILED. \n***"
@@ -90,3 +121,4 @@ else
 fi
 
 exit $RET
+
