@@ -29,10 +29,12 @@
 import argparse
 import os
 import re
+import pathlib
 
 FLAGS = None
 SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
              'jmx', 'gz', 'caffemodel', 'json', 'pdf', 'so', 'onnx')
+REPO_PATH_FROM_THIS_FILE = '../..'
 SKIP_PATHS = (
     'builddir', 'build/libevhtp', 'build/onnxruntime',
     'deploy/gke-marketplace-app/.gitignore',
@@ -81,6 +83,9 @@ OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 
+repo_abs_path = pathlib.Path(__file__).parent.joinpath(
+    REPO_PATH_FROM_THIS_FILE).resolve()
+
 copyright_year_re = re.compile(COPYRIGHT_YEAR_RE)
 
 
@@ -95,7 +100,8 @@ def visit(path):
             return True
 
     for skip in SKIP_PATHS:
-        if path.startswith(skip):
+        if str(pathlib.Path(path).resolve()).startswith(
+                str(repo_abs_path.joinpath(skip).resolve())):
             if FLAGS.verbose:
                 print("skipping due to path prefix: " + path)
             return True
