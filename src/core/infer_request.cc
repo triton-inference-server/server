@@ -284,14 +284,41 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     *new_input->MutableShape() = input.second.Shape();
     *new_input->MutableShapeWithBatchDim() = input.second.ShapeWithBatchDim();
 
+    std::shared_ptr<MutableMemory> new_data_str;
+
+    // Custom handling for null requests in TYPE_STRING. The null requests in
+    // type string have to follow a certain structure. We set the first 4 bytes
+    // in the Tensor to represent the number of total available bytes.
+    if (inference::DataType::TYPE_STRING == input.second.DType()) {
+      new_data_str = std::make_shared<AllocatedMemory>(
+          input.second.Data()->TotalByteSize(), mem_type, mem_id);
+      uint32_t* new_data_base =
+          reinterpret_cast<uint32_t*>(new_data_str->MutableBuffer());
+
+      // Total number of bytes available inside the Tensor is equal to the
+      // tensor's total byte size minus 4 bytes. The first four bytes are used
+      // to determine the string length.
+      *new_data_base = input.second.Data()->TotalByteSize() - 4;
+    }
+
     // Note that the input that have max byte size will be responsible for
     // holding the artifical data, while other inputs will hold a reference to
     // it with byte size that matches 'from'
     if (input.first == *max_input_name) {
-      new_input->SetData(data);
+      if (inference::DataType::TYPE_STRING == input.second.DType()) {
+        new_input->SetData(new_data_str);
+      } else {
+        new_input->SetData(data);
+      }
     } else {
-      new_input->AppendData(
-          data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
+      if (inference::DataType::TYPE_STRING == input.second.DType()) {
+        new_input->AppendData(
+            new_data_str->MutableBuffer(), input.second.Data()->TotalByteSize(),
+            mem_type, mem_id);
+      } else {
+        new_input->AppendData(
+            data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
+      }
     }
   }
 
