@@ -60,9 +60,10 @@ for proc in $triton_procs; do
     kill -9 $proc
 done
 
-python3 restart_test.py  > $CLIENT_LOG 2>&1
+python3 restart_test.py > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** restart_test.py test FAILED. \n***"
     RET=1
 fi
