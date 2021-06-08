@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -477,10 +477,21 @@ def dali_cmake_args():
     ]
 
 
+def install_dcgm_libraries():
+    return '''
+# Install DCGM
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
+&& mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
+&& apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
+&& add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+RUN apt-get update \
+&& apt-get install -y datacenter-gpu-manager
+'''
+
+
 def fil_cmake_args(images):
-    cargs = [
-        '-DTRITON_FIL_DOCKER_BUILD=ON'
-    ]
+    cargs = ['-DTRITON_FIL_DOCKER_BUILD=ON']
     if 'base' in images:
         cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
     else:
@@ -573,11 +584,16 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
+        df += install_dcgm_libraries()
+        df += '''
+RUN patch -ruN -d /usr/include/ < /workspace/build/libdcgm/dcgm_api_export.patch
+'''
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 '''
+
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -668,6 +684,7 @@ RUN apt-get update && \
          libre2-5 && \
     rm -rf /var/lib/apt/lists/*
 '''
+    df += install_dcgm_libraries()
     # Add dependencies needed for python backend
     if 'python' in backends:
         df += '''
@@ -736,7 +753,8 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
         dfile.write(df)
 
 
-def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends, repoagents):
+def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends,
+                              repoagents):
     df = '''
 #
 # Multistage build.
@@ -976,15 +994,16 @@ def container_build(images, backends, repoagents, endpoints):
         # the install artifacts from the tritonserver_build
         # container.
         if target_platform() == 'windows':
-            create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents)
+            create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile',
+                                      dockerfileargmap, backends, repoagents)
         else:
-            create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents, endpoints)
+            create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile',
+                                    dockerfileargmap, backends, repoagents,
+                                    endpoints)
         p = subprocess.Popen([
-                'docker', 'build', '-f',
-                os.path.join(FLAGS.build_dir, 'Dockerfile')
-            ] + ['-t', 'tritonserver', '.'])
+            'docker', 'build', '-f',
+            os.path.join(FLAGS.build_dir, 'Dockerfile')
+        ] + ['-t', 'tritonserver', '.'])
         p.wait()
         fail_if(p.returncode != 0, 'docker build tritonserver failed')
 
