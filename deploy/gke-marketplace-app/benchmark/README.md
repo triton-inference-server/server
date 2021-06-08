@@ -68,7 +68,11 @@ We the place the model into a GCS with following structure, `config.pbtxt` was p
         └── config.pbtxt 
 ```
 
+<<<<<<< 966f88fb296e4022d5f22836e1e579cc14988717
 When deploy Triton GKE application, point the model repository to directory contains the structure above with actual models. 
+=======
+When deploy Triton GKE application, point the model repository to directory contains the structure above with actual models. We provided a directory in `gs://triton_sample_models/21_06_mig5g_benchmark` to benchmark 21.06 release on A100 MIG 5gb slice. 
+>>>>>>> Update README and versions for 21.06 branch
 
 ## Performance
 

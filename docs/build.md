@@ -101,8 +101,8 @@ $ ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --e
 If you are building on master/main branch then \<container tag\> will
 default to "main". If you are building on a release branch then
 \<container tag\> will default to the branch name. For example, if you
-are building on the r21.05 branch, \<container tag\> will default to
-r21.05. Therefore, you typically do not need to provide \<container
+are building on the r21.06 branch, \<container tag\> will default to
+r21.06. Therefore, you typically do not need to provide \<container
 tag\> at all (nor the preceding colon). You can use a different
 \<container tag\> for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
@@ -258,8 +258,8 @@ $ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuil
 If you are building on master/main branch then \<container tag\> will
 default to "main". If you are building on a release branch then
 \<container tag\> will default to the branch name. For example, if you
-are building on the r21.05 branch, \<container tag\> will default to
-r21.05. Therefore, you typically do not need to provide \<container
+are building on the r21.06 branch, \<container tag\> will default to
+r21.06. Therefore, you typically do not need to provide \<container
 tag\> at all (nor the preceding colon). You can use a different
 \<container tag\> for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
