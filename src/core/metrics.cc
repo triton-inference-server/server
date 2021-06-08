@@ -133,7 +133,7 @@ Metrics::HashLabels(const std::map<std::string, std::string>& labels)
 Metrics::~Metrics()
 {
 #ifdef TRITON_ENABLE_METRICS_GPU
-  // Signal the dcgm thread to exit and then wait for it...
+  // Signal the DCGM thread to exit and then wait for it...
   if (dcgm_thread_ != nullptr) {
     dcgm_thread_exit_.store(true);
     dcgm_thread_->join();
@@ -273,7 +273,7 @@ Metrics::InitializeDcgmMetrics()
   cudaError_t cudaerr = cudaGetDeviceCount(&cuda_gpu_count);
   if (cudaerr != cudaSuccess) {
     LOG_WARNING
-        << "Cannot get cuda device count, GPU metrics will not be available";
+        << "Cannot get CUDA device count, GPU metrics will not be available";
     return false;
   }
   for (int i = 0; i < cuda_gpu_count; ++i) {
@@ -367,7 +367,7 @@ Metrics::InitializeDcgmMetrics()
           for (int didx = 0; didx < available_cuda_gpu_count; ++didx) {
             uint32_t cuda_id = available_cuda_gpu_ids[didx];
             if (cuda_ids_to_dcgm_ids.count(cuda_id) <= 0) {
-              LOG_WARNING << "Cannot find dcgm id for cuda id " << cuda_id;
+              LOG_WARNING << "Cannot find DCGM id for CUDA id " << cuda_id;
               continue;
             }
             uint32_t dcgm_id = cuda_ids_to_dcgm_ids.at(cuda_id);
