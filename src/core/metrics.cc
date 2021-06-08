@@ -344,8 +344,8 @@ Metrics::InitializeDcgmMetrics()
           DCGM_FI_DEV_POWER_USAGE,               // power usage, watts
           DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION,  // Total energy consumption, mJ
           util_flag,                             // util ratio, 1 = 1%
-          DCGM_FI_DEV_FB_USED,                   // Frame buffer used, MB
-          DCGM_FI_DEV_FB_TOTAL,                  // Frame buffer used, MB
+          DCGM_FI_DEV_FB_USED,                   // Frame buffer used, MiB
+          DCGM_FI_DEV_FB_TOTAL,                  // Frame buffer used, MiB
       };
 
       char fieldName[] = "field_group";
@@ -466,8 +466,10 @@ Metrics::InitializeDcgmMetrics()
                   LOG_WARNING << "Unable to get memory usage for GPU "
                               << cuda_id << ": " << errorString(dcgmerr);
                 }
-                gpu_memory_total_[didx]->Set(memory_total * 1000000);  // bytes
-                gpu_memory_used_[didx]->Set(memory_used * 1000000);    // bytes
+                gpu_memory_total_[didx]->Set(
+                    memory_total * 1024 * 1024);  // bytes
+                gpu_memory_used_[didx]->Set(
+                    memory_used * 1024 * 1024);  // bytes
               }
             }
           }
