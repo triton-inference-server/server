@@ -54,8 +54,9 @@ from distutils.dir_util import copy_tree
 #     (triton container version,
 #      upstream container version,
 #      ORT version,
-#      ORT openvino version (use None to disable openvino in ORT),
-#      OpenVINO version
+#      ORT OpenVINO version (use None to disable OpenVINO in ORT),
+#      Standalone OpenVINO version (non-windows),
+#      Standalone OpenVINO version (windows)
 #     )
 #
 # Currently the OpenVINO versions used in ORT and standalone must
@@ -64,7 +65,13 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.11.0dev': ('21.06dev', '21.05', '1.7.1', '2021.2.200', '2021.2.200')
+    '2.11.0dev':
+      ('21.06dev',   # triton container
+       '21.05',      # upstream container
+       '1.7.1',      # ORT
+       '2021.2.200', # ORT OpenVINO
+       '2021.2.200', # Standalone OpenVINO (non-windows)
+       '2021.2')     # Standalone OpenVINO (windows)
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -410,15 +417,20 @@ def onnxruntime_cmake_args(images, library_paths):
 
 
 def openvino_cmake_args():
-    cargs = [
-        '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][4]),
-    ]
-
     if target_platform() == 'windows':
+        cargs = [
+            '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][5]),
+        ]
+
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
     else:
+        cargs = [
+            '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][4]),
+        ]
+
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
         else:
@@ -776,7 +788,7 @@ COPY --from=tritonserver_build /tmp/tritonbuild/install/backends backends
             break
 
     df += '''
-ENTRYPOINT cmd.exe &&
+ENTRYPOINT []
 ENV NVIDIA_BUILD_ID {}
 LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}

@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,6 +34,7 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/numa_utils.h"
 #include "src/core/server_message.h"
+#include "src/core/shared_library.h"
 #include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -151,10 +152,19 @@ TritonModel::Create(
   TritonModel* raw_local_model = local_model.get();
 
   // Model initialization is optional... The TRITONBACKEND_Model
-  // object is this TritonModel object.
+  // object is this TritonModel object. We must set set shared library
+  // path to point to the backend directory in case the backend
+  // library attempts to load additional shared libaries.
   if (backend->ModelInitFn() != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(
-        reinterpret_cast<TRITONBACKEND_Model*>(raw_local_model)));
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
+    RETURN_IF_ERROR(slib->SetLibraryDirectory(backend->Directory()));
+
+    TRITONSERVER_Error* err = backend->ModelInitFn()(
+        reinterpret_cast<TRITONBACKEND_Model*>(raw_local_model));
+
+    RETURN_IF_ERROR(slib->ResetLibraryDirectory());
+    RETURN_IF_TRITONSERVER_ERROR(err);
   }
   local_model->initialized_ = true;
 
