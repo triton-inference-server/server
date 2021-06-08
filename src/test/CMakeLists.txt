@@ -317,6 +317,7 @@ install(
 set(
   TRITON_REPO_AGENT_SRCS
   ../core/triton_repo_agent.cc
+  ../core/shared_library.cc
   ../core/status.cc
   ../core/filesystem.cc
   ../core/model_config_utils.cc
@@ -377,6 +378,7 @@ target_link_libraries(
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
+  PRIVATE -ldl
 )
 
 # Remove all TRITON_ENABLE_XXX definitions for this test
