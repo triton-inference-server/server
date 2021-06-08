@@ -33,7 +33,7 @@ import pathlib
 
 FLAGS = None
 SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
-             'jmx', 'gz', 'caffemodel', 'json', 'pdf', 'so', 'onnx')
+             'jmx', 'gz', 'json', 'pdf', 'so', 'onnx')
 REPO_PATH_FROM_THIS_FILE = '../..'
 SKIP_PATHS = (
     'builddir', 'build/libevhtp', 'build/onnxruntime',
@@ -54,7 +54,7 @@ SKIP_PATHS = (
     'src/clients/c++/library/cencode.c', 'src/clients/c++/library/cencode.h',
     'src/clients/java', 'TRITON_VERSION')
 
-COPYRIGHT_YEAR_RE = 'Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,(20)?[2-9][0-9](-(20)?[2-9][0-9])?)*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved.'
+COPYRIGHT_YEAR_RE = 'Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved.'
 
 COPYRIGHT = '''
 
@@ -170,13 +170,9 @@ def visit(path):
                 elif len(year) == 9:  # 2021-2022
                     years.append(int(year[0:4]))
                     years.append(int(year[5:9]))
-                elif len(year) == 7 and year[4] == "-":  # 2021-22
+                elif len(year) == 7:  # 2021-22
                     years.append(int(year[0:4]))
                     years.append(int(year[5:7]) + 2000)
-                elif len(year) == 7 and year[2] == "-":  # 21-2022
-                    print("copyright year \"" + year + "\" is unclear for " +
-                          path + ": " + line)
-                    return False
                 elif len(year) == 5:  # 21-23
                     years.append(int(year[0:2]) + 2000)
                     years.append(int(year[3:5]) + 2000)
