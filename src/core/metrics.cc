@@ -272,7 +272,9 @@ Metrics::InitializeDcgmMetrics()
   int cuda_gpu_count;
   cudaError_t cudaerr = cudaGetDeviceCount(&cuda_gpu_count);
   if (cudaerr != cudaSuccess) {
-    LOG_WARNING << "Cannot get cuda device count";
+    LOG_WARNING
+        << "Cannot get cuda device count, GPU metrics will not be available";
+    return false;
   }
   for (int i = 0; i < cuda_gpu_count; ++i) {
     std::string pci_bus_id = "0000";  // pad 0's for uniformity
@@ -280,11 +282,12 @@ Metrics::InitializeDcgmMetrics()
     cudaerr = cudaDeviceGetPCIBusId(pcibusid_str, sizeof(pcibusid_str) - 1, i);
     if (cudaerr == cudaSuccess) {
       pci_bus_id.append(pcibusid_str);
-      // Filter out CUDA visible GPUs from GPUs found by DCGM
       if (pci_bus_id_to_dcgm_id.count(pci_bus_id) <= 0) {
-        LOG_INFO << "Skipping GPU:" << i << " since it's not CUDA enabled.";
+        LOG_INFO << "Skipping GPU:" << i
+                 << " since it's not CUDA enabled. This should never happen!";
         continue;
       }
+      // Filter out CUDA visible GPUs from GPUs found by DCGM
       LOG_INFO << "Collecting metrics for GPU " << i << ": "
                << pci_bus_id_to_device_name[pci_bus_id];
       auto& gpu_labels = pci_bus_id_to_gpu_labels[pci_bus_id];
@@ -463,8 +466,8 @@ Metrics::InitializeDcgmMetrics()
                   LOG_WARNING << "Unable to get memory usage for GPU "
                               << cuda_id << ": " << errorString(dcgmerr);
                 }
-                gpu_memory_total_[didx]->Set(memory_total * 1e6);  // bytes
-                gpu_memory_used_[didx]->Set(memory_used * 1e6);    // bytes
+                gpu_memory_total_[didx]->Set(memory_total * 1000000);  // bytes
+                gpu_memory_used_[didx]->Set(memory_used * 1000000);    // bytes
               }
             }
           }
