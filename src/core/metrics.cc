@@ -267,13 +267,17 @@ Metrics::InitializeDcgmMetrics()
 
 
   // Get CUDA-visible PCI Bus Ids and get DCGM metrics for each CUDA-visible GPU
-  std::map<uint32_t, uint32_t> dcgm_ids_to_cuda_ids;
-  std::vector<uint32_t> available_gpu_ids;
-  for (int i = 0; i < dcgm_gpu_count; ++i) {
+  std::map<uint32_t, uint32_t> cuda_ids_to_dcgm_ids;
+  std::vector<uint32_t> available_cuda_gpu_ids;
+  int cuda_gpu_count;
+  cudaError_t cudaerr = cudaGetDeviceCount(&cuda_gpu_count);
+  if (cudaerr != cudaSuccess) {
+    LOG_WARNING << "Cannot get cuda device count";
+  }
+  for (int i = 0; i < cuda_gpu_count; ++i) {
     std::string pci_bus_id = "0000";  // pad 0's for uniformity
     char pcibusid_str[64];
-    cudaError_t cudaerr =
-        cudaDeviceGetPCIBusId(pcibusid_str, sizeof(pcibusid_str) - 1, i);
+    cudaerr = cudaDeviceGetPCIBusId(pcibusid_str, sizeof(pcibusid_str) - 1, i);
     if (cudaerr == cudaSuccess) {
       pci_bus_id.append(pcibusid_str);
       // Filter out CUDA visible GPUs from GPUs found by DCGM
@@ -292,8 +296,8 @@ Metrics::InitializeDcgmMetrics()
       gpu_energy_consumption_.push_back(
           &gpu_energy_consumption_family_.Add(gpu_labels));
       uint32_t dcgm_id = pci_bus_id_to_dcgm_id[pci_bus_id];
-      dcgm_ids_to_cuda_ids[dcgm_id] = i;
-      available_gpu_ids.emplace_back(dcgm_id);
+      cuda_ids_to_dcgm_ids[i] = dcgm_id;
+      available_cuda_gpu_ids.emplace_back(i);
     } else {
       LOG_WARNING << "GPU metrics will not be available for device:" << i;
     }
@@ -308,25 +312,25 @@ Metrics::InitializeDcgmMetrics()
   }
 
   // Periodically send the DCGM metrics...
-  if (available_gpu_ids.size() > 0) {
+  if (available_cuda_gpu_ids.size() > 0) {
     dcgmHandle_t handle = dcgm_handle_;
     dcgmGpuGrp_t groupId = groupId_;
     dcgm_thread_exit_.store(false);
-    dcgm_thread_.reset(new std::thread([this, available_gpu_ids,
-                                        dcgm_ids_to_cuda_ids, handle, groupId] {
-      int available_gpu_count = available_gpu_ids.size();
+    dcgm_thread_.reset(new std::thread([this, available_cuda_gpu_ids,
+                                        cuda_ids_to_dcgm_ids, handle, groupId] {
+      int available_cuda_gpu_count = available_cuda_gpu_ids.size();
       // Stop attempting metrics if they fail multiple consecutive
       // times for a device.
       constexpr int fail_threshold = 3;
-      std::vector<int> power_limit_fail_cnt(available_gpu_count);
-      std::vector<int> power_usage_fail_cnt(available_gpu_count);
-      std::vector<int> energy_fail_cnt(available_gpu_count);
-      std::vector<int> util_fail_cnt(available_gpu_count);
-      std::vector<int> mem_fail_cnt(available_gpu_count);
-      std::vector<int> cuda_available_cnt(available_gpu_count);
+      std::vector<int> power_limit_fail_cnt(available_cuda_gpu_count);
+      std::vector<int> power_usage_fail_cnt(available_cuda_gpu_count);
+      std::vector<int> energy_fail_cnt(available_cuda_gpu_count);
+      std::vector<int> util_fail_cnt(available_cuda_gpu_count);
+      std::vector<int> mem_fail_cnt(available_cuda_gpu_count);
+      std::vector<int> cuda_available_cnt(available_cuda_gpu_count);
 
-      unsigned long long last_energy[available_gpu_count];
-      for (int didx = 0; didx < available_gpu_count; ++didx) {
+      unsigned long long last_energy[available_cuda_gpu_count];
+      for (int didx = 0; didx < available_cuda_gpu_count; ++didx) {
         last_energy[didx] = 0;
       }
       size_t field_count = 6;
@@ -357,13 +361,13 @@ Metrics::InitializeDcgmMetrics()
         while (!dcgm_thread_exit_.load()) {
           std::this_thread::sleep_for(std::chrono::milliseconds(2000));
           dcgmUpdateAllFields(handle, 1 /* wait for update*/);
-          for (int didx = 0; didx < available_gpu_count; ++didx) {
-            uint32_t dcgm_id = available_gpu_ids[didx];
-            if (dcgm_ids_to_cuda_ids.count(dcgm_id) <= 0) {
-              LOG_WARNING << "Cannot find cuda id for dcgm id " << dcgm_id;
+          for (int didx = 0; didx < available_cuda_gpu_count; ++didx) {
+            uint32_t cuda_id = available_cuda_gpu_ids[didx];
+            if (cuda_ids_to_dcgm_ids.count(cuda_id) <= 0) {
+              LOG_WARNING << "Cannot find dcgm id for cuda id " << cuda_id;
               continue;
             }
-            uint32_t cuda_id = dcgm_ids_to_cuda_ids.at(dcgm_id);
+            uint32_t dcgm_id = cuda_ids_to_dcgm_ids.at(cuda_id);
             dcgmFieldValue_v1 field_values[field_count];
             dcgmReturn_t dcgmerr = dcgmGetLatestValuesForFields(
                 handle, dcgm_id, fields, field_count, field_values);
