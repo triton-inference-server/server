@@ -306,8 +306,6 @@ GetModifiedTime(const std::string& path)
     mtime = std::max(mtime, GetModifiedTime(full_path));
   }
 
-  LOG_ERROR << "Modification time for '" << path << "': " << mtime;
-
   return mtime;
 }
 // Return true if any file in the subdirectory root at 'path' has been
