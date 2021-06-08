@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -305,8 +305,6 @@ GetModifiedTime(const std::string& path)
     const auto full_path = JoinPath({path, child});
     mtime = std::max(mtime, GetModifiedTime(full_path));
   }
-
-  LOG_ERROR << "Modification time for '" << path << "': " << mtime;
 
   return mtime;
 }
