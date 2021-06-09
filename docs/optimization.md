@@ -253,7 +253,11 @@ restart Triton.
 
 ```
 optimization { execution_accelerators {
-  gpu_execution_accelerator : [ { name : "tensorrt" } ]
+  gpu_execution_accelerator : [ {
+    name : "tensorrt"
+    parameters { key: "precision_mode" value: "FP16" }
+    parameters { key: "max_workspace_size_bytes" value: "1073741824" }
+    }]
 }}
 ```
 
