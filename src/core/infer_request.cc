@@ -251,9 +251,8 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
 
   // Second pass
   size_t max_byte_size = 0;
+  size_t max_str_byte_size = 0;
   const std::string* max_input_name;
-
-  bool includes_type_bytes = false;
   for (const auto& input : from.OriginalInputs()) {
     // Skip shape tensors in this pass
     if (input.second.IsShapeTensor()) {
@@ -261,16 +260,12 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     }
 
     if (input.second.DType() == inference::DataType::TYPE_STRING) {
-      includes_type_bytes = true;
       int64_t element_count = GetElementCount(input.second.Shape());
-      if (element_count == -1) {
-        LOG_WARNING
-            << "Tensor should not have a variable dimension at this stage.";
-      }
 
       size_t str_byte_size = static_cast<size_t>(4 * element_count);
       if (str_byte_size > max_byte_size) {
         max_byte_size = str_byte_size;
+        max_str_byte_size = max_byte_size;
         max_input_name = &(input.first);
       }
     } else {
@@ -289,12 +284,12 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
       std::make_shared<AllocatedMemory>(max_byte_size, mem_type, mem_id);
   auto data_base = data->BufferAt(0, &max_byte_size, &mem_type, &mem_id);
 
-  // Zero initialization is only required when there is
-  // a TYPE_BYTES tensor in the request.
-  if (includes_type_bytes) {
+  // Zero initialization is only required when there is a TYPE_BYTES tensor in
+  // the request. Only set the required number of bytes to zero.
+  if (max_str_byte_size > 0) {
     std::fill(
         data->MutableBuffer(),
-        data->MutableBuffer() + max_byte_size, 0);
+        data->MutableBuffer() + max_str_byte_size, 0);
   }
 
   for (const auto& input : from.OriginalInputs()) {
