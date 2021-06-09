@@ -111,7 +111,6 @@ if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Ensemble test FAILED. \n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Ensemble test PASSED. \n***"
 fi
 
