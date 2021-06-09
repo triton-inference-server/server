@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -236,10 +236,12 @@ PinnedMemoryManager::Create(const Options& options)
       LOG_WARNING << "Unable to allocate pinned system memory, pinned memory "
                      "pool will not be available: "
                   << std::string(cudaGetErrorString(err));
-    } else {
+    } else if (options.pinned_memory_pool_byte_size_ != 0) {
       LOG_INFO << "Pinned memory pool is created at '"
                << PointerToString(buffer) << "' with size "
                << options.pinned_memory_pool_byte_size_;
+    } else {
+      LOG_INFO << "Pinned memory pool disabled";
     }
 #endif  // TRITON_ENABLE_GPU
     instance_->AddPinnedMemoryBuffer(
@@ -285,10 +287,12 @@ PinnedMemoryManager::Create(const Options& options)
         LOG_WARNING << "Unable to allocate pinned system memory, pinned memory "
                        "pool will not be available: "
                     << std::string(cudaGetErrorString(err));
-      } else {
+      } else if (options.pinned_memory_pool_byte_size_ != 0) {
         LOG_INFO << "Pinned memory pool is created at '"
                  << PointerToString(buffer) << "' with size "
                  << options.pinned_memory_pool_byte_size_;
+      } else {
+        LOG_INFO << "Pinned memory pool disabled";
       }
 #endif  // TRITON_ENABLE_GPU
       ResetNumaMemoryPolicy();
