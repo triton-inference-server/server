@@ -28,7 +28,6 @@
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="7"
-
 SERVER=/opt/tritonserver/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
@@ -283,17 +282,22 @@ done
 kill $SERVER_PID
 wait $SERVER_PID
 
-(cd env/ && bash -ex ./test.sh)
+(cd env && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi
 
-(cd lifecycle/ && bash -ex ./test.sh)
+(cd lifecycle && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi
 
-(cd ensemble/ && bash -ex ./test.sh)
+(cd ensemble && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd restart && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi
