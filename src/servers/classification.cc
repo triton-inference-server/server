@@ -56,7 +56,7 @@ AddClassResults(
 
     const char* label;
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutputClassificationLabel(
-        response, output_idx, idx[k], &label));
+        response, output_idx, k, &label));
     if (label != nullptr) {
       class_strs->back() += ":";
       class_strs->back().append(label);
