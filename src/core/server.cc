@@ -153,8 +153,15 @@ InferenceServer::Init()
   std::unique_ptr<RateLimiter> local_rate_limiter;
   bool ignore_resources_and_priority =
       (rate_limit_mode_ == RateLimitMode::RL_OFF);
+  if (!ignore_resources_and_priority) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "rate limiter implementation is not complete. Please use "
+        "--rate-limit=OFF");
+  }
   status = RateLimiter::Create(
-      ignore_resources_and_priority, rate_limit_resource_map_, &local_rate_limiter);
+      ignore_resources_and_priority, rate_limit_resource_map_,
+      &local_rate_limiter);
   rate_limiter_ = std::move(local_rate_limiter);
 
   if (!status.IsOk()) {

@@ -158,11 +158,13 @@ TritonModel::Create(
   local_model->initialized_ = true;
 
   // FIXME: Should we use device blocking even for the sequential models?
-  const bool device_blocking = (local_model->backend_->ExecutionPolicy() == TRITONBACKEND_EXECUTION_DEVICE_BLOCKING);
+  const bool device_blocking =
+      (local_model->backend_->ExecutionPolicy() ==
+       TRITONBACKEND_EXECUTION_DEVICE_BLOCKING);
 
   // Create and initialize the model instances for this model.
-  RETURN_IF_ERROR(
-      TritonModelInstance::CreateInstances(raw_local_model, model_config, device_blocking));
+  RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
+      raw_local_model, model_config, device_blocking));
 
   RETURN_IF_ERROR(
       local_model->SetConfiguredScheduler(static_cast<void*>(raw_local_model)));
@@ -259,13 +261,13 @@ TritonModel::~TritonModel()
   // TritonModel.
   scheduler_.reset();
 
-  // Unregister itself from the rate limiter
-  server_->GetRateLimiter()->UnregisterModel(this);
-
   // Explicitly delete/finalize all model instances before finalizing
   // the model itself.
   instances_.clear();
   passive_instances_.clear();
+
+  // Unregister itself from the rate limiter
+  server_->GetRateLimiter()->UnregisterModel(this);
 
   // Model finalization is optional... The TRITONBACKEND_Model
   // object is this TritonModel object.
