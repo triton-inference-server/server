@@ -124,10 +124,10 @@ SetNumaMemoryPolicy(const HostPolicyCmdlineConfig& host_policy)
     RETURN_IF_ERROR(
         ParseIntOption("Parsing 'numa-node' value", it->second, &node_id));
     LOG_VERBOSE(1) << "Thread is binding to NUMA node " << it->second
-                   << ". Max NUMA node count: " << numa_max_node();
+                   << ". Max NUMA node count: " << (numa_max_node() + 1);
     numa_set = true;
     unsigned long node_mask = 1UL << node_id;
-    if (set_mempolicy(MPOL_BIND, &node_mask, numa_max_node() + 1) != 0) {
+    if (set_mempolicy(MPOL_BIND, &node_mask, (numa_max_node() + 1) + 1) != 0) {
       return Status(
           Status::Code::INTERNAL,
           std::string("Unable to set NUMA memory policy: ") + strerror(errno));
