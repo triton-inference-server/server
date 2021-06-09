@@ -552,6 +552,7 @@ GCSFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
+    *mtime_ns = 0;
     return Status::Success;
   }
 
@@ -1456,6 +1457,7 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
+    *mtime_ns = 0;
     return Status::Success;
   }
 
@@ -1470,7 +1472,8 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   // If request succeeds, copy over the modification time
   auto head_object_outcome = client_.HeadObject(head_request);
   if (head_object_outcome.IsSuccess()) {
-    *mtime_ns = head_object_outcome.GetResult().GetLastModified().Millis();
+    *mtime_ns = head_object_outcome.GetResult().GetLastModified().Millis() *
+                NANOS_PER_MILLIS;
   } else {
     return Status(
         Status::Code::INTERNAL,

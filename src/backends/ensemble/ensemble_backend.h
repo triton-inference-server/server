@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/backend.h"
 #include "model_config.pb.h"
+#include "src/core/backend.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 

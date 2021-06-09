@@ -26,11 +26,11 @@
 
 #include "src/backends/onnx/autofill.h"
 
+#include "model_config.pb.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/model_config.h"
-#include "model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 

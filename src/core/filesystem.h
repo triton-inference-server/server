@@ -100,7 +100,8 @@ Status IsDirectory(const std::string& path, bool* is_dir);
 
 /// Get file modification time in nanoseconds.
 /// \param path The path.
-/// \param mtime_ns Returns the file modification time.
+/// \param mtime_ns Returns the file modification time. For some filesystems a
+/// file/folder may not have a modification time, in that case return 0.
 /// \return Error status
 Status FileModificationTime(const std::string& path, int64_t* mtime_ns);
 

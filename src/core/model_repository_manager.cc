@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -280,7 +280,7 @@ GetModifiedTime(const std::string& path)
 
   // If 'path' is a file return its mtime. Otherwise, using the modification
   // time of the directory as baseline in case of file deletion
-  int64_t mtime;
+  int64_t mtime = 0;
   status = FileModificationTime(path, &mtime);
   if (!status.IsOk()) {
     LOG_ERROR << "Failed to determine modification time for '" << path

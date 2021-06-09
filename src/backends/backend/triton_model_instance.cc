@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/numa_utils.h"
+#include "src/core/shared_library.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -85,16 +86,24 @@ TritonModelInstance::CreateInstances(
                                     ? group.name() + "_" + std::to_string(c)
                                     : group.name()};
       const bool passive = group.passive();
-      std::vector<std::tuple<std::string, TRITONSERVER_InstanceGroupKind, int32_t>> instance_setting;
+      std::vector<
+          std::tuple<std::string, TRITONSERVER_InstanceGroupKind, int32_t>>
+          instance_setting;
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
-        instance_setting.emplace_back(group.host_policy().empty() ? "cpu" : group.host_policy(), TRITONSERVER_INSTANCEGROUPKIND_CPU, 0 /* device_id */);
+        instance_setting.emplace_back(
+            group.host_policy().empty() ? "cpu" : group.host_policy(),
+            TRITONSERVER_INSTANCEGROUPKIND_CPU, 0 /* device_id */);
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
-          instance_setting.emplace_back(group.host_policy().empty() ? ("gpu_" + std::to_string(device_id))
-                                          : group.host_policy(), TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id);
+          instance_setting.emplace_back(
+              group.host_policy().empty() ? ("gpu_" + std::to_string(device_id))
+                                          : group.host_policy(),
+              TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id);
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
-        instance_setting.emplace_back(group.host_policy().empty() ? "model" : group.host_policy(), TRITONSERVER_INSTANCEGROUPKIND_MODEL, 0 /* device_id */);
+        instance_setting.emplace_back(
+            group.host_policy().empty() ? "model" : group.host_policy(),
+            TRITONSERVER_INSTANCEGROUPKIND_MODEL, 0 /* device_id */);
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -154,10 +163,19 @@ TritonModelInstance::CreateInstance(
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
 
-  // Instance initialization is optional...
+  // Instance initialization is optional... We must set set shared
+  // library path to point to the backend directory in case the
+  // backend library attempts to load additional shared libaries.
   if (model->Backend()->ModelInstanceInitFn() != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(
-        model->Backend()->ModelInstanceInitFn()(triton_instance));
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
+    RETURN_IF_ERROR(slib->SetLibraryDirectory(model->Backend()->Directory()));
+
+    TRITONSERVER_Error* err =
+        model->Backend()->ModelInstanceInitFn()(triton_instance);
+
+    RETURN_IF_ERROR(slib->ResetLibraryDirectory());
+    RETURN_IF_TRITONSERVER_ERROR(err);
   }
 
   model->AddInstance(std::move(local_instance), passive);

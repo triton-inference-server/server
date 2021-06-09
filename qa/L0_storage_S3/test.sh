@@ -49,7 +49,7 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 # S3 bucket path (Point to bucket when testing cloud storage)
 BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
 
-# Cleanup S3 test bucket if exists (due to test failure)
+# Cleanup and delete S3 test bucket if it already exists (due to test failure)
 aws s3 rm $BUCKET_URL --recursive --include "*" && \
     aws s3 rb $BUCKET_URL || true
 
@@ -273,12 +273,59 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Clean up bucket
+# Clean up bucket contents
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+# Test reload of model with explicit model control
+rm -rf models && mkdir -p models/libtorch_float32_float32_float32 && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/1 models/libtorch_float32_float32_float32/. && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/config.pbtxt models/libtorch_float32_float32_float32/.
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/output0_labels.txt models/libtorch_float32_float32_float32/.
+
+# Remove version policy from config.pbtxt
+sed -i '/^version_policy/d' models/libtorch_float32_float32_float32/config.pbtxt
+
+# Copy contents of models into S3 bucket
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120 --model-control-mode=explicit"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+curl -X POST localhost:8000/v2/repository/models/libtorch_float32_float32_float32/load
+
+CURL_LOG=$(curl -X POST localhost:8000/v2/repository/index)
+
+if [ "$CURL_LOG" != "[{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"1\",\"state\":\"READY\"}]" ]; then
+    RET=1
+fi
+
+# Add new model version
+aws s3 cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/3 "${BUCKET_URL_SLASH}libtorch_float32_float32_float32/3" --recursive --include "*"
+
+curl -X POST localhost:8000/v2/repository/models/libtorch_float32_float32_float32/load
+
+CURL_LOG=$(curl -X POST localhost:8000/v2/repository/index)
+if [ "$CURL_LOG" != "[{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"1\",\"state\":\"UNAVAILABLE\",\"reason\":\"unloaded\"},{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"3\",\"state\":\"READY\"}]" ]; then
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Clean up bucket contents and delete bucket
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 aws s3 rb "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET

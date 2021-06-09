@@ -23,8 +23,10 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "src/core/shared_library.h"
 
+#include "mutex"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 
@@ -38,17 +40,27 @@
 
 namespace nvidia { namespace inferenceserver {
 
-Status
-OpenLibraryHandle(const std::string& path, void** handle)
-{
-  LOG_VERBOSE(1) << "OpenLibraryHandle: " << path;
+static std::mutex mu_;
 
+Status
+SharedLibrary::Acquire(std::unique_ptr<SharedLibrary>* slib)
+{
+  mu_.lock();
+  slib->reset(new SharedLibrary());
+  return Status::Success;
+}
+
+SharedLibrary::~SharedLibrary()
+{
+  mu_.unlock();
+}
+
+Status
+SharedLibrary::SetLibraryDirectory(const std::string& path)
+{
 #ifdef _WIN32
-  // Need to put backend directory on the DLL path so that any
-  // dependencies of the backend shared library are found
-  const std::string backend_dir = DirName(path);
-  LOG_VERBOSE(1) << "OpenLibraryHandle: backend dir = " << backend_dir;
-  if (!SetDllDirectory(backend_dir.c_str())) {
+  LOG_VERBOSE(1) << "SetLibraryDirectory: path = " << path;
+  if (!SetDllDirectory(path.c_str())) {
     LPSTR err_buffer = nullptr;
     size_t size = FormatMessageA(
         FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
@@ -60,16 +72,55 @@ OpenLibraryHandle(const std::string& path, void** handle)
 
     return Status(
         Status::Code::NOT_FOUND,
-        "unable to set dll path for backend library: " + errstr);
+        "unable to set dll path " + path + ": " + errstr);
   }
+#endif
+
+  return Status::Success;
+}
+
+Status
+SharedLibrary::ResetLibraryDirectory()
+{
+#ifdef _WIN32
+  LOG_VERBOSE(1) << "ResetLibraryDirectory";
+  if (!SetDllDirectory(NULL)) {
+    LPSTR err_buffer = nullptr;
+    size_t size = FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPSTR)&err_buffer, 0, NULL);
+    std::string errstr(err_buffer, size);
+    LocalFree(err_buffer);
+
+    return Status(
+        Status::Code::NOT_FOUND, "unable to reset dll path: " + errstr);
+  }
+#endif
+
+  return Status::Success;
+}
+
+Status
+SharedLibrary::OpenLibraryHandle(const std::string& path, void** handle)
+{
+  LOG_VERBOSE(1) << "OpenLibraryHandle: " << path;
+
+#ifdef _WIN32
+  // Need to put backend directory on the DLL path so that any
+  // dependencies of the backend shared library are found
+  const std::string backend_dir = DirName(path);
+  RETURN_IF_ERROR(SetLibraryDirectory(backend_dir));
 
   // HMODULE is typedef of void*
   // https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types
+  LOG_VERBOSE(1) << "OpenLibraryHandle: path = " << path;
   *handle = LoadLibrary(path.c_str());
 
   // Remove the dll path added above... do this unconditionally before
   // check for failure in dll load.
-  SetDllDirectory(NULL);
+  RETURN_IF_ERROR(ResetLibraryDirectory());
 
   if (*handle == nullptr) {
     LPSTR err_buffer = nullptr;
@@ -92,11 +143,12 @@ OpenLibraryHandle(const std::string& path, void** handle)
         "unable to load backend library: " + std::string(dlerror()));
   }
 #endif
+
   return Status::Success;
 }
 
 Status
-CloseLibraryHandle(void* handle)
+SharedLibrary::CloseLibraryHandle(void* handle)
 {
   if (handle != nullptr) {
 #ifdef _WIN32
@@ -121,14 +173,16 @@ CloseLibraryHandle(void* handle)
     }
 #endif
   }
+
   return Status::Success;
 }
 
 Status
-GetEntrypoint(
+SharedLibrary::GetEntrypoint(
     void* handle, const std::string& name, const bool optional, void** befn)
 {
   *befn = nullptr;
+
 #ifdef _WIN32
   void* fn = GetProcAddress((HMODULE)handle, name.c_str());
   if ((fn == nullptr) && !optional) {
@@ -174,4 +228,5 @@ GetEntrypoint(
   *befn = fn;
   return Status::Success;
 }
+
 }}  // namespace nvidia::inferenceserver
