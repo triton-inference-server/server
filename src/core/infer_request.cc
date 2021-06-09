@@ -26,6 +26,7 @@
 
 #include "src/core/infer_request.h"
 
+#include <algorithm>
 #include <deque>
 #include "src/core/backend.h"
 #include "src/core/logging.h"
@@ -263,9 +264,9 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
       int64_t element_count = GetElementCount(input.second.Shape());
 
       size_t str_byte_size = static_cast<size_t>(4 * element_count);
+      max_str_byte_size = std::max(str_byte_size, max_str_byte_size);
       if (str_byte_size > max_byte_size) {
         max_byte_size = str_byte_size;
-        max_str_byte_size = max_byte_size;
         max_input_name = &(input.first);
       }
     } else {
@@ -288,8 +289,7 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   // the request. Only set the required number of bytes to zero.
   if (max_str_byte_size > 0) {
     std::fill(
-        data->MutableBuffer(),
-        data->MutableBuffer() + max_str_byte_size, 0);
+        data->MutableBuffer(), data->MutableBuffer() + max_str_byte_size, 0);
   }
 
   for (const auto& input : from.OriginalInputs()) {
