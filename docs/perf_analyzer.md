@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -400,3 +400,31 @@ can achieve by using shared memory in your application. Use
 By default perf_analyzer uses HTTP to communicate with Triton. The GRPC
 protocol can be specificed with the -i option. If GRPC is selected the
 --streaming option can also be specified for GRPC streaming.
+
+## Benchmarking Triton directly via C API
+
+Besides using HTTP or gRPC server endpoints to communicate with Triton, perf_analyzer also allows user to benchmark Triton directly using C API. HTTP/gRPC endpoints introduce an additional latency in the pipeline which may not be of interest to the user who is using Triton via C API within their application. Specifically, this feature is useful to benchmark bare minimum Triton without additional overheads from HTTP/gRPC communication.
+
+### Prerequisite
+Pull the Triton SDK and the Inference Server container images on target machine.
+Since you will need access to the Tritonserver install, it might be easier if 
+you copy the perf_analyzer binary to the Inference Server container.
+
+### Required Parameters
+Use the --help option to see complete list of supported command line arguments.
+By default perf_analyzer expects the Triton instance to already be running. You can configure the C API mode using the `--service-kind` option. In additon, you will need to point
+perf_analyzer to the Triton server library path using the `--triton-server-directory` option and the model 
+repository path using the `--model-repository` option.
+If the server is run successfully, there is a prompt: "server is alive!" and perf_analyzer will print the stats, as normal.
+An example run would look like:
+```
+perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api --triton-server-directory=/opt/tritonserver --model-repository=/workspace/qa/L0_perf_analyzer_capi/models
+```
+
+### Non-supported functionalities
+There are a few functionalities that are missing from the C API. They are:
+1. Async mode (`-a`)
+2. Using shared memory mode (`--shared-memory=cuda` or `--shared-memory=system`)
+3. Request rate range mode
+4. For additonal known non-working cases, please refer to 
+   [qa/L0_perf_analyzer_capi/test.sh](https://github.com/triton-inference-server/server/blob/main/qa/L0_perf_analyzer_capi/test.sh#L239-L277)

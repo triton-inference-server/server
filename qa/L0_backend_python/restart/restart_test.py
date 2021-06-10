@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,19 +24,43 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app: nv-triton-client
-  name: nv-triton-client
-  namespace: default
-spec:
-  containers:
-  - image: nvcr.io/nvidia/tritonserver:21.05-py3-sdk
-    imagePullPolicy: Always
-    name: nv-triton-client
-    securityContext:
-      privileged: true
-    command: [ "/bin/bash", "-c", "--" ]
-    args: [ "while true; do sleep 30; done;" ]
+import sys
+sys.path.append("../../common")
+
+import test_util as tu
+import tritonclient.http as httpclient
+from tritonclient.utils import *
+import numpy as np
+import unittest
+
+
+class RestartTest(tu.TestResultCollector):
+    def _infer_helper(self, model_name, shape, data_type):
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            input_data_0 = np.array(np.random.randn(*shape), dtype=data_type)
+            inputs = [
+                httpclient.InferInput("INPUT0", shape,
+                                      np_to_triton_dtype(input_data_0.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data_0)
+            result = client.infer(model_name, inputs)
+            output0 = result.as_numpy('OUTPUT0')
+            self.assertTrue(np.all(input_data_0 == output0))
+
+    def test_restart(self):
+        shape = [1, 16]
+        model_name = 'identity_fp32'
+        dtype = np.float32
+
+        # Since the stub process has been killed, the first request
+        # will return an exception.
+        with self.assertRaises(InferenceServerException):
+            self._infer_helper(model_name, shape, dtype)
+        
+        # The second request should work properly since the stub process should
+        # have come alive.
+        self._infer_helper(model_name, shape, dtype)
+
+
+if __name__ == '__main__':
+    unittest.main()
