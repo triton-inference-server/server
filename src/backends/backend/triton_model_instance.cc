@@ -223,7 +223,7 @@ TritonModelInstance::SetBackendThread(
     std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
         device_to_thread_map)
 {
-  if (device_blocking && kind == TRITONSERVER_INSTANCEGROUPKIND_GPU) {
+  if (device_blocking && (kind == TRITONSERVER_INSTANCEGROUPKIND_GPU)) {
     auto thread_it = device_to_thread_map->find(device_id);
     if (thread_it != device_to_thread_map->end()) {
       LOG_VERBOSE(1) << "Using already started backend thread for " << Name()
@@ -234,7 +234,7 @@ TritonModelInstance::SetBackendThread(
   if (triton_backend_thread_.get() == nullptr) {
     std::unique_ptr<TritonBackendThread> local_backend_thread;
     RETURN_IF_ERROR(TritonBackendThread::CreateBackendThread(
-        Name(), model_, 5 /* nice */, device_id, &local_backend_thread));
+        Name(), model_, 0 /* nice */, device_id, &local_backend_thread));
     triton_backend_thread_ = std::move(local_backend_thread);
     device_to_thread_map->insert({device_id, triton_backend_thread_});
   }
