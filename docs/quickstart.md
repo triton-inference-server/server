@@ -53,7 +53,7 @@ Where \<xx.yy\> is the version of Triton that you want to pull.
 ## Create A Model Repository
 
 The [model repository](model_repository.md) is the directory where you
-place the models that you want Triton to server. An example model
+place the models that you want Triton to serve. An example model
 repository is included in the
 [docs/examples/model_repository](examples/model_repository). Before
 using the repository, you must fetch any missing model definition
