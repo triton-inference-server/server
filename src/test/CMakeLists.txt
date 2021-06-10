@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -317,7 +317,6 @@ install(
 set(
   TRITON_REPO_AGENT_SRCS
   ../core/triton_repo_agent.cc
-  ../core/shared_library.cc
   ../core/status.cc
   ../core/filesystem.cc
   ../core/model_config_utils.cc
