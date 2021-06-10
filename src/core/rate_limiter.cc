@@ -148,8 +148,8 @@ RateLimiter::DequeuePayload(
       std::unique_lock<std::mutex> lk(payload_queue->mu_);
       payload_queue->cv_.wait(
           lk, [payload_queue]() { return !(payload_queue->queue_.empty()); });
-      *payload = payload_queue->queue_.back();
-      payload_queue->queue_.pop_back();
+      *payload = payload_queue->queue_.front();
+      payload_queue->queue_.pop_front();
     }
     // FIXME: Fix when instance specific queues are added.
     (*payload)->SetInstance(instance);
