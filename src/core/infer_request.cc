@@ -26,6 +26,7 @@
 
 #include "src/core/infer_request.h"
 
+#include <algorithm>
 #include <deque>
 #include "src/core/backend.h"
 #include "src/core/logging.h"
@@ -249,18 +250,30 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     new_input->SetData(data);
   }
 
-
   // Second pass
   size_t max_byte_size = 0;
+  size_t max_str_byte_size = 0;
   const std::string* max_input_name;
   for (const auto& input : from.OriginalInputs()) {
     // Skip shape tensors in this pass
     if (input.second.IsShapeTensor()) {
       continue;
     }
-    if (input.second.Data()->TotalByteSize() >= max_byte_size) {
-      max_byte_size = input.second.Data()->TotalByteSize();
-      max_input_name = &(input.first);
+
+    if (input.second.DType() == inference::DataType::TYPE_STRING) {
+      int64_t element_count = GetElementCount(input.second.Shape());
+
+      size_t str_byte_size = static_cast<size_t>(4 * element_count);
+      max_str_byte_size = std::max(str_byte_size, max_str_byte_size);
+      if (str_byte_size > max_byte_size) {
+        max_byte_size = str_byte_size;
+        max_input_name = &(input.first);
+      }
+    } else {
+      if (input.second.Data()->TotalByteSize() >= max_byte_size) {
+        max_byte_size = input.second.Data()->TotalByteSize();
+        max_input_name = &(input.first);
+      }
     }
   }
 
@@ -268,9 +281,17 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   // [DLIS-1268] should use one growable static buffer for all null requests
   auto mem_type = TRITONSERVER_MEMORY_CPU;
   int64_t mem_id = 0;
-  std::shared_ptr<Memory> data =
+  std::shared_ptr<MutableMemory> data =
       std::make_shared<AllocatedMemory>(max_byte_size, mem_type, mem_id);
   auto data_base = data->BufferAt(0, &max_byte_size, &mem_type, &mem_id);
+
+  // Zero initialization is only required when there is a TYPE_BYTES tensor in
+  // the request. Only set the required number of bytes to zero.
+  if (max_str_byte_size > 0) {
+    std::fill(
+        data->MutableBuffer(), data->MutableBuffer() + max_str_byte_size, 0);
+  }
+
   for (const auto& input : from.OriginalInputs()) {
     // skip shape tensors in this pass
     if (input.second.IsShapeTensor()) {
@@ -290,8 +311,14 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     if (input.first == *max_input_name) {
       new_input->SetData(data);
     } else {
-      new_input->AppendData(
-          data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
+      if (inference::DataType::TYPE_STRING == input.second.DType()) {
+        new_input->AppendData(
+            data_base, GetElementCount(input.second.Shape()) * 4, mem_type,
+            mem_id);
+      } else {
+        new_input->AppendData(
+            data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
+      }
     }
   }
 
