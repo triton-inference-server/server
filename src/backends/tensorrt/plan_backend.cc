@@ -413,6 +413,14 @@ PlanBackend::CreateExecutionContexts(
               mn_itr->second, dla_core_id, &eit->second.first,
               &eit->second.second));
 
+          if (dla_core_id != -1) {
+            LOG_VERBOSE(1) << "Created new runtime on NVDLA core "
+                           << dla_core_id << " for " + Name();
+          } else {
+            LOG_VERBOSE(1) << "Created new runtime on GPU device " << gpu_device
+                           << " for " + Name();
+          }
+
           // Validate whether the engine can be shared
           bool is_dynamic = false;
           for (int idx = 0; idx < eit->second.second->getNbBindings(); idx++) {
@@ -431,6 +439,14 @@ PlanBackend::CreateExecutionContexts(
             if (eit->second.second != nullptr) {
               eit->second.second->destroy();
               eit->second.second = nullptr;
+            }
+          } else {
+            if (dla_core_id != -1) {
+              LOG_VERBOSE(1) << "Created new engine on NVDLA core "
+                             << dla_core_id << " for " + Name();
+            } else {
+              LOG_VERBOSE(1) << "Created new engine on GPU device "
+                             << gpu_device << " for " + Name();
             }
           }
         }
@@ -674,12 +690,30 @@ PlanBackend::CreateExecutionContext(
 
   auto device_pair = std::make_pair(gpu_device, dla_core_id);
   auto eit = device_engines_.find(device_pair);
+  const bool new_runtime = (eit->second.first == nullptr);
   if (eit->second.second == nullptr) {
     context->is_shared_engine_ = false;
     RETURN_IF_ERROR(
         LoadPlan(model, dla_core_id, &eit->second.first, &context->engine_));
+    if (dla_core_id != -1) {
+      LOG_VERBOSE(1) << "Created new engine on NVDLA core " << dla_core_id
+                     << " for " + Name();
+    } else {
+      LOG_VERBOSE(1) << "Created new engine on GPU device " << gpu_device
+                     << " for " + Name();
+    }
   } else {
     context->engine_ = eit->second.second;
+  }
+
+  if (new_runtime) {
+    if (dla_core_id != -1) {
+      LOG_VERBOSE(1) << "Created new runtime on NVDLA core " << dla_core_id
+                     << " for " + Name();
+    } else {
+      LOG_VERBOSE(1) << "Created new runtime on GPU device " << gpu_device
+                     << " for " + Name();
+    }
   }
 
   RETURN_IF_ERROR(context->InitOptimizationProfiles(profile_names));
