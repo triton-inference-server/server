@@ -25,12 +25,51 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-SAGEMAKER_ARGS="--model-repository=/opt/ml"
+SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
+SAGEMAKER_ARGS="--model-repository=${SAGEMAKER_SINGLE_MODEL_REPO}"
 if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
 fi
 if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
 fi
+if [ -n "$SAGEMAKER_TRITON_BUFFER_MANAGER_THREAD_COUNT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --buffer-manager-thread-count=${SAGEMAKER_TRITON_BUFFER_MANAGER_THREAD_COUNT}"
+fi
+if [ -n "$SAGEMAKER_TRITON_THREAD_COUNT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-thread-count=${SAGEMAKER_TRITON_THREAD_COUNT}"
+fi
 
-tritonserver --allow-grpc=false --allow-http=false --allow-metrics=false $SAGEMAKER_ARGS
+if [ -f "${SAGEMAKER_SINGLE_MODEL_REPO}/config.pbtxt" ]; then
+    echo "ERROR: Incorrect directory structure."
+    echo "       Model directory needs to contain the top level folder"
+    exit 1
+fi
+
+if [ -n "$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
+    if [ -d "${SAGEMAKER_SINGLE_MODEL_REPO}/$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
+        SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
+    else
+        echo "ERROR: Directory with provided SAGEMAKER_TRITON_DEFAULT_MODEL_NAME ${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME} does not exist"
+        exit 1
+    fi
+else
+    MODEL_DIRS=(`find "${SAGEMAKER_SINGLE_MODEL_REPO}" -mindepth 1 -maxdepth 1 -type d -printf "%f\n"`)
+    case ${#MODEL_DIRS[@]} in
+        0) echo "ERROR: No model found in model repository";
+           exit 1
+           ;;
+        1) echo "WARNING: No SAGEMAKER_TRITON_DEFAULT_MODEL_NAME provided."
+           echo "         Starting with the only existing model directory ${MODEL_DIRS[0]}";
+           export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=${MODEL_DIRS[0]}
+           ;;
+        *) echo "ERROR: More than 1 model directory found in model repository."
+           echo "       Either provide a single directory or set SAGEMAKER_TRITON_DEFAULT_MODEL_NAME to run the ensemble backend."
+           echo "       Directories found in model repository: ${MODEL_DIRS[@]}";
+           exit 1
+           ;;
+    esac
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
+fi
+
+tritonserver --allow-grpc=false --allow-http=false --allow-metrics=false --model-control-mode=explicit $SAGEMAKER_ARGS
