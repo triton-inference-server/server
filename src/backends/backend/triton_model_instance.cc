@@ -198,6 +198,7 @@ TritonModelInstance::CreateInstance(
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
       model, name, index, kind, device_id, profile_names, passive));
 
+  model->Server()->GetRateLimiter()->InitializePayloadQueues(local_instance.get());
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
   local_instance->SetBackendThread(
@@ -530,7 +531,6 @@ TritonModelInstance::TritonBackendThread::AddModelInstance(
 {
   model_instances_.push_back(model_instance);
 
-  /*
   // Initialize the instance on the backend thread
   auto init_payload = model_->Server()->GetRateLimiter()->GetPayload(
       RateLimiter::Payload::Operation::INIT, model_instances_.back());
@@ -544,7 +544,6 @@ TritonModelInstance::TritonBackendThread::AddModelInstance(
   RETURN_IF_ERROR(model_->Server()->GetRateLimiter()->EnqueuePayload(
       model_, warmup_payload));
   RETURN_IF_ERROR(warmup_payload->Wait());
-  */
 
   return Status::Success;
 }

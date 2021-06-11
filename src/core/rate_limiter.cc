@@ -109,25 +109,48 @@ RateLimiter::UnregisterModel(const TritonModel* model)
   return Status::Success;
 }
 
+void
+RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
+{
+  if (payload_queues_.find(instance->Model()) == payload_queues_.end()) {
+    payload_queues_.emplace(instance->Model(), new PayloadQueue());
+  }
+  PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
+  if (payload_queue->specific_queues_.find(instance) ==
+      payload_queue->specific_queues_.end()) {
+    payload_queue->specific_queues_.emplace(
+        instance, new std::deque<std::shared_ptr<Payload>>());
+  }
+}
+
 Status
 RateLimiter::EnqueuePayload(
     const TritonModel* model, std::shared_ptr<Payload> payload)
 {
+  auto pinstance = payload->GetInstance();
   if (payload_queues_.find(model) == payload_queues_.end()) {
-    LOG_INFO << "Should not print this";
+    LOG_INFO << "Should not print this ";
   }
   PayloadQueue* payload_queue = payload_queues_[model].get();
   {
     std::lock_guard<std::mutex> lk(payload_queue->mu_);
     payload->SetState(Payload::State::REQUESTED);
-    payload_queue->queue_.push_back(payload);
+    if (pinstance == nullptr) {
+      payload_queue->queue_.push_back(payload);
+    } else {
+      payload_queue->specific_queues_[pinstance]->push_back(payload);
+    }
   }
 
   if (ignore_resources_and_priority_) {
     // Directly wake up any one of the waiting threadto process the payload.
     // TODO: If payload includes a specific TritonModelInstance
     payload->SetState(Payload::State::SCHEDULED);
-    payload_queue->cv_.notify_one();
+    if (pinstance == nullptr) {
+      payload_queue->cv_.notify_one();
+    } else {
+      payload_queue->cv_.notify_all();
+    }
   } else {
     // TODO: Implement the RateLimiting pipeline here that will schedule when
     // an ExecuteThread gets to run.
@@ -139,27 +162,30 @@ void
 RateLimiter::DequeuePayload(
     TritonModelInstance* instance, std::shared_ptr<Payload>* payload)
 {
-  if (payload_queues_.find(instance->Model()) == payload_queues_.end()) {
-    payload_queues_.emplace(instance->Model(), new PayloadQueue());
-  }
+  payload->reset();
   PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
   if (ignore_resources_and_priority_) {
+    // while(payload->get() == nullptr)
     {
       std::unique_lock<std::mutex> lk(payload_queue->mu_);
-      payload_queue->cv_.wait(
-          lk, [payload_queue]() { return !(payload_queue->queue_.empty()); });
-      *payload = payload_queue->queue_.front();
-      payload_queue->queue_.pop_front();
+      payload_queue->cv_.wait(lk, [instance, payload_queue]() {
+        return !(
+            (payload_queue->queue_.empty()) &&
+            (payload_queue->specific_queues_[instance]->empty()));
+      });
+      if (!payload_queue->specific_queues_[instance]->empty()) {
+        *payload = payload_queue->specific_queues_[instance]->front();
+        payload_queue->specific_queues_[instance]->pop_front();
+      } else {
+        *payload = payload_queue->queue_.front();
+        payload_queue->queue_.pop_front();
+      }
     }
-    // FIXME: Fix when instance specific queues are added.
-    (*payload)->SetInstance(instance);
-    /*
     if ((*payload)->GetInstance() == nullptr) {
       (*payload)->SetInstance(instance);
     } else if ((*payload)->GetInstance() != instance) {
       LOG_ERROR << "Got mismatching instance in the payload to execute";
     }
-    */
     (*payload)->SetState(Payload::State::EXECUTING);
   } else {
     // TODO: Wait till RateLimiting pipeline notifies the thread

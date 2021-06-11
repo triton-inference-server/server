@@ -95,10 +95,15 @@ class RateLimiter {
   /// \return Status object indicating success or failure.
   Status UnregisterModel(const TritonModel* model);
 
-  Status EnqueuePayload(const TritonModel* model, std::shared_ptr<Payload> payload);
+  void InitializePayloadQueues(const TritonModelInstance* instance);
 
-  // TODO: Fix it for device blocking as a thread can accept requests for multiple instance
-  void DequeuePayload(TritonModelInstance* instance, std::shared_ptr<Payload>* payload);
+  Status EnqueuePayload(
+      const TritonModel* model, std::shared_ptr<Payload> payload);
+
+  // TODO: Fix it for device blocking as a thread can accept requests for
+  // multiple instance
+  void DequeuePayload(
+      TritonModelInstance* instance, std::shared_ptr<Payload>* payload);
 
   /// Requests one of the available model instance. In future, when the
   /// conditions are met, the callback will be invoked and a pointer to
@@ -127,21 +132,27 @@ class RateLimiter {
   class Payload {
    public:
     enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
-    enum State { UNINITIALIZED = 0, REQUESTED = 1, SCHEDULED = 3, EXECUTING = 4 };
-  
+    enum State {
+      UNINITIALIZED = 0,
+      REQUESTED = 1,
+      SCHEDULED = 3,
+      EXECUTING = 4
+    };
+
     Payload();
     void Reset(
         const Operation op_type, TritonModelInstance* instance = nullptr);
-    Operation GetOpType(){return op_type_;}
+    Operation GetOpType() { return op_type_; }
     void AddRequest(std::unique_ptr<InferenceRequest> request);
     void SetInstance(TritonModelInstance* model_instance);
-    TritonModelInstance* GetInstance() { return instance_;}
+    TritonModelInstance* GetInstance() { return instance_; }
 
     State GetState() { return state_; }
     void SetState(State state);
     void Execute(bool* should_exit);
     Status Wait();
     void Release();
+
    private:
     Operation op_type_;
     std::vector<std::unique_ptr<InferenceRequest>> requests_;
@@ -152,7 +163,9 @@ class RateLimiter {
   };
 
 
-  std::shared_ptr<Payload> GetPayload(const Payload::Operation op_type, TritonModelInstance* instance = nullptr);
+  std::shared_ptr<Payload> GetPayload(
+      const Payload::Operation op_type,
+      TritonModelInstance* instance = nullptr);
   void PayloadRelease(std::shared_ptr<Payload>& payload);
 
   // Holds the state of the model instance.
@@ -310,8 +323,12 @@ class RateLimiter {
   const size_t max_payload_bucket_count_;
   std::vector<std::shared_ptr<Payload>> payload_bucket_;
 
-  struct PayloadQueue { 
+  struct PayloadQueue {
     std::deque<std::shared_ptr<Payload>> queue_;
+    std::map<
+        const TritonModelInstance*,
+        std::unique_ptr<std::deque<std::shared_ptr<Payload>>>>
+        specific_queues_;
     std::mutex mu_;
     std::condition_variable cv_;
   };
