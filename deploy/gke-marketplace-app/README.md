@@ -136,7 +136,7 @@ export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -
 
 Third, we will try sending request to server with provide client example.
 
-If User selected deploy Triton to accept HTTP request, please launch [Locust](https://docs.locust.io/en/stable/installation.html) with Ingress host and port to query Triton Inference Server. In this [example script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/locustfile_bert_large.py), we send request to Triton server which has loaded a BERT large TensorRT Engine with Sequence length of 128 into GCP bucket. We simulate 300 concurrent user as target and spawn user at rate of 10 users per second.
+If User selected deploy Triton to accept HTTP request, please launch [Locust](https://docs.locust.io/en/stable/installation.html) with Ingress host and port to query Triton Inference Server. In this [example script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/locustfile_bert_large.py), we send request to Triton server which has loaded a BERT large TensorRT Engine with Sequence length of 128 into GCP bucket. We simulate 1000 concurrent user as target and spawn user at rate of 50 users per second.
 ```
 locust -f locustfile_bert_large.py -H http://${INGRESS_HOST}:${INGRESS_PORT}
 ```
