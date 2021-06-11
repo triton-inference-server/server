@@ -85,8 +85,10 @@ class DynamicBatchScheduler : public Scheduler {
       const inference::ModelQueuePolicy& default_queue_policy,
       const uint32_t priority_levels,
       const ModelQueuePolicyMap& queue_policy_map);
+
   void BatcherThread(const int nice);
   uint64_t GetDynamicBatch();
+  void DelegateResponse(std::unique_ptr<InferenceRequest>& request);
   void FinalizeResponses();
 
   // FIXME: Use shared_ptr for model once InferenceBackend class is cleaned up.

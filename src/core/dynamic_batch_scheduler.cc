@@ -141,6 +141,9 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->QueueStartNs());
 
   if (!dynamic_batching_enabled_) {
+    if (preserve_ordering_) {
+      DelegateResponse(request);
+    }
     // If not using dynamic batching, directly enqueue the
     // request to model for execution
     auto payload = model_->Server()->GetRateLimiter()->GetPayload(
@@ -488,6 +491,24 @@ DynamicBatchScheduler::GetDynamicBatch()
   // (and at that time will then see the delay has been exceeded and will send
   // the batch).
   return wait_ns / 1000;
+}
+
+void
+DynamicBatchScheduler::DelegateResponse(
+    std::unique_ptr<InferenceRequest>& request)
+{
+  std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+  completion_queue_.emplace_back();
+  auto queue_slot = &completion_queue_.back();
+  request->SetResponseDelegator(
+      [this, queue_slot](
+          std::unique_ptr<InferenceResponse>&& response, const uint32_t flags) {
+        {
+          std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+          queue_slot->emplace_back(std::move(response), flags);
+        }
+        FinalizeResponses();
+      });
 }
 
 void
