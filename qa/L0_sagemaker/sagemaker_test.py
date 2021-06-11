@@ -64,7 +64,7 @@ class SageMakerTest(tu.TestResultCollector):
 
         self.expected_result_ = {
             "model_name":
-                "model",
+                "sm_model",
             "model_version":
                 "1",
             "outputs": [{
