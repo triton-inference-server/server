@@ -284,9 +284,8 @@ PlanBackend::CreateExecutionContexts(
 
   // Create a runtime/engine/context trifecta for each instance.
   //
-  // TODO [DLIS-14] This can be optimized by sharing a runtime (across
-  // all instances?), and sharing an engine across instances that have
-  // access to the same GPU.
+  // We share the engine (for models that don't have dynamic shapes) and
+  // runtime across instances that have access to the same GPU/NVDLA.
   for (const auto& group : Config().instance_group()) {
     // TensorRT requires that every context have a GPU.
     if ((group.kind() != inference::ModelInstanceGroup::KIND_GPU) ||
