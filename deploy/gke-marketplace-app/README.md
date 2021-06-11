@@ -60,7 +60,7 @@ Currently, GKE >= 1.18.7 only supported in GKE rapid channel, to find the latest
 export PROJECT_ID=<your GCP project ID>
 export ZONE=<GCP zone of your choice>
 export REGION=<GCP region of your choice>
-export DEPLOYMENT_NAME=<GKE cluster name, triton_gke for example>
+export DEPLOYMENT_NAME=<GKE cluster name, triton-gke for example>
 
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing,Istio \
@@ -68,7 +68,8 @@ gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --node-locations=${ZONE} \
 --subnetwork=default \
 --scopes cloud-platform \
---num-nodes 1
+--num-nodes 1 \
+--project ${PROJECT_ID}
 
 # add GPU node pools, user can modify number of node based on workloads
 gcloud container node-pools create accel \
