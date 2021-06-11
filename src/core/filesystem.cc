@@ -916,7 +916,7 @@ ASFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
 
   auto blobProperty = bc.get_blob_property(container, object_path);
-  if (!blobProperty.valid()) {
+  if (errno != 0) {
     return Status(
         Status::Code::INTERNAL,
         "Unable to get blob property for file at " + path);
