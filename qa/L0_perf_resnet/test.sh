@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -77,6 +77,11 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
         echo "name : \"tensorrt\" " >> ${CONFIG_PATH}
         if [ "${MODEL_NAME}" = "${TFTRT_MODEL_NAME}" ] ; then
             echo "parameters { key: \"precision_mode\" value: \"FP16\" }" >> ${CONFIG_PATH}
+        fi
+
+        if [ "${MODEL_NAME}" = "${ONNXTRT_MODEL_NAME}" ] ; then
+            echo "parameters { key: \"precision_mode\" value: \"FP16\" }" >> ${CONFIG_PATH}
+            echo "parameters { key: \"max_workspace_size_bytes\" value: \"1073741824\" }" >> ${CONFIG_PATH}
         fi
     fi
     echo "} ]" >> ${CONFIG_PATH}
