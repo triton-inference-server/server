@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,6 +53,7 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 EXPECTED_NUM_TESTS="3"
+PERF_CLIENT=../clients/perf_client
 timestamp=$(date +%s)
 CONTAINER_NAME="tritonqatest${timestamp}"
 
@@ -71,9 +72,11 @@ source ../common/util.sh
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 RET=0
 
+BACKENDS="graphdef savedmodel onnx libtorch plan"
+
 # Construct model repository
 mkdir -p models
-for FW in graphdef savedmodel onnx libtorch plan; do
+for FW in $BACKENDS; do
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
 done
 
@@ -83,7 +86,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_
 rm -rf models/*nobatch*
 
 KIND="KIND_GPU"
-for FW in graphdef savedmodel onnx libtorch plan; do
+for FW in $BACKENDS; do
     for MC in `ls models/${FW}*/config.pbtxt`; do
         echo "instance_group [ { kind: ${KIND} }]" >> $MC
     done
@@ -127,7 +130,7 @@ for ENV_VAR in "shared_key"; do
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
         RET=1
-        break 
+        break
     fi
 
     set +e
@@ -151,7 +154,40 @@ for ENV_VAR in "shared_key"; do
     kill $SERVER_PID
     wait $SERVER_PID
 done
- 
+
+# Add test for explicit model control
+SERVER_LOG=$SERVER_LOG_BASE.explicit.log
+CLIENT_LOG=$CLIENT_LOG_BASE.explicit.log
+SERVER_ARGS="--model-repository=${AS_URL}/models --model-control-mode=explicit"  
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+    break
+fi
+
+set +e
+for BACKEND in $BACKENDS; do
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
+    if [ "$code" != "200" ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
+done
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 # Clean up container
 az storage container delete --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
 
