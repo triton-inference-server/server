@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -253,7 +253,11 @@ restart Triton.
 
 ```
 optimization { execution_accelerators {
-  gpu_execution_accelerator : [ { name : "tensorrt" } ]
+  gpu_execution_accelerator : [ {
+    name : "tensorrt"
+    parameters { key: "precision_mode" value: "FP16" }
+    parameters { key: "max_workspace_size_bytes" value: "1073741824" }
+    }]
 }}
 ```
 
