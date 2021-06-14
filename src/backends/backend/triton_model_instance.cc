@@ -36,6 +36,7 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/nvtx.h"
+#include "src/core/server.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -141,17 +142,6 @@ TritonModelInstance::CreateInstances(
     TritonModel* model, const inference::ModelConfig& model_config,
     const bool device_blocking)
 {
-  bool use_backend_threads = false;
-  size_t count = 0;
-  for (const auto& group : model_config.instance_group()) {
-    if (!group.passive()) {
-      count += group.count();
-      if (count > 1) {
-        use_backend_threads = true;
-        break;
-      }
-    }
-  }
   // This structure is used to allocate TritonBackendThread to instances on same
   // device for device blocking execution policy.
   std::map<uint32_t, std::shared_ptr<TritonBackendThread>> device_to_thread_map;
@@ -170,19 +160,19 @@ TritonModelInstance::CreateInstances(
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_CPU,
             0 /* device_id */, profile_names, passive, group.rate_limiter(),
-            use_backend_threads, device_blocking, &device_to_thread_map));
+            device_blocking, &device_to_thread_map));
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           RETURN_IF_ERROR(CreateInstance(
               model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_GPU,
               device_id, profile_names, passive, group.rate_limiter(),
-              use_backend_threads, device_blocking, &device_to_thread_map));
+              device_blocking, &device_to_thread_map));
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         RETURN_IF_ERROR(CreateInstance(
             model, instance_name, c, TRITONSERVER_INSTANCEGROUPKIND_MODEL,
             0 /* device_id */, profile_names, passive, group.rate_limiter(),
-            use_backend_threads, device_blocking, &device_to_thread_map));
+            device_blocking, &device_to_thread_map));
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -201,20 +191,18 @@ TritonModelInstance::CreateInstance(
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
     const std::vector<std::string>& profile_names, const bool passive,
     const inference::ModelRateLimiter& rate_limiter_config,
-    const bool use_backend_threads, const bool device_blocking,
+    const bool device_blocking,
     std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
         device_to_thread_map)
 {
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
       model, name, index, kind, device_id, profile_names, passive));
 
+  model->Server()->GetRateLimiter()->InitializePayloadQueues(local_instance.get());
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
-
-  if (use_backend_threads) {
-    local_instance->SetBackendThread(
-        device_id, device_blocking, device_to_thread_map);
-  }
+  local_instance->SetBackendThread(
+      kind, device_id, device_blocking, device_to_thread_map);
   RETURN_IF_ERROR(local_instance->GenerateWarmupData());
 
   // Instance initialization is optional...
@@ -231,11 +219,12 @@ TritonModelInstance::CreateInstance(
 
 Status
 TritonModelInstance::SetBackendThread(
-    const int32_t device_id, const bool device_blocking,
+    const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
+    const bool device_blocking,
     std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
         device_to_thread_map)
 {
-  if (device_blocking) {
+  if (device_blocking && (kind == TRITONSERVER_INSTANCEGROUPKIND_GPU)) {
     auto thread_it = device_to_thread_map->find(device_id);
     if (thread_it != device_to_thread_map->end()) {
       LOG_VERBOSE(1) << "Using already started backend thread for " << Name()
@@ -246,10 +235,13 @@ TritonModelInstance::SetBackendThread(
   if (triton_backend_thread_.get() == nullptr) {
     std::unique_ptr<TritonBackendThread> local_backend_thread;
     RETURN_IF_ERROR(TritonBackendThread::CreateBackendThread(
-        Name(), 5 /* nice */, device_id, &local_backend_thread));
+        Name(), model_, 0 /* nice */, device_id, &local_backend_thread));
     triton_backend_thread_ = std::move(local_backend_thread);
     device_to_thread_map->insert({device_id, triton_backend_thread_});
   }
+
+  triton_backend_thread_->AddModelInstance(this);
+
   return Status::Success;
 }
 
@@ -432,53 +424,8 @@ TritonModelInstance::GenerateWarmupData()
   return Status::Success;
 }
 
-Status
-TritonModelInstance::Initialize()
-{
-  Status status;
-  if (triton_backend_thread_.get() != nullptr) {
-    auto payload = std::make_shared<TritonBackendThread::Payload>(
-        TritonBackendThread::Operation::INIT, this);
-    triton_backend_thread_->Enqueue(payload);
-    status = payload->Wait();
-  } else {
-    status = InitializeFunc();
-  }
-  return status;
-}
-
-Status
-TritonModelInstance::WarmUp()
-{
-  Status status;
-  if (triton_backend_thread_.get() != nullptr) {
-    auto payload = std::make_shared<TritonBackendThread::Payload>(
-        TritonBackendThread::Operation::WARM_UP, this);
-    triton_backend_thread_->Enqueue(payload);
-    status = payload->Wait();
-  } else {
-    status = WarmUpFunc();
-  }
-  return status;
-}
-
 void
 TritonModelInstance::Schedule(
-    std::vector<std::unique_ptr<InferenceRequest>>&& requests,
-    const std::function<void()>& OnCompletion)
-{
-  if (triton_backend_thread_.get() != nullptr) {
-    auto payload = std::make_shared<TritonBackendThread::Payload>(
-        TritonBackendThread::Operation::INFER_RUN, this, std::move(requests),
-        OnCompletion);
-    triton_backend_thread_->Enqueue(payload);
-  } else {
-    ScheduleFunc(std::move(requests), OnCompletion);
-  }
-}
-
-void
-TritonModelInstance::ScheduleFunc(
     std::vector<std::unique_ptr<InferenceRequest>>&& requests,
     const std::function<void()>& OnCompletion)
 {
@@ -497,7 +444,7 @@ TritonModelInstance::ScheduleFunc(
 }
 
 Status
-TritonModelInstance::WarmUpFunc()
+TritonModelInstance::WarmUp()
 {
   for (auto& sample : warmup_samples_) {
     LOG_VERBOSE(1) << "model '" << sample.requests_.back()->ModelName()
@@ -560,11 +507,12 @@ TritonModelInstance::Execute(
 
 Status
 TritonModelInstance::TritonBackendThread::CreateBackendThread(
-    const std::string name, const int nice, const int32_t device_id,
+    const std::string name, TritonModel* model, const int nice,
+    const int32_t device_id,
     std::unique_ptr<TritonBackendThread>* triton_backend_thread)
 {
   TritonBackendThread* raw_triton_backend_thread =
-      new TritonBackendThread(name);
+      new TritonBackendThread(name, model);
   std::unique_ptr<TritonBackendThread> runner(raw_triton_backend_thread);
 
   runner->backend_thread_ =
@@ -577,73 +525,47 @@ TritonModelInstance::TritonBackendThread::CreateBackendThread(
   return Status::Success;
 }
 
+Status
+TritonModelInstance::TritonBackendThread::AddModelInstance(
+    TritonModelInstance* model_instance)
+{
+  model_instances_.push_back(model_instance);
+
+  // Initialize the instance on the backend thread
+  auto init_payload = model_->Server()->GetRateLimiter()->GetPayload(
+      RateLimiter::Payload::Operation::INIT, model_instances_.back());
+  RETURN_IF_ERROR(
+      model_->Server()->GetRateLimiter()->EnqueuePayload(model_, init_payload));
+  RETURN_IF_ERROR(init_payload->Wait());
+
+  // Warm-up the instance on the backend thread
+  auto warmup_payload = model_->Server()->GetRateLimiter()->GetPayload(
+      RateLimiter::Payload::Operation::WARM_UP, model_instances_.back());
+  RETURN_IF_ERROR(model_->Server()->GetRateLimiter()->EnqueuePayload(
+      model_, warmup_payload));
+  RETURN_IF_ERROR(warmup_payload->Wait());
+
+  return Status::Success;
+}
+
 TritonModelInstance::TritonBackendThread::TritonBackendThread(
-    const std::string& name)
-    : name_(name)
+    const std::string& name, TritonModel* model)
+    : name_(name), model_(model)
 {
 }
 
 TritonModelInstance::TritonBackendThread::~TritonBackendThread()
 {
   // Signal the backend thread to exit and then wait for it..
-  auto exit_payload = std::make_shared<Payload>(Operation::EXIT, nullptr);
-  queue_.Put(exit_payload);
+  // FIXME: Currently, the logic to use specific instance for the execution
+  // is not available within rate limiter. The destruction will fix with
+  // accurate thread control within rate limiter.
+  auto exit_payload = model_->Server()->GetRateLimiter()->GetPayload(
+      RateLimiter::Payload::Operation::EXIT, model_instances_.back());
+  model_->Server()->GetRateLimiter()->EnqueuePayload(model_, exit_payload);
   if (backend_thread_.joinable()) {
     backend_thread_.join();
   }
-}
-
-TritonModelInstance::TritonBackendThread::Payload::Payload(
-    const Operation op_type, TritonModelInstance* instance)
-    : op_type_(op_type), instance_(instance),
-      requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCompletion_([]() {})
-{
-}
-
-TritonModelInstance::TritonBackendThread::Payload::Payload(
-    const Operation op_type, TritonModelInstance* instance,
-    std::vector<std::unique_ptr<InferenceRequest>>&& requests,
-    std::function<void()> OnCompletion)
-    : op_type_(op_type), instance_(instance), requests_(std::move(requests)),
-      OnCompletion_(OnCompletion)
-{
-}
-
-Status
-TritonModelInstance::TritonBackendThread::Payload::Wait()
-{
-  return status_.get_future().get();
-}
-
-void
-TritonModelInstance::TritonBackendThread::Payload::Execute(bool* should_exit)
-{
-  *should_exit = false;
-
-  Status status;
-  switch (op_type_) {
-    case Operation::INFER_RUN:
-      instance_->ScheduleFunc(std::move(requests_), OnCompletion_);
-      break;
-    case Operation::INIT:
-      status = instance_->InitializeFunc();
-      break;
-    case Operation::WARM_UP:
-      status = instance_->WarmUpFunc();
-      break;
-    case Operation::EXIT:
-      *should_exit = true;
-  }
-
-  status_.set_value(status);
-}
-
-void
-TritonModelInstance::TritonBackendThread::Enqueue(
-    std::shared_ptr<Payload> payload)
-{
-  queue_.Put(payload);
 }
 
 void
@@ -666,11 +588,16 @@ TritonModelInstance::TritonBackendThread::BackendThread(
 
   bool should_exit = false;
   while (!should_exit) {
-    auto payload = queue_.Get();
+    std::shared_ptr<RateLimiter::Payload> payload;
+    // TODO: For device blocking there can be multiple model instances being
+    // managed by this thread.
+    model_->Server()->GetRateLimiter()->DequeuePayload(
+        model_instances_[0], &payload);
     NVTX_RANGE(nvtx_, "BackendThread " + name_);
     payload->Execute(&should_exit);
+    // Release the payload to the RateLimiter
+    model_->Server()->GetRateLimiter()->PayloadRelease(payload);
   }
-
   LOG_VERBOSE(1) << "Stopping backend thread for " << name_ << "...";
 }
 

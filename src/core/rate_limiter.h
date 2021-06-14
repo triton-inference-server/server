@@ -45,6 +45,8 @@ class RateLimiter {
 
  public:
   class ModelInstance;
+  class Payload;
+
 
   using StandardReleaseFunc = std::function<void(ModelInstance*)>;
   using StandardScheduleFunc = std::function<void(ModelInstance*)>;
@@ -93,6 +95,16 @@ class RateLimiter {
   /// \return Status object indicating success or failure.
   Status UnregisterModel(const TritonModel* model);
 
+  void InitializePayloadQueues(const TritonModelInstance* instance);
+
+  Status EnqueuePayload(
+      const TritonModel* model, std::shared_ptr<Payload> payload);
+
+  // TODO: Fix it for device blocking as a thread can accept requests for
+  // multiple instance
+  void DequeuePayload(
+      TritonModelInstance* instance, std::shared_ptr<Payload>* payload);
+
   /// Requests one of the available model instance. In future, when the
   /// conditions are met, the callback will be invoked and a pointer to
   /// allocated RateLimiter::ModelInstance object will be exposed as a
@@ -113,12 +125,48 @@ class RateLimiter {
       const StandardScheduleFunc& OnSchedule, const TritonModel* model,
       TritonModelInstance* instance = nullptr);
 
-  /// Gets the number of instance available to run inferences.
-  size_t AvailableInstanceCount(const TritonModel* model);
-
   /// Whether or not to ignore the resource configurations and priority settings
   /// for the rate limiter.
   bool IgnoreResourcesAndPriority() { return ignore_resources_and_priority_; }
+
+  class Payload {
+   public:
+    enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
+    enum State {
+      UNINITIALIZED = 0,
+      REQUESTED = 1,
+      SCHEDULED = 3,
+      EXECUTING = 4
+    };
+
+    Payload();
+    void Reset(
+        const Operation op_type, TritonModelInstance* instance = nullptr);
+    Operation GetOpType() { return op_type_; }
+    void AddRequest(std::unique_ptr<InferenceRequest> request);
+    void SetInstance(TritonModelInstance* model_instance);
+    TritonModelInstance* GetInstance() { return instance_; }
+
+    State GetState() { return state_; }
+    void SetState(State state);
+    void Execute(bool* should_exit);
+    Status Wait();
+    void Release();
+
+   private:
+    Operation op_type_;
+    std::vector<std::unique_ptr<InferenceRequest>> requests_;
+    std::function<void()> OnCompletion_;
+    TritonModelInstance* instance_;
+    State state_;
+    std::unique_ptr<std::promise<Status>> status_;
+  };
+
+
+  std::shared_ptr<Payload> GetPayload(
+      const Payload::Operation op_type,
+      TritonModelInstance* instance = nullptr);
+  void PayloadRelease(std::shared_ptr<Payload>& payload);
 
   // Holds the state of the model instance.
   class ModelInstance {
@@ -126,8 +174,6 @@ class RateLimiter {
     friend class RateLimiter;
     friend class ResourceManager;
     enum State { AVAILABLE, STAGED, ALLOCATED, REMOVED };
-
-    void ScheduleNow(std::vector<std::unique_ptr<InferenceRequest>>&& requests);
 
     /// Should be called when the request on the model instance is
     /// complete. This function releases the resources allocated to
@@ -202,7 +248,6 @@ class RateLimiter {
         const StandardScheduleFunc& OnSchedule,
         TritonModelInstance* triton_model_instance);
     void AddAvailableInstance(ModelInstance* instance);
-    size_t AvailableInstanceCount();
     void StageInstanceIfAvailable();
     void AllocateInstanceIfAvailable();
     void AddSpecificRequestQueue();
@@ -269,6 +314,25 @@ class RateLimiter {
 
   // Manager to keep track of the resource allocations
   std::unique_ptr<ResourceManager> resource_manager_;
+
+  // Mutex to serialize Payload allocation
+  std::mutex alloc_mu_;
+
+  // Keep some number of Payload objects for reuse to avoid the overhead
+  // of creating a Payload for every new request.
+  const size_t max_payload_bucket_count_;
+  std::vector<std::shared_ptr<Payload>> payload_bucket_;
+
+  struct PayloadQueue {
+    std::deque<std::shared_ptr<Payload>> queue_;
+    std::map<
+        const TritonModelInstance*,
+        std::unique_ptr<std::deque<std::shared_ptr<Payload>>>>
+        specific_queues_;
+    std::mutex mu_;
+    std::condition_variable cv_;
+  };
+  std::map<const TritonModel*, std::unique_ptr<PayloadQueue>> payload_queues_;
 };
 
 }}  // namespace nvidia::inferenceserver

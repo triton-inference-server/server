@@ -59,7 +59,7 @@ class TritonModelInstance {
   bool IsPassive() const { return passive_; }
   const std::vector<std::string>& Profiles() const { return profile_names_; }
 
-  Status Initialize();
+  Status Initialize() { return Status::Success; }
   Status WarmUp();
   void Schedule(
       std::vector<std::unique_ptr<InferenceRequest>>&& requests,
@@ -83,60 +83,38 @@ class TritonModelInstance {
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
       const std::vector<std::string>& profile_names, const bool passive,
       const inference::ModelRateLimiter& rate_limiter_config,
-      const bool use_backend_threads, const bool device_blocking,
+      const bool device_blocking,
       std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
           device_to_thread_map);
   Status SetBackendThread(
-      const int32_t device_id, const bool device_blocking,
+      const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
+      const bool device_blocking,
       std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
           device_to_thread_map);
   Status GenerateWarmupData();
 
-  Status InitializeFunc() { return Status::Success; }
-  Status WarmUpFunc();
-  void ScheduleFunc(
-      std::vector<std::unique_ptr<InferenceRequest>>&& requests,
-      const std::function<void()>& OnCompletion);
   void Execute(std::vector<TRITONBACKEND_Request*>& triton_requests);
 
   class TritonBackendThread {
    public:
     static Status CreateBackendThread(
-        const std::string name, const int nice, const int32_t device_id,
+        const std::string name, TritonModel* model, const int nice,
+        const int32_t device_id,
         std::unique_ptr<TritonBackendThread>* triton_backend_thread);
+    Status AddModelInstance(TritonModelInstance* model_instance);
     ~TritonBackendThread();
 
-    enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
-    class Payload {
-     public:
-      Payload(const Operation op_type, TritonModelInstance* instance);
-      Payload(
-          const Operation op_type, TritonModelInstance* instance,
-          std::vector<std::unique_ptr<InferenceRequest>>&& requests,
-          std::function<void()> OnCompletion);
-
-      void Execute(bool* should_exit);
-      Status Wait();
-
-     private:
-      Operation op_type_;
-      TritonModelInstance* instance_;
-      std::vector<std::unique_ptr<InferenceRequest>> requests_;
-      std::function<void()> OnCompletion_;
-      std::promise<Status> status_;
-    };
-
-    void Enqueue(std::shared_ptr<Payload> payload);
-
    private:
-    TritonBackendThread(const std::string& name);
+    TritonBackendThread(const std::string& name, TritonModel* model);
     void BackendThread(const int nice, const int32_t device_id);
 
     std::string name_;
 
+    TritonModel* model_;
+    std::vector<TritonModelInstance*> model_instances_;
+
     std::thread backend_thread_;
     std::atomic<bool> backend_thread_exit_;
-    triton::common::SyncQueue<std::shared_ptr<Payload>> queue_;
   };
   std::shared_ptr<TritonBackendThread> triton_backend_thread_;
 
