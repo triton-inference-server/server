@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="7"
+EXPECTED_NUM_TESTS="8"
 SERVER=/opt/tritonserver/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
@@ -77,6 +77,10 @@ cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
+
+mkdir -p models/non_contiguous/1/
+cp ../python_models/non_contiguous/model.py ./models/non_contiguous/1/
+cp ../python_models/non_contiguous/config.pbtxt ./models/non_contiguous/config.pbtxt
 
 # Unicode Characters
 mkdir -p models/string/1/
