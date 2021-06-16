@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -284,9 +284,8 @@ PlanBackend::CreateExecutionContexts(
 
   // Create a runtime/engine/context trifecta for each instance.
   //
-  // TODO [DLIS-14] This can be optimized by sharing a runtime (across
-  // all instances?), and sharing an engine across instances that have
-  // access to the same GPU.
+  // We share the engine (for models that don't have dynamic shapes) and
+  // runtime across instances that have access to the same GPU/NVDLA.
   for (const auto& group : Config().instance_group()) {
     // TensorRT requires that every context have a GPU.
     if ((group.kind() != inference::ModelInstanceGroup::KIND_GPU) ||
@@ -414,6 +413,9 @@ PlanBackend::CreateExecutionContexts(
               mn_itr->second, dla_core_id, &eit->second.first,
               &eit->second.second));
 
+          LOG_VERBOSE(1) << "Created new runtime on GPU device " << gpu_device
+                         << ", NVDLA core " << dla_core_id << " for " + Name();
+
           // Validate whether the engine can be shared
           bool is_dynamic = false;
           for (int idx = 0; idx < eit->second.second->getNbBindings(); idx++) {
@@ -433,6 +435,10 @@ PlanBackend::CreateExecutionContexts(
               eit->second.second->destroy();
               eit->second.second = nullptr;
             }
+          } else {
+            LOG_VERBOSE(1) << "Created new engine on GPU device " << gpu_device
+                           << ", NVDLA core " << dla_core_id
+                           << " for " + Name();
           }
         }
 
@@ -675,12 +681,20 @@ PlanBackend::CreateExecutionContext(
 
   auto device_pair = std::make_pair(gpu_device, dla_core_id);
   auto eit = device_engines_.find(device_pair);
+  const bool new_runtime = (eit->second.first == nullptr);
   if (eit->second.second == nullptr) {
     context->is_shared_engine_ = false;
     RETURN_IF_ERROR(
         LoadPlan(model, dla_core_id, &eit->second.first, &context->engine_));
+    LOG_VERBOSE(1) << "Created new engine on GPU device " << gpu_device
+                   << ", NVDLA core " << dla_core_id << " for " + Name();
   } else {
     context->engine_ = eit->second.second;
+  }
+
+  if (new_runtime) {
+    LOG_VERBOSE(1) << "Created new runtime on GPU device " << gpu_device
+                   << ", NVDLA core " << dla_core_id << " for " + Name();
   }
 
   RETURN_IF_ERROR(context->InitOptimizationProfiles(profile_names));
