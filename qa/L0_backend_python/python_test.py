@@ -257,7 +257,7 @@ class PythonTest(tu.TestResultCollector):
                 self.assertTrue(output0 is not None)
                 self.assertTrue(output0[0] == input_data.astype(np.bytes_))
 
-    def test_contiguous(self):
+    def test_non_contiguous(self):
         model_name = 'non_contiguous'
         shape = [2, 64, 84, 32, 55]
         new_shape = [64, 2, 32, 55, 84]
