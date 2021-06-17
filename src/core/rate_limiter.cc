@@ -135,6 +135,20 @@ RateLimiter::IdleInstanceCount(const TritonModel* model)
   return count;
 }
 
+
+bool
+RateLimiter::PayloadSlotAvailable(const TritonModel* model)
+{
+  bool result;
+  PayloadQueue* payload_queue = payload_queues_[model].get();
+  {
+    std::lock_guard<std::mutex> lk(payload_queue->mu_);
+    result = payload_queue->queue_.size() <
+             2 * payload_queue->specific_queues_.size();
+  }
+  return result;
+}
+
 Status
 RateLimiter::EnqueuePayload(
     const TritonModel* model, std::shared_ptr<Payload> payload)
@@ -194,6 +208,7 @@ RateLimiter::DequeuePayload(
         payload_queue->queue_.pop_front();
       }
     }
+    (*payload)->Callback();
     if ((*payload)->GetInstance() == nullptr) {
       (*payload)->SetInstance(instance);
     } else if ((*payload)->GetInstance() != instance) {
@@ -241,7 +256,7 @@ RateLimiter::RequestModelInstance(
 RateLimiter::Payload::Payload()
     : op_type_(Operation::INFER_RUN),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCompletion_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED)
+      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED)
 {
   exec_mu_.reset(new std::mutex());
 }
@@ -252,10 +267,10 @@ RateLimiter::Payload::Reset(
 {
   op_type_ = op_type;
   requests_.clear();
-  OnCompletion_ = []() {};
+  OnCallback_ = []() {};
   instance_ = instance;
   state_ = State::UNINITIALIZED;
-  OnCompletion_ = []() {};
+  OnCallback_ = []() {};
   status_.reset(new std::promise<Status>());
 }
 
@@ -264,10 +279,10 @@ RateLimiter::Payload::Release()
 {
   op_type_ = Operation::INFER_RUN;
   requests_.clear();
-  OnCompletion_ = []() {};
+  OnCallback_ = []() {};
   instance_ = nullptr;
   state_ = State::RELEASED;
-  OnCompletion_ = []() {};
+  OnCallback_ = []() {};
 }
 
 void
@@ -283,6 +298,12 @@ RateLimiter::Payload::AddRequest(std::unique_ptr<InferenceRequest> request)
   if (state_ == State::UNINITIALIZED) {
     state_ = State::READY;
   }
+}
+
+void
+RateLimiter::Payload::SetCallback(std::function<void()> OnCallback)
+{
+  OnCallback_ = OnCallback;
 }
 
 void
@@ -304,6 +325,12 @@ RateLimiter::Payload::Wait()
 }
 
 void
+RateLimiter::Payload::Callback()
+{
+  OnCallback_();
+}
+
+void
 RateLimiter::Payload::Execute(bool* should_exit)
 {
   *should_exit = false;
@@ -315,7 +342,7 @@ RateLimiter::Payload::Execute(bool* should_exit)
   Status status;
   switch (op_type_) {
     case Operation::INFER_RUN:
-      instance_->Schedule(std::move(requests_), OnCompletion_);
+      instance_->Schedule(std::move(requests_), OnCallback_);
       break;
     case Operation::INIT:
       status = instance_->Initialize();

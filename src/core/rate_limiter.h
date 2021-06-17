@@ -97,6 +97,7 @@ class RateLimiter {
 
   void InitializePayloadQueues(const TritonModelInstance* instance);
   size_t IdleInstanceCount(const TritonModel* model);
+  bool PayloadSlotAvailable(const TritonModel* model);
 
   Status EnqueuePayload(
       const TritonModel* model, std::shared_ptr<Payload> payload);
@@ -150,6 +151,8 @@ class RateLimiter {
     size_t BatchSize() { return requests_.size(); }
     void ReserveRequests(size_t size);
     void AddRequest(std::unique_ptr<InferenceRequest> request);
+    void SetCallback(std::function<void()> OnCallback);
+    void Callback();
     void SetInstance(TritonModelInstance* model_instance);
     TritonModelInstance* GetInstance() { return instance_; }
 
@@ -162,7 +165,7 @@ class RateLimiter {
    private:
     Operation op_type_;
     std::vector<std::unique_ptr<InferenceRequest>> requests_;
-    std::function<void()> OnCompletion_;
+    std::function<void()> OnCallback_;
     TritonModelInstance* instance_;
     State state_;
     std::unique_ptr<std::promise<Status>> status_;

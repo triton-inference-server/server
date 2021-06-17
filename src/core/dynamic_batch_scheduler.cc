@@ -168,7 +168,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       // this request. We do the actual wake outside of the lock to avoid having
       // the woken thread immediately block on the lock
       wake_batcher =
-          model_->Server()->GetRateLimiter()->IdleInstanceCount(model_) > 0;
+          model_->Server()->GetRateLimiter()->PayloadSlotAvailable(model_);
 
       // We may wake up runner less often if we don't enforce equal shape within
       // a batch, otherwise must always wake up runner to check it
@@ -223,7 +223,6 @@ DynamicBatchScheduler::BatcherThread(const int nice)
   }
 
   NewPayload();
-  const uint64_t default_wait_microseconds = 5 * 1000;
 
   while (!scheduler_thread_exit_.load()) {
     NVTX_RANGE(nvtx_, "DynamicBatcher " + model_->Name());
@@ -244,6 +243,11 @@ DynamicBatchScheduler::BatcherThread(const int nice)
     // Hold the lock for as short a time as possible.
     {
       std::unique_lock<std::mutex> lock(mu_);
+      auto requests_available = [this]() {
+        return (!queue_.Empty()) || scheduler_thread_exit_.load();
+      };
+      cv_.wait(lock, requests_available);
+
       if (delay_cnt > 0) {
         // Debugging/testing... wait until queue contains 'delay_cnt'
         // items...
@@ -255,56 +259,59 @@ DynamicBatchScheduler::BatcherThread(const int nice)
                        << " until " << delay_cnt
                        << " queued requests, current total = " << queue_.Size();
       } else if (queue_.Empty()) {
-        wait_microseconds = default_wait_microseconds;
+        wait_microseconds = 0;
       } else {
+        if (payload_saturated_) {
+          continue;
+        }
+        auto wait_for_slots = [this]() {
+          return model_->Server()->GetRateLimiter()->PayloadSlotAvailable(
+              model_);
+        };
+        slot_cv_.wait(lock, wait_for_slots);
         {
-          std::unique_lock<std::mutex> exec_lock(
+          std::lock_guard<std::mutex> exec_lock(
               *(curr_payload_->GetExecMutex()));
 
-          if ((curr_payload_->GetState() ==
-               RateLimiter::Payload::State::UNINITIALIZED)) {
-            auto payload_state = curr_payload_->GetState();
-            if (payload_saturated_ ||
-                payload_state == RateLimiter::Payload::State::EXECUTING ||
-                payload_state == RateLimiter::Payload::State::RELEASED) {
-              continue;
-            }
+          auto payload_state = curr_payload_->GetState();
+          if (payload_state == RateLimiter::Payload::State::EXECUTING ||
+              payload_state == RateLimiter::Payload::State::RELEASED) {
+            continue;
+          }
 
-            // Use dynamic batching to get request(s) to execute.
-            wait_microseconds = GetDynamicBatch();
+          // Use dynamic batching to get request(s) to execute.
+          wait_microseconds = GetDynamicBatch();
 
-            // Get requests that are rejected from searching dynamic batch.
-            queue_.ReleaseRejectedRequests(&rejected_requests);
+          // Get requests that are rejected from searching dynamic batch.
+          queue_.ReleaseRejectedRequests(&rejected_requests);
 
-            // Extract batch only if there is pending batch
-            auto pending_batch_queue_cnt = queue_.PendingBatchCount();
-            if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
-              curr_payload_->ReserveRequests(pending_batch_queue_cnt);
-              for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
-                std::unique_ptr<InferenceRequest> request;
-                auto status = queue_.Dequeue(&request);
-                if (status.IsOk()) {
-                  if (preserve_ordering_) {
-                    DelegateResponse(request);
-                  }
-                  curr_payload_->AddRequest(std::move(request));
-                } else {
-                  // The queue is empty which conflicts with pending batch
-                  // count. Send the current batch if any and reset related
-                  // variables.
-                  LOG_ERROR
-                      << "Failed to retrieve request from scheduler queue: "
-                      << status.Message();
-                  queue_.ResetCursor();
-                  queued_batch_size_ = 0;
-                  pending_batch_size_ = 0;
-                  break;
+          // Extract batch only if there is pending batch
+          auto pending_batch_queue_cnt = queue_.PendingBatchCount();
+          if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
+            curr_payload_->ReserveRequests(pending_batch_queue_cnt);
+            for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
+              std::unique_ptr<InferenceRequest> request;
+              auto status = queue_.Dequeue(&request);
+              if (status.IsOk()) {
+                if (preserve_ordering_) {
+                  DelegateResponse(request);
                 }
+                curr_payload_->AddRequest(std::move(request));
+              } else {
+                // The queue is empty which conflicts with pending batch
+                // count. Send the current batch if any and reset related
+                // variables.
+                LOG_ERROR << "Failed to retrieve request from scheduler queue: "
+                          << status.Message();
+                queue_.ResetCursor();
+                queued_batch_size_ = 0;
+                pending_batch_size_ = 0;
+                break;
               }
-
-              queued_batch_size_ -= pending_batch_size_;
-              pending_batch_size_ = 0;
             }
+
+            queued_batch_size_ -= pending_batch_size_;
+            pending_batch_size_ = 0;
           }
         }
       }
@@ -318,6 +325,8 @@ DynamicBatchScheduler::BatcherThread(const int nice)
     }
 
     if (curr_payload_->GetState() == RateLimiter::Payload::State::READY) {
+      auto callback = [this]() { slot_cv_.notify_one(); };
+      curr_payload_->SetCallback(callback);
       model_->Server()->GetRateLimiter()->EnqueuePayload(model_, curr_payload_);
       // curr_payload_->SetInstance(model_->Instances()[0].get());
       // bool should_exit;
@@ -440,10 +449,13 @@ DynamicBatchScheduler::GetDynamicBatch()
 
   // If the delay has been exceeded, or if the current batch can't grow
   // any larger then just immediately execute whatever is pending.
-  if (send_now || delay_is_exceeded ||
-      ((payload_batch_size + pending_batch_size_) >=
-       max_preferred_batch_size_)) {
+  if (send_now || ((payload_batch_size + pending_batch_size_) >=
+                   max_preferred_batch_size_)) {
     payload_saturated_ = true;
+    return 0;
+  }
+
+  if (delay_is_exceeded) {
     return 0;
   }
 
@@ -460,7 +472,6 @@ DynamicBatchScheduler::GetDynamicBatch()
     next_preferred_batch_size_ -= payload_batch_size;
   }
 
-  /*
   uint64_t wait_ns = pending_batch_delay_ns_ - delay_ns;
   // Note that taking request timeout into consideration allows us to reset
   // pending batch as soon as it is invalidated. But the cost is that in edge
@@ -484,8 +495,6 @@ DynamicBatchScheduler::GetDynamicBatch()
   // (and at that time will then see the delay has been exceeded and will send
   // the batch).
   return wait_ns / 1000;
-  */
-  return 1;
 }
 
 void
