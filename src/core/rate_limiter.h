@@ -96,6 +96,7 @@ class RateLimiter {
   Status UnregisterModel(const TritonModel* model);
 
   void InitializePayloadQueues(const TritonModelInstance* instance);
+  size_t IdleInstanceCount(const TritonModel* model);
 
   Status EnqueuePayload(
       const TritonModel* model, std::shared_ptr<Payload> payload);
@@ -134,15 +135,20 @@ class RateLimiter {
     enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
     enum State {
       UNINITIALIZED = 0,
-      REQUESTED = 1,
+      READY = 1,
+      REQUESTED = 2,
       SCHEDULED = 3,
-      EXECUTING = 4
+      EXECUTING = 4,
+      RELEASED = 5
     };
 
     Payload();
     void Reset(
         const Operation op_type, TritonModelInstance* instance = nullptr);
     Operation GetOpType() { return op_type_; }
+    std::mutex* GetExecMutex() { return exec_mu_.get(); }
+    size_t BatchSize() { return requests_.size(); }
+    void ReserveRequests(size_t size);
     void AddRequest(std::unique_ptr<InferenceRequest> request);
     void SetInstance(TritonModelInstance* model_instance);
     TritonModelInstance* GetInstance() { return instance_; }
@@ -160,6 +166,7 @@ class RateLimiter {
     TritonModelInstance* instance_;
     State state_;
     std::unique_ptr<std::promise<Status>> status_;
+    std::unique_ptr<std::mutex> exec_mu_;
   };
 
 
@@ -324,11 +331,13 @@ class RateLimiter {
   std::vector<std::shared_ptr<Payload>> payload_bucket_;
 
   struct PayloadQueue {
+    PayloadQueue() : idle_count_(0) {}
     std::deque<std::shared_ptr<Payload>> queue_;
     std::map<
         const TritonModelInstance*,
         std::unique_ptr<std::deque<std::shared_ptr<Payload>>>>
         specific_queues_;
+    std::atomic<size_t> idle_count_;
     std::mutex mu_;
     std::condition_variable cv_;
   };

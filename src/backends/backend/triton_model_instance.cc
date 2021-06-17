@@ -198,7 +198,8 @@ TritonModelInstance::CreateInstance(
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
       model, name, index, kind, device_id, profile_names, passive));
 
-  model->Server()->GetRateLimiter()->InitializePayloadQueues(local_instance.get());
+  model->Server()->GetRateLimiter()->InitializePayloadQueues(
+      local_instance.get());
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
   local_instance->SetBackendThread(
