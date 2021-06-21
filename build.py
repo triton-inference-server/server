@@ -78,11 +78,7 @@ EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-<<<<<<< HEAD
-    'openvino', 'tflite'
-=======
-    'openvino', 'fil'
->>>>>>> ccbf72663e3e09978d02663bc2fa612c565bf942
+    'openvino', 'fil', 'tflite'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
