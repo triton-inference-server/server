@@ -123,19 +123,6 @@ RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
   }
 }
 
-size_t
-RateLimiter::IdleInstanceCount(const TritonModel* model)
-{
-  size_t count;
-  PayloadQueue* payload_queue = payload_queues_[model].get();
-  {
-    std::lock_guard<std::mutex> lk(payload_queue->mu_);
-    count = payload_queue->idle_count_;
-  }
-  return count;
-}
-
-
 bool
 RateLimiter::PayloadSlotAvailable(const TritonModel* model)
 {
@@ -193,13 +180,11 @@ RateLimiter::DequeuePayload(
   if (ignore_resources_and_priority_) {
     {
       std::unique_lock<std::mutex> lk(payload_queue->mu_);
-      payload_queue->idle_count_++;
       payload_queue->cv_.wait(lk, [instance, payload_queue]() {
         return !(
             (payload_queue->queue_.empty()) &&
             (payload_queue->specific_queues_[instance]->empty()));
       });
-      payload_queue->idle_count_--;
       if (!payload_queue->specific_queues_[instance]->empty()) {
         *payload = payload_queue->specific_queues_[instance]->front();
         payload_queue->specific_queues_[instance]->pop_front();
@@ -295,9 +280,6 @@ void
 RateLimiter::Payload::AddRequest(std::unique_ptr<InferenceRequest> request)
 {
   requests_.push_back(std::move(request));
-  if (state_ == State::UNINITIALIZED) {
-    state_ = State::READY;
-  }
 }
 
 void

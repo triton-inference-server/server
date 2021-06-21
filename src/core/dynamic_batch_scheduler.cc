@@ -222,6 +222,9 @@ DynamicBatchScheduler::BatcherThread(const int nice)
     }
   }
 
+  auto wait_for_slots = [this]() {
+    return model_->Server()->GetRateLimiter()->PayloadSlotAvailable(model_);
+  };
   NewPayload();
 
   while (!scheduler_thread_exit_.load()) {
@@ -264,10 +267,6 @@ DynamicBatchScheduler::BatcherThread(const int nice)
         if (payload_saturated_) {
           continue;
         }
-        auto wait_for_slots = [this]() {
-          return model_->Server()->GetRateLimiter()->PayloadSlotAvailable(
-              model_);
-        };
         slot_cv_.wait(lock, wait_for_slots);
         {
           std::lock_guard<std::mutex> exec_lock(
@@ -308,6 +307,11 @@ DynamicBatchScheduler::BatcherThread(const int nice)
                 pending_batch_size_ = 0;
                 break;
               }
+            }
+
+            if (curr_payload_->GetState() ==
+                RateLimiter::Payload::State::UNINITIALIZED) {
+              curr_payload_->SetState(RateLimiter::Payload::State::READY);
             }
 
             queued_batch_size_ -= pending_batch_size_;

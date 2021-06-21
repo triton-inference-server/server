@@ -96,7 +96,6 @@ class RateLimiter {
   Status UnregisterModel(const TritonModel* model);
 
   void InitializePayloadQueues(const TritonModelInstance* instance);
-  size_t IdleInstanceCount(const TritonModel* model);
   bool PayloadSlotAvailable(const TritonModel* model);
 
   Status EnqueuePayload(
@@ -334,13 +333,11 @@ class RateLimiter {
   std::vector<std::shared_ptr<Payload>> payload_bucket_;
 
   struct PayloadQueue {
-    PayloadQueue() : idle_count_(0) {}
     std::deque<std::shared_ptr<Payload>> queue_;
     std::map<
         const TritonModelInstance*,
         std::unique_ptr<std::deque<std::shared_ptr<Payload>>>>
         specific_queues_;
-    std::atomic<size_t> idle_count_;
     std::mutex mu_;
     std::condition_variable cv_;
   };
