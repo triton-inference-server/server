@@ -43,14 +43,14 @@ PERF_ANALYZER=../clients/perf_analyzer
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
 
-INT_JSONDATAFILE=`pwd`/json_input_data_files/int_data.json
-INT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/int_data_diff_shape.json
-FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/float_data_with_shape.json
-STRING_JSONDATAFILE=`pwd`/json_input_data_files/string_data.json
-STRING_WITHSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/string_data_with_shape.json
-SEQ_JSONDATAFILE=`pwd`/json_input_data_files/seq_data.json
-SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
-IMAGE_JSONDATAFILE=`pwd`/json_input_data_files/image_data.json
+INT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/int_data.json
+INT_DIFFSHAPE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/int_data_diff_shape.json
+FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/float_data_with_shape.json
+STRING_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/string_data.json
+STRING_WITHSHAPE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/string_data_with_shape.json
+SEQ_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_data.json
+SHAPETENSORADTAFILE=`pwd`/../common/perf_analyzer_input_data_json/shape_tensor_data.json
+IMAGE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/image_data.json
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${DATADIR}"
@@ -115,6 +115,20 @@ fi
 # be done before other testing as the server might emit this warning
 # in certain test cases that are expected to raise this warning
 SERVER_ERROR_STRING="The previous sequence did not end before this sequence start"
+
+set +e
+$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes in string inputs\n***"
+  RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "input INPUT0 contains dynamic shape, provide shapes to send along with the request" | wc -l) -ne 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed: \n***"
+  RET=1
+fi
+set -e
 
 # Testing with ensemble and sequential model variants
 $PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \

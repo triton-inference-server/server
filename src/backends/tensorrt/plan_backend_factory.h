@@ -42,6 +42,7 @@ class PlanBackendFactory {
 
   static Status Create(
       const std::shared_ptr<BackendConfig>& backend_config,
+      const HostPolicyCmdlineConfigMap& host_policy_map,
       std::unique_ptr<PlanBackendFactory>* factory);
 
   Status CreateBackend(
@@ -54,12 +55,15 @@ class PlanBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackendFactory);
 
-  PlanBackendFactory(const std::shared_ptr<Config>& backend_config)
-      : backend_config_(backend_config)
+  PlanBackendFactory(
+      const std::shared_ptr<Config>& backend_config,
+      const HostPolicyCmdlineConfigMap& host_policy_map)
+      : backend_config_(backend_config), host_policy_map_(host_policy_map)
   {
   }
 
   const std::shared_ptr<Config> backend_config_;
+  const HostPolicyCmdlineConfigMap host_policy_map_;
 };
 
 }}  // namespace nvidia::inferenceserver

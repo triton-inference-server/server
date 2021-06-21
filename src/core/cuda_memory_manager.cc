@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -61,10 +61,12 @@ std::mutex CudaMemoryManager::instance_mu_;
 
 CudaMemoryManager::~CudaMemoryManager()
 {
-  auto status = cnmemFinalize();
-  if (status != CNMEM_STATUS_SUCCESS) {
-    LOG_ERROR << "Failed to finalize CUDA memory manager: [" << status << "] "
-              << cnmemGetErrorString(status);
+  if (has_allocation_) {
+    auto status = cnmemFinalize();
+    if (status != CNMEM_STATUS_SUCCESS) {
+      LOG_ERROR << "Failed to finalize CUDA memory manager: [" << status << "] "
+                << cnmemGetErrorString(status);
+    }
   }
 }
 
@@ -109,7 +111,10 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
       RETURN_IF_CNMEM_ERROR(
           cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW),
           std::string("Failed to finalize CUDA memory manager"));
+    } else {
+      LOG_INFO << "CUDA memory pool disabled";
     }
+
     // Use to finalize CNMeM properly when out of scope
     instance_.reset(new CudaMemoryManager(!devices.empty()));
   } else {

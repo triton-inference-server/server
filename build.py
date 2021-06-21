@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,8 +54,9 @@ from distutils.dir_util import copy_tree
 #     (triton container version,
 #      upstream container version,
 #      ORT version,
-#      ORT openvino version (use None to disable openvino in ORT),
-#      OpenVINO version
+#      ORT OpenVINO version (use None to disable OpenVINO in ORT),
+#      Standalone OpenVINO version (non-windows),
+#      Standalone OpenVINO version (windows)
 #     )
 #
 # Currently the OpenVINO versions used in ORT and standalone must
@@ -64,14 +65,24 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.11.0dev': ('21.06dev', '21.05', '1.7.1', '2021.2.200', '2021.2.200')
+    '2.11.0dev':
+      ('21.06dev',   # triton container
+       '21.05',      # upstream container
+       '1.8.0',      # ORT
+       '2021.2.200', # ORT OpenVINO
+       '2021.2.200', # Standalone OpenVINO (non-windows)
+       '2021.2')     # Standalone OpenVINO (windows)
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
+<<<<<<< HEAD
     'openvino', 'tflite'
+=======
+    'openvino', 'fil'
+>>>>>>> ccbf72663e3e09978d02663bc2fa612c565bf942
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -338,6 +349,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = pytorch_cmake_args(images)
     elif be == 'tflite':
         args = tflite_cmake_args()
+    elif be == 'fil':
+        args = fil_cmake_args(images)
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
@@ -414,15 +427,20 @@ def onnxruntime_cmake_args(images, library_paths):
 
 
 def openvino_cmake_args():
-    cargs = [
-        '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][4]),
-    ]
-
     if target_platform() == 'windows':
+        cargs = [
+            '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][5]),
+        ]
+
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
     else:
+        cargs = [
+            '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
+                TRITON_VERSION_MAP[FLAGS.version][4]),
+        ]
+
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
         else:
@@ -477,6 +495,30 @@ def tflite_cmake_args():
     ]
 
 
+def install_dcgm_libraries():
+    return '''
+# Install DCGM
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
+&& mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
+&& apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
+&& add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+RUN apt-get update \
+&& apt-get install -y datacenter-gpu-manager
+'''
+
+
+def fil_cmake_args(images):
+    cargs = ['-DTRITON_FIL_DOCKER_BUILD=ON']
+    if 'base' in images:
+        cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    else:
+        cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][1]))
+
+    return cargs
+
+
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
     df = '''
 ARG TRITON_VERSION={}
@@ -503,7 +545,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
-# python3-pip is needed by python backend
+# python3-pip and libarchive-dev is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
 # scons needed for tflite backend
 RUN apt-get update && \
@@ -529,14 +571,13 @@ RUN apt-get update && \
             scons \
             wget \
             zlib1g-dev \
+            libarchive-dev \
             pkg-config \
             uuid-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# grpcio-tools grpcio-channelz are needed by python backend
 RUN pip3 install --upgrade pip && \
-    pip3 install --upgrade wheel setuptools docker && \
-    pip3 install grpcio-tools grpcio-channelz
+    pip3 install --upgrade wheel setuptools docker
 
 # Install cmake 3.19 from source for ubuntu
 RUN build=1 && \
@@ -565,11 +606,16 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
+        df += install_dcgm_libraries()
+        df += '''
+RUN patch -ruN -d /usr/include/ < /workspace/build/libdcgm/dcgm_api_export.patch
+'''
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 '''
+
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -660,17 +706,18 @@ RUN apt-get update && \
          libre2-5 && \
     rm -rf /var/lib/apt/lists/*
 '''
+    df += install_dcgm_libraries()
     # Add dependencies needed for python backend
     if 'python' in backends:
         df += '''
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-         python3 \
+         python3 libarchive-dev \
          python3-pip && \
     pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade grpcio-tools grpcio-channelz numpy && \
+    pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 '''
     df += '''
@@ -730,7 +777,8 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
         dfile.write(df)
 
 
-def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends, repoagents):
+def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends,
+                              repoagents):
     df = '''
 #
 # Multistage build.
@@ -782,7 +830,7 @@ COPY --from=tritonserver_build /tmp/tritonbuild/install/backends backends
             break
 
     df += '''
-ENTRYPOINT cmd.exe &&
+ENTRYPOINT []
 ENV NVIDIA_BUILD_ID {}
 LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}
@@ -972,15 +1020,16 @@ def container_build(images, backends, repoagents, endpoints):
         # the install artifacts from the tritonserver_build
         # container.
         if target_platform() == 'windows':
-            create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents)
+            create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile',
+                                      dockerfileargmap, backends, repoagents)
         else:
-            create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                              backends, repoagents, endpoints)
+            create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile',
+                                    dockerfileargmap, backends, repoagents,
+                                    endpoints)
         p = subprocess.Popen([
-                'docker', 'build', '-f',
-                os.path.join(FLAGS.build_dir, 'Dockerfile')
-            ] + ['-t', 'tritonserver', '.'])
+            'docker', 'build', '-f',
+            os.path.join(FLAGS.build_dir, 'Dockerfile')
+        ] + ['-t', 'tritonserver', '.'])
         p.wait()
         fail_if(p.returncode != 0, 'docker build tritonserver failed')
 

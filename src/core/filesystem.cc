@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -552,6 +552,7 @@ GCSFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
+    *mtime_ns = 0;
     return Status::Success;
   }
 
@@ -915,10 +916,10 @@ ASFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   RETURN_IF_ERROR(ParsePath(path, &container, &object_path));
 
   auto blobProperty = bc.get_blob_property(container, object_path);
-  if (!blobProperty.valid()) {
+  if (errno != 0) {
     return Status(
-        Status::Code::INTERNAL,
-        "Unable to get blob property for file at " + path);
+        Status::Code::INTERNAL, "Unable to get blob property for file at " +
+                                    path + ", errno:" + strerror(errno));
   }
 
   auto time =
@@ -944,6 +945,12 @@ ASFileSystem::ListDirectory(
   // Append a slash to make it easier to list contents
   std::string full_dir = AppendSlash(dir_path);
   auto blobs = bc.list_blobs_segmented(container, "/", "", full_dir);
+  if (errno != 0) {
+    return Status(
+        Status::Code::INTERNAL, "Failed to get contents of directory " +
+                                    dir_path + ", errno:" + strerror(errno));
+  }
+
   for (auto&& item : blobs.blobs) {
     std::string name = item.name;
     int item_start = name.find(full_dir) + full_dir.size();
@@ -1013,6 +1020,11 @@ ASFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 
   as::blob_client_wrapper bc(client_);
   auto blobs = bc.list_blobs_segmented(container, "/", "", object_path, 1);
+  if (errno != 0) {
+    return Status(
+        Status::Code::INTERNAL, "Failed to check if directory at " + path +
+                                    ", errno:" + strerror(errno));
+  }
   *is_dir = blobs.blobs.size() > 0;
 
   return Status::Success;
@@ -1029,7 +1041,8 @@ ASFileSystem::ReadTextFile(const std::string& path, std::string* contents)
   bc.download_blob_to_stream(container, object_path, 0, 0, out_stream);
   if (errno != 0) {
     return Status(
-        Status::Code::INTERNAL, "Failed to fetch file stream at " + path);
+        Status::Code::INTERNAL, "Failed to fetch file stream at " + path +
+                                    ", errno:" + strerror(errno));
   }
   *contents = out_stream.str();
 
@@ -1047,7 +1060,8 @@ ASFileSystem::FileExists(const std::string& path, bool* exists)
   auto blobs = bc.list_blobs_segmented(container, "/", "", object, 1);
   if (errno != 0) {
     return Status(
-        Status::Code::INTERNAL, "Failed to check if file exists at " + path);
+        Status::Code::INTERNAL, "Failed to check if file exists at " + path +
+                                    ", errno:" + strerror(errno));
   }
   if (blobs.blobs.size() > 0) {
     *exists = true;
@@ -1456,6 +1470,7 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   bool is_dir;
   RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
+    *mtime_ns = 0;
     return Status::Success;
   }
 
@@ -1470,7 +1485,8 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   // If request succeeds, copy over the modification time
   auto head_object_outcome = client_.HeadObject(head_request);
   if (head_object_outcome.IsSuccess()) {
-    *mtime_ns = head_object_outcome.GetResult().GetLastModified().Millis();
+    *mtime_ns = head_object_outcome.GetResult().GetLastModified().Millis() *
+                NANOS_PER_MILLIS;
   } else {
     return Status(
         Status::Code::INTERNAL,

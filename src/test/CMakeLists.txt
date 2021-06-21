@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -69,6 +69,7 @@ set(
   ../core/pinned_memory_manager.cc
   ../core/status.cc
   ../core/cuda_utils.cc
+  ../core/numa_utils.cc
 )
 
 set(
@@ -76,6 +77,7 @@ set(
   ../core/pinned_memory_manager.h
   ../core/status.h
   ../core/cuda_utils.h
+  ../core/numa_utils.h
 )
 
 #
@@ -141,6 +143,7 @@ target_link_libraries(
   PRIVATE protobuf::libprotobuf
   PRIVATE -L${CNMEM_PATH}/lib
   PRIVATE -lcnmem
+  PRIVATE numa
 )
 install(
   TARGETS memory_test
@@ -189,6 +192,7 @@ target_link_libraries(
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
+  PRIVATE numa
 )
 install(
   TARGETS pinned_memory_manager_test
@@ -373,6 +377,7 @@ target_link_libraries(
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
+  PRIVATE -ldl
 )
 
 # Remove all TRITON_ENABLE_XXX definitions for this test

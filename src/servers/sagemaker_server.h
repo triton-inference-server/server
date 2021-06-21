@@ -53,6 +53,13 @@ class SagemakerAPIServer : public HTTPAPIServer {
   };
 
  private:
+  static std::string GetEnvironmentVariableOrDefault(
+      const std::string& variable_name, const std::string& default_value)
+  {
+    const char* value = getenv(variable_name.c_str());
+    return value ? value : default_value;
+  }
+
   explicit SagemakerAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
@@ -60,7 +67,11 @@ class SagemakerAPIServer : public HTTPAPIServer {
       const int32_t port, const int thread_cnt)
       : HTTPAPIServer(server, trace_manager, shm_manager, port, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
-        ping_mode_("ready"), model_name_("model"), model_version_str_("")
+        ping_mode_("ready"),
+        model_name_(SagemakerAPIServer::GetEnvironmentVariableOrDefault(
+            "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
+            "unspecified_SAGEMAKER_TRITON_DEFAULT_MODEL_NAME")),
+        model_version_str_("")
   {
   }
 
@@ -72,7 +83,9 @@ class SagemakerAPIServer : public HTTPAPIServer {
     return std::unique_ptr<InferRequestClass>(new SagemakeInferRequestClass(
         server_.get(), req, GetResponseCompressionType(req)));
   }
-  size_t GetInferenceHeaderLength(evhtp_request_t* req) override;
+  TRITONSERVER_Error* GetInferenceHeaderLength(
+      evhtp_request_t* req, int32_t content_length,
+      size_t* header_length) override;
 
   // Currently the compresssion schema hasn't been defined,
   // assume identity compression type is used for both request and response

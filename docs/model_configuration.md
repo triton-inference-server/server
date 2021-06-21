@@ -221,7 +221,7 @@ configuration file.
 When using --strict-model-config=false you can see the model
 configuration that was generated for a model by using the [model
 configuration
-endpoint](https://github.com/triton-inference-server/server/blob/master/docs/protocol/extension_model_configuration.md). The
+endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md). The
 easiest way to do this is to use a utility like *curl*:
 
 ```bash
@@ -481,6 +481,22 @@ on the CPU.
     {
       count: 2
       kind: KIND_CPU
+    }
+  ]
+```
+
+The instance group setting is associated with a host policy. The following
+configuration will associate all instances created by the instance group setting
+with host policy "policy_0". By default the host policy will be set according to
+the device kind of the instance, for instance, KIND_CPU is "cpu", KIND_MODEL is
+"model", and KIND_GPU is "gpu_\<gpu_id\>".
+
+```
+  instance_group [
+    {
+      count: 2
+      kind: KIND_CPU
+      host_policy: "policy_0"
     }
   ]
 ```

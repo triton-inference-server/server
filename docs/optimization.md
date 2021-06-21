@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -253,13 +253,19 @@ restart Triton.
 
 ```
 optimization { execution_accelerators {
-  gpu_execution_accelerator : [ { name : "tensorrt" } ]
+  gpu_execution_accelerator : [ {
+    name : "tensorrt"
+    parameters { key: "precision_mode" value: "FP16" }
+    parameters { key: "max_workspace_size_bytes" value: "1073741824" }
+    }]
 }}
 ```
 
 As Triton starts you should check the console output and wait until
 Triton prints the "Staring endpoints" message. ONNX model loading can
-be significantly slower when TensorRT optimization is enabled.  Now
+be significantly slower when TensorRT optimization is enabled. In 
+production you can use [model warmup](model_configuration.md#model-warmup)
+to avoid this model startup/optimization slowdown. Now
 run perf_analyzer using the same options as for the baseline.
 
 ```
@@ -363,3 +369,42 @@ section of the model configuration protobuf.
 You can follow the steps described above for TensorRT to see how this
 automatic FP16 optimization benefits a model by using perf_analyzer
 to evaluate the model's performance with and without the optimization.
+
+## NUMA Optimization
+
+Many modern CPUs are composed of multiple cores, memories and interconnects that
+expose different performance characteristics depending on how threads and
+data are allocated [cite https://www.kernel.org/doc/html/latest/vm/numa.html].
+Triton allows you to set host policies that describe this NUMA configuration for
+your system and then assign model instances to different host policies
+to exploit these NUMA properties.
+
+### Host Policy
+
+Triton allows you to specify host policy that associates with a policy name on
+startup. A host policy will be applied to a model instance if the instance is
+specified with the same policy name by using host policy field in [instance
+groups](model_configuration.md#instance-groups). Note that if not specified,
+the host policy field will be set to default name based on the instance
+property.
+
+To specify a host policy, you can specify the following in command line option:
+```
+--host-policy=<policy_name>,<setting>=<value>
+```
+
+Currently, the supported settings are the following:
+
+* *numa-node*: The NUMA node id that the host policy will be bound to, the
+  host policy restricts memory allocation to the node specified.
+
+* *cpu-cores*: The CPU cores to be run on, the instance with this host policy
+  set will be running on one of those CPU cores.
+
+Assuming that the system is configured to bind GPU 0 with NUMA node 0 which has
+CPU cores from 0 to 15, the following shows setting the numa-node and cpu-cores
+policies for "gpu_0":
+
+```
+$ tritonserver --host-policy=gpu_0,numa-node=0 --host-policy=gpu_0,cpu-cores=0-15 ...
+```

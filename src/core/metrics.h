@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -36,7 +36,7 @@
 #include "prometheus/text_serializer.h"
 
 #ifdef TRITON_ENABLE_METRICS_GPU
-#include <nvml.h>
+#include <dcgm_agent.h>
 #endif  // TRITON_ENABLE_METRICS_GPU
 
 namespace nvidia { namespace inferenceserver {
@@ -129,7 +129,7 @@ class Metrics {
   Metrics();
   virtual ~Metrics();
   static Metrics* GetSingleton();
-  bool InitializeNvmlMetrics();
+  bool InitializeDcgmMetrics();
 
   std::shared_ptr<prometheus::Registry> registry_;
   std::unique_ptr<prometheus::Serializer> serializer_;
@@ -161,9 +161,11 @@ class Metrics {
   std::vector<prometheus::Gauge*> gpu_power_limit_;
   std::vector<prometheus::Counter*> gpu_energy_consumption_;
 
-  std::vector<nvmlDevice_t> nvml_device_;
-  std::unique_ptr<std::thread> nvml_thread_;
-  std::atomic<bool> nvml_thread_exit_;
+  dcgmHandle_t dcgm_handle_;
+  std::unique_ptr<std::thread> dcgm_thread_;
+  std::atomic<bool> dcgm_thread_exit_;
+  dcgmGpuGrp_t groupId_;
+  bool standalone_ = false;
 #endif  // TRITON_ENABLE_METRICS_GPU
 
   bool metrics_enabled_;

@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -65,10 +65,19 @@ TritonBackend::Create(
   RETURN_IF_ERROR(local_backend->LoadBackendLibrary());
 
   // Backend initialization is optional... The TRITONBACKEND_Backend
-  // object is this TritonBackend object.
+  // object is this TritonBackend object. We must set set shared
+  // library path to point to the backend directory in case the
+  // backend library attempts to load additional shared libaries.
   if (local_backend->backend_init_fn_ != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(local_backend->backend_init_fn_(
-        reinterpret_cast<TRITONBACKEND_Backend*>(local_backend.get())));
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
+    RETURN_IF_ERROR(slib->SetLibraryDirectory(local_backend->dir_));
+
+    TRITONSERVER_Error* err = local_backend->backend_init_fn_(
+        reinterpret_cast<TRITONBACKEND_Backend*>(local_backend.get()));
+
+    RETURN_IF_ERROR(slib->ResetLibraryDirectory());
+    RETURN_IF_TRITONSERVER_ERROR(err);
   }
 
   *backend = std::move(local_backend);
@@ -138,8 +147,6 @@ TritonBackend::ClearHandles()
 Status
 TritonBackend::LoadBackendLibrary()
 {
-  RETURN_IF_ERROR(OpenLibraryHandle(libpath_, &dlhandle_));
-
   TritonBackendInitFn_t bifn;
   TritonBackendFiniFn_t bffn;
   TritonModelInitFn_t mifn;
@@ -148,34 +155,41 @@ TritonBackend::LoadBackendLibrary()
   TritonModelInstanceFiniFn_t iffn;
   TritonModelInstanceExecFn_t iefn;
 
-  // Backend initialize and finalize functions, optional
-  RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_Initialize", true /* optional */,
-      reinterpret_cast<void**>(&bifn)));
-  RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_Finalize", true /* optional */,
-      reinterpret_cast<void**>(&bffn)));
+  {
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
 
-  // Model initialize and finalize functions, optional
-  RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_ModelInitialize", true /* optional */,
-      reinterpret_cast<void**>(&mifn)));
-  RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_ModelFinalize", true /* optional */,
-      reinterpret_cast<void**>(&mffn)));
+    RETURN_IF_ERROR(slib->OpenLibraryHandle(libpath_, &dlhandle_));
 
-  // Model instance initialize and finalize functions, optional
-  RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_ModelInstanceInitialize", true /* optional */,
-      reinterpret_cast<void**>(&iifn)));
-  RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_ModelInstanceFinalize", true /* optional */,
-      reinterpret_cast<void**>(&iffn)));
+    // Backend initialize and finalize functions, optional
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        dlhandle_, "TRITONBACKEND_Initialize", true /* optional */,
+        reinterpret_cast<void**>(&bifn)));
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        dlhandle_, "TRITONBACKEND_Finalize", true /* optional */,
+        reinterpret_cast<void**>(&bffn)));
 
-  // Model instance execute function, required
-  RETURN_IF_ERROR(GetEntrypoint(
-      dlhandle_, "TRITONBACKEND_ModelInstanceExecute", false /* optional */,
-      reinterpret_cast<void**>(&iefn)));
+    // Model initialize and finalize functions, optional
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        dlhandle_, "TRITONBACKEND_ModelInitialize", true /* optional */,
+        reinterpret_cast<void**>(&mifn)));
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        dlhandle_, "TRITONBACKEND_ModelFinalize", true /* optional */,
+        reinterpret_cast<void**>(&mffn)));
+
+    // Model instance initialize and finalize functions, optional
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        dlhandle_, "TRITONBACKEND_ModelInstanceInitialize", true /* optional */,
+        reinterpret_cast<void**>(&iifn)));
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        dlhandle_, "TRITONBACKEND_ModelInstanceFinalize", true /* optional */,
+        reinterpret_cast<void**>(&iffn)));
+
+    // Model instance execute function, required
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        dlhandle_, "TRITONBACKEND_ModelInstanceExecute", false /* optional */,
+        reinterpret_cast<void**>(&iefn)));
+  }
 
   backend_init_fn_ = bifn;
   backend_fini_fn_ = bffn;
@@ -192,7 +206,9 @@ Status
 TritonBackend::UnloadBackendLibrary()
 {
   if (unload_enabled_) {
-    RETURN_IF_ERROR(CloseLibraryHandle(dlhandle_));
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
+    RETURN_IF_ERROR(slib->CloseLibraryHandle(dlhandle_));
   }
 
   ClearHandles();

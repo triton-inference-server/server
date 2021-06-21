@@ -26,6 +26,7 @@
 
 #include "src/core/infer_request.h"
 
+#include <algorithm>
 #include <deque>
 #include "src/core/backend.h"
 #include "src/core/logging.h"
@@ -249,18 +250,30 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     new_input->SetData(data);
   }
 
-
   // Second pass
   size_t max_byte_size = 0;
+  size_t max_str_byte_size = 0;
   const std::string* max_input_name;
   for (const auto& input : from.OriginalInputs()) {
     // Skip shape tensors in this pass
     if (input.second.IsShapeTensor()) {
       continue;
     }
-    if (input.second.Data()->TotalByteSize() >= max_byte_size) {
-      max_byte_size = input.second.Data()->TotalByteSize();
-      max_input_name = &(input.first);
+
+    if (input.second.DType() == inference::DataType::TYPE_STRING) {
+      int64_t element_count = GetElementCount(input.second.Shape());
+
+      size_t str_byte_size = static_cast<size_t>(4 * element_count);
+      max_str_byte_size = std::max(str_byte_size, max_str_byte_size);
+      if (str_byte_size > max_byte_size) {
+        max_byte_size = str_byte_size;
+        max_input_name = &(input.first);
+      }
+    } else {
+      if (input.second.Data()->TotalByteSize() >= max_byte_size) {
+        max_byte_size = input.second.Data()->TotalByteSize();
+        max_input_name = &(input.first);
+      }
     }
   }
 
@@ -268,9 +281,17 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   // [DLIS-1268] should use one growable static buffer for all null requests
   auto mem_type = TRITONSERVER_MEMORY_CPU;
   int64_t mem_id = 0;
-  std::shared_ptr<Memory> data =
+  std::shared_ptr<MutableMemory> data =
       std::make_shared<AllocatedMemory>(max_byte_size, mem_type, mem_id);
   auto data_base = data->BufferAt(0, &max_byte_size, &mem_type, &mem_id);
+
+  // Zero initialization is only required when there is a TYPE_BYTES tensor in
+  // the request. Only set the required number of bytes to zero.
+  if (max_str_byte_size > 0) {
+    std::fill(
+        data->MutableBuffer(), data->MutableBuffer() + max_str_byte_size, 0);
+  }
+
   for (const auto& input : from.OriginalInputs()) {
     // skip shape tensors in this pass
     if (input.second.IsShapeTensor()) {
@@ -290,8 +311,14 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     if (input.first == *max_input_name) {
       new_input->SetData(data);
     } else {
-      new_input->AppendData(
-          data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
+      if (inference::DataType::TYPE_STRING == input.second.DType()) {
+        new_input->AppendData(
+            data_base, GetElementCount(input.second.Shape()) * 4, mem_type,
+            mem_id);
+      } else {
+        new_input->AppendData(
+            data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
+      }
     }
   }
 
@@ -750,14 +777,17 @@ InferenceRequest::ReportStatisticsWithDuration(
 //
 // Input
 //
-InferenceRequest::Input::Input() : data_(new MemoryReference) {}
+InferenceRequest::Input::Input()
+    : data_(new MemoryReference), has_host_policy_specific_data_(false)
+{
+}
 
 InferenceRequest::Input::Input(
     const std::string& name, const inference::DataType datatype,
     const int64_t* shape, const uint64_t dim_count)
     : name_(name), datatype_(datatype),
       original_shape_(shape, shape + dim_count), is_shape_tensor_(false),
-      data_(new MemoryReference)
+      data_(new MemoryReference), has_host_policy_specific_data_(false)
 {
 }
 
@@ -765,7 +795,8 @@ InferenceRequest::Input::Input(
     const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& shape)
     : name_(name), datatype_(datatype), original_shape_(shape),
-      is_shape_tensor_(false), data_(new MemoryReference)
+      is_shape_tensor_(false), data_(new MemoryReference),
+      has_host_policy_specific_data_(false)
 {
 }
 
@@ -776,6 +807,18 @@ InferenceRequest::Input::SetIsShapeTensor(const bool is_shape_tensor)
   return Status::Success;
 }
 
+const std::shared_ptr<Memory>&
+InferenceRequest::Input::Data(const std::string host_policy_name) const
+{
+  auto device_data = host_policy_data_map_.find(host_policy_name);
+  if (device_data == host_policy_data_map_.end()) {
+    // Fall back on default data if there is no data that has been added for
+    // this host policy
+    return data_;
+  }
+  return device_data->second;
+}
+
 Status
 InferenceRequest::Input::AppendData(
     const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
@@ -784,6 +827,28 @@ InferenceRequest::Input::AppendData(
   if (byte_size > 0) {
     std::static_pointer_cast<MemoryReference>(data_)->AddBuffer(
         static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
+  }
+
+  return Status::Success;
+}
+
+Status
+InferenceRequest::Input::AppendDataWithHostPolicy(
+    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id, const char* host_policy_name)
+{
+  auto device_data = host_policy_data_map_.find(host_policy_name);
+  has_host_policy_specific_data_ = true;
+  if (device_data == host_policy_data_map_.end()) {
+    auto insert_pair = host_policy_data_map_.insert(
+        std::make_pair(std::string(host_policy_name), new MemoryReference));
+    device_data = insert_pair.first;
+  }
+  if (byte_size > 0) {
+    std::static_pointer_cast<MemoryReference>(device_data->second)
+        ->AddBuffer(
+            static_cast<const char*>(base), byte_size, memory_type,
+            memory_type_id);
   }
 
   return Status::Success;
@@ -807,6 +872,8 @@ Status
 InferenceRequest::Input::RemoveAllData()
 {
   data_ = std::make_shared<MemoryReference>();
+  host_policy_data_map_.clear();
+  has_host_policy_specific_data_ = false;
   return Status::Success;
 }
 
@@ -820,6 +887,34 @@ InferenceRequest::Input::DataBuffer(
   return Status::Success;
 }
 
+Status
+InferenceRequest::Input::DataBufferForHostPolicy(
+    const size_t idx, const void** base, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
+    const std::string host_policy_name) const
+{
+  auto device_data = host_policy_data_map_.find(host_policy_name);
+  if (device_data == host_policy_data_map_.end()) {
+    // Return data buffer if there is no host-policy specific buffer available
+    *base = data_->BufferAt(idx, byte_size, memory_type, memory_type_id);
+  } else {
+    *base = device_data->second->BufferAt(
+        idx, byte_size, memory_type, memory_type_id);
+  }
+
+  return Status::Success;
+}
+
+size_t
+InferenceRequest::Input::DataBufferCountForHostPolicy(
+    const std::string host_policy_name) const
+{
+  auto policy_data = host_policy_data_map_.find(host_policy_name);
+  if (policy_data != host_policy_data_map_.end()) {
+    return policy_data->second->BufferCount();
+  }
+  return data_->BufferCount();
+}
 
 std::ostream&
 operator<<(std::ostream& out, const InferenceRequest& request)

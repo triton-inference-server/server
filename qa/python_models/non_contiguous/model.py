@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,12 +24,28 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-apiVersion: v1
-kind: Secret
-metadata:
-  name: aws-credentials
-type: Opaque
-data:
-  AWS_DEFAULT_REGION: {{ .Values.service.type }}
-  AWS_ACCESS_KEY_ID: {{ .Values.service.id }}
-  AWS_SECRET_ACCESS_KEY: {{ .Values.service.key }}
+import numpy as np
+import sys
+
+sys.path.append('../../')
+import triton_python_backend_utils as pb_utils
+
+
+class TritonPythonModel:
+    def execute(self, requests):
+        responses = []
+        new_shape = [64, 2, 32, 55, 84]
+        shape_reorder = [1, 0, 4, 2, 3]
+        for request in requests:
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            input_numpy = input_tensor.as_numpy()
+            input_shape = input_numpy.shape
+            output0 = pb_utils.Tensor("OUTPUT0",
+                                      input_numpy.reshape(new_shape))
+            # Transpose the tensor to create a non-contiguous tensor.
+            output1 = pb_utils.Tensor("OUTPUT1", input_numpy.T)
+            output2 = pb_utils.Tensor("OUTPUT2",
+                                      np.transpose(input_numpy, shape_reorder))
+            responses.append(
+                pb_utils.InferenceResponse([output0, output1, output2]))
+        return responses

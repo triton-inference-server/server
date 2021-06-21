@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,12 +29,14 @@
 import argparse
 import os
 import re
+import pathlib
 
 FLAGS = None
 SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
-             'jmx', 'gz', 'caffemodel', 'json', 'pdf', 'so', 'onnx')
+             'jmx', 'gz', 'json', 'pdf', 'so', 'onnx')
+REPO_PATH_FROM_THIS_FILE = '../..'
 SKIP_PATHS = (
-    'builddir', 'build/libevhtp', 'build/onnxruntime',
+    'builddir', 'build/libdcgm', 'build/libevhtp', 'build/onnxruntime',
     'deploy/gke-marketplace-app/.gitignore',
     'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
     'deploy/gcp/.helmignore', 'deploy/aws/.helmignore',
@@ -52,8 +54,7 @@ SKIP_PATHS = (
     'src/clients/c++/library/cencode.c', 'src/clients/c++/library/cencode.h',
     'src/clients/java', 'TRITON_VERSION')
 
-COPYRIGHT_YEAR_RE0 = 'Copyright \\(c\\) (20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
-COPYRIGHT_YEAR_RE1 = 'Copyright \\(c\\) (20[0-9][0-9])-(20[0-9][0-9]), NVIDIA CORPORATION. All rights reserved.'
+COPYRIGHT_YEAR_RE = 'Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved.'
 
 COPYRIGHT = '''
 
@@ -82,8 +83,10 @@ OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 
-single_re = re.compile(COPYRIGHT_YEAR_RE0)
-range_re = re.compile(COPYRIGHT_YEAR_RE1)
+repo_abs_path = pathlib.Path(__file__).parent.joinpath(
+    REPO_PATH_FROM_THIS_FILE).resolve()
+
+copyright_year_re = re.compile(COPYRIGHT_YEAR_RE)
 
 
 def visit(path):
@@ -97,7 +100,8 @@ def visit(path):
             return True
 
     for skip in SKIP_PATHS:
-        if path.startswith(skip):
+        if str(pathlib.Path(path).resolve()).startswith(
+                str(repo_abs_path.joinpath(skip).resolve())):
             if FLAGS.verbose:
                 print("skipping due to path prefix: " + path)
             return True
@@ -144,40 +148,51 @@ def visit(path):
             prefix = '# '
         elif line.startswith('// '):
             prefix = '// '
-        elif not line.startswith(COPYRIGHT_YEAR_RE0[0]):
+        elif not line.startswith(COPYRIGHT_YEAR_RE[0]):
             print(
                 "incorrect prefix for copyright line, allowed prefixes '# ' or '// ', for "
                 + path + ": " + line)
             return False
 
-        start_year = 0
-        end_year = 0
+        # Check if the copyright year line matches the regex
+        # and see if the year(s) are reasonable
+        years = []
 
-        m = single_re.match(line[len(prefix):])
-        if m and len(m.groups()) == 1:
-            start_year = end_year = int(m.group(1))
+        copyright_row = line[len(prefix):]
+        if copyright_year_re.match(copyright_row):
+            for year in copyright_row.split("(c) " if "(c) " in
+                                            copyright_row else "Copyright "
+                                           )[1].split(" NVIDIA ")[0].split(","):
+                if len(year) == 4:  # 2021
+                    years.append(int(year))
+                elif len(year) == 2:  # 21
+                    years.append(int(year) + 2000)
+                elif len(year) == 9:  # 2021-2022
+                    years.append(int(year[0:4]))
+                    years.append(int(year[5:9]))
+                elif len(year) == 7:  # 2021-22
+                    years.append(int(year[0:4]))
+                    years.append(int(year[5:7]) + 2000)
+                elif len(year) == 5:  # 21-23
+                    years.append(int(year[0:2]) + 2000)
+                    years.append(int(year[3:5]) + 2000)
         else:
-            m = range_re.match(line[len(prefix):])
-            if m and len(m.groups()) == 2:
-                start_year = int(m.group(1))
-                end_year = int(m.group(2))
-            else:
-                print("copyright year is not recognized for " + path + ": " +
-                      line)
-                return False
+            print("copyright year is not recognized for " + path + ": " + line)
+            return False
 
-        if start_year > FLAGS.year:
+        if years[0] > FLAGS.year:
             print("copyright start year greater than current year for " + path +
                   ": " + line)
             return False
-        if end_year > FLAGS.year:
+        if years[-1] > FLAGS.year:
             print("copyright end year greater than current year for " + path +
                   ": " + line)
             return False
-        if end_year < start_year:
-            print("copyright start year greater than end year for " + path +
-                  ": " + line)
-            return False
+        for i in range(1, len(years)):
+            if years[i - 1] >= years[i]:
+                print("copyright years are not increasing for " + path + ": " +
+                      line)
+                return False
 
         # Subsequent lines must match the copyright body.
         copyright_body = [

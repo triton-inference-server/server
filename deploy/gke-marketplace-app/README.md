@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -104,18 +104,24 @@ gcloud beta container node-pools create accel \
   --project ${PROJECT_ID} \
   --zone ${ZONE} \
   --cluster ${DEPLOYMENT_NAME} \
-  --num-nodes 2 \
+  --num-nodes 1 \
   --accelerator type=nvidia-tesla-a100,count=1,gpu-partition-size=1g.5gb  \
-  --enable-autoscaling --min-nodes 2 --max-nodes 3 \
+  --enable-autoscaling --min-nodes 1 --max-nodes 2 \
   --machine-type=a2-highgpu-1g  \
   --disk-size=100 \
   --scopes cloud-platform \
   --verbosity error
+
+# deploy a newer NVIDIA device plugin for GKE to prepare GPU nodes for driver install, additional line to install MIG
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/cmd/nvidia_gpu/device-plugin.yaml
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-nvidia-mig.yaml
 ```
 
 Please note that A100 MIG in GKE does not support GPU metrics yet, also Triton GPU Metrics is not compatiable with A100 MIG. Hence, please disable GPU metrics by unselect allowGPUMetrics while deploy Triton GKE app. Also for the same reason, this deployer doesn't support inference workfload auto-scaling on A100 MIG as well.  
 
-Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. User could leave everything as default, if user has model that has been validated with Triton, they can provide GCS path point to that model in Triton format. By default, we provide a BERT large model optimized by TensorRT with batch size of 1 in public GCS bucket that is compatible with 21.03 release of Triton Server, in `gs://triton_sample_models/21_03`, please note this TensorRT engine only work with Tesla T4. If experiment with A100 MIG 5gb partition, user could use `gs://triton_sample_models/21_03_mig5g`. Also please note that this bucket locates in us-central1 hence loading model into Triton in other region might be effected. Also the first deployment of Triton Application will be slower than consecutive runs as image needs to be pulled into the GKE cluster. 
+Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. User could leave everything as default, if user has model that has been validated with Triton, they can provide GCS path point to that model in Triton format. By default, we provide a BERT large model optimized by TensorRT in public GCS bucket that is compatible with xx.yy release of Triton Server, in `gs://triton_sample_models/xx_yy`, please note this TensorRT engine only work with Tesla T4. If experiment with A100 MIG 5gb partition, user could use `gs://triton_sample_models/xx_yy_mig5g`. Also please note that this bucket locates in us-central1 hence loading model into Triton in other region might be effected. Also the first deployment of Triton Application will be slower than consecutive runs as image needs to be pulled into the GKE cluster. 
+
+Where <xx.yy> is the version of NGC Triton container needed.
 
 ![GKE Marketplace Application UI](ui.png)
 
@@ -134,11 +140,12 @@ If User selected deploy Triton to accept HTTP request, please launch [Locust](ht
 locust -f locustfile_bert_large.py -H http://${INGRESS_HOST}:${INGRESS_PORT}
 ```
 
-The client example push about ~300 QPS(Query per second) to Trition Server, and will trigger a auto scale of T4 GPU nodes (We recommend to use T4 and A100[MIG] for inference). From locust UI, we will observer a drop of latency mean and variance for the requests. At the end, after autoscaling, we see the latency stablized at ~60 ms, which is excellent for a model that has 345 million parameters. Since for each node, we use 1T4 + n1-standard-4 instance, and it can handle ~200 QPS, with on-demand price, it is ($0.35+$0.19)=$0.54/hr, that translate to 1.3 million inference per dollar for BERT large model at batch size 1. Further more, with 3 year commitment price, hr rate is ($0.16+$0.08)=$0.24/hr, that translate to 3 million inference per dollar. If user experiment with A100 MIG 5gb partition, 300 client can be processed by 1 MIG partition with no latency increase. Cuz A100 MIG 5gb partition offers more perf than a T4 GPU.
+The client example push about ~300 QPS(Query per second) to Triton Server, and will trigger a auto scale of T4 GPU nodes (We recommend to use T4 and A100[MIG] for inference). From locust UI, we will observer a drop of latency mean and variance for the requests. At the end, after autoscaling, we see the latency stablized at ~60 ms, which is excellent for a model that has 345 million parameters. Since for each node, we use 1T4 + n1-standard-4 instance, and it can handle ~200 QPS, with on-demand price, it is ($0.35+$0.19)=$0.54/hr, that translate to 1.3 million inference per dollar for BERT large model at batch size 1. Further more, with 3 year commitment price, hr rate is ($0.16+$0.08)=$0.24/hr, that translate to 3 million inference per dollar. 
 
 ![Locust Client Chart](client.png)
 
-Alternatively, user can opt to use [Perf Analyzer](https://github.com/triton-inference-server/server/blob/master/docs/perf_analyzer.md) to profile and study the performance of Triton Inference Server. Here we also provide a [client script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/perf_analyzer_grpc.sh) to use Perf Analyzer to send gRPC to Triton Server GKE deployment. Perf Analyzer client requires user to use NGC Triton Client Container(docker pull nvcr.io/nvidia/tritonserver:21.03-py3-sdk).  
+Alternatively, user can opt to use [Perf Analyzer](https://github.com/triton-inference-server/server/blob/master/docs/perf_analyzer.md) to profile and study the performance of Triton Inference Server. Here we also provide a [client script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/perf_analyzer_grpc.sh) to use Perf Analyzer to send gRPC to Triton Server GKE deployment. Perf Analyzer client requires user to use NGC Triton Client Container.
+
 ```
 bash perf_analyzer_grpc.sh ${INGRESS_HOST}:${INGRESS_PORT}
 ```

@@ -97,27 +97,36 @@ TritonRepoAgent::Create(
     std::shared_ptr<TritonRepoAgent>* agent)
 {
   std::shared_ptr<TritonRepoAgent> lagent(new TritonRepoAgent(name));
-  RETURN_IF_ERROR(OpenLibraryHandle(libpath, &lagent->dlhandle_));
-  RETURN_IF_ERROR(GetEntrypoint(
-      lagent->dlhandle_, "TRITONREPOAGENT_Initialize", true /* optional */,
-      reinterpret_cast<void**>(&lagent->init_fn_)));
-  RETURN_IF_ERROR(GetEntrypoint(
-      lagent->dlhandle_, "TRITONREPOAGENT_Finalize", true /* optional */,
-      reinterpret_cast<void**>(&lagent->fini_fn_)));
-  RETURN_IF_ERROR(GetEntrypoint(
-      lagent->dlhandle_, "TRITONREPOAGENT_ModelInitialize", true /* optional */,
-      reinterpret_cast<void**>(&lagent->model_init_fn_)));
-  RETURN_IF_ERROR(GetEntrypoint(
-      lagent->dlhandle_, "TRITONREPOAGENT_ModelFinalize", true /* optional */,
-      reinterpret_cast<void**>(&lagent->model_fini_fn_)));
-  RETURN_IF_ERROR(GetEntrypoint(
-      lagent->dlhandle_, "TRITONREPOAGENT_ModelAction", false /* optional */,
-      reinterpret_cast<void**>(&lagent->model_action_fn_)));
+
+  {
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
+
+    RETURN_IF_ERROR(slib->OpenLibraryHandle(libpath, &lagent->dlhandle_));
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        lagent->dlhandle_, "TRITONREPOAGENT_Initialize", true /* optional */,
+        reinterpret_cast<void**>(&lagent->init_fn_)));
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        lagent->dlhandle_, "TRITONREPOAGENT_Finalize", true /* optional */,
+        reinterpret_cast<void**>(&lagent->fini_fn_)));
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        lagent->dlhandle_, "TRITONREPOAGENT_ModelInitialize",
+        true /* optional */,
+        reinterpret_cast<void**>(&lagent->model_init_fn_)));
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        lagent->dlhandle_, "TRITONREPOAGENT_ModelFinalize", true /* optional */,
+        reinterpret_cast<void**>(&lagent->model_fini_fn_)));
+    RETURN_IF_ERROR(slib->GetEntrypoint(
+        lagent->dlhandle_, "TRITONREPOAGENT_ModelAction", false /* optional */,
+        reinterpret_cast<void**>(&lagent->model_action_fn_)));
+  }
+
   // Initialize if needed
   if (lagent->init_fn_ != nullptr) {
     RETURN_IF_TRITONSERVER_ERROR(lagent->init_fn_(
         reinterpret_cast<TRITONREPOAGENT_Agent*>(lagent.get())));
   }
+
   *agent = std::move(lagent);
   return Status::Success;
 }
@@ -136,9 +145,11 @@ TritonRepoAgent::~TritonRepoAgent()
       TRITONSERVER_ErrorDelete(err);
     };
   }
-  auto status = CloseLibraryHandle(dlhandle_);
-  if (!status.IsOk()) {
-    LOG_ERROR << "~TritonRepoAgent: " << status.AsString();
+
+  {
+    std::unique_ptr<SharedLibrary> slib;
+    LOG_STATUS_ERROR(SharedLibrary::Acquire(&slib), "~TritonRepoAgent");
+    LOG_STATUS_ERROR(slib->CloseLibraryHandle(dlhandle_), "~TritonRepoAgent");
   }
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -32,7 +32,9 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/numa_utils.h"
 #include "src/core/server_message.h"
+#include "src/core/shared_library.h"
 #include "src/core/tritonserver_apis.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -41,6 +43,7 @@ Status
 TritonModel::Create(
     InferenceServer* server, const std::string& model_repository_path,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
+    const HostPolicyCmdlineConfigMap& host_policy_map,
     const std::string& model_name, const int64_t version,
     const inference::ModelConfig& model_config,
     std::unique_ptr<TritonModel>* model)
@@ -149,16 +152,25 @@ TritonModel::Create(
   TritonModel* raw_local_model = local_model.get();
 
   // Model initialization is optional... The TRITONBACKEND_Model
-  // object is this TritonModel object.
+  // object is this TritonModel object. We must set set shared library
+  // path to point to the backend directory in case the backend
+  // library attempts to load additional shared libaries.
   if (backend->ModelInitFn() != nullptr) {
-    RETURN_IF_TRITONSERVER_ERROR(backend->ModelInitFn()(
-        reinterpret_cast<TRITONBACKEND_Model*>(raw_local_model)));
+    std::unique_ptr<SharedLibrary> slib;
+    RETURN_IF_ERROR(SharedLibrary::Acquire(&slib));
+    RETURN_IF_ERROR(slib->SetLibraryDirectory(backend->Directory()));
+
+    TRITONSERVER_Error* err = backend->ModelInitFn()(
+        reinterpret_cast<TRITONBACKEND_Model*>(raw_local_model));
+
+    RETURN_IF_ERROR(slib->ResetLibraryDirectory());
+    RETURN_IF_TRITONSERVER_ERROR(err);
   }
   local_model->initialized_ = true;
 
   // Create and initialize the model instances for this model.
-  RETURN_IF_ERROR(
-      TritonModelInstance::CreateInstances(raw_local_model, model_config));
+  RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
+      raw_local_model, host_policy_map, model_config));
 
   // Create a scheduler with 1 thread per instance. The backend is
   // already initialized so there is no need to have the scheduler
@@ -166,7 +178,13 @@ TritonModel::Create(
   RETURN_IF_ERROR(local_model->SetConfiguredScheduler(
       local_model->instances_.size() /* runner_cnt */,
       /* Initialization callback */
-      [](uint32_t runner_idx) -> Status { return Status::Success; },
+      [raw_local_model](uint32_t runner_idx) -> Status {
+        // Get the device kind and id of the associated instance to
+        // set NUMA config for the thread
+        const auto& instance = raw_local_model->instances_[runner_idx];
+        RETURN_IF_ERROR(SetNumaConfigOnThread(instance->HostPolicy()));
+        return Status::Success;
+      },
       /* Run callback */
       [raw_local_model, backend](
           uint32_t runner_idx,
@@ -811,6 +829,36 @@ TRITONBACKEND_InputProperties(
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_InputPropertiesForHostPolicy(
+    TRITONBACKEND_Input* input, const char* host_policy_name, const char** name,
+    TRITONSERVER_DataType* datatype, const int64_t** shape,
+    uint32_t* dims_count, uint64_t* byte_size, uint32_t* buffer_count)
+{
+  InferenceRequest::Input* ti =
+      reinterpret_cast<InferenceRequest::Input*>(input);
+  if (name != nullptr) {
+    *name = ti->Name().c_str();
+  }
+  if (datatype != nullptr) {
+    *datatype = DataTypeToTriton(ti->DType());
+  }
+  if (shape != nullptr) {
+    *shape = ti->ShapeWithBatchDim().data();
+  }
+  if (dims_count != nullptr) {
+    *dims_count = ti->ShapeWithBatchDim().size();
+  }
+  if (byte_size != nullptr) {
+    *byte_size = ti->Data(host_policy_name)->TotalByteSize();
+  }
+  if (buffer_count != nullptr) {
+    *buffer_count = ti->DataBufferCountForHostPolicy(host_policy_name);
+  }
+  return nullptr;  // success
+}
+
+
+TRITONSERVER_Error*
 TRITONBACKEND_InputBuffer(
     TRITONBACKEND_Input* input, const uint32_t index, const void** buffer,
     uint64_t* buffer_byte_size, TRITONSERVER_MemoryType* memory_type,
@@ -820,6 +868,26 @@ TRITONBACKEND_InputBuffer(
       reinterpret_cast<InferenceRequest::Input*>(input);
   Status status = ti->DataBuffer(
       index, buffer, buffer_byte_size, memory_type, memory_type_id);
+  if (!status.IsOk()) {
+    *buffer = nullptr;
+    *buffer_byte_size = 0;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_InputBufferForHostPolicy(
+    TRITONBACKEND_Input* input, const char* host_policy_name,
+    const uint32_t index, const void** buffer, uint64_t* buffer_byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  InferenceRequest::Input* ti =
+      reinterpret_cast<InferenceRequest::Input*>(input);
+  Status status = ti->DataBufferForHostPolicy(
+      index, buffer, buffer_byte_size, memory_type, memory_type_id,
+      host_policy_name);
   if (!status.IsOk()) {
     *buffer = nullptr;
     *buffer_byte_size = 0;

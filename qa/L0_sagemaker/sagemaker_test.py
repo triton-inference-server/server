@@ -64,7 +64,7 @@ class SageMakerTest(tu.TestResultCollector):
 
         self.expected_result_ = {
             "model_name":
-                "model",
+                "sm_model",
             "model_version":
                 "1",
             "outputs": [{
@@ -152,7 +152,7 @@ class SageMakerTest(tu.TestResultCollector):
 
         headers = {
             'Content-Type':
-                'application/application/vnd.sagemaker-triton.binary+json;json-header-size={}'
+                'application/vnd.sagemaker-triton.binary+json;json-header-size={}'
                 .format(header_length)
         }
         r = requests.post(self.url_, data=request_body, headers=headers)
@@ -186,7 +186,8 @@ class SageMakerTest(tu.TestResultCollector):
         r = requests.post(self.url_, data=request_body, headers=headers)
         r.raise_for_status()
 
-        result = httpclient.InferenceServerClient.parse_response_body(r._content)
+        result = httpclient.InferenceServerClient.parse_response_body(
+            r._content)
 
         output0_data = result.as_numpy('OUTPUT0')
         output1_data = result.as_numpy('OUTPUT1')
@@ -228,6 +229,124 @@ class SageMakerTest(tu.TestResultCollector):
         for i in range(16):
             self.assertEqual(output0_data[0][i], self.expected_output0_data_[i])
             self.assertEqual(output1_data[0][i], self.expected_output1_data_[i])
+
+    def test_malformed_binary_header(self):
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+
+        # Initialize the data
+        input_data = np.array(self.input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=True)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+        request_body, header_length = httpclient.InferenceServerClient.generate_request_body(
+            inputs, outputs=outputs)
+
+        headers = {
+            'Content-Type':
+                'additional-string/application/vnd.sagemaker-triton.binary+json;json-header-size={}'
+                .format(header_length)
+        }
+        r = requests.post(self.url_, data=request_body, headers=headers)
+        self.assertEqual(
+            400, r.status_code,
+            "Expected error code {} returned for the request; got: {}".format(
+                400, r.status_code))
+
+    def test_malformed_binary_header_not_number(self):
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+
+        # Initialize the data
+        input_data = np.array(self.input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=True)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+        request_body, header_length = httpclient.InferenceServerClient.generate_request_body(
+            inputs, outputs=outputs)
+
+        headers = {
+            'Content-Type':
+                'application/vnd.sagemaker-triton.binary+json;json-header-size=additional-string{}'
+                .format(header_length)
+        }
+        r = requests.post(self.url_, data=request_body, headers=headers)
+        self.assertEqual(
+            400, r.status_code,
+            "Expected error code {} returned for the request; got: {}".format(
+                400, r.status_code))
+
+    def test_malformed_binary_header_negative_number(self):
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+
+        # Initialize the data
+        input_data = np.array(self.input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=True)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+        request_body, header_length = httpclient.InferenceServerClient.generate_request_body(
+            inputs, outputs=outputs)
+
+        headers = {
+            'Content-Type':
+                'application/vnd.sagemaker-triton.binary+json;json-header-size=-123'
+        }
+        r = requests.post(self.url_, data=request_body, headers=headers)
+        self.assertEqual(
+            400, r.status_code,
+            "Expected error code {} returned for the request; got: {}".format(
+                400, r.status_code))
+
+    def test_malformed_binary_header_large_number(self):
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+
+        # Initialize the data
+        input_data = np.array(self.input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=True)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+        request_body, header_length = httpclient.InferenceServerClient.generate_request_body(
+            inputs, outputs=outputs)
+
+        headers = {
+            'Content-Type':
+                'application/vnd.sagemaker-triton.binary+json;json-header-size=12345'
+        }
+        r = requests.post(self.url_, data=request_body, headers=headers)
+        self.assertEqual(
+            400, r.status_code,
+            "Expected error code {} returned for the request; got: {}".format(
+                400, r.status_code))
 
 
 if __name__ == '__main__':

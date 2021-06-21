@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,6 +34,7 @@
 #include <memory>
 #include "src/core/filesystem.h"
 #include "src/core/server_message.h"
+#include "src/core/shared_library.h"
 #include "src/core/triton_repo_agent.h"
 
 namespace ni = nvidia::inferenceserver;
@@ -184,10 +185,28 @@ TRITONSERVER_MessageSerializeToJson(
 }
 #endif
 
-namespace nvidia::inferenceserver {
+namespace nvidia { namespace inferenceserver {
 
 Status
-OpenLibraryHandle(const std::string& path, void** handle)
+SharedLibrary::Acquire(std::unique_ptr<SharedLibrary>* slib)
+{
+  slib->reset(new SharedLibrary());
+  return Status::Success;
+}
+
+SharedLibrary::~SharedLibrary() {}
+Status
+SharedLibrary::SetLibraryDirectory(const std::string& path)
+{
+  return Status::Success;
+}
+Status
+SharedLibrary::ResetLibraryDirectory()
+{
+  return Status::Success;
+}
+Status
+SharedLibrary::OpenLibraryHandle(const std::string& path, void** handle)
 {
   auto it = global_mock_agents.find(path);
   if (it != global_mock_agents.end()) {
@@ -202,7 +221,7 @@ OpenLibraryHandle(const std::string& path, void** handle)
 }
 
 Status
-CloseLibraryHandle(void* handle)
+SharedLibrary::CloseLibraryHandle(void* handle)
 {
   for (auto& global_mock_agent : global_mock_agents) {
     if (reinterpret_cast<void*>(&global_mock_agent.second) == handle) {
@@ -216,7 +235,7 @@ CloseLibraryHandle(void* handle)
 }
 
 Status
-GetEntrypoint(
+SharedLibrary::GetEntrypoint(
     void* handle, const std::string& name, const bool optional, void** fn)
 {
   auto mock_agent = reinterpret_cast<MockSharedLibraryHandle*>(handle);
@@ -229,7 +248,7 @@ GetEntrypoint(
   return Status::Success;
 }
 
-}  // namespace nvidia::inferenceserver
+}}  // namespace nvidia::inferenceserver
 
 namespace {
 
