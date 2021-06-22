@@ -65,8 +65,8 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.11.0dev':
-      ('21.06dev',   # triton container
+    '2.12.0dev':
+      ('21.07dev',   # triton container
        '21.05',      # upstream container
        '1.8.0',      # ORT
        '2021.2.200', # ORT OpenVINO
