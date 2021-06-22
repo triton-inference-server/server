@@ -31,6 +31,12 @@ import sys
 import docker
 
 ### Global variables
+TRITON_VERSION_MAP = {
+    '2.11.0dev':
+      ('21.06dev',   # triton container
+       '21.05')      # upstream container     
+}
+
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
@@ -71,25 +77,60 @@ def fail_if(p, msg):
 
 
 ##### create base image
-def make_dockerfile(ddir, dockerfile_name, container_ver):
+def make_dockerfile(ddir, dockerfile_name):
+    # Set enviroment variables
     df = '''
+#
+# Multistage build.
+#
 FROM nvcr.io/nvidia/tritonserver:{}-py3 as full
 FROM nvcr.io/nvidia/tritonserver:{}-py3-min
-COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
-COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib  
-'''.format(container_ver, container_ver)
+ARG TRITON_VERSION={}
+ARG TRITON_CONTAINER_VERSION={}
+ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
+ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
+ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
+ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
+LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
+ENV PATH /opt/tritonserver/bin:${{PATH}}
+'''.format(FLAGS.upstream_container_version, FLAGS.upstream_container_version, FLAGS.version, FLAGS.container_version)
 
+    # Copy over files
+    df += '''
+# Create a user that can be used to run triton as
+# non-root. Make sure that this user to given ID 1000. All server
+# artifacts copied below are assign to this user.
+ENV TRITON_SERVER_USER=triton-server
+RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
+    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
+        useradd $TRITON_SERVER_USER; \
+    fi && \
+    [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
+    [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
+
+WORKDIR /opt/tritonserver
+RUN rm -fr /opt/tritonserver/*
+COPY --chown=1000:1000 --from=full /opt/tritonserver/LICENSE .
+COPY --chown=1000:1000 --from=full /opt/tritonserver/TRITON_VERSION .
+COPY --chown=1000:1000 --from=full /opt/tritonserver/NVIDIA_Deep_Learning_Container_License.pdf .
+COPY --chown=1000:1000 --from=full /opt/tritonserver/bin bin/
+COPY --chown=1000:1000 --from=full /opt/tritonserver/lib lib/
+COPY --chown=1000:1000 --from=full /opt/tritonserver/include/triton/core include/triton/core
+# Top-level include/core not copied so --chown does not set it correctly,
+# so explicit set on all of include
+RUN chown -R triton-server:triton-server include
+'''
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
 
 ### add additional backends needed
 def add_requested_backends(ddir, dockerfile_name, backends):
-    df = ""
+    df = "# Copying over backends \n"
     for backend in backends:
         if (backend.lower()
                 in (EXAMPLE_BACKENDS + CORE_BACKENDS + NONCORE_BACKENDS)):
-            df += '''COPY --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}    
+            df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}    
 '''.format(backend, backend)
         else:
             log("Cannot create container from unsupported backend: " + backend)
@@ -99,10 +140,10 @@ def add_requested_backends(ddir, dockerfile_name, backends):
 
 
 def add_requested_repoagents(ddir, dockerfile_name, repoagents):
-    df = ""
+    df = "#  Copying over repoagents \n"
     for ra in repoagents:
         if (ra in EXAMPLE_REPOAGENTS):
-            df += '''COPY --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}    
+            df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}    
 '''.format(ra, ra)
         else:
             log("Cannot create container from unsupported repoagent: " + ra)
@@ -116,18 +157,21 @@ def append_workdir(ddir, dockerfile_name, workdir_path):
         dfile.write(df)
 
 def install_dependencies(ddir, dockerfile_name):
+# TODO: remove libnvidia-ml-dev after 21.06 is launched
     df = '''
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+            libnvidia-ml-dev \
             libre2-dev \
             libb64-dev \
-            libnvidia-ml-dev
+            pciutils && \
     rm -rf /var/lib/apt/lists/*
 '''
-# TODO: remove libnvidia-ml-dev after 21.06 is launched
-    # Add dependencies needed for python backend
+
+# Add dependencies needed for python backend
     if 'python' in FLAGS.backend:
         df += '''
 # python3, python3-pip and some pip installs required for the python backend
@@ -139,6 +183,12 @@ RUN apt-get update && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools grpcio-channelz numpy && \
     rm -rf /var/lib/apt/lists/*
+'''
+    df += '''
+# Add entrypoint script
+WORKDIR /opt/tritonserver
+COPY --chown=1000:1000 --from=full /opt/tritonserver/nvidia_entrypoint.sh .
+ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 '''
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
@@ -173,11 +223,39 @@ if __name__ == '__main__':
                           required=False,
                           help='Enable verbose output.')
     parser.add_argument(
+        '--build-name',
+        type=str,
+        required=False,
+        help=
+        'Build name. Default is "tritonserver_build".'
+    )
+    parser.add_argument(
         '--build-dir',
         type=str,
         required=True,
         help=
         'Build directory. All repo clones and builds will be performed in this directory.'
+    )
+    parser.add_argument(
+        '--version',
+        type=str,
+        required=False,
+        help=
+        'The Triton version. If not specified defaults to the value in the TRITON_VERSION file.'
+    )
+    parser.add_argument(
+        '--container-version',
+        type=str,
+        required=False,
+        help=
+        'The Triton container version to build. If not specified the container version will be chosen automatically based on --version value.'
+    )
+    parser.add_argument(
+        '--upstream-container-version',
+        type=str,
+        required=False,
+        help=
+        'The upstream container version to use for the build. If not specified the upstream container version will be chosen automatically based on --version value.'
     )
     parser.add_argument(
         '--backend',
@@ -192,19 +270,36 @@ if __name__ == '__main__':
         required=False,
         help='Include specified repo agent in build as <repoagent-name>')
     FLAGS = parser.parse_args()
+
+    if FLAGS.build_name is None:
+        FLAGS.build_name = "tritonserver_build"
+    # Determine the versions. Start with Triton version, if --version
+    # is not explicitly specified read from TRITON_VERSION file.
+    if FLAGS.version is None:
+        with open('TRITON_VERSION', "r") as vfile:
+            FLAGS.version = vfile.readline().strip()
+    if FLAGS.container_version is None:
+        if FLAGS.version not in TRITON_VERSION_MAP:
+            fail('container version not known for {}'.format(FLAGS.version))
+        FLAGS.container_version = TRITON_VERSION_MAP[FLAGS.version][0]
+    if FLAGS.upstream_container_version is None:
+        if FLAGS.version not in TRITON_VERSION_MAP:
+            fail('upstream container version not known for {}'.format(
+                FLAGS.version))
+        FLAGS.upstream_container_version = TRITON_VERSION_MAP[
+            FLAGS.version][1]
+
     dockerfile_name = 'Dockerfile.buildbase'
-    container_name = "tritonserver_build"
     workdir_path="/opt/tritonserver"
-    server_version = 21.05
+    
     if FLAGS.backend is None:
         FLAGS.backend = []
     if FLAGS.repoagent is None:
         FLAGS.repoagent = []
-    print(FLAGS.backend)
 
-    make_dockerfile(FLAGS.build_dir, dockerfile_name, server_version)
+    make_dockerfile(FLAGS.build_dir, dockerfile_name)
     add_requested_backends(FLAGS.build_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.build_dir, dockerfile_name, FLAGS.repoagent)
     append_workdir(FLAGS.build_dir, dockerfile_name, workdir_path)
     install_dependencies(FLAGS.build_dir, dockerfile_name)
-    build_docker_container(FLAGS.build_dir, dockerfile_name, container_name)
+    build_docker_container(FLAGS.build_dir, dockerfile_name, FLAGS.build_name)
