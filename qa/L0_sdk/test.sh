@@ -166,7 +166,7 @@ python -c """import tritonclient; import tritonclient.grpc; import tritonclient.
           import tritonclient.utils; import tritonclient.grpc.model_config_pb2; \
           import tritonclient.grpc.service_pb2; import tritonclient.grpc.service_pb2_grpc; \
           import tritonclient.utils.cuda_shared_memory; import tritonclient.utils.shared_memory"""
-RET_VAL=$(($RET_VAL+$?))
+RET=$(($RET+$?))
 EXECUTABLES="perf_analyzer perf_client"
 for l in $EXECUTABLES; do
   if [ $(which -a $l | grep "/usr/local/bin/$l" | wc -l) -ne 1 ]; then
