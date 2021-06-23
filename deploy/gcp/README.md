@@ -30,10 +30,6 @@
 
 # Kubernetes Deploy: Triton Inference Server Cluster
 
-**NOTE: The prometheus operator used in these instructions is not yet
-updated to work with 1.16.x versions of Google Kubernetes Engine
-(GKE). You must use a GKE 1.15.x version to avoid this issue.**
-
 A helm chart for installing a single cluster of Triton Inference
 Server is provided. By default the cluster contains a single instance
 of the inference server but the *replicaCount* configuration parameter
