@@ -25,16 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# REPO_VERSION="21.06dev"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
-   REPO_VERSION=$1
-fi
-if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
+REPO_VERSION="21.06dev"
+# REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+# if [ "$#" -ge 1 ]; then
+#    REPO_VERSION=$1
+# fi
+# if [ -z "$REPO_VERSION" ]; then
+#     echo -e "Repository version must be specified"
+#     echo -e "\n***\n*** Test Failed\n***"
+#     exit 1
+# fi
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -100,8 +100,8 @@ RET=0
 
 # Verify the flag is set only on CPU-only device
 if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
-    # gpu_count=`lspci | grep -c ' VGA '`
-    gpu_count=`nvidia-smi -L | grep GPU | wc -l`
+    gpu_count=`lspci | grep -c ' VGA '`
+    #gpu_count=`nvidia-smi -L | grep GPU | wc -l`
     if [ "$gpu_count" -ne 0 ]; then
     echo -e "\n***\n*** Running on a device with GPU\n***"
     echo -e "\n***\n*** Test Failed To Run\n***"
@@ -200,7 +200,8 @@ for TARGET in cpu gpu; do
           models/.
       fi
     done
-
+    echo $ENSEMBLES
+    echo $BACKENDS
     if [ "$ENSEMBLES" == "1" ]; then
 
       # Copy identity backend models and ensembles
@@ -247,6 +248,8 @@ for TARGET in cpu gpu; do
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
     # This is done after the instance group change above so that identity backend models
     # are run on CPU. Skip for Windows test.
+  
+    # if [ grep -q "$BACKEND" <<< "identity" ]; then
     cp -r ../custom_models/custom_zero_1_float32 models/. &&\
         mkdir -p models/custom_zero_1_float32/1 && \
         (cd models/custom_zero_1_float32 && \
@@ -259,6 +262,8 @@ for TARGET in cpu gpu; do
             sed -i "s/custom_zero_1_float32/custom_nobatch_zero_1_float32/" config.pbtxt && \
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
+    # fi
+    
 
     # Check if running a memory leak check
     if [ "$TEST_VALGRIND" -eq 1 ]; then
