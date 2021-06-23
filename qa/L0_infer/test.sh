@@ -25,16 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION="21.06dev"
-# REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-# if [ "$#" -ge 1 ]; then
-#    REPO_VERSION=$1
-# fi
-# if [ -z "$REPO_VERSION" ]; then
-#     echo -e "Repository version must be specified"
-#     echo -e "\n***\n*** Test Failed\n***"
-#     exit 1
-# fi
+# REPO_VERSION="21.06dev"
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+   REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
 
 export CUDA_VISIBLE_DEVICES=0
 
