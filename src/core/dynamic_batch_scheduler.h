@@ -87,6 +87,7 @@ class DynamicBatchScheduler : public Scheduler {
       const ModelQueuePolicyMap& queue_policy_map);
 
   void BatcherThread(const int nice);
+  void NewPayload();
   uint64_t GetDynamicBatch();
   void DelegateResponse(std::unique_ptr<InferenceRequest>& request);
   void FinalizeResponses();
@@ -109,10 +110,12 @@ class DynamicBatchScheduler : public Scheduler {
   std::mutex mu_;
   std::condition_variable cv_;
 
-  std::mutex instance_mu_;
-  std::condition_variable instance_cv_;
+  std::condition_variable slot_cv_;
 
   std::shared_ptr<RateLimiter> rate_limiter_;
+
+  std::shared_ptr<RateLimiter::Payload> curr_payload_;
+  bool payload_saturated_;
 
   size_t max_batch_size_;
   size_t max_preferred_batch_size_;

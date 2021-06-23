@@ -123,6 +123,19 @@ RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
   }
 }
 
+bool
+RateLimiter::PayloadSlotAvailable(const TritonModel* model)
+{
+  bool result;
+  PayloadQueue* payload_queue = payload_queues_[model].get();
+  {
+    std::lock_guard<std::mutex> lk(payload_queue->mu_);
+    result = payload_queue->queue_.size() <
+             2 * payload_queue->specific_queues_.size();
+  }
+  return result;
+}
+
 Status
 RateLimiter::EnqueuePayload(
     const TritonModel* model, std::shared_ptr<Payload> payload)
@@ -165,7 +178,6 @@ RateLimiter::DequeuePayload(
   payload->reset();
   PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
   if (ignore_resources_and_priority_) {
-    // while(payload->get() == nullptr)
     {
       std::unique_lock<std::mutex> lk(payload_queue->mu_);
       payload_queue->cv_.wait(lk, [instance, payload_queue]() {
@@ -181,12 +193,12 @@ RateLimiter::DequeuePayload(
         payload_queue->queue_.pop_front();
       }
     }
+    (*payload)->Callback();
     if ((*payload)->GetInstance() == nullptr) {
       (*payload)->SetInstance(instance);
     } else if ((*payload)->GetInstance() != instance) {
       LOG_ERROR << "Got mismatching instance in the payload to execute";
     }
-    (*payload)->SetState(Payload::State::EXECUTING);
   } else {
     // TODO: Wait till RateLimiting pipeline notifies the thread
   }
@@ -229,8 +241,9 @@ RateLimiter::RequestModelInstance(
 RateLimiter::Payload::Payload()
     : op_type_(Operation::INFER_RUN),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCompletion_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED)
+      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED)
 {
+  exec_mu_.reset(new std::mutex());
 }
 
 void
@@ -239,10 +252,10 @@ RateLimiter::Payload::Reset(
 {
   op_type_ = op_type;
   requests_.clear();
-  OnCompletion_ = []() {};
+  OnCallback_ = []() {};
   instance_ = instance;
   state_ = State::UNINITIALIZED;
-  OnCompletion_ = []() {};
+  OnCallback_ = []() {};
   status_.reset(new std::promise<Status>());
 }
 
@@ -251,16 +264,28 @@ RateLimiter::Payload::Release()
 {
   op_type_ = Operation::INFER_RUN;
   requests_.clear();
-  OnCompletion_ = []() {};
+  OnCallback_ = []() {};
   instance_ = nullptr;
-  state_ = State::UNINITIALIZED;
-  OnCompletion_ = []() {};
+  state_ = State::RELEASED;
+  OnCallback_ = []() {};
+}
+
+void
+RateLimiter::Payload::ReserveRequests(size_t size)
+{
+  requests_.reserve(size);
 }
 
 void
 RateLimiter::Payload::AddRequest(std::unique_ptr<InferenceRequest> request)
 {
   requests_.push_back(std::move(request));
+}
+
+void
+RateLimiter::Payload::SetCallback(std::function<void()> OnCallback)
+{
+  OnCallback_ = OnCallback;
 }
 
 void
@@ -282,14 +307,24 @@ RateLimiter::Payload::Wait()
 }
 
 void
+RateLimiter::Payload::Callback()
+{
+  OnCallback_();
+}
+
+void
 RateLimiter::Payload::Execute(bool* should_exit)
 {
   *should_exit = false;
+  {
+    std::lock_guard<std::mutex> lock(*exec_mu_);
+    state_ = State::EXECUTING;
+  }
 
   Status status;
   switch (op_type_) {
     case Operation::INFER_RUN:
-      instance_->Schedule(std::move(requests_), OnCompletion_);
+      instance_->Schedule(std::move(requests_), OnCallback_);
       break;
     case Operation::INIT:
       status = instance_->Initialize();

@@ -96,6 +96,7 @@ class RateLimiter {
   Status UnregisterModel(const TritonModel* model);
 
   void InitializePayloadQueues(const TritonModelInstance* instance);
+  bool PayloadSlotAvailable(const TritonModel* model);
 
   Status EnqueuePayload(
       const TritonModel* model, std::shared_ptr<Payload> payload);
@@ -134,16 +135,23 @@ class RateLimiter {
     enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
     enum State {
       UNINITIALIZED = 0,
-      REQUESTED = 1,
+      READY = 1,
+      REQUESTED = 2,
       SCHEDULED = 3,
-      EXECUTING = 4
+      EXECUTING = 4,
+      RELEASED = 5
     };
 
     Payload();
     void Reset(
         const Operation op_type, TritonModelInstance* instance = nullptr);
     Operation GetOpType() { return op_type_; }
+    std::mutex* GetExecMutex() { return exec_mu_.get(); }
+    size_t BatchSize() { return requests_.size(); }
+    void ReserveRequests(size_t size);
     void AddRequest(std::unique_ptr<InferenceRequest> request);
+    void SetCallback(std::function<void()> OnCallback);
+    void Callback();
     void SetInstance(TritonModelInstance* model_instance);
     TritonModelInstance* GetInstance() { return instance_; }
 
@@ -156,10 +164,11 @@ class RateLimiter {
    private:
     Operation op_type_;
     std::vector<std::unique_ptr<InferenceRequest>> requests_;
-    std::function<void()> OnCompletion_;
+    std::function<void()> OnCallback_;
     TritonModelInstance* instance_;
     State state_;
     std::unique_ptr<std::promise<Status>> status_;
+    std::unique_ptr<std::mutex> exec_mu_;
   };
 
 
