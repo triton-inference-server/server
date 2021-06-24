@@ -245,7 +245,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--enable-gpu',
-        type=str,
+        action="store_true",
         required=True,
         help=
         'Flag to enable gpus for the build. Must be specified since only-cpu is not supported'
@@ -265,7 +265,7 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
     
     if FLAGS.work_dir is None:
-        FLAGS.work_dir = "$(PWD)"
+        FLAGS.work_dir = "."
     if FLAGS.build_name is None:
         FLAGS.build_name = "tritonserver"
     # Determine the versions. Start with Triton version, if --version
