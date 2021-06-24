@@ -32,9 +32,9 @@ import docker
 
 ### Global variables
 TRITON_VERSION_MAP = {
-    '2.11.0dev':
-      ('21.06dev',   # triton container
-       '21.05')      # upstream container     
+    '2.11.0dev': (
+        '21.06dev',  # triton container
+        '21.05')  # upstream container     
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -46,12 +46,9 @@ NONCORE_BACKENDS = [
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
 
-DEPENDENCY_MAP = {
-    'python': 
-    ('python3-pip'),
-    'pytorch':
-    ('python3-dev')
-}
+DEPENDENCY_MAP = {'python': ('python3-pip'), 'pytorch': ('python3-dev')}
+
+
 #### helper functions
 def log(msg, force=False):
     if force or not FLAGS.quiet:
@@ -93,7 +90,8 @@ ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
 ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
 LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
 ENV PATH /opt/tritonserver/bin:${{PATH}}
-'''.format(FLAGS.upstream_container_version, FLAGS.upstream_container_version, FLAGS.version, FLAGS.container_version)
+'''.format(FLAGS.upstream_container_version, FLAGS.upstream_container_version,
+           FLAGS.version, FLAGS.container_version)
 
     # Copy over files
     df += '''
@@ -151,13 +149,15 @@ def add_requested_repoagents(ddir, dockerfile_name, repoagents):
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
+
 def append_workdir(ddir, dockerfile_name, workdir_path):
     df = '''WORKDIR {}'''.format(workdir_path)
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
+
 def install_dependencies(ddir, dockerfile_name):
-# TODO: remove libnvidia-ml-dev after 21.06 is launched
+    # TODO: remove libnvidia-ml-dev after 21.06 is launched
     df = '''
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
@@ -171,7 +171,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 '''
 
-# Add dependencies needed for python backend
+    # Add dependencies needed for python backend
     if 'python' in FLAGS.backend:
         df += '''
 # python3, python3-pip and some pip installs required for the python backend
@@ -193,6 +193,7 @@ ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
+
 ### create build container
 def build_docker_container(ddir, dockerfile_name, container_name):
     # Before attempting to run the new image, make sure any
@@ -209,6 +210,7 @@ def build_docker_container(ddir, dockerfile_name, container_name):
     p.wait()
     fail_if(p.returncode != 0, 'docker build {} failed'.format(container_name))
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     group_qv = parser.add_mutually_exclusive_group()
@@ -222,13 +224,10 @@ if __name__ == '__main__':
                           action="store_true",
                           required=False,
                           help='Enable verbose output.')
-    parser.add_argument(
-        '--build-name',
-        type=str,
-        required=False,
-        help=
-        'Build name. Default is "tritonserver_build".'
-    )
+    parser.add_argument('--build-name',
+                        type=str,
+                        required=False,
+                        help='Build name. Default is "tritonserver_build".')
     parser.add_argument(
         '--build-dir',
         type=str,
@@ -286,12 +285,11 @@ if __name__ == '__main__':
         if FLAGS.version not in TRITON_VERSION_MAP:
             fail('upstream container version not known for {}'.format(
                 FLAGS.version))
-        FLAGS.upstream_container_version = TRITON_VERSION_MAP[
-            FLAGS.version][1]
+        FLAGS.upstream_container_version = TRITON_VERSION_MAP[FLAGS.version][1]
 
     dockerfile_name = 'Dockerfile.buildbase'
-    workdir_path="/opt/tritonserver"
-    
+    workdir_path = "/opt/tritonserver"
+
     if FLAGS.backend is None:
         FLAGS.backend = []
     if FLAGS.repoagent is None:

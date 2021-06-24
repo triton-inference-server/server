@@ -75,7 +75,7 @@ Where \<xx.yy\> is the version of Triton that you want to customize. The
 \<xx.yy\>-py3-min image is a minimal, base image that contains the CUDA,
 cuDNN, etc. dependencies that are required to run Triton. The
 \<xx.yy\>-py3 image contains the complete Triton with all options and
-backends.
+backends. 
 
 ### Minimum Triton
 
