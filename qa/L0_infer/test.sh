@@ -25,10 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# REPO_VERSION="21.06dev"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
-   REPO_VERSION=$1
+  REPO_VERSION=$1
 fi
 if [ -z "$REPO_VERSION" ]; then
     echo -e "Repository version must be specified"
@@ -200,8 +199,7 @@ for TARGET in cpu gpu; do
           models/.
       fi
     done
-    echo $ENSEMBLES
-    echo $BACKENDS
+
     if [ "$ENSEMBLES" == "1" ]; then
 
       # Copy identity backend models and ensembles
@@ -248,8 +246,6 @@ for TARGET in cpu gpu; do
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
     # This is done after the instance group change above so that identity backend models
     # are run on CPU. Skip for Windows test.
-  
-    # if [ grep -q "$BACKEND" <<< "identity" ]; then
     cp -r ../custom_models/custom_zero_1_float32 models/. &&\
         mkdir -p models/custom_zero_1_float32/1 && \
         (cd models/custom_zero_1_float32 && \
@@ -262,8 +258,6 @@ for TARGET in cpu gpu; do
             sed -i "s/custom_zero_1_float32/custom_nobatch_zero_1_float32/" config.pbtxt && \
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
-    # fi
-    
 
     # Check if running a memory leak check
     if [ "$TEST_VALGRIND" -eq 1 ]; then

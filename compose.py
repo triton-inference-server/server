@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -64,17 +64,17 @@ def log_verbose(msg):
 
 
 def fail(msg):
-    fail_if(True, msg)
-
+    print('error: {}'.format(msg), file=sys.stderr)
+    sys.exit(1)
+    
 
 def fail_if(p, msg):
     if p:
-        print('error: {}'.format(msg), file=sys.stderr)
-        sys.exit(1)
+        fail_if(True, msg)
+        
 
-
-##### create base image
-def make_dockerfile(ddir, dockerfile_name):
+##### create base image for gpu
+def start_gpu_dockerfile(ddir, dockerfile_name):
     # Set enviroment variables
     df = '''
 #
@@ -150,13 +150,9 @@ def add_requested_repoagents(ddir, dockerfile_name, repoagents):
         dfile.write(df)
 
 
-def append_workdir(ddir, dockerfile_name, workdir_path):
-    df = '''WORKDIR {}'''.format(workdir_path)
-    with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
-        dfile.write(df)
 
-
-def install_dependencies(ddir, dockerfile_name):
+# Install dependencies and run entrypoint script
+def end_gpu_dockerfile(ddir, dockerfile_name):
     # TODO: remove libnvidia-ml-dev after 21.06 is launched
     df = '''
 # Ensure apt-get won't prompt for selecting options
@@ -194,17 +190,8 @@ ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
         dfile.write(df)
 
 
-### create build container
+### Create container with docker build
 def build_docker_container(ddir, dockerfile_name, container_name):
-    # Before attempting to run the new image, make sure any
-    # previous <container_name> container is removed.
-    client = docker.from_env(timeout=3600)
-    try:
-        existing = client.containers.get(container_name)
-        existing.remove(force=True)
-    except docker.errors.NotFound:
-        pass  # ignore
-
     p = subprocess.Popen(['docker', 'build', '-t', container_name, '-f', \
         os.path.join(ddir, dockerfile_name), '.'])
     p.wait()
@@ -227,13 +214,13 @@ if __name__ == '__main__':
     parser.add_argument('--build-name',
                         type=str,
                         required=False,
-                        help='Build name. Default is "tritonserver_build".')
+                        help='Build name. Default is "tritonserver".')
     parser.add_argument(
-        '--build-dir',
+        '--work-dir',
         type=str,
-        required=True,
+        required=False,
         help=
-        'Build directory. All repo clones and builds will be performed in this directory.'
+        'Generated dockerfiles are placed here. Default to current directory.'
     )
     parser.add_argument(
         '--version',
@@ -257,6 +244,13 @@ if __name__ == '__main__':
         'The upstream container version to use for the build. If not specified the upstream container version will be chosen automatically based on --version value.'
     )
     parser.add_argument(
+        '--enable-gpu',
+        type=str,
+        required=True,
+        help=
+        'Flag to enable gpus for the build. Must be specified since only-cpu is not supported'
+    )
+    parser.add_argument(
         '--backend',
         action='append',
         required=False,
@@ -269,9 +263,11 @@ if __name__ == '__main__':
         required=False,
         help='Include specified repo agent in build as <repoagent-name>')
     FLAGS = parser.parse_args()
-
+    
+    if FLAGS.work_dir is None:
+        FLAGS.work_dir = "$(PWD)"
     if FLAGS.build_name is None:
-        FLAGS.build_name = "tritonserver_build"
+        FLAGS.build_name = "tritonserver"
     # Determine the versions. Start with Triton version, if --version
     # is not explicitly specified read from TRITON_VERSION file.
     if FLAGS.version is None:
@@ -287,17 +283,15 @@ if __name__ == '__main__':
                 FLAGS.version))
         FLAGS.upstream_container_version = TRITON_VERSION_MAP[FLAGS.version][1]
 
-    dockerfile_name = 'Dockerfile.buildbase'
-    workdir_path = "/opt/tritonserver"
+    dockerfile_name = 'Dockerfile.compose'
 
     if FLAGS.backend is None:
         FLAGS.backend = []
     if FLAGS.repoagent is None:
         FLAGS.repoagent = []
 
-    make_dockerfile(FLAGS.build_dir, dockerfile_name)
-    add_requested_backends(FLAGS.build_dir, dockerfile_name, FLAGS.backend)
-    add_requested_repoagents(FLAGS.build_dir, dockerfile_name, FLAGS.repoagent)
-    append_workdir(FLAGS.build_dir, dockerfile_name, workdir_path)
-    install_dependencies(FLAGS.build_dir, dockerfile_name)
-    build_docker_container(FLAGS.build_dir, dockerfile_name, FLAGS.build_name)
+    start_gpu_dockerfile(FLAGS.work_dir, dockerfile_name)
+    add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
+    add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
+    end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name)
+    build_docker_container(FLAGS.work_dir, dockerfile_name, FLAGS.build_name)

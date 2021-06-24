@@ -37,28 +37,26 @@ functionality that you don't require.
 Currently the customization is limited as described below but future
 releases will increase the amount of customization that is available.
 It is also possible to [build Triton](build.md#building-triton)
-yourself to get more exact customization.
+from source to get more exact customization.
 
 ## Use the compose.py script
 
-The `compose.py` script uses the existing NGC containers 
+The `compose.py` script uses the existing NGC Docker images 
 ```
 nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
 nvcr.io/nvidia/tritonserver:<xx.yy>-py3
 ```
-to build the new custom container. The resulting container version will be `xx.yy` as it inherits from the pre-mentioned builds.
+to build the new custom Triton Docker image.
 
-### Customizing backends and repo-agents
-
-`compose.py` provides a `--backend` option to specify the backend and a `--repoagent` option to specify the repository agent for the new container. The requested backend needs to be an officialy supported tritonbackend.
+`compose.py` provides `--backend` and `--repoagent` options that allow you to specify which backends and repository agents you want to include in the custom image. The `--enable-gpu` flag indicates that you want to create an image that supports NVIDIA GPUs. For example, the following creates a new docker image that contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum repository agent.
  
 Example:
 ```
-python3 compose.py --build-dir . --backend tensorflow1 --backend tensorflow2 --repoagent checksum
+python3 compose.py --backend tensorflow1 --backend tensorflow2 --repoagent checksum --enable-gpu
 ```
-will provide a container `tritonserver-build` locally. You can access the container with
+will provide a container `tritonserver` locally. You can access the container with
 ```
-docker run -it tritonserver_build:latest
+docker run -it tritonserver:latest
 ```
 
 
