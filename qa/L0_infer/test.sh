@@ -27,7 +27,7 @@
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
-  REPO_VERSION=$1
+    REPO_VERSION=$1
 fi
 if [ -z "$REPO_VERSION" ]; then
     echo -e "Repository version must be specified"
@@ -99,8 +99,7 @@ RET=0
 
 # Verify the flag is set only on CPU-only device
 if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
-    gpu_count=`lspci | grep -c ' VGA '`
-    #gpu_count=`nvidia-smi -L | grep GPU | wc -l`
+    gpu_count=`nvidia-smi -L | grep GPU | wc -l`
     if [ "$gpu_count" -ne 0 ]; then
     echo -e "\n***\n*** Running on a device with GPU\n***"
     echo -e "\n***\n*** Test Failed To Run\n***"
