@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,7 +49,7 @@ $ ./gen_qa_custom_ops
 ```
 
 This will create multiple model repositories in /tmp/<version>/qa_*
-(for example /tmp/19.08/qa_model_repository).  The TensorRT models
+(for example /tmp/21.05/qa_model_repository).  The TensorRT models
 will be created for the GPU on the system that CUDA considers device 0
 (zero). If you have multiple GPUs on your system see the documentation
 in the scripts for how to target a specific GPU.
@@ -60,11 +60,16 @@ Next you need to build a QA version of the Triton Docker image. This
 image will contain Triton, the QA tests, and all the dependencies
 needed to run the QA tests. First do a [Docker image
 build](build.md#building-triton-with-docker) to produce the
-*tritonserver_build* and *tritonserver* images. Then build the
-*tritonserver_sdk* image that contains the client libraries,
-model analyzer, and examples.
+*tritonserver_build* and *tritonserver* images.
+
+Then build the *tritonserver_sdk* image that contains the client
+libraries, model analyzer, and examples using the following
+commands. You must first checkout the <client branch> branch of the
+*client* repo into the clientrepo/ subdirectory. Typically you want to
+set <client branch> to be the same as your current server branch.
 
 ```
+$ git clone --single-branch --depth=1 -b <client branch> https://github.com/triton-inference-server/client.git clientrepo
 $ docker build -t tritonserver_sdk -f Dockerfile.sdk .
 ```
 
