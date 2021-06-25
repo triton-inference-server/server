@@ -37,13 +37,6 @@ TRITON_VERSION_MAP = {
         '21.05'),  # upstream container
 }
 
-EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
-CORE_BACKENDS = ['tensorrt', 'ensemble']
-NONCORE_BACKENDS = [
-    'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil'
-]
-EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
 
 #### helper functions
