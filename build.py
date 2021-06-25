@@ -654,6 +654,59 @@ LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
 ENV PATH /opt/tritonserver/bin:${{PATH}}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
+
+    df += '''
+WORKDIR /opt/tritonserver
+RUN rm -fr /opt/tritonserver/*
+COPY --chown=1000:1000 LICENSE .
+COPY --chown=1000:1000 TRITON_VERSION .
+COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
+
+# Top-level include/core not copied so --chown does not set it correctly,
+# so explicit set on all of include
+RUN chown -R triton-server:triton-server include
+'''
+
+    for noncore in NONCORE_BACKENDS:
+        if noncore in backends:
+            df += '''
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backends backends
+'''
+            break
+
+    if len(repoagents) > 0:
+        df += '''
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
+'''
+    df += dockerfile_add_installation_linux(argmap, backends)
+    
+    # Add feature labels for SageMaker endpoint
+    if 'sagemaker' in endpoints:
+        df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
+'''
+    mkdir(ddir)
+    with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
+        dfile.write(df)
+
+
+def dockerfile_add_installation_linux(argmap, backends):
+    df='''
+ARG TRITON_VERSION={}
+ARG TRITON_CONTAINER_VERSION={}
+
+ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
+ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
+ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
+ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
+LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
+
+ENV PATH /opt/tritonserver/bin:${{PATH}}
+'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'])
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -698,58 +751,22 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 '''
     df += '''
-WORKDIR /opt/tritonserver
-RUN rm -fr /opt/tritonserver/*
-COPY --chown=1000:1000 LICENSE .
-COPY --chown=1000:1000 TRITON_VERSION .
-COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
-
-# Top-level include/core not copied so --chown does not set it correctly,
-# so explicit set on all of include
-RUN chown -R triton-server:triton-server include
-'''
-
-    for noncore in NONCORE_BACKENDS:
-        if noncore in backends:
-            df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backends backends
-'''
-            break
-
-    if len(repoagents) > 0:
-        df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
-'''
-
-    df += '''
 # Extra defensive wiring for CUDA Compat lib
-RUN ln -sf ${{_CUDA_COMPAT_PATH}}/lib.real ${{_CUDA_COMPAT_PATH}}/lib \
- && echo ${{_CUDA_COMPAT_PATH}}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
+RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
+ && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
  && ldconfig \
- && rm -f ${{_CUDA_COMPAT_PATH}}/lib
+ && rm -f ${_CUDA_COMPAT_PATH}/lib
 
 COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tritonserver
 ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
-
+'''
+    df += '''
 ENV NVIDIA_BUILD_ID {}
 LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
-
-    # Add feature labels for SageMaker endpoint
-    if 'sagemaker' in endpoints:
-        df += '''
-LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
-COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
-'''
-
-    mkdir(ddir)
-    with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
-        dfile.write(df)
+    return df
 
 
 def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends,
