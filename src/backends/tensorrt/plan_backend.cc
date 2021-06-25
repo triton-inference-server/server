@@ -280,7 +280,7 @@ PlanBackend::CreateExecutionContexts(
 
   // Only need to map device to runner when creating contexts, after that,
   // only runner idx is needed.
-  std::map<int, size_t> device_to_runner_map;
+  std::map<std::pair<int, int64_t>, size_t> device_to_runner_map;
 
   // Create a runtime/engine/context trifecta for each instance.
   //
@@ -339,10 +339,11 @@ PlanBackend::CreateExecutionContexts(
               new triton::common::SyncQueue<size_t>());
           next_context_.emplace_back(-1);
         } else {
-          auto it = device_to_runner_map.find(gpu_device);
+          auto device_pair = std::make_pair(gpu_device, dla_core_id);
+          auto it = device_to_runner_map.find(device_pair);
           if (it == device_to_runner_map.end()) {
             it = device_to_runner_map
-                     .emplace(gpu_device, available_context_queue_.size())
+                     .emplace(device_pair, available_context_queue_.size())
                      .first;
             available_context_queue_.emplace_back(
                 new triton::common::SyncQueue<size_t>());
