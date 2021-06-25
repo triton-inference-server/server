@@ -84,7 +84,8 @@ One or more of the supported
 Runtime](https://github.com/triton-inference-server/onnxruntime_backend),
 [OpenVINO](https://github.com/triton-inference-server/openvino_backend),
 [Python](https://github.com/triton-inference-server/python_backend),
-and [DALI](https://github.com/triton-inference-server/dali_backend)
+[DALI](https://github.com/triton-inference-server/dali_backend) and
+[FIL](https://github.com/triton-inference-server/fil_backend)
 backends can be added to the minimum Triton image. The backend can be
 built from scratch or the appropriate backend directory can be copied
 from from the full Triton image. For example, to create a Triton image
