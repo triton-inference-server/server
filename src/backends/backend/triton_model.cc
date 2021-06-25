@@ -1,4 +1,5 @@
-// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights
+// reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -889,13 +890,14 @@ TRITONBACKEND_InputBufferForHostPolicy(
 {
   InferenceRequest::Input* ti =
       reinterpret_cast<InferenceRequest::Input*>(input);
-  
-  Status status = (host_policy_name == nullptr) ?
-        ti->DataBuffer(
-      index, buffer, buffer_byte_size, memory_type, memory_type_id)
-      : ti->DataBufferForHostPolicy(
-      index, buffer, buffer_byte_size, memory_type, memory_type_id,
-      host_policy_name);
+
+  Status status =
+      (host_policy_name == nullptr)
+          ? ti->DataBuffer(
+                index, buffer, buffer_byte_size, memory_type, memory_type_id)
+          : ti->DataBufferForHostPolicy(
+                index, buffer, buffer_byte_size, memory_type, memory_type_id,
+                host_policy_name);
   if (!status.IsOk()) {
     *buffer = nullptr;
     *buffer_byte_size = 0;

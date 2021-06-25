@@ -1,4 +1,5 @@
-// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights
+// reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -146,8 +147,7 @@ TritonModelInstance::CreateInstance(
   triton::common::TritonJson::Value policy_setting_json(
       host_policy_json, triton::common::TritonJson::ValueType::OBJECT);
   for (const auto& pr : host_policy) {
-    RETURN_IF_ERROR(
-        policy_setting_json.AddString(pr.first.c_str(), pr.second));
+    RETURN_IF_ERROR(policy_setting_json.AddString(pr.first.c_str(), pr.second));
   }
 
   RETURN_IF_ERROR(host_policy_json.Add(

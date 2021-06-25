@@ -758,24 +758,26 @@ main(int argc, char** argv)
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
-            irequest, input0, zero_data.data(), zero_data.size() * sizeof(uint32_t),
-            TRITONSERVER_MEMORY_CPU, 0, "fake_host_policy_name"),
+            irequest, input0, zero_data.data(),
+            zero_data.size() * sizeof(uint32_t), TRITONSERVER_MEMORY_CPU, 0,
+            "fake_host_policy_name"),
         "assigning zero INPUT0 data with host policy 'fake_host_policy_name'");
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
-            irequest, input1, zero_data.data(), zero_data.size() * sizeof(uint32_t),
-            TRITONSERVER_MEMORY_CPU, 0, "fake_host_policy_name"),
+            irequest, input1, zero_data.data(),
+            zero_data.size() * sizeof(uint32_t), TRITONSERVER_MEMORY_CPU, 0,
+            "fake_host_policy_name"),
         "assigning zero INPUT1 data with host policy 'fake_host_policy_name'");
   } else {
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestAppendInputData(
-            irequest, input0, zero_data.data(), zero_data.size() * sizeof(uint32_t),
-            TRITONSERVER_MEMORY_CPU, 0),
+            irequest, input0, zero_data.data(),
+            zero_data.size() * sizeof(uint32_t), TRITONSERVER_MEMORY_CPU, 0),
         "assigning zero INPUT0 data");
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestAppendInputData(
-            irequest, input1, zero_data.data(), zero_data.size() * sizeof(uint32_t),
-            TRITONSERVER_MEMORY_CPU, 0),
+            irequest, input1, zero_data.data(),
+            zero_data.size() * sizeof(uint32_t), TRITONSERVER_MEMORY_CPU, 0),
         "assigning zero INPUT1 data");
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
