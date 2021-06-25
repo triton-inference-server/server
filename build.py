@@ -70,8 +70,7 @@ TRITON_VERSION_MAP = {
        '21.05',      # upstream container
        '1.8.0',      # ORT
        '2021.2.200', # ORT OpenVINO
-       '2021.2.200', # Standalone OpenVINO (non-windows)
-       '2021.2')     # Standalone OpenVINO (windows)
+       '2021.2')     # Standalone OpenVINO
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -417,20 +416,15 @@ def onnxruntime_cmake_args(images, library_paths):
 
 
 def openvino_cmake_args():
-    if target_platform() == 'windows':
-        cargs = [
-            '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][5]),
-        ]
+    cargs = [
+        '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][4]),
+    ]
 
+    if target_platform() == 'windows':
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
     else:
-        cargs = [
-            '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][4]),
-        ]
-
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
         else:
