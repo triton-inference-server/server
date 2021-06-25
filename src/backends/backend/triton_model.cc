@@ -852,7 +852,11 @@ TRITONBACKEND_InputPropertiesForHostPolicy(
     *byte_size = ti->Data(host_policy_name)->TotalByteSize();
   }
   if (buffer_count != nullptr) {
-    *buffer_count = ti->DataBufferCountForHostPolicy(host_policy_name);
+    if (host_policy_name != nullptr) {
+      *buffer_count = ti->DataBufferCountForHostPolicy(host_policy_name);
+    } else {
+      *buffer_count = ti->DataBufferCount();
+    }
   }
   return nullptr;  // success
 }
@@ -885,7 +889,11 @@ TRITONBACKEND_InputBufferForHostPolicy(
 {
   InferenceRequest::Input* ti =
       reinterpret_cast<InferenceRequest::Input*>(input);
-  Status status = ti->DataBufferForHostPolicy(
+  
+  Status status = (host_policy_name == nullptr) ?
+        ti->DataBuffer(
+      index, buffer, buffer_byte_size, memory_type, memory_type_id)
+      : ti->DataBufferForHostPolicy(
       index, buffer, buffer_byte_size, memory_type, memory_type_id,
       host_policy_name);
   if (!status.IsOk()) {

@@ -132,10 +132,12 @@ for input_device in -1 0 1; do
                 full=${trial}_float32_float32_float32
                 full_log=$CLIENT_LOG.$full.$input_device.$output_device.$model_device
 
+                host_policy=cpu
                 if [ "$model_device" == "-1" ]; then
                     (cd $MODELSDIR/${full} && \
                         sed -i "s/instance_group.*/instance_group [{ kind: KIND_CPU }]/" config.pbtxt)
                 else
+                    host_policy=gpu_${model_device}
                     (cd $MODELSDIR/${full} && \
                         sed -i "s/instance_group.*/instance_group [{ kind: KIND_GPU, gpus: [${model_device}] }]/" config.pbtxt)
                 fi
@@ -146,6 +148,25 @@ for input_device in -1 0 1; do
                     cat $full_log
                     echo -e "\n***\n*** Test Failed\n***"
                     RET=1
+                fi
+                set -e
+
+                # Test with host policy
+                set +e
+                $IO_TEST_UTIL -i $input_device -o $output_device -h $host_policy -r $MODELSDIR -m $full >>$full_log 2>&1
+                # FIXME currently only apply the new changes to ORT backend, should apply to others
+                if [[ "$trial" == "onnx" ]]; then
+                  if [ $? -ne 0 ]; then
+                      cat $full_log
+                      echo -e "\n***\n*** Test Failed. Expect passing \n***"
+                      RET=1
+                  fi
+                else
+                  if [ $? -eq 0 ]; then
+                      cat $full_log
+                      echo -e "\n***\n*** Test Failed. Expect failure \n***"
+                      RET=1
+                  fi
                 fi
                 set -e
 
