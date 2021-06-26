@@ -848,13 +848,18 @@ TRITONBACKEND_InputPropertiesForHostPolicy(
   if (dims_count != nullptr) {
     *dims_count = ti->ShapeWithBatchDim().size();
   }
-  if (byte_size != nullptr) {
-    *byte_size = ti->Data(host_policy_name)->TotalByteSize();
-  }
-  if (buffer_count != nullptr) {
-    if (host_policy_name != nullptr) {
-      *buffer_count = ti->DataBufferCountForHostPolicy(host_policy_name);
-    } else {
+  if (host_policy_name != nullptr) {
+    if (byte_size != nullptr) {
+      *byte_size = ti->Data(host_policy_name)->TotalByteSize();
+    }
+    if (buffer_count != nullptr) {
+        *buffer_count = ti->DataBufferCountForHostPolicy(host_policy_name);
+    }
+  } else {
+    if (byte_size != nullptr) {
+      *byte_size = ti->Data()->TotalByteSize();
+    }
+    if (buffer_count != nullptr) {
       *buffer_count = ti->DataBufferCount();
     }
   }
