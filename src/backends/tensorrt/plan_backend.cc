@@ -278,8 +278,9 @@ PlanBackend::CreateExecutionContexts(
   static std::mutex global_context_mu;
   std::lock_guard<std::mutex> glock(global_context_mu);
 
-  // Only need to map device to runner when creating contexts, after that,
-  // only runner idx is needed.
+  // Only need to map 'device' to runner when creating contexts, after that,
+  // only runner idx is needed. A pair of primary device and secondary
+  // device will compose the 'device' which will have their own runner.
   std::map<std::pair<int, int64_t>, size_t> device_to_runner_map;
 
   // Create a runtime/engine/context trifecta for each instance.
