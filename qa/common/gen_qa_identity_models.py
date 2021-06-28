@@ -577,7 +577,12 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, io_cnt,
     config.flags = flags
     config.max_workspace_size = 1 << 20
     config.add_optimization_profile(profile)
-    engine = builder.build_engine(network, config)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
@@ -589,9 +594,8 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, io_cnt,
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine.serialize())
+        f.write(engine_bytes)
 
-    del engine
     del builder
 
 
@@ -682,7 +686,12 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt,
     config.flags = flags
 
     config.max_workspace_size = 1 << 20
-    engine = builder.build_engine(network, config)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
@@ -694,9 +703,8 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt,
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine.serialize())
+        f.write(engine_bytes)
 
-    del engine
     del builder
 
 
@@ -745,7 +753,12 @@ def create_plan_dynamic_modelfile(models_dir, model_version, io_cnt, max_batch,
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
     config.max_workspace_size = 1 << 20
-    engine = builder.build_engine(network, config)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
@@ -757,9 +770,8 @@ def create_plan_dynamic_modelfile(models_dir, model_version, io_cnt, max_batch,
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine.serialize())
+        f.write(engine_bytes)
 
-    del engine
     del builder
 
 

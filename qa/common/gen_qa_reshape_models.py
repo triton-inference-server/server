@@ -335,7 +335,12 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype,
     config = builder.create_builder_config()
     config.max_workspace_size = 1 << 20
     builder.max_batch_size = max(1, max_batch)
-    engine = builder.build_engine(network, config)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
     del network
 
     model_name = tu.get_zero_model_name(
@@ -348,9 +353,8 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype,
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine.serialize())
+        f.write(engine_bytes)
 
-    del engine
     del builder
 
 
