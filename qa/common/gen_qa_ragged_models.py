@@ -139,7 +139,7 @@ def create_savedmodel_modelfile(models_dir, model_version, dtype):
     # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
     # value [[2, 4, 1]].
     tf_dtype = np_to_tf_dtype(dtype)
-   
+
     tf.reset_default_graph()
     in_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
                              "TENSOR_RAGGED_INPUT")
@@ -484,8 +484,8 @@ def create_batch_input_models(models_dir):
                            "tensorflow", "savedmodel")
         create_savedmodel_modelfile(models_dir, model_version, np.float32)
     if FLAGS.onnx:
-        create_modelconfig(models_dir, 4, model_version, np.float32, "onnxruntime",
-                           "onnx")
+        create_modelconfig(models_dir, 4, model_version, np.float32,
+                           "onnxruntime", "onnx")
         create_onnx_modelfile(models_dir, model_version, np.float32)
 
 
