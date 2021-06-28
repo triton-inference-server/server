@@ -150,7 +150,6 @@ class InferTest(tu.TestResultCollector):
                          output1_raw=True,
                          swap=True)
 
-
     def test_class_fff(self):
         self._full_exact(np.float32,
                          np.float32,

@@ -139,7 +139,7 @@ def create_savedmodel_modelfile(models_dir, model_version, dtype):
     # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
     # value [[2, 4, 1]].
     tf_dtype = np_to_tf_dtype(dtype)
-   
+
     tf.reset_default_graph()
     in_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
                              "TENSOR_RAGGED_INPUT")
@@ -263,7 +263,12 @@ def create_plan_modelfile(models_dir, model_version, dtype):
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
     config.max_workspace_size = 1 << 20
-    engine = builder.build_engine(network, config)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
 
     model_name = "plan_batch_input"
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
@@ -274,9 +279,8 @@ def create_plan_modelfile(models_dir, model_version, dtype):
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine.serialize())
+        f.write(engine_bytes)
 
-    del engine
     del builder
 
 
@@ -480,8 +484,8 @@ def create_batch_input_models(models_dir):
                            "tensorflow", "savedmodel")
         create_savedmodel_modelfile(models_dir, model_version, np.float32)
     if FLAGS.onnx:
-        create_modelconfig(models_dir, 4, model_version, np.float32, "onnxruntime",
-                           "onnx")
+        create_modelconfig(models_dir, 4, model_version, np.float32,
+                           "onnxruntime", "onnx")
         create_onnx_modelfile(models_dir, model_version, np.float32)
 
 
