@@ -441,6 +441,7 @@ BackendResponder::SetFixedSizeOutputBuffer(
         std::make_pair(response, response_output));
   } else {
     // Direct copy without intermediate pinned memory.
+    LOG_ERROR << "CopyBuffer in SetFixedSizeOutputBuffer";
     bool cuda_used = false;
     status = CopyBuffer(
         response_output->Name(), tensor_memory_type, tensor_memory_type_id,
@@ -1041,6 +1042,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
     }
 #endif  // TRITON_ENABLE_GPU
 
+    LOG_ERROR << "CopyBuffer in SetFixedSizeInputTensor";
     // Direct copy without intermediate pinned memory.
     bool cuda_used = false;
     status = CopyBuffer(

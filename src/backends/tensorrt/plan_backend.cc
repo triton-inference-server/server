@@ -2841,6 +2841,9 @@ PlanBackend::Context::Run(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             status, "error input data");
       } else {
+        LOG_ERROR << "ProcessTensor2 called";
+        LOG_ERROR << "io_binding_info.memory_type_: " << io_binding_info.memory_type_;
+        LOG_ERROR << "io_binding_info.memory_type_id_: " << io_binding_info.memory_type_id_;
         payload_->collector_->ProcessTensor(
             name, datatype, static_cast<char*>(io_binding_info.buffer_),
             total_byte_size, io_binding_info.memory_type_,
@@ -3164,6 +3167,9 @@ PlanBackend::Context::Run(
       // Process the output tensors with the device memory address even if
       // zero-copy may be used, so that the memory copies perform asynchronously
       // and wait for model execution.
+      LOG_ERROR << "ProcessTensor4 called";
+      LOG_ERROR << "io_binding_info.memory_type_: " << TRITONSERVER_MEMORY_GPU;
+      LOG_ERROR << "io_binding_info.memory_type_id_: " << gpu_device_;
       payload_->responder_->ProcessTensor(
           name, dt, batchn_shape,
           static_cast<const char*>(io_binding_info.device_buffer_),
