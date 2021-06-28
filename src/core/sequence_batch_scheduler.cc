@@ -326,6 +326,13 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 Status
 SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
 {
+  // Queue timer starts at the beginning of the queueing and
+  // scheduling process
+  irequest->CaptureQueueStartNs();
+  INFER_TRACE_ACTIVITY(
+      irequest->Trace(), TRITONSERVER_TRACE_QUEUE_START,
+      irequest->QueueStartNs());
+
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
   // batched.
