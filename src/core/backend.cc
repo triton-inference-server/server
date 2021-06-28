@@ -143,25 +143,21 @@ InferenceBackend::SetConfiguredScheduler(void* model)
   // If 'sequence_batching' is configured use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
-    return Status(
-        Status::Code::INTERNAL, "SequenceBatcher is not yet supported");
-    /*
     // Sequence batcher
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnWarmup, OnRun,
-        enforce_equal_shape_tensors, &scheduler));
-    */
+        static_cast<TritonModel*>(model), enforce_equal_shape_tensors,
+        &scheduler));
   } else if (config_.has_dynamic_batching()) {
     // Dynamic batcher
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
-        static_cast<TritonModel*>(model), GetCpuNiceLevel(config_),
+        static_cast<TritonModel*>(model), nullptr, GetCpuNiceLevel(config_),
         true /* dynamic_batching_enabled */, config_.max_batch_size(),
         enforce_equal_shape_tensors, config_.dynamic_batching(), &scheduler));
   } else {
     // Default scheduler. Use dynamic batch scheduler (with batching
     // disabled) as the default scheduler.
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
-        static_cast<TritonModel*>(model), GetCpuNiceLevel(config_),
+        static_cast<TritonModel*>(model), nullptr, GetCpuNiceLevel(config_),
         false /* dynamic_batching_enabled */, 1 /* max_batch_size */,
         std::unordered_map<
             std::string, bool>() /* enforce_equal_shape_tensors */,

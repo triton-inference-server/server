@@ -51,8 +51,8 @@ class DynamicBatchScheduler : public Scheduler {
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
   static Status Create(
-      TritonModel* model, const int nice, const bool dynamic_batching_enabled,
-      const int32_t max_batch_size,
+      TritonModel* model, TritonModelInstance* model_instance, const int nice,
+      const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
@@ -63,8 +63,8 @@ class DynamicBatchScheduler : public Scheduler {
   // function to call when a request is scheduled. And the scheduler also
   // supports different queue policies for different priority levels.
   static Status Create(
-      TritonModel* model, const int nice, const bool dynamic_batching_enabled,
-      const int32_t max_batch_size,
+      TritonModel* model, TritonModelInstance* model_instance, const int nice,
+      const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const inference::ModelDynamicBatching& batcher_config,
       std::unique_ptr<Scheduler>* scheduler);
@@ -76,8 +76,8 @@ class DynamicBatchScheduler : public Scheduler {
 
  private:
   DynamicBatchScheduler(
-      TritonModel* model, const bool dynamic_batching_enabled,
-      const int32_t max_batch_size,
+      TritonModel* model, TritonModelInstance* model_instance,
+      const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
@@ -94,6 +94,7 @@ class DynamicBatchScheduler : public Scheduler {
 
   // FIXME: Use shared_ptr for model once InferenceBackend class is cleaned up.
   TritonModel* model_;
+  TritonModelInstance* model_instance_;
 
   // True if dynamic batching is enabled.
   const bool dynamic_batching_enabled_;

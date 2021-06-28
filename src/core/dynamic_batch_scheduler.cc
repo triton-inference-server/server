@@ -40,15 +40,16 @@
 namespace nvidia { namespace inferenceserver {
 
 DynamicBatchScheduler::DynamicBatchScheduler(
-    TritonModel* model, const bool dynamic_batching_enabled,
-    const int32_t max_batch_size,
+    TritonModel* model, TritonModelInstance* model_instance,
+    const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
     const inference::ModelQueuePolicy& default_queue_policy,
     const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map)
-    : model_(model), dynamic_batching_enabled_(dynamic_batching_enabled),
+    : model_(model), model_instance_(model_instance),
+      dynamic_batching_enabled_(dynamic_batching_enabled),
       queue_(default_queue_policy, priority_levels, queue_policy_map),
       max_batch_size_((size_t)std::max(1, max_batch_size)),
       preferred_batch_sizes_(preferred_batch_sizes),
@@ -68,8 +69,8 @@ DynamicBatchScheduler::DynamicBatchScheduler(
 
 Status
 DynamicBatchScheduler::Create(
-    TritonModel* model, const int nice, const bool dynamic_batching_enabled,
-    const int32_t max_batch_size,
+    TritonModel* model, TritonModelInstance* model_instance, const int nice,
+    const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
@@ -84,14 +85,14 @@ DynamicBatchScheduler::Create(
   batcher_config.set_max_queue_delay_microseconds(max_queue_delay_microseconds);
 
   return Create(
-      model, nice, dynamic_batching_enabled, max_batch_size,
+      model, model_instance, nice, dynamic_batching_enabled, max_batch_size,
       enforce_equal_shape_tensors, batcher_config, scheduler);
 }
 
 Status
 DynamicBatchScheduler::Create(
-    TritonModel* model, const int nice, const bool dynamic_batching_enabled,
-    const int32_t max_batch_size,
+    TritonModel* model, TritonModelInstance* model_instance, const int nice,
+    const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const inference::ModelDynamicBatching& batcher_config,
     std::unique_ptr<Scheduler>* scheduler)
@@ -102,7 +103,7 @@ DynamicBatchScheduler::Create(
   }
 
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
-      model, dynamic_batching_enabled, max_batch_size,
+      model, model_instance, dynamic_batching_enabled, max_batch_size,
       enforce_equal_shape_tensors, batcher_config.preserve_ordering(),
       preferred_batch_sizes, batcher_config.max_queue_delay_microseconds(),
       batcher_config.default_queue_policy(), batcher_config.priority_levels(),
@@ -189,8 +190,7 @@ void
 DynamicBatchScheduler::NewPayload()
 {
   curr_payload_ = model_->Server()->GetRateLimiter()->GetPayload(
-      RateLimiter::Payload::Operation::INFER_RUN,
-      nullptr /* TritonModelInstance*/);
+      RateLimiter::Payload::Operation::INFER_RUN, model_instance_);
   payload_saturated_ = false;
 }
 
