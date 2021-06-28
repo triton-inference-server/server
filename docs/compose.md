@@ -67,11 +67,33 @@ FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
 COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
 COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib
 ```
+Then install dependencies outlined in [build.py](https://github.com/triton-inference-server/server/blob/main/build.py#L670-L694)
 
+Example Dockerfile that only uses `Tensorflow 1` with the 21.06 build:
+```
+FROM nvcr.io/nvidia/tritonserver:21.06-py3 as full
+FROM nvcr.io/nvidia/tritonserver:21.06-py3-min
+COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
+COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib
+COPY --from=full /opt/tritonserver/backends/tensorflow1 /opt/tritonserver/backends/tensorflow1
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+         software-properties-common \
+         libb64-0d \
+         libre2-5 && \
+    rm -rf /var/lib/apt/lists/*
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
+&& mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
+&& apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
+&& add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+RUN apt-get update \
+&& apt-get install -y datacenter-gpu-manager
+```
 Then use Docker to create the image.
 
 ```
-$ docker build -t tritonserver_min .
+$ docker build -t tritonserver_min -f <Dockerfile name> .
 ```
 
 ### Triton with Supported Backends
