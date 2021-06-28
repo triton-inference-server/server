@@ -69,10 +69,10 @@ RUN pip install grpcio-tools
 
 # Download and install Build Tools for Visual Studio. The use of
 # powershell for the install seems to be required to make the command
-# wait for the install to complete before continuing. VS seems to not
-# uncommonly break something or other so we want to stick with a
-# working compiler. Currently this is 16.8.5. This page contains
-# download links for buildtools.
+# wait for the install to complete before continuing. To avoid failures
+# caused by VS regressions we want to stick with a working
+# compiler. Currently this is 16.8.5. This page contains download
+# links for buildtools.
 # https://docs.microsoft.com/en-us/visualstudio/releases/2019/history#release-dates-and-build-numbers
 ADD https://download.visualstudio.microsoft.com/download/pr/20130c62-1bc8-43d6-b4f0-c20bb7c79113/145a319d79a83376915d8f855605e152ef5f6fa2b2f1d2dca411fb03722eea72/vs_BuildTools.exe vs_buildtools.exe
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
