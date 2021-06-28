@@ -326,13 +326,6 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 Status
 SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
 {
-  // Queue timer starts at the beginning of the queueing and
-  // scheduling process
-  irequest->CaptureQueueStartNs();
-  INFER_TRACE_ACTIVITY(
-      irequest->Trace(), TRITONSERVER_TRACE_QUEUE_START,
-      irequest->QueueStartNs());
-
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
   // batched.
@@ -856,9 +849,9 @@ DirectSequenceBatch::DirectSequenceBatch(
 
   // Create a scheduler thread associated with 'batcher_idx' that
   // executes the queued requests.
-  const int nice = GetCpuNiceLevel(config);
+  const int nice = 0;
   scheduler_thread_.reset(
-      new std::thread([this, nice]() { SchedulerThread(nice); }));
+      new std::thread([this, nice]() { BatcherThread(nice); }));
 
   *is_initialized = true;
 }
