@@ -101,10 +101,9 @@ class RateLimiter {
   Status EnqueuePayload(
       const TritonModel* model, std::shared_ptr<Payload> payload);
 
-  // TODO: Fix it for device blocking as a thread can accept requests for
-  // multiple instance
   void DequeuePayload(
-      TritonModelInstance* instance, std::shared_ptr<Payload>* payload);
+      std::deque<TritonModelInstance*>& instance,
+      std::shared_ptr<Payload>* payload);
 
   /// Requests one of the available model instance. In future, when the
   /// conditions are met, the callback will be invoked and a pointer to

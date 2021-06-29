@@ -121,7 +121,7 @@ class TritonModelInstance {
     std::string name_;
 
     TritonModel* model_;
-    std::vector<TritonModelInstance*> model_instances_;
+    std::deque<TritonModelInstance*> model_instances_;
 
     std::thread backend_thread_;
     std::atomic<bool> backend_thread_exit_;

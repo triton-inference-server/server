@@ -173,21 +173,40 @@ RateLimiter::EnqueuePayload(
 
 void
 RateLimiter::DequeuePayload(
-    TritonModelInstance* instance, std::shared_ptr<Payload>* payload)
+    std::deque<TritonModelInstance*>& instances,
+    std::shared_ptr<Payload>* payload)
 {
   payload->reset();
-  PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
+  if (payload_queues_.find(instances[0]->Model()) == payload_queues_.end()) {
+    LOG_INFO << "Should not print this ";
+  }
+  PayloadQueue* payload_queue = payload_queues_[instances[0]->Model()].get();
   if (ignore_resources_and_priority_) {
+    size_t instance_index;
     {
       std::unique_lock<std::mutex> lk(payload_queue->mu_);
-      payload_queue->cv_.wait(lk, [instance, payload_queue]() {
-        return !(
-            (payload_queue->queue_.empty()) &&
-            (payload_queue->specific_queues_[instance]->empty()));
-      });
-      if (!payload_queue->specific_queues_[instance]->empty()) {
-        *payload = payload_queue->specific_queues_[instance]->front();
-        payload_queue->specific_queues_[instance]->pop_front();
+      payload_queue->cv_.wait(
+          lk, [instances, &instance_index, payload_queue]() {
+            bool empty = payload_queue->queue_.empty();
+            if (empty) {
+              instance_index = 0;
+              for (const auto instance : instances) {
+                empty = payload_queue->specific_queues_[instance]->empty();
+                if (empty) {
+                  instance_index++;
+                } else {
+                  break;
+                }
+              }
+            }
+            return !empty;
+          });
+      if (instance_index < instances.size()) {
+        TritonModelInstance* instance = instances[instance_index];
+        if (!payload_queue->specific_queues_[instance]->empty()) {
+          *payload = payload_queue->specific_queues_[instance]->front();
+          payload_queue->specific_queues_[instance]->pop_front();
+        }
       } else {
         *payload = payload_queue->queue_.front();
         payload_queue->queue_.pop_front();
@@ -195,9 +214,10 @@ RateLimiter::DequeuePayload(
     }
     (*payload)->Callback();
     if ((*payload)->GetInstance() == nullptr) {
-      (*payload)->SetInstance(instance);
-    } else if ((*payload)->GetInstance() != instance) {
-      LOG_ERROR << "Got mismatching instance in the payload to execute";
+      (*payload)->SetInstance(instances.front());
+      instances.pop_front();
+    } else {
+      instances.erase(instances.begin() + instance_index);
     }
   } else {
     // TODO: Wait till RateLimiting pipeline notifies the thread

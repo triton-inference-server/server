@@ -618,10 +618,7 @@ TritonModelInstance::TritonBackendThread::TritonBackendThread(
 
 TritonModelInstance::TritonBackendThread::~TritonBackendThread()
 {
-  // Signal the backend thread to exit and then wait for it..
-  // FIXME: Currently, the logic to use specific instance for the execution
-  // is not available within rate limiter. The destruction will fix with
-  // accurate thread control within rate limiter.
+  // Signal the backend thread to exit and then wait for it...
   auto exit_payload = model_->Server()->GetRateLimiter()->GetPayload(
       RateLimiter::Payload::Operation::EXIT, model_instances_.back());
   model_->Server()->GetRateLimiter()->EnqueuePayload(model_, exit_payload);
@@ -654,9 +651,10 @@ TritonModelInstance::TritonBackendThread::BackendThread(
     // TODO: For device blocking there can be multiple model instances being
     // managed by this thread.
     model_->Server()->GetRateLimiter()->DequeuePayload(
-        model_instances_[0], &payload);
+        model_instances_, &payload);
     NVTX_RANGE(nvtx_, "BackendThread " + name_);
     payload->Execute(&should_exit);
+    model_instances_.push_back(payload->GetInstance());
     // Release the payload to the RateLimiter
     model_->Server()->GetRateLimiter()->PayloadRelease(payload);
   }
