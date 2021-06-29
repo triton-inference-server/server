@@ -65,13 +65,12 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.11.0dev':
-      ('21.06dev',   # triton container
-       '21.05',      # upstream container
+    '2.12.0dev':
+      ('21.07dev',   # triton container
+       '21.06',      # upstream container
        '1.8.0',      # ORT
        '2021.2.200', # ORT OpenVINO
-       '2021.2.200', # Standalone OpenVINO (non-windows)
-       '2021.2')     # Standalone OpenVINO (windows)
+       '2021.2')     # Standalone OpenVINO
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -423,20 +422,15 @@ def onnxruntime_cmake_args(images, library_paths):
 
 
 def openvino_cmake_args():
-    if target_platform() == 'windows':
-        cargs = [
-            '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][5]),
-        ]
+    cargs = [
+        '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
+            TRITON_VERSION_MAP[FLAGS.version][4]),
+    ]
 
+    if target_platform() == 'windows':
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
     else:
-        cargs = [
-            '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][4]),
-        ]
-
         if 'base' in images:
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
         else:
@@ -1213,21 +1207,21 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.05 -> branch r21.05); otherwise the default <repo-tag> is "main" (e.g. version 21.05dev -> branch main).'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.06 -> branch r21.06); otherwise the default <repo-tag> is "main" (e.g. version 21.06dev -> branch main).'
     )
     parser.add_argument(
         '--repo-tag',
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.05 -> branch r21.05); otherwise the default <repo-tag> is "main" (e.g. version 21.05dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.06 -> branch r21.06); otherwise the default <repo-tag> is "main" (e.g. version 21.06dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.05 -> branch r21.05); otherwise the default <repo-tag> is "main" (e.g. version 21.05dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.06 -> branch r21.06); otherwise the default <repo-tag> is "main" (e.g. version 21.06dev -> branch main).'
     )
 
     FLAGS = parser.parse_args()
@@ -1261,7 +1255,22 @@ if __name__ == '__main__':
             FLAGS.version = vfile.readline().strip()
 
     log('version {}'.format(FLAGS.version))
+
+    # Determine the default repo-tag that should be used for images,
+    # backends and repo-agents if a repo-tag is not given
+    # explicitly. For release branches we use the release branch as
+    # the default, otherwise we use 'main'.
     default_repo_tag = 'main'
+    cver = FLAGS.container_version
+    if cver is None:
+        if FLAGS.version not in TRITON_VERSION_MAP:
+            fail(
+                'unable to determine default repo-tag, container version not known for {}'.format(
+                    FLAGS.version))
+        cver = TRITON_VERSION_MAP[FLAGS.version][0]
+    if not cver.endswith('dev'):
+        default_repo_tag = 'r' + cver
+    log('default repo-tag: {}'.format(default_repo_tag))
 
     # For other versions use the TRITON_VERSION_MAP unless explicitly
     # given.
@@ -1280,10 +1289,6 @@ if __name__ == '__main__':
         log('container version {}'.format(FLAGS.container_version))
         log('upstream container version {}'.format(
             FLAGS.upstream_container_version))
-
-        # Determine the default <repo-tag> based on container version.
-        if not FLAGS.container_version.endswith('dev'):
-            default_repo_tag = 'r' + FLAGS.container_version
 
     # Initialize map of backends to build and repo-tag for each.
     backends = {}

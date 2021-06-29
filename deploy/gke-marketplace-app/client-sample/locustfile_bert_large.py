@@ -56,7 +56,7 @@ class ProfileLoad(LoadTestShape):
             return None
 
 class TritonUser(HttpUser):
-    wait_time = between(1, 1)
+    wait_time = between(0.2, 0.2)
 
     @task()
     def bert(self):

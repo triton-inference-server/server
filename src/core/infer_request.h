@@ -114,7 +114,7 @@ class InferenceRequest {
 
     // The data for this input for a specific device
     const std::shared_ptr<Memory>& Data(
-        const std::string host_policy_name) const;
+        const std::string& host_policy_name) const;
 
     // Set the data for this input. Error if input already has some
     // data.
@@ -140,7 +140,7 @@ class InferenceRequest {
     // host policy, the number of buffers in the fallback input data is
     // returned.
     size_t DataBufferCountForHostPolicy(
-        const std::string host_policy_name) const;
+        const std::string& host_policy_name) const;
 
     // Get the 'idx' buffer containing a contiguous chunk of bytes for
     // the input. Return error is 'idx' refers to a buffer that does
@@ -174,7 +174,7 @@ class InferenceRequest {
     Status DataBufferForHostPolicy(
         const size_t idx, const void** base, size_t* byte_size,
         TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
-        const std::string host_policy_name) const;
+        const std::string& host_policy_name) const;
 
    private:
     DISALLOW_COPY_AND_ASSIGN(Input);

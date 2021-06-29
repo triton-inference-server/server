@@ -30,10 +30,6 @@
 
 # Kubernetes Deploy: Triton Inference Server Cluster
 
-**NOTE: The prometheus operator used in these instructions is not yet
-updated to work with 1.16.x versions of Google Kubernetes Engine
-(GKE). You must use a GKE 1.15.x version to avoid this issue.**
-
 A helm chart for installing a single cluster of Triton Inference
 Server is provided. By default the cluster contains a single instance
 of the inference server but the *replicaCount* configuration parameter
@@ -59,12 +55,24 @@ launch the inference server, and then send inference requests to the
 running server. You can access a Grafana endpoint to see real-time
 metrics reported by the inference server.
 
+
 ## Installing Helm
+
+### Helm v3
 
 If you do not already have Helm installed in your Kubernetes cluster,
 executing the following steps from the [official helm install
 guide](https://helm.sh/docs/intro/install/) will
 give you a quick setup.
+
+If you're currently using Helm v2 and would like to migrate to Helm v3,
+please see the [official migration guide](https://helm.sh/docs/topics/v2_v3_migration/).
+
+### Helm v2
+
+> **NOTE**: Moving forward this chart will only be tested and maintained for Helm v3.
+
+Below are example instructions for installing Helm v2. 
 
 ```
 $ curl https://raw.githubusercontent.com/helm/helm/master/scripts/get | bash
@@ -73,6 +81,8 @@ serviceaccount/tiller created
 $ kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
 $ helm init --service-account tiller --wait
 ```
+
+If you run into any issues, you can refer to the official installation guide [here](https://v2.helm.sh/docs/install/).
 
 ## Model Repository
 
