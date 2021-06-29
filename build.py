@@ -681,20 +681,14 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backen
         df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
 '''
-    df += dockerfile_add_installation_linux(argmap, backends)
+    df += dockerfile_add_installation_linux(argmap, backends, endpoints)
     
-    # Add feature labels for SageMaker endpoint
-    if 'sagemaker' in endpoints:
-        df += '''
-LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
-COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
-'''
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
 
-def dockerfile_add_installation_linux(argmap, backends):
+def dockerfile_add_installation_linux(argmap, backends, endpoints):
     df='''
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -766,6 +760,14 @@ LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
+
+# Add feature labels for SageMaker endpoint
+    if 'sagemaker' in endpoints:
+        df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
+'''
+
     return df
 
 

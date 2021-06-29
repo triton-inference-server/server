@@ -46,13 +46,13 @@ The `compose.py` script uses the existing NGC Docker images
 nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
 nvcr.io/nvidia/tritonserver:<xx.yy>-py3
 ```
-to build the new custom Triton Docker image.
+to create the new custom Triton Docker image.
 
-`compose.py` provides `--backend` and `--repoagent` options that allow you to specify which backends and repository agents you want to include in the custom image. The `--enable-gpu` flag indicates that you want to create an image that supports NVIDIA GPUs. For example, the following creates a new docker image that contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum repository agent.
+`compose.py` provides `--container-version`, `--backend`, `--repoagent` and `--endpoint` options that allow you to specify which upstream container to use and which backends, repository agents and endpoints to include in the custom image. The `--enable-gpu` flag indicates that you want to create an image that supports NVIDIA GPUs. For example, the following creates a new docker image that contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum repository agent.
  
 Example:
 ```
-python3 compose.py --backend tensorflow1 --backend tensorflow2 --repoagent checksum --enable-gpu
+python3 compose.py --backend tensorflow1 --backend tensorflow2 --repoagent checksum --enable-gpu --container-version 21.06
 ```
 will provide a container `tritonserver` locally. You can access the container with
 ```
