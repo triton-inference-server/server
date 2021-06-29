@@ -26,8 +26,8 @@
 
 #include "src/backends/tensorrt/autofill.h"
 
-#include "model_config.pb.h"
 #include <NvInfer.h>
+#include "model_config.pb.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"

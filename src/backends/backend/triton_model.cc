@@ -799,7 +799,7 @@ TRITONBACKEND_InputPropertiesForHostPolicy(
       *byte_size = ti->Data(host_policy_name)->TotalByteSize();
     }
     if (buffer_count != nullptr) {
-        *buffer_count = ti->DataBufferCountForHostPolicy(host_policy_name);
+      *buffer_count = ti->DataBufferCountForHostPolicy(host_policy_name);
     }
   } else {
     if (byte_size != nullptr) {

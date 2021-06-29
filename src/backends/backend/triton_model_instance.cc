@@ -36,9 +36,9 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/numa_utils.h"
-#include "src/core/shared_library.h"
 #include "src/core/nvtx.h"
 #include "src/core/server.h"
+#include "src/core/shared_library.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -145,8 +145,7 @@ TritonModelInstance::~TritonModelInstance()
 Status
 TritonModelInstance::CreateInstances(
     TritonModel* model, const HostPolicyCmdlineConfigMap& host_policy_map,
-    const inference::ModelConfig& model_config,
-    const bool device_blocking)
+    const inference::ModelConfig& model_config, const bool device_blocking)
 {
   static HostPolicyCmdlineConfig empty_host_policy;
 
@@ -164,24 +163,28 @@ TritonModelInstance::CreateInstances(
                                     ? group.name() + "_" + std::to_string(c)
                                     : group.name()};
       const bool passive = group.passive();
-      std::vector<
-          std::tuple<std::string, TRITONSERVER_InstanceGroupKind, int32_t, inference::ModelRateLimiter*>>
+      std::vector<std::tuple<
+          std::string, TRITONSERVER_InstanceGroupKind, int32_t,
+          const inference::ModelRateLimiter*>>
           instance_setting;
       if (group.kind() == inference::ModelInstanceGroup::KIND_CPU) {
         instance_setting.emplace_back(
             group.host_policy().empty() ? "cpu" : group.host_policy(),
-            TRITONSERVER_INSTANCEGROUPKIND_CPU, 0 /* device_id */, group.rate_limiter());
+            TRITONSERVER_INSTANCEGROUPKIND_CPU, 0 /* device_id */,
+            &group.rate_limiter());
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
         for (const int32_t device_id : group.gpus()) {
           instance_setting.emplace_back(
               group.host_policy().empty() ? ("gpu_" + std::to_string(device_id))
                                           : group.host_policy(),
-              TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id, group.rate_limiter());
+              TRITONSERVER_INSTANCEGROUPKIND_GPU, device_id,
+              &group.rate_limiter());
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         instance_setting.emplace_back(
             group.host_policy().empty() ? "model" : group.host_policy(),
-            TRITONSERVER_INSTANCEGROUPKIND_MODEL, 0 /* device_id */, group.rate_limiter());
+            TRITONSERVER_INSTANCEGROUPKIND_MODEL, 0 /* device_id */,
+            &group.rate_limiter());
       } else {
         return Status(
             Status::Code::INVALID_ARG,
@@ -200,7 +203,8 @@ TritonModelInstance::CreateInstances(
         RETURN_IF_ERROR(SetNumaConfigOnThread(*host_policy));
         auto err = CreateInstance(
             model, instance_name, c, std::get<1>(is), std::get<2>(is),
-            profile_names, passive, policy_name, *host_policy, std::get<3>(is), device_blocking, &device_to_thread_map);
+            profile_names, passive, policy_name, *host_policy,
+            *(std::get<3>(is)), device_blocking, &device_to_thread_map);
         RETURN_IF_ERROR(ResetNumaMemoryPolicy());
         RETURN_IF_ERROR(err);
       }

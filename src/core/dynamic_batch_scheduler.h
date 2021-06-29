@@ -35,7 +35,6 @@
 #include <set>
 #include <thread>
 #include "model_config.pb.h"
-#include "src/core/model_config.h"
 #include "src/backends/backend/triton_model.h"
 #include "src/backends/backend/triton_model_instance.h"
 #include "src/core/model_config.h"
