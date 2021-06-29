@@ -381,7 +381,7 @@ def pytorch_cmake_args(images):
 
 def onnxruntime_cmake_args(images, library_paths):
     cargs = [
-        '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
+        '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
