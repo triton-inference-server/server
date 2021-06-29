@@ -67,8 +67,8 @@ FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
 COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
 COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib
 ```
-Then install dependencies outlined in [build.py](https://github.com/triton-inference-server/server/blob/main/build.py#L670-L694)
-
+Then install dependencies outlined in [build.py](https://github.com/triton-inference-server/server/blob/main/build.py), `dockerfile_add_installation_linux()` function.
+ 
 Example Dockerfile that only uses `Tensorflow 1` with the 21.06 build:
 ```
 FROM nvcr.io/nvidia/tritonserver:21.06-py3 as full
