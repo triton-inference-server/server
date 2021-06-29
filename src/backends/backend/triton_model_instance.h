@@ -65,7 +65,7 @@ class TritonModelInstance {
   bool IsPassive() const { return passive_; }
   const std::vector<std::string>& Profiles() const { return profile_names_; }
 
-  Status Initialize() { return Status::Success; }
+  Status Initialize();
   Status WarmUp();
   void Schedule(
       std::vector<std::unique_ptr<InferenceRequest>>&& requests,

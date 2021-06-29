@@ -499,6 +499,13 @@ TritonModelInstance::Schedule(
 }
 
 Status
+TritonModelInstance::Initialize()
+{
+  RETURN_IF_ERROR(SetNumaConfigOnThread(HostPolicy()));
+  return Status::Success;
+}
+
+Status
 TritonModelInstance::WarmUp()
 {
   for (auto& sample : warmup_samples_) {
