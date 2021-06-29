@@ -28,16 +28,9 @@ import argparse
 import os
 import subprocess
 import sys
-import docker
-
-### Global variables
-TRITON_VERSION_MAP = {
-    '2.12.0dev': (
-        '21.07dev',  # triton container
-        '21.06'),  # upstream container
-}
 
 FLAGS = None
+
 
 #### helper functions
 def log(msg, force=False):
@@ -56,12 +49,12 @@ def log_verbose(msg):
 def fail(msg):
     print('error: {}'.format(msg), file=sys.stderr)
     sys.exit(1)
-    
+
 
 def fail_if(p, msg):
     if p:
         fail(msg)
-        
+
 
 ##### create base image for gpu
 def start_gpu_dockerfile(ddir, argmap, dockerfile_name):
@@ -72,15 +65,8 @@ def start_gpu_dockerfile(ddir, argmap, dockerfile_name):
 #
 FROM nvcr.io/nvidia/tritonserver:{}-py3 as full
 FROM nvcr.io/nvidia/tritonserver:{}-py3-min
-ARG TRITON_VERSION={}
-ARG TRITON_CONTAINER_VERSION={}
-ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
-ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
-LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
-ENV PATH /opt/tritonserver/bin:${{PATH}}
-'''.format(argmap['TRITON_CONTAINER_VERSION'], argmap['TRITON_CONTAINER_VERSION'], argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'])
+'''.format(argmap['TRITON_CONTAINER_VERSION'],
+           argmap['TRITON_CONTAINER_VERSION'])
 
     # Copy over files
     df += '''
@@ -107,6 +93,7 @@ COPY --chown=1000:1000 --from=full /opt/tritonserver/include include/
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
+
 ### add additional backends needed
 def add_requested_backends(ddir, dockerfile_name, backends):
     df = "# Copying over backends \n"
@@ -127,32 +114,47 @@ def add_requested_repoagents(ddir, dockerfile_name, repoagents):
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
+
 def create_argmap(container_version):
-    upstreamDockerImage = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(container_version)
-    
-    baseRunArgs = [ 'docker', 'inspect', '-f']
-    p_version = subprocess.run(baseRunArgs + ['{{range $index, $value := .Config.Env}}{{$value}} {{end}}', upstreamDockerImage], capture_output=True, text=True)
+    upstreamDockerImage = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
+        container_version)
+
+    baseRunArgs = ['docker', 'inspect', '-f']
+    p_version = subprocess.run(baseRunArgs + [
+        '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
+        upstreamDockerImage
+    ],
+                               capture_output=True,
+                               text=True)
     vars = p_version.stdout
-    import re # parse all PATH enviroment variables
+    import re  # parse all PATH enviroment variables
     e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
     version = "" if e == None else e.group(1)
-    fail_if(p_version.returncode != 0 or len(version) == 0, 'docker inspect to find triton version failed')
-    p_sha = subprocess.run(baseRunArgs + ['{{ index .Config.Labels "com.nvidia.build.ref"}}', upstreamDockerImage], capture_output=True, text=True)
-    fail_if(p_sha.returncode != 0, 'docker inspect of upstream docker image build sha failed')
-    p_build = subprocess.run(baseRunArgs + ['{{ index .Config.Labels "com.nvidia.build.id"}}', upstreamDockerImage], capture_output=True, text=True)
-    fail_if(p_build.returncode != 0, 'docker inspect of upstream docker image build sha failed')
-    
+    fail_if(p_version.returncode != 0 or len(version) == 0,
+            'docker inspect to find triton version failed')
+    p_sha = subprocess.run(baseRunArgs + [
+        '{{ index .Config.Labels "com.nvidia.build.ref"}}', upstreamDockerImage
+    ],
+                           capture_output=True,
+                           text=True)
+    fail_if(p_sha.returncode != 0,
+            'docker inspect of upstream docker image build sha failed')
+    p_build = subprocess.run(baseRunArgs + [
+        '{{ index .Config.Labels "com.nvidia.build.id"}}', upstreamDockerImage
+    ],
+                             capture_output=True,
+                             text=True)
+    fail_if(p_build.returncode != 0,
+            'docker inspect of upstream docker image build sha failed')
+
     argmap = {
-        'NVIDIA_BUILD_REF':
-            p_sha.stdout.rstrip(),
-        'NVIDIA_BUILD_ID':
-            p_build.stdout.rstrip(),
-        'TRITON_VERSION':
-            version,
-        'TRITON_CONTAINER_VERSION':
-            container_version,
+        'NVIDIA_BUILD_REF': p_sha.stdout.rstrip(),
+        'NVIDIA_BUILD_ID': p_build.stdout.rstrip(),
+        'TRITON_VERSION': version,
+        'TRITON_CONTAINER_VERSION': container_version,
     }
     return argmap
+
 
 # Install dependencies and run entrypoint script
 def end_gpu_dockerfile(ddir, dockerfile_name, argmap, backends, endpoint):
@@ -183,30 +185,28 @@ if __name__ == '__main__':
                           action="store_true",
                           required=False,
                           help='Enable verbose output.')
-    parser.add_argument('--output-name',
-                        type=str,
-                        required=False,
-                        help='Name for the generated Docker image. Default is "tritonserver".')
+    parser.add_argument(
+        '--output-name',
+        type=str,
+        required=False,
+        help='Name for the generated Docker image. Default is "tritonserver".')
     parser.add_argument(
         '--work-dir',
         type=str,
         required=False,
         help=
-        'Generated dockerfiles are placed here. Default to current directory.'
-    )
+        'Generated dockerfiles are placed here. Default to current directory.')
     parser.add_argument(
-        '--container-version',
+        '--upstream-container-version',
         type=str,
-        required=True,
+        required=False,
         help=
         'The version to use for the generated Docker image. If not specified the container version will be chosen automatically based on --version value.'
     )
-    parser.add_argument(
-        '--enable-gpu',
-        action="store_true",
-        required=False,
-        help='Generate a Triton image that supports GPU'
-    )
+    parser.add_argument('--enable-gpu',
+                        action="store_true",
+                        required=False,
+                        help='Generate a Triton image that supports GPU')
     parser.add_argument(
         '--backend',
         action='append',
@@ -218,14 +218,22 @@ if __name__ == '__main__':
         '--repoagent',
         action='append',
         required=False,
-        help='Include <repoagent-name> in the generated Docker image. The flag may be specified multiple times.')
+        help=
+        'Include <repoagent-name> in the generated Docker image. The flag may be specified multiple times.'
+    )
     parser.add_argument(
         '--endpoint',
         action='append',
         required=False,
-        help='Include <endpoint-name> in the generated Docker image. The flag may be specified multiple times.')
+        help=
+        'Include <endpoint-name> in the generated Docker image. The flag may be specified multiple times.'
+    )
     FLAGS = parser.parse_args()
-    
+    fail_if(
+        not FLAGS.enable_gpu,
+        "Only GPU versions are supported right now. Add --enable-gpu to compose.py command"
+    )
+
     if FLAGS.work_dir is None:
         FLAGS.work_dir = "."
     if FLAGS.output_name is None:
@@ -240,9 +248,21 @@ if __name__ == '__main__':
     if FLAGS.endpoint is None:
         FLAGS.endpoint = []
 
-    argmap = create_argmap(FLAGS.container_version)
+    if FLAGS.upstream_container_version is None:
+        # Read from TRITON_VERSION file in server repo to determine version
+        with open('TRITON_VERSION', "r") as vfile:
+            version = vfile.readline().strip()
+        import build
+        container_version, FLAGS.upstream_container_version = build.get_container_versions(
+            version, "", FLAGS.upstream_container_version)
+        log('version {}'.format(version))
+    log('upstream container version {}'.format(
+        FLAGS.upstream_container_version))
+    argmap = create_argmap(FLAGS.upstream_container_version)
+
     start_gpu_dockerfile(FLAGS.work_dir, argmap, dockerfile_name)
     add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
-    end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap, FLAGS.backend, FLAGS.endpoint)
+    end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap, FLAGS.backend,
+                       FLAGS.endpoint)
     build_docker_image(FLAGS.work_dir, dockerfile_name, FLAGS.output_name)

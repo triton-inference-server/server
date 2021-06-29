@@ -503,6 +503,19 @@ def fil_cmake_args(images):
     return cargs
 
 
+def get_container_versions(version, container_version,
+                           upstream_container_version):
+    if container_version is None:
+        if version not in TRITON_VERSION_MAP:
+            fail('container version not known for {}'.format(version))
+        container_version = TRITON_VERSION_MAP[version][0]
+    if upstream_container_version is None:
+        if version not in TRITON_VERSION_MAP:
+            fail('upstream container version not known for {}'.format(version))
+        upstream_container_version = TRITON_VERSION_MAP[version][1]
+    return container_version, upstream_container_version
+
+
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
     df = '''
 ARG TRITON_VERSION={}
@@ -626,9 +639,6 @@ def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents,
 #
 # Multistage build.
 #
-ARG TRITON_VERSION={}
-ARG TRITON_CONTAINER_VERSION={}
-
 ARG BASE_IMAGE={}
 ARG BUILD_IMAGE=tritonserver_build
 
@@ -642,18 +652,10 @@ FROM ${{BUILD_IMAGE}} AS tritonserver_build
 ############################################################################
 FROM ${{BASE_IMAGE}}
 
-ARG TRITON_VERSION
-ARG TRITON_CONTAINER_VERSION
-
-ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
-ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
-LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
-
 ENV PATH /opt/tritonserver/bin:${{PATH}}
-'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
-           argmap['BASE_IMAGE'])
+'''.format(argmap['BASE_IMAGE'])
+
+    df += dockerfile_add_installation_linux(argmap, backends, endpoints)
 
     df += '''
 WORKDIR /opt/tritonserver
@@ -681,15 +683,16 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backen
         df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
 '''
-    df += dockerfile_add_installation_linux(argmap, backends, endpoints)
-    
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
 
+"""Common steps for production docker image, shared by build.py and compose.py"""
+
+
 def dockerfile_add_installation_linux(argmap, backends, endpoints):
-    df='''
+    df = '''
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
 
@@ -761,7 +764,7 @@ LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
 
-# Add feature labels for SageMaker endpoint
+    # Add feature labels for SageMaker endpoint
     if 'sagemaker' in endpoints:
         df += '''
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
@@ -1277,16 +1280,9 @@ if __name__ == '__main__':
     # For other versions use the TRITON_VERSION_MAP unless explicitly
     # given.
     if not FLAGS.no_container_build:
-        if FLAGS.container_version is None:
-            if FLAGS.version not in TRITON_VERSION_MAP:
-                fail('container version not known for {}'.format(FLAGS.version))
-        FLAGS.container_version = TRITON_VERSION_MAP[FLAGS.version][0]
-        if FLAGS.upstream_container_version is None:
-            if FLAGS.version not in TRITON_VERSION_MAP:
-                fail('upstream container version not known for {}'.format(
-                    FLAGS.version))
-            FLAGS.upstream_container_version = TRITON_VERSION_MAP[
-                FLAGS.version][1]
+        FLAGS.container_version, FLAGS.upstream_container_version = get_container_versions(
+            FLAGS.version, FLAGS.container_version,
+            FLAGS.upstream_container_version)
 
         log('container version {}'.format(FLAGS.container_version))
         log('upstream container version {}'.format(
