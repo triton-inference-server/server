@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -79,6 +79,11 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-v Enable verbose logging" << std::endl;
   std::cerr << "\t-r [model repository absolute path]" << std::endl;
   std::cerr << "\t-m [model name to be tested]" << std::endl;
+  std::cerr << "\t-h [host policy name]" << std::endl;
+  std::cerr << "\tFor '-h', if specify, the input will be set with different "
+            << "host policy names, given that the specified value is the "
+            << "host policy that the model under test is associated with."
+            << std::endl;
   std::cerr << "\tFor device ID, -1 is used to stand for CPU device, "
             << "non-negative value is for GPU device." << std::endl;
 
@@ -428,9 +433,12 @@ main(int argc, char** argv)
   io_spec.output_type_ = TRITONSERVER_MEMORY_CPU;
   io_spec.output_type_id_ = 0;
 
+  const char* host_policy_cstr = nullptr;
+  std::string host_policy;
+
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:o:r:m:")) != -1) {
+  while ((opt = getopt(argc, argv, "vi:o:r:m:h:")) != -1) {
     switch (opt) {
       case 'i': {
         int64_t raw_id = std::stoll(optarg);
@@ -452,6 +460,11 @@ main(int argc, char** argv)
           io_spec.output_type_ = TRITONSERVER_MEMORY_GPU;
           io_spec.output_type_id_ = raw_id;
         }
+        break;
+      }
+      case 'h': {
+        host_policy = optarg;
+        host_policy_cstr = host_policy.c_str();
         break;
       }
       case 'r':
@@ -655,6 +668,10 @@ main(int argc, char** argv)
           irequest, InferRequestComplete, nullptr /* request_release_userp */),
       "setting request release callback");
 
+  // Create 0 data that shouldn't be selected and used to test host policy
+  // functionality
+  std::vector<uint32_t> zero_data(16);
+
   // Create the data for the two input tensors. Initialize the first
   // to unique integers and the second to all ones.
   std::vector<char> input0_data;
@@ -726,16 +743,53 @@ main(int argc, char** argv)
   input0_base = gpu_input ? input0_gpu.get() : &input0_data[0];
   input1_base = gpu_input ? input1_gpu.get() : &input1_data[0];
 
-  FAIL_IF_ERR(
-      TRITONSERVER_InferenceRequestAppendInputData(
-          irequest, input0, input0_base, input0_size, io_spec.input_type_,
-          io_spec.input_type_id_),
-      "assigning INPUT0 data");
-  FAIL_IF_ERR(
-      TRITONSERVER_InferenceRequestAppendInputData(
-          irequest, input1, input1_base, input1_size, io_spec.input_type_,
-          io_spec.input_type_id_),
-      "assigning INPUT1 data");
+
+  if (host_policy_cstr == nullptr) {
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputData(
+            irequest, input0, input0_base, input0_size, io_spec.input_type_,
+            io_spec.input_type_id_),
+        "assigning INPUT0 data");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputData(
+            irequest, input1, input1_base, input1_size, io_spec.input_type_,
+            io_spec.input_type_id_),
+        "assigning INPUT1 data");
+
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
+            irequest, input0, zero_data.data(),
+            zero_data.size() * sizeof(uint32_t), TRITONSERVER_MEMORY_CPU, 0,
+            "fake_host_policy_name"),
+        "assigning zero INPUT0 data with host policy 'fake_host_policy_name'");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
+            irequest, input1, zero_data.data(),
+            zero_data.size() * sizeof(uint32_t), TRITONSERVER_MEMORY_CPU, 0,
+            "fake_host_policy_name"),
+        "assigning zero INPUT1 data with host policy 'fake_host_policy_name'");
+  } else {
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputData(
+            irequest, input0, zero_data.data(),
+            zero_data.size() * sizeof(uint32_t), TRITONSERVER_MEMORY_CPU, 0),
+        "assigning zero INPUT0 data");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputData(
+            irequest, input1, zero_data.data(),
+            zero_data.size() * sizeof(uint32_t), TRITONSERVER_MEMORY_CPU, 0),
+        "assigning zero INPUT1 data");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
+            irequest, input0, input0_base, input0_size, io_spec.input_type_,
+            io_spec.input_type_id_, host_policy_cstr),
+        "assigning INPUT0 data to provided host policy");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
+            irequest, input1, input1_base, input1_size, io_spec.input_type_,
+            io_spec.input_type_id_, host_policy_cstr),
+        "assigning INPUT1 data to provided host policy");
+  }
 
   // Perform inference...
   auto p = new std::promise<TRITONSERVER_InferenceResponse*>();

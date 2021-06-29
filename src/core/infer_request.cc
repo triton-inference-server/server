@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -808,7 +808,7 @@ InferenceRequest::Input::SetIsShapeTensor(const bool is_shape_tensor)
 }
 
 const std::shared_ptr<Memory>&
-InferenceRequest::Input::Data(const std::string host_policy_name) const
+InferenceRequest::Input::Data(const std::string& host_policy_name) const
 {
   auto device_data = host_policy_data_map_.find(host_policy_name);
   if (device_data == host_policy_data_map_.end()) {
@@ -891,7 +891,7 @@ Status
 InferenceRequest::Input::DataBufferForHostPolicy(
     const size_t idx, const void** base, size_t* byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
-    const std::string host_policy_name) const
+    const std::string& host_policy_name) const
 {
   auto device_data = host_policy_data_map_.find(host_policy_name);
   if (device_data == host_policy_data_map_.end()) {
@@ -907,7 +907,7 @@ InferenceRequest::Input::DataBufferForHostPolicy(
 
 size_t
 InferenceRequest::Input::DataBufferCountForHostPolicy(
-    const std::string host_policy_name) const
+    const std::string& host_policy_name) const
 {
   auto policy_data = host_policy_data_map_.find(host_policy_name);
   if (policy_data != host_policy_data_map_.end()) {

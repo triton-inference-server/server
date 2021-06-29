@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -143,17 +143,14 @@ TritonModelInstance::CreateInstance(
   // Create the JSON representation of the backend configuration.
   triton::common::TritonJson::Value host_policy_json(
       triton::common::TritonJson::ValueType::OBJECT);
-  if (!host_policy.empty()) {
-    triton::common::TritonJson::Value policy_setting_json(
-        host_policy_json, triton::common::TritonJson::ValueType::OBJECT);
-    for (const auto& pr : host_policy) {
-      RETURN_IF_ERROR(
-          policy_setting_json.AddString(pr.first.c_str(), pr.second));
-    }
-
-    RETURN_IF_ERROR(host_policy_json.Add(
-        host_policy_name.c_str(), std::move(policy_setting_json)));
+  triton::common::TritonJson::Value policy_setting_json(
+      host_policy_json, triton::common::TritonJson::ValueType::OBJECT);
+  for (const auto& pr : host_policy) {
+    RETURN_IF_ERROR(policy_setting_json.AddString(pr.first.c_str(), pr.second));
   }
+
+  RETURN_IF_ERROR(host_policy_json.Add(
+      host_policy_name.c_str(), std::move(policy_setting_json)));
   TritonServerMessage host_policy_message(host_policy_json);
 
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
