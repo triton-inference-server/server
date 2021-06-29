@@ -45,7 +45,7 @@ class LargePayLoadTest(tu.TestResultCollector):
         # except the Python and plan backend should be able to handle payloads
         # larger than 2GBs using HTTP.
         very_large_tensor_shape = (math.trunc(
-            3 * (1024 * 1024 * 1024) / np.dtype(self._data_type).itemsize), )
+            2 * (1024 * 1024 * 1024) / np.dtype(self._data_type).itemsize), )
         self._very_large_in0 = np.random.random(
             very_large_tensor_shape).astype(self._data_type)
 
