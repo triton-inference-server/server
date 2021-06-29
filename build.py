@@ -1233,7 +1233,22 @@ if __name__ == '__main__':
             FLAGS.version = vfile.readline().strip()
 
     log('version {}'.format(FLAGS.version))
+
+    # Determine the default repo-tag that should be used for images,
+    # backends and repo-agents if a repo-tag is not given
+    # explicitly. For release branches we use the release branch as
+    # the default, otherwise we use 'main'.
     default_repo_tag = 'main'
+    cver = FLAGS.container_version
+    if cver is None:
+        if FLAGS.version not in TRITON_VERSION_MAP:
+            fail(
+                'unable to determine default repo-tag, container version not known for {}'.format(
+                    FLAGS.version))
+        cver = TRITON_VERSION_MAP[FLAGS.version][0]
+    if not cver.endswith('dev'):
+        default_repo_tag = 'r' + cver
+    log('default repo-tag: {}'.format(default_repo_tag))
 
     # For other versions use the TRITON_VERSION_MAP unless explicitly
     # given.
@@ -1252,10 +1267,6 @@ if __name__ == '__main__':
         log('container version {}'.format(FLAGS.container_version))
         log('upstream container version {}'.format(
             FLAGS.upstream_container_version))
-
-        # Determine the default <repo-tag> based on container version.
-        if not FLAGS.container_version.endswith('dev'):
-            default_repo_tag = 'r' + FLAGS.container_version
 
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
