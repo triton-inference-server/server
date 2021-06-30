@@ -136,7 +136,7 @@ SharedLibrary::OpenLibraryHandle(const std::string& path, void** handle)
         Status::Code::NOT_FOUND, "unable to load backend library: " + errstr);
   }
 #else
-  *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+  *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND);
   if (*handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
