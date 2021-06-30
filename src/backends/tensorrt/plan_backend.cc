@@ -2841,11 +2841,6 @@ PlanBackend::Context::Run(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             status, "error input data");
       } else {
-        LOG_ERROR << "ProcessTensor (Input) called";
-        LOG_ERROR << "io_binding_info.memory_type_: "
-                  << io_binding_info.memory_type_;
-        LOG_ERROR << "io_binding_info.memory_type_id_: "
-                  << io_binding_info.memory_type_id_;
         payload_->collector_->ProcessTensor(
             name, datatype, static_cast<char*>(io_binding_info.buffer_),
             total_byte_size, io_binding_info.memory_type_,
@@ -3035,6 +3030,13 @@ PlanBackend::Context::Run(
       SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support),
       "failed to check for is zero copy is supported");
 
+  // Wait for the inference to be completed before copying output if zero copy
+  // is supported. If output copy is on a separate stream, wait was already
+  // added to that stream
+  if (zero_copy_support && !use_output_copy_stream_) {
+    cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
+  }
+
   const auto output_stream =
       use_output_copy_stream_ ? output_copy_stream_ : stream_;
   // For each requested output verify that the output can accept the
@@ -3054,6 +3056,17 @@ PlanBackend::Context::Run(
 
     nvinfer1::Dims dims;
     dims = citr->second.context_->getBindingDimensions(binding_index);
+
+    // Process the output tensors with pinned memory address if zero-copy is
+    // supported. Otherwise use device memory address, so that the memory copies
+    // perform asynchronously and wait for model execution.
+    if (zero_copy_support) {
+      io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
+      io_binding_info.memory_type_id_ = 0;
+    } else {
+      io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
+      io_binding_info.memory_type_id_ = gpu_device_;
+    }
 
     // Make sure each output is of the expected size and copy it into
     // the payload responses.
@@ -3128,14 +3141,23 @@ PlanBackend::Context::Run(
       // FIXME add correctness checking like below
       inference::DataType dt =
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
-      // Process the output tensors with the device memory address even if
-      // zero-copy may be used, so that the memory copies perform asynchronously
-      // and wait for model execution.
-      payload_->responder_->ProcessTensor(
-          name, io_binding_info.io_shape_mapping_.first, dt,
-          io_binding_info.io_shape_mapping_.second,
-          static_cast<const char*>(io_binding_info.device_buffer_),
-          TRITONSERVER_MEMORY_GPU, gpu_device_);
+      // Wait for model execution to finish to process the output tensors with
+      // the pinned memory address if zero-copy is supported.
+      if (zero_copy_support) {
+        cudaEventSynchronize(events_[next_set_].output_ready_);
+        payload_->responder_->ProcessTensor(
+            name, io_binding_info.io_shape_mapping_.first, dt,
+            io_binding_info.io_shape_mapping_.second,
+            static_cast<const char*>(io_binding_info.buffer_),
+            io_binding_info.memory_type_, io_binding_info.memory_type_id_);
+
+      } else {
+        payload_->responder_->ProcessTensor(
+            name, io_binding_info.io_shape_mapping_.first, dt,
+            io_binding_info.io_shape_mapping_.second,
+            static_cast<const char*>(io_binding_info.device_buffer_),
+            io_binding_info.memory_type_, io_binding_info.memory_type_id_);
+      }
     } else {
       std::vector<int64_t> batchn_shape;
 
@@ -3172,37 +3194,20 @@ PlanBackend::Context::Run(
             "failed to run TRT response");
       }
 
-      // Process the output tensors with the device memory address even if
-      // zero-copy may be used, so that the memory copies perform asynchronously
-      // and wait for model execution.
+      // Wait for model execution to finish to process the output tensors with
+      // the pinned memory address if zero-copy is supported.
       if (zero_copy_support) {
-        io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
-        io_binding_info.memory_type_id_ = 0;
-        cudaError_t err = cudaHostGetDevicePointer(
-            &io_binding_info.device_buffer_, io_binding_info.buffer_, 0);
-        if (err != cudaSuccess) {
-          FAIL_ALL_AND_RETURN_IF_ERROR(
-              payload_->requests_, payload_->responses_, metric_reporter_.get(),
-              Status(
-                  Status::Code::INTERNAL,
-                  "unable to get mapped device address for output '" + name +
-                      ": " + cudaGetErrorString(err)),
-              "failed to get host ptr from device ptr");
-        }
+        cudaEventSynchronize(events_[next_set_].output_ready_);
+        payload_->responder_->ProcessTensor(
+            name, dt, batchn_shape,
+            static_cast<const char*>(io_binding_info.buffer_),
+            io_binding_info.memory_type_, io_binding_info.memory_type_id_);
       } else {
-        io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
-        io_binding_info.memory_type_id_ = gpu_device_;
+        payload_->responder_->ProcessTensor(
+            name, dt, batchn_shape,
+            static_cast<const char*>(io_binding_info.device_buffer_),
+            io_binding_info.memory_type_, io_binding_info.memory_type_id_);
       }
-
-      LOG_ERROR << "ProcessTensor (Output) called";
-      LOG_ERROR << "io_binding_info.memory_type_: "
-                << io_binding_info.memory_type_;
-      LOG_ERROR << "io_binding_info.memory_type_id_: "
-                << io_binding_info.memory_type_id_;
-      payload_->responder_->ProcessTensor(
-          name, dt, batchn_shape,
-          static_cast<const char*>(io_binding_info.device_buffer_),
-          io_binding_info.memory_type_, io_binding_info.memory_type_id_);
     }
   }
 }
