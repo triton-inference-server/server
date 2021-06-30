@@ -1078,7 +1078,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
     if (err != cudaSuccess) {
       return Status(
           Status::Code::INTERNAL, "unable to allocate memory for input '" +
-                                      input_name + " for " + name_ + ": " +
+                                      input_name + "' for " + name_ + ": " +
                                       cudaGetErrorString(err));
     }
 
@@ -1094,7 +1094,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
         return Status(
             Status::Code::INTERNAL,
             "unable to get mapped device address for input '" + input_name +
-                " for " + name_ + ": " + cudaGetErrorString(err));
+                "' for " + name_ + ": " + cudaGetErrorString(err));
       }
     } else {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
@@ -1274,7 +1274,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     if (byte_size == -1) {
       return Status(
           Status::Code::INTERNAL, "unable to calculate size for input '" +
-                                      input_name + " for " + name_);
+                                      input_name + "' for " + name_);
     }
     max_byte_size = std::max(max_byte_size, byte_size);
   }
@@ -1296,7 +1296,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   if (err != cudaSuccess) {
     return Status(
         Status::Code::INTERNAL, "unable to allocate memory for input '" +
-                                    input_name + " for " + name_ + ": " +
+                                    input_name + "' for " + name_ + ": " +
                                     cudaGetErrorString(err));
   }
 
@@ -1313,7 +1313,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
       return Status(
           Status::Code::INTERNAL,
           "unable to get mapped device address for input '" + input_name +
-              " for " + name_ + ": " + cudaGetErrorString(err));
+              "' for " + name_ + ": " + cudaGetErrorString(err));
     }
   } else {
     io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
@@ -1590,7 +1590,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       if (err != cudaSuccess) {
         return Status(
             Status::Code::INTERNAL, "unable to allocate memory for output '" +
-                                        io.name() + " for " + name_ + ": " +
+                                        io.name() + "' for " + name_ + ": " +
                                         cudaGetErrorString(err));
       }
 
@@ -1606,7 +1606,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
           return Status(
               Status::Code::INTERNAL,
               "unable to get mapped device address for output '" + io.name() +
-                  " for " + name_ + ": " + cudaGetErrorString(err));
+                  "' for " + name_ + ": " + cudaGetErrorString(err));
         }
       } else {
         io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
@@ -1726,7 +1726,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       if (byte_size == -1) {
         return Status(
             Status::Code::INTERNAL, "unable to calculate size for output '" +
-                                        io.name() + " for " + name_);
+                                        io.name() + "' for " + name_);
       }
       max_byte_size = std::max(max_byte_size, byte_size);
     }
@@ -1749,7 +1749,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
     if (err != cudaSuccess) {
       return Status(
           Status::Code::INTERNAL, "unable to allocate memory for output '" +
-                                      io.name() + " for " + name_ + ": " +
+                                      io.name() + "' for " + name_ + ": " +
                                       cudaGetErrorString(err));
     }
 
@@ -1778,7 +1778,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
         return Status(
             Status::Code::INTERNAL,
             "unable to get mapped device address for output '" + io.name() +
-                " for " + name_ + ": " + cudaGetErrorString(err));
+                "' for " + name_ + ": " + cudaGetErrorString(err));
       }
     } else {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
