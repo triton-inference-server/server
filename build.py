@@ -655,7 +655,7 @@ FROM ${{BASE_IMAGE}}
 ENV PATH /opt/tritonserver/bin:${{PATH}}
 '''.format(argmap['BASE_IMAGE'])
 
-    df += dockerfile_add_installation_linux(argmap, backends, endpoints)
+    df += dockerfile_add_installation_linux(argmap, backends)
 
     df += '''
 WORKDIR /opt/tritonserver
@@ -683,15 +683,20 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backen
         df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
 '''
+    # Add feature labels for SageMaker endpoint
+    if 'sagemaker' in endpoints:
+        df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
+'''
+
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
 
-"""Common steps for production docker image, shared by build.py and compose.py"""
-
-
-def dockerfile_add_installation_linux(argmap, backends, endpoints):
+def dockerfile_add_installation_linux(argmap, backends):
+    # Common steps for production docker image, shared by build.py and compose.py
     df = '''
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -763,13 +768,6 @@ LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
-
-    # Add feature labels for SageMaker endpoint
-    if 'sagemaker' in endpoints:
-        df += '''
-LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
-COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
-'''
 
     return df
 

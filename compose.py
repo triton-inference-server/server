@@ -115,6 +115,18 @@ def add_requested_repoagents(ddir, dockerfile_name, repoagents):
         dfile.write(df)
 
 
+def get_container_version_if_not_specified():
+    if FLAGS.container_version is None:
+        # Read from TRITON_VERSION file in server repo to determine version
+        with open('TRITON_VERSION', "r") as vfile:
+            version = vfile.readline().strip()
+        import build
+        FLAGS.container_version, upstream_container_version = build.get_container_versions(
+            version, FLAGS.container_version, "")
+        log('version {}'.format(version))
+    log('using container version {}'.format(FLAGS.container_version))
+
+
 def create_argmap(container_version):
     upstreamDockerImage = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
         container_version)
@@ -147,19 +159,32 @@ def create_argmap(container_version):
     fail_if(p_build.returncode != 0,
             'docker inspect of upstream docker image build sha failed')
 
+    p_find = subprocess.run(
+        ['docker', 'run', upstreamDockerImage, 'bash', '-c', 'ls /usr/bin/'],
+        capture_output=True,
+        text=True)
+    f = re.fullmatch("serve", p_find.stdout)
+    fail_if(p_find.returncode != 0, "Cannot search for 'serve' in /usr/bin")
+
     argmap = {
         'NVIDIA_BUILD_REF': p_sha.stdout.rstrip(),
         'NVIDIA_BUILD_ID': p_build.stdout.rstrip(),
         'TRITON_VERSION': version,
         'TRITON_CONTAINER_VERSION': container_version,
+        'ENDPOINTS': f,
     }
     return argmap
 
 
 # Install dependencies and run entrypoint script
-def end_gpu_dockerfile(ddir, dockerfile_name, argmap, backends, endpoint):
+def end_gpu_dockerfile(ddir, dockerfile_name, argmap, backends):
     import build
-    df = build.dockerfile_add_installation_linux(argmap, backends, endpoint)
+    df = build.dockerfile_add_installation_linux(argmap, backends)
+    if argmap['ENDPOINTS']:
+        df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+COPY --chown=1000:1000 --from=full /usr/bin/serve /usr/bin/.
+'''
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
@@ -197,7 +222,7 @@ if __name__ == '__main__':
         help=
         'Generated dockerfiles are placed here. Default to current directory.')
     parser.add_argument(
-        '--upstream-container-version',
+        '--container-version',
         type=str,
         required=False,
         help=
@@ -221,13 +246,6 @@ if __name__ == '__main__':
         help=
         'Include <repoagent-name> in the generated Docker image. The flag may be specified multiple times.'
     )
-    parser.add_argument(
-        '--endpoint',
-        action='append',
-        required=False,
-        help=
-        'Include <endpoint-name> in the generated Docker image. The flag may be specified multiple times.'
-    )
     FLAGS = parser.parse_args()
     fail_if(
         not FLAGS.enable_gpu,
@@ -245,24 +263,12 @@ if __name__ == '__main__':
         FLAGS.backend = []
     if FLAGS.repoagent is None:
         FLAGS.repoagent = []
-    if FLAGS.endpoint is None:
-        FLAGS.endpoint = []
 
-    if FLAGS.upstream_container_version is None:
-        # Read from TRITON_VERSION file in server repo to determine version
-        with open('TRITON_VERSION', "r") as vfile:
-            version = vfile.readline().strip()
-        import build
-        container_version, FLAGS.upstream_container_version = build.get_container_versions(
-            version, "", FLAGS.upstream_container_version)
-        log('version {}'.format(version))
-    log('upstream container version {}'.format(
-        FLAGS.upstream_container_version))
-    argmap = create_argmap(FLAGS.upstream_container_version)
+    get_container_version_if_not_specified()
+    argmap = create_argmap(FLAGS.container_version)
 
     start_gpu_dockerfile(FLAGS.work_dir, argmap, dockerfile_name)
     add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
-    end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap, FLAGS.backend,
-                       FLAGS.endpoint)
+    end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap, FLAGS.backend)
     build_docker_image(FLAGS.work_dir, dockerfile_name, FLAGS.output_name)
