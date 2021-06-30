@@ -543,7 +543,6 @@ def dali_cmake_args():
 
 def tflite_cmake_args():
     return [
-        "-DTRITON_ENABLE_GPU=OFF",
         "-DJOBS={}".format(multiprocessing.cpu_count()),
     ]
 
