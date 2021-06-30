@@ -3030,12 +3030,12 @@ PlanBackend::Context::Run(
       SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support),
       "failed to check for is zero copy is supported");
 
-  // Wait for the inference to be completed before copying output if zero copy
-  // is supported. If output copy is on a separate stream, wait was already
-  // added to that stream
-  if (zero_copy_support && !use_output_copy_stream_) {
-    cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
-  }
+  // // Wait for the inference to be completed before copying output if zero copy
+  // // is supported. If output copy is on a separate stream, wait was already
+  // // added to that stream
+  // if (zero_copy_support && !use_output_copy_stream_) {
+  //   cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
+  // }
 
   const auto output_stream =
       use_output_copy_stream_ ? output_copy_stream_ : stream_;
@@ -3057,10 +3057,12 @@ PlanBackend::Context::Run(
     nvinfer1::Dims dims;
     dims = citr->second.context_->getBindingDimensions(binding_index);
 
-    // Process the output tensors with pinned memory address if zero-copy is
-    // supported. Otherwise use device memory address, so that the memory copies
-    // perform asynchronously and wait for model execution.
+    // Wait for model execution to process the output tensors with pinned memory
+    // address if zero-copy is supported. Otherwise use device memory address,
+    // so that the memory copies perform asynchronously and wait for model
+    // execution.
     if (zero_copy_support) {
+      cudaEventSynchronize(events_[next_set_].ready_for_output_);
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
     } else {
@@ -3141,10 +3143,9 @@ PlanBackend::Context::Run(
       // FIXME add correctness checking like below
       inference::DataType dt =
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
-      // Wait for model execution to finish to process the output tensors with
-      // the pinned memory address if zero-copy is supported.
+      // Use pinned memory address if zero copy is supported, else use device
+      // memory address.
       if (zero_copy_support) {
-        cudaEventSynchronize(events_[next_set_].output_ready_);
         payload_->responder_->ProcessTensor(
             name, io_binding_info.io_shape_mapping_.first, dt,
             io_binding_info.io_shape_mapping_.second,
@@ -3194,10 +3195,9 @@ PlanBackend::Context::Run(
             "failed to run TRT response");
       }
 
-      // Wait for model execution to finish to process the output tensors with
-      // the pinned memory address if zero-copy is supported.
+      // Use pinned memory address if zero copy is supported, else use device
+      // memory address.
       if (zero_copy_support) {
-        cudaEventSynchronize(events_[next_set_].output_ready_);
         payload_->responder_->ProcessTensor(
             name, dt, batchn_shape,
             static_cast<const char*>(io_binding_info.buffer_),
