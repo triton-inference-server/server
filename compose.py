@@ -170,7 +170,7 @@ def create_argmap(container_version):
         'NVIDIA_BUILD_ID': p_build.stdout.rstrip(),
         'TRITON_VERSION': version,
         'TRITON_CONTAINER_VERSION': container_version,
-        'ENDPOINTS': f is not None,
+        'SAGEMAKER_ENDPOINT': f is not None,
     }
     return argmap
 
@@ -179,7 +179,7 @@ def create_argmap(container_version):
 def end_gpu_dockerfile(ddir, dockerfile_name, argmap, backends):
     import build
     df = build.dockerfile_add_installation_linux(argmap, backends)
-    if argmap['ENDPOINTS']:
+    if argmap['SAGEMAKER_ENDPOINT']:
         df += '''
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 COPY --chown=1000:1000 --from=full /usr/bin/serve /usr/bin/.
@@ -225,7 +225,7 @@ if __name__ == '__main__':
         type=str,
         required=False,
         help=
-        'The version to use for the generated Docker image. If not specified the container version will be chosen automatically based on --version value.'
+        'The version to use for the generated Docker image. If not specified the container version will be chosen automatically based on the repository branch.'
     )
     parser.add_argument('--enable-gpu',
                         action="store_true",
@@ -249,7 +249,7 @@ if __name__ == '__main__':
         '--dry-run',
         action="store_true",
         required=False,
-        help='Only create Dockerfile, does not create a container.')
+        help='Only creates Dockerfile.compose, does not build the Docker image.')
 
     FLAGS = parser.parse_args()
     fail_if(
