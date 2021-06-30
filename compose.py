@@ -163,15 +163,14 @@ def create_argmap(container_version):
         ['docker', 'run', upstreamDockerImage, 'bash', '-c', 'ls /usr/bin/'],
         capture_output=True,
         text=True)
-    f = re.fullmatch("serve", p_find.stdout)
+    f = re.search("serve", p_find.stdout)
     fail_if(p_find.returncode != 0, "Cannot search for 'serve' in /usr/bin")
-
     argmap = {
         'NVIDIA_BUILD_REF': p_sha.stdout.rstrip(),
         'NVIDIA_BUILD_ID': p_build.stdout.rstrip(),
         'TRITON_VERSION': version,
         'TRITON_CONTAINER_VERSION': container_version,
-        'ENDPOINTS': f,
+        'ENDPOINTS': f is not None,
     }
     return argmap
 
