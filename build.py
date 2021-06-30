@@ -288,7 +288,11 @@ def core_cmake_args(components, backends, install_dir):
 
     # If building the TFLite backend set enable MALI GPU
     if "tflite" in backends:
-        cargs.append("-DTRITON_ENABLE_MALI_GPU:BOOL=ON")
+        cargs.append(
+            "-DTRITON_ENABLE_MALI_GPU:BOOL={}".format(
+                cmake_enable(FLAGS.enable_mali_gpu)
+            )
+        )
 
     cargs.append(
         "-DTRITON_ENABLE_GRPC:BOOL={}".format(cmake_enable("grpc" in FLAGS.endpoint))
@@ -411,6 +415,9 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     ]
 
     cargs.append("-DTRITON_ENABLE_GPU:BOOL={}".format(cmake_enable(FLAGS.enable_gpu)))
+    cargs.append(
+        "-DTRITON_ENABLE_MALI_GPU:BOOL={}".format(cmake_enable(FLAGS.enable_mali_gpu))
+    )
 
     # If TRITONBUILD_* is defined in the env then we use it to set
     # corresponding cmake value.
@@ -537,7 +544,6 @@ def dali_cmake_args():
 def tflite_cmake_args():
     return [
         "-DTRITON_ENABLE_GPU=OFF",
-        "-DTRITON_ENABLE_MALI_GPU=ON",
         "-DJOBS={}".format(multiprocessing.cpu_count()),
     ]
 
@@ -1275,6 +1281,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--enable-gpu", action="store_true", required=False, help="Enable GPU support."
+    )
+    parser.add_argument(
+        "--enable-mali-gpu",
+        action="store_true",
+        required=False,
+        help="Enable ARM MALI GPU support.",
     )
     parser.add_argument(
         "--min-compute-capability",
