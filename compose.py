@@ -230,7 +230,7 @@ if __name__ == '__main__':
     parser.add_argument('--enable-gpu',
                         action="store_true",
                         required=False,
-                        help='Generate a Triton image that supports GPU')
+                        help='Generate a Triton image that supports GPU.')
     parser.add_argument(
         '--backend',
         action='append',
@@ -245,10 +245,16 @@ if __name__ == '__main__':
         help=
         'Include <repoagent-name> in the generated Docker image. The flag may be specified multiple times.'
     )
+    parser.add_argument(
+        '--dry-run',
+        action="store_true",
+        required=False,
+        help='Only create Dockerfile, does not create a container.')
+
     FLAGS = parser.parse_args()
     fail_if(
         not FLAGS.enable_gpu,
-        "Only GPU versions are supported right now. Add --enable-gpu to compose.py command"
+        "Only GPU versions are supported right now. Add --enable-gpu to compose.py command."
     )
 
     if FLAGS.work_dir is None:
@@ -270,4 +276,5 @@ if __name__ == '__main__':
     add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
     end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap, FLAGS.backend)
-    build_docker_image(FLAGS.work_dir, dockerfile_name, FLAGS.output_name)
+    if (not FLAGS.dry_run):
+        build_docker_image(FLAGS.work_dir, dockerfile_name, FLAGS.output_name)

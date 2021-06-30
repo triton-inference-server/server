@@ -41,13 +41,13 @@ from source to get more exact customization.
 
 ## Use the compose.py script
 
-The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server). Simply clone the repository and run `compose.py` to create a custom container. Note created container version will depend on the branch that was cloned. For example branch [r21.06](https://github.com/triton-inference-server/server/tree/r21.06) is needed to create a image based on the NGC 21.06 Triton release.
+The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server). Simply clone the repository and run `compose.py` to create a custom container. Note created container version will depend on the branch that was cloned. For example branch [r21.06](https://github.com/triton-inference-server/server/tree/r21.06) is needed to create a image based on the NGC 21.06 Triton release. 
 
 `compose.py` provides `--backend`, `--repoagent` and `--endpoint` options that allow you to specify which backends, repository agents and endpoints to include in the custom image. The `--enable-gpu` flag indicates that you want to create an image that supports NVIDIA GPUs. For example, the following creates a new docker image that contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum repository agent.
 
 Example:
 ```
-python3 compose.py --backend tensorflow1 --backend tensorflow2 --repoagent checksum --enable-gpu --container-version 21.06
+python3 compose.py --backend tensorflow1 --backend tensorflow2 --repoagent checksum --enable-gpu
 ```
 will provide a container `tritonserver` locally. You can access the container with
 ```
@@ -57,75 +57,8 @@ docker run -it tritonserver:latest
 
 ## Build it yourself
 
-If you would like to do what `compose.py` is doing under the hood yourself, you can pull the two Docker images used for customization using the following commands.
+If you would like to do what `compose.py` is doing under the hood yourself, you can run `compose.py` with the `--dry-run` option and then modify the `Dockerfile.compose` file to satisfy your needs. 
 
-```
-$ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
-$ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3
-```
-
-Where \<xx.yy\> is the version of Triton that you want to customize. The
-\<xx.yy\>-py3-min image is a minimal, base image that contains the CUDA,
-cuDNN, etc. dependencies that are required to run Triton. The
-\<xx.yy\>-py3 image contains the complete Triton with all options and
-backends.
-
-### Minimum Triton
-
-To create an image containing the minimal possible Triton use the
-following multi-stage Dockerfile. As mentioned above the amount of
-customization currently available is limited. As a result the minimum
-Triton still contains both HTTP/REST and GRPC endpoints; S3, GCS and
-Azure Storage filesystem support; and the TensorRT backend.
-
-```
-FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full
-FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
-COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
-COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib
-```
-
-Then use Docker to create the image.
-
-```
-$ docker build -t tritonserver_min .
-```
-
-### Triton with Supported Backends
-
-One or more of the supported
-[PyTorch](https://github.com/triton-inference-server/pytorch_backend),
-[TensorFlow1](https://github.com/triton-inference-server/tensorflow_backend),
-[TensorFlow2](https://github.com/triton-inference-server/tensorflow_backend),
-[ONNX
-Runtime](https://github.com/triton-inference-server/onnxruntime_backend),
-[OpenVINO](https://github.com/triton-inference-server/openvino_backend),
-[Python](https://github.com/triton-inference-server/python_backend),
-[DALI](https://github.com/triton-inference-server/dali_backend) and
-[FIL](https://github.com/triton-inference-server/fil_backend)
-backends can be added to the minimum Triton image. The backend can be
-built from scratch or the appropriate backend directory can be copied
-from from the full Triton image. For example, to create a Triton image
-that creates a minimum Triton plus support for TensorFlow1 use the
-following Dockerfile.
-
-```
-FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full
-FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min
-COPY --from=full /opt/tritonserver/bin /opt/tritonserver/bin
-COPY --from=full /opt/tritonserver/lib /opt/tritonserver/lib
-COPY --from=full /opt/tritonserver/backends/tensorflow1 /opt/tritonserver/backends/tensorflow1
-```
-
-Depending on the backend it may also be necessary to include
-additional dependencies in the image. For example, the Python backend
-requires that Python3 be installed in the image.
-
-Then use Docker to create the image.
-
-```
-$ docker build -t tritonserver_custom .
-```
 
 ### Triton with Unsupported and Custom Backends
 
@@ -134,12 +67,14 @@ backend](https://github.com/triton-inference-server/backend).  The
 result of that build should be a directory containing your backend
 shared library and any additional files required by the
 backend. Assuming your backend is called "mybackend" and that the
-directory is "./mkbackend", the following Dockerfile will create a
-Triton image that contains all the supported Triton backends plus your
+directory is "./mkbackend", adding the following to the Dockerfile `compose.py`
+created will create a Triton image that contains all the supported Triton backends plus your
 custom backend.
 
 ```
-FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full
+FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full # populated by compose.py
+...
+
 COPY ./mybackend /opt/tritonserver/backends/mybackend
 ```
 
@@ -148,5 +83,5 @@ backend as part of the Dockerfile. Then use Docker to create the
 image.
 
 ```
-$ docker build -t tritonserver_custom .
+$ docker build -t tritonserver_custom -f Dockerfile.compose .
 ```
