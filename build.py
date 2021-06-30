@@ -768,6 +768,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
          libb64-0d \
          libcurl4-openssl-dev \
+         libnuma-dev \
          libre2-5 && \
     rm -rf /var/lib/apt/lists/*
 """
