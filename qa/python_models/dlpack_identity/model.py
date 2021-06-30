@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +24,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
-    def initialize(self, args):
-        # Make sure that environment variables are correctly propagated
-        # to the Python models
-        if "MY_ENV" not in os.environ or os.environ["MY_ENV"] != 'MY_ENV':
-            raise pb_utils.TritonModelException(
-                "MY_ENV doesn't exists or contains incorrect value")
+    """
+    Identity model using Python backend DLPack interface.
+    """
 
     def execute(self, requests):
-        pass
+        responses = []
+        for request in requests:
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor = pb_utils.Tensor.from_dlpack("OUTPUT0",
+                                                     input_tensor.to_dlpack())
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
+        return responses

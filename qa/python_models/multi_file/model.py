@@ -24,9 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
-import os
 import file1
 from . import file2
 
@@ -40,9 +37,4 @@ class TritonPythonModel:
             raise pb_utils.TritonModelException('Imports do not work')
 
     def execute(self, requests):
-        responses = []
-        for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
-            out_tensor = pb_utils.Tensor("OUT", input_tensor.as_numpy())
-            responses.append(pb_utils.InferenceResponse([out_tensor], error))
-        return responses
+        pass

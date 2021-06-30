@@ -26,8 +26,6 @@
 
 import numpy as np
 import sys
-
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 

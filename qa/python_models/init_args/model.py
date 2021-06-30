@@ -25,15 +25,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import sys
-import json
-
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         self.args = args
         if args['model_name'] != 'init_args' or args[
@@ -43,7 +38,10 @@ class TritonPythonModel:
             )
 
     def execute(self, requests):
-        """ This function is called on inference request.
+        """
+        This function counts the number of keys in the
+        "initialize" args argument to make sure that they are
+        correct.
         """
         keys = [
             'model_config', 'model_instance_kind', 'model_instance_name',

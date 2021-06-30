@@ -24,20 +24,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
-
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
 
-    def initialize(self, args):
-        self.model_config = args['model_config']
-
     def execute(self, requests):
-        """ This function is called on inference request.
+        """
+        The body of this model doesn't matter. The main purpose of this model is
+        to test correct handling of Python errors in the `finalize` function.
         """
         responses = []
         for request in requests:

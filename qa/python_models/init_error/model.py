@@ -24,10 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
-
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 
@@ -38,7 +34,10 @@ class TritonPythonModel:
         lorem_ipsum
 
     def execute(self, requests):
-        """ This function is called on inference request.
+        """
+        The main purpose of this function is to check whether undefined
+        variables are correctly handled in `initialize` function. The body of
+        this function is never called or used.
         """
         responses = []
         for request in requests:
