@@ -37,6 +37,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+TEST_RESULT_FILE='test_results.txt'
 LARGE_PAYLOAD_TEST_PY=large_payload_test.py
 CLIENT_LOG_BASE="./client.log"
 DATADIR=`pwd`/models
@@ -89,7 +90,7 @@ for TARGET in graphdef savedmodel onnx libtorch plan python; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     else
-        check_test_results $CLIENT_LOG 1
+        check_test_results $TEST_RESULT_FILE 1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"

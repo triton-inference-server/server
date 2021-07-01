@@ -37,7 +37,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-
+TEST_RESULT_FILE='test_results.txt'
 RET=0
 rm -f *.log *.db
 EXPECTED_NUM_TESTS="1"

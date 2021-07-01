@@ -27,6 +27,7 @@
 
 CLIENT_LOG="./client.log"
 SHM_TEST=shared_memory_test.py
+TEST_RESULT_FILE='test_results.txt'
 
 # Configure to support test on jetson as well
 OPTDIR=${OPTDIR:="/opt"}
@@ -68,7 +69,7 @@ for i in \
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         else
-            check_test_results $CLIENT_LOG 1
+            check_test_results $TEST_RESULT_FILE 1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Result Verification Failed\n***"

@@ -34,6 +34,7 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+TEST_RESULT_FILE='test_results.txt'
 
 # Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
@@ -329,7 +330,7 @@ for model_trial in $MODEL_TRIALS; do
             echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
         else
-            check_test_results $CLIENT_LOG 1
+            check_test_results $TEST_RESULT_FILE 1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -394,7 +395,7 @@ for model_trial in $MODEL_TRIALS; do
             echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
         else
-            check_test_results $CLIENT_LOG 1
+            check_test_results $TEST_RESULT_FILE 1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -469,7 +470,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
       echo -e "\n***\n*** Test $i Failed\n***"
       RET=1
     else
-      check_test_results $CLIENT_LOG 1
+      check_test_results $TEST_RESULT_FILE 1
       if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -532,7 +533,7 @@ for i in $QUEUE_DELAY_TESTS ; do
         echo -e "\n***\n*** Test $i Failed\n***"
         RET=1
     else
-        check_test_results $CLIENT_LOG 1
+        check_test_results $TEST_RESULT_FILE 1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"
