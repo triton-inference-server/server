@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Note: This script is to be used with triton containers that need 
+# Note: This script is to be used with customized triton containers that need 
 # dependencies to run L0_infer tests
 apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -37,4 +37,4 @@ pip3 install nvidia-pyindex
 pip3 install tritonclient[all]
 
 # Run the actual test
-./test.sh
+bash -x test.sh

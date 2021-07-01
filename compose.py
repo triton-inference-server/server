@@ -249,7 +249,8 @@ if __name__ == '__main__':
         '--dry-run',
         action="store_true",
         required=False,
-        help='Only creates Dockerfile.compose, does not build the Docker image.')
+        help='Only creates Dockerfile.compose, does not build the Docker image.'
+    )
 
     FLAGS = parser.parse_args()
     fail_if(

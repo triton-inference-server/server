@@ -73,7 +73,7 @@ custom backend.
 
 ```
 FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full # populated by compose.py
-...
+... # Other compose commands
 
 COPY ./mybackend /opt/tritonserver/backends/mybackend
 ```
