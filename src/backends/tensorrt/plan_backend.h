@@ -417,9 +417,14 @@ class PlanBackend : public InferenceBackend {
     // separate_output_stream is selected to overlap copy and execution safely.
     int next_buffer_binding_set_;
 
-    // The aer Context::num_expected_bindings_ number of IOBindingInfo elements
-    // for copy stream
+    // There are Context::num_expected_bindings_ number of IOBindingInfo
+    // elements for copy stream
     std::vector<std::vector<IOBindingInfo>> io_binding_infos_;
+
+    std::vector<std::tuple<
+        std::string, inference::DataType, std::vector<int64_t>, const char*,
+        TRITONSERVER_MemoryType, int64_t, BackendResponder*>>
+        processTensor_tuples_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
     // engine. This is used to match the TensorRT context execution declaration

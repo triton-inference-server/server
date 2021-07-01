@@ -52,6 +52,36 @@ TimestampCaptureCallback(void* data)
 }
 #endif  // TRITON_ENABLE_STATS
 
+void CUDART_CB
+ProcessTensorCudaHost(void* params)
+{
+  using param_type = std::tuple<
+      std::string, inference::DataType, std::vector<int64_t>, const char*,
+      TRITONSERVER_MemoryType, int64_t, BackendResponder*>;
+  auto* param_tuple = reinterpret_cast<param_type*>(params);
+
+  const std::string& name = std::get<0>(*param_tuple);
+  const inference::DataType datatype = std::get<1>(*param_tuple);
+  std::vector<int64_t>& batchn_shape = std::get<2>(*param_tuple);
+  const char* buffer = std::get<3>(*param_tuple);
+  const TRITONSERVER_MemoryType memory_type = std::get<4>(*param_tuple);
+  const int64_t memory_type_id = std::get<5>(*param_tuple);
+  auto responder = std::get<6>(*param_tuple);
+
+  LOG_VERBOSE(1) << "name: " << name;
+  LOG_VERBOSE(1) << "datatype: " << datatype;
+  LOG_VERBOSE(1) << "batchn_shape.size(): " << batchn_shape.size();
+  for (size_t i = 0; i < batchn_shape.size(); i++) {
+    LOG_VERBOSE(1) << "batchn_shape[" << i << "]: " << batchn_shape[i];
+  }
+  LOG_VERBOSE(1) << "buffer: " << buffer;
+  LOG_VERBOSE(1) << "memory_type: " << memory_type;
+  LOG_VERBOSE(1) << "memory_type_id: " << memory_type_id;
+
+  responder->ProcessTensor(
+      name, datatype, batchn_shape, buffer, memory_type, memory_type_id);
+}
+
 Status
 CreateCudaEvent(
     const std::string& event_name, unsigned int event_flags, cudaEvent_t* event)
@@ -3030,13 +3060,6 @@ PlanBackend::Context::Run(
       SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support),
       "failed to check for is zero copy is supported");
 
-  // // Wait for the inference to be completed before copying output if zero copy
-  // // is supported. If output copy is on a separate stream, wait was already
-  // // added to that stream
-  // if (zero_copy_support && !use_output_copy_stream_) {
-  //   cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
-  // }
-
   const auto output_stream =
       use_output_copy_stream_ ? output_copy_stream_ : stream_;
   // For each requested output verify that the output can accept the
@@ -3062,7 +3085,6 @@ PlanBackend::Context::Run(
     // so that the memory copies perform asynchronously and wait for model
     // execution.
     if (zero_copy_support) {
-      cudaEventSynchronize(events_[next_set_].ready_for_output_);
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
     } else {
@@ -3146,6 +3168,7 @@ PlanBackend::Context::Run(
       // Use pinned memory address if zero copy is supported, else use device
       // memory address.
       if (zero_copy_support) {
+        LOG_VERBOSE(1) << "Normal ProcessTensor";
         payload_->responder_->ProcessTensor(
             name, io_binding_info.io_shape_mapping_.first, dt,
             io_binding_info.io_shape_mapping_.second,
@@ -3198,10 +3221,17 @@ PlanBackend::Context::Run(
       // Use pinned memory address if zero copy is supported, else use device
       // memory address.
       if (zero_copy_support) {
-        payload_->responder_->ProcessTensor(
-            name, dt, batchn_shape,
-            static_cast<const char*>(io_binding_info.buffer_),
-            io_binding_info.memory_type_, io_binding_info.memory_type_id_);
+        // std::string name_str = name;
+        LOG_VERBOSE(1) << "cudaLaunchHostFunc ProcessTensor";
+        cudaStreamWaitEvent(stream_, events_[next_set_].output_ready_, 0);
+        processTensor_tuples_.push_back(
+            {name, dt, batchn_shape,
+             static_cast<const char*>(io_binding_info.buffer_),
+             io_binding_info.memory_type_, io_binding_info.memory_type_id_,
+             payload_->responder_.get()});
+        cudaLaunchHostFunc(
+            stream_, ProcessTensorCudaHost,
+            reinterpret_cast<void*>(&processTensor_tuples_.back()));
       } else {
         payload_->responder_->ProcessTensor(
             name, dt, batchn_shape,
