@@ -162,7 +162,7 @@ When using Azure Storage, you must set the `AZURE_STORAGE_ACCOUNT` and `AZURE_ST
 environment variables with the values corresponding to your Azure Storage repository path. 
 
 If you don't know your `AZURE_STORAGE_KEY` and have your Azure CLI correctly configured,
-here's an example of how to find one related to your `AZURE_STORAGE_CONTAINER`:
+here's an example of how to find one related to your `AZURE_STORAGE_ACCOUNT`:
 
 ```bash
 $ export AZURE_STORAGE_ACCOUNT="account_name"
