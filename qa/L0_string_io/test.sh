@@ -35,6 +35,7 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+TEST_RESULT_FILE='test_results.txt'
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
@@ -71,7 +72,7 @@ python $STRING_CLIENT_TEST_PY -v >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 else
-    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"

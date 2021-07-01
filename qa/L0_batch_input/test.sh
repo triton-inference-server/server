@@ -44,6 +44,7 @@ EXPECTED_NUM_TESTS="6"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_ragged_model_repository
 IDENTITY_DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
 
+TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
@@ -92,7 +93,7 @@ for BACKEND in $BACKENDS; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     else
-        check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"

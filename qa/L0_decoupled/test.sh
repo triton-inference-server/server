@@ -38,7 +38,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 RET=0
-
+TEST_RESULT_FILE='test_results.txt'
 DECOUPLED_TEST=decoupled_test.py
 
 rm -f *.log
@@ -78,7 +78,7 @@ for i in \
             echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
     else
-        check_test_results $CLIENT_LOG 1
+        check_test_results $TEST_RESULT_FILE 1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -100,7 +100,7 @@ if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test test_one_to_multi_many Failed\n***"
         RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"

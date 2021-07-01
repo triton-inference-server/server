@@ -31,6 +31,7 @@ SIMPLE_TEST_PY=./ensemble_test.py
 
 CLIENT_LOG="./client.log"
 
+TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
@@ -56,7 +57,7 @@ python $SIMPLE_TEST_PY EnsembleTest.test_ensemble_add_sub >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -84,7 +85,7 @@ python $SIMPLE_TEST_PY EnsembleTest.test_ensemble_add_sub_one_output >>$CLIENT_L
 if [ $? -ne 0 ]; then
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"

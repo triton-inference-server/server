@@ -34,6 +34,7 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+TEST_RESULT_FILE='test_results.txt'
 
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_corrid_batcher_test.py
@@ -100,7 +101,7 @@ for model_trial in 4; do
             echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
         else
-            check_test_results $CLIENT_LOG 1
+            check_test_results $TEST_RESULT_FILE 1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Result Verification Failed\n***"
