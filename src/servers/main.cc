@@ -402,9 +402,10 @@ std::vector<Option> options_
        "Name of the model to be loaded on server startup. It may be specified "
        "multiple times to add multiple models. Note that this option will only "
        "take affect if --model-control-mode=explicit is true."},
+      // FIXME:  fix the default to execution_count once RL logic is complete.
       {OPTION_RATE_LIMIT, "rate-limit", Option::ArgStr,
        "Specify the mode for rate limiting. Options are \"execution_count\" "
-       "and \"off\". The default is \"execution_count\". For "
+       "and \"off\". The default is \"off\". For "
        "\"execution_count\", the server will determine the instance using "
        "configured priority and the number of time the instance has been "
        "used to run inference. The inference will finally be executed once "
@@ -1135,8 +1136,12 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   TRITONSERVER_ModelControlMode control_mode = TRITONSERVER_MODEL_CONTROL_NONE;
   std::set<std::string> startup_models_;
 
+  // FIXME: Once the rate limiter implementation is complete make
+  // EXEC_COUNT the default.
+  // TRITONSERVER_RateLimitMode rate_limit_mode =
+  //    TRITONSERVER_RATE_LIMIT_EXEC_COUNT;
   TRITONSERVER_RateLimitMode rate_limit_mode =
-      TRITONSERVER_RATE_LIMIT_EXEC_COUNT;
+      TRITONSERVER_RATE_LIMIT_OFF;
   std::vector<std::tuple<std::string, int, int>> rate_limit_resources;
 
 #ifdef TRITON_ENABLE_LOGGING
