@@ -158,6 +158,17 @@ must be prefixed with as://.
 $ tritonserver --model-repository=as://account_name/container_name/path/to/model/repository ...
 ```
 
+When using Azure Storage, you must set the `AZURE_STORAGE_ACCOUNT` and `AZURE_STORAGE_KEY`
+environment variables with the values corresponding to your Azure Storage repository path. 
+
+If you don't know your `AZURE_STORAGE_KEY` and have your Azure CLI correctly configured,
+here's an example of how to find one related to your `AZURE_STORAGE_CONTAINER`:
+
+```bash
+$ export AZURE_STORAGE_ACCOUNT="account_name"
+$ export AZURE_STORAGE_KEY=$(az storage account keys list -n $AZURE_STORAGE_ACCOUNT --query "[0].value")
+```
+
 ## Model Versions
 
 Each model can have one or more versions available in the model
