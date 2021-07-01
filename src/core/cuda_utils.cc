@@ -26,7 +26,6 @@
 
 #include "src/core/cuda_utils.h"
 
-#include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
 
@@ -91,7 +90,6 @@ CopyBuffer(
     memcpy(dst, src, byte_size);
   } else {
 #ifdef TRITON_ENABLE_GPU
-    LOG_ERROR << "cudaMemcpyAsync in CopyBuffer for " << msg;
     RETURN_IF_CUDA_ERR(
         cudaMemcpyAsync(dst, src, byte_size, cudaMemcpyDefault, cuda_stream),
         msg + ": failed to perform CUDA copy");
