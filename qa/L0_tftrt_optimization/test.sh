@@ -37,6 +37,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+TEST_RESULT_FILE='test_results.txt'
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 CLIENT_LOG="./client.log"
@@ -185,7 +186,7 @@ for MODEL in \
         cat $CLIENT_LOG
         RET=1
     else
-        check_test_results $CLIENT_LOG 1
+        check_test_results $TEST_RESULT_FILE 1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"

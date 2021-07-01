@@ -35,6 +35,7 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+TEST_RESULT_FILE='test_results.txt'
 # Make sure we can safety use symbolic link for SageMaker serve script
 if [ -d "/opt/ml/model" ] || [ -L "/opt/ml/model" ]; then
     echo -e "Default SageMaker model path must not be used for testing"
@@ -138,7 +139,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG $UNIT_TEST_COUNT
+    check_test_results $TEST_RESULT_FILE $UNIT_TEST_COUNT
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -173,7 +174,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG $UNIT_TEST_COUNT
+    check_test_results $TEST_RESULT_FILE $UNIT_TEST_COUNT
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -243,7 +244,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG $UNIT_TEST_COUNT
+    check_test_results $TEST_RESULT_FILE $UNIT_TEST_COUNT
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
