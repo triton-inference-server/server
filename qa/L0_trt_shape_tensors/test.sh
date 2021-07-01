@@ -37,6 +37,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG="./client.log"
 SHAPE_TENSOR_TEST=trt_shape_tensor_test.py
 
@@ -75,7 +76,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -89,7 +90,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -103,7 +104,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -147,7 +148,7 @@ for i in \
             echo -e "\n***\n*** Test Failed $i\n***"
             RET=1
         else
-            check_test_results $CLIENT_LOG 1
+            check_test_results $TEST_RESULT_FILE 1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -182,7 +183,7 @@ for i in \
             echo -e "\n***\n*** Test Failed $i\n***"
             RET=1
         else
-            check_test_results $CLIENT_LOG 1
+            check_test_results $TEST_RESULT_FILE 1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -228,7 +229,7 @@ for i in \
         echo -e "\n***\n*** Test $i Failed\n***"
         RET=1
     else
-        check_test_results $CLIENT_LOG 1
+        check_test_results $TEST_RESULT_FILE 1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"

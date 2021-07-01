@@ -30,6 +30,7 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 SHM_TEST=cuda_shared_memory_test.py
 
+TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
@@ -66,7 +67,7 @@ for i in \
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         else
-            check_test_results $CLIENT_LOG 1
+            check_test_results $TEST_RESULT_FILE 1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Result Verification Failed\n***"

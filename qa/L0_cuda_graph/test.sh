@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 TRT_CUDA_GRAPH_TEST=trt_cuda_graph_test.py
-
+TEST_RESULT_FILE='test_results.txt'
 DATADIR="./models"
 
 rm -rf ${DATADIR} 
@@ -78,7 +78,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -134,7 +134,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -190,7 +190,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -258,7 +258,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
