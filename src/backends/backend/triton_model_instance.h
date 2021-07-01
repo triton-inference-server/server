@@ -108,10 +108,11 @@ class TritonModelInstance {
   class TritonBackendThread {
    public:
     static Status CreateBackendThread(
-        const std::string name, TritonModel* model, const int nice,
+        const std::string name, TritonModelInstance* model, const int nice,
         const int32_t device_id,
         std::unique_ptr<TritonBackendThread>* triton_backend_thread);
-    Status AddModelInstance(TritonModelInstance* model_instance);
+    void AddModelInstance(TritonModelInstance* model_instance);
+    Status InitAndWarmUpModelInstance(TritonModelInstance* model_instance);
     ~TritonBackendThread();
 
    private:

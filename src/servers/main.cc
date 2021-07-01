@@ -1140,8 +1140,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   // EXEC_COUNT the default.
   // TRITONSERVER_RateLimitMode rate_limit_mode =
   //    TRITONSERVER_RATE_LIMIT_EXEC_COUNT;
-  TRITONSERVER_RateLimitMode rate_limit_mode =
-      TRITONSERVER_RATE_LIMIT_OFF;
+  TRITONSERVER_RateLimitMode rate_limit_mode = TRITONSERVER_RATE_LIMIT_OFF;
   std::vector<std::tuple<std::string, int, int>> rate_limit_resources;
 
 #ifdef TRITON_ENABLE_LOGGING

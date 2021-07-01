@@ -290,12 +290,13 @@ TritonModelInstance::SetBackendThread(
   if (triton_backend_thread_.get() == nullptr) {
     std::unique_ptr<TritonBackendThread> local_backend_thread;
     RETURN_IF_ERROR(TritonBackendThread::CreateBackendThread(
-        Name(), model_, 0 /* nice */, device_id, &local_backend_thread));
+        Name(), this, 0 /* nice */, device_id, &local_backend_thread));
     triton_backend_thread_ = std::move(local_backend_thread);
     device_to_thread_map->insert({device_id, triton_backend_thread_});
+  } else {
+    triton_backend_thread_->AddModelInstance(this);
   }
-
-  triton_backend_thread_->AddModelInstance(this);
+  triton_backend_thread_->InitAndWarmUpModelInstance(this);
 
   return Status::Success;
 }
@@ -569,14 +570,15 @@ TritonModelInstance::Execute(
 
 Status
 TritonModelInstance::TritonBackendThread::CreateBackendThread(
-    const std::string name, TritonModel* model, const int nice,
+    const std::string name, TritonModelInstance* model_instance, const int nice,
     const int32_t device_id,
     std::unique_ptr<TritonBackendThread>* triton_backend_thread)
 {
   TritonBackendThread* raw_triton_backend_thread =
-      new TritonBackendThread(name, model);
+      new TritonBackendThread(name, model_instance->Model());
   std::unique_ptr<TritonBackendThread> runner(raw_triton_backend_thread);
 
+  runner->AddModelInstance(model_instance);
   runner->backend_thread_ =
       std::thread([raw_triton_backend_thread, nice, device_id]() {
         raw_triton_backend_thread->BackendThread(nice, device_id);
@@ -587,22 +589,27 @@ TritonModelInstance::TritonBackendThread::CreateBackendThread(
   return Status::Success;
 }
 
-Status
+void
 TritonModelInstance::TritonBackendThread::AddModelInstance(
     TritonModelInstance* model_instance)
 {
   model_instances_.push_back(model_instance);
+}
 
+Status
+TritonModelInstance::TritonBackendThread::InitAndWarmUpModelInstance(
+    TritonModelInstance* model_instance)
+{
   // Initialize the instance on the backend thread
   auto init_payload = model_->Server()->GetRateLimiter()->GetPayload(
-      RateLimiter::Payload::Operation::INIT, model_instances_.back());
+      RateLimiter::Payload::Operation::INIT, model_instance);
   RETURN_IF_ERROR(
       model_->Server()->GetRateLimiter()->EnqueuePayload(model_, init_payload));
   RETURN_IF_ERROR(init_payload->Wait());
 
   // Warm-up the instance on the backend thread
   auto warmup_payload = model_->Server()->GetRateLimiter()->GetPayload(
-      RateLimiter::Payload::Operation::WARM_UP, model_instances_.back());
+      RateLimiter::Payload::Operation::WARM_UP, model_instance);
   RETURN_IF_ERROR(model_->Server()->GetRateLimiter()->EnqueuePayload(
       model_, warmup_payload));
   RETURN_IF_ERROR(warmup_payload->Wait());
