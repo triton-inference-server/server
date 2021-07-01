@@ -342,12 +342,14 @@ length 4, 3 and 2 in this case.
 
 You can also provide an optional "shape" field to the tensors. This is
 especially useful while profiling the models with variable-sized
-tensors as input. The specified shape values are treated as an
-override and analyzer still expects default input shapes to be
-provided as a command line option (see --shape) for variable-sized
-inputs. In the absence of "shape" field, the provided defaults will be
-used. Below is an example json file for a model with single input
-"INPUT", shape [-1,-1] and data type INT32:
+tensors as input. Additionally note that when providing the "shape" field,
+tensor contents must be provided separately in "content" field in row-major
+order. The specified shape values will override default input shapes
+provided as a command line option (see --shape) for variable-sized inputs.
+In the absence of "shape" field, the provided defaults will be used. There
+is no need to specify shape as a command line option if all the data steps
+provide shape values for variable tensors. Below is an example json file
+for a model with single input "INPUT", shape [-1,-1] and data type INT32:
 
 ```
   {
@@ -383,6 +385,19 @@ used. Below is an example json file for a model with single input
         ...
       ]
   }
+```
+
+The following is the example to provide contents as base64 string with explicit shapes:
+
+```
+{
+  "data": [{ 
+      "INPUT": {
+                 "content": {"b64": "/9j/4AAQSkZ(...)"},
+                 "shape": [7964]
+               }},
+    (...)]
+}
 ```
 
 ## Shared Memory
