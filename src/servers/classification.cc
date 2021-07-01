@@ -28,11 +28,21 @@
 
 #include <algorithm>
 #include <numeric>
+#include <sstream>
 #include "src/servers/common.h"
 
 namespace nvidia { namespace inferenceserver {
 
 namespace {
+
+template <typename T>
+std::string to_string_with_precision(const T a_value, const int n = 9)
+{
+    std::ostringstream out;
+    out.precision(n);
+    out << std::fixed << a_value;
+    return out.str();
+}
 
 template <typename T>
 TRITONSERVER_Error*
@@ -52,7 +62,7 @@ AddClassResults(
   const size_t class_cnt = std::min(element_cnt, (size_t)req_class_cnt);
   for (size_t k = 0; k < class_cnt; ++k) {
     class_strs->push_back(
-        std::to_string(probs[idx[k]]) + ":" + std::to_string(idx[k]));
+        to_string_with_precision(probs[idx[k]]) + ":" + std::to_string(idx[k]));
 
     const char* label;
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutputClassificationLabel(
