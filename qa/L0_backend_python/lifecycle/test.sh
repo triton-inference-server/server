@@ -28,6 +28,7 @@
 CLIENT_PY=./lifecycle_test.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="2"
+TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 

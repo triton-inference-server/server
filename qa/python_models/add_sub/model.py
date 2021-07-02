@@ -25,10 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import sys
 import json
 
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 
@@ -56,7 +54,6 @@ class TritonPythonModel:
 
         responses = []
         for request in requests:
-            input_tensors = request.inputs()
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             in_1 = pb_utils.get_input_tensor_by_name(request, "INPUT1")
             if in_0.as_numpy().dtype.type is np.bytes_ or in_0.as_numpy(

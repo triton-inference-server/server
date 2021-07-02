@@ -77,6 +77,7 @@ for trial in graphdef savedmodel onnx libtorch plan python; do
                     echo "max_batch_size: 64" >> config.pbtxt)
         continue
     fi
+
     mkdir -p $MODELSDIR/${full}/1 && \
         cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
         cp $DATADIR/${full}/config.pbtxt $MODELSDIR/${full}/. && \
