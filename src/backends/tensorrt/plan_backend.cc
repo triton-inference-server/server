@@ -3211,7 +3211,7 @@ PlanBackend::Context::Run(
       if (zero_copy_support_) {
         // std::string name_str = name;
         LOG_VERBOSE(1) << "cudaLaunchHostFunc ProcessTensor";
-        cudaStreamWaitEvent(stream_, events_[next_set_].output_ready_, 0);
+        cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
         processTensor_tuples_.push_back(
             {name, dt, batchn_shape,
              static_cast<const char*>(io_binding_info.buffer_),
