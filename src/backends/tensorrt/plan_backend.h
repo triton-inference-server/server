@@ -439,6 +439,9 @@ class PlanBackend : public InferenceBackend {
     // Whether to prepare the next batch before the context is ready for it
     bool eager_batching_;
 
+    // Whether zero copy is supported on this device
+    bool zero_copy_support_;
+
     // The host polciy associated with this instance
     const HostPolicyCmdlineConfig host_policy_;
     const std::string host_policy_name_;

@@ -200,6 +200,12 @@ PlanBackend::Context::Context(
     events_[idx].timestamp_signal_ = nullptr;
   }
   support_batching_ = (max_batch_size != NO_BATCHING);
+
+  Status status = SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support_);
+  if (!status.IsOk()) {
+    LOG_ERROR << "Failed to check if zero copy is supported";
+    zero_copy_support_ = false;
+  }
 }
 
 PlanBackend::Context::~Context()
@@ -1094,12 +1100,9 @@ PlanBackend::Context::InitializeShapeInputBinding(
     // on buffer_bindings_ being non-nullptr to indicate that the buffer has
     // been correctly initalized so even for zero-sized tensors always
     // allocate something.
-    bool zero_copy_support = false;
-    RETURN_IF_ERROR(
-        SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
     void* buffer = nullptr;
     cudaError_t err = cudaSuccess;
-    if (zero_copy_support) {
+    if (zero_copy_support_) {
       err = cudaHostAlloc(
           &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
     } else {
@@ -1115,7 +1118,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
     io_binding_info.byte_size_ = max_byte_size;
     io_binding_info.buffer_ = buffer;
     io_binding_info.device_buffer_ = buffer;
-    if (zero_copy_support) {
+    if (zero_copy_support_) {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
       err = cudaHostGetDevicePointer(
@@ -1313,11 +1316,9 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   // on buffer_bindings_ being non-nullptr to indicate that the buffer has
   // been correctly initalized so even for zero-sized tensors always allocate
   // something.
-  bool zero_copy_support = false;
-  RETURN_IF_ERROR(SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
   void* buffer = nullptr;
   cudaError_t err = cudaSuccess;
-  if (zero_copy_support) {
+  if (zero_copy_support_) {
     err = cudaHostAlloc(
         &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
   } else {
@@ -1334,7 +1335,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   io_binding_info.buffer_ = buffer;
   io_binding_info.device_buffer_ = buffer;
   io_binding_info.buffer_is_ragged_ = is_ragged;
-  if (zero_copy_support) {
+  if (zero_copy_support_) {
     io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
     io_binding_info.memory_type_id_ = 0;
     err = cudaHostGetDevicePointer(
@@ -1606,12 +1607,9 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       // rely on buffer_bindings_ being non-nullptr to indicate that the
       // buffer has been correctly initalized so even for zero-sized tensors
       // always allocate something.
-      bool zero_copy_support = false;
-      RETURN_IF_ERROR(
-          SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
       void* buffer = nullptr;
       cudaError_t err = cudaSuccess;
-      if (zero_copy_support) {
+      if (zero_copy_support_) {
         err = cudaHostAlloc(
             &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
       } else {
@@ -1627,7 +1625,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       io_binding_info.byte_size_ = max_byte_size;
       io_binding_info.buffer_ = buffer;
       io_binding_info.device_buffer_ = buffer;
-      if (zero_copy_support) {
+      if (zero_copy_support_) {
         io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
         io_binding_info.memory_type_id_ = 0;
         err = cudaHostGetDevicePointer(
@@ -1765,12 +1763,9 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
     // on buffer_bindings_ being non-nullptr to indicate that the buffer has
     // been correctly initalized so even for zero-sized tensors always
     // allocate something.
-    bool zero_copy_support = false;
-    RETURN_IF_ERROR(
-        SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support));
     void* buffer = nullptr;
     cudaError_t err = cudaSuccess;
-    if (zero_copy_support) {
+    if (zero_copy_support_) {
       err = cudaHostAlloc(
           &buffer, std::max((int64_t)1, max_byte_size), cudaHostAllocMapped);
     } else {
@@ -1799,7 +1794,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       }
       io_binding_info.io_shape_mapping_.second = output_shape;
     }
-    if (zero_copy_support) {
+    if (zero_copy_support_) {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
       err = cudaHostGetDevicePointer(
@@ -3054,12 +3049,6 @@ PlanBackend::Context::Run(
         output_copy_stream_, events_[next_set_].ready_for_output_, 0);
   }
 
-  bool zero_copy_support = false;
-  FAIL_ALL_AND_RETURN_IF_ERROR(
-      payload_->requests_, payload_->responses_, metric_reporter_.get(),
-      SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support),
-      "failed to check for is zero copy is supported");
-
   const auto output_stream =
       use_output_copy_stream_ ? output_copy_stream_ : stream_;
   // For each requested output verify that the output can accept the
@@ -3084,7 +3073,7 @@ PlanBackend::Context::Run(
     // address if zero-copy is supported. Otherwise use device memory address,
     // so that the memory copies perform asynchronously and wait for model
     // execution.
-    if (zero_copy_support) {
+    if (zero_copy_support_) {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
     } else {
@@ -3165,23 +3154,22 @@ PlanBackend::Context::Run(
       // FIXME add correctness checking like below
       inference::DataType dt =
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
+
       // Use pinned memory address if zero copy is supported, else use device
       // memory address.
-      if (zero_copy_support) {
-        LOG_VERBOSE(1) << "Normal ProcessTensor";
-        payload_->responder_->ProcessTensor(
-            name, io_binding_info.io_shape_mapping_.first, dt,
-            io_binding_info.io_shape_mapping_.second,
-            static_cast<const char*>(io_binding_info.buffer_),
-            io_binding_info.memory_type_, io_binding_info.memory_type_id_);
-
+      void* buffer = nullptr;
+      if (zero_copy_support_) {
+        buffer = io_binding_info.buffer_;
       } else {
-        payload_->responder_->ProcessTensor(
-            name, io_binding_info.io_shape_mapping_.first, dt,
-            io_binding_info.io_shape_mapping_.second,
-            static_cast<const char*>(io_binding_info.device_buffer_),
-            io_binding_info.memory_type_, io_binding_info.memory_type_id_);
+        buffer = io_binding_info.device_buffer_;
       }
+
+      LOG_VERBOSE(1) << "Normal ProcessTensor";
+      payload_->responder_->ProcessTensor(
+          name, io_binding_info.io_shape_mapping_.first, dt,
+          io_binding_info.io_shape_mapping_.second,
+          static_cast<const char*>(buffer), io_binding_info.memory_type_,
+          io_binding_info.memory_type_id_);
     } else {
       std::vector<int64_t> batchn_shape;
 
@@ -3220,7 +3208,7 @@ PlanBackend::Context::Run(
 
       // Use pinned memory address if zero copy is supported, else use device
       // memory address.
-      if (zero_copy_support) {
+      if (zero_copy_support_) {
         // std::string name_str = name;
         LOG_VERBOSE(1) << "cudaLaunchHostFunc ProcessTensor";
         cudaStreamWaitEvent(stream_, events_[next_set_].output_ready_, 0);
