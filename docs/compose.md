@@ -51,7 +51,7 @@ python3 compose.py --backend tensorflow1 --backend tensorflow2 --repoagent check
 ```
 will provide a container `tritonserver` locally. You can access the container with
 ```
-docker run -it tritonserver:latest
+$ docker run -it tritonserver:latest
 ```
 
 
@@ -72,9 +72,6 @@ created will create a Triton image that contains all the supported Triton backen
 custom backend.
 
 ```
-FROM nvcr.io/nvidia/tritonserver:<xx.yy>-py3 as full # populated by compose.py
-... # Other compose commands
-
 COPY ./mybackend /opt/tritonserver/backends/mybackend
 ```
 
