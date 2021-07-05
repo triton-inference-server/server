@@ -24,19 +24,43 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import triton_python_backend_utils as pb_utils
+name: "dlpack_identity"
+backend: "python"
 
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+input [
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
 
-class TritonPythonModel:
-    """
-    Identity model using Python backend DLPack interface.
-    """
+instance_group [{kind : KIND_CPU}]
 
-    def execute(self, requests):
-        responses = []
-        for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            out_tensor = pb_utils.Tensor.from_dlpack("OUTPUT0",
-                                                     input_tensor.to_dlpack())
-            responses.append(pb_utils.InferenceResponse([out_tensor]))
-        return responses
+parameters: {
+  key: "FORCE_CPU_ONLY_INPUT_TENSORS"
+  value: {
+    string_value:"no"
+  }
+}
