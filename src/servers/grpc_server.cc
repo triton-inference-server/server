@@ -3291,27 +3291,6 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   return !finished;
 }
 
-TRITONSERVER_Error* GetEncodedError(TRITONSERVER_InferenceResponse* res_, TRITONSERVER_Error* err_)
-{
-    // since grpc drops msg if status is not ok,
-    // attach request id to the error message
-    // grpc_client needs to parse it appropriately
-    const char *id;
-    LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseId(res_, &id),
-      "couldn't retrieve id for failed request");
-    TRITONSERVER_Error_Code err_code = TRITONSERVER_ErrorCode(err_);
-    std::string encoded_msg(TRITONSERVER_ErrorMessage(err_));
-    encoded_msg.append(" request_id = # ");
-    encoded_msg.append(id);
-    // encoded_msg looks like "<ErrorMessage> request_id = # <Request_ID>"
-    // TODO: Maybe a better way would be to send in json format.
-    TRITONSERVER_Error* encoded_err = TRITONSERVER_ErrorNew(
-        err_code, encoded_msg.c_str());
-    TRITONSERVER_ErrorDelete(err_); /* delete old error object */
-    return encoded_err;
-}
-
 void
 ModelInferHandler::InferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
@@ -3363,8 +3342,6 @@ ModelInferHandler::InferResponseComplete(
 
   if (err != nullptr) {
     response->Clear();
-    // encode request_id in error message
-    err = GetEncodedError(iresponse, err);
   }
 
   grpc::Status status;
@@ -3935,12 +3912,18 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
 
     if (err != nullptr) {
-      // encode request_id in error message
-      err = GetEncodedError(iresponse, err);
       grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
+
+      // repopulate the id so that client knows which request failed.
+      const char *id;
+      LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseId(iresponse, &id),
+        "couldn't retrieve id for failed request");
+      LOG_VERBOSE(1) << "Failed for ID: " << id << std::endl;
+      response->mutable_infer_response()->set_id(id);
     }
 
     TRITONSERVER_ErrorDelete(err);
