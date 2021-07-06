@@ -159,10 +159,10 @@ $ tritonserver --model-repository=as://account_name/container_name/path/to/model
 ```
 
 When using Azure Storage, you must set the `AZURE_STORAGE_ACCOUNT` and `AZURE_STORAGE_KEY`
-environment variables with the values corresponding to your Azure Storage repository path. 
+environment variables to an account that has access to the Azure Storage repository.
 
 If you don't know your `AZURE_STORAGE_KEY` and have your Azure CLI correctly configured,
-here's an example of how to find one related to your `AZURE_STORAGE_ACCOUNT`:
+here's an example of how to find a key corresponding to your `AZURE_STORAGE_ACCOUNT`:
 
 ```bash
 $ export AZURE_STORAGE_ACCOUNT="account_name"
