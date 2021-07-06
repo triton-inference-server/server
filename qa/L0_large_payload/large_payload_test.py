@@ -97,7 +97,7 @@ class LargePayLoadTest(tu.TestResultCollector):
         # FIXME Test is terminated due to libprotobuf FATAL error when GRPC sends
         # the second request with input tensors larger than 1.3GBs. In this test 
         # GRPC has been currently exempted from testing for Very Large tensor(3GBs)
-        # until problem is resolved. Should be uncommented once GRPC is fixed.
+        # until the problem is resolved. Should be uncommented once the GRPC issue is resolved.
         # See DLIS-2474.
         # if client[0] == grpcclient:
         #     inputs = [
