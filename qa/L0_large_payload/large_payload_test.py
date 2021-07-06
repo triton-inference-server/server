@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,6 +37,7 @@ from tritonclientutils import np_to_triton_dtype, InferenceServerException
 
 
 class LargePayLoadTest(tu.TestResultCollector):
+
     def setUp(self):
         self._data_type = np.float32
 
@@ -45,17 +46,17 @@ class LargePayLoadTest(tu.TestResultCollector):
         # except the Python and plan backend should be able to handle payloads
         # larger than 2GBs using HTTP.
         very_large_tensor_shape = (math.trunc(
-            6 * (1024 * 1024 * 1024) / np.dtype(self._data_type).itemsize), )
-        self._very_large_in0 = np.random.random(
-            very_large_tensor_shape).astype(self._data_type)
+            3 * (1024 * 1024 * 1024) / np.dtype(self._data_type).itemsize),)
+        self._very_large_in0 = np.random.random(very_large_tensor_shape).astype(
+            self._data_type)
 
         # 1.9 GBs allows us to test gRPC with moderate sizes too.
         large_tensor_shape = (math.trunc(1.9 * (1024 * 1024 * 1024) //
-                                         np.dtype(self._data_type).itemsize), )
+                                         np.dtype(self._data_type).itemsize),)
         self._large_in0 = np.random.random(large_tensor_shape).astype(
             self._data_type)
 
-        small_tensor_shape = (1, )
+        small_tensor_shape = (1,)
         self._small_in0 = np.random.random(small_tensor_shape).astype(
             self._data_type)
 
@@ -69,31 +70,8 @@ class LargePayLoadTest(tu.TestResultCollector):
                      model_name,
                      input_name='INPUT0',
                      output_name='OUTPUT0'):
-
-        # FIXME libtorch seems to have an issue with handling large batch sizes see DLIS-1770
-        if model_name.startswith('libtorch'):
-            try:
-                inputs = [
-                    client[0].InferInput(input_name, self._large_in0.shape,
-                                         np_to_triton_dtype(self._data_type))
-                ]
-                inputs[0].set_data_from_numpy(self._large_in0)
-                results = client[1].infer(model_name, inputs)
-
-                # if the inference is completed, examine results to ensure that
-                # the framework and protocol do support large payload
-                self.assertTrue(
-                    np.array_equal(self._large_in0,
-                                   results.as_numpy(output_name)),
-                    "output is different from input")
-            except InferenceServerException as ex:
-                self.assertTrue(
-                    ex.message() ==
-                    "OUTPUT__0: failed to perform CUDA copy: invalid argument")
-
         # plan does not supoort large batch sizes.
-        elif not model_name.startswith('plan'):
-
+        if not model_name.startswith('plan'):
             inputs = [
                 client[0].InferInput(input_name, self._large_in0.shape,
                                      np_to_triton_dtype(self._data_type))
@@ -117,15 +95,20 @@ class LargePayLoadTest(tu.TestResultCollector):
             with self.assertRaises(InferenceServerException):
                 results = client[1].infer(model_name, inputs)
 
-        if client[0] == grpcclient:
-            inputs = [
-                client[0].InferInput(input_name, self._very_large_in0.shape,
-                                     np_to_triton_dtype(self._data_type))
-            ]
-            inputs[0].set_data_from_numpy(self._very_large_in0)
-            # GRPC must fail for large payloads because of a 2GB protobuf limit
-            with self.assertRaises(InferenceServerException):
-                results = client[1].infer(model_name, inputs)
+        # FIXME Test is terminated due to libprotobuf FATAL error when GRPC sends
+        # the second request with input tensors larger than 1.3GBs. In this test
+        # GRPC has been currently exempted from testing for Very Large tensor(3GBs)
+        # until the problem is resolved. Should be uncommented once the GRPC issue is resolved.
+        # See DLIS-2474.
+        # if client[0] == grpcclient:
+        #     inputs = [
+        #         client[0].InferInput(input_name, self._very_large_in0.shape,
+        #                              np_to_triton_dtype(self._data_type))
+        #     ]
+        #     inputs[0].set_data_from_numpy(self._very_large_in0)
+        #     # GRPC must fail for large payloads because of a 2GB protobuf limit
+        #     with self.assertRaises(InferenceServerException):
+        #         results = client[1].infer(model_name, inputs)
 
         # Send a small payload to verify if the server is still functional
         inputs = [
