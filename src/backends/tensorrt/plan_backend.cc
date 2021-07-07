@@ -3058,6 +3058,7 @@ PlanBackend::Context::Run(
   payload_->responder_.reset(new BackendResponder(
       payload_->requests_, &payload_->responses_, max_batch_size_,
       enable_pinned_output_, output_stream, events_[next_set_].output_ready_));
+  payload_->process_tensor_tuples_.reserve(num_expected_bindings_);
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {
     auto& io_binding_info =
         io_binding_infos_[next_buffer_binding_set_][io_index];
@@ -3214,14 +3215,18 @@ PlanBackend::Context::Run(
         // std::string name_str = name;
         LOG_VERBOSE(1) << "cudaLaunchHostFunc ProcessTensor";
         cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
-        payload_->process_tensor_tuples_.push_back(
-            {name, dt, batchn_shape,
-             static_cast<const char*>(io_binding_info.buffer_),
-             io_binding_info.memory_type_, io_binding_info.memory_type_id_,
-             payload_->responder_.get()});
+        payload_->process_tensor_tuples_[io_index] = {
+            name,
+            dt,
+            batchn_shape,
+            static_cast<const char*>(io_binding_info.buffer_),
+            io_binding_info.memory_type_,
+            io_binding_info.memory_type_id_,
+            payload_->responder_.get()};
         cudaLaunchHostFunc(
             stream_, ProcessTensorCudaHost,
-            reinterpret_cast<void*>(&payload_->process_tensor_tuples_.back()));
+            reinterpret_cast<void*>(
+                &payload_->process_tensor_tuples_[io_index]));
       } else {
         payload_->responder_->ProcessTensor(
             name, dt, batchn_shape,
