@@ -3665,6 +3665,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       response->set_error_message(status.error_message());
 
       response->mutable_infer_response()->Clear();
+      // repopulate the id so that client knows which request failed.
+      response->mutable_infer_response()->set_id(request.id());
       state->step_ = Steps::WRITEREADY;
       if (!state->is_decoupled_) {
         state->context_->WriteResponseIfReady(state);
@@ -3916,6 +3918,14 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
+
+      // repopulate the id so that client knows which request failed.
+      const char *id;
+      LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseId(iresponse, &id),
+        "couldn't retrieve id for failed request");
+      LOG_VERBOSE(1) << "Failed for ID: " << id << std::endl;
+      response->mutable_infer_response()->set_id(id);
     }
 
     TRITONSERVER_ErrorDelete(err);
