@@ -3967,11 +3967,24 @@ GRPCServer::GRPCServer(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::string& server_addr, bool use_ssl, const SslOptions& ssl_options,
     const int infer_allocation_pool_size,
-    grpc_compression_level compression_level)
+    grpc_compression_level compression_level,
+    const int grpc_arg_keepalive_time_ms,
+    const int grpc_arg_keepalive_timeout_ms,
+    const bool grpc_arg_keepalive_permit_without_calls,
+    const int grpc_arg_http2_max_pings_without_data,
+    const int grpc_arg_http2_min_recv_ping_interval_without_data_ms,
+    const int grpc_arg_http2_max_ping_strikes)
     : server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       server_addr_(server_addr), use_ssl_(use_ssl), ssl_options_(ssl_options),
       infer_allocation_pool_size_(infer_allocation_pool_size),
-      compression_level_(compression_level), running_(false)
+      compression_level_(compression_level),
+      grpc_arg_keepalive_time_ms_(grpc_arg_keepalive_time_ms),
+      grpc_arg_keepalive_timeout_ms_(grpc_arg_keepalive_timeout_ms),
+      grpc_arg_keepalive_permit_without_calls_(grpc_arg_keepalive_permit_without_calls),
+      grpc_arg_http2_max_pings_without_data_(grpc_arg_http2_max_pings_without_data),
+      grpc_arg_http2_min_recv_ping_interval_without_data_ms_(grpc_arg_http2_min_recv_ping_interval_without_data_ms),
+      grpc_arg_http2_max_ping_strikes_(grpc_arg_http2_max_ping_strikes),
+      running_(false)
 {
 }
 
@@ -4029,6 +4042,16 @@ GRPCServer::Start()
   grpc_builder_.AddListeningPort(server_addr_, credentials);
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
+  // GRPC KeepAlive Settings: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
+  // NOTE: In order to work properly, the client-side settings should 
+  // be in agreement with server-side settings.
+  // TODO: Make values configurable from CLI
+  grpc_builder_.AddChannelArgument(GRPC_ARG_KEEPALIVE_TIME_MS, grpc_arg_keepalive_time_ms_);
+  grpc_builder_.AddChannelArgument(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, grpc_arg_keepalive_timeout_ms_);
+  grpc_builder_.AddChannelArgument(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, grpc_arg_keepalive_permit_without_calls_);
+  grpc_builder_.AddChannelArgument(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, grpc_arg_http2_max_pings_without_data_);
+  grpc_builder_.AddChannelArgument(GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS, grpc_arg_http2_min_recv_ping_interval_without_data_ms_);
+  grpc_builder_.AddChannelArgument(GRPC_ARG_HTTP2_MAX_PING_STRIKES, grpc_arg_http2_max_ping_strikes_);
   common_cq_ = grpc_builder_.AddCompletionQueue();
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
