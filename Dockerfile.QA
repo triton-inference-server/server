@@ -41,7 +41,7 @@ ARG TRITON_BACKEND_REPO_TAG=main
 ## into QA area.
 ############################################################################
 FROM ${BUILD_IMAGE} AS build
-
+EXPOSE 9000
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
