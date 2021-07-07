@@ -214,6 +214,7 @@ BackendResponder::ProcessTensor(
   size_t tensor_offset = 0;
 
   LOG_ERROR << "responses_->size(): " << responses_->size();
+  LOG_ERROR << "requests_.size(): " << requests_.size();
   LOG_ERROR << "BackendResponder::ProcessTensor CP1";
 
   for (size_t idx = 0; idx < responses_->size(); idx++) {

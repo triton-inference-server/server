@@ -356,6 +356,11 @@ class PlanBackend : public InferenceBackend {
       // until the end of execution.
       std::unique_ptr<BackendInputCollector> collector_;
       std::unique_ptr<BackendResponder> responder_;
+
+      std::vector<std::tuple<
+          std::string, inference::DataType, std::vector<int64_t>, const char*,
+          TRITONSERVER_MemoryType, int64_t, BackendResponder*>>
+          process_tensor_tuples_;
     };
 
     // Assume that the lifetime of composing completion data to extend till
@@ -420,11 +425,6 @@ class PlanBackend : public InferenceBackend {
     // There are Context::num_expected_bindings_ number of IOBindingInfo
     // elements for copy stream
     std::vector<std::vector<IOBindingInfo>> io_binding_infos_;
-
-    std::vector<std::tuple<
-        std::string, inference::DataType, std::vector<int64_t>, const char*,
-        TRITONSERVER_MemoryType, int64_t, BackendResponder*>>
-        processTensor_tuples_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
     // engine. This is used to match the TensorRT context execution declaration

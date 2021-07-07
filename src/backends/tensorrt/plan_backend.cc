@@ -3051,6 +3051,8 @@ PlanBackend::Context::Run(
 
   const auto output_stream =
       use_output_copy_stream_ ? output_copy_stream_ : stream_;
+
+  LOG_ERROR << "payload_->responder_.reset: New BackendResponder created";
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
   payload_->responder_.reset(new BackendResponder(
@@ -3212,14 +3214,14 @@ PlanBackend::Context::Run(
         // std::string name_str = name;
         LOG_VERBOSE(1) << "cudaLaunchHostFunc ProcessTensor";
         cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
-        processTensor_tuples_.push_back(
+        payload_->process_tensor_tuples_.push_back(
             {name, dt, batchn_shape,
              static_cast<const char*>(io_binding_info.buffer_),
              io_binding_info.memory_type_, io_binding_info.memory_type_id_,
              payload_->responder_.get()});
         cudaLaunchHostFunc(
             stream_, ProcessTensorCudaHost,
-            reinterpret_cast<void*>(&processTensor_tuples_.back()));
+            reinterpret_cast<void*>(&payload_->process_tensor_tuples_.back()));
       } else {
         payload_->responder_->ProcessTensor(
             name, dt, batchn_shape,
