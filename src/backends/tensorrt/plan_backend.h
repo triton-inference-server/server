@@ -359,7 +359,7 @@ class PlanBackend : public InferenceBackend {
 
       std::vector<std::tuple<
           std::string, inference::DataType, std::vector<int64_t>, const char*,
-          TRITONSERVER_MemoryType, int64_t, BackendResponder*>>
+          TRITONSERVER_MemoryType, int64_t, std::unique_ptr<BackendResponder>*>>
           process_tensor_tuples_;
     };
 

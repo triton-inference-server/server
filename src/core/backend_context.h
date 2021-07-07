@@ -138,11 +138,12 @@ class BackendResponder {
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const int max_batch_size, const bool pinned_enabled, cudaStream_t stream,
-      cudaEvent_t event)
+      cudaEvent_t event, bool zero_copy_support = false)
       : need_sync_(false), requests_(requests), responses_(responses),
         max_batch_size_(max_batch_size), pinned_enabled_(pinned_enabled),
         use_async_cpu_copy_(triton::common::AsyncWorkQueue::WorkerCount() > 1),
-        stream_(stream), event_(event), pending_pinned_byte_size_(0)
+        stream_(stream), event_(event),
+        pending_pinned_byte_size_(0), zero_copy_support_(zero_copy_support)
   {
   }
 
@@ -195,6 +196,7 @@ class BackendResponder {
   size_t pending_pinned_byte_size_;
   size_t pending_pinned_offset_;
   ResponsesList pending_pinned_outputs_;
+  bool zero_copy_support_;
 
   // Pinned memories that need to live over the lifetime of this
   // BackendResponder object.
