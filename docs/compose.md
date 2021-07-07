@@ -29,7 +29,7 @@
 # Customize Triton Container
 
 Two Docker images are available from [NVIDIA GPU Cloud
-(NGC)](https://ngc.nvidia.com>) that make it possible to easily
+(NGC)](https://ngc.nvidia.com) that make it possible to easily
 construct customized versions of Triton. By customizing Triton you can
 significantly reduce the size of the Triton image by removing
 functionality that you don't require.
