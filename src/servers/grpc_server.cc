@@ -3665,6 +3665,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       response->set_error_message(status.error_message());
 
       response->mutable_infer_response()->Clear();
+      // repopulate the id so that client knows which request failed.
+      response->mutable_infer_response()->set_id(request.id());
       state->step_ = Steps::WRITEREADY;
       if (!state->is_decoupled_) {
         state->context_->WriteResponseIfReady(state);
