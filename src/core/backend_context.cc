@@ -360,10 +360,15 @@ BackendResponder::Finalize()
     need_sync_ = false;
   }
 
-  if (zero_copy_support_) {
-    LOG_ERROR << "BackendResponder::Finalize cudaEventSynchronize";
-    cudaEventSynchronize(event_);
-  }
+  // if (zero_copy_support_) {
+  //   if (event_ != nullptr) {
+  //     cudaEventSynchronize(event_);
+  //     LOG_ERROR << "BackendResponder::Finalize cudaEventSynchronize";
+  //   } else {
+  //     LOG_ERROR << "BackendResponder::Finalize cudaStreamSynchronize";
+  //     cudaStreamSynchronize(stream_);
+  //   }
+  // }
 #endif  // TRITON_ENABLE_GPU
 
   // After the above sync all the GPU->pinned copies are complete. Any

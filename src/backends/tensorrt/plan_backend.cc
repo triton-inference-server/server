@@ -3055,7 +3055,7 @@ PlanBackend::Context::Run(
   const auto output_stream =
       use_output_copy_stream_ ? output_copy_stream_ : stream_;
 
-  payload_->process_tensor_tuples_.reserve(num_expected_bindings_);
+  payload_->process_tensor_tuples_.resize(num_expected_bindings_);
 
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
@@ -3217,7 +3217,7 @@ PlanBackend::Context::Run(
       // Use pinned memory address if zero copy is supported, else use device
       // memory address.
       if (zero_copy_support_) {
-        LOG_ERROR << "cudaLaunchHostFunc ProcessTensor";
+        LOG_ERROR << "Prep for ProcessTensorCudaHost";
         cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
         payload_->process_tensor_tuples_[io_index] = {
             name,
@@ -3227,6 +3227,9 @@ PlanBackend::Context::Run(
             io_binding_info.memory_type_,
             io_binding_info.memory_type_id_,
             &payload_->responder_};
+        LOG_ERROR << "cudaLaunchHostFunc ProcessTensorCudaHost";
+        // ProcessTensorCudaHost(reinterpret_cast<void*>(
+        //     &payload_->process_tensor_tuples_[io_index]));
         cudaLaunchHostFunc(
             stream_, ProcessTensorCudaHost,
             reinterpret_cast<void*>(
