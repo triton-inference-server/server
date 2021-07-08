@@ -3131,6 +3131,9 @@ PlanBackend::Context::Run(
       inference::DataType dt =
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
 
+      // Process the output tensors with pinned memory address if zero-copy is
+      // supported, otherwise use device memory. Peform memory copies
+      // asynchronously and wait for model execution.
       payload_->responder_->ProcessTensor(
           name, io_binding_info.io_shape_mapping_.first, dt,
           io_binding_info.io_shape_mapping_.second,
@@ -3172,6 +3175,9 @@ PlanBackend::Context::Run(
             "failed to run TRT response");
       }
 
+      // Process the output tensors with pinned memory address if zero-copy is
+      // supported, otherwise use device memory. Peform memory copies
+      // asynchronously and wait for model execution.
       payload_->responder_->ProcessTensor(
           name, dt, batchn_shape, static_cast<const char*>(buffer),
           io_binding_info.memory_type_, io_binding_info.memory_type_id_);
