@@ -31,7 +31,6 @@ import time
 time.sleep(5)
 
 
-
 class TritonPythonModel:
 
     def execute(self, requests):
