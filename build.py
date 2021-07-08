@@ -759,7 +759,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && ldconfig \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 
-COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tritonserver
+COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tritonserver/
 ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 '''
     df += '''
