@@ -476,7 +476,8 @@ BackendResponder::SetFixedSizeOutputBuffer(
     status = CopyBuffer(
         response_output->Name(), tensor_memory_type, tensor_memory_type_id,
         actual_memory_type, actual_memory_type_id, tensor_byte_size,
-        tensor_buffer + tensor_offset, buffer, stream_, &cuda_used);
+        tensor_buffer + tensor_offset, buffer, stream_, &cuda_used,
+        zero_copy_support_);
     cuda_copy |= cuda_used;
 
     if (!status.IsOk()) {
@@ -542,7 +543,8 @@ BackendResponder::FlushPendingPinned(
             response_output->Name(), tensor_memory_type, tensor_memory_type_id,
             response_memory_type, response_memory_type_id, response_byte_size,
             tensor_buffer + pending_pinned_offset_ + offset,
-            const_cast<void*>(response_buffer), stream_, &cuda_used);
+            const_cast<void*>(response_buffer), stream_, &cuda_used,
+            zero_copy_support_);
         cuda_copy |= cuda_used;
 
         if (!status.IsOk()) {

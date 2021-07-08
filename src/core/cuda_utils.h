@@ -79,7 +79,7 @@ Status CopyBuffer(
     const int64_t src_memory_type_id,
     const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
-    void* dst, cudaStream_t cuda_stream, bool* cuda_used);
+    void* dst, cudaStream_t cuda_stream, bool* cuda_used, bool zero_copy_support = false);
 
 #ifdef TRITON_ENABLE_GPU
 /// Validates the compute capability of the GPU indexed

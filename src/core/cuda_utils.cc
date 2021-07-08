@@ -26,10 +26,24 @@
 
 #include "src/core/cuda_utils.h"
 
+#include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
 
 namespace nvidia { namespace inferenceserver {
+
+void CUDART_CB
+MemcpyHost(void* params)
+{
+  using param_type = std::tuple<void*, const void*, const size_t>;
+  auto* param_tuple = reinterpret_cast<param_type*>(params);
+
+  void* dst = std::get<0>(*param_tuple);
+  const void* src = std::get<1>(*param_tuple);
+  const size_t byte_size = std::get<2>(*param_tuple);
+  LOG_ERROR << "byte_size in MemcpyHost: " << byte_size;
+  memcpy(dst, src, byte_size);
+}
 
 Status
 EnablePeerAccess(const double min_compute_capability)
@@ -76,7 +90,8 @@ CopyBuffer(
     const int64_t src_memory_type_id,
     const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
-    void* dst, cudaStream_t cuda_stream, bool* cuda_used)
+    void* dst, cudaStream_t cuda_stream, bool* cuda_used,
+    bool zero_copy_support)
 {
   NVTX_RANGE(nvtx_, "CopyBuffer");
 
@@ -87,7 +102,16 @@ CopyBuffer(
   // the src buffer is valid.
   if ((src_memory_type != TRITONSERVER_MEMORY_GPU) &&
       (dst_memory_type != TRITONSERVER_MEMORY_GPU)) {
-    memcpy(dst, src, byte_size);
+    if (zero_copy_support) {
+      auto params =
+          std::tuple<void*, const void*, const size_t>(dst, src, byte_size);
+      LOG_ERROR << "byte_size before MemcpyHost: " << byte_size;
+      cudaLaunchHostFunc(
+          cuda_stream, MemcpyHost, reinterpret_cast<void*>(&params));
+      *cuda_used = true;
+    } else {
+      memcpy(dst, src, byte_size);
+    }
   } else {
 #ifdef TRITON_ENABLE_GPU
     RETURN_IF_CUDA_ERR(
