@@ -52,37 +52,6 @@ TimestampCaptureCallback(void* data)
 }
 #endif  // TRITON_ENABLE_STATS
 
-// void CUDART_CB
-// ProcessTensorCudaHost(void* params)
-// {
-//   using param_type = std::tuple<
-//       std::string, inference::DataType, std::vector<int64_t>, const char*,
-//       TRITONSERVER_MemoryType, int64_t, std::unique_ptr<BackendResponder>*>;
-//   auto* param_tuple = reinterpret_cast<param_type*>(params);
-
-//   const std::string& name = std::get<0>(*param_tuple);
-//   const inference::DataType datatype = std::get<1>(*param_tuple);
-//   std::vector<int64_t>& batchn_shape = std::get<2>(*param_tuple);
-//   const char* buffer = std::get<3>(*param_tuple);
-//   const TRITONSERVER_MemoryType memory_type = std::get<4>(*param_tuple);
-//   const int64_t memory_type_id = std::get<5>(*param_tuple);
-//   auto responder = std::get<6>(*param_tuple);
-
-//   LOG_ERROR << "name: " << name;
-//   LOG_ERROR << "datatype: " << datatype;
-//   LOG_ERROR << "batchn_shape.size(): " << batchn_shape.size();
-//   for (size_t i = 0; i < batchn_shape.size(); i++) {
-//     LOG_ERROR << "batchn_shape[" << i << "]: " << batchn_shape[i];
-//   }
-//   LOG_ERROR << "buffer: " << buffer;
-//   LOG_ERROR << "memory_type: " << memory_type;
-//   LOG_ERROR << "memory_type_id: " << memory_type_id;
-
-//   (*responder)
-//       ->ProcessTensor(
-//           name, datatype, batchn_shape, buffer, memory_type, memory_type_id);
-// }
-
 Status
 CreateCudaEvent(
     const std::string& event_name, unsigned int event_flags, cudaEvent_t* event)
@@ -2352,8 +2321,6 @@ PlanBackend::Run(
   auto context =
       static_cast<Context*>(contexts_[next_context_[runner_idx]].get());
 
-  LOG_ERROR << "context->payload_->requests_: "
-            << context->payload_->requests_.size();
   bool run_failed = true;
   for (const auto& request : context->payload_->requests_) {
     if (request != nullptr) {
@@ -3055,11 +3022,8 @@ PlanBackend::Context::Run(
   const auto output_stream =
       use_output_copy_stream_ ? output_copy_stream_ : stream_;
 
-  // payload_->process_tensor_tuples_.resize(num_expected_bindings_);
-
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
-  LOG_ERROR << "payload_->responder_.reset";
   payload_->responder_.reset(new BackendResponder(
       payload_->requests_, &payload_->responses_, max_batch_size_,
       enable_pinned_output_, output_stream, events_[next_set_].output_ready_,
@@ -3083,6 +3047,7 @@ PlanBackend::Context::Run(
     // execution.
     void* buffer = nullptr;
     if (zero_copy_support_) {
+      cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
       buffer = io_binding_info.buffer_;
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
@@ -3166,7 +3131,6 @@ PlanBackend::Context::Run(
       inference::DataType dt =
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
 
-      LOG_VERBOSE(1) << "Normal ProcessTensor";
       payload_->responder_->ProcessTensor(
           name, io_binding_info.io_shape_mapping_.first, dt,
           io_binding_info.io_shape_mapping_.second,
@@ -3208,13 +3172,6 @@ PlanBackend::Context::Run(
             "failed to run TRT response");
       }
 
-      // Use pinned memory address if zero copy is supported, else use device
-      // memory address.
-      if (zero_copy_support_) {
-        LOG_ERROR << "Prep for ProcessTensor with MemcpyCudaHost";
-        cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
-      }
-
       payload_->responder_->ProcessTensor(
           name, dt, batchn_shape, static_cast<const char*>(buffer),
           io_binding_info.memory_type_, io_binding_info.memory_type_id_);
@@ -3223,10 +3180,6 @@ PlanBackend::Context::Run(
 
   if (zero_copy_support_) {
     cudaStreamWaitEvent(stream_, events_[next_set_].output_ready_, 0);
-    LOG_ERROR << "cudaStreamWaitEvent for output_ready";
-    // cudaStreamSynchronize(stream_);
-    // LOG_ERROR << "cudaStreamSynchronize after output_ready";
-    // payload_->process_tensor_tuples_.clear();
   }
 }
 
@@ -3294,7 +3247,6 @@ PlanBackend::Context::ProcessResponse(
 
     // Call Finalize() here to defer CUDA synchronization as much as possible
     payload->responder_->Finalize();
-    LOG_ERROR << "payload->responder_->Finalize() Done";
     cudaEventSynchronize(event_set.output_ready_);
     NVTX_MARKER("plan_output_ready");
     // Compute ends when the output data copy is completed

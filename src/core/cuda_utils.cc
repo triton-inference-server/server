@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,7 +26,6 @@
 
 #include "src/core/cuda_utils.h"
 
-#include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
 
@@ -36,13 +35,7 @@ void CUDART_CB
 MemcpyHost(void* args)
 {
   auto* copy_params = reinterpret_cast<CopyParams*>(args);
-
-  // void* dst = std::get<0>(*param_tuple);
-  // const void* src = std::get<1>(*param_tuple);
-  // const size_t byte_size = std::get<2>(*param_tuple);
-  LOG_ERROR << "byte_size in MemcpyHost: " << copy_params->byte_size_;
   memcpy(copy_params->dst_, copy_params->src_, copy_params->byte_size_);
-
   delete copy_params;
 }
 
@@ -105,7 +98,6 @@ CopyBuffer(
       (dst_memory_type != TRITONSERVER_MEMORY_GPU)) {
     if (zero_copy_support) {
       auto params = new CopyParams(dst, src, byte_size);
-      LOG_ERROR << "byte_size before MemcpyHost: " << byte_size;
       cudaLaunchHostFunc(
           cuda_stream, MemcpyHost, reinterpret_cast<void*>(params));
       *cuda_used = true;

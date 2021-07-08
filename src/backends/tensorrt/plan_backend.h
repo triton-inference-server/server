@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -356,11 +356,6 @@ class PlanBackend : public InferenceBackend {
       // until the end of execution.
       std::unique_ptr<BackendInputCollector> collector_;
       std::unique_ptr<BackendResponder> responder_;
-
-    //   std::vector<std::tuple<
-    //       std::string, inference::DataType, std::vector<int64_t>, const char*,
-    //       TRITONSERVER_MemoryType, int64_t, std::unique_ptr<BackendResponder>*>>
-    //       process_tensor_tuples_;
     };
 
     // Assume that the lifetime of composing completion data to extend till

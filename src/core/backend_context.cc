@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -200,7 +200,6 @@ BackendResponder::ProcessTensor(
     std::vector<int64_t>& batchn_shape, const char* buffer,
     const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
 {
-  LOG_ERROR << "BackendResponder::ProcessTensor start";
   // A value of CPU_PINNED indicates that pinned memory buffer is not
   // needed for this tensor. Any other value indicates that a pinned
   // memory buffer is needed when the target memory type matches
@@ -213,15 +212,9 @@ BackendResponder::ProcessTensor(
 
   size_t tensor_offset = 0;
 
-  LOG_ERROR << "responses_->size(): " << responses_->size();
-  LOG_ERROR << "requests_.size(): " << requests_.size();
-  LOG_ERROR << "BackendResponder::ProcessTensor CP1";
-
   for (size_t idx = 0; idx < responses_->size(); idx++) {
     auto& request = requests_[idx];
     auto& response = (*responses_)[idx];
-
-    LOG_ERROR << "BackendResponder::ProcessTensor CP2";
 
     // If then pending copies are from tensor buffer that is not
     // contiguous with 'response's part of that buffer, then need to
@@ -233,21 +226,12 @@ BackendResponder::ProcessTensor(
       need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
     }
 
-    LOG_ERROR << "BackendResponder::ProcessTensor CP3";
-    LOG_ERROR << "batchn_shape[0]: " << batchn_shape[0];
-    LOG_ERROR << "response->ModelName(): " << response->ModelName();
-    LOG_ERROR << "request->BatchSize(): " << request->BatchSize();
-
     // Override shape to be correct for this response.
     if (max_batch_size_ != BackendContext::NO_BATCHING) {
       batchn_shape[0] = request->BatchSize();
     }
 
-    LOG_ERROR << "BackendResponder::ProcessTensor CP4.1";
-
     const size_t tensor_byte_size = GetByteSize(datatype, batchn_shape);
-
-    LOG_ERROR << "BackendResponder::ProcessTensor CP4.2";
 
     InferenceResponse::Output* response_output = nullptr;
     if ((response != nullptr) &&
@@ -258,21 +242,17 @@ BackendResponder::ProcessTensor(
           &response, response_output, tensor_byte_size, tensor_offset, buffer,
           memory_type, memory_type_id, use_pinned_memory_type);
     }
-    LOG_ERROR << "BackendResponder::ProcessTensor CP5";
 
     tensor_offset += tensor_byte_size;
   }
-  LOG_ERROR << "BackendResponder::ProcessTensor CP6";
 
   // Done with the tensor, flush any pending pinned copies.
   need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
 #ifdef TRITON_ENABLE_GPU
   if ((need_sync_ || zero_copy_support_) && (event_ != nullptr)) {
     cudaEventRecord(event_, stream_);
-    LOG_ERROR << "BackendResponder cudaEventRecord";
   }
 #endif  // TRITON_ENABLE_GPU
-  LOG_ERROR << "BackendResponder::ProcessTensor end";
 }
 
 void
@@ -340,9 +320,8 @@ BackendResponder::ProcessTensor(
   // Done with the tensor, flush any pending pinned copies.
   need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
 #ifdef TRITON_ENABLE_GPU
-  if (need_sync_ && (event_ != nullptr)) {
+  if ((need_sync_ || zero_copy_support_) && (event_ != nullptr)) {
     cudaEventRecord(event_, stream_);
-    LOG_ERROR << "BackendResponder::ProcessTensor cudaEventRecord";
   }
 #endif  // TRITON_ENABLE_GPU
 }
@@ -359,16 +338,6 @@ BackendResponder::Finalize()
     }
     need_sync_ = false;
   }
-
-  // if (zero_copy_support_) {
-  //   if (event_ != nullptr) {
-  //     cudaEventSynchronize(event_);
-  //     LOG_ERROR << "BackendResponder::Finalize cudaEventSynchronize";
-  //   } else {
-  //     LOG_ERROR << "BackendResponder::Finalize cudaStreamSynchronize";
-  //     cudaStreamSynchronize(stream_);
-  //   }
-  // }
 #endif  // TRITON_ENABLE_GPU
 
   // After the above sync all the GPU->pinned copies are complete. Any
