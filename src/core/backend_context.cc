@@ -567,7 +567,7 @@ BackendResponder::FlushPendingPinned(
         "pinned buffer", tensor_memory_type, tensor_memory_type_id,
         pinned_memory_type, pinned_memory_id, pending_pinned_byte_size_,
         tensor_buffer + pending_pinned_offset_, pinned_buffer, stream_,
-        &cuda_used);
+        &cuda_used, zero_copy_support_);
     cuda_copy |= cuda_used;
 
     // If something goes wrong with the copy all the pending

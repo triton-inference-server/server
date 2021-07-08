@@ -79,7 +79,8 @@ Status CopyBuffer(
     const int64_t src_memory_type_id,
     const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
-    void* dst, cudaStream_t cuda_stream, bool* cuda_used, bool zero_copy_support = false);
+    void* dst, cudaStream_t cuda_stream, bool* cuda_used,
+    bool zero_copy_support = false);
 
 #ifdef TRITON_ENABLE_GPU
 /// Validates the compute capability of the GPU indexed
@@ -119,5 +120,16 @@ void CopyBufferHandler(
     void* dst, cudaStream_t cuda_stream, void* response_ptr,
     triton::common::SyncQueue<std::tuple<Status, bool, void*>>*
         completion_queue);
+
+struct CopyParams {
+  CopyParams(void* dst, const void* src, const size_t byte_size)
+      : dst_(dst), src_(src), byte_size_(byte_size)
+  {
+  }
+
+  void* dst_;
+  const void* src_;
+  const size_t byte_size_;
+};
 
 }}  // namespace nvidia::inferenceserver

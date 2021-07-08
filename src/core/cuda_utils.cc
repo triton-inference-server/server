@@ -33,16 +33,17 @@
 namespace nvidia { namespace inferenceserver {
 
 void CUDART_CB
-MemcpyHost(void* params)
+MemcpyHost(void* args)
 {
-  using param_type = std::tuple<void*, const void*, const size_t>;
-  auto* param_tuple = reinterpret_cast<param_type*>(params);
+  auto* copy_params = reinterpret_cast<CopyParams*>(args);
 
-  void* dst = std::get<0>(*param_tuple);
-  const void* src = std::get<1>(*param_tuple);
-  const size_t byte_size = std::get<2>(*param_tuple);
-  LOG_ERROR << "byte_size in MemcpyHost: " << byte_size;
-  memcpy(dst, src, byte_size);
+  // void* dst = std::get<0>(*param_tuple);
+  // const void* src = std::get<1>(*param_tuple);
+  // const size_t byte_size = std::get<2>(*param_tuple);
+  LOG_ERROR << "byte_size in MemcpyHost: " << copy_params->byte_size_;
+  memcpy(copy_params->dst_, copy_params->src_, copy_params->byte_size_);
+
+  delete copy_params;
 }
 
 Status
@@ -103,11 +104,10 @@ CopyBuffer(
   if ((src_memory_type != TRITONSERVER_MEMORY_GPU) &&
       (dst_memory_type != TRITONSERVER_MEMORY_GPU)) {
     if (zero_copy_support) {
-      auto params =
-          std::tuple<void*, const void*, const size_t>(dst, src, byte_size);
+      auto params = new CopyParams(dst, src, byte_size);
       LOG_ERROR << "byte_size before MemcpyHost: " << byte_size;
       cudaLaunchHostFunc(
-          cuda_stream, MemcpyHost, reinterpret_cast<void*>(&params));
+          cuda_stream, MemcpyHost, reinterpret_cast<void*>(params));
       *cuda_used = true;
     } else {
       memcpy(dst, src, byte_size);
