@@ -99,7 +99,8 @@ class GRPCServer {
   const int infer_allocation_pool_size_;
   grpc_compression_level compression_level_;
 
-  // GRPC KeepAlive Settings: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
+  // GRPC KeepAlive Settings:
+  // https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
   const int grpc_arg_keepalive_time_ms_;
   const int grpc_arg_keepalive_timeout_ms_;
   const bool grpc_arg_keepalive_permit_without_calls_;

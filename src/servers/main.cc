@@ -365,7 +365,8 @@ std::vector<Option> options_
       {OPTION_GRPC_ARG_KEEPALIVE_TIME_MS, "grpc-keepalive-time", Option::ArgInt,
        "The period (in milliseconds) after which a keepalive ping is sent on "
        "the transport."},
-      {OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS, "grpc-keepalive-timeout", Option::ArgInt,
+      {OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS, "grpc-keepalive-timeout",
+       Option::ArgInt,
        "The period (in milliseconds) the sender of the keepalive ping waits "
        "for an acknowledgement. If it does not receive an acknowledgment "
        "within this time, it will close the connection."},
@@ -388,8 +389,8 @@ std::vector<Option> options_
        "this time, then the ping will be considered a bad ping from the peer. "
        "Such a ping counts as a ‘ping strike’. On the client side, this does "
        "not have any effect."},
-      {OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES,
-       "grpc-http2-max-ping-strikes", Option::ArgInt,
+      {OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES, "grpc-http2-max-ping-strikes",
+       Option::ArgInt,
        "Maximum number of bad pings that the server will tolerate before "
        "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
        "0 allows the server to accept any number of bad pings."},
@@ -1095,9 +1096,12 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       grpc_response_compression_level_;
   int32_t grpc_arg_keepalive_time_ms = grpc_arg_keepalive_time_ms_;
   int32_t grpc_arg_keepalive_timeout_ms = grpc_arg_keepalive_timeout_ms_;
-  bool grpc_arg_keepalive_permit_without_calls = grpc_arg_keepalive_permit_without_calls_;
-  int32_t grpc_arg_http2_max_pings_without_data = grpc_arg_http2_max_pings_without_data_;
-  int32_t grpc_arg_http2_min_recv_ping_interval_without_data_ms = grpc_arg_http2_min_recv_ping_interval_without_data_ms_;
+  bool grpc_arg_keepalive_permit_without_calls =
+      grpc_arg_keepalive_permit_without_calls_;
+  int32_t grpc_arg_http2_max_pings_without_data =
+      grpc_arg_http2_max_pings_without_data_;
+  int32_t grpc_arg_http2_min_recv_ping_interval_without_data_ms =
+      grpc_arg_http2_min_recv_ping_interval_without_data_ms_;
   int32_t grpc_arg_http2_max_ping_strikes = grpc_arg_http2_max_ping_strikes_;
 #endif  // TRITON_ENABLE_GRPC
 
@@ -1262,7 +1266,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         grpc_arg_http2_max_pings_without_data = ParseIntOption(optarg);
         break;
       case OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS:
-        grpc_arg_http2_min_recv_ping_interval_without_data_ms = ParseIntOption(optarg);
+        grpc_arg_http2_min_recv_ping_interval_without_data_ms =
+            ParseIntOption(optarg);
         break;
       case OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES:
         grpc_arg_http2_max_ping_strikes = ParseIntOption(optarg);
@@ -1386,9 +1391,12 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   grpc_response_compression_level_ = grpc_response_compression_level;
   grpc_arg_keepalive_time_ms_ = grpc_arg_keepalive_time_ms;
   grpc_arg_keepalive_timeout_ms_ = grpc_arg_keepalive_timeout_ms;
-  grpc_arg_keepalive_permit_without_calls_ = grpc_arg_keepalive_permit_without_calls;
-  grpc_arg_http2_max_pings_without_data_ = grpc_arg_http2_max_pings_without_data;
-  grpc_arg_http2_min_recv_ping_interval_without_data_ms_ = grpc_arg_http2_min_recv_ping_interval_without_data_ms;
+  grpc_arg_keepalive_permit_without_calls_ =
+      grpc_arg_keepalive_permit_without_calls;
+  grpc_arg_http2_max_pings_without_data_ =
+      grpc_arg_http2_max_pings_without_data;
+  grpc_arg_http2_min_recv_ping_interval_without_data_ms_ =
+      grpc_arg_http2_min_recv_ping_interval_without_data_ms;
   grpc_arg_http2_max_ping_strikes_ = grpc_arg_http2_max_ping_strikes;
 #endif  // TRITON_ENABLE_GRPC
 
