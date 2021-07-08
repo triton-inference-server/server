@@ -77,7 +77,7 @@ for PROTOCOL in http grpc; do
         if [ "$LANG" == "c++" ]; then
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="10"
-            EXTRA_ARGS="-r 4500000 -i ${PROTOCOL}"
+            EXTRA_ARGS="-r 6750000 -i ${PROTOCOL}"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
             MAX_ALLOWED_ALLOC="1"
