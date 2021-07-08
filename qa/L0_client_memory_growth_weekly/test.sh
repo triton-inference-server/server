@@ -81,7 +81,7 @@ for PROTOCOL in http grpc; do
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
             MAX_ALLOWED_ALLOC="1"
-            EXTRA_ARGS="-r 3000000 -i ${PROTOCOL}"
+            EXTRA_ARGS="-r 2400000 -i ${PROTOCOL}"
         fi
 
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
