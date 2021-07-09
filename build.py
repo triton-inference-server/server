@@ -655,8 +655,6 @@ FROM ${{BASE_IMAGE}}
 ENV PATH /opt/tritonserver/bin:${{PATH}}
 '''.format(argmap['BASE_IMAGE'])
 
-    df += dockerfile_add_installation_linux(argmap, backends)
-
     df += '''
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
@@ -689,6 +687,8 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoag
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
 '''
+
+    df += dockerfile_add_installation_linux(argmap, backends)
 
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
