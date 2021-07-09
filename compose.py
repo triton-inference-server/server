@@ -100,7 +100,10 @@ def add_requested_backends(ddir, dockerfile_name, backends):
     for backend in backends:
         df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}    
 '''.format(backend, backend)
-
+    df += '''
+# Top-level /opt/tritonserver/backends not copied so need to explicitly set permissions here
+RUN chown triton-server:triton-server /opt/tritonserver/backends
+'''
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
@@ -110,7 +113,10 @@ def add_requested_repoagents(ddir, dockerfile_name, repoagents):
     for ra in repoagents:
         df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}    
 '''.format(ra, ra)
-
+    df += '''
+# Top-level /opt/tritonserver/repoagents not copied so need to explicitly set permissions here
+RUN chown triton-server:triton-server /opt/tritonserver/repoagents
+'''
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
