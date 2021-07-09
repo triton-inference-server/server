@@ -249,7 +249,7 @@ BackendResponder::ProcessTensor(
   // Done with the tensor, flush any pending pinned copies.
   need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
 #ifdef TRITON_ENABLE_GPU
-  if ((need_sync_ || zero_copy_support_) && (event_ != nullptr)) {
+  if (need_sync_ && (event_ != nullptr)) {
     cudaEventRecord(event_, stream_);
   }
 #endif  // TRITON_ENABLE_GPU
@@ -320,7 +320,7 @@ BackendResponder::ProcessTensor(
   // Done with the tensor, flush any pending pinned copies.
   need_sync_ |= FlushPendingPinned(buffer, memory_type, memory_type_id);
 #ifdef TRITON_ENABLE_GPU
-  if ((need_sync_ || zero_copy_support_) && (event_ != nullptr)) {
+  if (need_sync_ && (event_ != nullptr)) {
     cudaEventRecord(event_, stream_);
   }
 #endif  // TRITON_ENABLE_GPU
@@ -374,7 +374,7 @@ BackendResponder::Finalize()
             response_output->Name(), pinned_memory_type, pinned_memory_id,
             response_memory_type, response_memory_type_id, response_byte_size,
             pinned_buffer + offset, const_cast<void*>(response_buffer), stream_,
-            &cuda_used);
+            &cuda_used, zero_copy_support_);
         need_sync_ |= cuda_used;
 
         if (!status.IsOk()) {
@@ -588,7 +588,7 @@ BackendResponder::FlushPendingPinned(
               response_output->Name(), pinned_memory_type, pinned_memory_id,
               response_memory_type, response_memory_type_id, response_byte_size,
               pinned_buffer + offset, const_cast<void*>(response_buffer),
-              stream_, &cuda_used);
+              stream_, &cuda_used, zero_copy_support_);
           cuda_copy |= cuda_used;
 
           if (!status.IsOk()) {

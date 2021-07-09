@@ -3047,7 +3047,6 @@ PlanBackend::Context::Run(
     // execution.
     void* buffer = nullptr;
     if (zero_copy_support_) {
-      cudaStreamWaitEvent(stream_, events_[next_set_].ready_for_output_, 0);
       buffer = io_binding_info.buffer_;
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
       io_binding_info.memory_type_id_ = 0;
@@ -3182,10 +3181,6 @@ PlanBackend::Context::Run(
           name, dt, batchn_shape, static_cast<const char*>(buffer),
           io_binding_info.memory_type_, io_binding_info.memory_type_id_);
     }
-  }
-
-  if (zero_copy_support_) {
-    cudaStreamWaitEvent(stream_, events_[next_set_].output_ready_, 0);
   }
 }
 
