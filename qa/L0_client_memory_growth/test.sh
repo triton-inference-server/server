@@ -53,7 +53,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
-# Repetition of nightly or weekly test
+# Set the number of repetitions in nightly and weekly tests
 if [ "$TRITON_WEEKLY" == 1 ]; then
     REPETITION_CPP=6750000
     REPETITION_PY=2400000

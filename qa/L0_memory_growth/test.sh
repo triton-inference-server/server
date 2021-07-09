@@ -70,7 +70,7 @@ INSTANCE_CNT=2
 CONCURRENCY=32
 CLIENT_BS=8
 
-# Repetition of nightly or weekly test
+# Set the number of repetitions in nightly and weekly tests
 if [ "$TRITON_WEEKLY" == 1 ]; then
     REPETITION=240
 else
