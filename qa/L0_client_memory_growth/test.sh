@@ -53,6 +53,15 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
+# Repetitions for nightly or weekly test
+if [ "$TRITON_WEEKLY" -eq 1 ]; then
+    REPETITIONS_CPP=6750000
+    REPETITIONS_PY=2400000
+else
+    REPETITIONS_CPP=100000
+    REPETITIONS_PY=10000
+fi
+
 mkdir -p $DATADIR/custom_identity_int32/1
 
 RET=0
@@ -77,11 +86,11 @@ for PROTOCOL in http grpc; do
         if [ "$LANG" == "c++" ]; then
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="10"
-            EXTRA_ARGS="-r 100000 -i ${PROTOCOL}"
+            EXTRA_ARGS="-r ${REPETITIONS_CPP} -i ${PROTOCOL}"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
             MAX_ALLOWED_ALLOC="1"
-            EXTRA_ARGS="-r 10000 -i ${PROTOCOL}"
+            EXTRA_ARGS="-r ${REPETITIONS_PY} -i ${PROTOCOL}"
         fi
 
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
