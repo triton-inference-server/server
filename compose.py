@@ -56,9 +56,8 @@ def fail_if(p, msg):
         fail(msg)
 
 
-##### create base image for gpu
-def start_gpu_dockerfile(ddir, argmap, dockerfile_name):
-    # Set enviroment variables
+def start_gpu_dockerfile(ddir, argmap, dockerfile_name, backends):
+    # Set enviroment variables, set default user and install dependencies
     df = '''
 #
 # Multistage build.
@@ -68,21 +67,11 @@ FROM nvcr.io/nvidia/tritonserver:{}-py3-min
 '''.format(argmap['TRITON_CONTAINER_VERSION'],
            argmap['TRITON_CONTAINER_VERSION'])
 
+    import build
+    df += build.dockerfile_add_installation_linux(argmap, backends)
     # Copy over files
     df += '''
-# Create a user that can be used to run triton as
-# non-root. Make sure that this user to given ID 1000. All server
-# artifacts copied below are assign to this user.
-ENV TRITON_SERVER_USER=triton-server
-RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
-    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
-        useradd $TRITON_SERVER_USER; \
-    fi && \
-    [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
-    [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
-
 WORKDIR /opt/tritonserver
-RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 --from=full /opt/tritonserver/LICENSE .
 COPY --chown=1000:1000 --from=full /opt/tritonserver/TRITON_VERSION .
 COPY --chown=1000:1000 --from=full /opt/tritonserver/NVIDIA_Deep_Learning_Container_License.pdf .
@@ -94,7 +83,6 @@ COPY --chown=1000:1000 --from=full /opt/tritonserver/include include/
         dfile.write(df)
 
 
-### add additional backends needed
 def add_requested_backends(ddir, dockerfile_name, backends):
     df = "# Copying over backends \n"
     for backend in backends:
@@ -121,6 +109,26 @@ RUN chown triton-server:triton-server /opt/tritonserver/repoagents
         dfile.write(df)
 
 
+def end_gpu_dockerfile(ddir, dockerfile_name, argmap):
+    # Install additional dependencies
+    df = ""
+    if argmap['SAGEMAKER_ENDPOINT']:
+        df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+COPY --chown=1000:1000 --from=full /usr/bin/serve /usr/bin/.
+'''
+    with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
+        dfile.write(df)
+
+
+def build_docker_image(ddir, dockerfile_name, container_name):
+    # Create container with docker build
+    p = subprocess.Popen(['docker', 'build', '-t', container_name, '-f', \
+        os.path.join(ddir, dockerfile_name), '.'])
+    p.wait()
+    fail_if(p.returncode != 0, 'docker build {} failed'.format(container_name))
+
+
 def get_container_version_if_not_specified():
     if FLAGS.container_version is None:
         # Read from TRITON_VERSION file in server repo to determine version
@@ -134,6 +142,7 @@ def get_container_version_if_not_specified():
 
 
 def create_argmap(container_version):
+    # Extract information from upstream build
     upstreamDockerImage = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
         container_version)
 
@@ -179,27 +188,6 @@ def create_argmap(container_version):
         'SAGEMAKER_ENDPOINT': f is not None,
     }
     return argmap
-
-
-# Install dependencies and run entrypoint script
-def end_gpu_dockerfile(ddir, dockerfile_name, argmap, backends):
-    import build
-    df = build.dockerfile_add_installation_linux(argmap, backends)
-    if argmap['SAGEMAKER_ENDPOINT']:
-        df += '''
-LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
-COPY --chown=1000:1000 --from=full /usr/bin/serve /usr/bin/.
-'''
-    with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
-        dfile.write(df)
-
-
-### Create container with docker build
-def build_docker_image(ddir, dockerfile_name, container_name):
-    p = subprocess.Popen(['docker', 'build', '-t', container_name, '-f', \
-        os.path.join(ddir, dockerfile_name), '.'])
-    p.wait()
-    fail_if(p.returncode != 0, 'docker build {} failed'.format(container_name))
 
 
 if __name__ == '__main__':
@@ -279,9 +267,9 @@ if __name__ == '__main__':
     get_container_version_if_not_specified()
     argmap = create_argmap(FLAGS.container_version)
 
-    start_gpu_dockerfile(FLAGS.work_dir, argmap, dockerfile_name)
+    start_gpu_dockerfile(FLAGS.work_dir, argmap, dockerfile_name, FLAGS.backend)
     add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
-    end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap, FLAGS.backend)
+    end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap)
     if (not FLAGS.dry_run):
         build_docker_image(FLAGS.work_dir, dockerfile_name, FLAGS.output_name)
