@@ -138,7 +138,7 @@ for MODEL in $(ls models); do
 
     set +e
 
-    # Run the perf analyzer
+    # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
         $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
