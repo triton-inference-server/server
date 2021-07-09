@@ -70,6 +70,13 @@ INSTANCE_CNT=2
 CONCURRENCY=32
 CLIENT_BS=8
 
+# Repetition of nightly or weekly test
+if [ "$TRITON_WEEKLY" == 1 ]; then
+    REPETITION=240
+else
+    REPETITION=3
+fi
+
 # Threshold memory growth in MB
 MAX_ALLOWED_ALLOC="150"
 export MAX_ALLOWED_ALLOC
@@ -131,8 +138,8 @@ for MODEL in $(ls models); do
 
     set +e
 
-    # Run the perf analyzer 3 times
-    for i in {1..3}; do    
+    # Run the perf analyzer
+    for ((i=1; i<=$REPETITION; i++)); do
         $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG

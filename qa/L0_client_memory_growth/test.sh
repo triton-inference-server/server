@@ -54,7 +54,7 @@ SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
 # Repetition of nightly or weekly test
-if [ "$TRITON_WEEKLY" -eq 1 ]; then
+if [ "$TRITON_WEEKLY" == 1 ]; then
     REPETITION_CPP=6750000
     REPETITION_PY=2400000
 else
