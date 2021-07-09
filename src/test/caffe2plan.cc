@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -41,7 +41,8 @@ namespace {
 
 class Logger : public nvinfer1::ILogger {
  public:
-  void log(nvinfer1::ILogger::Severity severity, const char* msg) override
+  void log(
+      nvinfer1::ILogger::Severity severity, const char* msg) noexcept override
   {
     // Don't show INFO messages...
     if (severity == Severity::kINFO) {
@@ -93,13 +94,13 @@ class BatchStream {
       std::cerr << "Unexpected BatchStream failure" << std::endl;
       exit(1);
     }
-    mDims = nvinfer1::DimsNCHW{d[0], d[1], d[2], d[3]};
+    mDims = nvinfer1::Dims4{d[0], d[1], d[2], d[3]};
     fclose(file);
-    mImageSize = mDims.c() * mDims.h() * mDims.w();
+    mImageSize = mDims.d[1] * mDims.d[2] * mDims.d[3];
     mBatch.resize(mBatchSize * mImageSize, 0);
     mLabels.resize(mBatchSize, 0);
-    mFileBatch.resize(mDims.n() * mImageSize, 0);
-    mFileLabels.resize(mDims.n(), 0);
+    mFileBatch.resize(mDims.d[0] * mImageSize, 0);
+    mFileLabels.resize(mDims.d[0], 0);
     reset(0);
   }
 
@@ -107,7 +108,7 @@ class BatchStream {
   {
     mBatchCount = 0;
     mFileCount = 0;
-    mFileBatchPos = mDims.n();
+    mFileBatchPos = mDims.d[0];
     skip(firstBatch);
   }
 
@@ -118,12 +119,12 @@ class BatchStream {
 
     for (int csize = 1, batchPos = 0; batchPos < mBatchSize;
          batchPos += csize, mFileBatchPos += csize) {
-      if (mFileBatchPos == mDims.n() && !update())
+      if (mFileBatchPos == mDims.d[0] && !update())
         return false;
 
       // copy the smaller of: elements left to fulfill the request, or elements
       // left in the file buffer.
-      csize = std::min(mBatchSize - batchPos, mDims.n() - mFileBatchPos);
+      csize = std::min(mBatchSize - batchPos, mDims.d[0] - mFileBatchPos);
       std::copy_n(
           getFileBatch() + mFileBatchPos * mImageSize, csize * mImageSize,
           getBatch() + batchPos * mImageSize);
@@ -136,9 +137,9 @@ class BatchStream {
 
   void skip(int skipCount)
   {
-    if (mBatchSize >= mDims.n() && mBatchSize % mDims.n() == 0 &&
-        mFileBatchPos == mDims.n()) {
-      mFileCount += skipCount * mBatchSize / mDims.n();
+    if (mBatchSize >= mDims.d[0] && mBatchSize % mDims.d[0] == 0 &&
+        mFileBatchPos == mDims.d[0]) {
+      mFileCount += skipCount * mBatchSize / mDims.d[0];
       return;
     }
 
@@ -151,7 +152,7 @@ class BatchStream {
   float* getLabels() { return &mLabels[0]; }
   int getBatchesRead() const { return mBatchCount; }
   int getBatchSize() const { return mBatchSize; }
-  nvinfer1::DimsNCHW getDims() const { return mDims; }
+  nvinfer1::Dims4 getDims() const { return mDims; }
 
  private:
   float* getFileBatch() { return &mFileBatch[0]; }
@@ -171,12 +172,12 @@ class BatchStream {
     }
 
     size_t readInputCount =
-        fread(getFileBatch(), sizeof(float), mDims.n() * mImageSize, file);
+        fread(getFileBatch(), sizeof(float), mDims.d[0] * mImageSize, file);
     size_t readLabelCount =
-        fread(getFileLabels(), sizeof(float), mDims.n(), file);
+        fread(getFileLabels(), sizeof(float), mDims.d[0], file);
     ;
-    if ((readInputCount != size_t(mDims.n() * mImageSize)) ||
-        (readLabelCount != size_t(mDims.n()))) {
+    if ((readInputCount != size_t(mDims.d[0] * mImageSize)) ||
+        (readLabelCount != size_t(mDims.d[0]))) {
       return false;
     }
 
@@ -193,7 +194,7 @@ class BatchStream {
   int mFileCount{0}, mFileBatchPos{0};
   int mImageSize{0};
 
-  nvinfer1::DimsNCHW mDims;
+  nvinfer1::Dims4 mDims;
   std::vector<float> mBatch;
   std::vector<float> mLabels;
   std::vector<float> mFileBatch;
@@ -206,17 +207,18 @@ class Int8EntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator {
       BatchStream& stream, int firstBatch, bool readCache = true)
       : mStream(stream), mReadCache(readCache)
   {
-    nvinfer1::DimsNCHW dims = mStream.getDims();
-    mInputCount = mStream.getBatchSize() * dims.c() * dims.h() * dims.w();
+    nvinfer1::Dims4 dims = mStream.getDims();
+    mInputCount = mStream.getBatchSize() * dims.d[1] * dims.d[2] * dims.d[3];
     cudaMalloc(&mDeviceInput, mInputCount * sizeof(float));
     mStream.reset(firstBatch);
   }
 
   virtual ~Int8EntropyCalibrator() { cudaFree(mDeviceInput); }
 
-  int getBatchSize() const override { return mStream.getBatchSize(); }
+  int getBatchSize() const noexcept override { return mStream.getBatchSize(); }
 
-  bool getBatch(void* bindings[], const char* names[], int nbBindings) override
+  bool getBatch(
+      void* bindings[], const char* names[], int nbBindings) noexcept override
   {
     if (!mStream.next())
       return false;
@@ -228,7 +230,7 @@ class Int8EntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator {
     return true;
   }
 
-  const void* readCalibrationCache(size_t& length) override
+  const void* readCalibrationCache(size_t& length) noexcept override
   {
     mCalibrationCache.clear();
     std::ifstream input(calibrationTableName(), std::ios::binary);
@@ -242,7 +244,7 @@ class Int8EntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator {
     return length ? &mCalibrationCache[0] : nullptr;
   }
 
-  void writeCalibrationCache(const void* cache, size_t length) override
+  void writeCalibrationCache(const void* cache, size_t length) noexcept override
   {
     std::ofstream output(calibrationTableName(), std::ios::binary);
     output.write(reinterpret_cast<const char*>(cache), length);
@@ -270,7 +272,8 @@ CaffeToPlan(
     const size_t max_batch_size, const size_t max_workspace_size)
 {
   nvinfer1::IBuilder* builder = nvinfer1::createInferBuilder(gLogger);
-  nvinfer1::INetworkDefinition* network = builder->createNetwork();
+  nvinfer1::INetworkDefinition* network = builder->createNetworkV2(0);
+  nvinfer1::IBuilderConfig* config = builder->createBuilderConfig();
   nvcaffeparser1::ICaffeParser* parser = nvcaffeparser1::createCaffeParser();
 
   if ((model_dtype == nvinfer1::DataType::kINT8) &&
@@ -297,31 +300,29 @@ CaffeToPlan(
   }
 
   builder->setMaxBatchSize(max_batch_size);
-  builder->setMaxWorkspaceSize(max_workspace_size);
-  builder->setFp16Mode(model_dtype == nvinfer1::DataType::kHALF);
-
-  if (model_dtype == nvinfer1::DataType::kINT8) {
+  config->setMaxWorkspaceSize(max_workspace_size);
+  if (model_dtype == nvinfer1::DataType::kHALF) {
+    config->setFlag(nvinfer1::BuilderFlag::kFP16);
+  } else if (model_dtype == nvinfer1::DataType::kINT8) {
     BatchStream* calibrationStream =
         new BatchStream(calibration_filename, CAL_BATCH_SIZE, NB_CAL_BATCHES);
     Int8EntropyCalibrator* calibrator =
         new Int8EntropyCalibrator(*calibrationStream, FIRST_CAL_BATCH);
-    builder->setInt8Mode(true);
-    builder->setInt8Calibrator(calibrator);
+    config->setFlag(nvinfer1::BuilderFlag::kINT8);
+    config->setInt8Calibrator(calibrator);
   }
 
-  nvinfer1::ICudaEngine* engine = builder->buildCudaEngine(*network);
-  if (engine == nullptr) {
+  nvinfer1::IHostMemory* plan =
+      builder->buildSerializedNetwork(*network, *config);
+  if (plan == nullptr) {
     return false;
   }
-
-  nvinfer1::IHostMemory* plan = engine->serialize();
 
   std::ofstream output(
       output_filename, std::ios::binary | std::ios::out | std::ios::app);
   output.write(reinterpret_cast<const char*>(plan->data()), plan->size());
   output.close();
 
-  engine->destroy();
   parser->destroy();
   network->destroy();
   builder->destroy();
