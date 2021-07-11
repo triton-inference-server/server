@@ -142,10 +142,15 @@ def get_container_version_if_not_specified():
 
 
 def create_argmap(container_version):
-    # Extract information from upstream build
+    # Extract information from upstream build and create map other functions can 
+    # use
     upstreamDockerImage = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
         container_version)
-
+    
+    # first pull docker image
+    p = subprocess.run(['docker', 'pull', upstreamDockerImage])
+    fail_if(p.returncode != 0, 'docker pull container {} failed'.format(upstreamDockerImage))
+ 
     baseRunArgs = ['docker', 'inspect', '-f']
     p_version = subprocess.run(baseRunArgs + [
         '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
@@ -154,6 +159,7 @@ def create_argmap(container_version):
                                capture_output=True,
                                text=True)
     vars = p_version.stdout
+    log('PATH is {}'.format(vars))
     import re  # parse all PATH enviroment variables
     e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
     version = "" if e == None else e.group(1)
