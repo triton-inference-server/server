@@ -193,9 +193,9 @@ RUN if [ -d qa/L0_model_control_stress ]; then \
 
 # Create L0_client_memory_growth_weekly and L0_memory_growth_weekly for weekly test
 RUN mkdir -p qa/L0_client_memory_growth_weekly && \
-        cp -r qa/L0_client_memory_growth/. qa/L0_client_memory_growth_weekly && \
-        mkdir -p qa/L0_memory_growth_weekly && \
-        cp -r qa/L0_memory_growth/. qa/L0_memory_growth_weekly
+    cp -r qa/L0_client_memory_growth/. qa/L0_client_memory_growth_weekly && \
+    mkdir -p qa/L0_memory_growth_weekly && \
+    cp -r qa/L0_memory_growth/. qa/L0_memory_growth_weekly
 
 RUN cp /tmp/tritonbuild/install/backends/repeat/libtriton_repeat.so \
         qa/L0_model_config/.

@@ -55,7 +55,7 @@ source ../common/util.sh
 
 # Set the number of repetitions in nightly and weekly tests
 if [ "$TRITON_WEEKLY" == 1 ]; then
-    REPETITION_CPP=6750000
+    REPETITION_CPP=5000000
     REPETITION_PY=2400000
 else
     REPETITION_CPP=100000
