@@ -150,8 +150,10 @@ def create_argmap(container_version):
     # first pull docker image
     log("pulling container:{}".format(upstreamDockerImage))
     p = subprocess.run(['docker', 'pull', upstreamDockerImage])
-    fail_if(p.returncode != 0,
-            'docker pull container {} failed'.format(upstreamDockerImage))
+    fail_if(
+        p.returncode != 0,
+        'docker pull container {} failed, {}'.format(upstreamDockerImage,
+                                                     p.stderr))
 
     baseRunArgs = ['docker', 'inspect', '-f']
     p_version = subprocess.run(baseRunArgs + [
@@ -161,13 +163,13 @@ def create_argmap(container_version):
                                capture_output=True,
                                text=True)
     vars = p_version.stdout
-    log("inspect args {}, inspect error {}".format(vars, p_version.stderr))
+    log("inspect args: {}".format(vars))
     import re  # parse all PATH enviroment variables
     e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
     version = "" if e == None else e.group(1)
     fail_if(
         p_version.returncode != 0 or len(version) == 0,
-        'docker inspect to find triton version failed, error:{}'.format(
+        'docker inspect to find triton version failed, {}'.format(
             p_version.stderr))
     p_sha = subprocess.run(baseRunArgs + [
         '{{ index .Config.Labels "com.nvidia.build.ref"}}', upstreamDockerImage
@@ -176,8 +178,8 @@ def create_argmap(container_version):
                            text=True)
     fail_if(
         p_sha.returncode != 0,
-        'docker inspect of upstream docker image build sha failed, error:{}'.
-        format(p_sha.stderr))
+        'docker inspect of upstream docker image build sha failed, {}'.format(
+            p_sha.stderr))
     p_build = subprocess.run(baseRunArgs + [
         '{{ index .Config.Labels "com.nvidia.build.id"}}', upstreamDockerImage
     ],
@@ -185,17 +187,16 @@ def create_argmap(container_version):
                              text=True)
     fail_if(
         p_build.returncode != 0,
-        'docker inspect of upstream docker image build sha failed,  error:{}'.
-        format(p_build.stderr))
+        'docker inspect of upstream docker image build sha failed, {}'.format(
+            p_build.stderr))
 
     p_find = subprocess.run(
         ['docker', 'run', upstreamDockerImage, 'bash', '-c', 'ls /usr/bin/'],
         capture_output=True,
         text=True)
     f = re.search("serve", p_find.stdout)
-    fail_if(
-        p_find.returncode != 0,
-        "Cannot search for 'serve' in /usr/bin, error:{}".format(p_find.stderr))
+    fail_if(p_find.returncode != 0,
+            "Cannot search for 'serve' in /usr/bin, {}".format(p_find.stderr))
     argmap = {
         'NVIDIA_BUILD_REF': p_sha.stdout.rstrip(),
         'NVIDIA_BUILD_ID': p_build.stdout.rstrip(),
