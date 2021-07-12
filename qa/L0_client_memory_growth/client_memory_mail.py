@@ -35,7 +35,7 @@ from datetime import date
 
 if __name__ == '__main__':
     today = date.today().strftime("%Y-%m-%d")
-    # Set the subject for nightly and weekly tests
+    # Set the subject for weekly and nightly tests
     if (sys.argv[1] == "weekly"):
         subject = "Triton Client Memory Growth Weekly Summary: " + today
     else:
