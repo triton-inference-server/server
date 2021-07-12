@@ -2638,7 +2638,7 @@ PlanBackend::Context::Run(
       payload_->requests_, &payload_->responses_, enable_pinned_input_,
       gather_kernel_buffer_threshold_, input_copy_stream_,
       events_[next_set_].input_ready_, prev_input_ready_event,
-      host_policy_name_));
+      host_policy_name_, zero_copy_support_));
   // For each input, concatenate input values from each request into
   // the corresponding binding.
   for (int io_index = 0; io_index < num_expected_bindings_; ++io_index) {

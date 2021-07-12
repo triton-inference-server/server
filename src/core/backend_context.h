@@ -232,7 +232,7 @@ class BackendInputCollector {
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const bool pinned_enabled, const size_t kernel_buffer_threshold,
       cudaStream_t stream, cudaEvent_t event, cudaEvent_t buffer_ready_event,
-      const std::string host_policy_name)
+      const std::string host_policy_name, bool zero_copy_support)
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
         kernel_buffer_threshold_(kernel_buffer_threshold),
@@ -242,7 +242,8 @@ class BackendInputCollector {
         pending_copy_kernel_buffer_byte_size_(0),
         pending_copy_kernel_buffer_offset_(0),
         pending_copy_kernel_input_buffer_counts_(0), async_task_count_(0),
-        host_policy_name_(host_policy_name)
+        host_policy_name_(host_policy_name),
+        zero_copy_support_(zero_copy_support)
   {
   }
 
@@ -367,6 +368,8 @@ class BackendInputCollector {
   // Device information required by the collector when there are device
   // specific input buffers
   std::string host_policy_name_;
+
+  bool zero_copy_support_;
 };
 
 }}  // namespace nvidia::inferenceserver

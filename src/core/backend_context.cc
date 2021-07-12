@@ -793,7 +793,7 @@ BackendInputCollector::ProcessBatchInput(
     RETURN_IF_ERROR(CopyBuffer(
         "batch input buffer", src_mem_type, src_mem_id, memory_type,
         memory_type_id, buffer_byte_size, input_buffer, buffer, stream_,
-        &cuda_used));
+        &cuda_used, zero_copy_support_));
     need_sync_ |= cuda_used;
   }
   return Status::Success;
@@ -1049,7 +1049,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
         request_input->Name(), src_memory_type, src_memory_type_id,
         tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
         tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-        &cuda_used);
+        &cuda_used, zero_copy_support_);
     cuda_copy |= cuda_used;
 
     if (!status.IsOk()) {
@@ -1143,7 +1143,8 @@ BackendInputCollector::FlushPendingPinned(
             "pinned input buffer H2D", pinned_memory_type, pinned_memory_id,
             tensor_memory_type, tensor_memory_type_id,
             pending_pinned_byte_size_, pinned_buffer,
-            tensor_buffer + pending_pinned_offset_, stream_, &cuda_used);
+            tensor_buffer + pending_pinned_offset_, stream_, &cuda_used,
+            zero_copy_support_);
         cuda_copy |= cuda_used;
 
         // If something goes wrong with the copy all the pending
