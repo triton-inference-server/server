@@ -71,10 +71,13 @@ CONCURRENCY=32
 CLIENT_BS=8
 
 # Set the number of repetitions in nightly and weekly tests
+# Set the email subject for nightly and weekly tests
 if [ "$TRITON_WEEKLY" == 1 ]; then
     REPETITION=240
+    EMAIL_SUBJECT=1
 else
     REPETITION=3
+    EMAIL_SUBJECT=0
 fi
 
 # Threshold memory growth in MB
@@ -234,7 +237,7 @@ fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
 if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python server_memory_mail.py
+    python server_memory_mail.py $EMAIL_SUBJECT
 fi
 
 exit $RET

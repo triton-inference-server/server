@@ -35,7 +35,11 @@ from datetime import date
 
 if __name__ == '__main__':
     today = date.today().strftime("%Y-%m-%d")
-    subject = "Triton Client Memory Growth Summary: " + today
+    # Set the subject for nightly and weekly tests
+    if (sys.argv[1] == '1'):
+        subject = "Triton Client Memory Growth Weekly Summary: " + today
+    else:
+        subject = "Triton Client Memory Growth Summary: " + today
     memory_graphs = glob.glob("client_memory_growth*.log")
     html_content = "<html><head></head><body><pre style=\"font-size:11pt;font-family:Consolas;\">"
     for mem_graph in sorted(memory_graphs):

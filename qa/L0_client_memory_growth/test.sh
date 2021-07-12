@@ -54,12 +54,15 @@ SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
 # Set the number of repetitions in nightly and weekly tests
+# Set the email subject for nightly and weekly tests
 if [ "$TRITON_WEEKLY" == 1 ]; then
     REPETITION_CPP=5000000
     REPETITION_PY=2400000
+    EMAIL_SUBJECT=1
 else
     REPETITION_CPP=100000
     REPETITION_PY=10000
+    EMAIL_SUBJECT=0
 fi
 
 mkdir -p $DATADIR/custom_identity_int32/1
@@ -134,7 +137,8 @@ fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
 if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python client_memory_mail.py
+    # Pass 'TRITON_WEEKLY' to set the email subject
+    python client_memory_mail.py $EMAIL_SUBJECT
 fi
 
 exit $RET
