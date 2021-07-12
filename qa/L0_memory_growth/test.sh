@@ -74,10 +74,10 @@ CLIENT_BS=8
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_WEEKLY" == 1 ]; then
     REPETITION=240
-    EMAIL_SUBJECT=1
+    EMAIL_SUBJECT="weekly"
 else
     REPETITION=3
-    EMAIL_SUBJECT=0
+    EMAIL_SUBJECT="nightly"
 fi
 
 # Threshold memory growth in MB

@@ -58,11 +58,11 @@ source ../common/util.sh
 if [ "$TRITON_WEEKLY" == 1 ]; then
     REPETITION_CPP=5000000
     REPETITION_PY=2400000
-    EMAIL_SUBJECT=1
+    EMAIL_SUBJECT="weekly"
 else
     REPETITION_CPP=100000
     REPETITION_PY=10000
-    EMAIL_SUBJECT=0
+    EMAIL_SUBJECT="nightly"
 fi
 
 mkdir -p $DATADIR/custom_identity_int32/1
