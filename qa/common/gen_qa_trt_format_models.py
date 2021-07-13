@@ -454,9 +454,13 @@ if __name__ == '__main__':
                       trt.TensorFormat.CHW2, trt.TensorFormat.LINEAR)
 
     # Dynamic shape
+    # There is a known issue that TensorRT 8 selects kLINEAR format when the user
+    # uses reformat-free I/O with vectorized formats and with input/output tensors 
+    # which have only 3 dimensions. The workaround is to add an additional dimension
+    # to the tensors with size 1 to make them 4 dimensional tensors.
     # FIXME The generated model inputs are LINEAR format instead of CHW32 format
-    create_plan_model(FLAGS.models_dir, 0, 1, (-1, 2, 1), (-1, 2, 1),
-                      (-1, 2, 1), np.float32, np.float32, np.float32,
+    create_plan_model(FLAGS.models_dir, 0, 1, (-1, 2, 1, 1), (-1, 2, 1, 1),
+                      (-1, 2, 1, 1), np.float32, np.float32, np.float32,
                       trt.TensorFormat.CHW32, trt.TensorFormat.LINEAR)
     create_plan_model(FLAGS.models_dir, 8, 1, (-1, 2, 1), (-1, 2, 1),
                       (-1, 2, 1), np.float32, np.float32, np.float32,
