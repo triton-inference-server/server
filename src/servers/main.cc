@@ -94,6 +94,7 @@ bool grpc_use_ssl_ = false;
 nvidia::inferenceserver::SslOptions grpc_ssl_options_;
 grpc_compression_level grpc_response_compression_level_ =
     GRPC_COMPRESS_LEVEL_NONE;
+// KeepAlive defaults: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
 int32_t grpc_arg_keepalive_time_ms_ = 7200000;
 int32_t grpc_arg_keepalive_timeout_ms_ = 20000;
 bool grpc_arg_keepalive_permit_without_calls_ = false;
@@ -364,22 +365,23 @@ std::vector<Option> options_
        "compression level is selected as none."},
       {OPTION_GRPC_ARG_KEEPALIVE_TIME_MS, "grpc-keepalive-time", Option::ArgInt,
        "The period (in milliseconds) after which a keepalive ping is sent on "
-       "the transport."},
+       "the transport. Default is 7200000 (2 hours)."},
       {OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS, "grpc-keepalive-timeout",
        Option::ArgInt,
        "The period (in milliseconds) the sender of the keepalive ping waits "
        "for an acknowledgement. If it does not receive an acknowledgment "
-       "within this time, it will close the connection."},
+       "within this time, it will close the connection. "
+       "Default is 20000 (20 seconds)."},
       {OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
        "grpc-keepalive-permit-without-calls", Option::ArgBool,
        "Allows keepalive pings to be sent even if there are no calls in flight "
-       "(0 : false; 1 : true)."},
+       "(0 : false; 1 : true). Default is 0 (false)."},
       {OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
        "grpc-http2-max-pings-without-data", Option::ArgInt,
        "The maximum number of pings that can be sent when there is no "
        "data/header frame to be sent. gRPC Core will not continue sending "
        "pings if we run over the limit. Setting it to 0 allows sending pings "
-       "without such a restriction."},
+       "without such a restriction. Default is 2."},
       {OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
        "grpc-http2-min-recv-ping-interval-without-data", Option::ArgInt,
        "If there are no data/header frames being sent on the transport, this "
@@ -388,12 +390,12 @@ std::vector<Option> options_
        "successive pings. If the time between successive pings is less than "
        "this time, then the ping will be considered a bad ping from the peer. "
        "Such a ping counts as a ‘ping strike’. On the client side, this does "
-       "not have any effect."},
+       "not have any effect. Default is 300000 (5 minutes)."},
       {OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES, "grpc-http2-max-ping-strikes",
        Option::ArgInt,
        "Maximum number of bad pings that the server will tolerate before "
        "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
-       "0 allows the server to accept any number of bad pings."},
+       "0 allows the server to accept any number of bad pings. Default is 2."},
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
       {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
@@ -598,7 +600,11 @@ StartGrpcService(
   TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
       server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
       grpc_ssl_options_, grpc_infer_allocation_pool_size_,
-      grpc_response_compression_level_, service);
+      grpc_response_compression_level_, service, grpc_arg_keepalive_time_ms_,
+      grpc_arg_keepalive_timeout_ms_, grpc_arg_keepalive_permit_without_calls_,
+      grpc_arg_http2_max_pings_without_data_,
+      grpc_arg_http2_min_recv_ping_interval_without_data_ms_,
+      grpc_arg_http2_max_ping_strikes_);
   if (err == nullptr) {
     err = (*service)->Start();
   }

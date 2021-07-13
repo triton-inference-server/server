@@ -53,7 +53,13 @@ class GRPCServer {
       const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
       bool use_ssl, const SslOptions& ssl_options,
       int infer_allocation_pool_size, grpc_compression_level compression_level,
-      std::unique_ptr<GRPCServer>* grpc_server);
+      std::unique_ptr<GRPCServer>* grpc_server,
+      const int grpc_arg_keepalive_time_ms = 7200000,
+      const int grpc_arg_keepalive_timeout_ms = 20000,
+      const bool grpc_arg_keepalive_permit_without_calls = false,
+      const int grpc_arg_http2_max_pings_without_data = 2,
+      const int grpc_arg_http2_min_recv_ping_interval_without_data_ms = 300000,
+      const int grpc_arg_http2_max_ping_strikes = 2);
 
   ~GRPCServer();
 

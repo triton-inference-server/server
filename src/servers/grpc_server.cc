@@ -4003,12 +4003,22 @@ GRPCServer::Create(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
     bool use_ssl, const SslOptions& ssl_options, int infer_allocation_pool_size,
     grpc_compression_level compression_level,
-    std::unique_ptr<GRPCServer>* grpc_server)
+    std::unique_ptr<GRPCServer>* grpc_server,
+    const int grpc_arg_keepalive_time_ms,
+    const int grpc_arg_keepalive_timeout_ms,
+    const bool grpc_arg_keepalive_permit_without_calls,
+    const int grpc_arg_http2_max_pings_without_data,
+    const int grpc_arg_http2_min_recv_ping_interval_without_data_ms,
+    const int grpc_arg_http2_max_ping_strikes)
 {
   const std::string addr = "0.0.0.0:" + std::to_string(port);
   grpc_server->reset(new GRPCServer(
       server, trace_manager, shm_manager, addr, use_ssl, ssl_options,
-      infer_allocation_pool_size, compression_level));
+      infer_allocation_pool_size, compression_level, grpc_arg_keepalive_time_ms,
+      grpc_arg_keepalive_timeout_ms, grpc_arg_keepalive_permit_without_calls,
+      grpc_arg_http2_max_pings_without_data,
+      grpc_arg_http2_min_recv_ping_interval_without_data_ms,
+      grpc_arg_http2_max_ping_strikes));
 
   return nullptr;  // success
 }
@@ -4063,6 +4073,22 @@ GRPCServer::Start()
       grpc_arg_http2_min_recv_ping_interval_without_data_ms_);
   grpc_builder_.AddChannelArgument(
       GRPC_ARG_HTTP2_MAX_PING_STRIKES, grpc_arg_http2_max_ping_strikes_);
+
+  LOG_VERBOSE(1) << "=== GRPC KeepAlive Parameters ===";
+  LOG_VERBOSE(1) << "grpc_arg_keepalive_time_ms_: "
+                 << grpc_arg_keepalive_time_ms_;
+  LOG_VERBOSE(1) << "grpc_arg_keepalive_timeout_ms_: "
+                 << grpc_arg_keepalive_timeout_ms_;
+  LOG_VERBOSE(1) << "grpc_arg_keepalive_permit_without_calls_: "
+                 << grpc_arg_keepalive_permit_without_calls_;
+  LOG_VERBOSE(1) << "grpc_arg_http2_max_pings_without_data_: "
+                 << grpc_arg_http2_max_pings_without_data_;
+  LOG_VERBOSE(1) << "grpc_arg_http2_min_recv_ping_interval_without_data_ms_: "
+                 << grpc_arg_http2_min_recv_ping_interval_without_data_ms_;
+  LOG_VERBOSE(1) << "grpc_arg_http2_max_ping_strikes_: "
+                 << grpc_arg_http2_max_ping_strikes_;
+  LOG_VERBOSE(1) << "==============================";
+
   common_cq_ = grpc_builder_.AddCompletionQueue();
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
