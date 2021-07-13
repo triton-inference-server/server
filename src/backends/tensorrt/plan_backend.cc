@@ -3047,16 +3047,6 @@ PlanBackend::Context::Run(
     nvinfer1::Dims dims;
     dims = citr->second.context_->getBindingDimensions(binding_index);
 
-    // Use pinned memory address if zero-copy is supported, otherwise use device
-    // memory address. Memory copies are performed asynchronously and wait for
-    // model execution.
-    void* buffer = nullptr;
-    if (zero_copy_support_) {
-      buffer = io_binding_info.buffer_;
-    } else {
-      buffer = io_binding_info.device_buffer_;
-    }
-
     // Make sure each output is of the expected size and copy it into
     // the payload responses.
     bool cuda_copy = false;
@@ -3137,8 +3127,8 @@ PlanBackend::Context::Run(
       payload_->responder_->ProcessTensor(
           name, io_binding_info.io_shape_mapping_.first, dt,
           io_binding_info.io_shape_mapping_.second,
-          static_cast<const char*>(buffer), io_binding_info.memory_type_,
-          io_binding_info.memory_type_id_);
+          static_cast<const char*>(io_binding_info.buffer_),
+          io_binding_info.memory_type_, io_binding_info.memory_type_id_);
     } else {
       std::vector<int64_t> batchn_shape;
 
@@ -3179,7 +3169,8 @@ PlanBackend::Context::Run(
       // supported, otherwise use device memory. Peform memory copies
       // asynchronously and wait for model execution.
       payload_->responder_->ProcessTensor(
-          name, dt, batchn_shape, static_cast<const char*>(buffer),
+          name, dt, batchn_shape,
+          static_cast<const char*>(io_binding_info.buffer_),
           io_binding_info.memory_type_, io_binding_info.memory_type_id_);
     }
   }
