@@ -28,6 +28,7 @@
 CLIENT_PY=./lifecycle_test.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="2"
+TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 
@@ -73,7 +74,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** lifecycle_test.py FAILED. \n***"
     RET=1
 else
-    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"

@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+TEST_RESULT_FILE='test_results.txt'
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -69,7 +70,7 @@ python $OP_NAME_TEST_PY OutputNameValidationTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 else
-    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"

@@ -204,7 +204,8 @@ class TestResultCollector(unittest.TestCase):
             'errors': cls.errors,
             'failures': cls.failures
         }
-        print(json.dumps(json_res))
+        with open('test_results.txt', 'w+') as f:
+            f.write(json.dumps(json_res))
 
     def run(self, result=None):
         # result argument stores the accumulative test results

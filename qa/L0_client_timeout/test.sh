@@ -41,6 +41,7 @@ RET=0
 
 CLIENT_TIMEOUT_TEST=client_timeout_test.py
 CLIENT_TIMEOUT_TEST_CPP=../clients/client_timeout_test
+TEST_RESULT_FILE='test_results.txt'
 
 rm -f *.log
 rm -f *.log.*
@@ -187,7 +188,7 @@ for i in test_grpc_infer \
             echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
     else
-        check_test_results $CLIENT_LOG 1
+        check_test_results $TEST_RESULT_FILE 1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"

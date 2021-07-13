@@ -32,6 +32,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
+TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -74,6 +75,10 @@ cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
 (cd models/pytorch_fp32_fp32 && \
           sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
+mkdir -p models/delayed_model/1/
+cp -r ../python_models/delayed_model/model.py ./models/delayed_model/1/
+cp ../python_models/delayed_model/config.pbtxt ./models/delayed_model/
+
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
@@ -107,7 +112,7 @@ python3 $CLIENT_PY >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 else
-    check_test_results $CLIENT_LOG $EXPECTED_NUM_TESTS
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"

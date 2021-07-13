@@ -57,9 +57,19 @@ FetchContent_Declare(
   GIT_TAG ${TRITON_CORE_REPO_TAG}
   GIT_SHALLOW ON
 )
+FetchContent_Declare(
+  repo-backend
+  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
+  GIT_SHALLOW ON
+)
 
 set(TRITON_COMMON_ENABLE_PROTOBUF ON)
-FetchContent_MakeAvailable(repo-common repo-core)
+if(TRITON_ENABLE_GRPC)
+  set(TRITON_COMMON_ENABLE_GRPC ON)
+endif() # TRITON_ENABLE_GRPC
+
+FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
 if(${TRITON_ENABLE_GPU})
   add_definitions(-DTRITON_ENABLE_GPU=1)
