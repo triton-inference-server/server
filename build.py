@@ -78,7 +78,7 @@ EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil', 'fastertransformer'
+    'openvino', 'fil'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -341,8 +341,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = pytorch_cmake_args(images)
     elif be == 'fil':
         args = fil_cmake_args(images)
-    elif be == 'fastertransformer':
-        args = []
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
@@ -639,6 +637,8 @@ def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents,
 #
 # Multistage build.
 #
+ARG TRITON_VERSION={}
+ARG TRITON_CONTAINER_VERSION={}
 ARG BASE_IMAGE={}
 ARG BUILD_IMAGE=tritonserver_build
 
@@ -651,7 +651,8 @@ FROM ${{BUILD_IMAGE}} AS tritonserver_build
 ##  Production stage: Create container with just inference server executable
 ############################################################################
 FROM ${{BASE_IMAGE}}
-'''.format(argmap['BASE_IMAGE'])
+'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
+           argmap['BASE_IMAGE'])
 
     df += dockerfile_add_installation_linux(argmap, backends)
 
@@ -695,15 +696,15 @@ def dockerfile_add_installation_linux(argmap, backends):
     # Common steps for production docker image, shared by build.py and compose.py
     # set enviroment variables and TRITON_SERVER_USER so should be added earlier
     df = '''
-ARG TRITON_VERSION={}
-ARG TRITON_CONTAINER_VERSION={}
+ARG TRITON_VERSION
+ARG TRITON_CONTAINER_VERSION
 
-ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
-LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
-ENV PATH /opt/tritonserver/bin:${{PATH}}
-'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'])
+ENV PATH /opt/tritonserver/bin:${PATH}
+'''
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -1253,22 +1254,7 @@ if __name__ == '__main__':
             FLAGS.version = vfile.readline().strip()
 
     log('version {}'.format(FLAGS.version))
-
-    # Determine the default repo-tag that should be used for images,
-    # backends and repo-agents if a repo-tag is not given
-    # explicitly. For release branches we use the release branch as
-    # the default, otherwise we use 'main'.
     default_repo_tag = 'main'
-    cver = FLAGS.container_version
-    if cver is None:
-        if FLAGS.version not in TRITON_VERSION_MAP:
-            fail(
-                'unable to determine default repo-tag, container version not known for {}'.format(
-                    FLAGS.version))
-        cver = TRITON_VERSION_MAP[FLAGS.version][0]
-    if not cver.endswith('dev'):
-        default_repo_tag = 'r' + cver
-    log('default repo-tag: {}'.format(default_repo_tag))
 
     # For other versions use the TRITON_VERSION_MAP unless explicitly
     # given.
@@ -1280,6 +1266,10 @@ if __name__ == '__main__':
         log('container version {}'.format(FLAGS.container_version))
         log('upstream container version {}'.format(
             FLAGS.upstream_container_version))
+
+        # Determine the default <repo-tag> based on container version.
+        if not FLAGS.container_version.endswith('dev'):
+            default_repo_tag = 'r' + FLAGS.container_version
 
     # Initialize map of backends to build and repo-tag for each.
     backends = {}

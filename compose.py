@@ -62,9 +62,13 @@ def start_gpu_dockerfile(ddir, argmap, dockerfile_name, backends):
 #
 # Multistage build.
 #
+ARG TRITON_VERSION={}
+ARG TRITON_CONTAINER_VERSION={}
+
 FROM nvcr.io/nvidia/tritonserver:{}-py3 as full
 FROM nvcr.io/nvidia/tritonserver:{}-py3-min
-'''.format(argmap['TRITON_CONTAINER_VERSION'],
+'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
+           argmap['TRITON_CONTAINER_VERSION'],
            argmap['TRITON_CONTAINER_VERSION'])
 
     import build
