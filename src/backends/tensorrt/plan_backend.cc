@@ -172,9 +172,11 @@ PlanBackend::Context::Context(
   support_batching_ = (max_batch_size != NO_BATCHING);
 
   Status status = SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support_);
-  if (!status.IsOk()) {
-    LOG_ERROR << "Failed to check if zero copy is supported";
+  if ((!status.IsOk()) || (!zero_copy_support_)) {
+    LOG_INFO << "Zero copy optimization is disabled";
     zero_copy_support_ = false;
+  } else {
+    LOG_INFO << "Zero copy optimization is enabled";
   }
 }
 
@@ -551,7 +553,7 @@ PlanBackend::Context::InitOptimizationProfiles(
                 "trt failed to set binding dimension to " +
                     DimsDebugString(it->second.max_dims_[io_index]) +
                     " for input '" + engine_->getBindingName(binding_index) +
-                    "' for " + name_);
+                    "' for '" + name_ + "'");
           }
         }
       }
@@ -586,8 +588,8 @@ PlanBackend::Context::InitOptimizationProfiles(
           return Status(
               Status::Code::INVALID_ARG,
               "Can not set the specified optimization profile " + profile_name +
-                  "[" + std::to_string(profile_index) + "] for " + name_ +
-                  ". Expected optimization profile index range 0-" +
+                  "[" + std::to_string(profile_index) + "] for '" + name_ +
+                  "'. Expected optimization profile index range 0-" +
                   std::to_string(engine_->getNbOptimizationProfiles() - 1));
         }
       }
@@ -606,7 +608,7 @@ PlanBackend::Context::InitOptimizationProfiles(
                 "trt failed to set binding dimension to " +
                     DimsDebugString(res.first->second.max_dims_[io_index]) +
                     " for input '" + engine_->getBindingName(binding_index) +
-                    "' for " + name_);
+                    "' for '" + name_ + "'");
           }
         }
       }
@@ -952,21 +954,21 @@ PlanBackend::Context::InitializeShapeInputBinding(
     if (io_index < 0) {
       return Status(
           Status::Code::NOT_FOUND,
-          "input '" + input_name + "' not found for " + name_);
+          "input '" + input_name + "' not found for '" + name_ + "'");
     }
 
     if (io_binding_info.buffer_ != nullptr) {
       return Status(
           Status::Code::INVALID_ARG, "input '" + input_name +
                                          "' has already appeared as an " +
-                                         "input or output for " + name_);
+                                         "input or output for '" + name_ + "'");
     }
 
     if (!engine_->bindingIsInput(binding_index)) {
       return Status(
           Status::Code::INVALID_ARG,
           "input '" + input_name +
-              "' is expected to be an output in model for " + name_);
+              "' is expected to be an output in model for '" + name_ + "'");
     }
 
     // Skip if the binding is not a shape tensor
@@ -982,7 +984,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
               "  in model configuration for shape input '" + input_name +
               "', expecting " +
               inference::DataType_Name(inference::DataType::TYPE_INT32) +
-              " for " + name_);
+              " for '" + name_ + "'");
     }
 
     inference::DataType dt =
@@ -992,7 +994,8 @@ PlanBackend::Context::InitializeShapeInputBinding(
           Status::Code::INVALID_ARG,
           "unexpected datatype " + inference::DataType_Name(dt) +
               " in engine for shape input '" + input_name + "', expecting " +
-              inference::DataType_Name(input_datatype) + " for " + name_);
+              inference::DataType_Name(input_datatype) + " for '" + name_ +
+              "'");
     }
 
     io_binding_info.is_linear_format_ =
@@ -1007,7 +1010,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
         return Status(
             Status::Code::INVALID_ARG,
             "unexpected vectorized dim is -1 for non-linear input '" +
-                input_name + "' for " + name_);
+                input_name + "' for '" + name_ + "'");
       }
     }
 
@@ -1025,7 +1028,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
           Status::Code::INTERNAL,
           "trt failed to set binding dimension to " +
               DimsDebugString(context.max_dims_[io_index]) + " for input '" +
-              input_name + "' for " + name_);
+              input_name + "' for '" + name_ + "'");
     }
 
     context.nb_shape_values_ = (context.max_dims_[io_index].nbDims == 0)
@@ -1043,7 +1046,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
       return Status(
           Status::Code::INTERNAL,
           "trt failed to set the input shape binding for '" + input_name +
-              "' for " + name_ + ".");
+              "' for '" + name_ + "'");
     }
 
     if (engine_->isExecutionBinding(binding_index)) {
@@ -1081,8 +1084,8 @@ PlanBackend::Context::InitializeShapeInputBinding(
     if (err != cudaSuccess) {
       return Status(
           Status::Code::INTERNAL, "unable to allocate memory for input '" +
-                                      input_name + "' for " + name_ + ": " +
-                                      cudaGetErrorString(err));
+                                      input_name + "' for '" + name_ +
+                                      "': " + cudaGetErrorString(err));
     }
 
     io_binding_info.byte_size_ = max_byte_size;
@@ -1097,7 +1100,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
         return Status(
             Status::Code::INTERNAL,
             "unable to get mapped device address for input '" + input_name +
-                "' for " + name_ + ": " + cudaGetErrorString(err));
+                "' for '" + name_ + "': " + cudaGetErrorString(err));
       }
     } else {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
@@ -1133,7 +1136,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     if (io_index < 0) {
       return Status(
           Status::Code::NOT_FOUND,
-          "input '" + input_name + "' not found for " + name_);
+          "input '" + input_name + "' not found for '" + name_ + "'");
     }
 
     // Skip if shape binding is encountered
@@ -1145,14 +1148,14 @@ PlanBackend::Context::InitializeExecuteInputBinding(
       return Status(
           Status::Code::INVALID_ARG, "input '" + input_name +
                                          "' has already appeared as an " +
-                                         "input or output for " + name_);
+                                         "input or output for '" + name_ + "'");
     }
 
     if (!engine_->bindingIsInput(binding_index)) {
       return Status(
           Status::Code::INVALID_ARG,
           "input '" + input_name +
-              "' is expected to be an output in model for " + name_);
+              "' is expected to be an output in model for '" + name_ + "'");
     }
 
     inference::DataType dt =
@@ -1162,7 +1165,8 @@ PlanBackend::Context::InitializeExecuteInputBinding(
           Status::Code::INVALID_ARG,
           "unexpected datatype " + inference::DataType_Name(dt) +
               " for input '" + input_name + "', expecting " +
-              inference::DataType_Name(input_datatype) + " for " + name_);
+              inference::DataType_Name(input_datatype) + " for '" + name_ +
+              "'");
     }
 
     io_binding_info.is_linear_format_ =
@@ -1177,7 +1181,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         return Status(
             Status::Code::INVALID_ARG,
             "unexpected vectorized dim is -1 for non-linear input '" +
-                input_name + "' for " + name_);
+                input_name + "' for '" + name_ + "'");
       }
     }
 
@@ -1215,8 +1219,8 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         return Status(
             Status::Code::INVALID_ARG,
             "unexpected shape " + DimsDebugString(engine_dims) +
-                " for control input '" + input_name + "' for model " + name_ +
-                ": " + status.Message());
+                " for control input '" + input_name + "' for model '" + name_ +
+                "': " + status.Message());
       }
     }
 
@@ -1232,8 +1236,8 @@ PlanBackend::Context::InitializeExecuteInputBinding(
           return Status(
               Status::Code::INTERNAL,
               "model configuration specified invalid shape for input '" +
-                  input_name + "' for " + name_ +
-                  ". Error details: " + status.Message());
+                  input_name + "' for '" + name_ +
+                  "'. Error details: " + status.Message());
         }
         RETURN_IF_ERROR(MaximumDims(
             context.max_dims_[io_index], model_config_dims, support_batching_,
@@ -1251,7 +1255,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
             Status::Code::INTERNAL,
             "trt failed to set binding dimension to " +
                 DimsDebugString(context.max_dims_[io_index]) + " for input '" +
-                input_name + "' for " + name_);
+                input_name + "' for '" + name_ + "'");
       }
       if (!io_binding_info.is_linear_format_) {
         maximum_dims[io_binding_info.vectorized_dim_] +=
@@ -1277,7 +1281,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     if (byte_size == -1) {
       return Status(
           Status::Code::INTERNAL, "unable to calculate size for input '" +
-                                      input_name + "' for " + name_);
+                                      input_name + "' for '" + name_ + "'");
     }
     max_byte_size = std::max(max_byte_size, byte_size);
   }
@@ -1297,8 +1301,8 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   if (err != cudaSuccess) {
     return Status(
         Status::Code::INTERNAL, "unable to allocate memory for input '" +
-                                    input_name + "' for " + name_ + ": " +
-                                    cudaGetErrorString(err));
+                                    input_name + "' for '" + name_ +
+                                    "': " + cudaGetErrorString(err));
   }
 
   io_binding_info.byte_size_ = max_byte_size;
@@ -1314,7 +1318,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
       return Status(
           Status::Code::INTERNAL,
           "unable to get mapped device address for input '" + input_name +
-              "' for " + name_ + ": " + cudaGetErrorString(err));
+              "' for '" + name_ + "': " + cudaGetErrorString(err));
     }
   } else {
     io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
@@ -1324,7 +1328,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     return Status(
         Status::Code::INVALID_ARG,
         "unexpected allow-ragged for non-linear input '" + input_name +
-            "' for " + name_);
+            "' for '" + name_ + "'");
   }
 
   // Set buffer bindings of all optimization profile since buffer is allocated
@@ -1498,21 +1502,21 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       if (binding_index < 0) {
         return Status(
             Status::Code::NOT_FOUND,
-            "output '" + io.name() + "' not found for " + name_);
+            "output '" + io.name() + "' not found for '" + name_ + "'");
       }
 
       if (io_binding_info.buffer_ != nullptr) {
         return Status(
-            Status::Code::INVALID_ARG, "output '" + io.name() +
-                                           "' has already appeared as an " +
-                                           "input or output for " + name_);
+            Status::Code::INVALID_ARG,
+            "output '" + io.name() + "' has already appeared as an " +
+                "input or output for '" + name_ + "'");
       }
 
       if (engine_->bindingIsInput(binding_index)) {
         return Status(
             Status::Code::INVALID_ARG,
             "output '" + io.name() +
-                "' is expected to be an input in model for " + name_);
+                "' is expected to be an input in model for '" + name_ + "'");
       }
 
       if (io.data_type() != inference::DataType::TYPE_INT32) {
@@ -1522,7 +1526,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
                 "  in model configuration for shape output '" + io.name() +
                 "', expecting " +
                 inference::DataType_Name(inference::DataType::TYPE_INT32) +
-                " for " + name_);
+                " for '" + name_ + "'");
       }
 
       inference::DataType dt =
@@ -1532,7 +1536,8 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
             Status::Code::INVALID_ARG,
             "unexpected datatype " + inference::DataType_Name(dt) +
                 " for inference output '" + io.name() + "', expecting " +
-                inference::DataType_Name(io.data_type()) + " for " + name_);
+                inference::DataType_Name(io.data_type()) + " for '" + name_ +
+                "'");
       }
 
       io_binding_info.is_linear_format_ =
@@ -1547,7 +1552,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
           return Status(
               Status::Code::INVALID_ARG,
               "unexpected vectorized dim is -1 for non-linear output '" +
-                  io.name() + "' for " + name_);
+                  io.name() + "' for '" + name_ + "'");
         }
       }
 
@@ -1588,8 +1593,8 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       if (err != cudaSuccess) {
         return Status(
             Status::Code::INTERNAL, "unable to allocate memory for output '" +
-                                        io.name() + "' for " + name_ + ": " +
-                                        cudaGetErrorString(err));
+                                        io.name() + "' for '" + name_ +
+                                        "': " + cudaGetErrorString(err));
       }
 
       io_binding_info.byte_size_ = max_byte_size;
@@ -1604,7 +1609,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
           return Status(
               Status::Code::INTERNAL,
               "unable to get mapped device address for output '" + io.name() +
-                  "' for " + name_ + ": " + cudaGetErrorString(err));
+                  "' for '" + name_ + "': " + cudaGetErrorString(err));
         }
       } else {
         io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
@@ -1647,21 +1652,21 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       if (binding_index < 0) {
         return Status(
             Status::Code::NOT_FOUND,
-            "output '" + io.name() + "' not found for " + name_);
+            "output '" + io.name() + "' not found for '" + name_ + "'");
       }
 
       if (io_binding_info.buffer_ != nullptr) {
         return Status(
-            Status::Code::INVALID_ARG, "output '" + io.name() +
-                                           "' has already appeared as an " +
-                                           "input or output for " + name_);
+            Status::Code::INVALID_ARG,
+            "output '" + io.name() + "' has already appeared as an " +
+                "input or output for '" + name_ + "'");
       }
 
       if (engine_->bindingIsInput(binding_index)) {
         return Status(
             Status::Code::INVALID_ARG,
             "output '" + io.name() +
-                "' is expected to be an input in model for " + name_);
+                "' is expected to be an input in model for '" + name_ + "'");
       }
 
       inference::DataType dt =
@@ -1671,7 +1676,8 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
             Status::Code::INVALID_ARG,
             "unexpected datatype " + inference::DataType_Name(dt) +
                 " for inference output '" + io.name() + "', expecting " +
-                inference::DataType_Name(io.data_type()) + " for " + name_);
+                inference::DataType_Name(io.data_type()) + " for '" + name_ +
+                "'");
       }
 
       io_binding_info.is_linear_format_ =
@@ -1686,7 +1692,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
           return Status(
               Status::Code::INVALID_ARG,
               "unexpected vectorized dim is -1 for non-linear output '" +
-                  io.name() + "' for " + name_);
+                  io.name() + "' for '" + name_ + "'");
         }
       }
 
@@ -1707,7 +1713,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
         return Status(
             Status::Code::INVALID_ARG,
             "unexpected allow-ragged for non-linear output '" + io.name() +
-                "' for " + name_);
+                "' for '" + name_ + "'");
       }
 
       int64_t byte_size;
@@ -1724,7 +1730,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       if (byte_size == -1) {
         return Status(
             Status::Code::INTERNAL, "unable to calculate size for output '" +
-                                        io.name() + "' for " + name_);
+                                        io.name() + "' for '" + name_ + "'");
       }
       max_byte_size = std::max(max_byte_size, byte_size);
     }
@@ -1744,8 +1750,8 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
     if (err != cudaSuccess) {
       return Status(
           Status::Code::INTERNAL, "unable to allocate memory for output '" +
-                                      io.name() + "' for " + name_ + ": " +
-                                      cudaGetErrorString(err));
+                                      io.name() + "' for '" + name_ +
+                                      "': " + cudaGetErrorString(err));
     }
 
     io_binding_info.byte_size_ = max_byte_size;
@@ -1773,7 +1779,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
         return Status(
             Status::Code::INTERNAL,
             "unable to get mapped device address for output '" + io.name() +
-                "' for " + name_ + ": " + cudaGetErrorString(err));
+                "' for '" + name_ + "': " + cudaGetErrorString(err));
       }
     } else {
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_GPU;
@@ -1814,8 +1820,8 @@ PlanBackend::Context::InitializeBatchOutputBindings(
         return Status(
             Status::Code::INVALID_ARG,
             "batch output kind other than"
-            "BATCH_SCATTER_WITH_INPUT_SHAPE is not supported for " +
-                name_);
+            "BATCH_SCATTER_WITH_INPUT_SHAPE is not supported for '" +
+                name_ + "'");
       }
       // Set hints to for InitializeBatchOutputBindings()
       io_binding_info.buffer_is_ragged_ = true;
@@ -2004,8 +2010,8 @@ PlanBackend::Context::BuildCudaGraph(
     // FIXME handle shape tensor properly, for now if model uses shape tensor
     // then cuda graph is not captured
     if (engine_->isShapeBinding(io_index)) {
-      LOG_WARNING << "Detected shape tensor, CUDA graph is not captured for "
-                  << name_;
+      LOG_WARNING << "Detected shape tensor, CUDA graph is not captured for '"
+                  << name_ << "'";
       return false;
     }
   }
@@ -2014,7 +2020,7 @@ PlanBackend::Context::BuildCudaGraph(
   for (int s = 0; s < num_copy_streams_; s++) {
     if (!trt_context->context_->enqueue(
             batch_size, buffer_bindings_[s].data(), stream_, nullptr)) {
-      LOG_WARNING << "unable to record CUDA graph for " << name_;
+      LOG_WARNING << "unable to record CUDA graph for '" << name_ << "'";
       return false;
     }
   }
@@ -2024,8 +2030,8 @@ PlanBackend::Context::BuildCudaGraph(
     // The same spec has been captured
     if (trt_context->cuda_graph_execs_[set_idx].find(cuda_graph_key) !=
         trt_context->cuda_graph_execs_[set_idx].end()) {
-      LOG_WARNING << "Detected duplicated CUDA graph specification for "
-                  << name_ << ", skipping the duplicated specification";
+      LOG_WARNING << "Detected duplicated CUDA graph specification for '"
+                  << name_ << "', skipping the duplicated specification";
       return true;
     }
     // Use second set of buffers to capture cuda graph if double-buffering
@@ -2033,22 +2039,22 @@ PlanBackend::Context::BuildCudaGraph(
     cudaGraph_t graph;
     auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
     if (cuerr != cudaSuccess) {
-      LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
-                << cudaGetErrorString(cuerr);
+      LOG_ERROR << "unable to start CUDA graph for '" << name_
+                << "': " << cudaGetErrorString(cuerr);
       captured = false;
     } else {
       auto context = trt_context->context_;
       if (!context->enqueue(
               batch_size, buffer_bindings_[buffer_binding_index].data(),
               stream_, &events_[set_idx].ready_for_input_)) {
-        LOG_WARNING << "unable to record CUDA graph for " << name_;
+        LOG_WARNING << "unable to record CUDA graph for '" << name_ << "'";
         captured = false;
       }
 
       cuerr = cudaStreamEndCapture(stream_, &graph);
       if (cuerr != cudaSuccess) {
-        LOG_ERROR << "unable to finish CUDA graph for " << name_ << ": "
-                  << cudaGetErrorString(cuerr);
+        LOG_ERROR << "unable to finish CUDA graph for '" << name_
+                  << "': " << cudaGetErrorString(cuerr);
         captured = false;
       }
 
@@ -2056,8 +2062,8 @@ PlanBackend::Context::BuildCudaGraph(
         cudaGraphExec_t graph_exec;
         cuerr = cudaGraphInstantiate(&graph_exec, graph, NULL, NULL, 0);
         if (cuerr != cudaSuccess) {
-          LOG_ERROR << "unable to instantiate CUDA graph for " << name_ << ": "
-                    << cudaGetErrorString(cuerr);
+          LOG_ERROR << "unable to instantiate CUDA graph for '" << name_
+                    << "': " << cudaGetErrorString(cuerr);
           captured = false;
         } else {
           cuda_graph.cuda_graph_exec_ = graph_exec;
@@ -2071,7 +2077,7 @@ PlanBackend::Context::BuildCudaGraph(
   }
 
   if (captured) {
-    LOG_VERBOSE(1) << "captured CUDA graph for " << name_ << ", batch size "
+    LOG_VERBOSE(1) << "captured CUDA graph for '" << name_ << "', batch size "
                    << batch_size;
   }
 
@@ -2086,8 +2092,8 @@ PlanBackend::Context::BuildCudaGraphV2(
   // then cuda graph is not captured
   for (int i = 0; i < num_expected_bindings_; ++i) {
     if (engine_->isShapeBinding(i)) {
-      LOG_WARNING << "Detected shape tensor, CUDA graph is not captured for "
-                  << name_;
+      LOG_WARNING << "Detected shape tensor, CUDA graph is not captured for '"
+                  << name_ << "'";
       return false;
     }
   }
@@ -2097,7 +2103,7 @@ PlanBackend::Context::BuildCudaGraphV2(
   auto status =
       SetCudaGraphShape(trt_context, graph_spec, &cuda_graph_key, &cuda_graph);
   if (!status.IsOk()) {
-    LOG_ERROR << "Failed to set cuda graph shape for " << name_
+    LOG_ERROR << "Failed to set cuda graph shape for '" << name_ << "'"
               << status.Message();
     return false;
   }
@@ -2106,7 +2112,7 @@ PlanBackend::Context::BuildCudaGraphV2(
   for (int s = 0; s < num_copy_streams_; s++) {
     if (!trt_context->context_->enqueueV2(
             buffer_bindings_[s].data(), stream_, nullptr)) {
-      LOG_WARNING << "unable to record CUDA graph for " << name_;
+      LOG_WARNING << "unable to record CUDA graph for '" << name_ << "'";
       return false;
     }
   }
@@ -2118,22 +2124,22 @@ PlanBackend::Context::BuildCudaGraphV2(
     int buffer_bindings_index = num_copy_streams_ == 1 ? 0 : set_idx;
     auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
     if (cuerr != cudaSuccess) {
-      LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
-                << cudaGetErrorString(cuerr);
+      LOG_ERROR << "unable to start CUDA graph for '" << name_
+                << "': " << cudaGetErrorString(cuerr);
       captured = false;
     } else {
       auto context = trt_context->context_;
       if (!context->enqueueV2(
               buffer_bindings_[buffer_bindings_index].data(), stream_,
               &events_[set_idx].ready_for_input_)) {
-        LOG_WARNING << "unable to record CUDA graph for " << name_;
+        LOG_WARNING << "unable to record CUDA graph for '" << name_ << "'";
         captured = false;
       }
 
       cuerr = cudaStreamEndCapture(stream_, &graph);
       if (cuerr != cudaSuccess) {
-        LOG_ERROR << "unable to finish CUDA graph for " << name_ << ": "
-                  << cudaGetErrorString(cuerr);
+        LOG_ERROR << "unable to finish CUDA graph for '" << name_
+                  << "': " << cudaGetErrorString(cuerr);
         captured = false;
       }
 
@@ -2141,8 +2147,8 @@ PlanBackend::Context::BuildCudaGraphV2(
         cudaGraphExec_t graph_exec;
         cuerr = cudaGraphInstantiate(&graph_exec, graph, NULL, NULL, 0);
         if (cuerr != cudaSuccess) {
-          LOG_ERROR << "unable to instantiate CUDA graph for " << name_ << ": "
-                    << cudaGetErrorString(cuerr);
+          LOG_ERROR << "unable to instantiate CUDA graph for '" << name_
+                    << "': " << cudaGetErrorString(cuerr);
           captured = false;
         } else {
           cuda_graph.cuda_graph_exec_ = graph_exec;
@@ -2156,7 +2162,7 @@ PlanBackend::Context::BuildCudaGraphV2(
   }
 
   if (captured) {
-    LOG_VERBOSE(1) << "captured CUDA graph for " << name_ << ", batch size "
+    LOG_VERBOSE(1) << "captured CUDA graph for '" << name_ << "', batch size "
                    << graph_spec.batch_size_;
   }
 
@@ -2194,8 +2200,8 @@ PlanBackend::Context::SetCudaGraphShape(
         return Status(
             Status::Code::INTERNAL,
             "trt failed to set binding dimension to " + DimsDebugString(shape) +
-                " for binding " + std::to_string(binding_index) + " for " +
-                name_);
+                " for binding " + std::to_string(binding_index) + " for '" +
+                name_ + "'");
       }
       std::vector<int64_t> dims;
       DimsToDimVec(shape, &dims);
@@ -2225,7 +2231,7 @@ PlanBackend::Context::SetCudaGraphShape(
               Status::Code::INTERNAL,
               "trt failed to set binding dimension to " +
                   DimsDebugString(trt_shape) + " for binding " +
-                  std::to_string(binding_index) + " for " + name_);
+                  std::to_string(binding_index) + " for '" + name_ + "'");
         }
         cuda_graph_key->insert(
             cuda_graph_key->end(), shape.begin(), shape.end());
@@ -2236,7 +2242,7 @@ PlanBackend::Context::SetCudaGraphShape(
         return Status(
             Status::Code::INVALID_ARG,
             "trt failed to set binding dimension for unknown input '" + name +
-                "' for " + name_);
+                "' for '" + name_ + "'");
       }
     }
   }
@@ -2519,7 +2525,7 @@ PlanBackend::Context::Run(
 {
   Status status;
 
-  LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
+  LOG_VERBOSE(1) << "Running '" << name_ << "' with " << requests.size()
                  << " requests";
 
   NVTX_RANGE(nvtx_, "Run " + name_);
@@ -2664,7 +2670,7 @@ PlanBackend::Context::Run(
         status = Status(
             Status::Code::INTERNAL,
             "unable to find shape values for shape input '" + name +
-                "' in request for " + name_);
+                "' in request for '" + name_ + "'");
         FAIL_ALL_AND_RETURN_IF_ERROR(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             status, "missing shape values for the shape tensor");
@@ -2926,16 +2932,16 @@ PlanBackend::Context::Run(
   if (cuda_graph != nullptr) {
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
                    << " [" << std::to_string(citr->first)
-                   << "] is launching CUDA graph for " << name_;
+                   << "] is launching CUDA graph for '" << name_ << "'";
     cudaError_t err = cudaGraphLaunch(cuda_graph->cuda_graph_exec_, stream_);
     if (err != cudaSuccess) {
       cudaStreamSynchronize(stream_);
       FAIL_ALL_AND_RETURN_IF_ERROR(
           payload_->requests_, payload_->responses_, metric_reporter_.get(),
           Status(
-              Status::Code::INTERNAL, "unable to execute graph for inference " +
-                                          name_ + ": " +
-                                          cudaGetErrorString(err)),
+              Status::Code::INTERNAL,
+              "unable to execute graph for inference '" + name_ +
+                  "': " + cudaGetErrorString(err)),
           "failed to run TRT inference");
     }
     // Event recorded during CUDA graph capture is not visible outside of the
@@ -2944,7 +2950,7 @@ PlanBackend::Context::Run(
   } else {
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
                    << " [" << std::to_string(citr->first)
-                   << "] is being executed for " << name_;
+                   << "] is being executed for '" << name_ << "'";
     if (!citr->second.context_->allInputDimensionsSpecified()) {
       FAIL_ALL_AND_RETURN_IF_ERROR(
           payload_->requests_, payload_->responses_, metric_reporter_.get(),
@@ -2970,7 +2976,7 @@ PlanBackend::Context::Run(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
-                "unable to enqueue for inference " + name_),
+                "unable to enqueue for inference '" + name_ + "'"),
             "failed to run TRT inference");
       }
     } else {
@@ -2983,7 +2989,7 @@ PlanBackend::Context::Run(
             payload_->requests_, payload_->responses_, metric_reporter_.get(),
             Status(
                 Status::Code::INTERNAL,
-                "unable to enqueue for inference " + name_),
+                "unable to enqueue for inference '" + name_ + "'"),
             "failed to run TRT inference");
       }
     }
@@ -3199,7 +3205,7 @@ PlanBackend::Context::SetBindingDimensions(
     return Status(
         Status::Code::INTERNAL, "failed to create dims object for " +
                                     DimsListToString(shape) + " for input '" +
-                                    input_name + "' for " + name_ + ".");
+                                    input_name + "' for '" + name_ + "'");
   }
   auto status = ValidateDimension(
       this_dim, trt_context.min_dims_[io_index],
@@ -3207,8 +3213,8 @@ PlanBackend::Context::SetBindingDimensions(
   if (!status.IsOk()) {
     return Status(
         Status::Code::INTERNAL, "request specifies invalid shape for input '" +
-                                    input_name + "' for " + name_ +
-                                    ". Error details: " + status.Message());
+                                    input_name + "' for '" + name_ +
+                                    "'. Error details: " + status.Message());
   }
 
   if (!trt_context.is_dynamic_per_binding_[io_index]) {
@@ -3221,7 +3227,7 @@ PlanBackend::Context::SetBindingDimensions(
     return Status(
         Status::Code::INTERNAL, "trt failed to set binding dimension to " +
                                     DimsDebugString(this_dim) + " for input '" +
-                                    input_name + "' for " + name_);
+                                    input_name + "' for '" + name_ + "'");
   }
   return Status::Success;
 }
@@ -3456,7 +3462,7 @@ PlanBackend::Context::GetMostOptimizedProfile(
 
   LOG_VERBOSE(1) << "Optimization profile " << (*citr)->second.profile_name_
                  << " [" << std::to_string((*citr)->first)
-                 << "] is selected for " << name_;
+                 << "] is selected for '" << name_ << "'";
 
   return Status::Success;
 }
