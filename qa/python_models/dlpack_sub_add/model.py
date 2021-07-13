@@ -57,8 +57,8 @@ class TritonPythonModel:
             if in_0.is_cpu() and in_1.is_cpu():
                 if in_0.as_numpy().dtype.type is np.bytes_ or in_0.as_numpy(
                 ).dtype == np.object_:
-                    out_0, out_1 = (in_0.as_numpy().astype(np.int32) + in_1.as_numpy().astype(np.int32),\
-                        in_0.as_numpy().astype(np.int32) - in_1.as_numpy().astype(np.int32))
+                    out_0, out_1 = (in_0.as_numpy().astype(np.int32) - in_1.as_numpy().astype(np.int32),\
+                        in_0.as_numpy().astype(np.int32) + in_1.as_numpy().astype(np.int32))
                     out_tensor_0 = pb_utils.Tensor("OUTPUT0",
                                                    out_0.astype(output0_dtype))
                     out_tensor_1 = pb_utils.Tensor("OUTPUT1",
@@ -67,8 +67,8 @@ class TritonPythonModel:
                     in_0_pytorch, in_1_pytorch = from_dlpack(
                         in_0.to_dlpack()), from_dlpack(
                             in_1.to_dlpack())
-                    out_0, out_1 = (in_0_pytorch + in_1_pytorch,
-                                    in_0_pytorch - in_1_pytorch)
+                    out_0, out_1 = (in_0_pytorch - in_1_pytorch,
+                                    in_0_pytorch + in_1_pytorch)
 
                     if self.output0_dtype == np.object_:
                         out_tensor_0 = pb_utils.Tensor(
@@ -88,8 +88,8 @@ class TritonPythonModel:
                 in_0_pytorch, in_1_pytorch = from_dlpack(
                     in_0.to_dlpack()).cuda(), from_dlpack(
                         in_1.to_dlpack()).cuda()
-                out_0, out_1 = (in_0_pytorch + in_1_pytorch,
-                                in_0_pytorch - in_1_pytorch)
+                out_0, out_1 = (in_0_pytorch - in_1_pytorch,
+                                in_0_pytorch + in_1_pytorch)
                 out_tensor_0 = pb_utils.Tensor.from_dlpack(
                     "OUTPUT0", to_dlpack(out_0))
                 out_tensor_1 = pb_utils.Tensor.from_dlpack(
