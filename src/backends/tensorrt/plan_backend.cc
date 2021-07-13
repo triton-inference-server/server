@@ -3053,8 +3053,12 @@ PlanBackend::Context::Run(
     // execution.
     void* buffer = nullptr;
     if (zero_copy_support_) {
+      LOG_INFO << "io_binding_info.memory_type_ before: "
+               << io_binding_info.memory_type_;
       buffer = io_binding_info.buffer_;
       io_binding_info.memory_type_ = TRITONSERVER_MEMORY_CPU_PINNED;
+      LOG_INFO << "io_binding_info.memory_type_ after: "
+               << io_binding_info.memory_type_;
       io_binding_info.memory_type_id_ = 0;
     } else {
       buffer = io_binding_info.device_buffer_;
