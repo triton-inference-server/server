@@ -374,7 +374,7 @@ BackendResponder::Finalize()
             response_output->Name(), pinned_memory_type, pinned_memory_id,
             response_memory_type, response_memory_type_id, response_byte_size,
             pinned_buffer + offset, const_cast<void*>(response_buffer), stream_,
-            &cuda_used, zero_copy_support_);
+            &cuda_used, copy_on_stream_);
         need_sync_ |= cuda_used;
 
         if (!status.IsOk()) {
@@ -446,7 +446,7 @@ BackendResponder::SetFixedSizeOutputBuffer(
         response_output->Name(), tensor_memory_type, tensor_memory_type_id,
         actual_memory_type, actual_memory_type_id, tensor_byte_size,
         tensor_buffer + tensor_offset, buffer, stream_, &cuda_used,
-        zero_copy_support_);
+        copy_on_stream_);
     cuda_copy |= cuda_used;
 
     if (!status.IsOk()) {
@@ -513,7 +513,7 @@ BackendResponder::FlushPendingPinned(
             response_memory_type, response_memory_type_id, response_byte_size,
             tensor_buffer + pending_pinned_offset_ + offset,
             const_cast<void*>(response_buffer), stream_, &cuda_used,
-            zero_copy_support_);
+            copy_on_stream_);
         cuda_copy |= cuda_used;
 
         if (!status.IsOk()) {
@@ -536,7 +536,7 @@ BackendResponder::FlushPendingPinned(
         "pinned buffer", tensor_memory_type, tensor_memory_type_id,
         pinned_memory_type, pinned_memory_id, pending_pinned_byte_size_,
         tensor_buffer + pending_pinned_offset_, pinned_buffer, stream_,
-        &cuda_used, zero_copy_support_);
+        &cuda_used, copy_on_stream_);
     cuda_copy |= cuda_used;
 
     // If something goes wrong with the copy all the pending
@@ -588,7 +588,7 @@ BackendResponder::FlushPendingPinned(
               response_output->Name(), pinned_memory_type, pinned_memory_id,
               response_memory_type, response_memory_type_id, response_byte_size,
               pinned_buffer + offset, const_cast<void*>(response_buffer),
-              stream_, &cuda_used, zero_copy_support_);
+              stream_, &cuda_used, copy_on_stream_);
           cuda_copy |= cuda_used;
 
           if (!status.IsOk()) {
@@ -793,7 +793,7 @@ BackendInputCollector::ProcessBatchInput(
     RETURN_IF_ERROR(CopyBuffer(
         "batch input buffer", src_mem_type, src_mem_id, memory_type,
         memory_type_id, buffer_byte_size, input_buffer, buffer, stream_,
-        &cuda_used, zero_copy_support_));
+        &cuda_used, copy_on_stream_));
     need_sync_ |= cuda_used;
   }
   return Status::Success;
@@ -1049,7 +1049,7 @@ BackendInputCollector::SetFixedSizeInputTensor(
         request_input->Name(), src_memory_type, src_memory_type_id,
         tensor_memory_type, tensor_memory_type_id, src_byte_size, src_buffer,
         tensor_buffer + tensor_buffer_offset + input_offset, stream_,
-        &cuda_used, zero_copy_support_);
+        &cuda_used, copy_on_stream_);
     cuda_copy |= cuda_used;
 
     if (!status.IsOk()) {
@@ -1144,7 +1144,7 @@ BackendInputCollector::FlushPendingPinned(
             tensor_memory_type, tensor_memory_type_id,
             pending_pinned_byte_size_, pinned_buffer,
             tensor_buffer + pending_pinned_offset_, stream_, &cuda_used,
-            zero_copy_support_);
+            copy_on_stream_);
         cuda_copy |= cuda_used;
 
         // If something goes wrong with the copy all the pending

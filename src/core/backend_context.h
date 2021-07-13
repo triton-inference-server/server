@@ -138,12 +138,12 @@ class BackendResponder {
       const std::vector<std::unique_ptr<InferenceRequest>>& requests,
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const int max_batch_size, const bool pinned_enabled, cudaStream_t stream,
-      cudaEvent_t event, bool zero_copy_support = false)
+      cudaEvent_t event, bool copy_on_stream = false)
       : need_sync_(false), requests_(requests), responses_(responses),
         max_batch_size_(max_batch_size), pinned_enabled_(pinned_enabled),
         use_async_cpu_copy_(triton::common::AsyncWorkQueue::WorkerCount() > 1),
         stream_(stream), event_(event), pending_pinned_byte_size_(0),
-        zero_copy_support_(zero_copy_support)
+        copy_on_stream_(copy_on_stream)
   {
   }
 
@@ -196,7 +196,7 @@ class BackendResponder {
   size_t pending_pinned_byte_size_;
   size_t pending_pinned_offset_;
   ResponsesList pending_pinned_outputs_;
-  bool zero_copy_support_;
+  bool copy_on_stream_;
 
   // Pinned memories that need to live over the lifetime of this
   // BackendResponder object.
@@ -232,7 +232,7 @@ class BackendInputCollector {
       std::vector<std::unique_ptr<InferenceResponse>>* responses,
       const bool pinned_enabled, const size_t kernel_buffer_threshold,
       cudaStream_t stream, cudaEvent_t event, cudaEvent_t buffer_ready_event,
-      const std::string host_policy_name, bool zero_copy_support)
+      const std::string host_policy_name, bool copy_on_stream)
       : need_sync_(false), requests_(requests), responses_(responses),
         pinned_enabled_(pinned_enabled),
         kernel_buffer_threshold_(kernel_buffer_threshold),
@@ -242,8 +242,7 @@ class BackendInputCollector {
         pending_copy_kernel_buffer_byte_size_(0),
         pending_copy_kernel_buffer_offset_(0),
         pending_copy_kernel_input_buffer_counts_(0), async_task_count_(0),
-        host_policy_name_(host_policy_name),
-        zero_copy_support_(zero_copy_support)
+        host_policy_name_(host_policy_name), copy_on_stream_(copy_on_stream)
   {
   }
 
@@ -368,8 +367,7 @@ class BackendInputCollector {
   // Device information required by the collector when there are device
   // specific input buffers
   std::string host_policy_name_;
-
-  bool zero_copy_support_;
+  bool copy_on_stream_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -3047,10 +3047,9 @@ PlanBackend::Context::Run(
     nvinfer1::Dims dims;
     dims = citr->second.context_->getBindingDimensions(binding_index);
 
-    // Wait for model execution to process the output tensors with pinned memory
-    // address if zero-copy is supported. Otherwise use device memory address,
-    // so that the memory copies perform asynchronously and wait for model
-    // execution.
+    // Use pinned memory address if zero-copy is supported, otherwise use device
+    // memory address. Memory copies are performed asynchronously and wait for
+    // model execution.
     void* buffer = nullptr;
     if (zero_copy_support_) {
       buffer = io_binding_info.buffer_;

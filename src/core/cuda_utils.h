@@ -72,6 +72,8 @@ Status EnablePeerAccess(const double min_compute_capability);
 /// \param cuda_used returns whether a CUDA memory copy is initiated. If true,
 /// the caller should synchronize on the given 'cuda_stream' to ensure data copy
 /// is completed.
+/// \param copy_on_stream whether the memory copies should be performed in cuda
+/// host functions on the 'cuda_stream'.
 /// \return The error status. A non-ok status indicates failure to copy the
 /// buffer.
 Status CopyBuffer(
@@ -80,7 +82,7 @@ Status CopyBuffer(
     const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, bool* cuda_used,
-    bool zero_copy_support = false);
+    bool copy_on_stream = false);
 
 #ifdef TRITON_ENABLE_GPU
 /// Validates the compute capability of the GPU indexed
