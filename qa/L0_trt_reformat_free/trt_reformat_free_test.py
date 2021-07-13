@@ -182,7 +182,7 @@ class TrtReformatFreeTest(tu.TestResultCollector):
 
     def test_nobatch_chw32_input(self):
         model_name = "plan_nobatch_CHW32_LINEAR_float32_float32_float32"
-        input_np = np.arange(26, dtype=np.float32).reshape((13, 2, 1))
+        input_np = np.arange(26, dtype=np.float32).reshape((13, 2, 1, 1))
         expected_output0_np = input_np + input_np
         expected_output1_np = input_np - input_np
         # FIXME Can't generate reformat-free model of this specification
@@ -192,10 +192,10 @@ class TrtReformatFreeTest(tu.TestResultCollector):
         # for non-linear format tensor, the data buffer is padded and thus the
         # data byte size may not match what is calculated from tensor shape
         inputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT0', [13, 2, 1], "FP32"))
+        inputs.append(tritonhttpclient.InferInput('INPUT0', [13, 2, 1, 1], "FP32"))
         self.add_reformat_free_data_as_shared_memory("input0", inputs[-1],
                                                      reformatted_input_np)
-        inputs.append(tritonhttpclient.InferInput('INPUT1', [13, 2, 1], "FP32"))
+        inputs.append(tritonhttpclient.InferInput('INPUT1', [13, 2, 1, 1], "FP32"))
         self.add_reformat_free_data_as_shared_memory("input1", inputs[-1],
                                                      reformatted_input_np)
 
