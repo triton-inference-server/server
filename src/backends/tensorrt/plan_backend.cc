@@ -172,11 +172,14 @@ PlanBackend::Context::Context(
   support_batching_ = (max_batch_size != NO_BATCHING);
 
   Status status = SupportsIntegratedZeroCopy(gpu_device_, &zero_copy_support_);
-  if ((!status.IsOk()) || (!zero_copy_support_)) {
-    LOG_INFO << "Zero copy optimization is disabled";
+  if (!status.IsOk()) {
+    LOG_ERROR << "Failed to check if zero copy is supported: "
+              << status.Message();
     zero_copy_support_ = false;
+  } else if (zero_copy_support_) {
+    LOG_VERBOSE(1) << "Zero copy optimization is enabled";
   } else {
-    LOG_INFO << "Zero copy optimization is enabled";
+    LOG_VERBOSE(1) << "Zero copy optimization is disabled";
   }
 }
 
