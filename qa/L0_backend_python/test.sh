@@ -75,6 +75,10 @@ cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
 (cd models/pytorch_fp32_fp32 && \
           sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
+mkdir -p models/delayed_model/1/
+cp -r ../python_models/delayed_model/model.py ./models/delayed_model/1/
+cp ../python_models/delayed_model/config.pbtxt ./models/delayed_model/
+
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
