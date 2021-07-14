@@ -167,7 +167,7 @@ def create_argmap(container_version):
                                capture_output=True,
                                text=True)
     vars = p_version.stdout
-    log("inspect args: {}".format(vars))
+    log_verbose("inspect args: {}".format(vars))
     import re  # parse all PATH enviroment variables
     e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
     version = "" if e == None else e.group(1)
