@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -72,6 +72,8 @@ Status EnablePeerAccess(const double min_compute_capability);
 /// \param cuda_used returns whether a CUDA memory copy is initiated. If true,
 /// the caller should synchronize on the given 'cuda_stream' to ensure data copy
 /// is completed.
+/// \param copy_on_stream whether the memory copies should be performed in cuda
+/// host functions on the 'cuda_stream'.
 /// \return The error status. A non-ok status indicates failure to copy the
 /// buffer.
 Status CopyBuffer(
@@ -79,7 +81,8 @@ Status CopyBuffer(
     const int64_t src_memory_type_id,
     const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
-    void* dst, cudaStream_t cuda_stream, bool* cuda_used);
+    void* dst, cudaStream_t cuda_stream, bool* cuda_used,
+    bool copy_on_stream = false);
 
 #ifdef TRITON_ENABLE_GPU
 /// Validates the compute capability of the GPU indexed
@@ -119,5 +122,16 @@ void CopyBufferHandler(
     void* dst, cudaStream_t cuda_stream, void* response_ptr,
     triton::common::SyncQueue<std::tuple<Status, bool, void*>>*
         completion_queue);
+
+struct CopyParams {
+  CopyParams(void* dst, const void* src, const size_t byte_size)
+      : dst_(dst), src_(src), byte_size_(byte_size)
+  {
+  }
+
+  void* dst_;
+  const void* src_;
+  const size_t byte_size_;
+};
 
 }}  // namespace nvidia::inferenceserver
