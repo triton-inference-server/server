@@ -174,8 +174,9 @@ done
 # Next perform a test that has unbound memory growth. Use the busy op model
 # with a high delay in order to force requests to sit in the queue, and result
 # in memory growth.
-# The busy op model causes issues when running the CI.
+# The busy op model causes PTX failures when running the CI.
 # Should be uncommented when it's ready for merging.
+# TODO Re-enable after PTX issues are resolved. 
 # BUSY_OP_TEST=busy_op_test.py
 # DELAY_CYCLES=2100000000
 # NUM_REQUESTS=100
