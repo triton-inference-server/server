@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -417,8 +417,8 @@ class PlanBackend : public InferenceBackend {
     // separate_output_stream is selected to overlap copy and execution safely.
     int next_buffer_binding_set_;
 
-    // The aer Context::num_expected_bindings_ number of IOBindingInfo elements
-    // for copy stream
+    // There are Context::num_expected_bindings_ number of IOBindingInfo
+    // elements for copy stream
     std::vector<std::vector<IOBindingInfo>> io_binding_infos_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT
@@ -433,6 +433,9 @@ class PlanBackend : public InferenceBackend {
 
     // Whether to prepare the next batch before the context is ready for it
     bool eager_batching_;
+
+    // Whether zero copy is supported on this device
+    bool zero_copy_support_;
 
     // The host polciy associated with this instance
     const HostPolicyCmdlineConfig host_policy_;
